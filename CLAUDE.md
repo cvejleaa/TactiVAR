@@ -1,7 +1,8 @@
 # Arbejdsgang: hver ændring gennemgås af faste roller
 
-(Fra projekt-skabelonen. Gennemgå `[TILPAS ...]`-markeringerne her og i
-`.claude/agents/` som noget af det første i et nyt projekt — se README.md.)
+(Fra projekt-skabelonen. Markeringerne her er udfyldt for TactiVAR;
+`[TILPAS ...]` i `.claude/agents/` er delvist åbne — se README, "Kendt gæld".
+Spillets spec og opgørelse over kilden står i `docs/spec.md`.)
 
 Du arbejder efter en fast gennemgangs-model. Hver eneste ændring — også "bare
 en lille fejlrettelse" — skal igennem tre faste roller, før den landes. Kør dem
@@ -82,9 +83,9 @@ selv.
    UNDTAGELSER hvor der altid spørges først: alt der skriver i
    produktionsdata (migreringer, bagfyldninger, seed-scripts),
    tilbagerulninger, og udrulninger med et blokerende fund.
-   [TILPAS: har projektet endnu ikke CI, er trin 1's lokale kørsler gaten —
-   og opsætning af CI (lint + tests + build på hver PR) er en af de første
-   opgaver. Skriv jobbene her, når de findes.]
+   CI (`.github/workflows/ci.yml`) kører på hver PR: `npm run check`,
+   `npm test`, `npm run test:e2e`. Deploy (`deploy.yml`) starter først, når
+   CI er grøn på main, og tjekker bagefter at den nye version er live.
 5. Verificér i produktion og fortæl brugeren, hvad der er live.
 
 Rapportér rollernes konklusioner til brugeren, før du merger. Er en rolle
@@ -128,16 +129,18 @@ Kendte måder, ubevist kode slipper igennem med grøn suite:
 
 ## Faste regler
 
-- **Dansk** i UI, kommentarer, commits og PR-tekster. [TILPAS hvis projektet
-  har et andet sprog.]
+- **Dansk** i UI, kommentarer, commits og PR-tekster.
 - **Skriv aldrig modelnavn** (AI-model) i commits, PR'er eller kode.
-- **Farlige kommandoer:** [TILPAS — skriv de kommandoer/scripts her, der kan
-  overskrive eller ødelægge produktionsdata, og hvad de i stedet kræver
-  (tør-kørsel, andet miljø, spørg først). En regel som "kør aldrig X mod
-  produktion" skal stå HER, ikke huskes.]
-- **Spejlede/delte filer følges ad:** [TILPAS — findes samme logik i to
-  eksemplarer (fx klient ⇄ server), så skriv parrene her. Den ene uden den
-  anden er en halv ændring.]
+- **Farlige kommandoer:** `firebase deploy` (især `--only firestore:rules`)
+  mod projektet `tactivar` uden om workflowet — deploy sker kun via
+  `deploy.yml` efter grøn CI. Alt der skriver i `tactivar`-Firestore: spørg
+  først. En ændring af gemme-formatet (`public/state/`) uden migrering
+  sletter brugerens liga ved næste deploy — kræver et fixture fra forrige
+  version og en test, der indlæser det (`docs/spec.md` §9).
+- **Spejlede/delte filer følges ad:** `docs/spec.md` ⇄ koden (en ændret
+  regel/værdi rettes begge steder); `public/version.js` bumpes ved hver
+  udgivelse (deploy-tjekket sammenligner med den). Hvem-ser-hvad afgøres ét
+  sted (`public/engine/visibility.js`, når den findes).
 - **Serveren er eneste autoritet.** Validering i klienten kan omgås. Server-
   adgangstjek må aldrig være mere gavmilde end klientens regler — og de skal
   ligge FØR de dyre operationer, så en afvisning er billig.
@@ -166,6 +169,10 @@ Kendte måder, ubevist kode slipper igennem med grøn suite:
 
 ## Test-kommandoer
 
-[TILPAS: skriv projektets faktiske lint-, test- og build-kommandoer her, så
-de kun vedligeholdes ét sted. Nævn også, hvis test-runneren har eksplicitte
-include-lister, som nye testfiler skal tilføjes til.]
+- `npm ci` — installér (første gang).
+- `npm run check` — syntaks og imports for alle filer i `public/`.
+- `npm test` — unit-tests: alle `tests/unit/**/*.test.mjs` (ingen include-liste).
+- `npm run test:e2e` — starter selv en server på `public/` og kører Chromium
+  (`CHROME_PATH` kan pege på en browser; ellers prøves `/opt/pw-browsers`).
+- `npm run serve` — spillet lokalt på http://127.0.0.1:5000.
+- Intet build-trin: `public/` deployes som det er.

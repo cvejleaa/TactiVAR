@@ -1,0 +1,26 @@
+# Kører på hver PR og hvert push til main: statisk tjek, unit-tests og end-to-end i Chromium.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Statisk tjek (syntaks og imports)
+        run: npm run check
+      - name: Unit-tests
+        run: npm test
+      - name: End-to-end
+        run: npm run test:e2e
+        env:
+          CHROME_PATH: /usr/bin/google-chrome

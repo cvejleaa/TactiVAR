@@ -1,0 +1,83 @@
+# Automatisk deploy til Firebase (hosting + Firestore-regler), når CI er grøn på main.
+# Kræver GitHub-secret FIREBASE_SERVICE_ACCOUNT (JSON-nøgle til en servicekonto med rollen
+# "Firebase Admin"). Mangler nøglen, springes deployet over med en besked i loggen.
+name: Deploy til Firebase
+
+on:
+  # Deploy kun når CI er grøn på main – en rød build må aldrig komme i luften.
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    env:
+      HAS_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT != '' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Mangler nøgle?
+        if: env.HAS_KEY != 'true'
+        run: |
+          echo "::warning::Secret FIREBASE_SERVICE_ACCOUNT mangler – deploy sprunget over. Se README, afsnittet Deploy."
+
+      - uses: actions/setup-node@v4
+        if: env.HAS_KEY == 'true'
+        with:
+          node-version: 20
+
+      - name: Skriv servicekonto-nøgle
+        if: env.HAS_KEY == 'true'
+        run: printf '%s' "$KEY" > "$RUNNER_TEMP/sa.json"
+        env:
+          KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+
+      - name: Diagnose af nøgle og rettigheder
+        if: env.HAS_KEY == 'true'
+        run: |
+          EMAIL=$(jq -r .client_email "$RUNNER_TEMP/sa.json")
+          PROJ=$(jq -r .project_id "$RUNNER_TEMP/sa.json")
+          echo "Nøglen tilhører: $EMAIL (oprettet i projekt: $PROJ)"
+          gcloud auth activate-service-account --key-file "$RUNNER_TEMP/sa.json" --quiet
+          echo "--- Roller for kontoen i projektet tactivar ---"
+          gcloud projects get-iam-policy tactivar --flatten="bindings[].members" \
+            --filter="bindings.members:serviceAccount:$EMAIL" --format="value(bindings.role)" \
+            || echo "(kunne ikke læse IAM-politikken – kontoen mangler formentlig projektroller helt)"
+          echo "--- Er Firebase Rules API slået til? ---"
+          gcloud services list --enabled --project tactivar --filter="config.name:firebaserules.googleapis.com" --format="value(config.name)" \
+            || echo "(kunne ikke læse API-listen)"
+          echo "--- Firebase-projekter kontoen kan se ---"
+          npx --yes firebase-tools@13 projects:list --non-interactive || true
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/sa.json
+
+      - name: Deploy hosting og Firestore-regler
+        if: env.HAS_KEY == 'true'
+        run: npx --yes firebase-tools@13 deploy --only hosting,firestore:rules --project tactivar --non-interactive --force
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/sa.json
+
+      - name: Tjek at den nye version er live
+        if: env.HAS_KEY == 'true'
+        run: |
+          WANT=$(grep -o "'[^']*'" public/version.js | tr -d "'")
+          for i in 1 2 3 4 5 6; do
+            GOT=$(curl -fsS https://tactivar.web.app/version.js | grep -o "'[^']*'" | tr -d "'") || true
+            [ "$GOT" = "$WANT" ] && { echo "Live: v$GOT"; exit 0; }
+            sleep 10
+          done
+          echo "::error::Live version er '$GOT', forventede '$WANT'"; exit 1
+
+      - name: Fjern nøgle
+        if: always()
+        run: rm -f "$RUNNER_TEMP/sa.json"
