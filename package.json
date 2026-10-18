@@ -14,5 +14,8 @@
   "devDependencies": {
     "firebase-tools": "^13.35.1",
     "playwright-core": "^1.55.0"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }

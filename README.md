@@ -7,12 +7,15 @@ en rigtig kodebase. Spec og opgørelse over kilden: [`docs/spec.md`](docs/spec.m
 
 - **Live:** https://tactivar.web.app (Firebase Hosting, projekt `tactivar`).
 - **Gammel version:** vejleaa.dk/TacticVar er reserve, indtil den nye har
-  samme funktioner.
+  samme funktioner. Dens "Upload/Sync til Firestore" virker ikke længere –
+  bevidst: databasen stod åben for alle, og brugeren har bekræftet, at der
+  ikke ligger data i den.
 
 ## Opbygning
 - `public/` serveres som det er (intet build-trin): `index.html`,
-  `errors.js` (synlig fejlboks), `app.js`, `engine/` (ren spillogik, ingen
-  DOM, seedet tilfældighed), `state/` (gem/indlæs), `ui/`.
+  `errors.js` (synlig fejlboks), `app.js`, `version.js` (bumpes ved hver
+  ændring af `public/` – CI kræver det), `engine/` (ren spillogik, ingen DOM,
+  seedet tilfældighed). Planlagt: `state/` (gem/indlæs) og `ui/`.
 - `tests/unit/` (node:test), `tests/e2e/` (Playwright mod en lokal server).
 - `tools/check.mjs` (syntaks og imports), `tools/serve.mjs` (lokal server).
 - `firestore.rules`: afviser alt i trin 1 – spillet gemmer i browseren.
@@ -21,8 +24,9 @@ en rigtig kodebase. Spec og opgørelse over kilden: [`docs/spec.md`](docs/spec.m
 Merge til `main` → CI → `deploy.yml` deployer hosting og regler og tjekker,
 at versionen i `public/version.js` er live. Kræver repo-secret
 `FIREBASE_SERVICE_ACCOUNT` (JSON-nøgle til en servicekonto i projektet
-`tactivar` med rollen "Firebase Admin"). Mangler den, springes deployet
-over med en advarsel i loggen.
+`tactivar` med rollen "Firebase Admin"). Mangler den, fejler deploy-jobbet
+(rødt), så det aldrig ser grønt ud uden at være deployet. Efter deploy køres
+e2e-testen som smoke-test mod tactivar.web.app.
 
 ## Kendt gæld
 - `[TILPAS]` i `.claude/agents/` er kun delvist udfyldt (se tjeklisten).

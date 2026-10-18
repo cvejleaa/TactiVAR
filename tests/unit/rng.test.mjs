@@ -14,3 +14,16 @@ test('int dækker begge endepunkter og intet udenfor', () => {
   const set = new Set(Array.from({ length: 2000 }, () => r.int(1, 3)));
   assert.deepEqual([...set].sort(), [1, 2, 3]);
 });
+
+test('algoritmen er låst: faste værdier for seed 42 (gemte seeds må ikke flytte sig tavst)', () => {
+  const r = createRng(42);
+  assert.deepEqual([r.next(), r.next(), r.next()], [0.6011037519201636, 0.44829055899754167, 0.8524657934904099]);
+});
+
+test('chance og pick', () => {
+  const r = createRng(3);
+  assert.equal(Array.from({ length: 100 }, () => r.chance(0)).some(Boolean), false);
+  assert.equal(Array.from({ length: 100 }, () => r.chance(1)).every(Boolean), true);
+  const set = new Set(Array.from({ length: 300 }, () => r.pick(['a', 'b', 'c'])));
+  assert.deepEqual([...set].sort(), ['a', 'b', 'c']);
+});

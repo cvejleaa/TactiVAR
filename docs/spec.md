@@ -180,8 +180,9 @@ visning". Sortering på kopi med `origIdx`.
   test, der indlæser det med truppen intakt.
 - Eksport/import af hele spillet som JSON-fil (backup og flytning mellem
   browsere/domæner).
-- Gamle data fra vejleaa.dk kan ikke læses direkte (localStorage er bundet
-  til domænet) — se §11 om Firestore-sync.
+- Gamle data fra vejleaa.dk kan ikke flyttes (localStorage er bundet til
+  domænet, og der ligger intet i Firestore) — den nye version starter med en
+  ny liga. Eksport/import gør fremtidige flytninger mulige.
 
 ## 9b. Regressionsnet — hvert punkt, der er faldet af før, har en test
 | Faldt af (kilde) | Test |

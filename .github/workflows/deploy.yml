@@ -15,6 +15,9 @@ concurrency:
   group: deploy
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 jobs:
   deploy:
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
@@ -29,7 +32,8 @@ jobs:
       - name: Mangler nøgle?
         if: env.HAS_KEY != 'true'
         run: |
-          echo "::warning::Secret FIREBASE_SERVICE_ACCOUNT mangler – deploy sprunget over. Se README, afsnittet Deploy."
+          echo "::error::Secret FIREBASE_SERVICE_ACCOUNT mangler – intet er deployet. Se README, afsnittet Deploy."
+          exit 1
 
       - uses: actions/setup-node@v4
         if: env.HAS_KEY == 'true'
@@ -70,13 +74,20 @@ jobs:
       - name: Tjek at den nye version er live
         if: env.HAS_KEY == 'true'
         run: |
-          WANT=$(grep -o "'[^']*'" public/version.js | tr -d "'")
+          WANT=$(node -e "import('./public/version.js').then(m => console.log(m.VERSION))")
           for i in 1 2 3 4 5 6; do
-            GOT=$(curl -fsS https://tactivar.web.app/version.js | grep -o "'[^']*'" | tr -d "'") || true
+            GOT=$(curl -fsS "https://tactivar.web.app/version.js?t=$(date +%s)" | node --input-type=module -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log((s.match(/VERSION\s*=\s*'([^']+)'/)||[])[1]||''))") || true
             [ "$GOT" = "$WANT" ] && { echo "Live: v$GOT"; exit 0; }
             sleep 10
           done
           echo "::error::Live version er '$GOT', forventede '$WANT'"; exit 1
+
+      - name: Smoke-test mod den live side
+        if: env.HAS_KEY == 'true'
+        run: npm ci --no-audit --no-fund && npm run test:e2e
+        env:
+          BASE_URL: https://tactivar.web.app
+          CHROME_PATH: /usr/bin/google-chrome
 
       - name: Fjern nøgle
         if: always()

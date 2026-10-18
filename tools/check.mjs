@@ -5,7 +5,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 
-const ROOT = path.resolve(new URL('../public', import.meta.url).pathname);
+// Mappen kan gives som argument (bruges af testen af selve tjekket).
+const ROOT = path.resolve(process.argv[2] || new URL('../public', import.meta.url).pathname);
 const files = [];
 (function walk(dir) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -22,13 +23,14 @@ for (const f of files) {
     fejl++; console.error(`❌ Syntaksfejl i ${path.relative(ROOT, f)}:\n${e.stderr}`);
   }
   const src = fs.readFileSync(f, 'utf8');
-  for (const m of src.matchAll(/(?:import|export)\s[^'"]*?from\s+['"](\.[^'"]+)['"]|import\(\s*['"](\.[^'"]+)['"]\s*\)/g)) {
-    const spec = m[1] || m[2];
+  for (const m of src.matchAll(/(?:import|export)\s[^'"]*?from\s+['"](\.[^'"]+)['"]|import\(\s*['"](\.[^'"]+)['"]\s*\)|import\s+['"](\.[^'"]+)['"]/g)) {
+    const spec = m[1] || m[2] || m[3];
     const target = path.resolve(path.dirname(f), spec);
     if (!fs.existsSync(target)) { fejl++; console.error(`❌ ${path.relative(ROOT, f)} importerer ${spec}, som ikke findes`); }
   }
 }
-const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+const htmlPath = path.join(ROOT, 'index.html');
+const html = fs.existsSync(htmlPath) ? fs.readFileSync(htmlPath, 'utf8') : '';
 for (const m of html.matchAll(/(?:src|href)="(?!https?:|#|data:)([^"]+)"/g)) {
   if (!fs.existsSync(path.join(ROOT, m[1]))) { fejl++; console.error(`❌ index.html henviser til ${m[1]}, som ikke findes`); }
 }
