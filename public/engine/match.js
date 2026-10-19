@@ -117,7 +117,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
     if (min === 45) {
       const hp = Math.round((st.hPoss / (st.hPoss + st.aPoss)) * 100);
       const leader = st.hTacticSuccess >= st.aTacticSuccess ? home : away;
-      addEv(45, 'HALFTIME', 'TACTIC', true, false, 'Pause-analyse', `⏸️ [45' PAUSE-ANALYSE] Stillingen er ${hG}-${aG}. ${home.name} har haft ${hp}% af bolden. ${leader.name} har vundet flest taktiske dueller (${Math.max(st.hTacticSuccess, st.aTacticSuccess)}).`);
+      addEv(min, 'HALFTIME', 'TACTIC', true, false, 'Pause-analyse', `⏸️ [45' PAUSE-ANALYSE] Stillingen er ${hG}-${aG}. ${home.name} har haft ${hp}% af bolden. ${leader.name} har vundet flest taktiske dueller (${Math.max(st.hTacticSuccess, st.aTacticSuccess)}).`);
     }
     checkTriggers(H, min); checkTriggers(A, min);
 
