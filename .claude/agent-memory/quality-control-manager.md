@@ -4,3 +4,9 @@
   der tilføjer felter til det gemte: indlæses forrige versions fixture?
 - Brugerens kerneklage er "ting falder af efter deploy". Tjek hver PR mod
   regressionsnettet i docs/spec.md §9b — ikke kun mod PR'ens egen beskrivelse.
+- Afledte strenge beregnet EFTER en mutation (fx kamphoved efter Hvis-Så-skifte)
+  modsiger det, der blev vist før. Tjek hvornår et resumé beregnes.
+- Bogføring skal have en idempotens-vagt (runde N kan kun bogføres når ligaen
+  står på N−1) – dobbeltklik og genindlæsning midt i afspilning.
+- Resultatobjekter må ikke bære skjulte tal ud til UI ufiltreret: alt der vises
+  for en modstander går gennem engine/visibility.js (viewPlayer, viewRatingEntry).
