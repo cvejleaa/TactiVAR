@@ -6,3 +6,7 @@
 - Dobbelt vagt: migration + normalizeLeague/fixTactics normaliserer samme regel -> hver kan fjernes alene med grøn suite (kun begge sammen fanges).
 - "Tom handling"-grene (same-check) og clone-vs-reference overlever typisk: assertér at intet event logges / at plan-objektet ikke aliaseres.
 - DRAW-betingelse testet kun på lighed og "foran" -> `<=0` overlever; test også bagud.
+- Negativ-assert på tekst (doesNotMatch) er tom, hvis grenen der producerer teksten aldrig kører i fixturet: MOD-KUNNEN-noten kræver pmM>=50, men friske ligaer (seed 1/7/42) har max ~52 på ét hold -> grenen kørte 0 gange, mutation der gen-indsætter "%" overlevede. Probe: tæl events der matcher den POSITIVE tekst; sæt data (counterTactics=90) i testen.
+- e2e-regex på #player-card alene dækker ikke andre steder samme tal kunne stå (#opponent-bar): ret til hele body.
+- Mod-kolonnen: rækkefølge/gennemsnit/sort kun format-testet (^\d+ · \d+ · \d+$) -> reverse/slice/sort-mutationer overlever. Assertér mod p.counterTactics.
+- Ækvivalent mutation: Math.max(1, rule.margin || 1) – ||1 skjuler max(0..) for margin 0; brug negativ margin (-2).
