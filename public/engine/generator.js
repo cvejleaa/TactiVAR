@@ -133,7 +133,7 @@ export function defaultTactics(starterIds, profile) {
       phase2_defending: { pressingHeight: p.press, offsideTrap: p.offside, tacklingIntensity: p.tackle },
       phase3_transition: { onBallWon: p.won, onBallLost: p.lost },
     },
-    conditionalRules: [{ ruleId: 1, minuteTrigger: 65, condition: 'TRAILING', newFormation: '3-4-3', slotRemapping: [0, 1, 2, 3, 5, 6, 7, 4, 8, 9, 10], used: false }],
+    conditionalRules: [{ ruleId: 1, minuteTrigger: 65, condition: 'TRAILING', margin: 1, newFormation: '3-4-3', newPlan: null, slotRemapping: [0, 1, 2, 3, 5, 6, 7, 4, 8, 9, 10] }],
   };
 }
 

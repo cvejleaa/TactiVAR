@@ -2,7 +2,7 @@
 // din kamp, tidslinje, statistik, karakterark og TactiVAR Avisen. Karakterer for
 // modstandere vises kun som stjerner (engine/visibility.js).
 import { h } from './dom.js';
-import { stars } from './labels.js';
+import { stars, starsEl } from './labels.js';
 import { viewRatingEntry } from '../engine/visibility.js';
 
 export const REPORT_FILTERS = [['all', 'Alle hændelser'], ['tactic', 'Kun taktik'], ['key', 'Kun nøglemomenter']];
@@ -45,7 +45,7 @@ function ratingsTable(list, isOwn, title) {
     h('table', {}, h('tbody', {}, rows.map((e) => h('tr', { class: e.isMotM ? 'motm' : '' },
       h('td', {}, `#${e.shirtNumber} ${e.shortName}`), h('td', { class: 'muted' }, minutes(e)),
       h('td', {}, [e.goals ? '⚽'.repeat(e.goals) : '', e.assists ? '🅰'.repeat(e.assists) : '', e.saves ? `🧤${e.saves}` : '', e.aerialWins ? `✈${e.aerialWins}` : '', e.yellowCard ? '🟨' : '', e.injured ? '🚑' : '', e.isMotM ? '👑' : ''].join(' ')),
-      h('td', { class: 'rating' }, isOwn ? e.rating.toFixed(1) : stars(e.stars)),
+      h('td', { class: 'rating' }, isOwn ? e.rating.toFixed(1) : starsEl(e.stars)),
       isOwn ? h('td', { class: 'xp' }, `+${e.gainedCounterXp} 🧠`) : null)))));
 }
 

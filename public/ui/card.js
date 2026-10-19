@@ -1,7 +1,7 @@
 // Spillerkort: offentlige data for alle, evner og mod-kunnen kun for eget hold, VAR-profilen
 // for ingen. Scouting-indtryk og private noter vises for alle spillere.
 import { h, LOCK } from './dom.js';
-import { LINE, SKILL_LABELS, kr, stars } from './labels.js';
+import { LINE, SKILL_LABELS, kr, starsEl } from './labels.js';
 import { aerialBreakdown } from '../engine/generator.js';
 import { COUNTER_KEYS, COUNTER_LABELS, masteryVs } from '../engine/counter.js';
 
@@ -29,7 +29,7 @@ export function renderCard({ player: p, team, isOwn, opponent, scouting, note, o
       h('div', { class: 'muted' }, `Løn ${kr(p.weeklyWage)}/uge · Værdi ${kr(p.marketValue)}`),
     ];
   } else {
-    body = [h('div', { class: 'lockbox' }, `Evner, spring, luftduel, arketype og kontrakt: ${LOCK}`), h('div', {}, `Offentlig vurdering: ${stars(p.publicStars)}`)];
+    body = [h('div', { class: 'lockbox' }, `Evner, spring, luftduel, arketype og kontrakt: ${LOCK}`), h('div', {}, 'Offentlig vurdering: ', starsEl(p.publicStars))];
   }
 
   return h('div', { class: 'panel card', id: 'player-card' }, head, body,

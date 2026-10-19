@@ -99,11 +99,15 @@ spillerobjekt; de skal ligge hos den der observerer.
   LOW_BLOCK/MID_BLOCK/HIGH_GEGENPRESS, offsideTrap OFF/NORMAL/EXTREME_VAR_LINE,
   tacklingIntensity CAUTIOUS/NORMAL/AGGRESSIVE · Fase 3 onBallWon
   FAST_COUNTER/KEEP_POSSESSION, onBallLost COUNTER_PRESS_5S/DROP_BACK.
-- Hvis-Så: maks 5 one-shot, betingelse TRAILING/LEADING_BY_1/DRAW, felter
-  `{ruleId, minuteTrigger, condition, newFormation, slotRemapping[11]}`.
-  Default 65' TRAILING → 3-4-3. **Rettet:** v2.5b logger kun skiftet og
-  kører kun hjemmeholdets regler — de skal reelt skifte formation, for begge.
-  UI til at redigere minut/betingelse/formation: med.
+- Hvis-Så: maks 5 one-shot. Betingelse "Bagud med mindst N mål", "Foran med
+  mindst N mål" (N = 1–5) eller "Uafgjort" (skema 2; skema 1's "Foran med 1"
+  betød præcis 1 og er migreret til "mindst 1" – brugerens ønske om selv at
+  angive antal mål). Mål: en formation (med `slotRemapping`) ELLER en af holdets
+  planer A/B/C – så skiftes formation, trukne positioner og faser; spillerne
+  beholder pladserne, og de aktive regler kører videre (planens egne regler
+  bruges ikke midt i kampen). Skift til den plan, der allerede spilles, gør
+  intet. Den aktive plan holdes lig med live-taktikken. Reglerne kører for
+  begge hold.
 - Bot-hold har hver sin taktiske profil (`BOT_TACTICAL_PROFILES`).
 
 ## 5. Kampmotor (v2.5b)
@@ -226,9 +230,11 @@ avisens hovedperson altid målmanden.
 
 ## 10b. Layout (skal bevares, selv uden Tailwind)
 Mørkt tema (#0f172a, paneler slate-900, lilla VAR-accent, smaragd for gode
-tal). To kolonner: regneark + spillerkort til venstre (7/12), formation,
-bane og taktik til højre (5/12); "⤢ Bred visning" giver regnearket fuld
-bredde. Topbar: klubvælger, gem-status, gem/nulstil. Mobil: én kolonne.
+tal). Regnearket i fuld bredde øverst (ingen sidelæns scroll, fast overskrift,
+egen lodret scroll ved 55 % af skærmhøjden); nedenunder spillerkort | bane |
+taktik + tabel i 3 kolonner (2 under 1300 px, 1 under 800 px). Topbar:
+klubvælger, kampknapper, gem-status, gem/eksport/import/ny liga. Modstanderes
+stjerner: udfyldte i guld, tomme dæmpet.
 
 ## 11. Udeladt / udskudt
 - **Firestore-seeder + API-nøgle-modal** (udeladt i trin 1): seederen skrev

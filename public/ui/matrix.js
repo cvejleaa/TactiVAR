@@ -1,7 +1,7 @@
 // Regneark/scouting-matrix (docs/spec.md §8). Modstanderes skjulte kolonner vises som
 // "🔒 ??" og kan ikke sorteres (synlighed afgøres i engine/visibility.js).
 import { h, LOCK } from './dom.js';
-import { LINE, stars } from './labels.js';
+import { LINE, starsEl } from './labels.js';
 import { canSeeField } from '../engine/visibility.js';
 import { FORMATIONS } from '../engine/formations.js';
 import { masteryVs } from '../engine/counter.js';
@@ -72,7 +72,7 @@ export function renderMatrix({ team, isOwn, opponent, ui, notes, onSort, onSelec
       if (c.key === 'line') return h('td', { class: cls }, h('span', { class: 'chip' }, LINE[p.line]));
       if (c.key === 'fresh') return h('td', { class: cls }, p.injuryMatchesLeft > 0 ? h('span', { class: 'injury' }, `🚑 ${p.injuryMatchesLeft}`) : `${p.freshness}%`);
       if (c.key === 'height') return h('td', { class: cls }, `${p.heightCm} cm`);
-      if (c.key === 'rating') return h('td', { class: cls }, isOwn ? (avgRating(p) ? avgRating(p).toFixed(1) : '–') : stars(p.publicStars));
+      if (c.key === 'rating') return h('td', { class: cls }, isOwn ? (avgRating(p) ? avgRating(p).toFixed(1) : '–') : starsEl(p.publicStars));
       if (c.key === 'mod') return h('td', { class: cls }, `${masteryVs(p, opponent)}%`);
       const v = c.value(p, ctx);
       return h('td', { class: cls + (c.heat ? ' ' + heatClass(v) : '') }, c.fmt ? c.fmt(v) : v);

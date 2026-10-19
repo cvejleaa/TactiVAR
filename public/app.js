@@ -21,7 +21,7 @@ let timer = null;
 
 const storage = window.localStorage;
 let game = null;          // { league, notes, ui } – det der gemmes
-let view = { viewTeamIdx: 0, sortCol: 'pos', sortDesc: false, filter: 'all', wide: false, selectedPlayerId: null, swapId: null, pitchSwapId: null, notice: '', savedAt: null };
+let view = { viewTeamIdx: 0, sortCol: 'pos', sortDesc: false, filter: 'all', selectedPlayerId: null, swapId: null, pitchSwapId: null, notice: '', savedAt: null };
 
 // Skift af hold/visning afbryder et påbegyndt byt, så et senere klik aldrig bytter uden varsel.
 const clearSwap = () => { view.swapId = null; view.pitchSwapId = null; };
@@ -46,7 +46,8 @@ function persist() {
 
 // Én ændring = ændr, gem, tegn igen. Modstanderhold tilbyder ingen redigering (låste
 // felter, ingen byt-knapper, ingen træk) – det er vagten, og e2e-testen holder øje med den.
-function change(fn) { fn(); persist(); render(); }
+// Den aktive plan holdes lig med live-taktikken, så Hvis-Så-regler til "Plan A" er det, man ser.
+function change(fn) { fn(); act.syncActivePreset(myTeam(), game.ui.activePresetIndex); persist(); render(); }
 
 function start() {
   const r = loadGame(storage);
@@ -98,7 +99,6 @@ function renderControls() {
     // Kampknapperne står i topbaren, så de findes i alle visninger (også når man scouter).
     h('button', { id: 'play-round', class: 'primary', disabled: !!mc?.playing, onclick: playNextRound }, `▶ Spil runde ${game.league.leagueMetadata.round + 1} mod ${teams[game.ui.opponentIdx].name}`),
     game.league.lastRound && !mc ? h('button', { id: 'open-last', onclick: () => openMatchCenter(game.league.lastRound, false) }, `📺 Se runde ${game.league.lastRound.round}`) : null,
-    h('button', { id: 'wide-toggle', onclick: () => { view.wide = !view.wide; render(); } }, view.wide ? '⤡ Smal visning' : '⤢ Bred visning'),
     h('span', { class: 'savestatus' + (view.saveError ? ' failed' : ''), id: 'save-status' }, view.saveError ? '⚠ IKKE gemt' : view.savedAt ? `✔ Gemt kl. ${time(view.savedAt)}` : 'Ikke gemt'),
     h('button', { id: 'save-now', onclick: () => { persist(); render(); } }, '💾 Gem nu'),
     h('button', { id: 'export', onclick: exportFile }, '⬇ Eksportér'),
@@ -166,9 +166,14 @@ function render() {
   app.replaceChildren(...[
     view.notice ? h('div', { class: 'notice', id: 'notice' }, view.notice) : null,
     mc ? matchCenterEl() : null,
-    h('div', { class: 'grid' + (view.wide ? ' wide' : '') },
-      h('section', { class: 'col-left' }, header, opponentPick, matrix, card),
-      h('section', { class: 'col-right' }, pitch, tactics, standings))].filter(Boolean));
+    // Regnearket i fuld bredde øverst (intet sidelæns scroll); spillerkort, bane og
+    // taktik + tabel side om side nedenunder.
+    h('div', { class: 'layout' },
+      h('section', { class: 'top' }, header, opponentPick, matrix),
+      h('div', { class: 'cols' },
+        h('section', { class: 'c-card' }, card),
+        h('section', { class: 'c-pitch' }, pitch),
+        h('section', { class: 'c-tac' }, tactics, standings)))].filter(Boolean));
   document.body.dataset.klar = 'ja';
 }
 

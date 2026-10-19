@@ -67,6 +67,7 @@ try {
   check('Sortering på FIN giver højeste først', fins.length === 18 && fins.every((v, i) => i === 0 || fins[i - 1] >= v), fins.join(','));
 
   // Træk en spiller ud af zonen
+  await g.locator('#pitch').scrollIntoViewIfNeeded();
   const tok = g.locator('#pitch .token[data-slot="6"]');
   const box = await tok.boundingBox(); const pbox = await g.locator('#pitch').boundingBox();
   await g.mouse.move(box.x + box.width / 2, box.y + 10); await g.mouse.down();
@@ -115,6 +116,14 @@ try {
   check('Formation gemmes straks', (await g.inputValue('#formation')) === '3-5-2');
   await g.click('#add-rule'); await reload();
   check('Ny Hvis-Så-regel gemmes straks', (await g.locator('#rules .rule').count()) === 2);
+  // Regel 2: "Foran med mindst 2 mål → skift til Plan C"; regel 1: Uafgjort skjuler antal mål
+  await g.selectOption('#rules .rule:nth-of-type(2) .rule-margin', '2');
+  await g.selectOption('#rules .rule:nth-of-type(2) .rule-target', 'plan:2');
+  await g.selectOption('#rules .rule:nth-of-type(1) .rule-cond', 'DRAW');
+  await reload();
+  check('Hvis-Så: antal mål og skift til egen plan gemmes', (await g.inputValue('#rules .rule:nth-of-type(2) .rule-margin')) === '2' && (await g.inputValue('#rules .rule:nth-of-type(2) .rule-target')) === 'plan:2');
+  check('Hvis-Så: "Uafgjort" har intet antal mål', (await g.locator('#rules .rule:nth-of-type(1) .rule-margin').count()) === 0);
+  check('Hvis-Så: målvælgeren viser dine planer og markerer den aktive', (await g.locator('#rules .rule:nth-of-type(2) .rule-target option', { hasText: 'aktiv nu' }).count()) === 1);
   await g.click('.presets button:nth-child(2)'); await reload();
   check('Plan-skift gemmes straks', (await g.textContent('.presets button.active')).startsWith('Plan B') && (await g.inputValue('#formation')) === '4-3-3');
   const [s7, s8] = [await nameAt(7), await nameAt(8)];
@@ -158,8 +167,13 @@ try {
   await g.click('#pitch .token[data-slot="2"]'); await g.click('#pitch .token[data-slot="3"]');
   check('Modstander: klik på to brikker bytter ikke', (await g.locator('#pitch .token[data-slot="2"] .token-name').textContent()) === oppBefore);
   check('Ligatabellen viser holdenes typiske stil', (await g.textContent('#standings')).includes('•'));
-  await g.click('#wide-toggle');
-  check('Bred visning kan slås til og fra på et bot-hold', (await g.locator('.grid.wide').count()) === 1 && (await g.click('#wide-toggle'), (await g.locator('.grid.wide').count()) === 0));
+  // Layout: regnearket i fuld bredde uden sidelæns scroll; 3/2/1 kolonner nedenunder
+  const colsAt = async (w) => { await g.setViewportSize({ width: w, height: 900 }); return g.evaluate(() => getComputedStyle(document.querySelector('.cols')).gridTemplateColumns.split(' ').length); };
+  check('Layout: 3 kolonner ved 1400 px, 2 ved 1000 px, 1 ved 700 px', (await colsAt(1400)) === 3 && (await colsAt(1000)) === 2 && (await colsAt(700)) === 1);
+  await g.setViewportSize({ width: 1400, height: 1000 });
+  const sideScroll = await g.evaluate(() => { const w = document.querySelector('.tablewrap'); return w.scrollWidth - w.clientWidth; });
+  check('Layout: regnearket kræver ikke sidelæns scroll ved 1400 px', sideScroll <= 1, `${sideScroll}px`);
+  check('Layout: siden selv scroller ikke sidelæns', await g.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
 
   // ---------- Kampe: Match Center ----------
   await g.selectOption('#team-select', '0');
@@ -178,6 +192,8 @@ try {
   check('Resultattavlen svarer til slutfløjtet', mcText.includes(`${score.replace(' - ', ' - ')}`) && /\d+ - \d+/.test(score));
   const oppRatings = await g.locator('.ratings').nth(1).locator('td.rating').allTextContents();
   const ownRatings = await g.locator('.ratings').nth(0).locator('td.rating').allTextContents();
+  const starColors = await g.evaluate(() => { const s = document.querySelector('.ratings .star-on'), o = document.querySelector('.ratings .star-off'); return s && o ? [getComputedStyle(s).color, getComputedStyle(o).color] : null; });
+  check('Stjerner er læsbare: udfyldte og tomme har forskellig farve', !!starColors && starColors[0] !== starColors[1], String(starColors));
   check('Karakterark: eget hold eksakte karakterer, modstander kun stjerner', ownRatings.every((t) => /^\d+\.\d$/.test(t)) && oppRatings.length >= 11 && oppRatings.every((t) => /^[★☆]{5}$/.test(t)));
   const por = await g.textContent('#player-of-round');
   const porIsMine = (await g.locator('.ratings').nth(0).textContent()).includes(por.match(/#\d+ [^ ]+ [^ (]+/)[0]);
@@ -188,7 +204,7 @@ try {
   await g.click('#match-cards .matchcard:nth-child(2)');
   check('De øvrige kampe kan åbnes', (await g.textContent('#scoreboard')).includes((await g.textContent('#match-cards .matchcard:nth-child(2)')).split(' ')[0]));
   await g.click('#close-mc');
-  const stHead = await g.locator('#standings').locator('xpath=..').locator('h3').textContent();
+  const stHead = await g.textContent('#standings-title');
   check('Ligatabellen er opdateret efter runde 1', stHead.includes('efter 1 runde'), stHead);
   await reload();
   check('Efter F5: runden er gemt og kan genses', (await g.isVisible('#open-last')) && (await g.textContent('#play-round')).includes('runde 2'));
@@ -202,7 +218,7 @@ try {
   const liveCard = await g.textContent('#match-cards .matchcard:nth-child(1)');
   check('Under afspilning viser kort 1 live-stillingen fra 0-0, ikke slutresultatet', /0-0/.test(liveCard), liveCard);
   await reload();
-  const head2 = await g.locator('#standings').locator('xpath=..').locator('h3').textContent();
+  const head2 = await g.textContent('#standings-title');
   check('Genindlæst midt i afspilningen: runde 2 er alligevel bogført og gemt', head2.includes('efter 2 runde') && (await g.textContent('#open-last')).includes('runde 2'), head2);
 
   // Avisen med faste data – begge grene, uafhængigt af tilfældighed

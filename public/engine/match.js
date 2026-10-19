@@ -8,6 +8,16 @@ import { createSheet, finalizeSheet } from './ratings.js';
 import { describeFinish, describeHeader, describeVarTiming } from './clues.js';
 
 export const MAX_SUBS = 3;
+const PLAN_LETTERS = ['A', 'B', 'C'];
+
+// Hvis-Så-betingelse: "mindst N mål" bagud/foran (N = margin, 1–5), eller uafgjort.
+export function ruleConditionMet(rule, own, opp) {
+  const diff = own - opp, n = Math.max(1, rule.margin || 1);
+  if (rule.condition === 'TRAILING') return diff <= -n;
+  if (rule.condition === 'LEADING') return diff >= n;
+  if (rule.condition === 'DRAW') return diff === 0;
+  return false;
+}
 const coordsOf = (tactics) => FORMATIONS[tactics.baseFormation] || FORMATIONS['4-4-2'];
 const tag = (p) => `#${p.shirtNumber} ${p.shortName}`;
 // Danske navne på taktikvalg i referatet.
@@ -99,11 +109,26 @@ export function simulateMatch(home, away, rng, opts = {}) {
   function checkTriggers(side, min) {
     const own = side.isHome ? hG : aG, opp = side.isHome ? aG : hG;
     side.tactics.conditionalRules.forEach((rule) => {
-      if (rule.used || min < rule.minuteTrigger || !FORMATIONS[rule.newFormation]) return;
-      const met = (rule.condition === 'TRAILING' && own < opp) || (rule.condition === 'LEADING_BY_1' && own - opp === 1) || (rule.condition === 'DRAW' && own === opp);
-      if (!met) return;
-      rule.used = true;
+      if (rule.used || min < rule.minuteTrigger) return;
+      if (!ruleConditionMet(rule, own, opp)) return;
       const from = side.tactics.baseFormation;
+      // Skift til en af holdets egne planer: formation, trukne positioner og faser følger
+      // med; spillerne beholder deres pladser, og Hvis-Så-reglerne kører videre.
+      const plan = Number.isInteger(rule.newPlan) ? side.team.tacticPresets?.[rule.newPlan] : null;
+      if (plan && FORMATIONS[plan.baseFormation]) {
+        rule.used = true;
+        // Spiller holdet allerede præcis den plan, er skiftet en tom handling – intet logges.
+        const same = plan.baseFormation === side.tactics.baseFormation && JSON.stringify(plan.phases) === JSON.stringify(side.tactics.phases) && JSON.stringify(plan.customCoords || {}) === JSON.stringify(side.tactics.customCoords || {});
+        if (same) return;
+        side.tactics.baseFormation = plan.baseFormation;
+        side.tactics.customCoords = structuredClone(plan.customCoords || {});
+        side.tactics.phases = structuredClone(plan.phases);
+        const name = `Plan ${PLAN_LETTERS[rule.newPlan]}`;
+        addEv(min, 'TRIGGER', 'HIGHLIGHT', side.isHome, true, `${side.team.name} skifter til ${name}`, `📋 [${side.team.name} • Hvis-Så] I ${min}. minut skifter holdet fra ${from} til ${name} (${plan.baseFormation}, ${TXT[plan.phases.phase1_buildUp.passingStyle]} / ${TXT[plan.phases.phase2_defending.pressingHeight]}).`);
+        return;
+      }
+      if (!FORMATIONS[rule.newFormation]) return;
+      rule.used = true;
       const remap = rule.slotRemapping;
       if (Array.isArray(remap) && remap.length === 11 && new Set(remap).size === 11 && remap.every((i) => i >= 0 && i < 11)) {
         const old = side.starters.slice();

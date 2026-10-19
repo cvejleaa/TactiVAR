@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createRng } from '../../public/engine/rng.js';
 import { createLeague } from '../../public/engine/generator.js';
-import { SAVE_KEY, BACKUP_PREFIX, SCHEMA_VERSION, loadGame, saveGame, resetGame, exportGame, importGame, parseSave } from '../../public/state/storage.js';
+import { SAVE_KEY, BACKUP_PREFIX, SCHEMA_VERSION, loadGame, saveGame, resetGame, exportGame, importGame, parseSave, serialize } from '../../public/state/storage.js';
 import * as act from '../../public/state/actions.js';
 
 function fakeStorage(initial = {}, { failWrite = false } = {}) {
@@ -168,7 +168,8 @@ test('skema-version kræves; ui og noter får standardværdier; migratedFrom er 
   const r = parseSave(JSON.stringify({ ...ok, ui: undefined, notes: 'x' }));
   assert.deepEqual(r.state.ui, { activePresetIndex: 0, opponentIdx: 1 });
   assert.deepEqual(r.state.notes, {});
-  assert.equal(r.migratedFrom, null);
+  assert.equal(r.migratedFrom, 1, 'fixture fra skema 1 migreres');
+  assert.equal(parseSave(serialize(r.state)).migratedFrom, null, 'nyeste skema migreres ikke');
 });
 
 test('migreringer køres i rækkefølge fra det gemte skema', async () => {
@@ -215,4 +216,30 @@ test('referatfiltre: "Kun taktik" medtager Hvis-Så-skift; spilletid vises som 9
   assert.equal(minutes({ minIn: 1, minOut: 90 }), "90'");
   assert.equal(minutes({ minIn: 1, minOut: 63 }), "0'–63'");
   assert.equal(minutes({ minIn: 63, minOut: 90 }), "63'–90'");
+});
+
+// ---------- Skema 2: Hvis-Så med antal mål og planer ----------
+test('migrering 1 → 2: gamle regler får antal mål; "Foran med 1" bliver "Foran med mindst 1"', () => {
+  const old = JSON.parse(FIXTURE);
+  assert.equal(old.schemaVersion, 1);
+  const t0 = old.league.teams[0];
+  t0.tactics.conditionalRules = [
+    { ruleId: 1, minuteTrigger: 65, condition: 'TRAILING', newFormation: '3-4-3', slotRemapping: [0, 1, 2, 3, 5, 6, 7, 4, 8, 9, 10] },
+    { ruleId: 2, minuteTrigger: 75, condition: 'LEADING_BY_1', newFormation: '5-4-1', slotRemapping: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10] },
+  ];
+  t0.tacticPresets[1].conditionalRules = [{ ruleId: 1, minuteTrigger: 80, condition: 'LEADING_BY_1', newFormation: '5-4-1' }];
+  const r = loadGame(fakeStorage({ [SAVE_KEY]: JSON.stringify(old) }));
+  assert.equal(r.status, 'ok', r.error); assert.equal(r.migratedFrom, 1);
+  const rules = r.state.league.teams[0].tactics.conditionalRules;
+  assert.deepEqual(rules.map((x) => [x.condition, x.margin, x.newFormation, x.newPlan, x.minuteTrigger]), [['TRAILING', 1, '3-4-3', null, 65], ['LEADING', 1, '5-4-1', null, 75]]);
+  assert.equal(r.state.league.teams[0].tacticPresets[1].conditionalRules[0].condition, 'LEADING');
+  assert.equal(r.state.league.leagueMetadata.round, 1, 'ligaen følger med uændret');
+});
+
+test('handling: den aktive plan holdes lig med live-taktikken', () => {
+  const t = createLeague(createRng(3)).teams[0];
+  act.setFormation(t, '3-5-2'); act.syncActivePreset(t, 0);
+  assert.equal(t.tacticPresets[0].baseFormation, '3-5-2');
+  t.tactics.phases.phase1_buildUp.passingStyle = 'SHORT';
+  assert.equal(t.tacticPresets[0].phases.phase1_buildUp.passingStyle, 'BALANCED', 'en kopi, ikke samme objekt');
 });
