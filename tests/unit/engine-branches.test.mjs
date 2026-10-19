@@ -838,9 +838,9 @@ test('rundens overraskelse: ≥3 pladser OG ≥3 point under taberen; uafgjort t
   assert.equal(buildGazette([M('A', 'D', 0, 1)], { round: 4 }).upset, null); // uden tabel ingen overraskelse
 });
 test('dit holds løber: kun dit eget hold, den der løb længst', () => {
-  const e = (id, user, km, ts) => ({ playerId: id, teamId: user ? 'me' : 'bot', isUserTeam: user, shirtNumber: 1, shortName: id, rating: 6, goals: 0, assists: 0, distanceKm: km, topSpeed: ts });
+  const e = (id, user, km, ts) => ({ playerId: id, teamId: user ? 'me' : 'bot', isUserTeam: user, shirtNumber: 1, shortName: id, rating: 6, goals: 0, assists: 0, distanceKm: km, topSpeed: ts, hiShare: km });
   const g = buildGazette([M('me', 'bot', 1, 0, { ratings: { home: [e('a', true, 10.1, 30), e('b', true, 11.5, 31)], away: [e('x', false, 13, 33)] } })]);
-  assert.deepEqual(g.myRunner, { playerId: 'b', teamId: 'me', shirtNumber: 1, shortName: 'b', distanceKm: 11.5, topSpeed: 31 });
+  assert.deepEqual(g.myRunner, { playerId: 'b', teamId: 'me', shirtNumber: 1, shortName: 'b', distanceKm: 11.5, topSpeed: 31, hiShare: 11.5 });
   assert.equal(buildGazette([M('me', 'bot', 1, 0, { ratings: { home: [], away: [e('x', false, 13, 33)] } })]).myRunner, null);
 });
 test('tabellen før runden: placering og point, kun fra runde 3', async () => {
@@ -943,4 +943,42 @@ test('normalizeLeague giver gamle spillere 0 i km, minutter og topfart (ikke NaN
   const { league } = normalizeLeague(L);
   const q = league.teams[1].squad[2];
   assert.deepEqual([q.distanceSum, q.minutesSum, q.topSpeedMax], [0, 0, 0]);
+});
+
+// ---------- v3.7.1: andel højintenst løb og kampen bag "Rundens mål" ----------
+test('runProfile: andel højintenst løb = (kæde-basis + (PAC−10)·0,4) · pres · (0,8 + 0,2·friskhed) ± 1, klemt 1–20', () => {
+  const r = { next: () => 0.5 }; // støj 0
+  const team = (press) => ({ tactics: { phases: { phase2_defending: { pressingHeight: press } } } });
+  const hi = (line, { pace = 10, press = 'MID_BLOCK', fresh = 100 } = {}) => runProfile({ line, freshness: fresh, skills: { stamina: 10, pace } }, team(press), r).hiShare;
+  assert.deepEqual([hi('GK'), hi('DEF'), hi('MID'), hi('ATT')], [2, 7, 9, 11]);
+  assert.equal(hi('MID', { pace: 15 }), 11);                  // 9 + 2
+  assert.equal(hi('MID', { press: 'HIGH_GEGENPRESS' }), 10.4); // 9·1,15 = 10,35
+  assert.equal(hi('MID', { press: 'LOW_BLOCK' }), 8.1);        // ·0,9
+  assert.equal(hi('MID', { fresh: 50 }), 8.1);                 // ·0,9
+  assert.equal(hi('ATT', { pace: 40 }), 20);                   // loft
+  assert.equal(hi('GK', { pace: 1 }), 1);                      // bund (2 − 3,6)
+  assert.equal(runProfile({ line: 'MID', skills: { stamina: 10, pace: 10 } }, team('MID_BLOCK'), { next: () => 1 }).hiShare, 10); // støj +1
+});
+test('finalizeSheet: km i højintenst løb = distance · andel; modstandere ser hverken andel eller km i HI', () => {
+  const s = createSheet(), r = { next: () => 0.5 };
+  const team = { id: 't', name: 'T', isBot: false, tactics: { phases: { phase2_defending: { pressingHeight: 'MID_BLOCK' } } } };
+  s.register({ id: 'a', shirtNumber: 1, shortName: 'a', line: 'MID', skills: { stamina: 10, pace: 10 } }, team, true, 'CM', 1, r, 15, 5);
+  const e = finalizeSheet(s, 0, 0, r, counterXpForMatch).home[0];
+  assert.equal(e.hiShare, 9); assert.equal(e.hiKm, 1); // 11,1 km · 9 % = 0,999
+  const opp = viewRatingEntry(e, false);
+  assert.ok(!('hiShare' in opp) && !('hiKm' in opp));
+  assert.ok(!('hiKmSum' in viewPlayer({ id: 'p', hiKmSum: 3, skills: {} }, false)));
+});
+test('bogføring: km i højintenst løb summeres over sæsonen', () => {
+  const L = createLeague(createRng(2)); const p = L.teams[0].squad[0];
+  const res = syntheticRound(L, { ratings: [{ playerId: p.id, rating: 6, gainedCounterXp: 1, distanceKm: 11, hiKm: 1.1, topSpeed: 30, minIn: 1, minOut: 90 }] });
+  commitRound(L, res, { next: () => 0.5 });
+  assert.equal(p.hiKmSum, 1.1);
+});
+test('hvert mål ved, hvilken kamp i runden det faldt i', () => {
+  const L = createLeague(createRng(31)), res = playRound(L, 1, createRng(31));
+  const all = res.matches.flatMap((m, i) => m.goalsPool.map((g) => [g, i]));
+  assert.ok(all.length > 0);
+  for (const [g, i] of all) { assert.equal(g.matchIdx, i); assert.equal(g.match, `${res.matches[i].homeName} - ${res.matches[i].awayName}`); }
+  if (res.gazette.goalOfTheRound) assert.ok(Number.isInteger(res.gazette.goalOfTheRound.matchIdx));
 });

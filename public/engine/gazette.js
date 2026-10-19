@@ -51,7 +51,7 @@ export function buildGazette(matches, { positions = null, round = 0 } = {}) {
 
   // Dit holds løber: kun dit eget hold (km og topfart er private – visibility.js).
   const mine = players.filter((p) => p.isUserTeam && p.distanceKm > 0).sort((a, b) => b.distanceKm - a.distanceKm)[0] || null;
-  const myRunner = mine ? { playerId: mine.playerId, teamId: mine.teamId, shirtNumber: mine.shirtNumber, shortName: mine.shortName, distanceKm: mine.distanceKm, topSpeed: mine.topSpeed } : null;
+  const myRunner = mine ? { playerId: mine.playerId, teamId: mine.teamId, shirtNumber: mine.shirtNumber, shortName: mine.shortName, distanceKm: mine.distanceKm, topSpeed: mine.topSpeed, hiShare: mine.hiShare } : null;
 
   return {
     totalGoals, totalVarChecks, playerOfTheRound: players[0] || null, goalOfTheRound: goals[0] || null, defensiveAction: defensive, myResult,

@@ -180,6 +180,13 @@ Tick hvert 3. minut (1..90).
   11,2, ANG 10,0) · (0,9 + STA·0,01) · pres (gegenpres 1,06, lav blok 0,96) · støj ±4 % ·
   min/90; topfart 25 + PAC·0,45 ± 1 (MV −3), mindst 10 min. Private (RATING_PRIVATE_FIELDS);
   spillerkortet viser km pr. 90 min og bedste topfart for sæsonen.
+- **Højintenst løb (v3.7.1**, brugeren: "hvor stor en andel af deres løb der er højintense løb"):
+  andel = (kæde-basis MV 2/FOR 7/MID 9/ANG 11 % + (PAC−10)·0,4) · pres (gegenpres 1,15, lav blok
+  0,9) · (0,8 + 0,2·friskhed/100) ± 1, klemt 1–20 % (topdivisioner ≈7–12 % for markspillere).
+  Vises som "N % HI" i karakterarket, "N % højintenst" for dit holds løber og sæsonandelen på
+  spillerkortet. Privat (røber fart og pres).
+- **Rundens mål viser kampen** (v3.7.1, brugeren: "hvilken kamp var dette i?"): hvert mål får
+  `matchIdx`; avisen linker til netop den kamps referat (ældre runder: kun navnet).
 - **Friskhed (v3.7**, brugeren: "kun 3 af mine spillere der har under 100%"; kilden
   −max(4, 14 − STA/2) + 8 straks): kampen koster round(km · (1,5 − STA·0,03)) ± 2 (støj, så
   STA ikke kan regnes baglæns); restitution 35 % af det, der mangler op til 100 (bænk +15

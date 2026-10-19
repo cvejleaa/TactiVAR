@@ -295,9 +295,9 @@ try {
   const mpOpp = await g.locator('.ratings').nth(1).locator('.mp-token .mp-val').allTextContents();
   check('Minibane: 11 startere pr. hold – egne med karakter, modstanderens kun stjerner', mpOwn.length === 11 && mpOwn.every((t) => /^\d+\.\d$/.test(t)) && mpOpp.length === 11 && mpOpp.every((t) => /^[★☆]{5}$/.test(t)), `${mpOwn.length}/${mpOpp.length}`);
   const runs = await g.locator('.ratings').nth(0).locator('td.run').allTextContents();
-  check('Karakterark: dit hold har løbet distance og topfart, modstanderen ikke', runs.length >= 11 && runs.filter((t) => /^\d+\.\d km · \d+\.\d km\/t$/.test(t)).length >= 11 && (await g.locator('.ratings').nth(1).locator('td.run').count()) === 0, runs.slice(0, 2).join(' | '));
+  check('Karakterark: dit hold har løbet distance og topfart, modstanderen ikke', runs.length >= 11 && runs.filter((t) => /^\d+\.\d km · \d+ % HI · \d+\.\d km\/t$/.test(t)).length >= 11 && (await g.locator('.ratings').nth(1).locator('td.run').count()) === 0, runs.slice(0, 2).join(' | '));
   const gzText = await g.textContent('#gazette');
-  check('Avisen: en overskrift pr. kamp og dit holds løber', (await g.locator('#headlines li').count()) === 4 && /Dit holds løber: #\d+ .+ – \d+\.\d km/.test(gzText), gzText.slice(0, 200));
+  check('Avisen: en overskrift pr. kamp og dit holds løber med andel højintenst', (await g.locator('#headlines li').count()) === 4 && /Dit holds løber: #\d+ .+ – \d+\.\d km, \d+ % højintenst/.test(gzText), gzText.slice(0, 200));
   const iconTitles = await g.evaluate(() => [...document.querySelectorAll('.ratings .ricon')].map((e) => [e.textContent, e.title]));
   check('Ikonerne i karakterarket har mouse-over-tekst', iconTitles.length > 0 && iconTitles.every(([t, ti]) => ti.length > 3 && !ti.includes('undefined')), JSON.stringify(iconTitles.slice(0, 3)));
   const legendTxt = await g.textContent('#icon-legend');
@@ -351,6 +351,16 @@ try {
   await tab('kamp');
   check('Kamp-fanen genviser seneste runde færdigspillet (ikke live)', (await g.isVisible('#match-center')) && (await g.locator('#skip').count()) === 0 && (await g.textContent('#match-center')).includes('runde 1'));
   const evAll = await g.locator('#feed .ev').count();
+  // "Rundens mål" i avisen (Liga-fanen) viser kampen og linker til netop dens referat
+  await tab('liga');
+  const gor = await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.lastRound.gazette.goalOfTheRound);
+  if (gor) {
+    check('Rundens mål viser, hvilken kamp det faldt i', (await g.textContent('#goal-of-round-match')).includes(gor.match.replace(' - ', ' – ')));
+    await g.click('#goal-of-round-match');
+    const card = await g.textContent(`#match-cards .matchcard:nth-child(${gor.matchIdx + 1})`);
+    check('Linket åbner netop den kamps referat i Kamp-fanen', (await g.textContent('#tabs .tab.active')).includes('Kamp') && (await g.locator(`#match-cards .matchcard:nth-child(${gor.matchIdx + 1}).active`).count()) === 1 && card.startsWith(gor.match.split(' - ')[0]), card);
+  } else check('Runden havde intet mål (intet link at teste)', true);
+  await tab('kamp');
   // Hver handling prøves på en frisk side (uden igangværende Match Center).
   await g.click('#match-cards .matchcard:nth-child(3)');
   const card3 = (await g.locator('#match-cards .matchcard:nth-child(3).active').count()) === 1;
