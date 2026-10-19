@@ -54,7 +54,7 @@ export const SCOUTING_PER_PLAYER = 20;
 // mangler op til 100 (ikke brugt: +15 oveni) – jo mere træt, jo hurtigere kommer han sig.
 // Ligevægt for en fast starter f = 100 − 1,86·pris (QC: med fast +5 endte alle på bunden, og
 // rotation blev en fast afgift): MID STA 10 (pris ≈13) ≈76 %, STA 20 (≈10) ≈81 %, målmand ≈85 %.
-export const REST_SHARE = 0.35, REST_BENCH = 15, FRESH_FLOOR = 50;
+export const REST_SHARE = 0.41, REST_BENCH = 15, FRESH_FLOOR = 50;
 export const matchCost = (km, stamina) => Math.round(km * (1.5 - stamina * 0.03));
 export const restore = (f) => Math.min(100, f + Math.round(REST_SHARE * (100 - f)));
 export const afterMatchFreshness = (fresh, km, stamina, noise = 0) => Math.max(FRESH_FLOOR, restore(fresh - Math.max(0, matchCost(km, stamina) + noise)));

@@ -20,7 +20,7 @@ globalThis.document = { createElement: (t) => new FakeEl(t), createTextNode: (t)
 
 const { createRng } = await import('../../public/engine/rng.js');
 const { createLeague } = await import('../../public/engine/generator.js');
-const { renderStats } = await import('../../public/ui/stats.js');
+const { renderStats, shortTeam } = await import('../../public/ui/stats.js');
 
 const all = (el, pred, out = []) => { if (el instanceof FakeEl) { if (pred(el)) out.push(el); el.children.forEach((c) => all(c, pred, out)); } return out; };
 const byId = (el, id) => all(el, (e) => e.attrs.id === id)[0];
@@ -34,7 +34,8 @@ function world() {
 }
 const render = (L, me) => renderStats({ league: L, myTeamId: me.id });
 const list = (root, key) => all(root, (e) => e.dataset.key === key)[0];
-const items = (l) => all(l, (e) => e.tag === 'li');
+const items = (l) => all(l, (e) => e.tag === 'tr'); // v3.10.1: hver liste er en tabel – én række pr. spiller
+const rowCells = (tr) => tr.children.map((c) => c.textContent);
 
 test('statistik-fanen: fire sektioner, kun spillerne åben, "fra runde N" fra ligaen (1 uden felt)', () => {
   const { L, me } = world();
@@ -61,9 +62,12 @@ test('spillerlister: titel/nøgle pr. liste, top 5 efter værdi (lighed: flest k
     ['sGoals', '⚽ Topscorere'], ['sAssists', '🅰 Flest oplæg'], ['sMotm', '👑 Kampens spiller'], ['sHeaderGoals', '🗣 Hovedstødsmål'],
     ['sPenaltyGoals', '🎯 Straffemål'], ['sSetPieceGoals', '🧱 Dødboldmål'], ['sCleanSheets', '🧤 Clean sheets'], ['sYellow', '🟨 Gule kort']]);
   const top = items(list(root, 'sGoals'));
-  assert.deepEqual(top.map((li) => li.textContent), [
-    `#${mine[9].shirtNumber} ${mine[9].shortName} ${me.name} 9`, `#${theirs[10].shirtNumber} ${theirs[10].shortName} ${other.name} 7`,
-    `#${theirs[9].shirtNumber} ${theirs[9].shortName} ${other.name} 7`, `#${mine[10].shirtNumber} ${mine[10].shortName} ${me.name} 5`, `#${theirs[8].shirtNumber} ${theirs[8].shortName} ${other.name} 3`]);
+  // Fire celler: placering · #nr Navn · kort holdnavn · værdi (ingen ombrud – hver ting i sin egen celle)
+  const sn = (t) => shortTeam(t.name);
+  assert.deepEqual(top.map(rowCells), [
+    ['1.', `#${mine[9].shirtNumber} ${mine[9].shortName}`, sn(me), '9'], ['2.', `#${theirs[10].shirtNumber} ${theirs[10].shortName}`, sn(other), '7'],
+    ['3.', `#${theirs[9].shirtNumber} ${theirs[9].shortName}`, sn(other), '7'], ['4.', `#${mine[10].shirtNumber} ${mine[10].shortName}`, sn(me), '5'], ['5.', `#${theirs[8].shirtNumber} ${theirs[8].shortName}`, sn(other), '3']]);
+  assert.equal(top[1].children[2].attrs.title, other.name, 'fuldt holdnavn i title');
   assert.deepEqual(top.map((li) => li.className), ['mine', '', '', 'mine', '']);
   // Hver anden liste viser præcis sin egen spiller med sin egen værdi
   const only = (key) => items(list(root, key)).map((li) => li.children.at(-1).textContent.trim());
@@ -80,9 +84,10 @@ test('bedste vurdering: kun spillere med stjerner OG kampe, flest stjerner førs
   set(me.squad[1], 3, 5); set(other.squad[1], 5, 1); set(other.squad[2], 5, 4); set(me.squad[2], 4, 0);   // sidste har ingen kampe i statistikken
   const root = render(L, me);
   const rows = items(list(root, 'publicStars'));
-  assert.deepEqual(rows.map((li) => li.children[0].textContent), [`#${other.squad[2].shirtNumber} ${other.squad[2].shortName}`, `#${other.squad[1].shirtNumber} ${other.squad[1].shortName}`, `#${me.squad[1].shirtNumber} ${me.squad[1].shortName}`]);
+  assert.deepEqual(rows.map((li) => li.children[1].textContent), [`#${other.squad[2].shirtNumber} ${other.squad[2].shortName}`, `#${other.squad[1].shirtNumber} ${other.squad[1].shortName}`, `#${me.squad[1].shirtNumber} ${me.squad[1].shortName}`]);
   assert.deepEqual(rows.map((li) => li.className), ['', '', 'mine']);
-  assert.equal(rows[0].children.at(-1).attrs.title ?? rows[0].children.at(-1).title, '5 af 5 stjerner');
+  const starsCell = rows[0].children.at(-1).children[0];   // stjernerne står i værdicellen på samme række
+  assert.equal(starsCell.attrs.title ?? starsCell.title, '5 af 5 stjerner');
 });
 
 test('holdtal: ni kolonner uden taktik-afslørende tal, alle hold, bold % = snit pr. kamp, straffe (mål), dit hold markeret', () => {

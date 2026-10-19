@@ -37,7 +37,19 @@ test('rundens mål: flere typer vinder, ingen over 50 %, VAR under 40 %; friskhe
   assert.ok(Object.values(r.kinds).every((v) => v <= 0.5), JSON.stringify(r.kinds));
   assert.ok((r.kinds.VAR ?? 0) < 0.4, JSON.stringify(r.kinds));
   // Før v3.7 lå startelleverne på ≈95–100 % efter flere runder; nu mærkes trætheden
-  assert.ok(r.freshMe < 85, String(r.freshMe));
+  assert.ok(r.freshMe < 90, String(r.freshMe));
+});
+// v3.10.1 (brugeren efter 17 runder: "næsten alle mine spillere er langt nede i friskhed" – valgt ≈80 %
+// for en fast starter): restitution 41 % af det manglende (før 35 %).
+test('friskhed: en CM der spiller hver kamp ender omkring 80 % (v3.10: ≈75 %); startelleven i snit ≈85 % (v3.10: ≈81 %)', async () => {
+  const { afterMatchFreshness, matchCost } = await import('../../public/engine/season.js');
+  let f = 100;
+  for (let i = 0; i < 40; i++) f = afterMatchFreshness(f, 11.8, 11);   // CM: 11,8 km, STA 11 → pris ≈ 13,8
+  assert.equal(matchCost(11.8, 11), 14);
+  assert.ok(f >= 78 && f <= 82, `CM-ligevægt ${f} (0,35 gav 74)`);
+  const { measureSeason } = await import('../../tools/measure-duels.mjs');
+  const r = measureSeason(30);
+  assert.ok(r.freshMe >= 83 && r.freshMe <= 88, `startelleven ${r.freshMe} (v3.10: 80,9)`);
 });
 
 test('løb pr. plads følger dokumentet: CM længst, wingbacks/kanter flest HI, stoppere færrest km og HI; målmænd under 4 % HI', async () => {

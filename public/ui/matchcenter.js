@@ -28,7 +28,13 @@ function statsRows(m, st) {
     ['Expected goals (xG)', st.hXg.toFixed(2), st.aXg.toFixed(2)],
     ['Vundne luftdueller', st.hAerialWon, st.aAerialWon],
     ['VAR-tjek', st.hVarChecks, st.aVarChecks],
-    ['Frispark / skader', `${st.hFouls} / ${st.hInjuries}`, `${st.aFouls} / ${st.aInjuries}`],
+    ['Frispark begået / skader', `${st.hFouls} / ${st.hInjuries}`, `${st.aFouls} / ${st.aInjuries}`],
+    // Dødbolde (v3.10.1, brugeren: "den her info bør også fremgå af højreside med statistik").
+    // Kampe fra før v3.10 har ikke tallene – de vises som "–".
+    ['Frispark i skudafstand', st.hFreeKicks ?? '–', st.aFreeKicks ?? '–'],
+    ['Hjørnespark', st.hCorners ?? '–', st.aCorners ?? '–'],
+    ['Straffe (mål)', st.hPenalties != null ? `${st.hPenalties} (${st.hPenaltyGoals})` : '–', st.aPenalties != null ? `${st.aPenalties} (${st.aPenaltyGoals})` : '–'],
+    ['Gule kort', st.hYellows ?? '–', st.aYellows ?? '–'],
   ];
   return h('table', { class: 'mstats', id: 'match-stats' }, h('thead', {}, h('tr', {}, h('th', {}, m.homeName), h('th', {}, ''), h('th', {}, m.awayName))),
     h('tbody', {}, rows.map(([l, a, b]) => h('tr', {}, h('td', {}, String(a)), h('th', {}, l), h('td', {}, String(b))))));
