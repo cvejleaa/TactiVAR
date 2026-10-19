@@ -48,7 +48,7 @@ try {
   // ---------- Spillet (regressionsnettet i docs/spec.md §9b) ----------
   fejl.length = 0; // de bevidste testfejl ovenfor tæller ikke med
   const fresh = async () => { const c = await browser.newContext({ viewport: { width: 1400, height: 1000 } }); const pg = await c.newPage(); pg.on('pageerror', (e) => fejl.push(e.message)); await pg.goto(BASE + '/'); await pg.waitForSelector('body[data-klar="ja"]'); return pg; };
-  const g = await fresh();
+  let g = await fresh();
   const rows = () => g.locator('#matrix tbody tr').count();
   check('Ny liga: dit hold vises med 18 spillere', (await rows()) === 18);
   check('Holdvælgeren har 8 hold', (await g.locator('#team-select option').count()) === 8);
@@ -262,6 +262,17 @@ try {
   const mig = await g.evaluate(() => ({ schema: JSON.parse(localStorage.getItem('tactivar_save')).schemaVersion, backups: Object.keys(localStorage).filter((k) => k.startsWith('tactivar_backup_')).length }));
   check('Migrering: gemmes straks i skema 2, kun én backup trods tre genindlæsninger', mig.schema === 2 && mig.backups === 1, JSON.stringify(mig));
   check('Migrering: ligaen fra skema 1 er intakt (runde 1, 18 spillere)', (await g.textContent('#standings-title')).includes('efter 1 runde') && (await rows()) === 18);
+
+  // Mislykkes backuppen ved migrering (fuldt lager), overskrives det gamle format ikke – og der advares
+  await g.evaluate((f) => { for (const k of Object.keys(localStorage)) if (k.startsWith('tactivar_')) localStorage.removeItem(k); localStorage.setItem('tactivar_save', f); }, fixture);
+  await g.addInitScript(() => { const set = Storage.prototype.setItem; Storage.prototype.setItem = function (k, v) { if (String(k).startsWith('tactivar_backup_')) throw new Error('QuotaExceededError'); return set.call(this, k, v); }; });
+  await reload();
+  const noBackup = await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).schemaVersion);
+  check('Migrering uden mulig backup: det gamle format står urørt, og der advares', noBackup === 1 && (await g.textContent('#fejlboks')).includes('kunne ikke tages backup'));
+  const fresh2 = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
+  const g2 = await fresh2.newPage(); await g2.goto(BASE + '/'); await g2.waitForSelector('body[data-klar="ja"]');
+  await g.close();
+  g = g2; // fortsæt i en ren side uden den kastende setItem
 
   // Ny liga og import tager backup af det nuværende spil
   await g.selectOption('#team-select', '0');

@@ -50,10 +50,18 @@ function change(fn) { fn(); act.syncActivePreset(myTeam(), game.ui.activePresetI
 
 function start() {
   const r = loadGame(storage);
-  // Et migreret spil gemmes straks i det nye format (ellers tog hver genindlæsning en ny backup).
-  if (r.status === 'ok') { game = r.state; view.savedAt = r.state.savedAt; if (r.migratedFrom) persist(); if (r.migratedFrom) view.notice = r.migratedFrom === 1 ? 'Dit spil er opdateret: Hvis-Så-regler kan nu sættes til "Bagud/Foran med mindst N mål" og skifte til dine egne planer. Dine regler er bevaret – "Foran med 1" gælder nu fra 1 mål og opefter.' : `Dit spil er opdateret fra et ældre gemme-format (skema ${r.migratedFrom}).`; }
-  else if (r.status === 'empty') { game = newGame(); persist(); }
-  else return renderLoadError(r);
+  if (r.status === 'error') return renderLoadError(r);
+  if (r.status === 'empty') { game = newGame(); persist(); }
+  else {
+    game = r.state; view.savedAt = r.state.savedAt;
+    if (r.migratedFrom != null) {
+      view.notice = r.migratedFrom === 1 ? 'Dit spil er opdateret: Hvis-Så-regler kan nu sættes til "Bagud/Foran med mindst N mål" og skifte til dine egne planer. Dine regler er bevaret – "Foran med 1" gælder nu fra 1 mål og opefter.' : `Dit spil er opdateret fra et ældre gemme-format (skema ${r.migratedFrom}).`;
+      // Gem straks i det nye format (ellers tog hver genindlæsning en ny backup) – men kun
+      // når backuppen af det gamle format lykkedes; ellers står det gamle urørt, og der advares.
+      if (r.backupKey) persist();
+      else window.tactivarFejl?.('Dit spil er opdateret, men der kunne ikke tages backup af det gamle format (er browserens lager fuldt?). Eksportér spillet med ⬇ Eksportér som sikkerhed.');
+    }
+  }
   view.viewTeamIdx = myIdx();
   view.selectedPlayerId = myTeam().squad[3].id;
   render();
