@@ -28,11 +28,34 @@ export const ARCHETYPES = {
 };
 
 // Truppens opbygning: #1–11 starter, #12–18 bænk (spec §2; #10–11 og #16–18 fastsat).
+// Naturlig position (v3.8) passer til standardopstillingen 4-4-2 (LB CB CB RB / LM CM CM RM / ST ST):
+// 2 MV; forsvar 3 CB + 3 FB; midtbane 3 CM + 2 WM + 1 AM; angreb 3 ST + 1 WM.
+const POSITION_OF_LINE = { GK: 'GK', DEF: 'CB', MID: 'CM', ATT: 'ST' };
 const BLUEPRINT = [
-  ['GK', 'STARTER'], ['DEF', 'STARTER'], ['DEF', 'STARTER'], ['DEF', 'STAR'], ['DEF', 'STARTER'],
-  ['MID', 'STARTER'], ['MID', 'STARTER'], ['MID', 'STAR'], ['ATT', 'STARTER'], ['MID', 'STARTER'], ['ATT', 'STARTER'],
-  ['GK', 'ROTATION'], ['DEF', 'ROTATION'], ['DEF', 'TALENT'], ['MID', 'ROTATION'], ['MID', 'TALENT'], ['ATT', 'ROTATION'], ['ATT', 'TALENT'],
+  ['GK', 'STARTER', 'GK'], ['DEF', 'STARTER', 'FB'], ['DEF', 'STARTER', 'CB'], ['DEF', 'STAR', 'CB'], ['DEF', 'STARTER', 'FB'],
+  ['MID', 'STARTER', 'WM'], ['MID', 'STARTER', 'CM'], ['MID', 'STAR', 'CM'], ['ATT', 'STARTER', 'ST'], ['MID', 'STARTER', 'WM'], ['ATT', 'STARTER', 'ST'],
+  ['GK', 'ROTATION', 'GK'], ['DEF', 'ROTATION', 'CB'], ['DEF', 'TALENT', 'FB'], ['MID', 'ROTATION', 'CM'], ['MID', 'TALENT', 'AM'], ['ATT', 'ROTATION', 'ST'], ['ATT', 'TALENT', 'WM'],
 ];
+export const POSITIONS = ['GK', 'CB', 'FB', 'CM', 'WM', 'AM', 'ST'];
+
+// Naturlig position til spillere uden en (ligaer fra før v3.8): pr. kæde efter højde – de
+// højeste bliver stoppere og angribere, de laveste backs og kanter (dokumentets mønster),
+// i samme forhold som BLUEPRINT. Kun spillere uden position røres.
+export function assignPositions(squad) {
+  const byLine = {};
+  for (const p of squad) if (!POSITIONS.includes(p.position)) (byLine[p.line] ||= []).push(p);
+  for (const [line, list] of Object.entries(byLine)) {
+    list.sort((a, b) => (b.heightCm ?? 0) - (a.heightCm ?? 0) || String(a.id).localeCompare(String(b.id)));
+    const n = list.length;
+    list.forEach((p, i) => {
+      if (line === 'GK') p.position = 'GK';
+      else if (line === 'DEF') p.position = i < Math.ceil(n / 2) ? 'CB' : 'FB';
+      else if (line === 'MID') p.position = i < Math.floor(n / 2) ? 'CM' : i === Math.floor(n / 2) && n >= 4 ? 'AM' : 'WM';
+      else p.position = n >= 4 && i === n - 1 ? 'WM' : 'ST';
+    });
+  }
+  return squad;
+}
 
 const TIERS = {
   STAR: { age: [24, 28], stat: [11, 15], arch: 0.75 },
@@ -60,18 +83,27 @@ export function rollStat(rng, min, max) {
   return clamp(Math.round(min + ((rng.next() + rng.next()) / 2) * (max - min)), 1, 20);
 }
 
-// Højde efter Superligaen (v3.7, brugerens dokument "Spillerhøjde i Superligaen": ligasnit
-// ≈184 cm, trupper 182,9–187,5, laveste 169, højeste 201 – målmænd 190–200, midtstoppere
-// 185–195, lavest på kanterne). Truppen er 2 MÅL, 6 FOR, 6 MID, 4 ANG:
-// (2·192 + 6·186 + 6·179,5 + 4·181)/18 ≈ 183,4 + holdprofil (−1,5…+3, snit +0,75) ≈ 184.
-export const HEIGHT_MID = { GK: 192, DEF: 186, MID: 179.5, ATT: 181 };
+// Højde efter Superligaen (brugerens dokument "Spillerhøjde i Superligaen": ligasnit ≈184 cm,
+// trupper 182,9–187,5, 169–201). Fra v3.8 pr. NATURLIG POSITION efter dokumentets tabel:
+// MV 193–195 (188–201), CB 189–191 (184–198), ST 185–188 (178–196), CM/DM 182–185 (175–192),
+// backs og kanter 174–177 (169–183). Tre terninger −d..d om midten (spredning ≈3,5 cm ved d=3,
+// ≈4,5 ved d=4), klemt til positionens spænd. Truppen 2 GK/3 CB/3 FB/3 CM/3 WM/1 AM/3 ST:
+// (2·194 + 3·190 + 6·175,5 + 4·183,5 + 3·186,5)/18 = 183,6 + holdprofil (−1,5…+3, snit +0,75) ≈ 184,3.
+export const HEIGHT_BY_POS = {
+  GK: { mid: 194, dice: 3, min: 188, max: 201 },
+  CB: { mid: 190, dice: 3, min: 184, max: 198 },
+  ST: { mid: 186.5, dice: 4, min: 178, max: 196 },
+  CM: { mid: 183.5, dice: 4, min: 175, max: 192 },
+  AM: { mid: 183.5, dice: 4, min: 175, max: 192 },
+  FB: { mid: 175.5, dice: 3, min: 169, max: 183 },
+  WM: { mid: 175.5, dice: 3, min: 169, max: 183 },
+};
 export const HEIGHT_MIN = 168, HEIGHT_MAX = 201;
 export const HEIGHT_ZERO = 166;
-export const HEIGHT_DICE = { GK: 4, DEF: 6, MID: 6, ATT: 6 }; // tre terninger −d..d pr. kæde
 export const HEIGHT_TEAM_MEAN_OFFSET = 0.75;                  // snit af holdprofilen (−1,5…+3)
 
-// Højden ved fraktil q (0–1) i kædens fordeling – den samme fordeling, generatoren trækker fra
-// (holdprofilen sat til sit snit). Bruges, når en eksisterende liga lægges om (skema 3 → 4).
+// Højden ved fraktil q (0–1) i en fordeling { mid, dice, min, max } – den samme, generatoren
+// trækker fra (holdprofilen sat til sit snit). Bruges, når en eksisterende liga lægges om.
 const diceCdfCache = {};
 function diceSums(d) {
   if (diceCdfCache[d]) return diceCdfCache[d];
@@ -79,10 +111,11 @@ function diceSums(d) {
   for (let a = -d; a <= d; a++) for (let b = -d; b <= d; b++) for (let c = -d; c <= d; c++) sums.push(a + b + c);
   return (diceCdfCache[d] = sums.sort((x, y) => x - y));
 }
-export function heightAtQuantile(line, q) {
-  const sums = diceSums(HEIGHT_DICE[line] ?? 6);
+export function heightAtQuantile(key, q, table = HEIGHT_BY_POS) {
+  const t = table[key] ?? table.CM ?? Object.values(table)[0];
+  const sums = diceSums(t.dice);
   const v = sums[Math.min(sums.length - 1, Math.max(0, Math.floor(q * sums.length)))];
-  return clamp(Math.round((HEIGHT_MID[line] ?? 181) + HEIGHT_TEAM_MEAN_OFFSET) + v, HEIGHT_MIN, HEIGHT_MAX);
+  return clamp(Math.round(t.mid + HEIGHT_TEAM_MEAN_OFFSET) + v, t.min ?? HEIGHT_MIN, t.max ?? HEIGHT_MAX);
 }
 
 export function aerialBreakdown(heightCm, jumpingPower, strength, positioning) {
@@ -98,7 +131,7 @@ export function isArchetypeUnlocked(arch, player) {
   return Object.entries(arch.unlockReq).every(([k, v]) => (stats[k] || 0) >= v);
 }
 
-export function generatePlayer(rng, line, roleTier, shirtNumber, teamIdx, usedShortNames, heightOffset = 0) {
+export function generatePlayer(rng, line, roleTier, shirtNumber, teamIdx, usedShortNames, heightOffset = 0, position = POSITION_OF_LINE[line]) {
   const t = TIERS[roleTier];
   const [bMin, bMax] = t.stat;
   const age = rng.int(t.age[0], t.age[1]);
@@ -109,11 +142,11 @@ export function generatePlayer(rng, line, roleTier, shirtNumber, teamIdx, usedSh
   } while (usedShortNames.has(shortName));
   usedShortNames.add(shortName);
 
-  // Klokkeform om kædens midte plus holdets profil, klemt til Superligaens 168–201 cm.
-  // Bred spredning i hver kæde (brugeren: "ikke at alle spillere skal ligge tæt på gns. for deres
-  // position"): spredning ≈6,5 cm ude på banen, ≈4,5 cm for målmænd; hele truppen ligner Superligaen.
-  const d = HEIGHT_DICE[line];
-  const heightCm = clamp(Math.round(HEIGHT_MID[line] + heightOffset) + rng.int(-d, d) + rng.int(-d, d) + rng.int(-d, d), HEIGHT_MIN, HEIGHT_MAX);
+  // Klokkeform om positionens midte plus holdets profil, klemt til positionens spænd (v3.8).
+  // Hele truppen spreder sig stadig bredt (brugeren: "ikke at alle spillere skal ligge tæt på gns.
+  // for deres position"), fordi positionerne ligger fra 175,5 til 194.
+  const ht = HEIGHT_BY_POS[position], d = ht.dice;
+  const heightCm = clamp(Math.round(ht.mid + heightOffset) + rng.int(-d, d) + rng.int(-d, d) + rng.int(-d, d), ht.min, ht.max);
   const r = (a, b) => rollStat(rng, a, b);
   const jumpingPower = r(bMin - 1, bMax + (line === 'DEF' || line === 'ATT' ? 2 : 0));
   const skills = {
@@ -131,7 +164,7 @@ export function generatePlayer(rng, line, roleTier, shirtNumber, teamIdx, usedSh
   const sum = Object.values(skills).reduce((a, b) => a + b, 0);
   const player = {
     id: `plr_t${teamIdx}_${shirtNumber}`, name: `${firstName} ${lastName}`, shortName,
-    age, seasonAgeCounter: 1, line, shirtNumber, roleTier,
+    age, seasonAgeCounter: 1, line, position, shirtNumber, roleTier,
     freshness: 100, injuryMatchesLeft: 0, lastRating: 0, ratingSum: 0, ratingGames: 0, publicStars: 0, distanceSum: 0, minutesSum: 0, topSpeedMax: 0, hiKmSum: 0, hiDistSum: 0,
     heightCm, jumpingPower, aerialPower: aerialBreakdown(heightCm, jumpingPower, skills.strength, skills.positioning).total,
     skills, varProfile,
@@ -171,7 +204,7 @@ export function generateTeam(rng, idx) {
   const used = new Set();
   // Holdprofil: fysisk "power-hold" op til +3 cm, tekniske hold ned til −1,5 cm (Superligaen 182,9–187,5).
   const heightOffset = rng.int(-3, 6) / 2;
-  const squad = BLUEPRINT.map(([line, tier], i) => generatePlayer(rng, line, tier, i + 1, idx, used, heightOffset));
+  const squad = BLUEPRINT.map(([line, tier, pos], i) => generatePlayer(rng, line, tier, i + 1, idx, used, heightOffset, pos));
   const starters = defaultStarterIds(squad);
   const isBot = idx !== 0;
   const own = isBot ? BOT_PROFILES[idx] : BOT_PROFILES[0];

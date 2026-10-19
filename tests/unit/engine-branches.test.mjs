@@ -690,21 +690,28 @@ test('modstandere ser hverken km, topfart eller sæsonløb – ejeren ser dem', 
 });
 
 // ---------- #5 Løb og topfart ----------
-test('runProfile: kæde-basis · (0,9 + STA·0,01) · pres · støj; topfart 25 + PAC·0,45 (MV −3)', () => {
+test('runProfile: rolle-basis · (0,9 + STA·0,01) · pres · støj; topfart 25 + PAC·0,45 (MV −3)', () => {
   const r = { next: () => 0.5 }; // støj 0,96 + 0,04 = 1,00; topfart-støj 0
   const team = (press) => ({ tactics: { phases: { phase2_defending: { pressingHeight: press } } } });
   const pl = (line, sta = 10, pace = 10) => ({ line, skills: { stamina: sta, pace } });
-  const km = (line, press = 'MID_BLOCK', sta = 10) => Math.round(runProfile(pl(line, sta), team(press), r).km90 * 1000) / 1000;
-  assert.deepEqual([km('GK'), km('DEF'), km('MID'), km('ATT')], [5.5, 9.8, 11.2, 10]);
-  assert.equal(km('MID', 'HIGH_GEGENPRESS'), 11.872); // ·1,06
-  assert.equal(km('MID', 'LOW_BLOCK'), 10.752);       // ·0,96
-  assert.equal(km('MID', 'MID_BLOCK', 20), 12.32);    // ·1,1
-  assert.equal(km('MID', 'MID_BLOCK', 1), 10.192);    // ·0,91
+  const km = (line, press = 'MID_BLOCK', sta = 10, role) => Math.round(runProfile(pl(line, sta), team(press), r, role).km90 * 1000) / 1000;
+  // v3.8: pladsen i kampen afgør (v3.7.1 var kæden: MID 11,2 og DEF 9,8 for både back og stopper).
+  const roles = ['GK', 'CB', 'LB', 'RWB', 'LM', 'RW', 'CDM', 'CM', 'CAM', 'CF', 'ST'];
+  assert.deepEqual(roles.map((ro) => km('MID', 'MID_BLOCK', 10, ro)), [5.5, 9.5, 10.6, 11, 11, 11, 11.8, 11.8, 10.8, 10.8, 10]);
+  // Dokumentets rækkefølge: CM > kanter > offensive > angriber = … > CB.
+  assert.ok(km('MID', 'MID_BLOCK', 10, 'CM') > km('MID', 'MID_BLOCK', 10, 'RM') && km('MID', 'MID_BLOCK', 10, 'RM') > km('MID', 'MID_BLOCK', 10, 'CAM') && km('MID', 'MID_BLOCK', 10, 'ST') > km('MID', 'MID_BLOCK', 10, 'CB'));
+  // Uden rolle (fx en gammel kampkopi): kædens plads – MV, stopper, central midtbane, angriber.
+  assert.deepEqual([km('GK'), km('DEF'), km('MID'), km('ATT')], [5.5, 9.5, 11.8, 10]);
+  assert.equal(km('MID', 'MID_BLOCK', 10, 'SUB (MID)'), 11.8);
+  assert.equal(km('MID', 'HIGH_GEGENPRESS'), 12.508); // 11,8·1,06
+  assert.equal(km('MID', 'LOW_BLOCK'), 11.328);       // ·0,96
+  assert.equal(km('MID', 'MID_BLOCK', 20), 12.98);    // ·1,1
+  assert.equal(km('MID', 'MID_BLOCK', 1), 10.738);    // ·0,91
   assert.equal(runProfile(pl('MID', 10, 10), team('MID_BLOCK'), r).topSpeed, 29.5);
   assert.equal(runProfile(pl('MID', 10, 20), team('MID_BLOCK'), r).topSpeed, 34);
   assert.equal(runProfile(pl('GK', 10, 10), team('MID_BLOCK'), r).topSpeed, 26.5);
   assert.equal(runProfile(pl('ATT', 10, 99), team('MID_BLOCK'), r).topSpeed, 36); // loft
-  assert.equal(runProfile(pl('MID', 10, 10), team('MID_BLOCK'), { next: () => 0.96 }).km90.toFixed(3), '11.612'); // støj 0,96 + 0,96·0,08 = 1,0368
+  assert.equal(runProfile(pl('MID', 10, 10), team('MID_BLOCK'), { next: () => 0.96 }).km90.toFixed(3), '12.234'); // 11,8 · (0,96 + 0,96·0,08 = 1,0368)
 });
 test('finalizeSheet: km for spilletiden, ingen topfart under 10 min, og raten pr. 90 fjernes', () => {
   const s = createSheet(), r = { next: () => 0.5 };
@@ -715,11 +722,11 @@ test('finalizeSheet: km for spilletiden, ingen topfart under 10 min, og raten pr
   s.register(mk('c'), team, true, 'CM', 85, r, 15, 7);  // 5 min
   const res = finalizeSheet(s, 0, 0, r, counterXpForMatch);
   const by = Object.fromEntries(res.home.map((e) => [e.playerId, e]));
-  assert.equal(by.a.distanceKm, 11.1); // 11,2·89/90 = 11,08
-  assert.equal(by.b.distanceKm, 3.6);  // 11,2·29/90 = 3,61
-  assert.equal(by.c.distanceKm, 0.6);  // 11,2·5/90 = 0,62
+  assert.equal(by.a.distanceKm, 11.7); // CM 11,8·89/90 = 11,67 (v3.7.1 kæde: 11,1)
+  assert.equal(by.b.distanceKm, 3.8);  // 11,8·29/90 = 3,80
+  assert.equal(by.c.distanceKm, 0.7);  // 11,8·5/90 = 0,66
   assert.equal(by.a.topSpeed, 29.5); assert.equal(by.c.topSpeed, null);
-  assert.equal(by.a.hiShare, 9); assert.equal(by.b.hiShare, 9); assert.equal(by.c.hiShare, null); // under 10 min: ingen andel
+  assert.equal(by.a.hiShare, 8); assert.equal(by.b.hiShare, 8); assert.equal(by.c.hiShare, null); // under 10 min: ingen andel
   assert.equal(by.c.hiKm, null); assert.ok(by.b.hiKm > 0); // og ingen HI-km til sæsonsummen
   for (const e of res.home) assert.ok(!('km90' in e), 'raten pr. 90 min røber udholdenheden');
 });
@@ -880,7 +887,8 @@ test('friskhed virker i luftduellen – både angriber og forsvarer', () => {
   const run = (shAir, shFresh, defFresh) => {
     const a = arena({ home: { p1: { attackFocus: 'HIGH_CROSSES' } } });
     for (const p of mids(a.A)) p.skills.intercepting = 1;
-    slot(a.A, 0).skills.goalkeeping = 0; slot(a.A, 1).aerialPower = 10; slot(a.A, 1).freshness = defFresh;
+    slot(a.A, 0).skills.goalkeeping = 0;
+    for (const i of [1, 2, 3, 4]) Object.assign(slot(a.A, i), { aerialPower: 10, freshness: defFresh }); // v3.8: en stopper (slot 2/3) tager luftduellen
     Object.assign(slot(a.H, 9), { aerialPower: shAir, freshness: shFresh });
     for (const b of a.A.squad.slice(11)) b.skills = SK(1); // ingen bot-rotation af den trætte forsvarer
     return simulateMatch(a.H, a.A, stubRng({ 0.48: true, 0.3: true, 0.55: true })).events.filter((e) => e.type === 'HEADER_GOAL').length;
@@ -889,6 +897,24 @@ test('friskhed virker i luftduellen – både angriber og forsvarer', () => {
   assert.equal(run(11, 50, 100), 0);    // 9,625 < 10
   assert.equal(run(10, 100, 100), 0);   // 10 > 10 er falsk
   assert.ok(run(10, 100, 50) >= 25);    // 10 > 8,75
+});
+
+test('luftduel i feltet tages af en midtstopper, når holdet har en (v3.8) – ellers af den trukne forsvarer', () => {
+  const run = (formation) => {
+    const a = arena({ home: { p1: { attackFocus: 'HIGH_CROSSES' } } });
+    if (formation) a.A.tactics.baseFormation = formation;
+    for (const p of mids(a.A)) p.skills.intercepting = 1;
+    slot(a.A, 0).skills.goalkeeping = 0;
+    // Backs/wingbacks (slot 1 og 4 i 4-4-2) er luftstærke, stopperne svage: vinder skytten, var det en stopper.
+    for (const i of [1, 2, 3, 4]) Object.assign(slot(a.A, i), { aerialPower: [1, 4].includes(i) ? 20 : 5, freshness: 100 });
+    Object.assign(slot(a.H, 9), { aerialPower: 11, freshness: 100 });
+    for (const b of a.A.squad.slice(11)) b.skills = SK(1);
+    const ev = simulateMatch(a.H, a.A, stubRng({ 0.48: true, 0.3: true, 0.55: true })).events;
+    return { goals: ev.filter((e) => e.type === 'HEADER_GOAL').length, clears: ev.filter((e) => e.label === 'Luftduel i feltet').map((e) => e.text) };
+  };
+  const r = run();
+  assert.ok(r.goals >= 25, `stopperne (5) taber til skytten (11): ${r.goals}`);
+  assert.equal(r.clears.length, 0);
 });
 
 // ---------- #8 Bot-rotationens filtre ----------
@@ -948,25 +974,28 @@ test('normalizeLeague giver gamle spillere 0 i km, minutter og topfart (ikke NaN
 });
 
 // ---------- v3.7.1: andel højintenst løb og kampen bag "Rundens mål" ----------
-test('runProfile: andel højintenst løb = (kæde-basis + (PAC−10)·0,4) · pres · (0,8 + 0,2·friskhed) ± 1, klemt 1–20', () => {
+test('runProfile: andel højintenst løb = (rolle-basis + (PAC−10)·0,4) · pres · (0,8 + 0,2·friskhed) ± 1, klemt 1–20', () => {
   const r = { next: () => 0.5 }; // støj 0
   const team = (press) => ({ tactics: { phases: { phase2_defending: { pressingHeight: press } } } });
-  const hi = (line, { pace = 10, press = 'MID_BLOCK', fresh = 100 } = {}) => runProfile({ line, freshness: fresh, skills: { stamina: 10, pace } }, team(press), r).hiShare;
-  assert.deepEqual([hi('GK'), hi('DEF'), hi('MID'), hi('ATT')], [2, 7, 9, 11]);
-  assert.equal(hi('MID', { pace: 15 }), 11);                  // 9 + 2
-  assert.equal(hi('MID', { press: 'HIGH_GEGENPRESS' }), 10.4); // 9·1,15 = 10,35
-  assert.equal(hi('MID', { press: 'LOW_BLOCK' }), 8.1);        // ·0,9
-  assert.equal(hi('MID', { fresh: 50 }), 8.1);                 // ·0,9
+  const hi = (line, { pace = 10, press = 'MID_BLOCK', fresh = 100, role } = {}) => runProfile({ line, freshness: fresh, skills: { stamina: 10, pace } }, team(press), r, role).hiShare;
+  // v3.8 pr. rolle (v3.7.1 pr. kæde: 2/7/9/11): wingbacks og kanter flest, stoppere færrest.
+  const roles = ['GK', 'CB', 'LB', 'LWB', 'RM', 'LW', 'CDM', 'CM', 'CAM', 'ST'];
+  assert.deepEqual(roles.map((role) => hi('MID', { role })), [2, 5, 11, 13, 13, 13, 8, 8, 10, 11]);
+  assert.deepEqual([hi('GK'), hi('DEF'), hi('MID'), hi('ATT')], [2, 5, 8, 11]); // uden rolle: kædens plads
+  assert.equal(hi('MID', { pace: 15 }), 10);                  // 8 + 2
+  assert.equal(hi('MID', { press: 'HIGH_GEGENPRESS' }), 9.2); // 8·1,15
+  assert.equal(hi('MID', { press: 'LOW_BLOCK' }), 7.2);        // ·0,9
+  assert.equal(hi('MID', { fresh: 50 }), 7.2);                 // ·0,9
   assert.equal(hi('ATT', { pace: 40 }), 20);                   // loft
   assert.equal(hi('GK', { pace: 1 }), 1);                      // bund (2 − 3,6)
-  assert.equal(runProfile({ line: 'MID', skills: { stamina: 10, pace: 10 } }, team('MID_BLOCK'), { next: () => 1 }).hiShare, 10); // støj +1
+  assert.equal(runProfile({ line: 'MID', skills: { stamina: 10, pace: 10 } }, team('MID_BLOCK'), { next: () => 1 }).hiShare, 9); // 8, støj +1
 });
 test('finalizeSheet: km i højintenst løb = distance · andel; modstandere ser hverken andel eller km i HI', () => {
   const s = createSheet(), r = { next: () => 0.5 };
   const team = { id: 't', name: 'T', isBot: false, tactics: { phases: { phase2_defending: { pressingHeight: 'MID_BLOCK' } } } };
   s.register({ id: 'a', shirtNumber: 1, shortName: 'a', line: 'MID', skills: { stamina: 10, pace: 10 } }, team, true, 'CM', 1, r, 15, 5);
   const e = finalizeSheet(s, 0, 0, r, counterXpForMatch).home[0];
-  assert.equal(e.hiShare, 9); assert.equal(e.hiKm, 1); // 11,1 km · 9 % = 0,999
+  assert.equal(e.hiShare, 8); assert.equal(e.hiKm, 0.94); // CM: 11,7 km · 8 % = 0,936
   // Afrunding til 2 decimaler: 10,5 km · 9,5 % = 0,9975 → 1; 4,3 km · 11 % = 0,473 → 0,47 (1 decimal gav 0,5)
   const s2 = createSheet();
   s2.register({ id: 'b', shirtNumber: 2, shortName: 'b', line: 'ATT', skills: { stamina: 10, pace: 10 } }, team, true, 'ST', 56, r, 15, 9);
@@ -1007,4 +1036,65 @@ test('Rundens mål: kampen findes via matchIdx, ellers via navnet (runder fra f�
   assert.equal(goalMatchIdx(goal, [{ homeName: 'B', awayName: 'A' }]), -1);
   assert.equal(goalMatchIdx(goal, null), -1);
   assert.equal(goalMatchIdx(null, []), -1);
+});
+
+import { FORMATIONS } from '../../public/engine/formations.js';
+import { RUN_BY_ROLE } from '../../public/engine/ratings.js';
+const slotRoles = (team) => FORMATIONS[team.tactics.baseFormation].map((s) => s.r);
+const RUN_HI = (role, line) => (role ? RUN_BY_ROLE[role].hi : RUN_BY_ROLE[{ GK: 'GK', DEF: 'CB', MID: 'CM', ATT: 'ST' }[line]].hi);
+
+// ---------- v3.8 Test Manager: løb efter plads – tabellen, ledningen og indskifterne ----------
+test('RUN_BY_ROLE er dokumentets løbetal (bogstavelig), og HVER rolle i HVER formation har en post', async () => {
+  const { RUN_BY_ROLE, runBase } = await import('../../public/engine/ratings.js');
+  const { FORMATIONS } = await import('../../public/engine/formations.js');
+  const W = { km: 11.0, hi: 13 };
+  assert.deepEqual(RUN_BY_ROLE, {
+    GK: { km: 5.5, hi: 2 }, CB: { km: 9.5, hi: 5 },
+    LB: { km: 10.6, hi: 11 }, RB: { km: 10.6, hi: 11 },
+    LWB: W, RWB: W, LM: W, RM: W, LW: W, RW: W,
+    CDM: { km: 11.8, hi: 8 }, CM: { km: 11.8, hi: 8 },
+    CAM: { km: 10.8, hi: 10 }, CF: { km: 10.8, hi: 10 }, ST: { km: 10.0, hi: 11 },
+  });
+  const roles = new Set(Object.values(FORMATIONS).flatMap((f) => f.map((s) => s.r)));
+  for (const r of roles) assert.ok(RUN_BY_ROLE[r], `rolle ${r} mangler i RUN_BY_ROLE (falder ellers stille tilbage på kæden)`);
+  // Ukendt rolle → kædens plads; ukendt begge dele → 10 km / 8 %
+  assert.deepEqual(runBase('SUB (DEF)', 'DEF'), { km: 9.5, hi: 5 });
+  assert.deepEqual(runBase(undefined, 'GK'), { km: 5.5, hi: 2 });
+  assert.deepEqual(runBase('XX', 'YY'), { km: 10, hi: 8 });
+  assert.deepEqual(runBase(undefined, undefined), { km: 10, hi: 8 });
+  assert.deepEqual(runBase('LB', 'ATT'), { km: 10.6, hi: 11 }, 'rollen vinder over kæden');
+});
+test('sheet.register: løbet følger runRole; uden runRole rollen selv – ikke kæden', () => {
+  const r = { next: () => 0.5 };
+  const team = { id: 't', name: 'T', isBot: false, tactics: { phases: { phase2_defending: { pressingHeight: 'MID_BLOCK' } } } };
+  const mid = (id) => ({ id, shirtNumber: 5, shortName: id, line: 'MID', skills: { stamina: 10, pace: 10 } });
+  const s = createSheet();
+  s.register(mid('a'), team, true, 'LM', 1, r, 15, 5);                 // runRole = role = LM
+  s.register(mid('b'), team, true, 'SUB (MID)', 1, r, 15, 6, 'LM');    // roleteksten er ikke en rolle; runRole afgør
+  s.register(mid('c'), team, true, 'SUB (MID)', 1, r, 15, 7);          // ingen runRole: kædens plads (CM)
+  const by = Object.fromEntries(finalizeSheet(s, 0, 0, r, counterXpForMatch).home.map((e) => [e.playerId, e]));
+  // LM: 11,0 km/90 · 89/90 = 10,9 og 13 % · CM: 11,8 → 11,7 km og 8 %
+  assert.deepEqual([by.a.distanceKm, by.a.hiShare], [10.9, 13]);
+  assert.deepEqual([by.b.distanceKm, by.b.hiShare], [10.9, 13]);
+  assert.deepEqual([by.c.distanceKm, by.c.hiShare], [11.7, 8]);
+});
+test('kampen: også en INDSKIFTER løber efter den plads han kommer ind på (ikke efter kæden)', () => {
+  const PRESS_HI = { HIGH_GEGENPRESS: 1.15, MID_BLOCK: 1, LOW_BLOCK: 0.9 };
+  let checked = 0, differing = 0;
+  for (const seed of [22, 5, 8]) {
+    const L = createLeague(createRng(seed)), base = createRng(3);
+    const rng = { ...base, chance: (p) => (p === 0.06 || p === 0.4 ? true : base.chance(p)) }; // skader i hvert tick → mange skift
+    const m = simulateMatch(L.teams[0], L.teams[1], rng);
+    for (const [list, team] of [[m.ratings.home, L.teams[0]], [m.ratings.away, L.teams[1]]]) {
+      for (const e of list.filter((x) => x.role.startsWith('SUB') && x.hiShare != null)) {
+        const pl = team.squad.find((p) => p.id === e.playerId);
+        const exp = (hi) => (hi + (pl.skills.pace - 10) * 0.4) * PRESS_HI[team.tactics.phases.phase2_defending.pressingHeight] * (0.8 + 0.2 * pl.freshness / 100);
+        const slotRole = slotRoles(team)[e.slot];
+        const hiSlot = RUN_HI(slotRole), hiLine = RUN_HI(null, pl.line);
+        assert.ok(Math.abs(e.hiShare - exp(hiSlot)) <= 1.05, `${seed} indskifter på ${slotRole} (kæde ${pl.line}): ${e.hiShare} vs forventet ${exp(hiSlot).toFixed(1)}`);
+        checked++; if (Math.abs(exp(hiSlot) - exp(hiLine)) >= 3) differing++;
+      }
+    }
+  }
+  assert.ok(checked >= 8 && differing >= 3, `for lidt data: ${checked} indskiftere, ${differing} hvor pladsen og kæden adskiller sig`);
 });

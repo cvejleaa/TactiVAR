@@ -67,14 +67,15 @@ function prepareSide(team, isHome, notes) {
 
 function rolesOf(side) {
   const coords = coordsOf(side.tactics);
-  const defs = [], mids = [], atts = [];
+  const defs = [], mids = [], atts = [], cbs = [];
   side.starters.forEach((p, i) => {
     if (i === 0) return;
+    if (coords[i].r === 'CB') cbs.push(p);
     const line = lineOfRole(coords[i].r);
     (line === 'DEF' ? defs : line === 'MID' ? mids : atts).push(p);
   });
   const s = side.starters;
-  return { gk: s[0], defs: defs.length ? defs : s.slice(1, 5), mids: mids.length ? mids : s.slice(5, 9), atts: atts.length ? atts : s.slice(9) };
+  return { gk: s[0], defs: defs.length ? defs : s.slice(1, 5), mids: mids.length ? mids : s.slice(5, 9), atts: atts.length ? atts : s.slice(9), cbs };
 }
 
 function customDragged(side) {
@@ -101,7 +102,8 @@ export function simulateMatch(home, away, rng, opts = {}) {
   const addEv = (min, type, category, isHome, plot, label, text, varMsg) =>
     events.push({ min, type, category, isHome, plot, label, text, varMsg, hG, aG, stats: { ...st } });
   const observe = (player, text) => observations.push({ playerId: player.id, text });
-  const register = (side, p, role, minIn, slot) => sheet.register(p, side.team, side.isHome, role, minIn, rng, masteryVs(p, other(side).team), slot);
+  // Løbet følger pladsen (v3.8): også en indskifter løber efter den rolle, han kommer ind på.
+  const register = (side, p, role, minIn, slot) => sheet.register(p, side.team, side.isHome, role, minIn, rng, masteryVs(p, other(side).team), slot, slot != null ? coordsOf(side.tactics)[slot].r : role);
 
   for (const side of [H, A]) side.starters.forEach((p, i) => p && register(side, p, coordsOf(side.tactics)[i].r, 1, i));
   // Startformationen gemmes, så karakterarket kan vise spillerne på banen.
@@ -299,18 +301,22 @@ export function simulateMatch(home, away, rng, opts = {}) {
       const assist = (bonus) => { if (assister.id !== shooter.id) { sheet.adjust(assister.id, bonus); sheet.bump(assister.id, 'assists'); } };
       const high = attPh.phase1_buildUp.attackFocus === 'HIGH_CROSSES' || attPh.phase1_buildUp.passingStyle === 'DIRECT_LONG';
       if (high && rng.chance(0.55)) {
-        if (shooter.aerialPower * freshFactor(shooter) + rng.next() * 6 > defender.aerialPower * freshFactor(defender) + gk.skills.goalkeeping * 0.38 + rng.next() * 6) {
+        // Høje bolde i feltet tages af en midtstopper, når holdet har en på banen (v3.8: med
+        // backs på ≈175 cm gav en tilfældig forsvarer næsten tre gange så mange hovedstødsmål).
+        // Samme trukne forsvarer afgør hvilken stopper – ingen ekstra terning.
+        const aDef = dR.cbs.length ? (dR.cbs.includes(defender) ? defender : dR.cbs[Math.max(0, dR.defs.indexOf(defender)) % dR.cbs.length]) : defender;
+        if (shooter.aerialPower * freshFactor(shooter) + rng.next() * 6 > aDef.aerialPower * freshFactor(aDef) + gk.skills.goalkeeping * 0.38 + rng.next() * 6) {
           scored(); st[k(att, 'AerialWon')]++; st[k(att, 'TacticSuccess')]++;
           sheet.adjust(shooter.id, 1.35); sheet.bump(shooter.id, 'goals'); sheet.bump(shooter.id, 'aerialWins'); assist(0.55);
-          sheet.adjust(defender.id, -0.35); sheet.adjust(gk.id, -0.25);
+          sheet.adjust(aDef.id, -0.35); sheet.adjust(gk.id, -0.25);
           const prose = describeHeader(shooter.aerialPower);
           observe(shooter, `Luftduel (${min}. min mod ${def.team.name}): ${shooter.shortName} scorede med ${prose}.`);
           goalsPool.push({ scorer: tag(shooter), teamName: att.team.name, match: `${home.name} - ${away.name}`, min, kind: 'HEADER', spectacle: goalSpectacle('HEADER', { aerialPower: shooter.aerialPower }, min, rng), desc: describeGoal('HEADER', tag(shooter), tag(assister), min, rng) });
           addEv(min, 'HEADER_GOAL', 'HIGHLIGHT', att.isHome, true, `⚽ Hovedstødsmål: ${tag(shooter)}`, `⚽ [${att.team.name} • ${hG}-${aG}] MÅÅÅL! ${tag(shooter)} (${shooter.heightCm} cm) header bolden ind – ${prose}.`);
         } else {
           st[k(def, 'AerialWon')]++;
-          sheet.adjust(defender.id, 0.4); sheet.bump(defender.id, 'aerialWins');
-          addEv(min, 'INFO', 'PLAY', def.isHome, false, 'Luftduel i feltet', `✈️ [${def.team.name} forsvar] Stærk luftduel: ${tag(defender)} (${defender.heightCm} cm) stiger højest og clearer foran ${tag(shooter)}.`);
+          sheet.adjust(aDef.id, 0.4); sheet.bump(aDef.id, 'aerialWins');
+          addEv(min, 'INFO', 'PLAY', def.isHome, false, 'Luftduel i feltet', `✈️ [${def.team.name} forsvar] Stærk luftduel: ${tag(aDef)} (${aDef.heightCm} cm) stiger højest og clearer foran ${tag(shooter)}.`);
         }
       } else if (rng.next() < 0.22) {
         st[k(att, 'VarChecks')]++;

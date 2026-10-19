@@ -1,7 +1,7 @@
 // Spillerkort: offentlige data for alle, evner og mod-kunnen kun for eget hold, VAR-profilen
 // for ingen. Scouting-indtryk og private noter vises for alle spillere.
 import { h, LOCK } from './dom.js';
-import { LINE, SKILL_LABELS, kr, starsEl } from './labels.js';
+import { LINE, POSITION_FULL, SKILL_LABELS, kr, starsEl } from './labels.js';
 import { aerialBreakdown } from '../engine/generator.js';
 import { COUNTER_KEYS, COUNTER_LABELS, COUNTER_POOL } from '../engine/counter.js';
 
@@ -13,7 +13,7 @@ export function renderCard({ player: p, team, isOwn, opponent, scouting, note, o
   if (!p) return h('div', { class: 'panel muted' }, 'Klik på en spiller for at se spillerkortet.');
   const head = h('div', { class: 'card-head' },
     h('h3', {}, `#${p.shirtNumber} ${p.name}`),
-    h('div', { class: 'muted' }, `${team.name} • ${LINE[p.line]} • ${p.age} år • ${p.heightCm} cm • ${p.injuryMatchesLeft > 0 ? `🚑 skadet i ${p.injuryMatchesLeft} kamp(e)` : `Friskhed ${p.freshness}%`}`));
+    h('div', { class: 'muted' }, `${team.name} • ${LINE[p.line]}${POSITION_FULL[p.position] ? ` • ${POSITION_FULL[p.position]}` : ''} • ${p.age} år • ${p.heightCm} cm • ${p.injuryMatchesLeft > 0 ? `🚑 skadet i ${p.injuryMatchesLeft} kamp(e)` : `Friskhed ${p.freshness}%`}`));
 
   let body;
   if (isOwn) {

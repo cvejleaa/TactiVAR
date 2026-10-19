@@ -357,8 +357,9 @@ test('migrering 3 → 4: rang i hver kæde bevares, ligaen får Superligaens sni
 });
 
 test('migrering 3 → 4: en spiller, hvis højde ændres, får rettet ALLE forekomster i scouting og referat; ugyldig højde røres ikke', async () => {
-  const { MIGRATIONS } = await import('../../public/state/storage.js');
-  const { heightAtQuantile } = await import('../../public/engine/generator.js');
+  const { MIGRATIONS, HEIGHT_V37 } = await import('../../public/state/storage.js');
+  const { heightAtQuantile: hq } = await import('../../public/engine/generator.js');
+  const heightAtQuantile = (line, q) => hq(line, q, HEIGHT_V37); // 3 → 4 bruger v3.7's frosne tabel
   const d = JSON.parse(FIXTURE3);
   const all = d.league.teams.flatMap((t) => t.squad);
   const defs = all.filter((p) => p.line === 'DEF').sort((a, b) => a.heightCm - b.heightCm || String(a.id).localeCompare(String(b.id)));
@@ -387,4 +388,112 @@ test('migrering 2 → 3 retter også højden i teksterne (−5 cm)', async () =>
   const out = MIGRATIONS[2](d);
   assert.equal(out.league.scouting[viewer][p.id][0], `${p.shortName} (${p.heightCm} cm)`); // p er muteret: ny højde
   assert.equal(out.league.teams[0].squad[0].heightCm, JSON.parse(FIXTURE2).league.teams[0].squad[0].heightCm - 5);
+});
+
+// ---------- Skema 5 (v3.8): naturlig position og højde pr. position ----------
+const FIXTURE4 = fs.readFileSync(new URL('../fixtures/save-schema4.json', import.meta.url), 'utf8');
+test('migrering 4 → 5: alle får en naturlig position; højde efter dokumentets tabel; rang i positionen bevares; tekster følger med', async () => {
+  const { MIGRATIONS } = await import('../../public/state/storage.js');
+  const { HEIGHT_BY_POS } = await import('../../public/engine/generator.js');
+  const d = JSON.parse(FIXTURE4);
+  assert.equal(d.schemaVersion, 4);
+  assert.ok(d.league.teams.every((t) => t.squad.every((p) => p.position === undefined)), 'fixturet er en v3.7-liga uden positioner');
+  const before = new Map(d.league.teams.flatMap((t) => t.squad.map((p) => [p.id, p.heightCm])));
+  // En spiller i dit hold, hvis højde ændres (findes på en kopi)
+  const probe = MIGRATIONS[4](JSON.parse(FIXTURE4)).league.teams[0].squad;
+  const someone = d.league.teams[0].squad.find((p, i) => probe[i].heightCm !== p.heightCm);
+  const tag = `#${someone.shirtNumber} ${someone.shortName}`, old = someone.heightCm;
+  d.league.lastRound.matches[0].events.push({ text: `✈️ Stærk luftduel: ${tag} (${someone.heightCm} cm) stiger højest.` });
+  const viewer = d.league.teams.find((t) => !t.isBot).id;
+  (d.league.scouting[viewer] ||= {})[someone.id] = [`${someone.shortName} (${someone.heightCm} cm) ruver.`];
+  const out = MIGRATIONS[4](d);
+  assert.equal(out.schemaVersion, 5);
+  for (const t of out.league.teams) {
+    const c = (line, pos) => t.squad.filter((p) => p.line === line && p.position === pos).length;
+    assert.deepEqual([c('GK', 'GK'), c('DEF', 'CB'), c('DEF', 'FB'), c('MID', 'CM'), c('MID', 'AM'), c('MID', 'WM'), c('ATT', 'ST'), c('ATT', 'WM')], [2, 3, 3, 3, 1, 2, 3, 1], t.name);
+    // Pr. hold og kæde: enhver stopper var mindst lige så høj som enhver back før migreringen.
+    for (const [line, hi, lo] of [['DEF', 'CB', 'FB'], ['ATT', 'ST', 'WM']]) {
+      const H = t.squad.filter((p) => p.line === line && p.position === hi), L = t.squad.filter((p) => p.line === line && p.position === lo);
+      for (const a of H) for (const b of L) assert.ok(before.get(a.id) >= before.get(b.id), `${t.name} ${line}`);
+    }
+  }
+  const players = out.league.teams.flatMap((t) => t.squad);
+  for (const pos of Object.keys(HEIGHT_BY_POS)) {
+    const ps = players.filter((p) => p.position === pos);
+    if (!ps.length) continue;
+    const t = HEIGHT_BY_POS[pos], mean = ps.reduce((a, p) => a + p.heightCm, 0) / ps.length;
+    assert.ok(ps.every((p) => p.heightCm >= t.min && p.heightCm <= t.max), pos);
+    assert.ok(Math.abs(mean - (t.mid + 0.75)) <= 1.5, `${pos} snit ${mean}`);
+    // Rang i positionen (over hele ligaen) bevares
+    for (const a of ps) for (const b of ps) if (before.get(a.id) > before.get(b.id)) assert.ok(a.heightCm >= b.heightCm, `${pos}: ${a.shortName} vs ${b.shortName}`);
+  }
+  const cbMean = players.filter((p) => p.position === 'CB').reduce((a, p) => a + p.heightCm, 0) / 24;
+  const fbMean = players.filter((p) => p.position === 'FB').reduce((a, p) => a + p.heightCm, 0) / 24;
+  assert.ok(cbMean - fbMean >= 12, `CB ${cbMean} vs FB ${fbMean} (v3.7: samme kæde-fordeling, forskel ≈5)`);
+  const now = players.find((p) => p.id === someone.id).heightCm;
+  assert.notEqual(now, old, 'testdata: højden ændres');
+  assert.equal(out.league.lastRound.matches[0].events.at(-1).text, `✈️ Stærk luftduel: ${tag} (${now} cm) stiger højest.`);
+  assert.equal(out.league.scouting[viewer][someone.id][0], `${someone.shortName} (${now} cm) ruver.`);
+});
+test('fixture skema 4 indlæses (parseSave) – positioner sat, intet tabt, migreret fra 4', () => {
+  const r = parseSave(FIXTURE4);
+  assert.ok(r.ok, r.error);
+  assert.equal(r.migratedFrom, 4);
+  const d = JSON.parse(FIXTURE4);
+  assert.equal(r.state.league.teams.length, 8);
+  assert.equal(r.state.league.leagueMetadata.round, d.league.leagueMetadata.round);
+  assert.ok(r.state.league.teams.every((t) => t.squad.length === 18 && t.squad.every((p) => ['GK', 'CB', 'FB', 'CM', 'WM', 'AM', 'ST'].includes(p.position))));
+  assert.equal(JSON.stringify(r.state.league.teams[0].tactics.lineupSlots), JSON.stringify(d.league.teams[0].tactics.lineupSlots));
+});
+
+// ---------- v3.8 Test Manager: rang-fraktilen, lige høje og ugyldig højde i 4 → 5 ----------
+test('migrering 4 → 5: ny højde = fraktil (rang+½)/n i positionen over hele ligaen – hver spiller, ikke kun bånd', async () => {
+  const { MIGRATIONS } = await import('../../public/state/storage.js');
+  const { heightAtQuantile } = await import('../../public/engine/generator.js');
+  const d = JSON.parse(FIXTURE4);
+  const before = new Map(d.league.teams.flatMap((t) => t.squad.map((p) => [p.id, p.heightCm])));
+  const out = MIGRATIONS[4](JSON.parse(FIXTURE4));
+  const players = out.league.teams.flatMap((t) => t.squad);
+  for (const pos of ['GK', 'CB', 'FB', 'CM', 'AM', 'WM', 'ST']) {
+    const ps = players.filter((p) => p.position === pos).sort((a, b) => before.get(a.id) - before.get(b.id) || String(a.id).localeCompare(String(b.id)));
+    ps.forEach((p, i) => assert.equal(p.heightCm, heightAtQuantile(pos, (i + 0.5) / ps.length), `${pos} nr. ${i} (${p.id})`));
+  }
+});
+test('migrering 4 → 5: lige høje i samme position får højder efter id (ikke efter trup-rækkefølge)', async () => {
+  const { MIGRATIONS } = await import('../../public/state/storage.js');
+  const { heightAtQuantile } = await import('../../public/engine/generator.js');
+  const d = JSON.parse(FIXTURE4);
+  const sq = d.league.teams[0].squad;
+  // plr_t0_13 står EFTER plr_t0_2 i truppen, men er mindre som tekst. Begge er ligaens højeste stoppere og lige høje.
+  for (const id of ['plr_t0_2', 'plr_t0_13']) sq.find((p) => p.id === id).heightCm = 201;
+  const out = MIGRATIONS[4](d);
+  const cbs = out.league.teams.flatMap((t) => t.squad).filter((p) => p.position === 'CB');
+  assert.equal(cbs.length, 24);
+  const h = (id) => out.league.teams[0].squad.find((p) => p.id === id).heightCm;
+  const lo = heightAtQuantile('CB', 22.5 / 24), hi = heightAtQuantile('CB', 23.5 / 24);
+  assert.ok(lo < hi, `testdata: de to øverste rang skal give forskellig højde (${lo} / ${hi})`);
+  assert.deepEqual([h('plr_t0_13'), h('plr_t0_2')], [lo, hi]);
+});
+test('migrering 4 → 5: en spiller med ugyldig højde røres ikke – men får stadig en position, og de andre får tal', async () => {
+  const { MIGRATIONS } = await import('../../public/state/storage.js');
+  const d = JSON.parse(FIXTURE4);
+  const bad = d.league.teams[1].squad.find((p) => p.id === 'plr_t1_5'); // en back
+  bad.heightCm = null;
+  const out = MIGRATIONS[4](d);
+  const o = out.league.teams[1].squad.find((p) => p.id === 'plr_t1_5');
+  assert.equal(o.heightCm, null);
+  assert.ok(['CB', 'FB'].includes(o.position), o.position);
+  for (const p of out.league.teams.flatMap((t) => t.squad)) if (p.id !== 'plr_t1_5') assert.ok(Number.isInteger(p.heightCm), `${p.id} ${p.heightCm}`);
+});
+
+test('HEIGHT_V37 er v3.7\'s fordeling, frosset (bogstavelig) – migreringen 3 → 4 må aldrig følge senere tabelrettelser', async () => {
+  const { HEIGHT_V37 } = await import('../../public/state/storage.js');
+  const { heightAtQuantile } = await import('../../public/engine/generator.js');
+  assert.deepEqual(HEIGHT_V37, {
+    GK: { mid: 192, dice: 4, min: 168, max: 201 }, DEF: { mid: 186, dice: 6, min: 168, max: 201 },
+    MID: { mid: 179.5, dice: 6, min: 168, max: 201 }, ATT: { mid: 181, dice: 6, min: 168, max: 201 },
+  });
+  // fraktiler uden for midten (terningernes antal sider afgør): GK d=4, øvrige d=6
+  assert.deepEqual([0.1, 0.9].map((q) => heightAtQuantile('GK', q, HEIGHT_V37)), [187, 199]);
+  assert.deepEqual([0.1, 0.9].map((q) => heightAtQuantile('MID', q, HEIGHT_V37)), [171, 189]);
 });

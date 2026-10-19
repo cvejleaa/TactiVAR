@@ -2,7 +2,7 @@
 // standardværdier, eksisterende data røres ikke. Grundlaget for migreringsreglen i
 // docs/spec.md §9 – en ny version må aldrig slette ligaen.
 import { FORMATIONS } from './formations.js';
-import { defaultTactics, defaultStarterIds, emptyStanding, BOT_PROFILES, aerialBreakdown } from './generator.js';
+import { defaultTactics, defaultStarterIds, emptyStanding, BOT_PROFILES, aerialBreakdown, assignPositions } from './generator.js';
 
 const PLAYER_DEFAULTS = { freshness: 100, injuryMatchesLeft: 0, lastRating: 0, ratingSum: 0, ratingGames: 0, publicStars: 0, seasonAgeCounter: 1, archetype: null, distanceSum: 0, minutesSum: 0, topSpeedMax: 0, hiKmSum: 0, hiDistSum: 0 };
 
@@ -52,6 +52,7 @@ export function normalizeLeague(league) {
       if (!p.counterTactics) p.counterTactics = { vsPress: 15, vsLowBlock: 15, vsTrapLong: 15 };
       p.aerialPower = aerialBreakdown(p.heightCm, p.jumpingPower, p.skills.strength, p.skills.positioning).total;
     }
+    assignPositions(team.squad); // kun spillere uden (gyldig) naturlig position
     const ids = new Set(team.squad.map((p) => p.id));
     const starters = defaultStarterIds(team.squad);
     const profile = BOT_PROFILES[idx] || BOT_PROFILES[0];

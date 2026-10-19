@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRng } from '../../public/engine/rng.js';
 import { FORMATIONS, FORMATION_NAMES, MAX_ANCHOR_RADIUS, isOutOfZone, clampPos, lineOfRole } from '../../public/engine/formations.js';
-import { createLeague, aerialBreakdown, rollStat, TEAM_NAMES, HEIGHT_MID } from '../../public/engine/generator.js';
+import { createLeague, aerialBreakdown, rollStat, TEAM_NAMES, HEIGHT_BY_POS, assignPositions, generatePlayer } from '../../public/engine/generator.js';
 import { viewPlayer, canSeeField, viewRatingEntry } from '../../public/engine/visibility.js';
 import { initialCounterTactics, opponentTacticKeys, masteryVs, counterXpForMatch, applyCounterXp, COUNTER_POOL } from '../../public/engine/counter.js';
 import { starsFromRating, createSheet, finalizeSheet } from '../../public/engine/ratings.js';
@@ -485,16 +485,41 @@ test('mod-kunnen start: round((alder−16)·1,2 + POS·0,8) + støj −8..8, kle
   assert.deepEqual(initialCounterTactics(fixedInt(8), 40, 20), { vsPress: 33, vsLowBlock: 33, vsTrapLong: 33 });
 });
 
-test('højde: snit pr. kæde = HEIGHT_MID + holdprofil (±1 cm), bred spredning i hver kæde (brugeren: ikke alle tæt på positionens snit)', () => {
-  const by = { GK: [], DEF: [], MID: [], ATT: [] };
-  for (let seed = 1; seed <= 40; seed++) for (const t of createLeague(createRng(seed)).teams) for (const p of t.squad) by[p.line].push(p.heightCm);
-  for (const [line, hs] of Object.entries(by)) {
-    const mean = hs.reduce((a, b) => a + b) / hs.length, sd = Math.sqrt(hs.reduce((a, h) => a + (h - mean) ** 2, 0) / hs.length);
-    assert.ok(Math.abs(mean - (HEIGHT_MID[line] + 0.75)) <= 1, `${line} snit ${mean}`);
-    if (line === 'GK') assert.ok(sd >= 4 && sd <= 5.3, `GK spredning ${sd}`); // tre terninger −4..4 (≈4,5)
-    else assert.ok(sd >= 6 && sd <= 7.3, `${line} spredning ${sd}`);       // tre terninger −6..6 (≈6,5; v3.6 ≈5,5)
+test('højde pr. naturlig position efter dokumentets tabel (v3.8): snit, spænd og spredning; ligasnit ≈184', () => {
+  const by = {}, all = [];
+  for (let seed = 1; seed <= 40; seed++) for (const t of createLeague(createRng(seed)).teams) for (const p of t.squad) { (by[p.position] ||= []).push(p.heightCm); all.push(p.heightCm); }
+  const stats = (hs) => { const mean = hs.reduce((a, b) => a + b) / hs.length; return { mean, sd: Math.sqrt(hs.reduce((a, h) => a + (h - mean) ** 2, 0) / hs.length), min: Math.min(...hs), max: Math.max(...hs) }; };
+  for (const [pos, hs] of Object.entries(by)) {
+    const t = HEIGHT_BY_POS[pos], s = stats(hs);
+    assert.ok(Math.abs(s.mean - (t.mid + 0.75)) <= 1, `${pos} snit ${s.mean}`);
+    assert.ok(s.min >= t.min && s.max <= t.max, `${pos} spænd ${s.min}–${s.max}`);
+    assert.ok(s.sd >= 2.8 && s.sd <= (t.dice === 4 ? 5 : 4), `${pos} spredning ${s.sd}`); // d=3 ≈3,5; d=4 ≈4,5
   }
-  assert.deepEqual(HEIGHT_MID, { GK: 192, DEF: 186, MID: 179.5, ATT: 181 });
+  // Dokumentet: CB 189–191, backs og kanter 174–177, MV 193–195. v3.7.1 pr. kæde gav FOR ≈186,75 for
+  // både stoppere og backs og MID ≈180,25 for både central og kant – de bånd er røde her.
+  assert.ok(stats(by.CB).mean >= 189 && stats(by.CB).mean <= 191.5, 'CB');
+  assert.ok(stats(by.FB).mean >= 174 && stats(by.FB).mean <= 177, 'FB');
+  assert.ok(stats(by.WM).mean >= 174 && stats(by.WM).mean <= 177, 'WM');
+  assert.ok(stats(by.GK).mean >= 193 && stats(by.GK).mean <= 196, 'GK');
+  const league = stats(all);
+  assert.ok(league.mean >= 183.5 && league.mean <= 185, `ligasnit ${league.mean}`); // Superligaen ≈184
+  assert.ok(league.min >= 169 && league.max <= 201 && league.max >= 198, `spænd ${league.min}–${league.max}`);
+  assert.ok(league.sd >= 6, `hele truppen spreder sig stadig (brugeren: ikke alle tæt på snittet) – ${league.sd}`);
+});
+test('naturlig position: truppen er 2 GK / 3 CB / 3 FB / 3 CM / 2+1 WM / 1 AM / 3 ST, og standard-11 passer til 4-4-2', () => {
+  const t = createLeague(createRng(3)).teams[0];
+  const count = (line, pos) => t.squad.filter((p) => p.line === line && p.position === pos).length;
+  assert.deepEqual([count('GK', 'GK'), count('DEF', 'CB'), count('DEF', 'FB'), count('MID', 'CM'), count('MID', 'WM'), count('MID', 'AM'), count('ATT', 'ST'), count('ATT', 'WM')], [2, 3, 3, 3, 2, 1, 3, 1]);
+  const start = t.tactics.lineupSlots.map((id) => t.squad.find((p) => p.id === id).position);
+  assert.deepEqual(start, ['GK', 'FB', 'CB', 'CB', 'FB', 'WM', 'CM', 'CM', 'WM', 'ST', 'ST']); // LB CB CB RB / LM CM CM RM / ST ST
+});
+test('assignPositions: kun spillere uden position; pr. kæde efter højde (høje → CB/ST, lave → FB/WM, midterste MID → OM)', () => {
+  const mk = (id, line, heightCm, position) => ({ id, line, heightCm, position });
+  const sq = [mk('d1', 'DEF', 180), mk('d2', 'DEF', 192), mk('d3', 'DEF', 175), mk('d4', 'DEF', 186),
+    mk('m1', 'MID', 170), mk('m2', 'MID', 190), mk('m3', 'MID', 185), mk('m4', 'MID', 178), mk('m5', 'MID', 181), mk('m6', 'MID', 188),
+    mk('a1', 'ATT', 175), mk('a2', 'ATT', 190), mk('a3', 'ATT', 182), mk('a4', 'ATT', 186), mk('g', 'GK', 190), mk('x', 'DEF', 170, 'CB')];
+  const pos = Object.fromEntries(assignPositions(sq).map((p) => [p.id, p.position]));
+  assert.deepEqual(pos, { d1: 'FB', d2: 'CB', d3: 'FB', d4: 'CB', m1: 'WM', m2: 'CM', m3: 'CM', m4: 'WM', m5: 'AM', m6: 'CM', a1: 'WM', a2: 'ST', a3: 'ST', a4: 'ST', g: 'GK', x: 'CB' });
 });
 test('forsæson-indtrykket om luftspillet kræver 190 cm (v3.6: 187) og spring 13', () => {
   const vp = { cynicism: 5, theatre: 5, varPulse: 5 };
@@ -503,12 +528,127 @@ test('forsæson-indtrykket om luftspillet kræver 190 cm (v3.6: 187) og spring 1
   assert.ok(!generateScoutingClues('A. B', vp, 190, 12).some((c) => c.includes('en hel etage')));
 });
 
-test('heightAtQuantile: fraktiler af de tre terninger om kædens midte + holdprofilens snit (0,75)', async () => {
+test('heightAtQuantile: fraktiler af de tre terninger om positionens midte + holdprofilens snit (0,75), klemt til spændet', async () => {
   const { heightAtQuantile } = await import('../../public/engine/generator.js');
-  assert.equal(heightAtQuantile('GK', 0.5), 193);    // round(192,75) + median 0
-  assert.equal(heightAtQuantile('MID', 0.5), 180);   // round(180,25)
-  assert.equal(heightAtQuantile('DEF', 0), 169);     // 187 − 18
-  assert.equal(heightAtQuantile('ATT', 0.999), 199); // 182 + 17 (indeks 2194 af 2197)
-  assert.equal(heightAtQuantile('DEF', 0.9999), 201); // 187 + 18 = 205 → loft 201
-  assert.equal(heightAtQuantile('GK', 0), 181);      // 193 − 12
+  const { HEIGHT_V37 } = await import('../../public/state/storage.js');
+  assert.equal(heightAtQuantile('GK', 0.5), 195);    // round(194,75) + median 0 (v3.7: 193)
+  assert.equal(heightAtQuantile('CM', 0.5), 184);    // round(184,25)
+  assert.equal(heightAtQuantile('FB', 0.5), 176);    // round(176,25) (v3.7 FOR: 187)
+  assert.equal(heightAtQuantile('CB', 0.5), 191);
+  assert.equal(heightAtQuantile('FB', 0), 169);      // 176 − 9 = 167 → bund 169
+  assert.equal(heightAtQuantile('CB', 0), 184);      // 191 − 9 = 182 → bund 184
+  assert.equal(heightAtQuantile('ST', 0.9999), 196); // 187 + 12 = 199 → loft 196
+  assert.equal(heightAtQuantile('GK', 0), 188);      // 195 − 9 = 186 → bund 188
+  // v3.7's frosne tabel giver stadig migreringens gamle tal (3 → 4).
+  assert.equal(heightAtQuantile('GK', 0.5, HEIGHT_V37), 193);
+  assert.equal(heightAtQuantile('DEF', 0, HEIGHT_V37), 169);
+  assert.equal(heightAtQuantile('ATT', 0.999, HEIGHT_V37), 199);
+  assert.equal(heightAtQuantile('DEF', 0.9999, HEIGHT_V37), 201);
+});
+
+// ---------- v3.8 Test Manager: huller i position og højde pr. position ----------
+// Tabellen pinnes BOGSTAVELIGT (som v3.7's HEIGHT_MID var det): snit/spænd-testene ovenfor sammenligner
+// med tabellen selv, så en ændret mid/dice/min/max fulgte med og forblev grøn.
+test('HEIGHT_BY_POS er dokumentets tabel (bogstavelig): midte, terninger og spænd pr. position', () => {
+  assert.deepEqual(HEIGHT_BY_POS, {
+    GK: { mid: 194, dice: 3, min: 188, max: 201 },
+    CB: { mid: 190, dice: 3, min: 184, max: 198 },
+    ST: { mid: 186.5, dice: 4, min: 178, max: 196 },
+    CM: { mid: 183.5, dice: 4, min: 175, max: 192 },
+    AM: { mid: 183.5, dice: 4, min: 175, max: 192 },
+    FB: { mid: 175.5, dice: 3, min: 169, max: 183 },
+    WM: { mid: 175.5, dice: 3, min: 169, max: 183 },
+  });
+});
+test('heightAtQuantile pr. position: fraktiler, bund og loft for ALLE syv (migreringens tal)', async () => {
+  const { heightAtQuantile } = await import('../../public/engine/generator.js');
+  // [q=0 (bund), 0,1, 0,25, 0,5, 0,75, 0,9, 0,9999 (loft)] – regnet fra midte+0,75 og tre terninger
+  const want = {
+    GK: [188, 190, 193, 195, 197, 200, 201], CB: [184, 186, 189, 191, 193, 196, 198], ST: [178, 181, 184, 187, 190, 193, 196],
+    CM: [175, 178, 181, 184, 187, 190, 192], AM: [175, 178, 181, 184, 187, 190, 192],
+    FB: [169, 171, 174, 176, 178, 181, 183], WM: [169, 171, 174, 176, 178, 181, 183],
+  };
+  for (const [pos, w] of Object.entries(want)) assert.deepEqual([0, 0.1, 0.25, 0.5, 0.75, 0.9, 0.9999].map((q) => heightAtQuantile(pos, q)), w, pos);
+  // Indekset er floor(q·n), ikke ceil: ST (n=729) q=19,5/729 → indeks 19 (sum −9 → 178), ceil gav 20 (−8 → 179)
+  assert.equal(heightAtQuantile('ST', 19.5 / 729), 178);
+  // Ukendt nøgle falder på CM-fordelingen (ikke på en tilfældig anden)
+  assert.equal(heightAtQuantile('MID', 0.5), heightAtQuantile('CM', 0.5));
+  assert.equal(heightAtQuantile('MID', 0.1), 178);
+});
+
+const posLine = { GK: 'GK', CB: 'DEF', FB: 'DEF', CM: 'MID', WM: 'MID', AM: 'MID', ST: 'ATT' };
+const stubRng = (int) => ({ next: () => 0.5, int, pick: (a) => a[0], chance: () => false });
+test('generatePlayer: højden følger POSITIONEN (ikke kæden): bund, loft, terningernes antal og holdprofilen – alle syv', () => {
+  const h = (pos, int, off = 0) => generatePlayer(stubRng(int), posLine[pos], 'STARTER', 1, 0, new Set(), off, pos).heightCm;
+  const all = (int, off) => Object.fromEntries(Object.keys(posLine).map((p) => [p, h(p, int, off)]));
+  // alle terninger på laveste/højeste værdi: spændets bund og loft slår igennem
+  assert.deepEqual(all((a) => a), { GK: 188, CB: 184, FB: 169, CM: 175, WM: 169, AM: 175, ST: 178 });
+  assert.deepEqual(all((a, b) => b), { GK: 201, CB: 198, FB: 183, CM: 192, WM: 183, AM: 192, ST: 196 });
+  // terningerne på −d/2 afrundet (d=3: −1 hver, d=4: −2 hver) – røber et forkert antal sider; midten = round(mid)
+  assert.deepEqual(all((a) => Math.round(a / 2)), { GK: 191, CB: 187, FB: 173, CM: 178, WM: 173, AM: 178, ST: 181 });
+  // holdprofilen +2 lægges til midten før afrunding (alle andre kalder har offset 0)
+  assert.deepEqual(all((a) => Math.round(a / 2), 2), { GK: 193, CB: 189, FB: 175, CM: 180, WM: 175, AM: 180, ST: 183 });
+});
+test('generatePlayer: position gemmes på spilleren, og uden position vælges kædens (MV/CB/CM/ST)', () => {
+  const mk = (line, pos) => (pos === undefined
+    ? generatePlayer(stubRng((a) => a), line, 'STARTER', 1, 0, new Set(), 0)
+    : generatePlayer(stubRng((a) => a), line, 'STARTER', 1, 0, new Set(), 0, pos));
+  assert.deepEqual(['GK', 'DEF', 'MID', 'ATT'].map((l) => mk(l).position), ['GK', 'CB', 'CM', 'ST']);
+  assert.equal(mk('DEF', 'FB').position, 'FB');
+  assert.equal(mk('MID', 'AM').position, 'AM');
+  assert.equal(mk('DEF').heightCm, 184, 'uden position er en DEF en stopper (bund 184), ikke en back (169)');
+});
+test('truppens bænk og start: positionen pr. trøjenummer står fast i ALLE hold (rækkefølgen i BLUEPRINT)', () => {
+  const want = ['GK', 'FB', 'CB', 'CB', 'FB', 'WM', 'CM', 'CM', 'ST', 'WM', 'ST', 'GK', 'CB', 'FB', 'CM', 'AM', 'ST', 'WM'];
+  for (const seed of [3, 9]) for (const t of createLeague(createRng(seed)).teams) assert.deepEqual(t.squad.map((p) => p.position), want, `${t.name}`);
+});
+
+test('assignPositions: ulige/små kæder, ugyldig position, lige høje (id afgør), manglende højde, ukendt kæde', () => {
+  const run = (line, hs, extra = {}) => {
+    const sq = hs.map((h, i) => ({ id: `p${i}`, line, heightCm: h, ...extra }));
+    assignPositions(sq);
+    return sq.map((p) => p.position);
+  };
+  // DEF: ceil(n/2) stoppere (n=5 → 3 CB + 2 FB; floor gav 2 + 3); høje først
+  assert.deepEqual(run('DEF', [190, 180, 188, 175, 185]), ['CB', 'FB', 'CB', 'FB', 'CB']);
+  // MID: floor(n/2) CM, så AM kun fra 4 spillere, resten WM
+  assert.deepEqual(run('MID', [190, 189, 188, 187, 186]), ['CM', 'CM', 'AM', 'WM', 'WM']); // n=5: floor 2 (ceil gav 3 CM)
+  assert.deepEqual(run('MID', [190, 189, 188, 187]), ['CM', 'CM', 'AM', 'WM']);              // n=4: præcis grænsen
+  assert.deepEqual(run('MID', [190, 189, 188]), ['CM', 'WM', 'WM']);                         // n=3: ingen AM
+  // ATT: kun fra 4 spillere bliver den laveste en WM (kant); under det er alle ST
+  assert.deepEqual(run('ATT', [190, 189, 188]), ['ST', 'ST', 'ST']);
+  assert.deepEqual(run('ATT', [190, 189, 188, 187]), ['ST', 'ST', 'ST', 'WM']);
+  assert.deepEqual(run('ATT', [190, 189, 188, 187, 186]), ['ST', 'ST', 'ST', 'ST', 'WM']);
+  // En position der ikke er en af de syv regnes som manglende (ikke kun tom/undefined)
+  assert.deepEqual(run('DEF', [190, 180], { position: 'XX' }), ['CB', 'FB']);
+  assert.deepEqual(run('GK', [190, 195]), ['GK', 'GK']);
+  // Lige høje: lavere id først (p0 før p1) → p0 bliver CB; omvendt indlæsningsrækkefølge giver samme svar
+  const tie = [{ id: 'b', line: 'DEF', heightCm: 185 }, { id: 'a', line: 'DEF', heightCm: 185 }];
+  assignPositions(tie);
+  assert.deepEqual(tie.map((p) => [p.id, p.position]), [['b', 'FB'], ['a', 'CB']]);
+  // Manglende højde tæller som lavest (backs/kanter), ikke højest
+  const mis = [{ id: 'x', line: 'DEF' }, { id: 'y', line: 'DEF', heightCm: 170 }];
+  assignPositions(mis);
+  assert.deepEqual(mis.map((p) => p.position), ['FB', 'CB']);
+});
+
+test('position er OFFENTLIG: modstandere ser den på spilleren, ligesom højden', () => {
+  const p = { id: 'p', name: 'A', shortName: 'A', line: 'DEF', position: 'CB', heightCm: 190, skills: { pace: 10 } };
+  assert.equal(canSeeField('position', false), true);
+  assert.equal(viewPlayer(p, false).position, 'CB');
+  assert.equal(viewPlayer(p, true).position, 'CB');
+});
+
+test('normalizeLeague: spillere uden (gyldig) position får en – gyldige røres ikke', () => {
+  const L = league(5);
+  const sq = L.teams[2].squad;
+  const keep = sq.find((p) => p.line === 'MID' && p.position === 'AM'); // gyldig, men ikke den assignPositions ville vælge
+  for (const p of sq) if (p !== keep) delete p.position;
+  sq[0].position = 'XX'; // GK med ugyldig position
+  const { league: N } = normalizeLeague(L);
+  const out = N.teams[2].squad;
+  assert.deepEqual(out.map((p) => ['GK', 'CB', 'FB', 'CM', 'WM', 'AM', 'ST'].includes(p.position)), out.map(() => true));
+  assert.equal(out[0].position, 'GK');
+  assert.equal(out.find((p) => p.id === keep.id).position, 'AM');
+  assert.equal(out.filter((p) => p.line === 'DEF' && p.position === 'CB').length, 3);
 });

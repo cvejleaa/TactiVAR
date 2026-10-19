@@ -1,5 +1,8 @@
 // Danske visningsnavne for motorens værdier.
 export const LINE = { GK: 'MÅL', DEF: 'FOR', MID: 'MID', ATT: 'ANG' };
+// Naturlig position (v3.8) med tavlens ord; den fulde betegnelse står i title.
+export const POSITION = { GK: 'MV', CB: 'CB', FB: 'Back', CM: 'CM', WM: 'Kant', AM: 'OM', ST: 'ANG' };
+export const POSITION_FULL = { GK: 'Målmand', CB: 'Midtstopper', FB: 'Back/wingback (LB/RB/LWB/RWB)', CM: 'Central/defensiv midtbane (CM/CDM)', WM: 'Kant (LM/RM/LW/RW)', AM: 'Offensiv midtbane (CAM/CF)', ST: 'Angriber (ST)' };
 export const PHASE_OPTIONS = {
   passingStyle: [['SHORT', 'Korte pasninger'], ['BALANCED', 'Balanceret'], ['DIRECT_LONG', 'Direkte lange bolde']],
   attackFocus: [['CENTRAL', 'Centralt'], ['HIGH_CROSSES', 'Høje indlæg'], ['LOW_CUTBACKS', 'Lave cutbacks']],

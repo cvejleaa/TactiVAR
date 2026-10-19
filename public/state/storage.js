@@ -3,11 +3,11 @@
 // i en backup-nøgle, FØR der tilbydes en ny liga, og fejlen vises.
 import { normalizeLeague, normalizeRule } from '../engine/sanitize.js';
 import { COUNTER_KEYS, scaleIntoPool, counterFloor } from '../engine/counter.js';
-import { heightAtQuantile } from '../engine/generator.js';
+import { heightAtQuantile, assignPositions } from '../engine/generator.js';
 
 export const SAVE_KEY = 'tactivar_save';
 export const BACKUP_PREFIX = 'tactivar_backup_';
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 // Migreringer: MIGRATIONS[n] løfter et gemt objekt fra skema n til n+1. Tilføj en ny,
 // hver gang gemme-formatet ændres – sammen med et fixture fra forrige version i
@@ -47,13 +47,39 @@ export const MIGRATIONS = {
     for (const [line, list] of Object.entries(byLine)) {
       list.sort((a, b) => a.heightCm - b.heightCm || String(a.id).localeCompare(String(b.id)));
       list.forEach((p, i) => {
-        const h = heightAtQuantile(line, (i + 0.5) / list.length);
+        const h = heightAtQuantile(line, (i + 0.5) / list.length, HEIGHT_V37);
         newHeight.set(p.id, [p.heightCm, h]); p.heightCm = h;
       });
     }
     fixHeightTexts(d, newHeight);
     return { ...d, schemaVersion: 4 };
   },
+  // 4 → 5 (v3.8, dokumentets nye tabel "højde pr. position"): hver spiller får en naturlig
+  // position (pr. hold og kæde efter højde – de højeste bliver stoppere/angribere, de laveste
+  // backs/kanter), og højden lægges pr. position på generatorens fordeling efter rang i hele
+  // ligaen. Den højeste stopper forbliver den højeste stopper.
+  4: (d) => {
+    const byPos = {};
+    for (const t of d.league?.teams || []) {
+      assignPositions(t.squad || []);
+      for (const p of t.squad || []) if (Number.isFinite(p.heightCm)) (byPos[p.position] ||= []).push(p);
+    }
+    const newHeight = new Map();
+    for (const [pos, list] of Object.entries(byPos)) {
+      list.sort((a, b) => a.heightCm - b.heightCm || String(a.id).localeCompare(String(b.id)));
+      list.forEach((p, i) => {
+        const h = heightAtQuantile(pos, (i + 0.5) / list.length);
+        newHeight.set(p.id, [p.heightCm, h]); p.heightCm = h;
+      });
+    }
+    fixHeightTexts(d, newHeight);
+    return { ...d, schemaVersion: 5 };
+  },
+};
+// v3.7's fordeling pr. kæde – frosset, så migreringen 3 → 4 altid giver de samme højder.
+export const HEIGHT_V37 = {
+  GK: { mid: 192, dice: 4, min: 168, max: 201 }, DEF: { mid: 186, dice: 6, min: 168, max: 201 },
+  MID: { mid: 179.5, dice: 6, min: 168, max: 201 }, ATT: { mid: 181, dice: 6, min: 168, max: 201 },
 };
 
 // Højden står i nogle tekster ("Navn (193 cm)"): scouting-indtryk og seneste rundes referat.
