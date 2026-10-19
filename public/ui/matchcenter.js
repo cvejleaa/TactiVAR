@@ -4,7 +4,7 @@
 import { h } from './dom.js';
 import { starsEl } from './labels.js';
 import { viewRatingEntry } from '../engine/visibility.js';
-import { GOAL_KIND_LABEL } from '../engine/gazette.js';
+import { GOAL_KIND_LABEL, goalMatchIdx } from '../engine/gazette.js';
 import { FORMATIONS } from '../engine/formations.js';
 import { isStarter, placeLabel, lineupSort } from './lineup.js';
 
@@ -57,7 +57,7 @@ function ratingsTable(list, isOwn, title, formation) {
       h('td', { class: 'icons' }, e.goals ? icon('⚽', e.goals) : null, e.assists ? icon('🅰', e.assists) : null, e.saves ? icon('🧤', e.saves) : null, e.aerialWins ? icon('✈', e.aerialWins) : null,
         e.yellowCard ? icon('🟨') : null, e.injured ? icon('🚑') : null, e.isMotM ? icon('👑') : null),
       h('td', { class: 'rating' }, isOwn ? e.rating.toFixed(1) : starsEl(e.stars)),
-      isOwn ? h('td', { class: 'run', title: 'Løbet distance · topfart (kun dit hold – det røber udholdenhed og fart)' }, e.distanceKm > 0 ? `${e.distanceKm.toFixed(1)} km${e.topSpeed ? ` · ${e.topSpeed.toFixed(1)} km/t` : ''}` : '–') : null,
+      isOwn ? h('td', { class: 'run', title: 'Løbet distance · andel højintenst løb (over ca. 20 km/t) · topfart – kun dit hold (det røber udholdenhed og fart)' }, e.distanceKm > 0 ? `${e.distanceKm.toFixed(1)} km${e.hiShare != null ? ` · ${Math.round(e.hiShare)} % HI` : ''}${e.topSpeed ? ` · ${e.topSpeed.toFixed(1)} km/t` : ''}` : '–') : null,
       isOwn ? h('td', { class: 'xp', title: `${TIP['🧠']} – ved fuld pulje glemmer han lidt af de andre stilarter` }, `+${e.gainedCounterXp} 🧠`) : null)))));
 }
 
@@ -70,9 +70,13 @@ function miniPitch(rows, formation, isOwn) {
     }, h('span', { class: 'mp-val' }, isOwn ? e.rating.toFixed(1) : starsEl(e.stars)), h('span', { class: 'mp-name' }, `${coords[e.slot].r} ${e.shortName}`)))));
 }
 
-const legend = () => h('div', { class: 'muted legend', id: 'icon-legend' }, RATING_ICONS.map(([s, t]) => `${s} ${t}`).join(' · '));
+const legend = (isOwn = true) => h('div', { class: 'muted legend', id: 'icon-legend' }, RATING_ICONS.map(([s, t]) => `${s} ${t}`).join(' · ') + ' · HI = andel højintenst løb (over ca. 20 km/t), kun dit hold');
 
-export function renderGazette(g, myTeamId) {
+// onOpenMatch(i): åbner referatet af kamp i i runden (Liga: skift til Kamp; Kamp: vis kampen).
+// matches: rundens kampe – bruges til at finde kampen for mål fra før v3.7.1 (uden matchIdx).
+export function renderGazette(g, myTeamId, onOpenMatch = null, matches = null) {
+  const goal = g?.goalOfTheRound;
+  const goalIdx = goalMatchIdx(goal, matches);
   if (!g) return null;
   // Rundens spiller går gennem visibility.js: modstandere vises kun med stjerner.
   const pr = g.playerOfTheRound ? viewRatingEntry(g.playerOfTheRound, g.playerOfTheRound.teamId === myTeamId) : null;
@@ -81,9 +85,14 @@ export function renderGazette(g, myTeamId) {
     h('p', {}, `Runden bød på ${g.totalGoals} scoringer og ${g.totalVarChecks} VAR-tjek på tværs af de 4 stadions. ${g.myResult}`),
     pr ? h('p', { id: 'player-of-round' }, h('strong', { title: 'Bedste karakter i runden' }, '🏆 Rundens spiller: '), `#${pr.shirtNumber} ${pr.shortName} (${pr.teamName}) – `, 'rating' in pr ? `karakter ${pr.rating.toFixed(1)}` : starsEl(pr.stars), feats ? ` • ${feats}` : '') : null,
     g.headlines?.length ? h('ul', { class: 'headlines', id: 'headlines' }, g.headlines.map((x) => h('li', {}, x))) : null,
-    g.goalOfTheRound ? h('p', { id: 'goal-of-round' }, h('strong', {}, '🚀 Rundens mål'), GOAL_KIND_LABEL[g.goalOfTheRound.kind] ? ` (${GOAL_KIND_LABEL[g.goalOfTheRound.kind]})` : '', h('strong', {}, ': '), g.goalOfTheRound.desc) : null,
+    g.goalOfTheRound ? h('p', { id: 'goal-of-round' }, h('strong', {}, '🚀 Rundens mål'), GOAL_KIND_LABEL[g.goalOfTheRound.kind] ? ` (${GOAL_KIND_LABEL[g.goalOfTheRound.kind]})` : '', h('strong', {}, ': '), g.goalOfTheRound.desc,
+      // Hvilken kamp – som link til referatet, når runden ved det (fra v3.7.1).
+      g.goalOfTheRound.match ? ' ' : null,
+      g.goalOfTheRound.match ? (onOpenMatch && goalIdx >= 0
+        ? h('button', { class: 'linklike', id: 'goal-of-round-match', title: 'Åbn referatet af kampen – målet er markeret', onclick: () => onOpenMatch(goalIdx, goal) }, `📺 ${g.goalOfTheRound.match.replace(' - ', ' – ')}`)
+        : h('span', { class: 'muted' }, `(${g.goalOfTheRound.match.replace(' - ', ' – ')})`)) : null) : null,
     g.upset ? h('p', { id: 'upset' }, h('strong', {}, '😮 Rundens overraskelse: '), `${g.upset.winner} (nr. ${g.upset.winnerPos}) slog ${g.upset.loser} (nr. ${g.upset.loserPos}) ${g.upset.score}.`) : null,
-    g.myRunner && g.myRunner.teamId === myTeamId ? h('p', { id: 'my-runner' }, h('strong', {}, '🏃 Dit holds løber: '), `#${g.myRunner.shirtNumber} ${g.myRunner.shortName} – ${g.myRunner.distanceKm.toFixed(1)} km${g.myRunner.topSpeed ? `, topfart ${g.myRunner.topSpeed.toFixed(1)} km/t` : ''}.`) : null,
+    g.myRunner && g.myRunner.teamId === myTeamId ? h('p', { id: 'my-runner' }, h('strong', {}, '🏃 Dit holds løber: '), `#${g.myRunner.shirtNumber} ${g.myRunner.shortName} – ${g.myRunner.distanceKm.toFixed(1)} km${g.myRunner.hiShare != null ? `, ${Math.round(g.myRunner.hiShare)} % højintenst` : ''}${g.myRunner.topSpeed ? `, topfart ${g.myRunner.topSpeed.toFixed(1)} km/t` : ''}.`) : null,
     !g.goalOfTheRound && g.defensiveAction ? h('p', {}, h('strong', {}, '🛡 Rundens defensive aktion: '), `#${g.defensiveAction.shirtNumber} ${g.defensiveAction.shortName} (${g.defensiveAction.teamName}) holdt nullet.`) : null);
 }
 
@@ -111,12 +120,14 @@ export function renderMatchCenter({ mc, myTeamId, on }) {
     last.varMsg && mc.playing ? h('div', { class: 'varbanner' }, `📺 VAR: ${last.varMsg}`) : null,
     h('div', { class: 'mc-grid' },
       h('div', {}, h('div', { class: 'toolbar' }, REPORT_FILTERS.map(([v, l]) => h('button', { class: 'mini' + (mc.filter === v ? ' active' : ''), onclick: () => on.filter(v) }, l))),
-        h('div', { class: 'feed', id: 'feed' }, feed.map((e) => h('div', { class: `ev ${e.category.toLowerCase()} ${e.type.toLowerCase()}` }, h('span', { class: 'ev-min' }, `${e.min}'`), e.text)))),
+        // Et mål åbnet fra avisen markeres i referatet (samme minut, samme målscorer).
+        h('div', { class: 'feed', id: 'feed' }, feed.map((e) => { const focus = mc.focus && /GOAL/.test(e.type) && e.min === mc.focus.min && e.text.includes(mc.focus.scorer);
+          return h('div', { class: `ev ${e.category.toLowerCase()} ${e.type.toLowerCase()}${focus ? ' focus' : ''}`, id: focus ? 'goal-focus' : null }, h('span', { class: 'ev-min' }, `${e.min}'`), e.text); }))),
       h('div', {}, statsRows(m, last.stats))),
     // Karakterarkene side om side under referatet (stablet på smal skærm).
     mc.playing ? null : h('div', { class: 'ratings-grid' },
       ratingsTable(m.ratings.home, isOwnSide('home'), `${m.homeName} – karakterer`, m.startFormations?.home),
       ratingsTable(m.ratings.away, isOwnSide('away'), `${m.awayName} – karakterer`, m.startFormations?.away)),
     mc.playing ? null : legend(),
-    mc.playing ? null : renderGazette(mc.gazette, myTeamId));
+    mc.playing ? null : renderGazette(mc.gazette, myTeamId, on.openGoal, mc.matches));
 }

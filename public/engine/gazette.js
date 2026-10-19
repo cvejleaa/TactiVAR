@@ -16,6 +16,9 @@ export function headline(m, round = 0) {
   return pick(Math.abs(hG - aG) >= 3 ? HEADLINES.BIG : HEADLINES.WIN)(w, l, s);
 }
 
+// Hvilken kamp i runden et mål faldt i: matchIdx (fra v3.7.1), ellers kampens navn; −1 = ukendt.
+export const goalMatchIdx = (goal, matches) => (!goal ? -1 : Number.isInteger(goal.matchIdx) ? goal.matchIdx : (matches || []).findIndex((m) => `${m.homeName} - ${m.awayName}` === goal.match));
+
 export const GOAL_KIND_LABEL = { LONGSHOT: 'Langskud', DRIBBLE: 'Dribletur', COUNTER: 'Kontra', CUTBACK: 'Cutback', COMBINATION: 'Kombination', HEADER: 'Hovedstød', VAR: 'VAR-drama' };
 
 // positions: teamId → { pos, points } i tabellen FØR runden (tidligst runde 3).
@@ -51,7 +54,7 @@ export function buildGazette(matches, { positions = null, round = 0 } = {}) {
 
   // Dit holds løber: kun dit eget hold (km og topfart er private – visibility.js).
   const mine = players.filter((p) => p.isUserTeam && p.distanceKm > 0).sort((a, b) => b.distanceKm - a.distanceKm)[0] || null;
-  const myRunner = mine ? { playerId: mine.playerId, teamId: mine.teamId, shirtNumber: mine.shirtNumber, shortName: mine.shortName, distanceKm: mine.distanceKm, topSpeed: mine.topSpeed } : null;
+  const myRunner = mine ? { playerId: mine.playerId, teamId: mine.teamId, shirtNumber: mine.shirtNumber, shortName: mine.shortName, distanceKm: mine.distanceKm, topSpeed: mine.topSpeed, hiShare: mine.hiShare } : null;
 
   return {
     totalGoals, totalVarChecks, playerOfTheRound: players[0] || null, goalOfTheRound: goals[0] || null, defensiveAction: defensive, myResult,

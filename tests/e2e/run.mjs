@@ -295,9 +295,11 @@ try {
   const mpOpp = await g.locator('.ratings').nth(1).locator('.mp-token .mp-val').allTextContents();
   check('Minibane: 11 startere pr. hold – egne med karakter, modstanderens kun stjerner', mpOwn.length === 11 && mpOwn.every((t) => /^\d+\.\d$/.test(t)) && mpOpp.length === 11 && mpOpp.every((t) => /^[★☆]{5}$/.test(t)), `${mpOwn.length}/${mpOpp.length}`);
   const runs = await g.locator('.ratings').nth(0).locator('td.run').allTextContents();
-  check('Karakterark: dit hold har løbet distance og topfart, modstanderen ikke', runs.length >= 11 && runs.filter((t) => /^\d+\.\d km · \d+\.\d km\/t$/.test(t)).length >= 11 && (await g.locator('.ratings').nth(1).locator('td.run').count()) === 0, runs.slice(0, 2).join(' | '));
+  const runExpect = await g.evaluate(() => { const m = JSON.parse(localStorage.getItem('tactivar_save')).league.lastRound.matches[0]; const own = [m.ratings.home, m.ratings.away].find((l) => l[0].isUserTeam); const e = own.find((x) => x.hiShare != null && x.distanceKm > 0); return `${e.distanceKm.toFixed(1)} km · ${Math.round(e.hiShare)} % HI`; });
+  check('Karakterark: HI-andelen er spillerens afrundede tal', runs.some((t) => t.startsWith(runExpect)), runExpect);
+  check('Karakterark: dit hold har løbet distance og topfart, modstanderen ikke', runs.length >= 11 && runs.filter((t) => /^\d+\.\d km · \d+ % HI · \d+\.\d km\/t$/.test(t)).length >= 11 && (await g.locator('.ratings').nth(1).locator('td.run').count()) === 0, runs.slice(0, 2).join(' | '));
   const gzText = await g.textContent('#gazette');
-  check('Avisen: en overskrift pr. kamp og dit holds løber', (await g.locator('#headlines li').count()) === 4 && /Dit holds løber: #\d+ .+ – \d+\.\d km/.test(gzText), gzText.slice(0, 200));
+  check('Avisen: en overskrift pr. kamp og dit holds løber med andel højintenst', (await g.locator('#headlines li').count()) === 4 && /Dit holds løber: #\d+ .+ – \d+\.\d km, \d+ % højintenst/.test(gzText), gzText.slice(0, 200));
   const iconTitles = await g.evaluate(() => [...document.querySelectorAll('.ratings .ricon')].map((e) => [e.textContent, e.title]));
   check('Ikonerne i karakterarket har mouse-over-tekst', iconTitles.length > 0 && iconTitles.every(([t, ti]) => ti.length > 3 && !ti.includes('undefined')), JSON.stringify(iconTitles.slice(0, 3)));
   const legendTxt = await g.textContent('#icon-legend');
@@ -336,11 +338,11 @@ try {
   check('Ligatabellen er opdateret efter runde 1', stHead.includes('efter 1 runde'), stHead);
   await g.selectOption('#team-select', '2');
   // Spillerkortet viser sæsonens løb (km pr. 90 min og bedste topfart) for en spiller, der har spillet
-  const card = await g.evaluate(() => { const t = JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((x) => !x.isBot); const p = t.squad.find((x) => x.minutesSum > 0); return { nr: p.shirtNumber, km: (p.distanceSum / p.minutesSum * 90).toFixed(1), ts: p.topSpeedMax.toFixed(1) }; });
+  const card = await g.evaluate(() => { const t = JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((x) => !x.isBot); const p = t.squad.find((x) => x.minutesSum > 0 && x.hiDistSum > 0); return { nr: p.shirtNumber, km: (p.distanceSum / p.minutesSum * 90).toFixed(1), ts: p.topSpeedMax.toFixed(1), hi: Math.round(p.hiKmSum / p.hiDistSum * 100) }; });
   await g.selectOption('#team-select', '0');
   await g.locator('#matrix tbody tr', { has: g.locator('td:first-child', { hasText: new RegExp(`#${card.nr}$`) }) }).first().click();
   const rs = await g.textContent('#run-stats');
-  check('Spillerkortet: km pr. 90 min og topfart for sæsonen', rs.includes(`${card.km} km pr. 90 min`) && rs.includes(`topfart ${card.ts} km/t`), `${rs} (forventet ${card.km} / ${card.ts})`);
+  check('Spillerkortet: km pr. 90 min, andel højintenst og topfart for sæsonen', rs.includes(`${card.km} km pr. 90 min`) && rs.includes(` ${card.hi} % højintenst`) && rs.includes(`topfart ${card.ts} km/t`), `${rs} (forventet ${card.km} / ${card.hi} % / ${card.ts})`);
   await tab('liga'); await g.selectOption('#team-select', '2');
   check('Holdvælgeren i Liga-fanen viser holdet i Trup', (await g.textContent('#tabs .tab.active')).includes('Trup') && (await g.textContent('#club-name')) === (await g.locator('#team-select option').nth(2).textContent()));
   await g.selectOption('#team-select', '0');
@@ -351,6 +353,22 @@ try {
   await tab('kamp');
   check('Kamp-fanen genviser seneste runde færdigspillet (ikke live)', (await g.isVisible('#match-center')) && (await g.locator('#skip').count()) === 0 && (await g.textContent('#match-center')).includes('runde 1'));
   const evAll = await g.locator('#feed .ev').count();
+  // "Rundens mål" i avisen (Liga-fanen) viser kampen og linker til netop dens referat
+  await tab('liga');
+  const gor = await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.lastRound.gazette.goalOfTheRound);
+  if (gor) {
+    check('Rundens mål viser, hvilken kamp det faldt i', (await g.textContent('#goal-of-round-match')).includes(gor.match.replace(' - ', ' – ')));
+    await g.click('#goal-of-round-match');
+    const card = await g.textContent(`#match-cards .matchcard:nth-child(${gor.matchIdx + 1})`);
+    check('Linket åbner netop den kamps referat i Kamp-fanen', (await g.textContent('#tabs .tab.active')).includes('Kamp') && (await g.locator(`#match-cards .matchcard:nth-child(${gor.matchIdx + 1}).active`).count()) === 1 && card.startsWith(gor.match.split(' - ')[0]), card);
+    const focus = await g.locator('#goal-focus').textContent();
+    check('Målet er markeret i referatet og rullet frem', focus.includes(`${gor.min}'`) && focus.includes(gor.scorer) && (await g.locator('#goal-focus').isVisible()) && (await g.evaluate(() => { const r = document.getElementById('goal-focus').getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight; })), focus);
+    // Også fra avisen inde i Kamp-fanen (vælg først en anden kamp)
+    await g.click(`#match-cards .matchcard:nth-child(${((gor.matchIdx + 1) % 4) + 1})`);
+    await g.click('#match-center #goal-of-round-match');
+    check('Fra avisen i Kamp-fanen: kampen skiftes, og målet markeres', (await g.locator(`#match-cards .matchcard:nth-child(${gor.matchIdx + 1}).active`).count()) === 1 && (await g.locator('#goal-focus').count()) === 1);
+  } else check('Runden havde intet mål (intet link at teste)', true);
+  await tab('kamp');
   // Hver handling prøves på en frisk side (uden igangværende Match Center).
   await g.click('#match-cards .matchcard:nth-child(3)');
   const card3 = (await g.locator('#match-cards .matchcard:nth-child(3).active').count()) === 1;
@@ -420,6 +438,21 @@ try {
   const note2 = await g.textContent('#notice');
   check('Migrering fra skema 2: beskeden nævner 100 point og Superliga-højderne, men ikke Hvis-Så og ikke de 5 cm', note2.includes('100 point') && note2.includes('Superliga') && !note2.includes('Hvis-Så') && !note2.includes('5 cm'), note2);
   const h2 = await g.evaluate(() => { const hs = JSON.parse(localStorage.getItem('tactivar_save')).league.teams.flatMap((t) => t.squad.map((p) => p.heightCm)); return [hs.reduce((a, b) => a + b) / hs.length, Math.min(...hs), Math.max(...hs)]; });
+  // Et gem fra v3.7.0 (skema 4, uden HI-felter og matchIdx): ingen "undefined"/"NaN", ingen 0 % HI,
+  // og linket i Rundens mål findes via kampens navn
+  const fixture4 = fs.readFileSync(new URL('../fixtures/save-schema4.json', import.meta.url), 'utf8');
+  await g.evaluate((f) => { for (const k of Object.keys(localStorage)) if (k.startsWith('tactivar_')) localStorage.removeItem(k); localStorage.setItem('tactivar_save', f); }, fixture4);
+  await reload();
+  await tab('kamp');
+  const old4 = await g.textContent('#match-center');
+  check('Gem fra v3.7.0: karakterark og avis uden "undefined"/"NaN" og uden HI-tal', !/undefined|NaN|% HI/.test(old4) && (await g.locator('.ratings td.run').count()) > 0, old4.slice(0, 120));
+  await g.click('#match-center #goal-of-round-match');
+  const g4 = JSON.parse(fixture4).league.lastRound.gazette.goalOfTheRound;
+  check('Gem fra v3.7.0: Rundens mål linker til kampen fundet ud fra navnet', (await g.textContent('#scoreboard')).includes(g4.match.split(' - ')[0]) && (await g.locator('#goal-focus').count()) === 1);
+  await tab('trup');
+  await g.locator('#matrix tbody tr').first().click();
+  check('Gem fra v3.7.0: spillerkortet viser ikke 0 % højintenst, men at tallet kommer', (await g.textContent('#run-stats')).includes('højintenst: kommer efter næste kamp'));
+
   // Skema 3 (v3.6 – den version, de fleste kommer fra): beskeden handler om højder og friskhed
   const fixture3 = fs.readFileSync(new URL('../fixtures/save-schema3.json', import.meta.url), 'utf8');
   await g.evaluate((f) => { for (const k of Object.keys(localStorage)) if (k.startsWith('tactivar_')) localStorage.removeItem(k); localStorage.setItem('tactivar_save', f); }, fixture3);

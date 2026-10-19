@@ -132,7 +132,7 @@ export function generatePlayer(rng, line, roleTier, shirtNumber, teamIdx, usedSh
   const player = {
     id: `plr_t${teamIdx}_${shirtNumber}`, name: `${firstName} ${lastName}`, shortName,
     age, seasonAgeCounter: 1, line, shirtNumber, roleTier,
-    freshness: 100, injuryMatchesLeft: 0, lastRating: 0, ratingSum: 0, ratingGames: 0, publicStars: 0, distanceSum: 0, minutesSum: 0, topSpeedMax: 0,
+    freshness: 100, injuryMatchesLeft: 0, lastRating: 0, ratingSum: 0, ratingGames: 0, publicStars: 0, distanceSum: 0, minutesSum: 0, topSpeedMax: 0, hiKmSum: 0, hiDistSum: 0,
     heightCm, jumpingPower, aerialPower: aerialBreakdown(heightCm, jumpingPower, skills.strength, skills.positioning).total,
     skills, varProfile,
     archetype: null,
