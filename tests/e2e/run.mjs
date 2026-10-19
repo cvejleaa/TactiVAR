@@ -282,9 +282,12 @@ try {
   await tab('kamp');
   check('Kamp-fanen genviser seneste runde færdigspillet (ikke live)', (await g.isVisible('#match-center')) && (await g.locator('#skip').count()) === 0 && (await g.textContent('#match-center')).includes('runde 1'));
   const evAll = await g.locator('#feed .ev').count();
-  await g.click('#match-center .toolbar button:nth-child(3)');
+  // Hver handling prøves på en frisk side (uden igangværende Match Center).
   await g.click('#match-cards .matchcard:nth-child(3)');
-  check('Efter F5: Kamp-fanen kan skifte kamp og filter', (await g.locator('#match-cards .matchcard:nth-child(3).active').count()) === 1 && (await g.locator('#match-center .toolbar button:nth-child(3).active').count()) === 1 && evAll > 0);
+  const card3 = (await g.locator('#match-cards .matchcard:nth-child(3).active').count()) === 1;
+  await reload();
+  await g.click('#match-center .toolbar button:nth-child(3)');
+  check('Efter F5: Kamp-fanen kan skifte kamp og filter', card3 && (await g.locator('#match-center .toolbar button:nth-child(3).active').count()) === 1 && (await g.locator('#feed .ev').count()) < evAll);
   await tab('liga'); // runde 2 startes fra en anden fane end Kamp
 
   // Runden er bogført og gemt FØR afspilningen: luk/genindlæs midt i kampen

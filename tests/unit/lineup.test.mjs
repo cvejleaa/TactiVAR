@@ -7,7 +7,7 @@ import { placeLabel, lineupSort } from '../../public/ui/lineup.js';
 const E = (o) => ({ role: 'X', line: 'MID', minIn: 1, slot: null, ...o });
 
 test('placeLabel: pladsens rolle, også for målmanden på plads 0', () => {
-  assert.equal(placeLabel(E({ slot: 0, line: 'GK', role: 'GK' }), '4-2-3-1'), 'GK');
+  assert.equal(placeLabel(E({ slot: 0, line: 'GK', role: 'X' }), '4-2-3-1'), 'GK');
   assert.equal(placeLabel(E({ slot: 8, line: 'MID', role: 'CAM' }), '4-2-3-1'), 'CAM');
 });
 
