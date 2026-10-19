@@ -72,7 +72,10 @@ try {
   await g.locator('#bench .bench-p').first().click();
   check('…og et byt startet i regnearket kan afsluttes på bænken', (await tName(7)) !== benchShort && (await g.locator('#notice').count()) === 0);
   const smallTop = await (async () => { await g.setViewportSize({ width: 1366, height: 768 }); await g.evaluate(() => window.scrollTo(0, 0)); const t = await g.evaluate(() => document.getElementById('pitch').getBoundingClientRect().top); await g.setViewportSize({ width: 1400, height: 1000 }); return t; })();
-  check('Laptop (1366×768): banen begynder inden for skærmen i Trup', smallTop < 768, `${Math.round(smallTop)}px`);
+  // Mindst den øverste tredjedel af banen (angrebet) skal kunne ses uden at scrolle.
+  check('Laptop (1366×768): banen begynder højt nok til, at mindst 200 px af den ses i Trup', smallTop < 768 - 200, `${Math.round(smallTop)}px`);
+  const ratio = await g.evaluate(() => { const r = document.getElementById('pitch').getBoundingClientRect(); return r.width / r.height; });
+  check('Banen bevarer sit forhold 68:80 (ikke strakt)', Math.abs(ratio - 68 / 80) < 0.02, ratio.toFixed(3));
   await tab('taktik');
   check('Taktik-fanen: bane, spillerkort og taktik – men ikke regnearket', (await g.isVisible('#pitch')) && (await g.isVisible('#player-card')) && (await g.locator('#matrix').count()) === 0);
   check('Tre fase-paneler og Hvis-Så-regler', (await g.locator('#tactics fieldset[data-phase]').count()) === 3 && (await g.locator('#rules .rule').count()) === 1);

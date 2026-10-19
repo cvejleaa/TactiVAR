@@ -131,6 +131,7 @@ test('mod-XP: 1–5 point; primær +XP, sekundær +50 %, øvrige −1 med alders
   assert.deepEqual(applyCounterXp({ vsPress: 50, vsLowBlock: 40, vsTrapLong: 50 }, 30, opp, 4), { vsPress: 54, vsLowBlock: 39, vsTrapLong: 52 });
   assert.deepEqual(applyCounterXp({ vsPress: 50, vsLowBlock: 25, vsTrapLong: 50 }, 30, opp, 4).vsLowBlock, 25); // bund 25 for ≥26 år
   assert.deepEqual(applyCounterXp({ vsPress: 98, vsLowBlock: 12, vsTrapLong: 50 }, 20, opp, 4), { vsPress: 100, vsLowBlock: 12, vsTrapLong: 52 });
+  assert.deepEqual(applyCounterXp({ vsPress: 50, vsLowBlock: 40, vsTrapLong: 50 }, 30, opp, 1), { vsPress: 51, vsLowBlock: 39, vsTrapLong: 50 }); // sekundær +50 % af 1 = 0
 });
 
 // ---------- Karakterer ----------

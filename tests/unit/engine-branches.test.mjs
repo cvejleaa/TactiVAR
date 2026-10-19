@@ -508,3 +508,27 @@ test('vinder presset duellen, får angriberen ingen chance i samme tick', () => 
   assert.equal(count(won, 'Fase 1 virker'), 30);
   assert.equal(won.stats.hShots, 30);
 });
+
+test('referatet: alle fire udfald skrives fra dit holds side, bot-kampe neutralt', () => {
+  // Dit hold (hjemme) bygger op og vinder (modstanderens INT 1)
+  let a = arena({ home: { p1: { passingStyle: 'DIRECT_LONG' } } });
+  for (const p of mids(a.A)) p.skills.intercepting = 1;
+  let t = simulateMatch(a.H, a.A, stubRng({ 0.48: true })).events.filter((e) => e.label === 'Fase 1 virker').map((e) => e.text);
+  assert.ok(t.length === 30 && t.every((x) => x.startsWith('✅ [DIN OPBYGNING VIRKER] Dine direkte lange bolde bryder igennem')), t[0]);
+  // Modstanderen (ude) bygger op og bryder dit pres
+  a = arena({ home: { p2: { pressingHeight: 'LOW_BLOCK' } } });
+  for (const p of mids(a.A)) p.skills.passing = 11; // udeholdet har bolden
+  for (const p of mids(a.H)) p.skills.intercepting = 1;
+  t = simulateMatch(a.H, a.A, stubRng({ 0.48: true })).events.filter((e) => e.label === 'Fase 1 virker').map((e) => e.text);
+  assert.ok(t.length === 30 && t.every((x) => x.startsWith('❌ [DIT PRES BRYDES]') && x.includes('din lave blok')), t[0]);
+  // Din opbygning fanges offside (modstanderens fælde navngives ikke)
+  a = arena({ away: { p2: { offsideTrap: 'NORMAL' } } });
+  for (const p of mids(a.A)) p.skills.intercepting = 17;
+  t = simulateMatch(a.H, a.A, stubRng({ 0.48: true, 0.45: true })).events.filter((e) => e.label === 'Offside-fælde virker').map((e) => e.text);
+  assert.ok(t.length === 30 && t.every((x) => x.startsWith('❌ [DIN OPBYGNING STOPPES]') && x.endsWith('fanges offside.') && !/fælde/i.test(x)), t[0]);
+  // To bot-hold: neutral tekst (ingen ❌ og ingen "din/dit") – begge udfald forekommer
+  const { L } = arena();
+  for (const p of [...L.teams[2].squad, ...L.teams[3].squad]) p.skills.intercepting = 20; // hvem der end har bolden, taber den
+  const ev = simulateMatch(L.teams[2], L.teams[3], stubRng({ 0.48: true })).events.filter((e) => e.label === 'Fase 1 virker' || e.label === 'Fase 2 pres virker');
+  assert.ok(ev.some((e) => e.label === 'Fase 2 pres virker') && ev.every((e) => !/❌|\b(DIN|DIT|Din|Dit|Dine|dine|din|dit)\b/.test(e.text)), ev.map((e) => e.text).join(' | ').slice(0, 300));
+});

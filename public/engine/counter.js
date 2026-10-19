@@ -52,7 +52,7 @@ export function applyCounterXp(counterTactics, age, oppTeam, gain) {
   const next = { ...counterTactics };
   for (const k of COUNTER_KEYS) {
     if (k === primary) next[k] = Math.min(100, next[k] + gain);
-    else if (k === secondary) next[k] = Math.min(100, next[k] + Math.round(gain * 0.5));
+    else if (k === secondary) next[k] = Math.min(100, next[k] + Math.floor(gain * 0.5));
     else next[k] = Math.max(floor, next[k] - 1);
   }
   return next;
