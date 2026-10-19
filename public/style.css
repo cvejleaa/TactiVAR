@@ -60,3 +60,23 @@ fieldset.phase legend { color: var(--dæmpet); padding: 0 .3rem; }
 .standings tr.mine td { color: var(--grøn); } .standings tr.viewing { outline: 1px solid var(--lilla); } .standings td:nth-child(2) { text-align: left; } .pts { font-weight: 800; }
 .errorpanel { border-color: var(--rød); }
 .savestatus.failed { color: var(--rød); font-weight: 800; }
+
+button.primary { background: var(--grøn); border-color: var(--grøn); color: #052e16; font-weight: 800; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+.help { margin-top: .4rem; font-size: .75rem; }
+.matchcenter { margin-bottom: 1rem; border-color: var(--lilla); }
+.cards { display: flex; flex-wrap: wrap; gap: .4rem; margin: .5rem 0; }
+.matchcard { font-size: .75rem; } .matchcard.active { background: var(--lilla); border-color: var(--lilla); }
+.scoreboard { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 1rem; padding: .5rem 0; }
+.scoreboard .right { text-align: right; } .score { text-align: center; } #score { font-size: 2rem; font-weight: 900; }
+.timeline { position: relative; height: 1.6rem; background: #1e293b; border-radius: .3rem; margin: .5rem 0; }
+.tl-half { position: absolute; left: 50%; top: 0; bottom: 0; border-left: 1px dashed #64748b; }
+.tl-mark { position: absolute; transform: translateX(-50%); font-size: .9rem; } .tl-mark.home { top: 0; } .tl-mark.away { bottom: 0; }
+.varbanner { background: #4c1d95; border: 1px solid var(--lilla); padding: .4rem .8rem; border-radius: .3rem; font-weight: 700; }
+.mc-grid { display: grid; grid-template-columns: 3fr 2fr; gap: 1rem; } @media (max-width: 900px) { .mc-grid { grid-template-columns: 1fr; } }
+.feed { max-height: 26rem; overflow-y: auto; font-size: .8rem; }
+.ev { padding: .3rem 0; border-bottom: 1px solid var(--kant); } .ev-min { display: inline-block; width: 2.4rem; color: var(--dæmpet); font-family: ui-monospace, monospace; }
+.ev.highlight { font-weight: 700; } .ev.tactic { color: #cbd5e1; }
+.mstats td, .mstats th { text-align: center; } .mstats tbody th { color: var(--dæmpet); font-weight: 400; }
+.ratings table td:first-child { text-align: left; } .ratings tr.motm { background: #78350f55; } .rating { font-weight: 800; } .xp { color: #c4b5fd; }
+.gazette { background: #0b1222; }

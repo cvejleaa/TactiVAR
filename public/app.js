@@ -12,6 +12,12 @@ import { renderPitch } from './ui/pitch.js';
 import { renderTactics } from './ui/tactics.js';
 import { renderStandings } from './ui/standings.js';
 import { opponentTacticKeys } from './engine/counter.js';
+import { playRound, commitRound } from './engine/season.js';
+import { renderMatchCenter } from './ui/matchcenter.js';
+
+export const PLAYBACK_MS = 420;
+let mc = null;            // Match Center: { round, matches, gazette, viewIdx, filter, shownCount, playing }
+let timer = null;
 
 const storage = window.localStorage;
 let game = null;          // { league, notes, ui } – det der gemmes
@@ -117,6 +123,8 @@ function render() {
 
   const opponentPick = isOwn ? h('div', { class: 'panel row', id: 'opponent-bar' },
     h('label', {}, '🎯 Næste modstander ', select(String(game.ui.opponentIdx), league.teams.map((t, i) => [String(i), t.name]).filter(([i]) => Number(i) !== myIdx()), (v) => change(() => { game.ui.opponentIdx = Number(v); }), { id: 'opponent-select' })),
+    h('button', { id: 'play-round', class: 'primary', disabled: !!mc?.playing, onclick: playNextRound }, `▶ Spil runde ${league.leagueMetadata.round + 1} mod ${opponent.name}`),
+    league.lastRound && !mc ? h('button', { id: 'open-last', onclick: () => openMatchCenter(league.lastRound, false) }, `📺 Se runde ${league.lastRound.round}`) : null,
     h('span', { class: 'muted' }, `🧠 Mod-kolonnen måler mod-kunnen mod ${opponent.name}s typiske stil: ${opponentTacticKeys(opponent).label}`)) : null;
 
   const matrix = renderMatrix({
@@ -156,10 +164,43 @@ function render() {
 
   app.replaceChildren(...[
     view.notice ? h('div', { class: 'notice', id: 'notice' }, view.notice) : null,
+    mc ? matchCenterEl() : null,
     h('div', { class: 'grid' + (view.wide ? ' wide' : '') },
       h('section', { class: 'col-left' }, header, opponentPick, matrix, card),
       h('section', { class: 'col-right' }, pitch, tactics, standings))].filter(Boolean));
   document.body.dataset.klar = 'ja';
 }
+
+// ---------- Kampe ----------
+// Runden afvikles og bogføres + gemmes FØR afspilningen (rettet ift. v2.5b, der gemte
+// før bogføringen) – lukkes fanen midt i, er runden alligevel talt med én gang.
+function playNextRound() {
+  if (mc?.playing) return;
+  const rng = createRng(randomSeed());
+  const result = playRound(game.league, game.ui.opponentIdx, rng);
+  commitRound(game.league, result, rng);
+  persist();
+  openMatchCenter(result, true);
+}
+
+function openMatchCenter(result, live) {
+  clearInterval(timer);
+  mc = { round: result.round, matches: result.matches, gazette: result.gazette, viewIdx: 0, filter: 'all', shownCount: live ? 1 : Infinity, playing: live };
+  render();
+  document.getElementById('match-center')?.scrollIntoView({ block: 'start' });
+  if (live) timer = setInterval(() => { mc.shownCount++; if (mc.shownCount >= mc.matches[0].events.length) finishPlayback(); else renderMc(); }, PLAYBACK_MS);
+}
+
+function finishPlayback() { clearInterval(timer); timer = null; mc.playing = false; mc.shownCount = Infinity; render(); }
+
+const mcHandlers = {
+  skip: finishPlayback,
+  close: () => { clearInterval(timer); mc = null; render(); },
+  view: (i) => { mc.viewIdx = i; renderMc(); },
+  filter: (f) => { mc.filter = f; renderMc(); },
+};
+const matchCenterEl = () => renderMatchCenter({ mc, myTeamId: myTeam().id, on: mcHandlers });
+// Under afspilning tegnes kun Match Center om (ikke hele siden).
+function renderMc() { const el = document.getElementById('match-center'); if (el) el.replaceWith(matchCenterEl()); }
 
 start();

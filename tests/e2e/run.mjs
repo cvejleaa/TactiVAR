@@ -160,6 +160,34 @@ try {
   await g.click('#wide-toggle');
   check('Bred visning kan slås til og fra på et bot-hold', (await g.locator('.grid.wide').count()) === 1 && (await g.click('#wide-toggle'), (await g.locator('.grid.wide').count()) === 0));
 
+  // ---------- Kampe: Match Center ----------
+  await g.selectOption('#team-select', '0');
+  await g.click('#play-round');
+  await g.waitForSelector('#match-center');
+  check('Under afspilning kan runden ikke startes igen', await g.isDisabled('#play-round'));
+  await g.click('#skip');
+  check('Runden har 4 kampe', (await g.locator('#match-cards .matchcard').count()) === 4);
+  const mcText = await g.textContent('#match-center');
+  check('Referatet indeholder slutfløjt, statistik og karakterark', mcText.includes('SLUTFLØJT') && (await g.isVisible('#match-stats')) && (await g.locator('.ratings').count()) === 2);
+  const feedText = await g.textContent('#feed');
+  check('Referatet: ingen evnetal og ingen interne koder', !/\b(FIN|PAS|POS|INT|STA|STR|BAL|PAC)\s*[:=]?\s*\d/.test(feedText) && !/BALANCED|MID_BLOCK|HIGH_GEGENPRESS/.test(mcText));
+  const score = (await g.textContent('#score')).trim();
+  check('Resultattavlen svarer til slutfløjtet', mcText.includes(`${score.replace(' - ', ' - ')}`) && /\d+ - \d+/.test(score));
+  const oppRatings = await g.locator('.ratings').nth(1).locator('td.rating').allTextContents();
+  const ownRatings = await g.locator('.ratings').nth(0).locator('td.rating').allTextContents();
+  check('Karakterark: eget hold eksakte karakterer, modstander kun stjerner', ownRatings.every((t) => /^\d+\.\d$/.test(t)) && oppRatings.length >= 11 && oppRatings.every((t) => /^[★☆]{5}$/.test(t)));
+  check('Avisen kårer rundens spiller', (await g.textContent('#gazette')).includes('Rundens spiller'));
+  const allEvents = await g.locator('#feed .ev').count();
+  await g.click('#match-center .toolbar button:nth-child(3)');
+  check('Filteret "Kun nøglemomenter" viser færre hændelser', (await g.locator('#feed .ev').count()) < allEvents);
+  await g.click('#match-cards .matchcard:nth-child(2)');
+  check('De øvrige kampe kan åbnes', (await g.textContent('#scoreboard')).includes((await g.textContent('#match-cards .matchcard:nth-child(2)')).split(' ')[0]));
+  await g.click('#close-mc');
+  const stHead = await g.locator('#standings').locator('xpath=..').locator('h3').textContent();
+  check('Ligatabellen er opdateret efter runde 1', stHead.includes('efter 1 runde'), stHead);
+  await reload();
+  check('Efter F5: runden er gemt og kan genses', (await g.isVisible('#open-last')) && (await g.textContent('#play-round')).includes('runde 2'));
+
   // Ny liga og import tager backup af det nuværende spil
   await g.selectOption('#team-select', '0');
   const savedBefore = await g.evaluate(() => localStorage.getItem('tactivar_save'));

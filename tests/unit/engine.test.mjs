@@ -267,6 +267,8 @@ test('anti-spionage: ingen evnetal i referatet, ingen mod-kunnen for bots', () =
     for (const o of m.observations) assert.doesNotMatch(o.text, /\d+\s*\/\s*20|\b\d{1,2}\s*(point|pt)\b/, o.text);
   }
   for (const { m } of botsOnly) for (const e of m.events) assert.doesNotMatch(e.text, /mod-kunnen/i, e.text);
+  // Referatet er på dansk – motorens interne koder må ikke stå i teksten
+  for (const { m } of manyMatches(30, 33)) for (const t of [...m.events.map((e) => e.text), m.homeTacticStr]) assert.doesNotMatch(t, /\b(SHORT|BALANCED|DIRECT_LONG|LOW_BLOCK|MID_BLOCK|HIGH_GEGENPRESS|HIGH_CROSSES|LOW_CUTBACKS|EXTREME_VAR_LINE)\b/, t);
 });
 
 test('viewRatingEntry: modstandere ser stjerner, ikke karakter, mod-kunnen eller XP', () => {

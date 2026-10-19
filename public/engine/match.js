@@ -10,6 +10,8 @@ import { describeFinish, describeHeader, describeVarTiming } from './clues.js';
 export const MAX_SUBS = 3;
 const coordsOf = (tactics) => FORMATIONS[tactics.baseFormation] || FORMATIONS['4-4-2'];
 const tag = (p) => `#${p.shirtNumber} ${p.shortName}`;
+// Danske navne på taktikvalg i referatet.
+const TXT = { SHORT: 'korte pasninger', BALANCED: 'balanceret opbygning', DIRECT_LONG: 'direkte lange bolde', LOW_BLOCK: 'lav blok', MID_BLOCK: 'mellemblok', HIGH_GEGENPRESS: 'højt gegenpress' };
 const isAvailable = (p) => !(p.injuryMatchesLeft > 0);
 
 // Kamplokal side: kopi af taktikken + aktuelle 11 spillere + bænk.
@@ -70,7 +72,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
   const hAvg = Math.round(avg(H.starters, (p) => masteryVs(p, away)));
   const aAvg = Math.round(avg(A.starters, (p) => masteryVs(p, home)));
 
-  const tacticStr = (s) => { const p = s.tactics.phases; return `${s.tactics.baseFormation} • ${p.phase1_buildUp.passingStyle}/${p.phase2_defending.pressingHeight}`; };
+  const tacticStr = (s) => { const p = s.tactics.phases; return `${s.tactics.baseFormation} • ${TXT[p.phase1_buildUp.passingStyle]} / ${TXT[p.phase2_defending.pressingHeight]}`; };
   const masteryIntro = !home.isBot ? ` Din Start-11 har i gennemsnit 🧠 ${hAvg}% Mod-Kunnen mod ${opponentTacticKeys(away).label}.` : '';
   const hCustom = customDragged(H);
   const customIntro = hCustom.length ? ` Bemærk: ${home.name} har trukket ${tag(hCustom[0].player)} ud af sin grundposition.` : '';
@@ -160,7 +162,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
         st[k(att, 'TacticSuccess')]++;
         sheet.adjust(playmaker.id, 0.35); sheet.bump(playmaker.id, 'tacticWins');
         const note = !att.team.isBot && pmM >= 50 ? ` 🧠 [MOD-KUNNEN: ${pmM}%] ${tag(playmaker)} kender ${def.team.name}s pres og finder vejen igennem.` : ` ${tag(playmaker)} styrer midtbanen.`;
-        addEv(min, 'TACTIC_WIN', 'TACTIC', att.isHome, false, 'Fase 1 virker', `✅ [FASE 1 VIRKER • ${att.team.name}] ${pass}-opbygningen bryder ${def.team.name}s ${height}.${note}`);
+        addEv(min, 'TACTIC_WIN', 'TACTIC', att.isHome, false, 'Fase 1 virker', `✅ [FASE 1 VIRKER • ${att.team.name}] ${TXT[pass]} bryder igennem ${def.team.name}s ${TXT[height]}.${note}`);
       } else {
         st[k(def, 'TacticSuccess')]++;
         if (defPh.phase2_defending.offsideTrap !== 'OFF' && rng.chance(0.45)) {
