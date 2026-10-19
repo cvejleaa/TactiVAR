@@ -247,9 +247,9 @@ function openMatchCenter(result, live) {
   if (live) timer = setInterval(() => { mc.shownCount++; if (mc.shownCount >= mc.matches[0].events.length) finishPlayback(); else renderMc(); }, PLAYBACK_MS);
 }
 
-// Link fra Liga-siden til referatet af én kamp i seneste runde (aldrig under afspilning).
+// Link fra Liga-siden til referatet af én kamp i seneste runde. Under afspilning vises
+// resultaterne slet ikke (vagten står ét sted: i liga-fanens render).
 function openReport(i) {
-  if (mc?.playing) return;
   mc = lastRoundView(game.league.lastRound); mc.viewIdx = i;
   showTab('kamp');
 }

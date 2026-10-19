@@ -71,6 +71,20 @@ try {
   await g.locator('#matrix tbody tr', { hasText: benchShort }).locator('button').click();
   await g.locator('#bench .bench-p').first().click();
   check('…og et byt startet i regnearket kan afsluttes på bænken', (await tName(7)) !== benchShort && (await g.locator('#notice').count()) === 0);
+  // Et byt startet på banen markeres også i regnearket
+  const n7 = await tName(7);
+  await g.click('#pitch .token[data-slot="7"]');
+  check('Byt startet på banen markeres i regnearket', (await g.locator('#matrix tbody tr.swapping').count()) === 1 && (await g.locator('#matrix tbody tr.swapping').textContent()).includes(n7));
+  await g.click('#pitch .token[data-slot="7"]');
+  // Samme spiller to gange i regnearket: intet byt, ingen besked
+  const posBefore = await g.locator('#matrix tbody tr td:first-child').allTextContents();
+  await g.locator('#matrix tbody tr:nth-child(3) button').click(); await g.locator('#matrix tbody tr:nth-child(3) button').click();
+  check('Samme spiller valgt to gange: intet byt og ingen besked', JSON.stringify(await g.locator('#matrix tbody tr td:first-child').allTextContents()) === JSON.stringify(posBefore) && (await g.locator('#notice').count()) === 0 && (await g.locator('#matrix tbody tr.swapping').count()) === 0);
+  // Bænk → bænk vælger om; holdskift nulstiller valget
+  await g.locator('#bench .bench-p').nth(0).click(); await g.locator('#bench .bench-p').nth(1).click();
+  check('Bænk efter bænk: det nye valg erstatter det gamle', (await g.locator('#bench .bench-p.active').count()) === 1 && (await g.locator('#bench .bench-p').nth(1).getAttribute('class')).includes('active'));
+  await g.selectOption('#team-select', '1'); await g.selectOption('#team-select', '0');
+  check('Holdskift nulstiller et påbegyndt byt', (await g.locator('#bench .bench-p.active').count()) === 0 && (await g.locator('#notice').count()) === 0);
   const smallTop = await (async () => { await g.setViewportSize({ width: 1366, height: 768 }); await g.evaluate(() => window.scrollTo(0, 0)); const t = await g.evaluate(() => document.getElementById('pitch').getBoundingClientRect().top); await g.setViewportSize({ width: 1400, height: 1000 }); return t; })();
   // Mindst den øverste tredjedel af banen (angrebet) skal kunne ses uden at scrolle.
   check('Laptop (1366×768): banen begynder højt nok til, at mindst 200 px af den ses i Trup', smallTop < 768 - 200, `${Math.round(smallTop)}px`);
@@ -294,6 +308,18 @@ try {
   const res = await g.locator('#last-round .fixture').allTextContents();
   check('Liga: sidste rundes 4 resultater med link til referat', res.length === 4 && res.every((t) => /\d+-\d+/.test(t) && t.includes('Referat')), res.join(' | '));
   check('Liga: næste runde er runde 2', (await g.textContent('#next-round h3')).includes('runde 2'));
+  // Resultater og parringer svarer præcist til det gemte spil (navne, retning, score, runde)
+  const fromSave = await g.evaluate(async () => {
+    const save = JSON.parse(localStorage.getItem('tactivar_save'));
+    const { pairRound } = await import('/engine/season.js');
+    const L = save.league, me = L.teams.find((t) => !t.isBot).name;
+    return { round: L.lastRound.round, me, results: L.lastRound.matches.map((m) => `${m.homeName}${m.homeGoals}-${m.awayGoals}${m.awayName}📺 Referat`),
+      next: pairRound(L, save.ui.opponentIdx).map(([a, b]) => `${L.teams[a].name}–${L.teams[b].name}`) };
+  });
+  check('Liga: resultaterne er sidste rundes kampe med rigtig retning og score', JSON.stringify(res) === JSON.stringify(fromSave.results) && (await g.textContent('#last-round h3')).includes(`runde ${fromSave.round}`), `${res[0]} / ${fromSave.results[0]}`);
+  check('Liga: næste runde er de parringer, der faktisk spilles', JSON.stringify(await g.locator('#next-round .fixture').allTextContents()) === JSON.stringify(fromSave.next));
+  const mineRes = await g.locator('#last-round .fixture.mine').allTextContents(), mineNext = await g.locator('#next-round .fixture.mine').allTextContents();
+  check('Liga: præcis én kamp markeret som din – i begge lister', mineRes.length === 1 && mineRes[0].includes(fromSave.me) && mineNext.length === 1 && mineNext[0].includes(fromSave.me) && res.filter((t) => t.includes(fromSave.me)).length === 1);
   const third = await g.locator('#last-round .fixture').nth(2).locator('.fx-team').first().textContent();
   await g.locator('#last-round .fixture').nth(2).click();
   check('Klik på et resultat åbner netop den kamps referat i Kamp-fanen', (await g.textContent('#tabs .tab.active')).includes('Kamp') && (await g.locator('#match-cards .matchcard:nth-child(3).active').count()) === 1 && (await g.textContent('#scoreboard')).includes(third) && (await g.locator('#match-center .toolbar button:nth-child(1).active').count()) === 1);

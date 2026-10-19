@@ -132,6 +132,15 @@ test('mod-XP: 1–5 point; primær +XP, sekundær +50 %, øvrige −1 med alders
   assert.deepEqual(applyCounterXp({ vsPress: 50, vsLowBlock: 25, vsTrapLong: 50 }, 30, opp, 4).vsLowBlock, 25); // bund 25 for ≥26 år
   assert.deepEqual(applyCounterXp({ vsPress: 98, vsLowBlock: 12, vsTrapLong: 50 }, 20, opp, 4), { vsPress: 100, vsLowBlock: 12, vsTrapLong: 52 });
   assert.deepEqual(applyCounterXp({ vsPress: 50, vsLowBlock: 40, vsTrapLong: 50 }, 30, opp, 1), { vsPress: 51, vsLowBlock: 39, vsTrapLong: 50 }); // sekundær +50 % af 1 = 0
+  // Afrunding og bund (Test Manager): .5-tilfælde, halv kamp, 0,5 pr. sejr, sekundær floor, alder 26, loft 100.
+  assert.equal(counterXpForMatch({ minutesPlayed: 90, tacticWins: 1, goals: 0 }), 3); // 2,5 → 3 (floor gav 2)
+  assert.equal(counterXpForMatch({ minutesPlayed: 45, tacticWins: 0, goals: 1 }), 2); // 1,5 → 2
+  assert.equal(counterXpForMatch({ minutesPlayed: 90, tacticWins: 4, goals: 0 }), 4); // 0,25 pr. sejr gav 3
+  assert.equal(applyCounterXp({ vsPress: 50, vsLowBlock: 40, vsTrapLong: 50 }, 30, opp, 3).vsTrapLong, 51); // floor(1,5); ceil/0,6/round gav 52
+  assert.equal(applyCounterXp({ vsPress: 50, vsLowBlock: 40, vsTrapLong: 50 }, 30, opp, 5).vsTrapLong, 52); // floor(2,5); 0,6 gav 53
+  assert.equal(applyCounterXp({ vsPress: 50, vsLowBlock: 25, vsTrapLong: 50 }, 26, opp, 3).vsLowBlock, 25); // 26 år: bund 25
+  assert.equal(applyCounterXp({ vsPress: 50, vsLowBlock: 25, vsTrapLong: 50 }, 25, opp, 3).vsLowBlock, 24); // 25 år: bund 12
+  assert.equal(applyCounterXp({ vsPress: 50, vsLowBlock: 40, vsTrapLong: 99 }, 30, opp, 5).vsTrapLong, 100); // sekundær klemmes
 });
 
 // ---------- Karakterer ----------
