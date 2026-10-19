@@ -125,8 +125,10 @@ export function simulateMatch(home, away, rng, opts = {}) {
         const same = plan.baseFormation === side.tactics.baseFormation && JSON.stringify(plan.phases) === JSON.stringify(side.tactics.phases) && JSON.stringify(plan.customCoords || {}) === JSON.stringify(side.tactics.customCoords || {});
         if (same) return;
         side.tactics.baseFormation = plan.baseFormation;
-        side.tactics.customCoords = structuredClone(plan.customCoords || {});
-        side.tactics.phases = structuredClone(plan.phases);
+        // Kampens taktik ændres kun ved genanvisning (aldrig i stedet), så planens objekter
+        // kan bruges direkte; resultatets endState er en kopi.
+        side.tactics.customCoords = plan.customCoords || {};
+        side.tactics.phases = plan.phases;
         const name = `Plan ${PLAN_LETTERS[rule.newPlan]}`;
         announceShift(side, min, `${side.team.name} skifter til ${name}`, `📋 [${side.team.name} • Hvis-Så] I ${min}. minut skifter holdet fra ${from} til ${name} (${plan.baseFormation}, ${TXT[plan.phases.phase1_buildUp.passingStyle]} / ${TXT[plan.phases.phase2_defending.pressingHeight]}).`);
         return;
