@@ -1,5 +1,6 @@
 // Spillergenerator og ny liga (docs/spec.md §1–2). Al tilfældighed fra den seedede rng.
 import { initialCounterTactics } from './counter.js';
+import { TEAM_STAT_DEFAULTS, PLAYER_SEASON_DEFAULTS } from './stats.js';
 import { generateScoutingClues } from './clues.js';
 
 export const TEAM_NAMES = ['Bibamus United', 'FC Vejleå', 'Ølstykke IF', 'Lyngby Tacticians', 'Nordkysten BK', 'Furesø Boldklub', 'Roskilde Rovers', 'Kronborg United'];
@@ -167,6 +168,7 @@ export function generatePlayer(rng, line, roleTier, shirtNumber, teamIdx, usedSh
   const player = {
     id: `plr_t${teamIdx}_${shirtNumber}`, name: `${firstName} ${lastName}`, shortName,
     age, seasonAgeCounter: 1, line, position, shirtNumber, roleTier,
+    ...PLAYER_SEASON_DEFAULTS,
     freshness: 100, injuryMatchesLeft: 0, lastRating: 0, ratingSum: 0, ratingGames: 0, publicStars: 0, distanceSum: 0, minutesSum: 0, topSpeedMax: 0, hiKmSum: 0, hiDistSum: 0,
     heightCm, jumpingPower, aerialPower: aerialBreakdown(heightCm, jumpingPower, skills.strength, skills.positioning).total,
     skills, varProfile,
@@ -224,7 +226,7 @@ export function generateTeam(rng, idx) {
 }
 
 export function emptyStanding(team) {
-  return { teamId: team.id, teamName: team.name, isBot: team.isBot, played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, varNet: 0, points: 0 };
+  return { teamId: team.id, teamName: team.name, isBot: team.isBot, played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, varNet: 0, points: 0, ...TEAM_STAT_DEFAULTS };
 }
 
 export function createLeague(rng) {
@@ -239,6 +241,7 @@ export function createLeague(rng) {
   }
   return {
     leagueMetadata: { id: 'league_div_1', name: 'TactiVAR Superligaen', seasonNumber: 1, footballYear: 1, round: 0, standings: teams.map(emptyStanding) },
+    statsFromRound: 1, history: [],
     teams,
     scouting,
     lastRound: null,

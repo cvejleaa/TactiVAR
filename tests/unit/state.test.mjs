@@ -531,3 +531,18 @@ test('gem fra v3.9: dit valg af løb uden bold (og pasningsstil) overlever indl�
     assert.equal(tac.phases.phase1_buildUp.offBallRuns, 'MANY'); assert.equal(tac.phases.phase1_buildUp.passingStyle, 'DIRECT_LONG');
   }
 });
+
+// ---------- v3.10: statistik i et gem fra v3.9 ----------
+const FIXTURE_V39 = fs.readFileSync(new URL('../fixtures/save-v3.9.json', import.meta.url), 'utf8');
+test('gem fra v3.9: indlæses uden migrering; statistikken starter tom fra næste runde, intet andet ændres', () => {
+  const raw = JSON.parse(FIXTURE_V39);
+  assert.ok(!FIXTURE_V39.includes('statsFromRound') && !FIXTURE_V39.includes('sGoals'), 'fixturet er gemt før v3.10');
+  const r = parseSave(FIXTURE_V39);
+  assert.ok(r.ok, r.error); assert.equal(r.migratedFrom, null);
+  const L = r.state.league;
+  assert.equal(L.statsFromRound, raw.league.leagueMetadata.round + 1); assert.deepEqual(L.history, []);
+  assert.ok(L.teams.every((t) => t.squad.every((p) => p.sGoals === 0 && p.sGames === 0 && p.freeRunsSum === 0)));
+  for (const s of L.leagueMetadata.standings) { assert.equal(s.shots, 0); assert.equal(s.cleanSheets, 0); }
+  // Tabellen er urørt
+  assert.deepEqual(L.leagueMetadata.standings.map((s) => [s.points, s.goalsFor]), raw.league.leagueMetadata.standings.map((s) => [s.points, s.goalsFor]));
+});

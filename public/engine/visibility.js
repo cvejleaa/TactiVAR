@@ -3,9 +3,11 @@
 // alle denne fil. I trin 1 er beskyttelsen visuel: alt ligger i browseren.
 
 // Offentligt: alle i ligaen må se det (teams_public).
-export const PUBLIC_FIELDS = ['id', 'name', 'shortName', 'shirtNumber', 'line', 'position', 'age', 'heightCm', 'freshness', 'injuryMatchesLeft', 'publicStars', 'roleTier'];
+export const PUBLIC_FIELDS = ['id', 'name', 'shortName', 'shirtNumber', 'line', 'position', 'age', 'heightCm', 'freshness', 'injuryMatchesLeft', 'publicStars', 'roleTier',
+  // Sæsonstatistik (v3.10): alt det, der står i referaterne – mål, oplæg, kort, MotM, dødboldmål.
+  'sGames', 'sMinutes', 'sGoals', 'sAssists', 'sMotm', 'sYellow', 'sCleanSheets', 'sHeaderGoals', 'sPenaltyGoals', 'sSetPieceGoals'];
 // Kun holdets ejer (teams_private).
-export const OWNER_FIELDS = ['skills', 'jumpingPower', 'aerialPower', 'archetype', 'weeklyWage', 'marketValue', 'lastRating', 'ratingSum', 'ratingGames', 'counterTactics', 'seasonAgeCounter', 'distanceSum', 'minutesSum', 'topSpeedMax', 'hiKmSum', 'hiDistSum'];
+export const OWNER_FIELDS = ['skills', 'jumpingPower', 'aerialPower', 'archetype', 'weeklyWage', 'marketValue', 'lastRating', 'ratingSum', 'ratingGames', 'counterTactics', 'seasonAgeCounter', 'distanceSum', 'minutesSum', 'topSpeedMax', 'hiKmSum', 'hiDistSum', 'freeRunsSum', 'freeRunsWonSum'];
 // Ingen spiller – kun motoren (teams_secrets).
 export const SECRET_FIELDS = ['varProfile'];
 
@@ -36,4 +38,16 @@ export function canSeeField(field, viewerOwnsTeam) {
   if (PUBLIC_FIELDS.includes(field)) return true;
   if (SECRET_FIELDS.includes(field)) return false;
   return viewerOwnsTeam;
+}
+
+// Holdtal i statistikken (v3.10, QC): sæsonsummer lægger støjen sammen væk, så tal, der følger en
+// skjult indstilling, vises kun for dit eget hold – skud/xG (løb uden bold), kontraer (omstilling,
+// løb, genpres), hjørnespark og VAR-tjek (høje bolde). Andre hold: det, der ikke røber en indstilling.
+export const TEAM_STATS_PUBLIC = ['sMatches', 'possSum', 'fouls', 'foulsWon', 'yellows', 'penalties', 'penaltyGoals', 'setPieceGoals', 'cleanSheets'];
+export const TEAM_STATS_OWNER = ['shots', 'onTarget', 'xg', 'freeKicks', 'corners', 'headerGoals', 'counterGoals', 'counterGoalsAgainst', 'varChecks'];
+export function viewTeamStats(row, viewerOwnsTeam) {
+  const out = { teamId: row.teamId, teamName: row.teamName };
+  for (const k of TEAM_STATS_PUBLIC) out[k] = row[k];
+  if (viewerOwnsTeam) for (const k of TEAM_STATS_OWNER) out[k] = row[k];
+  return out;
 }

@@ -1723,3 +1723,43 @@ test('stille frispark (58 %) tælles på forsvaret uden hændelse; skade-frispar
   const card = sp({ script: { 0.06: (n) => n === 0 } });
   assert.equal([...card.m.ratings.home, ...card.m.ratings.away].filter((e) => e.yellowCard).length, 1);
 });
+
+// ---------- v3.10: sæsonstatistik (bogføring, historik, synlighed) ----------
+test('statistik: to runder bogføres eksakt – spillertal fra karakterarket, holdtal fra kampens statistik, historik pr. runde', async () => {
+  const { viewTeamStats, viewPlayer } = await import('../../public/engine/visibility.js');
+  const L = createLeague(createRng(4));
+  assert.equal(L.statsFromRound, 1); assert.deepEqual(L.history, []);
+  const [H, A] = L.teams, [p, q, gk] = [H.squad[8], H.squad[5], A.squad[0]];
+  const stats = (o = {}) => ({ hShots: 7, aShots: 3, hOnTarget: 4, aOnTarget: 1, hXg: 1.234, aXg: 0.4, hPoss: 60, aPoss: 40, hFouls: 9, aFouls: 12, hFreeKicks: 2, aFreeKicks: 1, hCorners: 5, aCorners: 2, hPenalties: 1, aPenalties: 0, hPenaltyGoals: 1, aPenaltyGoals: 0, hSetPieceGoals: 2, aSetPieceGoals: 0, hHeaderGoals: 1, aHeaderGoals: 0, hCounterGoals: 0, aCounterGoals: 1, hVarChecks: 1, aVarChecks: 2, ...o });
+  const rnd = (round, hG, aG, home, away) => ({ round, gazette: null, matches: [{ homeId: H.id, awayId: A.id, homeName: H.name, awayName: A.name, homeGoals: hG, awayGoals: aG, homeVarNet: 0, observations: [], injuries: [], stats: stats(),
+    goalsPool: [{ kind: 'PENALTY' }, { kind: 'CORNER' }, { kind: 'LONGSHOT' }].slice(0, hG + aG), ratings: { home, away } }] });
+  const e = (pl, o) => ({ playerId: pl.id, rating: 7, gainedCounterXp: 1, distanceKm: 10, minIn: 1, minOut: 90, goals: 0, assists: 0, ...o });
+  commitRound(L, rnd(1, 2, 1, [e(p, { goals: 2, penaltyGoals: 1, setPieceGoals: 2, headerGoals: 1, isMotM: true, freeRuns: 3, freeRunsWon: 2 }), e(q, { assists: 1, yellowCard: true, minIn: 61 })], [e(gk, { cleanSheet: false })]), createRng(1));
+  commitRound(L, rnd(2, 0, 0, [e(p, { freeRuns: 1 })], [e(gk, { cleanSheet: true })]), createRng(1));
+  assert.deepEqual([p.sGames, p.sMinutes, p.sGoals, p.sMotm, p.sPenaltyGoals, p.sSetPieceGoals, p.sHeaderGoals, p.freeRunsSum, p.freeRunsWonSum], [2, 180, 2, 1, 1, 2, 1, 4, 2]);
+  assert.deepEqual([q.sGames, q.sMinutes, q.sAssists, q.sYellow], [1, 29, 1, 1]);
+  assert.deepEqual([gk.sGames, gk.sCleanSheets], [2, 1]);
+  const sh = L.leagueMetadata.standings.find((s) => s.teamId === H.id), sa = L.leagueMetadata.standings.find((s) => s.teamId === A.id);
+  assert.ok(Math.abs(sh.xg - 2.468) < 1e-9, String(sh.xg)); // summen afrundes ikke undervejs (ellers 2,46)
+  assert.deepEqual([sh.sMatches, sh.shots, sh.onTarget, Math.round(sh.xg * 1000) / 1000, sh.possSum, sh.fouls, sh.foulsWon, sh.corners, sh.penalties, sh.penaltyGoals, sh.setPieceGoals, sh.headerGoals, sh.counterGoalsAgainst, sh.varChecks, sh.cleanSheets, sh.yellows],
+    [2, 14, 8, 2.468, 120, 18, 24, 10, 2, 2, 4, 2, 2, 2, 1, 1]);
+  assert.deepEqual([sa.counterGoals, sa.cleanSheets, sa.possSum], [2, 1, 80]);
+  assert.equal(L.history.length, 2);
+  assert.deepEqual(L.history[0], { round: 1, matches: 1, goals: 3, setPiece: 2, kinds: { PENALTY: 1, CORNER: 1, LONGSHOT: 1 }, biggest: { diff: 1, label: `${H.name} 2-1 ${A.name}` }, most: { goals: 3, label: `${H.name} 2-1 ${A.name}` } });
+  assert.equal(L.history[1].biggest, null);
+  // Synlighed: andre hold ser ikke tal, der følger en skjult indstilling
+  const opp = viewTeamStats(sh, false), own = viewTeamStats(sh, true);
+  for (const k of ['shots', 'onTarget', 'xg', 'corners', 'headerGoals', 'counterGoals', 'counterGoalsAgainst', 'varChecks', 'freeKicks']) { assert.ok(!(k in opp), k); assert.ok(k in own, k); }
+  for (const k of ['possSum', 'fouls', 'foulsWon', 'yellows', 'penalties', 'penaltyGoals', 'setPieceGoals', 'cleanSheets', 'sMatches']) assert.equal(opp[k], sh[k], k);
+  const pv = viewPlayer(p, false);
+  assert.equal(pv.sGoals, 2); assert.equal(pv.sPenaltyGoals, 1);
+  assert.ok(!('freeRunsSum' in pv) && !('freeRunsWonSum' in pv));
+  assert.equal(viewPlayer(p, true).freeRunsWonSum, 2);
+});
+test('statistik: historikken har et loft på 60 runder', async () => {
+  const { HISTORY_MAX } = await import('../../public/engine/stats.js');
+  const L = createLeague(createRng(4));
+  const [H, A] = L.teams;
+  for (let r = 1; r <= HISTORY_MAX + 3; r++) commitRound(L, { round: r, gazette: null, matches: [{ homeId: H.id, awayId: A.id, homeName: H.name, awayName: A.name, homeGoals: 0, awayGoals: 0, homeVarNet: 0, observations: [], injuries: [], goalsPool: [], stats: {}, ratings: { home: [], away: [] } }] }, createRng(r));
+  assert.equal(L.history.length, 60); assert.equal(L.history[0].round, 4);
+});
