@@ -205,3 +205,14 @@ test('handlinger: plan-skift bevarer den aktuelle opstilling; updateRule, remove
   t.tactics.customCoords = { 3: { x: 1, y: 1 } }; act.resetDrag(t); assert.deepEqual(t.tactics.customCoords, {});
   assert.equal(act.moveSlot(t, 11, { x: 50, y: 50 }), false);
 });
+
+test('referatfiltre: "Kun taktik" medtager Hvis-Så-skift; spilletid vises som 90\' for hele kampen', async () => {
+  const { filterEvents, minutes } = await import('../../public/ui/matchcenter.js');
+  const ev = [{ category: 'TACTIC', type: 'TACTIC_WIN' }, { category: 'HIGHLIGHT', type: 'TRIGGER' }, { category: 'PLAY', type: 'SAVE' }, { category: 'HIGHLIGHT', type: 'GOAL' }];
+  assert.deepEqual(filterEvents(ev, 'tactic').map((e) => e.type), ['TACTIC_WIN', 'TRIGGER']);
+  assert.deepEqual(filterEvents(ev, 'key').map((e) => e.type), ['TRIGGER', 'GOAL']);
+  assert.equal(filterEvents(ev, 'all').length, 4);
+  assert.equal(minutes({ minIn: 1, minOut: 90 }), "90'");
+  assert.equal(minutes({ minIn: 1, minOut: 63 }), "0'–63'");
+  assert.equal(minutes({ minIn: 63, minOut: 90 }), "63'–90'");
+});

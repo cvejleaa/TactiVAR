@@ -93,8 +93,11 @@ const time = (ms) => new Date(ms).toLocaleTimeString('da-DK', { hour: '2-digit',
 
 function renderControls() {
   const teams = game.league.teams;
-  controls.replaceChildren(
+  controls.replaceChildren(...[
     select(String(view.viewTeamIdx), teams.map((t, i) => [String(i), (t.isBot ? '' : '★ ') + t.name]), (v) => showTeam(Number(v)), { id: 'team-select', title: 'Vælg hold at se' }),
+    // Kampknapperne står i topbaren, så de findes i alle visninger (også når man scouter).
+    h('button', { id: 'play-round', class: 'primary', disabled: !!mc?.playing, onclick: playNextRound }, `▶ Spil runde ${game.league.leagueMetadata.round + 1} mod ${teams[game.ui.opponentIdx].name}`),
+    game.league.lastRound && !mc ? h('button', { id: 'open-last', onclick: () => openMatchCenter(game.league.lastRound, false) }, `📺 Se runde ${game.league.lastRound.round}`) : null,
     h('button', { id: 'wide-toggle', onclick: () => { view.wide = !view.wide; render(); } }, view.wide ? '⤡ Smal visning' : '⤢ Bred visning'),
     h('span', { class: 'savestatus' + (view.saveError ? ' failed' : ''), id: 'save-status' }, view.saveError ? '⚠ IKKE gemt' : view.savedAt ? `✔ Gemt kl. ${time(view.savedAt)}` : 'Ikke gemt'),
     h('button', { id: 'save-now', onclick: () => { persist(); render(); } }, '💾 Gem nu'),
@@ -105,7 +108,7 @@ function renderControls() {
       const g = newGame(); const r = resetGame(storage, g);
       if (!r.ok) { window.tactivarFejl?.(r.error); return; }
       game = g; view = { ...view, viewTeamIdx: myIdx(), selectedPlayerId: null, notice: r.backupKey ? `Ny liga startet. Det gamle spil ligger som backup (${r.backupKey}).` : 'Ny liga startet.' }; view.savedAt = r.savedAt; render();
-    } }, '🎲 Ny liga'));
+    } }, '🎲 Ny liga')].filter(Boolean));
 }
 
 function render() {
@@ -123,8 +126,6 @@ function render() {
 
   const opponentPick = isOwn ? h('div', { class: 'panel row', id: 'opponent-bar' },
     h('label', {}, '🎯 Næste modstander ', select(String(game.ui.opponentIdx), league.teams.map((t, i) => [String(i), t.name]).filter(([i]) => Number(i) !== myIdx()), (v) => change(() => { game.ui.opponentIdx = Number(v); }), { id: 'opponent-select' })),
-    h('button', { id: 'play-round', class: 'primary', disabled: !!mc?.playing, onclick: playNextRound }, `▶ Spil runde ${league.leagueMetadata.round + 1} mod ${opponent.name}`),
-    league.lastRound && !mc ? h('button', { id: 'open-last', onclick: () => openMatchCenter(league.lastRound, false) }, `📺 Se runde ${league.lastRound.round}`) : null,
     h('span', { class: 'muted' }, `🧠 Mod-kolonnen måler mod-kunnen mod ${opponent.name}s typiske stil: ${opponentTacticKeys(opponent).label}`)) : null;
 
   const matrix = renderMatrix({

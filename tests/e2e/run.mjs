@@ -162,9 +162,11 @@ try {
 
   // ---------- Kampe: Match Center ----------
   await g.selectOption('#team-select', '0');
+  await g.selectOption('#team-select', '3'); // kampknappen findes også, mens man scouter
   await g.click('#play-round');
   await g.waitForSelector('#match-center');
   check('Under afspilning kan runden ikke startes igen', await g.isDisabled('#play-round'));
+  check('Under afspilning: besked om at runden er bogført, og de andre resultater er skjulte', (await g.isVisible('#booked-note')) && !/\d-\d/.test(await g.locator('#match-cards .matchcard:nth-child(2)').textContent()));
   await g.click('#skip');
   check('Runden har 4 kampe', (await g.locator('#match-cards .matchcard').count()) === 4);
   const mcText = await g.textContent('#match-center');
@@ -176,7 +178,9 @@ try {
   const oppRatings = await g.locator('.ratings').nth(1).locator('td.rating').allTextContents();
   const ownRatings = await g.locator('.ratings').nth(0).locator('td.rating').allTextContents();
   check('Karakterark: eget hold eksakte karakterer, modstander kun stjerner', ownRatings.every((t) => /^\d+\.\d$/.test(t)) && oppRatings.length >= 11 && oppRatings.every((t) => /^[★☆]{5}$/.test(t)));
-  check('Avisen kårer rundens spiller', (await g.textContent('#gazette')).includes('Rundens spiller'));
+  const por = await g.textContent('#player-of-round');
+  const porIsMine = (await g.locator('.ratings').nth(0).textContent()).includes(por.match(/#\d+ [^ ]+ [^ (]+/)[0]);
+  check('Avisen kårer rundens spiller – med karakter kun hvis det er din spiller, ellers stjerner', porIsMine ? /karakter \d+\.\d/.test(por) : (/[★☆]{5}/.test(por) && !/karakter/.test(por)), por);
   const allEvents = await g.locator('#feed .ev').count();
   await g.click('#match-center .toolbar button:nth-child(3)');
   check('Filteret "Kun nøglemomenter" viser færre hændelser', (await g.locator('#feed .ev').count()) < allEvents);
