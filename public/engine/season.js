@@ -17,12 +17,16 @@ export function pairRound(league, opponentIdx) {
   return pairs;
 }
 
+// Tabellen FØR runden – til "Rundens overraskelse" (tidligst runde 3; før er pladserne tilfældige).
+export function tableBefore(league, round) {
+  if (round < 3) return null;
+  return Object.fromEntries(sortStandings(league.leagueMetadata.standings).map((s, i) => [s.teamId, { pos: i + 1, points: s.points }]));
+}
+
 export function playRound(league, opponentIdx, rng) {
   const round = (league.leagueMetadata.round || 0) + 1;
   const matches = pairRound(league, opponentIdx).map(([h, a]) => simulateMatch(league.teams[h], league.teams[a], rng, { round }));
-  // Tabellen FØR runden – til "Rundens overraskelse" (tidligst runde 3; før er pladserne tilfældige).
-  const positions = round >= 3 ? Object.fromEntries(sortStandings(league.leagueMetadata.standings).map((s, i) => [s.teamId, { pos: i + 1, points: s.points }])) : null;
-  return { round, matches, gazette: buildGazette(matches, { positions, round }) };
+  return { round, matches, gazette: buildGazette(matches, { positions: tableBefore(league, round), round }) };
 }
 
 function applyStanding(standings, m) {

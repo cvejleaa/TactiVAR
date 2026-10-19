@@ -355,3 +355,36 @@ test('migrering 3 → 4: rang i hver kæde bevares, ligaen får Superligaens sni
   const ev = out.league.lastRound.matches[0].events.at(-1).text;
   assert.ok(ev.includes(`(${players.find((p) => p.id === someone.id).heightCm} cm)`), ev);
 });
+
+test('migrering 3 → 4: en spiller, hvis højde ændres, får rettet ALLE forekomster i scouting og referat; ugyldig højde røres ikke', async () => {
+  const { MIGRATIONS } = await import('../../public/state/storage.js');
+  const { heightAtQuantile } = await import('../../public/engine/generator.js');
+  const d = JSON.parse(FIXTURE3);
+  const all = d.league.teams.flatMap((t) => t.squad);
+  const defs = all.filter((p) => p.line === 'DEF').sort((a, b) => a.heightCm - b.heightCm || String(a.id).localeCompare(String(b.id)));
+  const tallest = defs.at(-1), shortest = defs[0];
+  const wantTall = heightAtQuantile('DEF', (defs.length - 0.5) / defs.length), wantShort = heightAtQuantile('DEF', 0.5 / defs.length);
+  assert.notEqual(tallest.heightCm, wantTall, 'testdata: højden ændres');
+  const viewer = d.league.teams.find((t) => !t.isBot).id;
+  const tag = `#${tallest.shirtNumber} ${tallest.shortName}`;
+  d.league.scouting[viewer][tallest.id] = [`${tallest.shortName} (${tallest.heightCm} cm) … igen ${tallest.shortName} (${tallest.heightCm} cm).`];
+  d.league.lastRound.matches[0].events.push({ text: `${tag} (${tallest.heightCm} cm) vandt, og ${tag} (${tallest.heightCm} cm) vandt igen.` });
+  const broken = all.find((p) => p.line === 'MID'); broken.heightCm = 'x';
+  const out = MIGRATIONS[3](d);
+  const p = out.league.teams.flatMap((t) => t.squad).find((x) => x.id === tallest.id);
+  assert.equal(p.heightCm, wantTall);
+  assert.equal(out.league.teams.flatMap((t) => t.squad).find((x) => x.id === shortest.id).heightCm, wantShort); // fraktil (i + 0,5)/n
+  assert.equal(out.league.scouting[viewer][tallest.id][0], `${tallest.shortName} (${wantTall} cm) … igen ${tallest.shortName} (${wantTall} cm).`);
+  assert.equal(out.league.lastRound.matches[0].events.at(-1).text, `${tag} (${wantTall} cm) vandt, og ${tag} (${wantTall} cm) vandt igen.`);
+  assert.equal(out.league.teams.flatMap((t) => t.squad).find((x) => x.id === broken.id).heightCm, 'x');
+});
+
+test('migrering 2 → 3 retter også højden i teksterne (−5 cm)', async () => {
+  const { MIGRATIONS } = await import('../../public/state/storage.js');
+  const d = JSON.parse(FIXTURE2);
+  const p = d.league.teams[0].squad[0], viewer = d.league.teams.find((t) => !t.isBot).id;
+  d.league.scouting[viewer][p.id] = [`${p.shortName} (${p.heightCm} cm)`];
+  const out = MIGRATIONS[2](d);
+  assert.equal(out.league.scouting[viewer][p.id][0], `${p.shortName} (${p.heightCm} cm)`); // p er muteret: ny højde
+  assert.equal(out.league.teams[0].squad[0].heightCm, JSON.parse(FIXTURE2).league.teams[0].squad[0].heightCm - 5);
+});

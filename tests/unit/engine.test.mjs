@@ -502,3 +502,13 @@ test('forsæson-indtrykket om luftspillet kræver 190 cm (v3.6: 187) og spring 1
   assert.ok(!generateScoutingClues('A. B', vp, 189, 13).some((c) => c.includes('en hel etage')));
   assert.ok(!generateScoutingClues('A. B', vp, 190, 12).some((c) => c.includes('en hel etage')));
 });
+
+test('heightAtQuantile: fraktiler af de tre terninger om kædens midte + holdprofilens snit (0,75)', async () => {
+  const { heightAtQuantile } = await import('../../public/engine/generator.js');
+  assert.equal(heightAtQuantile('GK', 0.5), 193);    // round(192,75) + median 0
+  assert.equal(heightAtQuantile('MID', 0.5), 180);   // round(180,25)
+  assert.equal(heightAtQuantile('DEF', 0), 169);     // 187 − 18
+  assert.equal(heightAtQuantile('ATT', 0.999), 199); // 182 + 17 (indeks 2194 af 2197)
+  assert.equal(heightAtQuantile('DEF', 0.9999), 201); // 187 + 18 = 205 → loft 201
+  assert.equal(heightAtQuantile('GK', 0), 181);      // 193 − 12
+});
