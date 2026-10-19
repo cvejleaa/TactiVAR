@@ -1758,6 +1758,14 @@ test('statistik: to runder bogføres eksakt – spillertal fra karakterarket, ho
   assert.ok(!('freeRunsSum' in pv) && !('freeRunsWonSum' in pv));
   assert.equal(viewPlayer(p, true).freeRunsWonSum, 2);
 });
+test('statistik: en historik, der allerede er for lang (fx ældre gem), beskæres til de seneste 60', () => {
+  const L = createLeague(createRng(4));
+  const [H, A] = L.teams;
+  L.leagueMetadata.round = 65;
+  L.history = Array.from({ length: 65 }, (_, i) => ({ round: i + 1, matches: 4, goals: 1, setPiece: 0, kinds: {}, biggest: null, most: null }));
+  commitRound(L, { round: 66, gazette: null, matches: [{ homeId: H.id, awayId: A.id, homeName: H.name, awayName: A.name, homeGoals: 0, awayGoals: 0, homeVarNet: 0, observations: [], injuries: [], goalsPool: [], stats: {}, ratings: { home: [], away: [] } }] }, createRng(1));
+  assert.equal(L.history.length, 60); assert.equal(L.history[0].round, 7); assert.equal(L.history.at(-1).round, 66);
+});
 test('statistik: historikken har et loft på 60 runder', async () => {
   const { HISTORY_MAX } = await import('../../public/engine/stats.js');
   const L = createLeague(createRng(4));
@@ -1780,3 +1788,372 @@ test('goalSpectacle for dødbolde (v3.10): straffe lavt, frispark højt, hjørne
   assert.equal(goalSpectacle('CORNER', { aerialPower: 14 }, 50, r(0.5)), 10.9);      // 4 + 4,9 + 2
   assert.equal(goalSpectacle('SETPIECE', { aerialPower: 10 }, 50, r(0.5)), 9.5);     // 4 + 3,5 + 2
 });
+
+
+// ---------- Test Manager v3.10: huller fundet ved mutation ----------
+// Én dødbold/hændelse i tick 0 (n === 0), så ratings er eksakte: start 6,5 (next 0,5), ingen klemning.
+const once = (n) => n === 0;
+const lastPick = (rng) => ({ ...rng, pick: (arr) => arr[arr.length - 1] });
+const half = { next: () => 0.5 };
+const stNums = (m, side, ...ks) => ks.map((k) => m.stats[side + k]);
+function spx({ script = {}, gk = 10, tweak = null, wrap = null, home = {}, nextValue = 0.5 } = {}) {
+  const a = arena({ home });
+  slot(a.A, 0).skills.goalkeeping = gk;
+  if (tweak) tweak(a);
+  const rng = stubRng(script, nextValue);
+  const m = simulateMatch(a.H, a.A, wrap ? wrap(rng) : rng);
+  return { a, m, pool: m.goalsPool };
+}
+
+test('kontramål: oplægsgiveren (vinderens første midtbane) får assist og +0,4, står i teksten, og holdets kontramål tælles', () => {
+  const run = (nextValue) => {
+    const a = arena();
+    for (const p of a.A.squad) p.skills.intercepting = 20;
+    slot(a.A, 9).skills.pace = 14;
+    return { a, m: simulateMatch(a.H, a.A, stubRng({ 0.48: shots(2), 0.032: shots(2) }, nextValue)) };   // kun to dueller → to kontraer
+  };
+  const { a, m } = run(0.5);
+  const helper = rOf(m, 'away', a.A, 5);
+  assert.equal(m.awayGoals, 2);
+  assert.equal(helper.assists, 2); assert.equal(sumOf(m, 'away', 'assists'), 2);
+  assert.equal(helper.rating, 8.0);                    // 6,5 + 2·0,35 (vandt presset) + 2·0,4 (oplæg); 0,5 pr. oplæg ville give 8,2
+  assert.equal(m.stats.aCounterGoals, 2); assert.equal(m.stats.hCounterGoals, 0);
+  // Teksten: oplægsgiveren (ikke skytten) sendte den i dybden. next 0 → første tekstvariant, der nævner ham.
+  const t = run(0);
+  const g = t.m.goalsPool[0];
+  assert.equal(g.desc, `Kontra i ${g.min}. minut: bolden blev erobret, ${tg(slot(t.a.A, 5))} sendte den i dybden, og ${g.scorer} løb fra alle og scorede.`);
+  assert.notEqual(g.scorer, tg(slot(t.a.A, 5)));
+});
+
+test('straffespark i detaljer: taker er bedste FIN, fældet spiller er en anden, ratings/statistik/bogføring/xG/pointe-tekst præcis', () => {
+  const t = (a) => { slot(a.H, 10).skills.finishing = 15; };
+  const { a, m, pool } = spx({ script: { 0.011: once }, tweak: t });
+  const taker = slot(a.H, 10), e = rOf(m, 'home', a.H, 10);
+  assert.equal(pool.length, 1); assert.equal(pool[0].kind, 'PENALTY'); assert.equal(pool[0].scorer, tg(taker));
+  assert.equal(pool[0].spectacle, goalSpectacle('PENALTY', {}, pool[0].min, half));
+  assert.equal(pool[0].desc, describeGoal('PENALTY', tg(taker), tg(slot(a.H, 9)), pool[0].min, half));   // fældet: første angriber (ikke taker)
+  assert.equal(e.rating, 7.5);                                  // 6,5 + 1,0 (1,25 ville give 7,8)
+  assert.equal(rOf(m, 'away', a.A, 0).rating, 6.4);             // MV −0,1
+  assert.equal(rOf(m, 'away', a.A, 1).rating, 6.2);             // forbryderen −0,3
+  assert.deepEqual([e.goals, e.penaltyGoals, e.setPieceGoals, e.headerGoals], [1, 1, 1, 0]);
+  assert.deepEqual(stNums(m, 'h', 'Penalties', 'PenaltyGoals', 'SetPieceGoals', 'HeaderGoals', 'Shots', 'OnTarget'), [1, 1, 1, 0, 1, 1]);
+  assert.equal(m.stats.aFouls, 1); assert.ok(Math.abs(m.stats.hXg - 0.76) < 1e-9, String(m.stats.hXg));   // 0,7 ville give 0,70
+  // Reddet: MV +0,8 (+0,5 clean sheet), redning tælles, taker −0,4, på mål men ikke mål; hændelsen står hos forsvaret
+  const s = spx({ script: { 0.011: once }, gk: 17.3, tweak: t });
+  assert.equal(s.m.homeGoals, 0);
+  assert.equal(rOf(s.m, 'away', s.a.A, 0).rating, 7.8); assert.equal(rOf(s.m, 'away', s.a.A, 0).saves, 1);
+  assert.equal(rOf(s.m, 'home', s.a.H, 10).rating, 6.1); assert.equal(rOf(s.m, 'away', s.a.A, 1).rating, 6.7);   // forbryder −0,3 + clean sheet 0,5
+  assert.equal(s.m.stats.hOnTarget, 1);
+  assert.equal(s.m.events.find((x) => x.label.startsWith('🧤 Straffe reddet')).isHome, false);
+  assert.equal(s.m.events.find((x) => x.type === 'GOAL'), undefined);
+});
+test('straffespark: friskhed tæller for både taker og målmand (frisk FIN 15 slår MV 16, træt gør ikke; frisk MV 20 holder, træt MV slås)', () => {
+  const taker = (fresh) => (a) => { slot(a.H, 10).skills.finishing = 15; slot(a.H, 10).freshness = fresh; };
+  assert.equal(spx({ script: { 0.011: once }, gk: 16, tweak: taker(100) }).m.homeGoals, 1);   // 21,3 > 20
+  assert.equal(spx({ script: { 0.011: once }, gk: 16, tweak: taker(0) }).m.homeGoals, 0);     // 17,55 < 20
+  const keeper = (fresh) => (a) => { slot(a.H, 10).skills.finishing = 15; for (const q of a.A.squad) q.freshness = fresh; };   // hele truppen: en træt bot-starter rotes ellers ud
+  assert.equal(spx({ script: { 0.011: once }, gk: 20, tweak: keeper(100) }).m.homeGoals, 0);  // 21,3 < 24
+  assert.equal(spx({ script: { 0.011: once }, gk: 20, tweak: keeper(0) }).m.homeGoals, 1);    // 21,3 > 19
+});
+test('straffespark og frispark: fældet spiller og forbryder trækkes fra de rigtige grupper (sidste i listen)', () => {
+  const p = spx({ script: { 0.011: once }, wrap: lastPick, tweak: (a) => { slot(a.H, 10).skills.finishing = 15; } });
+  const text = p.m.events.find((x) => x.type === 'GOAL').text;
+  assert.ok(text.includes(`${tg(slot(p.a.H, 8))} fældes i feltet af ${tg(slot(p.a.A, 4))} (`), text);   // angribere+midtbane → sidste midtbane; forsvar → sidste back
+  const f = spx({ script: { 0.061: once, 0.37: true }, gk: 5, wrap: lastPick, tweak: (a) => { slot(a.H, 10).skills.finishing = 15; } });
+  assert.ok(f.m.events.find((x) => x.type === 'GOAL').text.includes(`Frispark efter ${tg(slot(f.a.A, 8))}s (`), 'forbryderen kan også være en midtbanespiller');
+});
+
+test('frispark-skud i detaljer: taker = bedste FIN+PAS, +1,4 / MV −0,3, bogført som dødbold (ikke hoved), xG 0,07, tekst og scorer', () => {
+  const t = (a) => { slot(a.H, 9).skills.finishing = 15; slot(a.H, 10).skills.finishing = 13; slot(a.H, 10).skills.passing = 13; slot(a.H, 6).skills.passing = 14; };   // FIN+PAS: plads 10 = 26, plads 9 = 25, plads 6 = 24
+  const { a, m, pool } = spx({ script: { 0.061: once, 0.37: true }, gk: 5, tweak: t });
+  const e = rOf(m, 'home', a.H, 10);
+  assert.equal(pool.length, 1); assert.equal(pool[0].kind, 'FREEKICK'); assert.equal(pool[0].scorer, tg(slot(a.H, 10)));   // hverken bedste FIN (plads 9) eller bedste PAS (plads 6)
+  assert.equal(pool[0].spectacle, goalSpectacle('FREEKICK', { finishing: 13 }, pool[0].min, half));
+  assert.equal(pool[0].desc, describeGoal('FREEKICK', tg(slot(a.H, 10)), tg(slot(a.H, 10)), pool[0].min, half));
+  assert.equal(e.rating, 7.9); assert.equal(rOf(m, 'away', a.A, 0).rating, 6.2);                // 6,5 + 1,4 · MV 6,5 − 0,3
+  assert.deepEqual([e.goals, e.setPieceGoals, e.headerGoals, e.penaltyGoals], [1, 1, 0, 0]);
+  assert.deepEqual(stNums(m, 'h', 'FreeKicks', 'SetPieceGoals', 'HeaderGoals', 'Shots', 'OnTarget'), [1, 1, 0, 1, 1]);
+  assert.ok(Math.abs(m.stats.hXg - 0.07) < 1e-9, String(m.stats.hXg)); assert.equal(m.stats.aFouls, 1);
+  assert.ok(m.events.find((x) => x.type === 'GOAL').text.includes('FRISPARKSMÅL! Frispark efter '));
+  // Reddet: på mål, redning tælles (+0,4 +0,5 clean sheet), hændelsen hedder "Frispark reddet" og står hos forsvaret
+  const s = spx({ script: { 0.061: once, 0.37: true }, gk: 20, tweak: t });
+  assert.equal(s.m.homeGoals, 0); assert.equal(s.m.stats.hOnTarget, 1);
+  assert.equal(rOf(s.m, 'away', s.a.A, 0).rating, 7.4); assert.equal(rOf(s.m, 'away', s.a.A, 0).saves, 1);
+  const ev = s.m.events.find((x) => x.label === 'Frispark reddet');
+  assert.ok(ev && ev.isHome === false && ev.text.includes(tg(slot(s.a.H, 10))), ev?.text);
+});
+test('frispark-skud: friskhed tæller for taker og målmand', () => {
+  const run = (tf, gf, fin, gk) => spx({ script: { 0.061: once, 0.37: true }, gk, tweak: (a) => { slot(a.H, 10).skills.finishing = fin; slot(a.H, 10).freshness = tf; for (const q of a.A.squad) q.freshness = gf; } }).m.homeGoals;
+  assert.equal(run(100, 100, 15, 10), 1);   // 19 > 18
+  assert.equal(run(0, 100, 15, 10), 0);     // 15,25 < 18
+  assert.equal(run(100, 100, 20, 20), 0);   // 24 < 28
+  assert.equal(run(100, 0, 20, 20), 1);     // 24 > 23
+});
+test('frispark-indlæg: taker = bedste PAS får assist (xG 0,1, ét skud), hovedstødsspiller er den bedste i luften ≠ taker', () => {
+  const t = (a) => { slot(a.H, 6).skills.passing = 15; slot(a.H, 10).skills.finishing = 15; slot(a.H, 3).aerialPower = 20; };
+  const { a, m, pool } = spx({ script: { 0.061: once }, tweak: t });
+  assert.equal(pool.length, 1); assert.equal(pool[0].kind, 'SETPIECE'); assert.equal(pool[0].scorer, tg(slot(a.H, 3)));
+  assert.equal(pool[0].spectacle, goalSpectacle('SETPIECE', { aerialPower: 20 }, pool[0].min, half));
+  assert.equal(pool[0].desc, describeGoal('SETPIECE', tg(slot(a.H, 3)), tg(slot(a.H, 6)), pool[0].min, half));
+  assert.equal(rOf(m, 'home', a.H, 6).assists, 1);
+  assert.deepEqual(stNums(m, 'h', 'Shots', 'FreeKicks', 'SetPieceGoals', 'HeaderGoals', 'AerialWon', 'TacticSuccess'), [1, 1, 1, 1, 1, 0]);
+  assert.ok(Math.abs(m.stats.hXg - 0.1) < 1e-9, String(m.stats.hXg));
+  const e = rOf(m, 'home', a.H, 3);
+  assert.deepEqual([e.goals, e.headerGoals, e.setPieceGoals, e.aerialWins], [1, 1, 1, 1]);
+  assert.ok(m.observations.some((o) => o.playerId === slot(a.H, 3).id && /^Luftduel \(\d+\. min mod .+\): .+ scorede med /.test(o.text)));
+  assert.ok(m.events.find((x) => x.type === 'HEADER_GOAL').text.includes(`MÅÅÅL PÅ FRISPARK! ${tg(slot(a.H, 6))} slår frisparket ind, og ${tg(slot(a.H, 3))} (`));
+  // Taker, der selv er bedst i luften, er ikke hovedstødsspiller: han slår ind, en anden header (ellers ingen assist)
+  const self = spx({ script: { 0.061: once }, tweak: (a2) => { t(a2); slot(a2.H, 6).aerialPower = 25; } });
+  assert.equal(self.pool[0].scorer, tg(slot(self.a.H, 3))); assert.equal(rOf(self.m, 'home', self.a.H, 6).assists, 1);
+});
+test('hovedstødsspiller blandt de tre bedste i luften (stopperne går med op): sidste af tre vælges, ikke 1. eller 5.', () => {
+  const t = (a) => { slot(a.H, 6).skills.passing = 15; [[3, 20], [4, 19], [7, 18], [8, 17]].forEach(([i, v]) => { slot(a.H, i).aerialPower = v; }); };
+  const { a, pool } = spx({ script: { 0.061: once }, wrap: lastPick, tweak: t });
+  assert.equal(pool[0].scorer, tg(slot(a.H, 7)));    // top-3 = 20, 19, 18 → sidste = plads 7 (18)
+});
+test('frisparksindlæg: forsvaret får +0,5 (i åbent spil ikke): 14,2 slår ikke dødbolden men slår åbent indlæg; 14,4 er mål', () => {
+  const air = (v) => (a) => { for (const p of a.H.squad) p.aerialPower = v; };
+  assert.equal(spx({ script: { 0.061: true }, tweak: air(14.2) }).m.homeGoals, 0);    // 17,2 < 17,3
+  assert.equal(spx({ script: { 0.061: true }, tweak: air(14.4) }).m.homeGoals, 30);   // 17,4 > 17,3
+  const open = spx({ script: { 0.3: true, 0.55: true }, home: { p1: { attackFocus: 'HIGH_CROSSES' } }, tweak: air(14.2) });
+  assert.equal(open.m.homeGoals, 30, 'åbent spil: tærskel 13,8 (uden dødboldfordel)');
+});
+test('dødbolde vundet af forsvaret: tekst pr. type, luftsejr +0,4 og aerialWins til forsvareren, ingen dødboldmål', () => {
+  const def = (a) => { for (const p of a.A.squad) p.aerialPower = 20; };
+  const fk = spx({ script: { 0.061: shots(2) }, tweak: def });
+  const cb = rOf(fk.m, 'away', fk.a.A, 2);
+  assert.equal(fk.m.homeGoals, 0); assert.equal(fk.m.stats.aAerialWon, 2); assert.equal(fk.m.stats.hAerialWon, 0);
+  assert.equal(cb.rating, 7.8); assert.equal(cb.aerialWins, 2);                // 6,5 + 2·0,4 + clean sheet 0,5
+  const evs = fk.m.events.filter((x) => x.label === 'Luftduel i feltet');
+  assert.equal(evs.length, 2); assert.ok(evs.every((x) => /Frisparksindlæg: #\d+ .+ \(\d+ cm\) stiger højest og clearer foran #\d+ /.test(x.text)), evs[0].text);
+  assert.doesNotMatch(evs[0].text, /Hjørnespark|Stærk luftduel/);
+  const co = spx({ script: { 0.3: shots(2), 0.9: true }, gk: 20, tweak: def });
+  const ce = co.m.events.filter((x) => x.label === 'Luftduel i feltet');
+  assert.equal(ce.length, 2); assert.ok(ce.every((x) => /Hjørnespark: #\d+ .+ stiger højest/.test(x.text)), ce[0].text);
+  const open = spx({ script: { 0.3: shots(2), 0.55: true }, home: { p1: { attackFocus: 'HIGH_CROSSES' } }, tweak: def });
+  const oe = open.m.events.filter((x) => x.label === 'Luftduel i feltet');
+  assert.ok(oe.length === 2 && oe.every((x) => /Stærk luftduel: #\d+ /.test(x.text)), oe[0]?.text);
+  assert.equal(open.m.stats.aTacticSuccess, 0, 'forsvarets luftsejr er ikke en taktisk succes');
+});
+test('hjørnespark-mål i detaljer: hoved +1,35, oplægsgiver (bedste PAS) +0,55, forsvarer −0,35, MV −0,25; bogført som hoved- og dødboldmål, ikke taktisk succes', () => {
+  const t = (a) => { slot(a.H, 7).aerialPower = 20; slot(a.H, 6).skills.passing = 15; slot(a.H, 10).skills.finishing = 15; };
+  const { a, m, pool } = spx({ script: { 0.3: shots(2), 0.9: true }, gk: 20, tweak: t });
+  assert.equal(m.homeGoals, 2); assert.ok(pool.every((g) => g.kind === 'CORNER'), pool.map((g) => g.kind).join());
+  const sh = rOf(m, 'home', a.H, 7), as = rOf(m, 'home', a.H, 6);
+  assert.equal(sh.rating, 9.2); assert.equal(as.rating, 7.6);                    // 6,5 + 2·1,35 · 6,5 + 2·0,55
+  assert.equal(as.assists, 2); assert.deepEqual([sh.goals, sh.headerGoals, sh.setPieceGoals, sh.aerialWins], [2, 2, 2, 2]);
+  assert.equal(rOf(m, 'away', a.A, 2).rating, 5.8);                              // aDef 6,5 − 2·0,35
+  assert.equal(rOf(m, 'away', a.A, 0).rating, 7.0);                              // MV: 6,5 + 2·0,5 (reddet 1. skud) − 2·0,25
+  assert.deepEqual(stNums(m, 'h', 'Corners', 'SetPieceGoals', 'HeaderGoals', 'AerialWon', 'TacticSuccess', 'Shots'), [2, 2, 2, 2, 0, 4]);
+  assert.equal(pool[0].scorer, tg(slot(a.H, 7)));
+  assert.equal(pool[0].spectacle, goalSpectacle('CORNER', { aerialPower: 20 }, pool[0].min, half));
+  assert.equal(pool[0].desc, describeGoal('CORNER', tg(slot(a.H, 7)), tg(slot(a.H, 6)), pool[0].min, half));
+  assert.ok(m.observations.some((o) => o.playerId === slot(a.H, 7).id && /^Luftduel \(\d+\. min mod .+\): .+ scorede med /.test(o.text)));
+  assert.ok(m.events.find((x) => x.type === 'HEADER_GOAL').text.includes(`MÅÅÅL PÅ HJØRNESPARK! ${tg(slot(a.H, 6))} slår hjørnesparket ind, og ${tg(slot(a.H, 7))} (`));
+  // xG: skud 0,2·… + 0,04 pr. hjørnespark (ingen ekstra uden hjørnet)
+  const no = spx({ script: { 0.3: shots(2) }, gk: 20, tweak: t });
+  assert.ok(Math.abs(m.stats.hXg - no.m.stats.hXg - 2 * 0.04) < 1e-9, `${m.stats.hXg} ${no.m.stats.hXg}`);
+});
+test('hjørnespark efter redning: kun efter en reddet afslutning i åbent spil og i løb (90 %), og et vundet åbent indlæg giver ikke hjørne', () => {
+  const sv = (extra) => spx({ script: { 0.3: shots(2), 0.9: true, ...extra }, gk: 20 });
+  assert.equal(sv({}).m.stats.hCorners, 2);
+  // Åbent indlæg: forsvaret vinder → hjørne 90 % (ikke 50 %); angriberen vinder → intet hjørne
+  const hc = { home: { p1: { attackFocus: 'HIGH_CROSSES' } } };
+  const lost = spx({ script: { 0.3: shots(2), 0.55: true, 0.9: true }, ...hc, tweak: (a) => { for (const p of a.A.squad) p.aerialPower = 20; } });
+  assert.equal(lost.m.stats.hCorners, 2);
+  const won = spx({ script: { 0.3: shots(2), 0.55: true, 0.9: true }, ...hc, tweak: (a) => { for (const p of a.H.squad) p.aerialPower = 20; } });
+  assert.equal(won.m.stats.hCorners, 0); assert.equal(won.m.homeGoals, 2);
+  // Redning i løb uden bold giver også hjørnespark
+  const run = fx({ rm: { finishing: 1, passing: 1, pace: 1, ballControl: 1 }, gk: 20, script: { 0.9: true } });
+  assert.equal(run.m.stats.hCorners, run.m.events.filter((e) => e.label === 'Redning').length);
+  assert.ok(run.m.stats.hCorners >= 2, String(run.m.stats.hCorners));
+});
+test('åbent indlæg: er oplægsgiveren samme spiller som hovedstødsspilleren, bogføres ingen assist (kun målet)', () => {
+  // lastPick: skytte = sidste af angribere+midtbane, oplægsgiver = sidste midtbanespiller = samme spiller (plads 8)
+  const { a, m, pool } = spx({ script: { 0.3: once, 0.55: true }, home: { p1: { attackFocus: 'HIGH_CROSSES' } }, wrap: lastPick, tweak: (a2) => { slot(a2.H, 8).aerialPower = 20; } });
+  assert.equal(pool.length, 1); assert.equal(pool[0].scorer, tg(slot(a.H, 8)));
+  assert.equal(rOf(m, 'home', a.H, 8).goals, 1); assert.equal(rOf(m, 'home', a.H, 8).assists, 0); assert.equal(sumOf(m, 'home', 'assists'), 0);
+});
+test('hjørnespark: oplægsgiveren er den bedste afleverer; hovedstødsspilleren en anden end ham, selv om han er bedst i luften', () => {
+  const t = (a) => { slot(a.H, 6).skills.passing = 15; slot(a.H, 6).aerialPower = 25; slot(a.H, 9).skills.finishing = 15; slot(a.H, 3).aerialPower = 20; };
+  const { a, pool, m } = spx({ script: { 0.3: once, 0.9: true }, gk: 20, tweak: t });
+  assert.equal(pool.length, 1); assert.equal(pool[0].scorer, tg(slot(a.H, 3)));
+  assert.equal(rOf(m, 'home', a.H, 6).assists, 1);
+});
+test('bogføring pr. måltype: hovedstød i åbent spil er hovedstødsmål men ikke dødboldmål; langskud er ingen af delene', () => {
+  const open = spx({ script: { 0.3: shots(2), 0.55: true }, home: { p1: { attackFocus: 'HIGH_CROSSES' } }, tweak: (a) => { slot(a.H, 9).aerialPower = 20; } });
+  const e = rOf(open.m, 'home', open.a.H, 9);
+  assert.deepEqual(open.pool.map((g) => g.kind), ['HEADER', 'HEADER']);
+  assert.deepEqual([e.headerGoals, e.setPieceGoals, e.penaltyGoals], [2, 0, 0]);
+  assert.deepEqual(stNums(open.m, 'h', 'HeaderGoals', 'SetPieceGoals', 'AerialWon', 'TacticSuccess'), [2, 0, 2, 2]);
+  const plain = spx({ script: { 0.3: shots(2) }, tweak: (a) => { slot(a.H, 9).skills.finishing = 15; } });
+  const p = rOf(plain.m, 'home', plain.a.H, 9);
+  assert.equal(plain.m.homeGoals, 2); assert.deepEqual([p.headerGoals, p.setPieceGoals, p.penaltyGoals], [0, 0, 0]);
+});
+test('en tick giver højst én hændelse: straffe/frispark fortrænger chancen, og efter tabt bold er der ingen dødbolde', () => {
+  const pen = spx({ script: { 0.011: true, 0.3: true } });
+  assert.equal(pen.m.stats.hShots, 30); assert.equal(pen.m.stats.hPenalties, 30);
+  const fk = spx({ script: { 0.061: true, 0.3: true } });
+  assert.equal(fk.m.stats.hShots, 30); assert.equal(fk.m.stats.hFreeKicks, 30);
+  assert.equal(spx({ script: { 0.011: true, 0.061: true } }).m.stats.hFreeKicks, 0, 'straffe først, så frispark');
+  // Opbygningen stoppes hver tick (presset vinder) → bolden er tabt → ingen dødbolde
+  const lost = spx({ script: { 0.48: true, 0.011: true, 0.061: true } });
+  assert.equal(lost.m.events.filter((e) => e.label === 'Fase 2 pres virker').length, 30);
+  assert.deepEqual(stNums(lost.m, 'h', 'Penalties', 'FreeKicks', 'Shots'), [0, 0, 0]);
+  const lost2 = spx({ script: { 0.48: true, 0.061: true } });
+  assert.equal(lost2.m.stats.hFreeKicks, 0);
+});
+test('stille frispark tælles på forsvaret, ikke angriberen', () => {
+  const g = spx({ script: { 0.58: true } });
+  assert.deepEqual([g.m.stats.aFouls, g.m.stats.hFouls], [30, 0]);
+});
+test('gult kort: kun taktisk frispark (ikke skade-frispark), og frisparket logges som FOUL', () => {
+  const card = spx({ script: { 0.06: once } });
+  assert.equal(card.m.events.filter((e) => e.type === 'FOUL').length, 1);
+  assert.equal([...card.m.ratings.home, ...card.m.ratings.away].filter((e) => e.yellowCard).length, 1);
+  const inj = spx({ script: { 0.06: once, 0.4: true } });
+  assert.ok([...inj.m.ratings.home, ...inj.m.ratings.away].every((e) => !e.yellowCard), 'skade-frispark nævner intet kort');
+});
+
+test('fuldtids-analyse: hvert tal står på sin plads (dit hold hjemme), kun for dit hold, som nøglehændelse af typen FULLTIME', () => {
+  // Bolden hos hjemme alle ticks (poss 10 + 3·30 mod 10 → 91 %), opbygningen vinder hver duel (30 af 30; pres 0 af 0),
+  // straffe i tick 0–1 (reddet), frispark-indlæg i de næste 4 (tabt luftduel = skud uden på mål), 3 afslutninger der scorer.
+  const a = arena();
+  slot(a.H, 9).skills.finishing = 25; slot(a.H, 1).skills.finishing = 26; slot(a.H, 1).freshness = 0;   // pladsens FIN 26 · 0,75 + 6,3 = 25,8 < MV 26
+  slot(a.A, 0).skills.goalkeeping = 22;
+  for (const p of mids(a.H)) p.skills.passing = 20;
+  const m = simulateMatch(a.H, a.A, stubRng({ 0.48: true, 0.011: (n) => n < 2, 0.061: (n) => n < 4, 0.3: (n) => n < 3 }));
+  const ft = m.events.filter((e) => e.type === 'FULLTIME');
+  assert.equal(ft.length, 1); assert.equal(ft[0].label, 'Fuldtids-analyse'); assert.equal(ft[0].isHome, true); assert.equal(ft[0].min, 90);
+  const st = m.stats;
+  assert.ok(m.homeGoals > 0 && m.awayGoals === 0, `${m.homeGoals}-${m.awayGoals}`);
+  // Tal, der skal være forskellige, så en ombytning bliver rød
+  assert.ok(st.hShots !== st.hOnTarget && st.hFreeKicks !== st.hCorners && st.hPenalties !== st.hPenaltyGoals && st.hFouls !== st.aFouls && st.hFreeKicks !== st.hPenalties, JSON.stringify(st));
+  assert.deepEqual(stNums(m, 'h', 'Penalties', 'PenaltyGoals', 'FreeKicks', 'Corners'), [2, 0, 4, 0]);
+  const poss = Math.round(st.hPoss / (st.hPoss + st.aPoss) * 100);
+  assert.equal(poss, 91);
+  assert.equal(ft[0].text, `📊 [90' FULDTIDS-ANALYSE] ${m.homeGoals}-${m.awayGoals} til dig. Du havde 91% af bolden og ${st.hShots} afslutninger (${st.hOnTarget} på mål). Din opbygning kom igennem 30 af 30 gange; dit pres vandt bolden 0 af 0 gange.`
+    + ` Dødbolde: 4 frispark i skudafstand, 0 hjørnespark, 2 straffe (0 mål) · frispark begået ${st.hFouls}, tilkendt ${st.aFouls}.`
+    + ft[0].text.slice(ft[0].text.indexOf(' 🎯 Løb uden bold (Normal): ')));
+  assert.match(ft[0].text, / 🎯 Løb uden bold \(Normal\): \d+ løb, \d+ kom fri \(\d+ mål\) · kontraer imod i alt: 0 \(0 mål\)\.$/);
+  // Kun dit hold: har modstanderen ikke et brugerhold, står der ingen analyse for ham (bot hjemme, dig ude)
+  const swap = arena(); swap.H.isBot = true; swap.A.isBot = false;
+  const m2 = simulateMatch(swap.H, swap.A, stubRng({}));
+  const f2 = m2.events.filter((e) => e.type === 'FULLTIME');
+  assert.equal(f2.length, 1); assert.equal(f2[0].isHome, false);
+  assert.equal(simulateMatch(...(() => { const b = arena(); b.H.isBot = true; return [b.H, b.A]; })(), stubRng({})).events.filter((e) => e.type === 'FULLTIME').length, 0, 'to bots: ingen analyse');
+});
+test('fuldtids-analysen er en nøglehændelse i referatets filter (og ikke blot en almindelig INFO)', async () => {
+  const { filterEvents } = await import('../../public/ui/matchcenter.js');
+  const evs = [{ type: 'FULLTIME', cat: 'TACTIC' }, { type: 'INFO', cat: 'PLAY' }, { type: 'GOAL', cat: 'HIGHLIGHT' }];
+  assert.deepEqual(filterEvents(evs, 'key').map((e) => e.type), ['FULLTIME', 'GOAL']);
+});
+
+// ---------- Test Manager v3.10: clean sheet, statistik, synlighed, tekster ----------
+test('cleanSheet i karakterarket: MV/CB/LB/RB, 0 mål imod og mindst 60 minutter (starter: minIn 1 → 59 + 1); hvert hold regnes mod sine egne mål imod', () => {
+  const r = { next: () => 0.5 };
+  const mkTeam = (id) => ({ id, name: id, isBot: false, tactics: { phases: { phase2_defending: { pressingHeight: 'MID_BLOCK' } } } });
+  const mk = (id) => ({ id, shirtNumber: 1, shortName: id, line: 'DEF', skills: { stamina: 10, pace: 10 } });
+  const s = createSheet(), th = mkTeam('h'), ta = mkTeam('a');
+  const add = (id, role, minOut, team = th, isHome = true, minIn = 1) => { s.register(mk(id), team, isHome, role, minIn, r, 15, 1).minOut = minOut; };
+  add('gk', 'GK', 90); add('cb60', 'CB', 60); add('cb59', 'CB', 59); add('lb61', 'LB', 61); add('rb', 'RB', 90); add('lwb', 'LWB', 90);
+  add('cm', 'CM', 90); add('st', 'ST', 90); add('sub', 'SUB (DEF)', 90, th, true, 31); add('cb20', 'CB', 20);
+  add('agk', 'GK', 90, ta, false); add('acb', 'CB', 90, ta, false);
+  const cs = (list) => Object.fromEntries(list.map((e) => [e.playerId, e.cleanSheet]));
+  // 0-1: hjemmeholdet har lukket 1 ind (ingen clean sheet), udeholdet 0 (MV og CB har)
+  const res = finalizeSheet(s, 0, 1, r, counterXpForMatch);
+  assert.ok(Object.values(cs(res.home)).every((v) => v === false), JSON.stringify(cs(res.home)));
+  assert.deepEqual(cs(res.away), { agk: true, acb: true });
+  // 0-0: positiv liste – kun de fire roller med mindst 60 minutter (cb60 = 59 + 1 ja, cb59 = 58 + 1 nej)
+  const s2 = createSheet();
+  const add2 = (id, role, minOut, minIn = 1) => { s2.register(mk(id), th, true, role, minIn, r, 15, 1).minOut = minOut; };
+  add2('gk', 'GK', 90); add2('cb60', 'CB', 60); add2('cb59', 'CB', 59); add2('lb61', 'LB', 61); add2('rb', 'RB', 90); add2('lwb', 'LWB', 90);
+  add2('cm', 'CM', 90); add2('st', 'ST', 90); add2('sub', 'SUB (DEF)', 90, 31); add2('cb20', 'CB', 20);
+  assert.deepEqual(cs(finalizeSheet(s2, 0, 0, r, counterXpForMatch).home),
+    { gk: true, cb60: true, cb59: false, lb61: true, rb: true, lwb: false, cm: false, st: false, sub: false, cb20: false });
+  // Mål imod fra den anden side: 1-0 hjemme → udeholdet lukkede 1 ind
+  const s3 = createSheet(); s3.register(mk('x'), ta, false, 'GK', 1, r, 15, 0); s3.register(mk('y'), th, true, 'GK', 1, r, 15, 0);
+  const r3 = finalizeSheet(s3, 1, 0, r, counterXpForMatch);
+  assert.equal(r3.away[0].cleanSheet, false); assert.equal(r3.home[0].cleanSheet, true);
+});
+
+test('runStats: km pr. 90 (distance/minutter·90), HI-andel afrundet (ikke afskåret), topfart – og null uden data', async () => {
+  const { runStats } = await import('../../public/engine/stats.js');
+  const r = runStats({ minutesSum: 180, distanceSum: 21, hiDistSum: 3, hiKmSum: 2, topSpeedMax: 31.2 });
+  assert.ok(Math.abs(r.km90 - 10.5) < 1e-9, String(r.km90)); assert.equal(r.hiPct, 67); assert.equal(r.top, 31.2);   // 2/3 = 66,7 → 67 (afskåret 66)
+  assert.deepEqual(runStats({ minutesSum: 0, distanceSum: 0, hiDistSum: 0, hiKmSum: 0, topSpeedMax: 0 }), { km90: null, hiPct: null, top: null });
+  // Gem fra v3.7.0: minutter men ingen HI-data endnu
+  assert.deepEqual(runStats({ minutesSum: 90, distanceSum: 10, hiDistSum: 0, hiKmSum: 0, topSpeedMax: 0 }), { km90: 10, hiPct: null, top: null });
+});
+
+test('statistik: flere kampe pr. runde – største sejr/målrigeste (uafgjort: første), udesejr, clean sheet til den rigtige side, dødboldmål, minutter og frispark', () => {
+  const L = createLeague(createRng(4));
+  const [T0, T1, T2, T3] = L.teams;
+  const P = (t, i) => t.squad[i];
+  const mk = (h, a, hG, aG, kinds = [], home = [], away = [], st = {}) => ({ homeId: h.id, awayId: a.id, homeName: h.name, awayName: a.name, homeGoals: hG, awayGoals: aG, homeVarNet: 0, observations: [], injuries: [], stats: st, goalsPool: kinds.map((kind) => ({ kind })), ratings: { home, away } });
+  const e = (pl, o) => ({ playerId: pl.id, rating: 7, gainedCounterXp: 1, distanceKm: 10, minIn: 1, minOut: 90, goals: 0, assists: 0, ...o });
+  const rnd = (round, matches) => ({ round, gazette: null, matches });
+  commitRound(L, rnd(1, [
+    mk(T0, T1, 3, 0, ['PENALTY', 'CORNER', 'HEADER'], [e(P(T0, 0), { minOut: 60 }), e(P(T0, 1), { minIn: 46 })], [], { hPoss: 2, aPoss: 1, hFreeKicks: 3, aFreeKicks: 1, hShots: 5, aShots: 2 }),
+    mk(T2, T3, 2, 2, ['FREEKICK', 'SETPIECE', 'LONGSHOT', 'LONGSHOT']),
+  ]), createRng(1));
+  commitRound(L, rnd(2, [mk(T1, T0, 0, 2), mk(T2, T3, 1, 3)]), createRng(1));
+  commitRound(L, rnd(3, [mk(T0, T2, 1, 1), mk(T1, T3, 1, 1)]), createRng(1));
+  assert.deepEqual(L.history[0], { round: 1, matches: 2, goals: 7, setPiece: 4, kinds: { PENALTY: 1, CORNER: 1, HEADER: 1, FREEKICK: 1, SETPIECE: 1, LONGSHOT: 2 },
+    biggest: { diff: 3, label: `${T0.name} 3-0 ${T1.name}` }, most: { goals: 4, label: `${T2.name} 2-2 ${T3.name}` } });   // HEADER og LONGSHOT er ikke dødbolde
+  assert.deepEqual(L.history[1].biggest, { diff: 2, label: `${T1.name} 0-2 ${T0.name}` }, 'udesejr tæller, og ved lighed står den første');
+  assert.deepEqual(L.history[1].most, { goals: 4, label: `${T2.name} 1-3 ${T3.name}` });
+  assert.equal(L.history[2].biggest, null); assert.deepEqual(L.history[2].most, { goals: 2, label: `${T0.name} 1-1 ${T2.name}` }, 'ved lighed står den første');
+  const row = (t) => L.leagueMetadata.standings.find((s) => s.teamId === t.id);
+  assert.deepEqual([row(T0).cleanSheets, row(T1).cleanSheets, row(T2).cleanSheets, row(T3).cleanSheets], [2, 0, 0, 0], 'clean sheet = 0 mål imod, for det rigtige hold');
+  assert.deepEqual([row(T0).freeKicks, row(T1).freeKicks, row(T0).shots], [3, 1, 5]);
+  assert.deepEqual([row(T0).possSum, row(T1).possSum], [67, 33], '2 mod 1 → 66,7 % afrundet 67 (afskåret 66); kampe uden tal tæller 0');
+  assert.equal(P(T0, 0).sMinutes, 60);                      // starter taget ud efter 60: (60 − 1) + 1
+  assert.equal(P(T0, 1).sMinutes, 44);                      // indskifter kom ind i 46. minut: 90 − 46
+});
+
+test('synlighed: ti sæsonfelter er offentlige på spillere, løb uden bold kun ejerens; holdtal: ti offentlige (hovedstødsmål som pr. spiller), resten kun dit eget', async () => {
+  const { PLAYER_SEASON_FIELDS, TEAM_STAT_FIELDS } = await import('../../public/engine/stats.js');
+  const { viewTeamStats } = await import('../../public/engine/visibility.js');
+  const p = Object.fromEntries(PLAYER_SEASON_FIELDS.map((k, i) => [k, i + 1]));
+  const pub = ['sGames', 'sMinutes', 'sGoals', 'sAssists', 'sMotm', 'sYellow', 'sCleanSheets', 'sHeaderGoals', 'sPenaltyGoals', 'sSetPieceGoals'], priv = ['freeRunsSum', 'freeRunsWonSum'];
+  assert.deepEqual([...PLAYER_SEASON_FIELDS].sort(), [...pub, ...priv].sort());
+  const o = viewPlayer(p, false), w = viewPlayer(p, true);
+  for (const k of pub) { assert.equal(o[k], p[k], k); assert.equal(w[k], p[k], k); }
+  for (const k of priv) { assert.ok(!(k in o), k); assert.equal(w[k], p[k], k); }
+  const row = { teamId: 't', teamName: 'T', ...Object.fromEntries(TEAM_STAT_FIELDS.map((k, i) => [k, i + 1])) };
+  const publicKeys = ['sMatches', 'possSum', 'fouls', 'foulsWon', 'yellows', 'penalties', 'penaltyGoals', 'setPieceGoals', 'headerGoals', 'cleanSheets'];
+  const opp = viewTeamStats(row, false), own = viewTeamStats(row, true);
+  assert.deepEqual(Object.keys(opp).sort(), ['teamId', 'teamName', ...publicKeys].sort());
+  assert.equal(opp.teamId, 't'); assert.equal(opp.teamName, 'T');
+  assert.deepEqual(Object.keys(own).sort(), ['teamId', 'teamName', ...TEAM_STAT_FIELDS].sort(), 'ejeren ser alle holdtal');
+  for (const k of TEAM_STAT_FIELDS) assert.equal(own[k], row[k], k);
+});
+
+test('nye måltyper: tre egne tekster pr. type (aldrig kombinationsteksten), scorer og oplægsgiver på de rigtige pladser', () => {
+  const v = (kind, x) => describeGoal(kind, 'S', 'A', 33, { next: () => x });
+  const expected = {
+    PENALTY: ['Straffespark i 33. minut: A blev fældet i feltet, og S sendte målmanden den forkerte vej.', 'S var iskold fra pletten i 33. minut, efter at A var blevet lagt ned i feltet.', 'Kold, rolig, mål: S scorede på straffespark i 33. minut.'],
+    FREEKICK: ['Et frispark for vitrineskabet i 33. minut: S krøllede bolden over muren og op i hjørnet.', 'S sendte et frispark ind under overliggeren i 33. minut – målmanden nåede kun at se efter den.', 'Direkte frispark i 33. minut: S fandt det lange hjørne fra 22 meter.'],
+    CORNER: ['Hjørnespark i 33. minut: A slog bolden ind, og S stangede den i mål.', 'S vandt luftduellen på As hjørnespark i 33. minut og headede ind.', 'Dødboldsstyrke i 33. minut: hjørnespark fra A, hovedstød fra S.'],
+    SETPIECE: ['Frisparksindlæg i 33. minut: A lagde bolden ind, og S headede den i mål.', 'S kom først på As frispark i 33. minut og nikkede ind.', 'Indøvet dødbold i 33. minut: frispark fra A, hovedstød fra S.'],
+  };
+  for (const [kind, texts] of Object.entries(expected)) assert.deepEqual([v(kind, 0), v(kind, 0.5), v(kind, 0.99)], texts, kind);
+});
+test('goalSpectacle for dødbolde: straffespark sjældent flot, frispark på FIN, hjørne/indlæg på luftkraft; +3 sent', () => {
+  const r = (x) => ({ next: () => x });
+  assert.equal(goalSpectacle('PENALTY', {}, 50, r(0.5)), 4.5);                          // 3 + 1,5
+  assert.equal(goalSpectacle('PENALTY', {}, 50, r(1)), 6);
+  assert.equal(goalSpectacle('PENALTY', {}, 85, r(0)), 6);                              // 3 + 3 sent
+  assert.equal(goalSpectacle('FREEKICK', { finishing: 12 }, 50, r(0.5)), 16.6);         // 11 + 3,6 + 2
+  assert.equal(goalSpectacle('FREEKICK', { finishing: 10 }, 50, r(0)), 14);             // 11 + 3
+  assert.equal(goalSpectacle('CORNER', { aerialPower: 12 }, 50, r(0.5)), 10.2);         // 4 + 4,2 + 2
+  assert.equal(goalSpectacle('CORNER', { aerialPower: 10 }, 50, r(0)), 7.5);            // 4 + 3,5
+  assert.equal(goalSpectacle('SETPIECE', { aerialPower: 14 }, 50, r(0.5)), 10.9);       // 4 + 4,9 + 2
+  assert.equal(goalSpectacle('SETPIECE', { aerialPower: 10 }, 50, r(0)), 7.5);
+});
+test('avisens etiketter for alle måltyper (også de fire dødbolde)', async () => {
+  const { GOAL_KIND_LABEL } = await import('../../public/engine/gazette.js');
+  assert.deepEqual(GOAL_KIND_LABEL, { LONGSHOT: 'Langskud', DRIBBLE: 'Dribletur', COUNTER: 'Kontra', CUTBACK: 'Cutback', COMBINATION: 'Kombination', HEADER: 'Hovedstød', VAR: 'VAR-drama', PENALTY: 'Straffespark', FREEKICK: 'Frispark', CORNER: 'Hjørnespark', SETPIECE: 'Frisparksindlæg' });
+});
+

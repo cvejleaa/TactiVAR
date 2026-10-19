@@ -320,7 +320,7 @@ visning". Sortering på kopi med `origIdx`.
 Brugeren: "Jeg vil gerne have noget statistik med på liga siden af al mulig slags". Nederst på
 Liga-fanen, fire sammenfoldede sektioner (skjult under afspilning, ligesom avisen):
 1. **Spillere** (top 5): mål, oplæg, Kampens spiller, hovedstøds-, straffe- og dødboldmål, clean
-   sheets (MV/forsvar, 0 imod, ≥ 59 min), gule kort, bedste vurdering (offentlige stjerner for alle).
+   sheets (MV/forsvar, 0 imod, mindst 59 spilleminutter – en starter har 89), gule kort, bedste vurdering (offentlige stjerner for alle).
 2. **Holdtal**: bold %, frispark begået/tilkendt, gule kort, straffe (mål), dødboldmål, clean sheets.
 3. **Ligaens forløb**: mål pr. runde (søjler), måltyper, største sejr, målrigeste kamp.
 4. **Dit hold (privat)**: afslutninger, xG, hjørnespark, frispark i skudafstand, hovedstødsmål,

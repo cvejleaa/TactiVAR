@@ -92,7 +92,7 @@ export function finalizeSheet(sheet, homeGoals, awayGoals, rng, xpFor) {
   for (const e of all) {
     const conceded = e.isHome ? awayGoals : homeGoals;
     if (conceded === 0 && CLEAN_SHEET_ROLES.has(e.role)) e.rating = clamp(e.rating + 0.5, RATING_MIN, RATING_MAX);
-    // Clean sheet i statistikken (v3.10): MV/forsvar, 0 mål imod og mindst 60 minutter på banen.
+    // Clean sheet i statistikken (v3.10): MV/forsvar, 0 mål imod og mindst 59 spilleminutter (minOut − minIn; en starter har 89).
     e.cleanSheet = conceded === 0 && CLEAN_SHEET_ROLES.has(e.role) && (e.minOut - e.minIn) >= 59;
     e.rating = Math.round(e.rating * 10) / 10;
     e.stars = starsFromRating(e.rating, starNoise(rng));
