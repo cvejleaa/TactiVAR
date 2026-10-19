@@ -445,3 +445,55 @@ test('fixture skema 4 indlæses (parseSave) – positioner sat, intet tabt, migr
   assert.ok(r.state.league.teams.every((t) => t.squad.length === 18 && t.squad.every((p) => ['GK', 'CB', 'FB', 'CM', 'WM', 'AM', 'ST'].includes(p.position))));
   assert.equal(JSON.stringify(r.state.league.teams[0].tactics.lineupSlots), JSON.stringify(d.league.teams[0].tactics.lineupSlots));
 });
+
+// ---------- v3.8 Test Manager: rang-fraktilen, lige høje og ugyldig højde i 4 → 5 ----------
+test('migrering 4 → 5: ny højde = fraktil (rang+½)/n i positionen over hele ligaen – hver spiller, ikke kun bånd', async () => {
+  const { MIGRATIONS } = await import('../../public/state/storage.js');
+  const { heightAtQuantile } = await import('../../public/engine/generator.js');
+  const d = JSON.parse(FIXTURE4);
+  const before = new Map(d.league.teams.flatMap((t) => t.squad.map((p) => [p.id, p.heightCm])));
+  const out = MIGRATIONS[4](JSON.parse(FIXTURE4));
+  const players = out.league.teams.flatMap((t) => t.squad);
+  for (const pos of ['GK', 'CB', 'FB', 'CM', 'AM', 'WM', 'ST']) {
+    const ps = players.filter((p) => p.position === pos).sort((a, b) => before.get(a.id) - before.get(b.id) || String(a.id).localeCompare(String(b.id)));
+    ps.forEach((p, i) => assert.equal(p.heightCm, heightAtQuantile(pos, (i + 0.5) / ps.length), `${pos} nr. ${i} (${p.id})`));
+  }
+});
+test('migrering 4 → 5: lige høje i samme position får højder efter id (ikke efter trup-rækkefølge)', async () => {
+  const { MIGRATIONS } = await import('../../public/state/storage.js');
+  const { heightAtQuantile } = await import('../../public/engine/generator.js');
+  const d = JSON.parse(FIXTURE4);
+  const sq = d.league.teams[0].squad;
+  // plr_t0_13 står EFTER plr_t0_2 i truppen, men er mindre som tekst. Begge er ligaens højeste stoppere og lige høje.
+  for (const id of ['plr_t0_2', 'plr_t0_13']) sq.find((p) => p.id === id).heightCm = 201;
+  const out = MIGRATIONS[4](d);
+  const cbs = out.league.teams.flatMap((t) => t.squad).filter((p) => p.position === 'CB');
+  assert.equal(cbs.length, 24);
+  const h = (id) => out.league.teams[0].squad.find((p) => p.id === id).heightCm;
+  const lo = heightAtQuantile('CB', 22.5 / 24), hi = heightAtQuantile('CB', 23.5 / 24);
+  assert.ok(lo < hi, `testdata: de to øverste rang skal give forskellig højde (${lo} / ${hi})`);
+  assert.deepEqual([h('plr_t0_13'), h('plr_t0_2')], [lo, hi]);
+});
+test('migrering 4 → 5: en spiller med ugyldig højde røres ikke – men får stadig en position, og de andre får tal', async () => {
+  const { MIGRATIONS } = await import('../../public/state/storage.js');
+  const d = JSON.parse(FIXTURE4);
+  const bad = d.league.teams[1].squad.find((p) => p.id === 'plr_t1_5'); // en back
+  bad.heightCm = null;
+  const out = MIGRATIONS[4](d);
+  const o = out.league.teams[1].squad.find((p) => p.id === 'plr_t1_5');
+  assert.equal(o.heightCm, null);
+  assert.ok(['CB', 'FB'].includes(o.position), o.position);
+  for (const p of out.league.teams.flatMap((t) => t.squad)) if (p.id !== 'plr_t1_5') assert.ok(Number.isInteger(p.heightCm), `${p.id} ${p.heightCm}`);
+});
+
+test('HEIGHT_V37 er v3.7\'s fordeling, frosset (bogstavelig) – migreringen 3 → 4 må aldrig følge senere tabelrettelser', async () => {
+  const { HEIGHT_V37 } = await import('../../public/state/storage.js');
+  const { heightAtQuantile } = await import('../../public/engine/generator.js');
+  assert.deepEqual(HEIGHT_V37, {
+    GK: { mid: 192, dice: 4, min: 168, max: 201 }, DEF: { mid: 186, dice: 6, min: 168, max: 201 },
+    MID: { mid: 179.5, dice: 6, min: 168, max: 201 }, ATT: { mid: 181, dice: 6, min: 168, max: 201 },
+  });
+  // fraktiler uden for midten (terningernes antal sider afgør): GK d=4, øvrige d=6
+  assert.deepEqual([0.1, 0.9].map((q) => heightAtQuantile('GK', q, HEIGHT_V37)), [187, 199]);
+  assert.deepEqual([0.1, 0.9].map((q) => heightAtQuantile('MID', q, HEIGHT_V37)), [171, 189]);
+});

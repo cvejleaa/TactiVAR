@@ -135,9 +135,10 @@ Tick hvert 3. minut (1..90).
   `node tools/measure-duels.mjs 100`) ca. 59 % med ligaens taktikker, ca. 53 % neutralt
   og 71–77 % med den rigtige mod-stil. Vinder forsvaret duellen, er bolden tabt:
   ingen chance for angriberen i samme tick (1,76 → ca. 1,4 mål pr. kamp; hovedstødsmål
-  uændret ca. 0,05 pr. kamp med både gamle og nye højder ved N = 100; v3.8's højde pr.
-  position: 1,43 mål og 0,14 hovedstød pr. kamp mod v3.7.1's 1,39/0,09 ved N = 20 – højere
-  angribere, lavere backs). Referatet skrives fra brugerens hold: ✅/❌ efter om DIN
+  uændret ca. 0,05 pr. kamp med både gamle og nye højder ved N = 100). v3.8 (højde pr.
+  position): høje bolde i feltet tages af en midtstopper, når holdet har en på banen (den
+  trukne forsvarer afgør hvilken – ingen ekstra terning); ellers gav backs på ≈175 cm 0,14
+  hovedstødsmål pr. kamp. Målt N = 100: 1,41 mål og 0,09 hovedstød (v3.7.1: 1,41 / 0,07). Referatet skrives fra brugerens hold: ✅/❌ efter om DIN
   taktik virkede, kun dine egne valg navngives; pause-analysen tæller dine dueller.
 - Positions-vurdering 25 %: ude af zone (>28) −0,45 karakter (presspiller
   +0,35), ellers +0,40.

@@ -887,7 +887,8 @@ test('friskhed virker i luftduellen – både angriber og forsvarer', () => {
   const run = (shAir, shFresh, defFresh) => {
     const a = arena({ home: { p1: { attackFocus: 'HIGH_CROSSES' } } });
     for (const p of mids(a.A)) p.skills.intercepting = 1;
-    slot(a.A, 0).skills.goalkeeping = 0; slot(a.A, 1).aerialPower = 10; slot(a.A, 1).freshness = defFresh;
+    slot(a.A, 0).skills.goalkeeping = 0;
+    for (const i of [1, 2, 3, 4]) Object.assign(slot(a.A, i), { aerialPower: 10, freshness: defFresh }); // v3.8: en stopper (slot 2/3) tager luftduellen
     Object.assign(slot(a.H, 9), { aerialPower: shAir, freshness: shFresh });
     for (const b of a.A.squad.slice(11)) b.skills = SK(1); // ingen bot-rotation af den trætte forsvarer
     return simulateMatch(a.H, a.A, stubRng({ 0.48: true, 0.3: true, 0.55: true })).events.filter((e) => e.type === 'HEADER_GOAL').length;
@@ -896,6 +897,24 @@ test('friskhed virker i luftduellen – både angriber og forsvarer', () => {
   assert.equal(run(11, 50, 100), 0);    // 9,625 < 10
   assert.equal(run(10, 100, 100), 0);   // 10 > 10 er falsk
   assert.ok(run(10, 100, 50) >= 25);    // 10 > 8,75
+});
+
+test('luftduel i feltet tages af en midtstopper, når holdet har en (v3.8) – ellers af den trukne forsvarer', () => {
+  const run = (formation) => {
+    const a = arena({ home: { p1: { attackFocus: 'HIGH_CROSSES' } } });
+    if (formation) a.A.tactics.baseFormation = formation;
+    for (const p of mids(a.A)) p.skills.intercepting = 1;
+    slot(a.A, 0).skills.goalkeeping = 0;
+    // Backs/wingbacks (slot 1 og 4 i 4-4-2) er luftstærke, stopperne svage: vinder skytten, var det en stopper.
+    for (const i of [1, 2, 3, 4]) Object.assign(slot(a.A, i), { aerialPower: [1, 4].includes(i) ? 20 : 5, freshness: 100 });
+    Object.assign(slot(a.H, 9), { aerialPower: 11, freshness: 100 });
+    for (const b of a.A.squad.slice(11)) b.skills = SK(1);
+    const ev = simulateMatch(a.H, a.A, stubRng({ 0.48: true, 0.3: true, 0.55: true })).events;
+    return { goals: ev.filter((e) => e.type === 'HEADER_GOAL').length, clears: ev.filter((e) => e.label === 'Luftduel i feltet').map((e) => e.text) };
+  };
+  const r = run();
+  assert.ok(r.goals >= 25, `stopperne (5) taber til skytten (11): ${r.goals}`);
+  assert.equal(r.clears.length, 0);
 });
 
 // ---------- #8 Bot-rotationens filtre ----------
@@ -1017,4 +1036,65 @@ test('Rundens mål: kampen findes via matchIdx, ellers via navnet (runder fra f�
   assert.equal(goalMatchIdx(goal, [{ homeName: 'B', awayName: 'A' }]), -1);
   assert.equal(goalMatchIdx(goal, null), -1);
   assert.equal(goalMatchIdx(null, []), -1);
+});
+
+import { FORMATIONS } from '../../public/engine/formations.js';
+import { RUN_BY_ROLE } from '../../public/engine/ratings.js';
+const slotRoles = (team) => FORMATIONS[team.tactics.baseFormation].map((s) => s.r);
+const RUN_HI = (role, line) => (role ? RUN_BY_ROLE[role].hi : RUN_BY_ROLE[{ GK: 'GK', DEF: 'CB', MID: 'CM', ATT: 'ST' }[line]].hi);
+
+// ---------- v3.8 Test Manager: løb efter plads – tabellen, ledningen og indskifterne ----------
+test('RUN_BY_ROLE er dokumentets løbetal (bogstavelig), og HVER rolle i HVER formation har en post', async () => {
+  const { RUN_BY_ROLE, runBase } = await import('../../public/engine/ratings.js');
+  const { FORMATIONS } = await import('../../public/engine/formations.js');
+  const W = { km: 11.0, hi: 13 };
+  assert.deepEqual(RUN_BY_ROLE, {
+    GK: { km: 5.5, hi: 2 }, CB: { km: 9.5, hi: 5 },
+    LB: { km: 10.6, hi: 11 }, RB: { km: 10.6, hi: 11 },
+    LWB: W, RWB: W, LM: W, RM: W, LW: W, RW: W,
+    CDM: { km: 11.8, hi: 8 }, CM: { km: 11.8, hi: 8 },
+    CAM: { km: 10.8, hi: 10 }, CF: { km: 10.8, hi: 10 }, ST: { km: 10.0, hi: 11 },
+  });
+  const roles = new Set(Object.values(FORMATIONS).flatMap((f) => f.map((s) => s.r)));
+  for (const r of roles) assert.ok(RUN_BY_ROLE[r], `rolle ${r} mangler i RUN_BY_ROLE (falder ellers stille tilbage på kæden)`);
+  // Ukendt rolle → kædens plads; ukendt begge dele → 10 km / 8 %
+  assert.deepEqual(runBase('SUB (DEF)', 'DEF'), { km: 9.5, hi: 5 });
+  assert.deepEqual(runBase(undefined, 'GK'), { km: 5.5, hi: 2 });
+  assert.deepEqual(runBase('XX', 'YY'), { km: 10, hi: 8 });
+  assert.deepEqual(runBase(undefined, undefined), { km: 10, hi: 8 });
+  assert.deepEqual(runBase('LB', 'ATT'), { km: 10.6, hi: 11 }, 'rollen vinder over kæden');
+});
+test('sheet.register: løbet følger runRole; uden runRole rollen selv – ikke kæden', () => {
+  const r = { next: () => 0.5 };
+  const team = { id: 't', name: 'T', isBot: false, tactics: { phases: { phase2_defending: { pressingHeight: 'MID_BLOCK' } } } };
+  const mid = (id) => ({ id, shirtNumber: 5, shortName: id, line: 'MID', skills: { stamina: 10, pace: 10 } });
+  const s = createSheet();
+  s.register(mid('a'), team, true, 'LM', 1, r, 15, 5);                 // runRole = role = LM
+  s.register(mid('b'), team, true, 'SUB (MID)', 1, r, 15, 6, 'LM');    // roleteksten er ikke en rolle; runRole afgør
+  s.register(mid('c'), team, true, 'SUB (MID)', 1, r, 15, 7);          // ingen runRole: kædens plads (CM)
+  const by = Object.fromEntries(finalizeSheet(s, 0, 0, r, counterXpForMatch).home.map((e) => [e.playerId, e]));
+  // LM: 11,0 km/90 · 89/90 = 10,9 og 13 % · CM: 11,8 → 11,7 km og 8 %
+  assert.deepEqual([by.a.distanceKm, by.a.hiShare], [10.9, 13]);
+  assert.deepEqual([by.b.distanceKm, by.b.hiShare], [10.9, 13]);
+  assert.deepEqual([by.c.distanceKm, by.c.hiShare], [11.7, 8]);
+});
+test('kampen: også en INDSKIFTER løber efter den plads han kommer ind på (ikke efter kæden)', () => {
+  const PRESS_HI = { HIGH_GEGENPRESS: 1.15, MID_BLOCK: 1, LOW_BLOCK: 0.9 };
+  let checked = 0, differing = 0;
+  for (const seed of [22, 5, 8]) {
+    const L = createLeague(createRng(seed)), base = createRng(3);
+    const rng = { ...base, chance: (p) => (p === 0.06 || p === 0.4 ? true : base.chance(p)) }; // skader i hvert tick → mange skift
+    const m = simulateMatch(L.teams[0], L.teams[1], rng);
+    for (const [list, team] of [[m.ratings.home, L.teams[0]], [m.ratings.away, L.teams[1]]]) {
+      for (const e of list.filter((x) => x.role.startsWith('SUB') && x.hiShare != null)) {
+        const pl = team.squad.find((p) => p.id === e.playerId);
+        const exp = (hi) => (hi + (pl.skills.pace - 10) * 0.4) * PRESS_HI[team.tactics.phases.phase2_defending.pressingHeight] * (0.8 + 0.2 * pl.freshness / 100);
+        const slotRole = slotRoles(team)[e.slot];
+        const hiSlot = RUN_HI(slotRole), hiLine = RUN_HI(null, pl.line);
+        assert.ok(Math.abs(e.hiShare - exp(hiSlot)) <= 1.05, `${seed} indskifter på ${slotRole} (kæde ${pl.line}): ${e.hiShare} vs forventet ${exp(hiSlot).toFixed(1)}`);
+        checked++; if (Math.abs(exp(hiSlot) - exp(hiLine)) >= 3) differing++;
+      }
+    }
+  }
+  assert.ok(checked >= 8 && differing >= 3, `for lidt data: ${checked} indskiftere, ${differing} hvor pladsen og kæden adskiller sig`);
 });
