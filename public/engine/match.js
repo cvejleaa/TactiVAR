@@ -21,6 +21,15 @@ export function ruleConditionMet(rule, own, opp) {
 const coordsOf = (tactics) => FORMATIONS[tactics.baseFormation] || FORMATIONS['4-4-2'];
 const tag = (p) => `#${p.shirtNumber} ${p.shortName}`;
 // Danske navne på taktikvalg i referatet.
+// Fase-duellen (v3.6, målt med tools/measure-duels.mjs): pres = INT + POS·0,85 + STA·0,35, så
+// opbygning vinder ca. 55–60 % med neutrale stile (før: 96,8 % – presset kunne næsten aldrig vinde).
+// Den rigtige mod-stil giver STYLE_BONUS; mod-kunnen (0–100) vejer MASTERY_WEIGHT pr. point.
+export const STYLE_BONUS = 3;
+export const MASTERY_WEIGHT = 0.05;
+// Dine egne valg i referatet (grammatisk rigtigt i en sætning om dit hold).
+const YOUR_PASS = { SHORT: 'Dine korte pasninger', BALANCED: 'Din balancerede opbygning', DIRECT_LONG: 'Dine direkte lange bolde' };
+const YOUR_PRESS = { LOW_BLOCK: 'din lave blok', MID_BLOCK: 'din mellemblok', HIGH_GEGENPRESS: 'dit høje gegenpres' };
+const cap = (t) => t[0].toUpperCase() + t.slice(1);
 const TXT = { SHORT: 'korte pasninger', BALANCED: 'balanceret opbygning', DIRECT_LONG: 'direkte lange bolde', LOW_BLOCK: 'lav blok', MID_BLOCK: 'mellemblok', HIGH_GEGENPRESS: 'højt gegenpress' };
 const isAvailable = (p) => !(p.injuryMatchesLeft > 0);
 
@@ -89,6 +98,8 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // Andre holds taktiske overvejelser (faser, Hvis-Så) må ikke kunne læses – kun deres
   // startopstilling. Egne valg (det menneskestyrede hold) vises fuldt.
   const own = (s) => !s.team.isBot;
+  // Fase-dueller pr. hold til pause-analysen: forsøg/sejre med opbygning og med pres.
+  const duelLog = Object.fromEntries([H, A].map((s) => [s.team.id, { build: 0, buildWon: 0, press: 0, pressWon: 0 }]));
   const tacticStr = (s) => { const p = s.tactics.phases; return own(s) ? `${s.tactics.baseFormation} • ${TXT[p.phase1_buildUp.passingStyle]} / ${TXT[p.phase2_defending.pressingHeight]}` : s.tactics.baseFormation; };
   const hCustom = customDragged(H);
   const customIntro = hCustom.length ? ` Bemærk: ${home.name} har trukket ${tag(hCustom[0].player)} ud af sin grundposition.` : '';
@@ -159,7 +170,10 @@ export function simulateMatch(home, away, rng, opts = {}) {
     if (min === 45) {
       const hp = Math.round((st.hPoss / (st.hPoss + st.aPoss)) * 100);
       const leader = st.hTacticSuccess >= st.aTacticSuccess ? home : away;
-      addEv(min, 'HALFTIME', 'TACTIC', true, false, 'Pause-analyse', `⏸️ [45' PAUSE-ANALYSE] Stillingen er ${hG}-${aG}. ${home.name} har haft ${hp}% af bolden. ${leader.name} har vundet flest taktiske dueller (${Math.max(st.hTacticSuccess, st.aTacticSuccess)}).`);
+      // Dit holds egen duel-statistik (kun egne valg nævnes – modstanderens stil røbes ikke).
+      const mine = [H, A].find(own);
+      const yours = mine ? ` Din opbygning er kommet igennem ${duelLog[mine.team.id].buildWon} af ${duelLog[mine.team.id].build} gange; dit pres har vundet bolden ${duelLog[mine.team.id].pressWon} af ${duelLog[mine.team.id].press} gange.` : '';
+      addEv(min, 'HALFTIME', 'TACTIC', true, false, 'Pause-analyse', `⏸️ [45' PAUSE-ANALYSE] Stillingen er ${hG}-${aG}. ${home.name} har haft ${hp}% af bolden. ${leader.name} har vundet flest taktiske dueller (${Math.max(st.hTacticSuccess, st.aTacticSuccess)}).${yours}`);
     }
     checkTriggers(H, min); checkTriggers(A, min);
 
@@ -191,32 +205,43 @@ export function simulateMatch(home, away, rng, opts = {}) {
     // Fase 1 mod fase 2 (48 %) med sten-saks-papir-bonus og mod-kunnen.
     if (rng.chance(0.48)) {
       const pmM = masteryVs(playmaker, def.team), prM = masteryVs(presser, att.team);
-      let build = playmaker.skills.passing + playmaker.skills.ballControl + pmM * 0.03 + rng.next() * 7;
-      let press = presser.skills.intercepting + presser.skills.stamina * 0.6 + prM * 0.03 + rng.next() * 7;
+      let build = playmaker.skills.passing + playmaker.skills.ballControl + pmM * MASTERY_WEIGHT + rng.next() * 7;
+      let press = presser.skills.intercepting + presser.skills.positioning * 0.85 + presser.skills.stamina * 0.35 + prM * MASTERY_WEIGHT + rng.next() * 7;
       const pass = attPh.phase1_buildUp.passingStyle, focus = attPh.phase1_buildUp.attackFocus, height = defPh.phase2_defending.pressingHeight;
-      if (pass === 'SHORT' && height === 'LOW_BLOCK') build += 3;
-      if (pass === 'DIRECT_LONG' && height === 'HIGH_GEGENPRESS') build += 3;
-      if (height === 'HIGH_GEGENPRESS' && pass === 'SHORT') press += 3;
-      if (height === 'LOW_BLOCK' && focus === 'CENTRAL') press += 3;
+      if (pass === 'SHORT' && height === 'LOW_BLOCK') build += STYLE_BONUS;
+      if (pass === 'DIRECT_LONG' && height === 'HIGH_GEGENPRESS') build += STYLE_BONUS;
+      if (height === 'HIGH_GEGENPRESS' && pass === 'SHORT') press += STYLE_BONUS;
+      if (height === 'LOW_BLOCK' && focus === 'CENTRAL') press += STYLE_BONUS;
+      duelLog[att.team.id].build++; duelLog[def.team.id].press++;
       if (build >= press) {
+        duelLog[att.team.id].buildWon++;
         st[k(att, 'TacticSuccess')]++;
         sheet.adjust(playmaker.id, 0.35); sheet.bump(playmaker.id, 'tacticWins');
         // Ingen besked afhængig af mod-kunnen mod modstanderen – den ville røbe deres stil.
         const note = ` ${tag(playmaker)} styrer midtbanen.`;
         // Kun dit eget holds valg navngives; modstanderens stil beskrives ikke.
-        const how = own(att) ? `Dine ${TXT[pass]} bryder igennem ${def.team.name}s pres` : own(def) ? `${att.team.name} spiller sig igennem dit ${TXT[height]}` : `${att.team.name} spiller sig igennem ${def.team.name}s pres`;
-        addEv(min, 'TACTIC_WIN', 'TACTIC', att.isHome, false, 'Fase 1 virker', `✅ [FASE 1 VIRKER • ${att.team.name}] ${how}.${note}`);
+        // Teksten er den samme, uanset om en stilbonus afgjorde duellen (ellers røbede ordvalget modstanderens stil).
+        const text = own(att) ? `✅ [DIN OPBYGNING VIRKER] ${YOUR_PASS[pass]} bryder igennem ${def.team.name}s pres.${note}`
+          : own(def) ? `❌ [DIT PRES BRYDES] ${att.team.name} spiller sig igennem ${YOUR_PRESS[height]}.${note}`
+          : `✅ [FASE 1 VIRKER • ${att.team.name}] ${att.team.name} spiller sig igennem ${def.team.name}s pres.${note}`;
+        addEv(min, 'TACTIC_WIN', 'TACTIC', att.isHome, false, 'Fase 1 virker', text);
       } else {
+        duelLog[def.team.id].pressWon++;
         st[k(def, 'TacticSuccess')]++;
         if (defPh.phase2_defending.offsideTrap !== 'OFF' && rng.chance(0.45)) {
           sheet.adjust(back.id, 0.4); sheet.adjust(striker.id, -0.25); sheet.bump(back.id, 'tacticWins');
           // Kun din egen offside-fælde navngives; hos modstandere er det blot en offside.
-          const offTxt = own(def) ? `Din offside-fælde klapper, og ${tag(striker)} fanges. ${tag(back)} dirigerer linjen perfekt.` : `${tag(striker)} (${att.team.name}) fanges offside.`;
-          addEv(min, 'TACTIC_FAIL', 'TACTIC', def.isHome, false, 'Offside-fælde virker', `🛑 [FASE 2 VIRKER • ${def.team.name}] ${offTxt}`);
+          const offTxt = own(def) ? `✅ [DIN OFFSIDE-FÆLDE VIRKER] ${tag(striker)} (${att.team.name}) fanges. ${tag(back)} dirigerer linjen perfekt.`
+            : own(att) ? `❌ [DIN OPBYGNING STOPPES] ${tag(striker)} fanges offside.`
+            : `🛑 [FASE 2 VIRKER • ${def.team.name}] ${tag(striker)} (${att.team.name}) fanges offside.`;
+          addEv(min, 'TACTIC_FAIL', 'TACTIC', def.isHome, false, 'Offside-fælde virker', offTxt);
         } else {
           sheet.adjust(presser.id, 0.35); sheet.adjust(playmaker.id, -0.2); sheet.bump(presser.id, 'tacticWins');
           const counter = !own(def) ? '' : defPh.phase3_transition.onBallWon === 'FAST_COUNTER' ? ' Din lynkontra sættes straks i gang.' : ' Dit hold falder til ro på bolden.';
-          addEv(min, 'TACTIC_FAIL', 'TACTIC', def.isHome, false, 'Fase 2 pres virker', `🛑 [FASE 1 STOPPER MOD FASE 2] ${tag(presser)} (${def.team.name}) erobrer bolden fra ${tag(playmaker)}.${counter}`);
+          const text = own(def) ? `✅ [DIT PRES VIRKER] ${cap(YOUR_PRESS[height])} lukker af: ${tag(presser)} erobrer bolden fra ${tag(playmaker)} (${att.team.name}).${counter}`
+            : own(att) ? `❌ [DIN OPBYGNING STOPPES] ${YOUR_PASS[pass]} kommer ikke igennem: ${tag(presser)} (${def.team.name}) erobrer bolden fra ${tag(playmaker)}.`
+            : `🛑 [FASE 1 STOPPER MOD FASE 2] ${tag(presser)} (${def.team.name}) erobrer bolden fra ${tag(playmaker)}.`;
+          addEv(min, 'TACTIC_FAIL', 'TACTIC', def.isHome, false, 'Fase 2 pres virker', text);
         }
       }
     }

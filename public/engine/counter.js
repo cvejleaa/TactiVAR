@@ -38,21 +38,22 @@ export function masteryVs(player, oppTeam) {
   return Math.round((ct[primary] ?? DEFAULT_MASTERY) * 0.65 + (ct[secondary] ?? DEFAULT_MASTERY) * 0.35);
 }
 
-// Erfaring for én kamp: 4–16 point efter spilletid, taktiske dueller og mål.
+// Erfaring for én kamp: 1–5 point efter spilletid, taktiske dueller og mål (v3.6; før 4–16,
+// så en starter gik fra ~45 til ~70 på 3 runder – målt med tools/measure-duels.mjs).
 export function counterXpForMatch({ minutesPlayed, tacticWins, goals }) {
-  const xp = Math.round((minutesPlayed / 90) * (9 + tacticWins * 2 + (goals > 0 ? 2 : 0)));
-  return clamp(xp, 4, 16);
+  const xp = Math.round((minutesPlayed / 90) * (2 + tacticWins * 0.5 + (goals > 0 ? 1 : 0)));
+  return clamp(xp, 1, 5);
 }
 
-// Primær stil +XP, sekundær +60 %, øvrige ruster −3 (bund 25 for ≥26 år, ellers 12). Returnerer ny værdi.
+// Primær stil +XP, sekundær +50 %, øvrige ruster −1 (bund 25 for ≥26 år, ellers 12). Returnerer ny værdi.
 export function applyCounterXp(counterTactics, age, oppTeam, gain) {
   const { primary, secondary } = opponentTacticKeys(oppTeam);
   const floor = age >= 26 ? 25 : 12;
   const next = { ...counterTactics };
   for (const k of COUNTER_KEYS) {
     if (k === primary) next[k] = Math.min(100, next[k] + gain);
-    else if (k === secondary) next[k] = Math.min(100, next[k] + Math.round(gain * 0.6));
-    else next[k] = Math.max(floor, next[k] - 3);
+    else if (k === secondary) next[k] = Math.min(100, next[k] + Math.round(gain * 0.5));
+    else next[k] = Math.max(floor, next[k] - 1);
   }
   return next;
 }

@@ -120,15 +120,17 @@ test('mod-kunnen: startværdier 12–75 og modstanderens stilart', () => {
   assert.equal(masteryVs({}, phases('SHORT', 'CENTRAL', 'HIGH_GEGENPRESS', 'NORMAL')), 25);
 });
 
-test('mod-XP: 4–16 point; primær +XP, sekundær +60 %, øvrige −3 med aldersbund', () => {
-  assert.equal(counterXpForMatch({ minutesPlayed: 90, tacticWins: 0, goals: 0 }), 9);
-  assert.equal(counterXpForMatch({ minutesPlayed: 90, tacticWins: 2, goals: 1 }), 15);
-  assert.equal(counterXpForMatch({ minutesPlayed: 90, tacticWins: 9, goals: 1 }), 16);
-  assert.equal(counterXpForMatch({ minutesPlayed: 10, tacticWins: 0, goals: 0 }), 4);
+// v3.6 (brugeren: "for hurtigt optjent erfaring"): før gav en hel kamp uden dueller 9 og
+// maks. 16; sekundær +60 % og rust −3. Tallene nedenfor er røde mod den gamle formel.
+test('mod-XP: 1–5 point; primær +XP, sekundær +50 %, øvrige −1 med aldersbund', () => {
+  assert.equal(counterXpForMatch({ minutesPlayed: 90, tacticWins: 0, goals: 0 }), 2);
+  assert.equal(counterXpForMatch({ minutesPlayed: 90, tacticWins: 2, goals: 1 }), 4);
+  assert.equal(counterXpForMatch({ minutesPlayed: 90, tacticWins: 9, goals: 1 }), 5);
+  assert.equal(counterXpForMatch({ minutesPlayed: 10, tacticWins: 0, goals: 0 }), 1);
   const opp = phases('SHORT', 'CENTRAL', 'HIGH_GEGENPRESS', 'EXTREME_VAR_LINE'); // primær vsPress, sekundær vsTrapLong
-  assert.deepEqual(applyCounterXp({ vsPress: 50, vsLowBlock: 40, vsTrapLong: 50 }, 30, opp, 10), { vsPress: 60, vsLowBlock: 37, vsTrapLong: 56 });
-  assert.deepEqual(applyCounterXp({ vsPress: 50, vsLowBlock: 26, vsTrapLong: 50 }, 30, opp, 10).vsLowBlock, 25); // bund 25 for ≥26 år
-  assert.deepEqual(applyCounterXp({ vsPress: 95, vsLowBlock: 13, vsTrapLong: 50 }, 20, opp, 10), { vsPress: 100, vsLowBlock: 12, vsTrapLong: 56 });
+  assert.deepEqual(applyCounterXp({ vsPress: 50, vsLowBlock: 40, vsTrapLong: 50 }, 30, opp, 4), { vsPress: 54, vsLowBlock: 39, vsTrapLong: 52 });
+  assert.deepEqual(applyCounterXp({ vsPress: 50, vsLowBlock: 25, vsTrapLong: 50 }, 30, opp, 4).vsLowBlock, 25); // bund 25 for ≥26 år
+  assert.deepEqual(applyCounterXp({ vsPress: 98, vsLowBlock: 12, vsTrapLong: 50 }, 20, opp, 4), { vsPress: 100, vsLowBlock: 12, vsTrapLong: 52 });
 });
 
 // ---------- Karakterer ----------
