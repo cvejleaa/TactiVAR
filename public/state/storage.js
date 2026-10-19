@@ -18,8 +18,8 @@ export const MIGRATIONS = {
     return { ...d, schemaVersion: 2 };
   },
   // 2 → 3 (v3.6, brugerens ønske): mod-kunnen på den nye skala (×0,55, inden for puljen på
-  // 120 – "man kan ikke være god imod alt") og spillerne 5 cm lavere ("snit på 186 cm, hvor
-  // den gennemsnitlige dansker er 181"). Rækkefølgen mellem spillerne bevares; luftduellen
+  // 100 – "man kan ikke være god imod alt") og spillerne 5 cm lavere ("snit på 186 cm, hvor
+  // den gennemsnitlige dansker er 181"). Rækkefølgen mellem spillerne bevares (svagt: bunden kan samle nogle); luftduellen
   // genberegnes af normalizeLeague, og højden i scouting-indtrykkene rettes med.
   2: (d) => {
     const newHeight = new Map();

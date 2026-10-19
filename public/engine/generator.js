@@ -60,7 +60,8 @@ export function rollStat(rng, min, max) {
   return clamp(Math.round(min + ((rng.next() + rng.next()) / 2) * (max - min)), 1, 20);
 }
 
-export const HEIGHT_MID = { GK: 186, DEF: 182, MID: 176, ATT: 179 };
+// Truppen er 2 MÅL, 6 FOR, 6 MID, 4 ANG: (2·186 + 6·182 + 6·178 + 4·181)/18 ≈ 180,9 cm.
+export const HEIGHT_MID = { GK: 186, DEF: 182, MID: 178, ATT: 181 };
 export const HEIGHT_ZERO = 163;
 
 export function aerialBreakdown(heightCm, jumpingPower, strength, positioning) {

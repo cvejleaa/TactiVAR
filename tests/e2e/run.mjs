@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import { chromium } from 'playwright-core';
 import { startServer } from '../../tools/serve.mjs';
 
-const PORT = 5055;
+const PORT = Number(process.env.PORT || 5055); // egen port, når flere kørsler deler maskinen
 const BASE = (process.env.BASE_URL || `http://127.0.0.1:${PORT}`).replace(/\/$/, '');
 const kandidater = [process.env.CHROME_PATH, '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', '/usr/bin/google-chrome', '/usr/bin/chromium'];
 const executablePath = kandidater.find((p) => p && fs.existsSync(p));
@@ -58,6 +58,9 @@ try {
   check('Regnearkets kolonner i rækkefølge (Alder står hvor den skal)', JSON.stringify(heads.slice(0, 20)) === JSON.stringify(['Pos/#', 'Spiller', 'Kæde', 'Alder', 'Frisk/🚑', 'Højde', 'Spring', '✈ Luft', 'PAC', 'STA', 'STR', 'BAL', 'PAS', 'FIN', 'POS', 'INT', 'GK', 'Gns', '⭐ Vurd', '🧠 Mod']), heads.join('|'));
   const modCells = await g.locator('#matrix tbody td.modcell').allTextContents();
   check('Mod-kolonnen viser tre egne værdier, ingen % mod en modstander', modCells.length === 18 && modCells.every((t) => /^\d+ · \d+ · \d+$/.test(t)) && !(await g.textContent('body')).match(/mod-kunnen[^.)]*\d+\s*%|mod [A-ZÆØÅ][^:]*: \d+%/i), modCells[0]);
+  const used = await g.textContent('#counter-used');
+  const usedN = Number(used.match(/Erfaring brugt: (\d+)\/100/)?.[1]);
+  check('Spillerkortet viser puljen: erfaring brugt X/100 og hvad der sker, når den er fuld', usedN > 0 && usedN <= 100 && used.includes('glemmer'), used);
   check('Spillerkortet viser 9 evne-barer og luftduel-udregningen', (await g.locator('#player-card .bars .bar').count()) === 9 && (await g.textContent('#aerial-breakdown')).includes('× 0,35'));
   // Opstilling i Trup: regneark, bane, bænk og kort på samme fane – men ikke taktik-indstillingerne
   check('Trup-fanen har regneark, bane, bænk og spillerkort – men ikke taktikken', (await g.isVisible('#matrix')) && (await g.isVisible('#pitch')) && (await g.isVisible('#bench')) && (await g.isVisible('#player-card')) && (await g.locator('#tactics').count()) === 0);
@@ -385,7 +388,7 @@ try {
   await g.evaluate((f) => { for (const k of Object.keys(localStorage)) if (k.startsWith('tactivar_')) localStorage.removeItem(k); localStorage.setItem('tactivar_save', f); }, fixture);
   await reload();
   const migNotice = await g.textContent('#notice');
-  check('Migrering: beskeden forklarer puljen på 120 og de 5 cm – og nævner backuppen', ['120 point', '5 cm lavere', 'Hvis-Så', 'backup'].every((x) => migNotice.includes(x)), migNotice);
+  check('Migrering: beskeden forklarer puljen på 100 og de 5 cm – og nævner backuppen', ['100 point', '5 cm lavere', 'Hvis-Så', 'backup'].every((x) => migNotice.includes(x)), migNotice);
   await reload(); await reload();
   const mig = await g.evaluate(() => ({ schema: JSON.parse(localStorage.getItem('tactivar_save')).schemaVersion, backups: Object.keys(localStorage).filter((k) => k.startsWith('tactivar_backup_')).length }));
   check('Migrering: gemmes straks i skema 3, kun én backup trods tre genindlæsninger', mig.schema === 3 && mig.backups === 1, JSON.stringify(mig));

@@ -3,7 +3,7 @@ export const COUNTER_KEYS = ['vsPress', 'vsLowBlock', 'vsTrapLong'];
 export const COUNTER_LABELS = { vsPress: 'Mod Gegenpress', vsLowBlock: 'Mod Lav Blok', vsTrapLong: 'Mod VAR-Linje & Lange Bolde' };
 const DEFAULT_MASTERY = 15; // v3.6-skalaen (startværdier ca. 20)
 // Man kan ikke være god mod alt (brugerens ønske, v3.6): de tre værdier deler en pulje.
-export const COUNTER_POOL = 120;
+export const COUNTER_POOL = 100; // højst ≈33 i snit (brugeren fandt 40–50 for højt); en specialist kan nå 90·5·5
 export const counterFloor = (age) => (age >= 26 ? 15 : 5);
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));

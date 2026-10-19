@@ -41,7 +41,7 @@ begrundelse).
   trekantsfordelt og klemt til 1–20.
 - Højde (v3.6, brugeren: "snit på 186 cm, hvor den gennemsnitlige dansker er 181";
   kilden: GK/DEF 181–198 jævnt, øvrige 172–195): klokkeform om kædens midte
-  GK 186, FOR 182, MID 176, ANG 179 ± 15 (tre terninger −5..5), holdsnit ≈181.
+  GK 186, FOR 182, MID 178, ANG 181 ± 15 (tre terninger −5..5); truppen 2/6/6/4 giver ≈180,9.
   Springkraft 1–20.
 - **Luftduel** `aerialPower = round(heightScore·0,35 + jump·0,35 +
   strength·0,15 + positioning·0,15)`, `heightScore = clamp(1..20,
@@ -121,10 +121,11 @@ Tick hvert 3. minut (1..90).
   + Mod·0,05, sten-saks-papir: SHORT slår LOW_BLOCK, DIRECT_LONG slår HIGH_GEGENPRESS,
   HIGH_GEGENPRESS slår SHORT, LOW_BLOCK slår CENTRAL (+3).
   **Afviger fra kilden (v3.6, brugerens fund):** kildens pres INT+STA·0,6 og Mod·0,03 gav
-  opbygningen 96,8 % af duellerne. Nu ca. 57 % med ligaens taktikker, ca. 52 % neutralt
-  og 73–76 % med den rigtige mod-stil (`node tools/measure-duels.mjs 20`). Vinder
-  forsvaret duellen, er bolden tabt: ingen chance for angriberen i samme tick
-  (1,76 → 1,53 mål pr. kamp). Referatet skrives fra brugerens hold: ✅/❌ efter om DIN
+  opbygningen 96,8 % af duellerne. Nu (efter mod-kunnen-puljen og de nye højder,
+  `node tools/measure-duels.mjs 100`) ca. 59 % med ligaens taktikker, ca. 53 % neutralt
+  og 71–77 % med den rigtige mod-stil. Vinder forsvaret duellen, er bolden tabt:
+  ingen chance for angriberen i samme tick (1,76 → ca. 1,4 mål pr. kamp; hovedstødsmål
+  uændret ca. 0,05 pr. kamp med både gamle og nye højder ved N = 100). Referatet skrives fra brugerens hold: ✅/❌ efter om DIN
   taktik virkede, kun dine egne valg navngives; pause-analysen tæller dine dueller.
 - Positions-vurdering 25 %: ude af zone (>28) −0,45 karakter (presspiller
   +0,35), ellers +0,40.
@@ -170,9 +171,9 @@ Tick hvert 3. minut (1..90).
   `round((alder−16)·1,2 + POS·0,8) + rnd(−8..+8)`, klemt 5–45, snit ≈18–20
   (v3.6, brugeren: "startværdierne skal sænkes"; kilden 2,2/1,5/±10, 12–75, snit ≈33).
 - **Pulje (v3.6, brugeren: "man kan ikke være god imod alt"):** summen af de tre er
-  højst 120 (`COUNTER_POOL`). Overskud betales af den stil, der ikke blev trænet,
+  højst 100 (`COUNTER_POOL`; QC: 120 tillod 40·40·40, det brugeren kaldte for højt). Overskud betales af den stil, der ikke blev trænet,
   derefter af den sekundære, hver ned til bunden; derefter af den trænede selv.
-  Spillerkortet viser "Erfaring brugt: X/120".
+  Spillerkortet viser "Erfaring brugt: X/100 – ved fuld pulje glemmer han …"; 🧠 Mod sorterer på den bedste af de tre.
 - Mod en modstander = primær·0,65 + sekundær·0,35 (afledt af modstanderens
   pres, offside-fælde, pasningsstil, angrebsfokus); default 15 (før 25).
   VAR-linje-bonus = vsTrapLong·0,045 (før ·0,025 – samme effekt på den lavere skala).

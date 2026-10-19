@@ -59,7 +59,7 @@ test('spillernes værdier ligger i kildens intervaller', () => {
     const [lo, hi] = ranges[p.roleTier];
     assert.ok(p.age >= lo && p.age <= hi, `${p.roleTier} alder ${p.age}`);
     // v3.6: klokkeform om kædens midte (GK 186, FOR 182, MID 176, ANG 179) ± 15 cm
-    const mid = { GK: 186, DEF: 182, MID: 176, ATT: 179 }[p.line];
+    const mid = { GK: 186, DEF: 182, MID: 178, ATT: 181 }[p.line];
     assert.ok(p.heightCm >= mid - 15 && p.heightCm <= mid + 15, `${p.line} ${p.heightCm}`);
     for (const v of Object.values(p.skills)) assert.ok(v >= 1 && v <= 20);
     assert.ok(p.varProfile.cynicism >= 4 && p.varProfile.theatre >= 3);
@@ -150,25 +150,24 @@ test('mod-XP: 1–5 point; primær +XP, sekundær +50 %, øvrige −1 med alders
   assert.equal(applyCounterXp({ ...base, vsLowBlock: 15 }, 26, opp, 3).vsLowBlock, 15);
   assert.equal(applyCounterXp({ ...base, vsLowBlock: 15 }, 25, opp, 3).vsLowBlock, 14);
   assert.equal(applyCounterXp({ ...base, vsLowBlock: 5 }, 20, opp, 3).vsLowBlock, 5);
-  // Loft 100 på primær og sekundær
-  assert.deepEqual(applyCounterXp({ vsPress: 98, vsLowBlock: 5, vsTrapLong: 10 }, 20, opp, 4), { vsPress: 100, vsLowBlock: 5, vsTrapLong: 12 });
-  assert.equal(applyCounterXp({ vsPress: 5, vsLowBlock: 5, vsTrapLong: 99 }, 20, opp, 5).vsTrapLong, 100);
+  // Med puljen kan én stil højst nå 100 − 2·bund: 90 for en ung spiller
+  assert.deepEqual(applyCounterXp({ vsPress: 88, vsLowBlock: 5, vsTrapLong: 7 }, 20, opp, 4), { vsPress: 90, vsLowBlock: 5, vsTrapLong: 5 });
 });
 
 // v3.6 (brugeren: "man kan ikke være god imod alt"): summen af de tre er højst COUNTER_POOL.
 test('mod-kunnen-puljen: erfaring mod én stil koster de andre – ubrugt stil først, så den sekundære', () => {
   const opp = phases('SHORT', 'CENTRAL', 'HIGH_GEGENPRESS', 'EXTREME_VAR_LINE'); // primær vsPress, sekundær vsTrapLong
-  assert.equal(COUNTER_POOL, 120);
-  // 60+20+40 = 120; +4/+2/−1 = 125 → overskud 5 tages fra den ubrugte (lav blok): 19 → 14 (24 år: bund 5)
-  assert.deepEqual(applyCounterXp({ vsPress: 60, vsLowBlock: 20, vsTrapLong: 40 }, 24, opp, 4), { vsPress: 64, vsLowBlock: 14, vsTrapLong: 42 });
-  // Ubrugt stil allerede i bund (15 for 30 år): den sekundære betaler
-  assert.deepEqual(applyCounterXp({ vsPress: 60, vsLowBlock: 15, vsTrapLong: 45 }, 30, opp, 4), { vsPress: 64, vsLowBlock: 15, vsTrapLong: 41 });
+  assert.equal(COUNTER_POOL, 100); // QC: 120 tillod 40·40·40 – det brugeren kaldte for højt
+  // 50+15+35 = 100; +4/+2/−1 = 105 → overskud 5 tages fra den ubrugte (lav blok): 14 → 9 (24 år: bund 5)
+  assert.deepEqual(applyCounterXp({ vsPress: 50, vsLowBlock: 15, vsTrapLong: 35 }, 24, opp, 4), { vsPress: 54, vsLowBlock: 9, vsTrapLong: 37 });
+  // Ubrugt stil allerede i bund (15 for 30 år): den sekundære betaler 37 → 31
+  assert.deepEqual(applyCounterXp({ vsPress: 50, vsLowBlock: 15, vsTrapLong: 35 }, 30, opp, 4), { vsPress: 54, vsLowBlock: 15, vsTrapLong: 31 });
   // Begge andre i bund: den trænede stil kan ikke vokse forbi puljen
-  assert.deepEqual(applyCounterXp({ vsPress: 90, vsLowBlock: 15, vsTrapLong: 15 }, 30, opp, 5), { vsPress: 90, vsLowBlock: 15, vsTrapLong: 15 });
+  assert.deepEqual(applyCounterXp({ vsPress: 70, vsLowBlock: 15, vsTrapLong: 15 }, 30, opp, 5), { vsPress: 70, vsLowBlock: 15, vsTrapLong: 15 });
   // Over mange kampe mod samme stil: aldrig over puljen, og aldrig høj i alle tre
   let ct = { vsPress: 40, vsLowBlock: 40, vsTrapLong: 40 };
   const lowBlockOpp = phases('SHORT', 'CENTRAL', 'LOW_BLOCK', 'OFF');
-  for (let i = 0; i < 60; i++) { ct = applyCounterXp(ct, 24, i % 2 ? opp : lowBlockOpp, 5); assert.ok(Object.values(ct).reduce((a, b) => a + b) <= 120, JSON.stringify(ct)); }
+  for (let i = 0; i < 60; i++) { ct = applyCounterXp(ct, 24, i % 2 ? opp : lowBlockOpp, 5); assert.ok(Object.values(ct).reduce((a, b) => a + b) <= 100, JSON.stringify(ct)); }
   assert.ok(Math.min(...Object.values(ct)) <= 30, JSON.stringify(ct));
 });
 
@@ -371,7 +370,7 @@ test('runde bogføres: stilling, karakterer, skader heles først og nye lægges 
 
 test('scoutingbogen holder højst 20 indtryk pr. spiller, nyeste først', () => {
   const L = league(18), rng = createRng(3);
-  for (let r = 0; r < 40; r++) commitRound(L, playRound(L, 1 + (r % 7), rng), rng);
+  for (let r = 0; r < 80; r++) commitRound(L, playRound(L, 1 + (r % 7), rng), rng); // 80 runder: nok indtryk til loftet
   const lists = Object.values(L.scouting[L.teams[0].id]);
   assert.equal(SCOUTING_PER_PLAYER, 20);
   assert.ok(lists.some((l) => l.length === 20), 'testdata skal ramme loftet');
@@ -456,4 +455,11 @@ test('referatet viser ingen mod-kunnen-procent mod modstanderen (kan bruges til 
     assert.doesNotMatch(e.text, /mod-kunnen|erfaring mod|🧠|\d+\s*%(?! af bolden)/i, e.text);
   }
   assert.ok(duels > 20, `for få vundne dueller for dit hold (${duels})`);
+});
+
+test('holdsnittet for højde ligger tæt på den danske 181 cm (før ≈186)', () => {
+  const hs = [];
+  for (let seed = 1; seed <= 20; seed++) for (const t of createLeague(createRng(seed)).teams) hs.push(t.squad.reduce((a, p) => a + p.heightCm, 0) / 18);
+  const mean = hs.reduce((a, b) => a + b) / hs.length;
+  assert.ok(mean >= 180 && mean <= 182, String(mean));
 });

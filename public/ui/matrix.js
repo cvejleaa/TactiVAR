@@ -8,7 +8,8 @@ import { COUNTER_KEYS } from '../engine/counter.js';
 
 // Mod-kunnen vises som spillerens tre egne værdier – ikke som én % mod en bestemt
 // modstander, for den kunne bruges til at regne modstanderens stil ud (brugerens valg).
-const modAvg = (p) => COUNTER_KEYS.reduce((a, k) => a + p.counterTactics[k], 0) / 3;
+// Sorteres på den bedste af de tre: med puljen (v3.6) har alle fuldt erfarne samme sum.
+const modBest = (p) => Math.max(...COUNTER_KEYS.map((k) => p.counterTactics[k]));
 
 const avgSkill = (p) => Object.values(p.skills).reduce((a, b) => a + b, 0) / 9;
 const avgRating = (p) => (p.ratingGames ? p.ratingSum / p.ratingGames : 0);
@@ -27,7 +28,7 @@ export const COLUMNS = [
     .map(([k, label, title]) => ({ key: k, label, title, field: 'skills', value: (p) => p.skills[k], num: true, heat: true })),
   { key: 'avg', label: 'Gns', title: 'Gennemsnit af de 9 kerne-evner', field: 'skills', value: avgSkill, num: true, fmt: (v) => v.toFixed(1) },
   { key: 'rating', label: '⭐ Vurd', title: 'Eget hold: gennemsnitlig karakter. Modstandere: stjerner', field: 'publicStars', value: (p, c) => (c.isOwn ? avgRating(p) : p.publicStars), num: true },
-  { key: 'mod', label: '🧠 Mod', title: 'Mod-kunnen: mod gegenpress / mod lav blok / mod VAR-linje & lange bolde (sorterer på gennemsnittet)', field: 'counterTactics', value: modAvg, num: true },
+  { key: 'mod', label: '🧠 Mod', title: 'Mod-kunnen: mod gegenpress / mod lav blok / mod VAR-linje & lange bolde (sorterer på den bedste)', field: 'counterTactics', value: modBest, num: true },
 ];
 
 export const FILTERS = [['all', 'Alle (18)'], ['start', 'Start-11'], ['bench', 'Bænk'], ['GK', 'MÅL'], ['DEF', 'FOR'], ['MID', 'MID'], ['ATT', 'ANG']];

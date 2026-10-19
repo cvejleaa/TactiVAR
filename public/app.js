@@ -68,10 +68,7 @@ function start() {
   else {
     game = r.state; view.savedAt = r.state.savedAt;
     if (r.migratedFrom != null) {
-      view.notice = [
-        r.migratedFrom <= 1 ? 'Hvis-Så-regler kan nu sættes til "Bagud/Foran med mindst N mål" og skifte til dine egne planer – "Foran med 1" gælder fra 1 mål og opefter.' : '',
-        r.migratedFrom <= 2 ? 'Mod-kunnen er sat ned på den nye skala: hver spiller har højst 120 point fordelt på de tre stilarter – lærer han noget nyt, glemmer han lidt af det gamle. Alle spillere er 5 cm lavere (holdsnit tæt på den danske 181 cm).' : '',
-      ].filter(Boolean).join(' ').replace(/^/, 'Dit spil er opdateret: ') + (r.backupKey ? ' Det gamle spil ligger som backup i browseren.' : '');
+      view.notice = migrationNotice(r.migratedFrom) + (r.backupKey ? ' Det gamle spil ligger som backup i browseren.' : '');
       // Gem straks i det nye format (ellers tog hver genindlæsning en ny backup) – men kun
       // når backuppen af det gamle format lykkedes; ellers står det gamle urørt, og der advares.
       if (r.backupKey) persist();
@@ -81,6 +78,15 @@ function start() {
   view.viewTeamIdx = myIdx();
   view.selectedPlayerId = myTeam().squad[3].id;
   render();
+}
+
+// Forklaringen på en migrering – både ved indlæsning og ved import af en ældre fil.
+function migrationNotice(from) {
+  if (from == null) return '';
+  return 'Dit spil er opdateret: ' + [
+    from <= 1 ? 'Hvis-Så-regler kan nu sættes til "Bagud/Foran med mindst N mål" og skifte til dine egne planer – "Foran med 1" gælder fra 1 mål og opefter.' : '',
+    from <= 2 ? 'Mod-kunnen er sat ca. 45 % ned (alle hold): hver spiller har nu højst 100 point fordelt på de tre stilarter – lærer han noget nyt, glemmer han lidt af det gamle. Alle spillere er 5 cm lavere (holdsnit tæt på den danske 181 cm).' : '',
+  ].filter(Boolean).join(' ');
 }
 
 function renderLoadError(r) {
@@ -103,7 +109,7 @@ function importButton() {
     if (!r.ok) { window.tactivarFejl?.(`Import mislykkedes: ${r.error}`); return; }
     const res = resetGame(storage, r.state);
     if (!res.ok) { window.tactivarFejl?.(res.error); return; }
-    dropMatchView(); game = r.state; view.viewTeamIdx = myIdx(); view.notice = `Spillet er importeret fra ${file.name}.${res.backupKey ? ` Det tidligere spil ligger som backup (${res.backupKey}).` : ''}`; view.savedAt = res.savedAt; render();
+    dropMatchView(); game = r.state; view.viewTeamIdx = myIdx(); view.notice = `Spillet er importeret fra ${file.name}.${res.backupKey ? ` Det tidligere spil ligger som backup (${res.backupKey}).` : ''} ${migrationNotice(r.migratedFrom)}`.trim(); view.savedAt = res.savedAt; render();
   } });
   return h('span', {}, input, h('button', { onclick: () => input.click() }, '⬆ Importér'));
 }
