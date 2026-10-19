@@ -516,11 +516,16 @@ export function simulateMatch(home, away, rng, opts = {}) {
     }
   }
 
-  // Opsummering af løb uden bold – kun dit eget hold (dine valg og dine tal).
+  // Fuldtids-analyse (v3.10, brugeren: "Ved pausen får jeg information om hvordan min opbygning
+  // har klaret sig, men det får jeg ikke af vide ved fuldtid") – kun dit hold, dine valg og tal.
   const meSide = [H, A].find(own);
   if (meSide) {
     const d = duelLog[meSide.team.id], runs = meSide.tactics.phases.phase1_buildUp.offBallRuns ?? 'NORMAL';
-    addEv(90, 'INFO', 'TACTIC', meSide.isHome, false, 'Løb uden bold', `🎯 [LØB UDEN BOLD • ${RUNS_LABEL[runs]}] ${d.runs} løb, ${d.runsWon} kom fri (${d.runGoals} mål) · kontraer imod i alt: ${d.countersAgainst} (${d.counterGoalsAgainst} mål).`);
+    const p = meSide.isHome ? 'h' : 'a', poss = Math.round((st[p + 'Poss'] / (st.hPoss + st.aPoss)) * 100);
+    const [myG, oppG] = meSide.isHome ? [hG, aG] : [aG, hG];
+    addEv(90, 'FULLTIME', 'TACTIC', meSide.isHome, false, 'Fuldtids-analyse',
+      `📊 [90' FULDTIDS-ANALYSE] ${myG}-${oppG} til dig. Du havde ${poss}% af bolden og ${st[p + 'Shots']} afslutninger (${st[p + 'OnTarget']} på mål). Din opbygning kom igennem ${d.buildWon} af ${d.build} gange; dit pres vandt bolden ${d.pressWon} af ${d.press} gange.`
+      + ` 🎯 Løb uden bold (${RUNS_LABEL[runs]}): ${d.runs} løb, ${d.runsWon} kom fri (${d.runGoals} mål) · kontraer imod i alt: ${d.countersAgainst} (${d.counterGoalsAgainst} mål).`);
   }
   const ratings = finalizeSheet(sheet, hG, aG, rng, counterXpForMatch);
   addEv(90, 'END', 'HIGHLIGHT', true, false, 'Slutfløjt', `🏁 SLUTFLØJT! ${home.name} ${hG} - ${aG} ${away.name}.${ratings.motm ? ` Kampens spiller: #${ratings.motm.shirtNumber} ${ratings.motm.shortName} (${ratings.motm.teamName}).` : ''}`);

@@ -987,15 +987,15 @@ test('opsummering ved slutfløjt: kun dit hold, med din indstilling, dine løb o
   // Test Manager v3.9: Mange har chance-tallet 0,36 – uden det her var der 0 løb, og teksten "0 løb, 0 kom fri" var tom
   const r = decide({ rm: { passing: 20, finishing: 1 }, runs: 'MANY', script: { 0.36: true } });
   assert.ok(r.m.ratings.home.reduce((a, e) => a + e.freeRuns, 0) >= 25, 'fixturet skal have løb');
-  const sum = r.m.events.filter((e) => e.label === 'Løb uden bold');
+  const sum = r.m.events.filter((e) => e.label === 'Fuldtids-analyse').map((e) => ({ ...e, text: e.text.match(/🎯 .*$/)[0] }));
   assert.equal(sum.length, 1);
   assert.ok(sum[0].isHome && sum[0].min === 90);
   const runs = r.m.ratings.home.reduce((a, e) => a + e.freeRuns, 0), won = r.m.ratings.home.reduce((a, e) => a + e.freeRunsWon, 0);
-  assert.equal(sum[0].text, `🎯 [LØB UDEN BOLD • Mange] ${runs} løb, ${won} kom fri (${r.m.homeGoals} mål) · kontraer imod i alt: 0 (0 mål).`);
+  assert.equal(sum[0].text, `🎯 Løb uden bold (Mange): ${runs} løb, ${won} kom fri (${r.m.homeGoals} mål) · kontraer imod i alt: 0 (0 mål).`);
   // Bot mod bot: ingen opsummering
   const { L } = arena();
   const b = simulateMatch(L.teams[2], L.teams[3], createRng(5));
-  assert.equal(b.events.filter((e) => e.label === 'Løb uden bold').length, 0);
+  assert.equal(b.events.filter((e) => e.label === 'Fuldtids-analyse').length, 0);
 });
 test('frispilningsløb er private i karakterarket (de røber positionering, fart og indstilling)', async () => {
   const { viewRatingEntry } = await import('../../public/engine/visibility.js');
@@ -1338,7 +1338,7 @@ function ctr({ n = 2, key = 0.032, tweak = null, home = {}, away = {}, form = nu
   for (const p of a.A.squad) p.skills.intercepting = 20;
   if (tweak) tweak(a);
   const m = simulateMatch(a.H, a.A, stubRng({ 0.48: true, [key]: shots(n) }));
-  return { a, m, summary: m.events.find((e) => e.label === 'Løb uden bold')?.text };
+  return { a, m, summary: m.events.find((e) => e.label === 'Fuldtids-analyse')?.text.match(/🎯 .*$/)?.[0] };
 }
 test('kontramål: skytten +1,25 og målmanden −0,3, tæller som skud, på mål og xG, og står i din opsummering som "kontraer imod"', () => {
   const { a, m, summary } = ctr({ tweak: (a) => { slot(a.A, 9).skills.pace = 14; } });
@@ -1347,7 +1347,7 @@ test('kontramål: skytten +1,25 og målmanden −0,3, tæller som skud, på mål
   assert.equal(rOf(m, 'home', a.H, 0).rating, 5.9);                                                // 6,5 − 2·0,3
   assert.equal(m.stats.aShots, 2); assert.equal(m.stats.aOnTarget, 2); assert.equal(m.stats.hShots, 0);
   assert.ok(Math.abs(m.stats.aXg - 2 * 0.3) < 1e-9, String(m.stats.aXg));                          // 0,2 + 0,5·0,2 pr. kontra
-  assert.equal(summary, '🎯 [LØB UDEN BOLD • Normal] 0 løb, 0 kom fri (0 mål) · kontraer imod i alt: 2 (2 mål).');
+  assert.equal(summary, '🎯 Løb uden bold (Normal): 0 løb, 0 kom fri (0 mål) · kontraer imod i alt: 2 (2 mål).');
   // Avisen/karakterarket regner kontramålet som COUNTER med skyttens fart: 5,5 + 14·0,2 + 0,5·4
   const g = m.goalsPool[0];
   assert.equal(g.kind, 'COUNTER'); assert.equal(g.teamName, a.A.name);
@@ -1369,7 +1369,7 @@ test('reddet kontra: målmanden +0,5 pr. redning, redning tælles, hændelsen st
     assert.match(e.text, /^🧤 \[.+\] .+ kontrer, men #\d+ .+ redder fra #\d+ .+\.$/, e.text);
     assert.doesNotMatch(e.text, /højt oppe/, e.text); // 0 løb i kampen: "højt oppe" ville være usandt
   }
-  assert.equal(summary, '🎯 [LØB UDEN BOLD • Mange] 0 løb, 0 kom fri (0 mål) · kontraer imod i alt: 3 (0 mål).');
+  assert.equal(summary, '🎯 Løb uden bold (Mange): 0 løb, 0 kom fri (0 mål) · kontraer imod i alt: 3 (0 mål).');
 });
 test('kontra-afgørelsen: skyttens FIN + 1 mod målmandens MV, begge ·friskhed (strengt større)', () => {
   const goals9 = (o) => ctr({ tweak: (a) => { Object.assign(slot(a.A, 9).skills, { finishing: o.fin ?? 10 }); slot(a.A, 9).freshness = o.sf ?? 100; slot(a.H, 0).skills.goalkeeping = o.gk; slot(a.H, 0).freshness = o.gf ?? 100; } }).m.awayGoals;
@@ -1492,7 +1492,7 @@ function fx({ rm = {}, def = {}, gk = 1, n = 2, runs = 'NORMAL', rslot = 8, form
   Object.assign(slot(a.H, rslot).skills, rm);
   if (tweak) tweak(a);
   const m = simulateMatch(a.H, a.A, stubRng({ [CHANCE_KEY[runs]]: shots(n), ...script }, nextValue));
-  return { a, m, runner: slot(a.H, rslot), goals: m.events.filter((e) => e.type === 'GOAL'), summary: m.events.find((e) => e.label === 'Løb uden bold')?.text };
+  return { a, m, runner: slot(a.H, rslot), goals: m.events.filter((e) => e.type === 'GOAL'), summary: m.events.find((e) => e.label === 'Fuldtids-analyse')?.text.match(/🎯 .*$/)?.[0] };
 }
 test('løber → aflevering fra kanten: CUTBACK, oplæg til løberen (+0,15 +0,5 pr. mål), mål, observation og tekst hos modtageren', () => {
   const { a, m, runner, goals, summary } = fx({ rm: { passing: 20, finishing: 1 } });
@@ -1509,7 +1509,7 @@ test('løber → aflevering fra kanten: CUTBACK, oplæg til løberen (+0,15 +0,5
   assert.ok(goals[0].text.includes(`✅ ${tg(runner)} løber sig fri på kanten og lægger den tværs til ${tg(fin)}.`), goals[0].text);
   const desc = goals[0].text.split(`til ${tg(fin)}. `)[1];                    // målteksten efter løbs-linjen: oplægsgiver = løberen, scorer = modtageren
   assert.ok(desc && desc.includes(tg(runner)) && desc.includes(tg(fin)), goals[0].text);
-  assert.equal(summary, '🎯 [LØB UDEN BOLD • Normal] 2 løb, 2 kom fri (2 mål) · kontraer imod i alt: 0 (0 mål).');
+  assert.equal(summary, '🎯 Løb uden bold (Normal): 2 løb, 2 kom fri (2 mål) · kontraer imod i alt: 0 (0 mål).');
 });
 test('løber → skud fra kanten: LONGSHOT uden oplæg, +1,4 til løberen selv; pris i rating for en redning', () => {
   const g = fx({ rm: { finishing: 20, passing: 1, pace: 1, ballControl: 1 } });
@@ -1518,7 +1518,7 @@ test('løber → skud fra kanten: LONGSHOT uden oplæg, +1,4 til løberen selv; 
   assert.equal(sumOf(g.m, 'home', 'assists'), 0);
   assert.equal(g.m.goalsPool[0].scorer, tg(g.runner));
   assert.ok(g.goals[0].text.includes(`✅ ${tg(g.runner)} løber sig fri på kanten og skyder.`), g.goals[0].text);
-  assert.equal(g.summary, '🎯 [LØB UDEN BOLD • Normal] 2 løb, 2 kom fri (2 mål) · kontraer imod i alt: 0 (0 mål).');
+  assert.equal(g.summary, '🎯 Løb uden bold (Normal): 2 løb, 2 kom fri (2 mål) · kontraer imod i alt: 0 (0 mål).');
   // Redning: FIN 11,5 + 3,5 = 15 mod MV 10 + 5 = 15 → ikke større → redning; 11,6 → mål
   const save = fx({ rm: { finishing: 11.5, passing: 1, pace: 1, ballControl: 1 }, gk: 10 });
   assert.equal(save.m.homeGoals, 0);
@@ -1604,14 +1604,14 @@ test('kontra-tjek efter en opsnappet dribling bruger løberens trin, hans boldta
   const r = fx({ ...drb, n: 2, script: { 0.088: shots(2) } });
   assert.deepEqual(r.m.goalsPool.map((g) => g.kind), ['COUNTER', 'COUNTER']);
   assert.equal(r.m.events.filter((e) => e.label === 'Opsnappet').length, 2);
-  assert.equal(r.summary, '🎯 [LØB UDEN BOLD • Mange] 2 løb, 2 kom fri (0 mål) · kontraer imod i alt: 2 (2 mål).');
+  assert.equal(r.summary, '🎯 Løb uden bold (Mange): 2 løb, 2 kom fri (0 mål) · kontraer imod i alt: 2 (2 mål).');
 });
 test('opsummering: Få og Normal, løb som tabes (30 løb, 0 kom fri, 0 løbs-mål selv om holdet scorer på almindelige skud)', () => {
   const lost = fx({ runs: 'FEW', n: 30, def: { positioning: 20, intercepting: 20 } });
-  assert.equal(lost.summary, `🎯 [LØB UDEN BOLD • Få] 30 løb, 0 kom fri (0 mål) · kontraer imod i alt: 0 (0 mål).`);
+  assert.equal(lost.summary, `🎯 Løb uden bold (Få): 30 løb, 0 kom fri (0 mål) · kontraer imod i alt: 0 (0 mål).`);
   assert.ok(lost.m.homeGoals >= 25, 'de almindelige skud scorer, men tæller ikke som løbs-mål');
   const won = fx({ rm: { passing: 20, finishing: 1 }, n: 30 });
-  assert.equal(won.summary, `🎯 [LØB UDEN BOLD • Normal] 30 løb, 30 kom fri (30 mål) · kontraer imod i alt: 0 (0 mål).`);
+  assert.equal(won.summary, `🎯 Løb uden bold (Normal): 30 løb, 30 kom fri (30 mål) · kontraer imod i alt: 0 (0 mål).`);
 });
 test('løber trækkes efter indstillingens vægte: Få → plads 8 (RM), Mange → plads 7 (CM) ved next 0,5', () => {
   for (const [runs, s] of [['FEW', 8], ['MANY', 7]]) {
