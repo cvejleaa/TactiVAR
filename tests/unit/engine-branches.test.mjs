@@ -495,3 +495,16 @@ test('kampen gemmer hvert holds startformation og pladsen pr. karakter – også
   assert.ok(out, 'den udskiftede spiller findes');
   assert.equal(sub.slot, out.slot);
 });
+
+test('vinder presset duellen, får angriberen ingen chance i samme tick', () => {
+  const run = (int) => {
+    const { H, A } = arena();
+    for (const p of mids(A)) p.skills.intercepting = int;
+    return simulateMatch(H, A, stubRng({ 0.48: true, 0.3: true }));
+  };
+  const lost = run(17), won = run(1); // hjemmeholdet har bolden i alle 30 ticks
+  assert.equal(count(lost, 'Fase 2 pres virker'), 30);
+  assert.equal(lost.stats.hShots, 0);
+  assert.equal(count(won, 'Fase 1 virker'), 30);
+  assert.equal(won.stats.hShots, 30);
+});

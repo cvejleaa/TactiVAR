@@ -102,3 +102,9 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .mp-val { background: var(--bg); border: 1px solid #fff; border-radius: .3rem; padding: 0 .25rem; font-weight: 800; font-size: .72rem; }
 .mp-val .stars { font-size: .62rem; } .mp-token.motm .mp-val { border-color: #fbbf24; box-shadow: 0 0 0 2px #fbbf2488; }
 .ratings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-top: 1rem; } @media (max-width: 900px) { .ratings-grid { grid-template-columns: 1fr; } }
+.fixtures { display: grid; grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr)); gap: .4rem; }
+.fixture { display: grid; grid-template-columns: 1fr auto 1fr auto; gap: .6rem; align-items: center; text-align: left; padding: .45rem .7rem; }
+.fixture.static { background: #1e293b; border: 1px solid #334155; border-radius: .35rem; grid-template-columns: 1fr auto 1fr; }
+.fixture.mine { border-color: var(--grøn); } .fx-team.right { text-align: right; } .fx-score { min-width: 2.6rem; text-align: center; } .fx-link { font-size: .72rem; color: var(--blå); }
+.lineup-layout .pitch { max-height: 70vh; margin: 0 auto; }
+.tab-trup .tablewrap { max-height: 46vh; }

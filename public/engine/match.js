@@ -202,7 +202,10 @@ export function simulateMatch(home, away, rng, opts = {}) {
       addEv(min, 'TACTIC_WIN', 'TACTIC', att.isHome, false, 'Custom pos virker', `✅ [TAKTIK VIRKER • CUSTOM POS] Den justerede placering af ${tag(cp.player)} (${att.team.name}) skaber overtal i mellemrummet.`);
     }
 
-    // Fase 1 mod fase 2 (48 %) med sten-saks-papir-bonus og mod-kunnen.
+    // Fase 1 mod fase 2 (48 %) med sten-saks-papir-bonus og mod-kunnen. Vinder forsvaret
+    // duellen, er bolden tabt, og angriberen får ingen chance i samme tick (v3.6 – før kunne
+    // "❌ din opbygning stoppes" efterfølges af dit mål i samme minut).
+    let ballLost = false;
     if (rng.chance(0.48)) {
       const pmM = masteryVs(playmaker, def.team), prM = masteryVs(presser, att.team);
       let build = playmaker.skills.passing + playmaker.skills.ballControl + pmM * MASTERY_WEIGHT + rng.next() * 7;
@@ -226,6 +229,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
           : `✅ [FASE 1 VIRKER • ${att.team.name}] ${att.team.name} spiller sig igennem ${def.team.name}s pres.${note}`;
         addEv(min, 'TACTIC_WIN', 'TACTIC', att.isHome, false, 'Fase 1 virker', text);
       } else {
+        ballLost = true;
         duelLog[def.team.id].pressWon++;
         st[k(def, 'TacticSuccess')]++;
         if (defPh.phase2_defending.offsideTrap !== 'OFF' && rng.chance(0.45)) {
@@ -271,8 +275,8 @@ export function simulateMatch(home, away, rng, opts = {}) {
       }
     }
 
-    // Chance (30 %): høje bolde, VAR-tjek eller almindelig afslutning.
-    if (rng.chance(0.3)) {
+    // Chance (30 %): høje bolde, VAR-tjek eller almindelig afslutning – ikke efter tabt bold.
+    if (!ballLost && rng.chance(0.3)) {
       const cR = att === H ? hR : aR, dR = def === H ? hR : aR;
       const shooter = rng.pick(cR.atts.concat(cR.mids)), assister = rng.pick(cR.mids), defender = rng.pick(dR.defs), gk = dR.gk;
       st[k(att, 'Shots')]++;

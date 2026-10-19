@@ -113,9 +113,15 @@ spillerobjekt; de skal ligge hos den der observerer.
 ## 5. Kampmotor (v2.5b)
 Tick hvert 3. minut (1..90).
 - Boldbesiddelse: midtbanens (PAS+BAL) + Mod·0,03 + rnd·8 (mod rnd·7,5).
-- Fase-duel 48 %: opbygning PAS+BAL+rnd·7 mod pres INT+STA·0,6+rnd·7, + Mod·0,03,
-  sten-saks-papir: SHORT slår LOW_BLOCK, DIRECT_LONG slår HIGH_GEGENPRESS,
-  HIGH_GEGENPRESS slår SHORT, LOW_BLOCK slår CENTRAL (bonus afskåret: brug +3).
+- Fase-duel 48 %: opbygning PAS+BAL+rnd·7 mod pres INT+POS·0,85+STA·0,35+rnd·7,
+  + Mod·0,05, sten-saks-papir: SHORT slår LOW_BLOCK, DIRECT_LONG slår HIGH_GEGENPRESS,
+  HIGH_GEGENPRESS slår SHORT, LOW_BLOCK slår CENTRAL (+3).
+  **Afviger fra kilden (v3.6, brugerens fund):** kildens pres INT+STA·0,6 og Mod·0,03 gav
+  opbygningen 96,8 % af duellerne. Nu ca. 57 % med ligaens taktikker, ca. 52 % neutralt
+  og 73–76 % med den rigtige mod-stil (`node tools/measure-duels.mjs 20`). Vinder
+  forsvaret duellen, er bolden tabt: ingen chance for angriberen i samme tick
+  (1,76 → 1,53 mål pr. kamp). Referatet skrives fra brugerens hold: ✅/❌ efter om DIN
+  taktik virkede, kun dine egne valg navngives; pause-analysen tæller dine dueller.
 - Positions-vurdering 25 %: ude af zone (>28) −0,45 karakter (presspiller
   +0,35), ellers +0,40.
 - Offside-fælde 45 % hvis ikke OFF. Offside-fælde og kontra (FAST_COUNTER) nævnes kun i teksten for dit eget hold; hos modstandere står blot "fanges offside" / "erobrer bolden".
@@ -160,8 +166,10 @@ Tick hvert 3. minut (1..90).
   `round((alder−16)·2,2 + POS·1,5) + rnd(−10..+11)`, klemt 12–75.
 - Mod en modstander = primær·0,65 + sekundær·0,35 (afledt af modstanderens
   pres, offside-fælde, pasningsstil, angrebsfokus); default 25.
-- XP pr. kamp = `round(min/90·(9 + 2·taktikdueller + (mål?2:0)))`, klemt 4–16;
-  primær +XP, sekundær +round(XP·0,6), øvrige −3; bund 25 (≥26 år) ellers 12.
+- XP pr. kamp = `round(min/90·(2 + 0,5·taktikdueller + (mål?1:0)))`, klemt 1–5;
+  primær +XP, sekundær +round(XP·0,5), øvrige −1; bund 25 (≥26 år) ellers 12.
+  (v3.6, brugeren: "for hurtigt"; kilden gav 4–16, +60 %, −3 – en starter gik fra
+  ~45 til ~70 på 3 runder. Eksisterende værdier i gemte spil er uændrede.)
 - UI (brugerens valg, afviger fra v2.5): kolonne 🧠Mod viser spillerens tre
   egne værdier "gegenpress · lav blok · VAR-linje" (sorterer på gennemsnittet;
   "??" for modstandere) – ingen samlet % mod en bestemt modstander, da den kan
@@ -237,8 +245,10 @@ tal). Topbar: klubvælger, ▶ Spil runde + modstandervælger (står sammen, for
 Mod-tal og knap gælder den valgte modstander), gem-status, gem/eksport/import/ny
 liga. Under topbaren fire faner (v3.5, brugerens valg); den valgte fane gemmes i
 `ui.tab` (ukendt værdi → Trup, intet skemaskift):
-- **Trup**: klubhoved, regnearket i fuld bredde (ingen sidelæns scroll, egen
-  lodret scroll ved 55 %), spillerkort.
+- **Trup** (opstilling, v3.6): klubhoved, regnearket i fuld bredde (ingen sidelæns
+  scroll, egen lodret scroll ved 46 %), derunder bane + bænkrække | spillerkort.
+  Ét fælles byt-valg: startes i regnearket, på banen eller på bænken og afsluttes
+  hvor som helst af de tre.
 - **Taktik**: bane + bænkrække (klik bænk → klik brik = skift ind) | spillerkort
   + formation/planer/faser/Hvis-Så. 2 kolonner, 1 under 900 px.
 - **Kamp**: Match Center for igangværende eller seneste runde (tom tilstand før
@@ -246,8 +256,10 @@ liga. Under topbaren fire faner (v3.5, brugerens valg); den valgte fane gemmes i
   pladsen efter navnet (naturlig kæde i parentes ved afvigelse, indskiftere
   "ind på X"), minibane "Startopstilling" med karakter/stjerner, ikoner med
   mouse-over + forklaring under (touch).
-- **Liga**: tabel + avis; klik på et hold åbner det i Trup. Under afspilning
-  siges det, at tabellen allerede er opdateret.
+- **Liga**: tabel, sidste rundes resultater (klik = referatet i Kamp), næste
+  rundes kampe (fra pairRound – afhænger af modstanderen valgt ved ▶; et fast
+  kampprogram er §10.7) og avis; klik på et hold åbner det i Trup. Under afspilning
+  skjules resultater og avis, og det siges, at tabellen allerede er opdateret.
 Modstanderes stjerner: udfyldte i guld, tomme dæmpet.
 
 ## 11. Udeladt / udskudt
@@ -274,7 +286,7 @@ mod v2.5b-koden:
 | 3-lags anti-spionage (public/private/secrets) | kun visning i klienten; Firestore åben i test mode | med (visning), reel beskyttelse udskudt |
 | Arketyper "låses op når evne-kravet er trænet op" | ingen træning findes; låsning afgøres kun ved fødsel | udskudt (Fredagstræning) |
 | "Kun bedste spiller på banen tæller ved hold-bonus" | arketyper påvirker ikke motoren | udskudt (Fredagstræning-PR) |
-| Mod-kunnen +4–16 %, −3 % rust | stemmer | med |
+| Mod-kunnen +4–16 %, −3 % rust | afviger (v3.6, brugerens valg: 1–5, −1) | med, langsommere |
 | 1 sæson = 5 uger (14 runder), 3 kampe/uge | ingen kalender; man kan spille runde 1 uendeligt | §10.7 |
 | Skader med auto-indskiftning | findes, men med fejl (§5 "Rettet") | rettet |
 | Klumme om runden | kun én kort sætning | §10.3 |

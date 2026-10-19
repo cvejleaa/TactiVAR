@@ -11,7 +11,8 @@ import { renderCard } from './ui/card.js';
 import { renderPitch } from './ui/pitch.js';
 import { renderTactics } from './ui/tactics.js';
 import { renderStandings } from './ui/standings.js';
-import { playRound, commitRound } from './engine/season.js';
+import { playRound, commitRound, pairRound } from './engine/season.js';
+import { renderLastRound, renderNextRound } from './ui/rounds.js';
 import { renderMatchCenter, renderGazette } from './ui/matchcenter.js';
 
 export const PLAYBACK_MS = 420;
@@ -24,10 +25,11 @@ let timer = null;
 
 const storage = window.localStorage;
 let game = null;          // { league, notes, ui } – det der gemmes
-let view = { viewTeamIdx: 0, sortCol: 'pos', sortDesc: false, filter: 'all', selectedPlayerId: null, swapId: null, pitchSwapId: null, notice: '', savedAt: null };
+// pitchSwapId = det ene påbegyndte byt, uanset om det startede i regnearket, på banen eller på bænken.
+let view = { viewTeamIdx: 0, sortCol: 'pos', sortDesc: false, filter: 'all', selectedPlayerId: null, pitchSwapId: null, notice: '', savedAt: null };
 
 // Skift af hold/visning afbryder et påbegyndt byt, så et senere klik aldrig bytter uden varsel.
-const clearSwap = () => { view.swapId = null; view.pitchSwapId = null; };
+const clearSwap = () => { view.pitchSwapId = null; };
 // Holdvælgeren viser holdet i Trup, hvis man står i Kamp/Liga (der ville valget ellers ikke ses).
 function showTeam(idx) {
   view.viewTeamIdx = idx; clearSwap(); view.notice = ''; view.selectedPlayerId = game.league.teams[idx].squad[0].id;
@@ -145,14 +147,15 @@ function render() {
     h('div', { class: 'right' }, h('div', { class: 'muted' }, 'Klubkasse'), h('strong', {}, isOwn ? kr(team.cashBalance) : '🔒 Skjult')));
 
   const matrix = renderMatrix({
-    team, isOwn, opponent, ui: { ...view }, notes: game.notes,
+    team, isOwn, opponent, ui: { ...view, swapId: view.pitchSwapId }, notes: game.notes,
     onSort: (c) => { if (view.sortCol === c.key) view.sortDesc = !view.sortDesc; else { view.sortCol = c.key; view.sortDesc = !!c.num; } clearSwap(); view.notice = ''; render(); },
     onBlocked: (c) => { view.notice = `🔒 Anti-spionage: du kan ikke sortere ${team.name} på "${c.label}" – det er skjult information.`; render(); },
     onSelect: (p) => { view.selectedPlayerId = p.id; render(); },
     onFilter: (f) => { view.filter = f; render(); },
     onSwap: (p) => {
-      if (!view.swapId) { view.swapId = p.id; view.notice = `🔁 Vælg den spiller, ${p.shortName} skal byttes med.`; render(); return; }
-      const a = view.swapId; clearSwap(); view.notice = '';
+      if (!view.pitchSwapId) { view.pitchSwapId = p.id; view.notice = `🔁 Vælg den spiller, ${p.shortName} skal byttes med (i regnearket, på banen eller på bænken).`; render(); return; }
+      const a = view.pitchSwapId; clearSwap(); view.notice = '';
+      if (a === p.id) { render(); return; }
       change(() => act.swapPlayers(team, a, p.id));
     },
   });
@@ -183,14 +186,21 @@ function render() {
   // Faner: ét emne ad gangen (brugerens ønske: "et noget rodet layout").
   const tab = TABS.some(([k]) => k === game.ui.tab) ? game.ui.tab : 'trup';
   const shown = mc || (league.lastRound ? lastRoundView(league.lastRound) : null);
+  // Hver fane bygges kun, når den vises: banen og kortet er ét DOM-element og kan kun stå ét sted.
   const content = {
-    trup: [header, matrix, card],
+    // Opstilling sker i Trup: tallene og sorteringen over banen (brugeren: "nærmest umuligt at
+    // opstille sit hold, da informationerne og sorteringsmulighederne ligger på 2 forskellige faner").
+    trup: () => [header, matrix, h('div', { class: 'tactics-layout lineup-layout' }, h('section', {}, pitch), h('section', {}, card))],
     // Kortet står også i Taktik, så et klik på en brik viser spilleren uden fanebyt.
-    taktik: [h('div', { class: 'tactics-layout' }, h('section', {}, pitch), h('section', {}, card, tactics))],
-    kamp: [shown ? renderMatchCenter({ mc: shown, myTeamId: mine.id, on: mcHandlers }) : h('div', { class: 'panel empty', id: 'no-matches' }, 'Ingen kampe spillet endnu. Vælg modstander i topbaren og tryk ▶ Spil runde.')],
-    liga: [mc?.playing ? h('div', { class: 'notice', id: 'booked-league' }, '📺 Runden spilles i Kamp-fanen – tabellen herunder er allerede opdateret med den.') : null,
-      standings, league.lastRound && !mc?.playing ? renderGazette(league.lastRound.gazette, mine.id) : null],
-  }[tab];
+    taktik: () => [h('div', { class: 'tactics-layout' }, h('section', {}, pitch), h('section', {}, card, tactics))],
+    kamp: () => [shown ? renderMatchCenter({ mc: shown, myTeamId: mine.id, on: mcHandlers }) : h('div', { class: 'panel empty', id: 'no-matches' }, 'Ingen kampe spillet endnu. Vælg modstander i topbaren og tryk ▶ Spil runde.')],
+    liga: () => [mc?.playing ? h('div', { class: 'notice', id: 'booked-league' }, '📺 Runden spilles i Kamp-fanen – tabellen herunder er allerede opdateret med den.') : null,
+      standings,
+      // Resultaterne skjules under afspilningen, ligesom avisen (ellers afsløres de).
+      league.lastRound && !mc?.playing ? renderLastRound({ round: league.lastRound, myTeamId: mine.id, onOpen: openReport }) : null,
+      renderNextRound({ league, pairs: pairRound(league, game.ui.opponentIdx), myTeamId: mine.id }),
+      league.lastRound && !mc?.playing ? renderGazette(league.lastRound.gazette, mine.id) : null],
+  }[tab]();
   app.replaceChildren(...[
     h('nav', { class: 'tabs', id: 'tabs' }, TABS.map(([k, label]) => h('button', { id: `tab-${k}`, class: 'tab' + (k === tab ? ' active' : ''), onclick: () => showTab(k) }, label))),
     view.notice ? h('div', { class: 'notice', id: 'notice' }, view.notice) : null,
@@ -235,6 +245,13 @@ function openMatchCenter(result, live) {
   render();
   window.scrollTo(0, 0);
   if (live) timer = setInterval(() => { mc.shownCount++; if (mc.shownCount >= mc.matches[0].events.length) finishPlayback(); else renderMc(); }, PLAYBACK_MS);
+}
+
+// Link fra Liga-siden til referatet af én kamp i seneste runde (aldrig under afspilning).
+function openReport(i) {
+  if (mc?.playing) return;
+  mc = lastRoundView(game.league.lastRound); mc.viewIdx = i;
+  showTab('kamp');
 }
 
 function finishPlayback() { clearInterval(timer); timer = null; mc.playing = false; mc.shownCount = Infinity; render(); }

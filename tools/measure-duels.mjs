@@ -14,7 +14,7 @@ const isFail = (e) => e.label === 'Fase 2 pres virker' || e.label === 'Offside-f
 
 // setup(team, i) kan sætte faser før hver runde; returnerer andel fase 1-sejre (alle hold).
 export function measure(setup = null, rounds = 3) {
-  let win = 0, fail = 0, ownWin = 0, ownFail = 0;
+  let win = 0, fail = 0, ownWin = 0, ownFail = 0, goals = 0, games = 0;
   const series = [];
   for (let s = 1; s <= N; s++) {
     const rng = createRng(s * 7919);
@@ -26,6 +26,7 @@ export function measure(setup = null, rounds = 3) {
     for (let r = 0; r < rounds; r++) {
       if (setup) L.teams.forEach(setup);
       const res = playRound(L, 1, rng);
+      for (const m of res.matches) { goals += m.homeGoals + m.awayGoals; games++; }
       for (const m of res.matches) for (const e of m.events) {
         const mine = (e.isHome ? m.homeId : m.awayId) === me.id;
         if (isWin(e)) { win++; if (mine) ownWin++; }
@@ -36,7 +37,7 @@ export function measure(setup = null, rounds = 3) {
     }
     series.push(ser);
   }
-  return { rate: win / (win + fail), n: win + fail, ownWin, ownFail, series };
+  return { rate: win / (win + fail), n: win + fail, ownWin, ownFail, series, goalsPerMatch: goals / games };
 }
 
 const phases = (pass, focus, height) => (t) => {
@@ -46,7 +47,7 @@ const phases = (pass, focus, height) => (t) => {
 if (import.meta.url === `file://${process.argv[1]}`) {
   const pct = (x) => `${(x * 100).toFixed(1)} %`;
   const liga = measure();
-  console.log(`Ligaens egne taktikker: fase 1 vinder ${pct(liga.rate)} (${liga.n} dueller, ${N} ligaer × 3 runder).`);
+  console.log(`Ligaens egne taktikker: fase 1 vinder ${pct(liga.rate)} (${liga.n} dueller, ${N} ligaer × 3 runder); ${liga.goalsPerMatch.toFixed(2)} mål pr. kamp.`);
   console.log(`Neutralt (balanceret/lave cutbacks mod mellemblok): fase 1 vinder ${pct(measure(phases('BALANCED', 'LOW_CUTBACKS', 'MID_BLOCK')).rate)}.`);
   // Alle spiller korte pasninger centralt mod højt gegenpress: presset har den rigtige mod-stil.
   console.log(`Rigtig mod-stil til presset (korte pasninger mod gegenpres): pres vinder ${pct(1 - measure(phases('SHORT', 'LOW_CUTBACKS', 'HIGH_GEGENPRESS')).rate)}.`);

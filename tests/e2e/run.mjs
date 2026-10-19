@@ -59,7 +59,20 @@ try {
   const modCells = await g.locator('#matrix tbody td.modcell').allTextContents();
   check('Mod-kolonnen viser tre egne værdier, ingen % mod en modstander', modCells.length === 18 && modCells.every((t) => /^\d+ · \d+ · \d+$/.test(t)) && !(await g.textContent('body')).match(/mod-kunnen[^.)]*\d+\s*%|mod [A-ZÆØÅ][^:]*: \d+%/i), modCells[0]);
   check('Spillerkortet viser 9 evne-barer og luftduel-udregningen', (await g.locator('#player-card .bars .bar').count()) === 9 && (await g.textContent('#aerial-breakdown')).includes('× 0,35'));
-  check('Trup-fanen viser ikke banen og taktikken', (await g.locator('#pitch').count()) === 0 && (await g.locator('#tactics').count()) === 0);
+  // Opstilling i Trup: regneark, bane, bænk og kort på samme fane – men ikke taktik-indstillingerne
+  check('Trup-fanen har regneark, bane, bænk og spillerkort – men ikke taktikken', (await g.isVisible('#matrix')) && (await g.isVisible('#pitch')) && (await g.isVisible('#bench')) && (await g.isVisible('#player-card')) && (await g.locator('#tactics').count()) === 0);
+  // Ét fælles byt: start i regnearket (bænkspiller), afslut på banen
+  const tName = async (slot) => g.locator(`#pitch .token[data-slot="${slot}"] .token-name`).textContent();
+  const benchRow = g.locator('#matrix tbody tr', { hasText: 'BÆNK' }).first();
+  const benchShort = (await benchRow.locator('td:nth-child(2)').textContent()).trim();
+  await benchRow.locator('button').click();
+  await g.click('#pitch .token[data-slot="7"]');
+  check('Byt startet i regnearket kan afsluttes på banen', (await tName(7)) === benchShort, `${benchShort} / ${await tName(7)}`);
+  await g.locator('#matrix tbody tr', { hasText: benchShort }).locator('button').click();
+  await g.locator('#bench .bench-p').first().click();
+  check('…og et byt startet i regnearket kan afsluttes på bænken', (await tName(7)) !== benchShort && (await g.locator('#notice').count()) === 0);
+  const smallTop = await (async () => { await g.setViewportSize({ width: 1366, height: 768 }); await g.evaluate(() => window.scrollTo(0, 0)); const t = await g.evaluate(() => document.getElementById('pitch').getBoundingClientRect().top); await g.setViewportSize({ width: 1400, height: 1000 }); return t; })();
+  check('Laptop (1366×768): banen begynder inden for skærmen i Trup', smallTop < 768, `${Math.round(smallTop)}px`);
   await tab('taktik');
   check('Taktik-fanen: bane, spillerkort og taktik – men ikke regnearket', (await g.isVisible('#pitch')) && (await g.isVisible('#player-card')) && (await g.locator('#matrix').count()) === 0);
   check('Tre fase-paneler og Hvis-Så-regler', (await g.locator('#tactics fieldset[data-phase]').count()) === 3 && (await g.locator('#rules .rule').count()) === 1);
@@ -226,6 +239,10 @@ try {
   // ---------- Kampe: Match Center ----------
   await g.selectOption('#team-select', '0');
   await g.selectOption('#team-select', '3'); // kampknappen findes også, mens man scouter
+  await tab('liga');
+  const oppName = (await g.locator('#opponent-select option:checked').textContent()).trim();
+  const nextFx = await g.locator('#next-round .fixture').allTextContents();
+  check('Liga før runde 1: næste rundes 4 kampe, din kamp mod den valgte modstander – ingen resultater endnu', nextFx.length === 4 && (await g.locator('#next-round .fixture.mine').textContent()).includes(oppName) && (await g.locator('#last-round').count()) === 0, nextFx.join(' | '));
   check('Kamp-fanen før første runde: tom tilstand med vejledning', await (async () => { await tab('kamp'); return (await g.textContent('#no-matches')).includes('Spil runde'); })());
   await tab('trup');
   await g.click('#play-round');
@@ -234,7 +251,7 @@ try {
   check('Under afspilning kan runden ikke startes igen, og modstanderen kan ikke skiftes', (await g.isDisabled('#play-round')) && (await g.isDisabled('#opponent-select')));
   check('Under afspilning: besked om at runden er bogført, og de andre resultater er skjulte', (await g.isVisible('#booked-note')) && !/\d-\d/.test(await g.locator('#match-cards .matchcard:nth-child(2)').textContent()));
   await tab('liga');
-  check('Under afspilning: Liga-fanen siger, at tabellen allerede er opdateret – og avisen venter', (await g.isVisible('#booked-league')) && (await g.locator('#gazette').count()) === 0);
+  check('Under afspilning: Liga-fanen siger, at tabellen allerede er opdateret – og avisen og resultaterne venter', (await g.isVisible('#booked-league')) && (await g.locator('#gazette').count()) === 0 && (await g.locator('#last-round').count()) === 0);
   await tab('kamp');
   await g.click('#skip');
   check('Runden har 4 kampe', (await g.locator('#match-cards .matchcard').count()) === 4);
@@ -271,6 +288,13 @@ try {
   await tab('liga');
   const stHead = await g.textContent('#standings-title');
   check('Efter slutfløjt: Liga-fanen viser avisen og ingen afspilningsbesked', (await g.isVisible('#gazette')) && (await g.locator('#booked-league').count()) === 0);
+  const res = await g.locator('#last-round .fixture').allTextContents();
+  check('Liga: sidste rundes 4 resultater med link til referat', res.length === 4 && res.every((t) => /\d+-\d+/.test(t) && t.includes('Referat')), res.join(' | '));
+  check('Liga: næste runde er runde 2', (await g.textContent('#next-round h3')).includes('runde 2'));
+  const third = await g.locator('#last-round .fixture').nth(2).locator('.fx-team').first().textContent();
+  await g.locator('#last-round .fixture').nth(2).click();
+  check('Klik på et resultat åbner netop den kamps referat i Kamp-fanen', (await g.textContent('#tabs .tab.active')).includes('Kamp') && (await g.locator('#match-cards .matchcard:nth-child(3).active').count()) === 1 && (await g.textContent('#scoreboard')).includes(third) && (await g.locator('#match-center .toolbar button:nth-child(1).active').count()) === 1);
+  await tab('liga');
   check('Ligatabellen er opdateret efter runde 1', stHead.includes('efter 1 runde'), stHead);
   await g.selectOption('#team-select', '2');
   check('Holdvælgeren i Liga-fanen viser holdet i Trup', (await g.textContent('#tabs .tab.active')).includes('Trup') && (await g.textContent('#club-name')) === (await g.locator('#team-select option').nth(2).textContent()));
