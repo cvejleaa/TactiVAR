@@ -38,12 +38,9 @@ function persist() {
   else { view.saveError = r.error; window.tactivarFejl?.(r.error); }
 }
 
-// Én ændring af eget hold = ændr, gem, tegn igen. Modstanderhold kan aldrig ændres –
-// det afgøres her, ét sted, uanset hvilken knap der kaldte.
-function change(fn, team = null) {
-  if (team && team.isBot) { view.notice = '🔒 Du kan kun ændre dit eget hold.'; render(); return; }
-  fn(); persist(); render();
-}
+// Én ændring = ændr, gem, tegn igen. Modstanderhold tilbyder ingen redigering (låste
+// felter, ingen byt-knapper, ingen træk) – det er vagten, og e2e-testen holder øje med den.
+function change(fn) { fn(); persist(); render(); }
 
 function start() {
   const r = loadGame(storage);
@@ -131,7 +128,7 @@ function render() {
     onSwap: (p) => {
       if (!view.swapId) { view.swapId = p.id; view.notice = `🔁 Vælg den spiller, ${p.shortName} skal byttes med.`; render(); return; }
       const a = view.swapId; clearSwap(); view.notice = '';
-      change(() => act.swapPlayers(team, a, p.id), team);
+      change(() => act.swapPlayers(team, a, p.id));
     },
   });
 
@@ -141,18 +138,18 @@ function render() {
   const pitch = h('div', { class: 'panel' }, h('h3', {}, `Taktiktavle – ${team.tactics.baseFormation}`),
     renderPitch({ team, isOwn, ui: view,
       onSelect: (p, own) => { view.selectedPlayerId = p.id; view.pitchSwapId = own ? (view.pitchSwapId === p.id ? null : p.id) : null; view.notice = view.pitchSwapId ? `🔁 Klik på en anden brik for at bytte ${p.shortName}s plads.` : ''; render(); },
-      onTokenSwap: (a, b) => { clearSwap(); view.notice = ''; change(() => act.swapPlayers(team, a, b), team); },
-      onMove: (slot, pos) => { clearSwap(); change(() => act.moveSlot(team, slot, pos), team); } }),
+      onTokenSwap: (a, b) => { clearSwap(); view.notice = ''; change(() => act.swapPlayers(team, a, b)); },
+      onMove: (slot, pos) => { clearSwap(); change(() => act.moveSlot(team, slot, pos)); } }),
     isOwn ? h('div', { class: 'muted help' }, 'Træk = justér position (målmanden står fast) · Klik på to brikker = byt plads · Bænkspillere skiftes ind med 🔁 i regnearket') : null);
 
   const tactics = renderTactics({ team, isOwn, ui: game.ui, on: {
-    formation: (f) => change(() => act.setFormation(team, f), team),
-    preset: (i) => change(() => { act.switchPreset(team, game.ui.activePresetIndex, i); game.ui.activePresetIndex = i; }, team),
-    resetDrag: () => change(() => act.resetDrag(team), team),
-    phase: (ph, f, v) => change(() => act.setPhase(team, ph, f, v), team),
-    rule: (i, patch) => change(() => act.updateRule(team, i, patch), team),
-    addRule: () => change(() => act.addRule(team), team),
-    removeRule: (i) => change(() => act.removeRule(team, i), team),
+    formation: (f) => change(() => act.setFormation(team, f)),
+    preset: (i) => change(() => { act.switchPreset(team, game.ui.activePresetIndex, i); game.ui.activePresetIndex = i; }),
+    resetDrag: () => change(() => act.resetDrag(team)),
+    phase: (ph, f, v) => change(() => act.setPhase(team, ph, f, v)),
+    rule: (i, patch) => change(() => act.updateRule(team, i, patch)),
+    addRule: () => change(() => act.addRule(team)),
+    removeRule: (i) => change(() => act.removeRule(team, i)),
   } });
 
   const standings = renderStandings({ league, viewTeamId: team.id, onPick: (id) => showTeam(league.teams.findIndex((t) => t.id === id)) });
