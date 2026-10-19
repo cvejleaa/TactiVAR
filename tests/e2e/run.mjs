@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import { chromium } from 'playwright-core';
 import { startServer } from '../../tools/serve.mjs';
 
-const PORT = 5055;
+const PORT = Number(process.env.PORT || 5055); // egen port, når flere kørsler deler maskinen
 const BASE = (process.env.BASE_URL || `http://127.0.0.1:${PORT}`).replace(/\/$/, '');
 const kandidater = [process.env.CHROME_PATH, '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', '/usr/bin/google-chrome', '/usr/bin/chromium'];
 const executablePath = kandidater.find((p) => p && fs.existsSync(p));
@@ -58,8 +58,43 @@ try {
   check('Regnearkets kolonner i rækkefølge (Alder står hvor den skal)', JSON.stringify(heads.slice(0, 20)) === JSON.stringify(['Pos/#', 'Spiller', 'Kæde', 'Alder', 'Frisk/🚑', 'Højde', 'Spring', '✈ Luft', 'PAC', 'STA', 'STR', 'BAL', 'PAS', 'FIN', 'POS', 'INT', 'GK', 'Gns', '⭐ Vurd', '🧠 Mod']), heads.join('|'));
   const modCells = await g.locator('#matrix tbody td.modcell').allTextContents();
   check('Mod-kolonnen viser tre egne værdier, ingen % mod en modstander', modCells.length === 18 && modCells.every((t) => /^\d+ · \d+ · \d+$/.test(t)) && !(await g.textContent('body')).match(/mod-kunnen[^.)]*\d+\s*%|mod [A-ZÆØÅ][^:]*: \d+%/i), modCells[0]);
+  const used = await g.textContent('#counter-pool #counter-used');
+  const usedN = Number(used.match(/Erfaring brugt: (\d+)\/100/)?.[1]);
+  const shown = (await g.textContent('#player-card h3')).match(/^#(\d+)/)[1];
+  const expectSum = await g.evaluate((nr) => { const t = JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((x) => !x.isBot); const p = t.squad.find((x) => String(x.shirtNumber) === nr); return p.counterTactics.vsPress + p.counterTactics.vsLowBlock + p.counterTactics.vsTrapLong; }, shown);
+  check('Spillerkortet viser puljen: erfaring brugt = summen af de tre værdier /100, og hvad der sker, når den er fuld', usedN === expectSum && used.includes('glemmer'), `${used} (forventet ${expectSum})`);
   check('Spillerkortet viser 9 evne-barer og luftduel-udregningen', (await g.locator('#player-card .bars .bar').count()) === 9 && (await g.textContent('#aerial-breakdown')).includes('× 0,35'));
-  check('Trup-fanen viser ikke banen og taktikken', (await g.locator('#pitch').count()) === 0 && (await g.locator('#tactics').count()) === 0);
+  // Opstilling i Trup: regneark, bane, bænk og kort på samme fane – men ikke taktik-indstillingerne
+  check('Trup-fanen har regneark, bane, bænk og spillerkort – men ikke taktikken', (await g.isVisible('#matrix')) && (await g.isVisible('#pitch')) && (await g.isVisible('#bench')) && (await g.isVisible('#player-card')) && (await g.locator('#tactics').count()) === 0);
+  // Ét fælles byt: start i regnearket (bænkspiller), afslut på banen
+  const tName = async (slot) => g.locator(`#pitch .token[data-slot="${slot}"] .token-name`).textContent();
+  const benchRow = g.locator('#matrix tbody tr', { hasText: 'BÆNK' }).first();
+  const benchShort = (await benchRow.locator('td:nth-child(2)').textContent()).trim();
+  await benchRow.locator('button').click();
+  await g.click('#pitch .token[data-slot="7"]');
+  check('Byt startet i regnearket kan afsluttes på banen', (await tName(7)) === benchShort, `${benchShort} / ${await tName(7)}`);
+  await g.locator('#matrix tbody tr', { hasText: benchShort }).locator('button').click();
+  await g.locator('#bench .bench-p').first().click();
+  check('…og et byt startet i regnearket kan afsluttes på bænken', (await tName(7)) !== benchShort && (await g.locator('#notice').count()) === 0);
+  // Et byt startet på banen markeres også i regnearket
+  const n7 = await tName(7);
+  await g.click('#pitch .token[data-slot="7"]');
+  check('Byt startet på banen markeres i regnearket', (await g.locator('#matrix tbody tr.swapping').count()) === 1 && (await g.locator('#matrix tbody tr.swapping').textContent()).includes(n7));
+  await g.click('#pitch .token[data-slot="7"]');
+  // Samme spiller to gange i regnearket: intet byt, ingen besked
+  const posBefore = await g.locator('#matrix tbody tr td:first-child').allTextContents();
+  await g.locator('#matrix tbody tr:nth-child(3) button').click(); await g.locator('#matrix tbody tr:nth-child(3) button').click();
+  check('Samme spiller valgt to gange: intet byt og ingen besked', JSON.stringify(await g.locator('#matrix tbody tr td:first-child').allTextContents()) === JSON.stringify(posBefore) && (await g.locator('#notice').count()) === 0 && (await g.locator('#matrix tbody tr.swapping').count()) === 0);
+  // Bænk → bænk vælger om; holdskift nulstiller valget
+  await g.locator('#bench .bench-p').nth(0).click(); await g.locator('#bench .bench-p').nth(1).click();
+  check('Bænk efter bænk: det nye valg erstatter det gamle', (await g.locator('#bench .bench-p.active').count()) === 1 && (await g.locator('#bench .bench-p').nth(1).getAttribute('class')).includes('active'));
+  await g.selectOption('#team-select', '1'); await g.selectOption('#team-select', '0');
+  check('Holdskift nulstiller et påbegyndt byt', (await g.locator('#bench .bench-p.active').count()) === 0 && (await g.locator('#notice').count()) === 0);
+  const smallTop = await (async () => { await g.setViewportSize({ width: 1366, height: 768 }); await g.evaluate(() => window.scrollTo(0, 0)); const t = await g.evaluate(() => document.getElementById('pitch').getBoundingClientRect().top); await g.setViewportSize({ width: 1400, height: 1000 }); return t; })();
+  // Mindst den øverste tredjedel af banen (angrebet) skal kunne ses uden at scrolle.
+  check('Laptop (1366×768): banen begynder højt nok til, at mindst 200 px af den ses i Trup', smallTop < 768 - 200, `${Math.round(smallTop)}px`);
+  const ratio = await g.evaluate(() => { const r = document.getElementById('pitch').getBoundingClientRect(); return r.width / r.height; });
+  check('Banen bevarer sit forhold 68:80 (ikke strakt)', Math.abs(ratio - 68 / 80) < 0.02, ratio.toFixed(3));
   await tab('taktik');
   check('Taktik-fanen: bane, spillerkort og taktik – men ikke regnearket', (await g.isVisible('#pitch')) && (await g.isVisible('#player-card')) && (await g.locator('#matrix').count()) === 0);
   check('Tre fase-paneler og Hvis-Så-regler', (await g.locator('#tactics fieldset[data-phase]').count()) === 3 && (await g.locator('#rules .rule').count()) === 1);
@@ -226,6 +261,10 @@ try {
   // ---------- Kampe: Match Center ----------
   await g.selectOption('#team-select', '0');
   await g.selectOption('#team-select', '3'); // kampknappen findes også, mens man scouter
+  await tab('liga');
+  const oppName = (await g.locator('#opponent-select option:checked').textContent()).trim();
+  const nextFx = await g.locator('#next-round .fixture').allTextContents();
+  check('Liga før runde 1: næste rundes 4 kampe, din kamp mod den valgte modstander – ingen resultater endnu', nextFx.length === 4 && (await g.locator('#next-round .fixture.mine').textContent()).includes(oppName) && (await g.locator('#last-round').count()) === 0, nextFx.join(' | '));
   check('Kamp-fanen før første runde: tom tilstand med vejledning', await (async () => { await tab('kamp'); return (await g.textContent('#no-matches')).includes('Spil runde'); })());
   await tab('trup');
   await g.click('#play-round');
@@ -234,7 +273,7 @@ try {
   check('Under afspilning kan runden ikke startes igen, og modstanderen kan ikke skiftes', (await g.isDisabled('#play-round')) && (await g.isDisabled('#opponent-select')));
   check('Under afspilning: besked om at runden er bogført, og de andre resultater er skjulte', (await g.isVisible('#booked-note')) && !/\d-\d/.test(await g.locator('#match-cards .matchcard:nth-child(2)').textContent()));
   await tab('liga');
-  check('Under afspilning: Liga-fanen siger, at tabellen allerede er opdateret – og avisen venter', (await g.isVisible('#booked-league')) && (await g.locator('#gazette').count()) === 0);
+  check('Under afspilning: Liga-fanen siger, at tabellen allerede er opdateret – og avisen og resultaterne venter', (await g.isVisible('#booked-league')) && (await g.locator('#gazette').count()) === 0 && (await g.locator('#last-round').count()) === 0);
   await tab('kamp');
   await g.click('#skip');
   check('Runden har 4 kampe', (await g.locator('#match-cards .matchcard').count()) === 4);
@@ -271,6 +310,25 @@ try {
   await tab('liga');
   const stHead = await g.textContent('#standings-title');
   check('Efter slutfløjt: Liga-fanen viser avisen og ingen afspilningsbesked', (await g.isVisible('#gazette')) && (await g.locator('#booked-league').count()) === 0);
+  const res = await g.locator('#last-round .fixture').allTextContents();
+  check('Liga: sidste rundes 4 resultater med link til referat', res.length === 4 && res.every((t) => /\d+-\d+/.test(t) && t.includes('Referat')), res.join(' | '));
+  check('Liga: næste runde er runde 2', (await g.textContent('#next-round h3')).includes('runde 2'));
+  // Resultater og parringer svarer præcist til det gemte spil (navne, retning, score, runde)
+  const fromSave = await g.evaluate(async () => {
+    const save = JSON.parse(localStorage.getItem('tactivar_save'));
+    const { pairRound } = await import('/engine/season.js');
+    const L = save.league, me = L.teams.find((t) => !t.isBot).name;
+    return { round: L.lastRound.round, me, results: L.lastRound.matches.map((m) => `${m.homeName}${m.homeGoals}-${m.awayGoals}${m.awayName}📺 Referat`),
+      next: pairRound(L, save.ui.opponentIdx).map(([a, b]) => `${L.teams[a].name}–${L.teams[b].name}`) };
+  });
+  check('Liga: resultaterne er sidste rundes kampe med rigtig retning og score', JSON.stringify(res) === JSON.stringify(fromSave.results) && (await g.textContent('#last-round h3')).includes(`runde ${fromSave.round}`), `${res[0]} / ${fromSave.results[0]}`);
+  check('Liga: næste runde er de parringer, der faktisk spilles', JSON.stringify(await g.locator('#next-round .fixture').allTextContents()) === JSON.stringify(fromSave.next));
+  const mineRes = await g.locator('#last-round .fixture.mine').allTextContents(), mineNext = await g.locator('#next-round .fixture.mine').allTextContents();
+  check('Liga: præcis én kamp markeret som din – i begge lister', mineRes.length === 1 && mineRes[0].includes(fromSave.me) && mineNext.length === 1 && mineNext[0].includes(fromSave.me) && res.filter((t) => t.includes(fromSave.me)).length === 1);
+  const third = await g.locator('#last-round .fixture').nth(2).locator('.fx-team').first().textContent();
+  await g.locator('#last-round .fixture').nth(2).click();
+  check('Klik på et resultat åbner netop den kamps referat i Kamp-fanen', (await g.textContent('#tabs .tab.active')).includes('Kamp') && (await g.locator('#match-cards .matchcard:nth-child(3).active').count()) === 1 && (await g.textContent('#scoreboard')).includes(third) && (await g.locator('#match-center .toolbar button:nth-child(1).active').count()) === 1);
+  await tab('liga');
   check('Ligatabellen er opdateret efter runde 1', stHead.includes('efter 1 runde'), stHead);
   await g.selectOption('#team-select', '2');
   check('Holdvælgeren i Liga-fanen viser holdet i Trup', (await g.textContent('#tabs .tab.active')).includes('Trup') && (await g.textContent('#club-name')) === (await g.locator('#team-select option').nth(2).textContent()));
@@ -330,9 +388,12 @@ try {
   // Et gemt spil fra skema 1 migreres, gemmes straks i nyt format og tager kun ÉN backup
   const fixture = fs.readFileSync(new URL('../fixtures/save-schema1.json', import.meta.url), 'utf8');
   await g.evaluate((f) => { for (const k of Object.keys(localStorage)) if (k.startsWith('tactivar_')) localStorage.removeItem(k); localStorage.setItem('tactivar_save', f); }, fixture);
-  await reload(); await reload(); await reload();
+  await reload();
+  const migNotice = await g.textContent('#notice');
+  check('Migrering: beskeden forklarer puljen på 100 og de 5 cm – og nævner backuppen', ['100 point', '5 cm lavere', 'Hvis-Så', 'backup'].every((x) => migNotice.includes(x)), migNotice);
+  await reload(); await reload();
   const mig = await g.evaluate(() => ({ schema: JSON.parse(localStorage.getItem('tactivar_save')).schemaVersion, backups: Object.keys(localStorage).filter((k) => k.startsWith('tactivar_backup_')).length }));
-  check('Migrering: gemmes straks i skema 2, kun én backup trods tre genindlæsninger', mig.schema === 2 && mig.backups === 1, JSON.stringify(mig));
+  check('Migrering: gemmes straks i skema 3, kun én backup trods tre genindlæsninger', mig.schema === 3 && mig.backups === 1, JSON.stringify(mig));
   await tab('liga'); const migHead = await g.textContent('#standings-title'); await tab('trup');
   check('Migrering: ligaen fra skema 1 er intakt (runde 1, 18 spillere)', migHead.includes('efter 1 runde') && (await rows()) === 18);
   // Runden er gemt før v3.5 (uden plads og startformation): Kamp-fanen viser den med listen, uden minibane
@@ -340,6 +401,15 @@ try {
   const oldRows = await g.locator('.ratings').nth(0).locator('tbody tr td:first-child').allTextContents();
   check('Gammel runde uden plads: karakterark med gemt rolle, ingen minibane', (await g.isVisible('#match-center')) && (await g.locator('.minipitch').count()) === 0 && oldRows.length >= 11 && oldRows.every((t) => / · \S/.test(t) && !/undefined|null/.test(t)), oldRows.slice(0, 2).join(' | '));
   await tab('trup');
+
+  // Skema 2 (brugerens egen liga før v3.6): beskeden nævner puljen og højden – ikke Hvis-Så
+  const fixture2 = fs.readFileSync(new URL('../fixtures/save-schema2.json', import.meta.url), 'utf8');
+  await g.evaluate((f) => { for (const k of Object.keys(localStorage)) if (k.startsWith('tactivar_')) localStorage.removeItem(k); localStorage.setItem('tactivar_save', f); }, fixture2);
+  await reload();
+  const note2 = await g.textContent('#notice');
+  check('Migrering fra skema 2: beskeden nævner 100 point og 5 cm, men ikke Hvis-Så', note2.includes('100 point') && note2.includes('5 cm lavere') && !note2.includes('Hvis-Så'), note2);
+  const h2 = await g.evaluate((f) => { const a = JSON.parse(f).league.teams[0].squad[0].heightCm, b = JSON.parse(localStorage.getItem('tactivar_save')).league.teams[0].squad[0].heightCm; return [a, b]; }, fixture2);
+  check('Migrering fra skema 2: spillerne er gemt 5 cm lavere', h2[1] === h2[0] - 5, h2.join(' → '));
 
   // Mislykkes backuppen ved migrering (fuldt lager), overskrives det gamle format ikke – og der advares
   await g.evaluate((f) => { for (const k of Object.keys(localStorage)) if (k.startsWith('tactivar_')) localStorage.removeItem(k); localStorage.setItem('tactivar_save', f); }, fixture);

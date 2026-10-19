@@ -60,8 +60,13 @@ export function rollStat(rng, min, max) {
   return clamp(Math.round(min + ((rng.next() + rng.next()) / 2) * (max - min)), 1, 20);
 }
 
+// Truppen er 2 MÅL, 6 FOR, 6 MID, 4 ANG: (2·186 + 6·182 + 6·178 + 4·181)/18 ≈ 180,9 cm.
+export const HEIGHT_MID = { GK: 186, DEF: 182, MID: 178, ATT: 181 };
+export const HEIGHT_ZERO = 163;
+
 export function aerialBreakdown(heightCm, jumpingPower, strength, positioning) {
-  const heightScore = clamp(Math.round((heightCm - 168) * 0.7), 1, 20);
+  // Nulpunkt 163 cm (v3.6; før 168): spillerne blev 5 cm lavere, luftduellerne skal ikke svækkes.
+  const heightScore = clamp(Math.round((heightCm - HEIGHT_ZERO) * 0.7), 1, 20);
   const wHeight = heightScore * 0.35, wJump = jumpingPower * 0.35, wStr = strength * 0.15, wPos = positioning * 0.15;
   const exact = wHeight + wJump + wStr + wPos;
   return { heightScore, wHeight, wJump, wStr, wPos, exact, total: Math.round(exact) };
@@ -83,7 +88,9 @@ export function generatePlayer(rng, line, roleTier, shirtNumber, teamIdx, usedSh
   } while (usedShortNames.has(shortName));
   usedShortNames.add(shortName);
 
-  const heightCm = line === 'GK' || line === 'DEF' ? rng.int(181, 198) : rng.int(172, 195);
+  // Højde (v3.6, brugeren: "snit på 186 cm, hvor den gennemsnitlige dansker er 181"):
+  // klokkeform om kædens midte, holdsnit ca. 181–182 (før jævnt 181–198 / 172–195).
+  const heightCm = HEIGHT_MID[line] + rng.int(-5, 5) + rng.int(-5, 5) + rng.int(-5, 5); // spredning ca. 5–6 cm
   const r = (a, b) => rollStat(rng, a, b);
   const jumpingPower = r(bMin - 1, bMax + (line === 'DEF' || line === 'ATT' ? 2 : 0));
   const skills = {

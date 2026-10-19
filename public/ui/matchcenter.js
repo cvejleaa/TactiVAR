@@ -56,7 +56,7 @@ function ratingsTable(list, isOwn, title, formation) {
       h('td', { class: 'icons' }, e.goals ? icon('⚽', e.goals) : null, e.assists ? icon('🅰', e.assists) : null, e.saves ? icon('🧤', e.saves) : null, e.aerialWins ? icon('✈', e.aerialWins) : null,
         e.yellowCard ? icon('🟨') : null, e.injured ? icon('🚑') : null, e.isMotM ? icon('👑') : null),
       h('td', { class: 'rating' }, isOwn ? e.rating.toFixed(1) : starsEl(e.stars)),
-      isOwn ? h('td', { class: 'xp', title: TIP['🧠'] }, `+${e.gainedCounterXp} 🧠`) : null)))));
+      isOwn ? h('td', { class: 'xp', title: `${TIP['🧠']} – ved fuld pulje glemmer han lidt af de andre stilarter` }, `+${e.gainedCounterXp} 🧠`) : null)))));
 }
 
 // Startopstillingen som lille bane med karakter (eget hold) eller stjerner (modstander).

@@ -39,10 +39,14 @@ begrundelse).
   positioning, intercepting, goalkeeping`, vægtet efter kæde (GK goalkeeping
   base+2, andre 1–2; finishing for ikke-ATT 2–9). `rollStat` er
   trekantsfordelt og klemt til 1–20.
-- Højde: GK/DEF 181–198 cm, øvrige 172–195. Springkraft 1–20.
+- Højde (v3.6, brugeren: "snit på 186 cm, hvor den gennemsnitlige dansker er 181";
+  kilden: GK/DEF 181–198 jævnt, øvrige 172–195): klokkeform om kædens midte
+  GK 186, FOR 182, MID 178, ANG 181 ± 15 (tre terninger −5..5); truppen 2/6/6/4 giver ≈180,9.
+  Springkraft 1–20.
 - **Luftduel** `aerialPower = round(heightScore·0,35 + jump·0,35 +
   strength·0,15 + positioning·0,15)`, `heightScore = clamp(1..20,
-  round((cm−168)·0,70))`. Mellemregningen vises på spillerkortet.
+  round((cm−163)·0,70))` (v3.6: nulpunkt 163, før 168, så luftduellerne ikke
+  svækkes af de lavere spillere). Mellemregningen vises på spillerkortet.
 - **VAR-profil (skjult for alle, også ejer)**: cynicism 4–18, theatre 3–18,
   varPulse baseMin−1..baseMax+2. Vises som "??" — "Afsløres gennem kampe".
 - Unikt kortnavn pr. hold: "M. Jensen".
@@ -113,9 +117,16 @@ spillerobjekt; de skal ligge hos den der observerer.
 ## 5. Kampmotor (v2.5b)
 Tick hvert 3. minut (1..90).
 - Boldbesiddelse: midtbanens (PAS+BAL) + Mod·0,03 + rnd·8 (mod rnd·7,5).
-- Fase-duel 48 %: opbygning PAS+BAL+rnd·7 mod pres INT+STA·0,6+rnd·7, + Mod·0,03,
-  sten-saks-papir: SHORT slår LOW_BLOCK, DIRECT_LONG slår HIGH_GEGENPRESS,
-  HIGH_GEGENPRESS slår SHORT, LOW_BLOCK slår CENTRAL (bonus afskåret: brug +3).
+- Fase-duel 48 %: opbygning PAS+BAL+rnd·7 mod pres INT+POS·0,85+STA·0,35+rnd·7,
+  + Mod·0,05, sten-saks-papir: SHORT slår LOW_BLOCK, DIRECT_LONG slår HIGH_GEGENPRESS,
+  HIGH_GEGENPRESS slår SHORT, LOW_BLOCK slår CENTRAL (+3).
+  **Afviger fra kilden (v3.6, brugerens fund):** kildens pres INT+STA·0,6 og Mod·0,03 gav
+  opbygningen 96,8 % af duellerne. Nu (efter mod-kunnen-puljen og de nye højder,
+  `node tools/measure-duels.mjs 100`) ca. 59 % med ligaens taktikker, ca. 53 % neutralt
+  og 71–77 % med den rigtige mod-stil. Vinder forsvaret duellen, er bolden tabt:
+  ingen chance for angriberen i samme tick (1,76 → ca. 1,4 mål pr. kamp; hovedstødsmål
+  uændret ca. 0,05 pr. kamp med både gamle og nye højder ved N = 100). Referatet skrives fra brugerens hold: ✅/❌ efter om DIN
+  taktik virkede, kun dine egne valg navngives; pause-analysen tæller dine dueller.
 - Positions-vurdering 25 %: ude af zone (>28) −0,45 karakter (presspiller
   +0,35), ellers +0,40.
 - Offside-fælde 45 % hvis ikke OFF. Offside-fælde og kontra (FAST_COUNTER) nævnes kun i teksten for dit eget hold; hos modstandere står blot "fanges offside" / "erobrer bolden".
@@ -157,11 +168,21 @@ Tick hvert 3. minut (1..90).
 
 ## 7. Mod-kunnen (v2.2b)
 - `counterTactics {vsPress, vsLowBlock, vsTrapLong}`, start
-  `round((alder−16)·2,2 + POS·1,5) + rnd(−10..+11)`, klemt 12–75.
+  `round((alder−16)·1,2 + POS·0,8) + rnd(−8..+8)`, klemt 5–45, snit ≈18–20
+  (v3.6, brugeren: "startværdierne skal sænkes"; kilden 2,2/1,5/±10, 12–75, snit ≈33).
+- **Pulje (v3.6, brugeren: "man kan ikke være god imod alt"):** summen af de tre er
+  højst 100 (`COUNTER_POOL`; QC: 120 tillod 40·40·40, det brugeren kaldte for højt). Overskud betales af den stil, der ikke blev trænet,
+  derefter af den sekundære, hver ned til bunden; derefter af den trænede selv.
+  Spillerkortet viser "Erfaring brugt: X/100 – ved fuld pulje glemmer han …"; 🧠 Mod sorterer på den bedste af de tre.
 - Mod en modstander = primær·0,65 + sekundær·0,35 (afledt af modstanderens
-  pres, offside-fælde, pasningsstil, angrebsfokus); default 25.
-- XP pr. kamp = `round(min/90·(9 + 2·taktikdueller + (mål?2:0)))`, klemt 4–16;
-  primær +XP, sekundær +round(XP·0,6), øvrige −3; bund 25 (≥26 år) ellers 12.
+  pres, offside-fælde, pasningsstil, angrebsfokus); default 15 (før 25).
+  VAR-linje-bonus = vsTrapLong·0,045 (før ·0,025 – samme effekt på den lavere skala).
+- XP pr. kamp = `round(min/90·(2 + 0,5·taktikdueller + (mål?1:0)))`, klemt 1–5;
+  primær +XP, sekundær +floor(XP·0,5), øvrige −1; bund 15 (≥26 år) ellers 5.
+  (v3.6, brugeren: "for hurtigt"; kilden gav 4–16, +60 %, −3, bund 25/12 – en
+  starter gik fra ~45 til ~70 på 3 runder.)
+- Skema 3 (v3.6) migrerer eksisterende ligaer: mod-kunnen ×0,55 ind i puljen,
+  højde −5 cm (rækkefølgen bevares; luftduel og scouting-tekster følger med).
 - UI (brugerens valg, afviger fra v2.5): kolonne 🧠Mod viser spillerens tre
   egne værdier "gegenpress · lav blok · VAR-linje" (sorterer på gennemsnittet;
   "??" for modstandere) – ingen samlet % mod en bestemt modstander, da den kan
@@ -186,7 +207,9 @@ visning". Sortering på kopi med `origIdx`.
   `sanitizeLeagueData`). Kan data ikke migreres: de rå data lægges i en
   backup-nøgle, FØR der tilbydes ny liga, og fejlen vises. Hver PR, der
   ændrer skemaet, tilføjer et fixture gemt af den forrige version og en
-  test, der indlæser det med truppen intakt.
+  test, der indlæser det med truppen intakt. Skema 1 → 2 (v3.4, Hvis-Så) og
+  2 → 3 (v3.6, mod-kunnen-pulje og højde) – fixtures `tests/fixtures/save-schema1.json`
+  og `save-schema2.json`.
 - Eksport/import af hele spillet som JSON-fil (backup og flytning mellem
   browsere/domæner).
 - Gamle data fra vejleaa.dk kan ikke flyttes (localStorage er bundet til
@@ -237,8 +260,10 @@ tal). Topbar: klubvælger, ▶ Spil runde + modstandervælger (står sammen, for
 Mod-tal og knap gælder den valgte modstander), gem-status, gem/eksport/import/ny
 liga. Under topbaren fire faner (v3.5, brugerens valg); den valgte fane gemmes i
 `ui.tab` (ukendt værdi → Trup, intet skemaskift):
-- **Trup**: klubhoved, regnearket i fuld bredde (ingen sidelæns scroll, egen
-  lodret scroll ved 55 %), spillerkort.
+- **Trup** (opstilling, v3.6): klubhoved, regnearket i fuld bredde (ingen sidelæns
+  scroll, egen lodret scroll ved 46 %), derunder bane + bænkrække | spillerkort.
+  Ét fælles byt-valg: startes i regnearket, på banen eller på bænken og afsluttes
+  hvor som helst af de tre.
 - **Taktik**: bane + bænkrække (klik bænk → klik brik = skift ind) | spillerkort
   + formation/planer/faser/Hvis-Så. 2 kolonner, 1 under 900 px.
 - **Kamp**: Match Center for igangværende eller seneste runde (tom tilstand før
@@ -246,8 +271,10 @@ liga. Under topbaren fire faner (v3.5, brugerens valg); den valgte fane gemmes i
   pladsen efter navnet (naturlig kæde i parentes ved afvigelse, indskiftere
   "ind på X"), minibane "Startopstilling" med karakter/stjerner, ikoner med
   mouse-over + forklaring under (touch).
-- **Liga**: tabel + avis; klik på et hold åbner det i Trup. Under afspilning
-  siges det, at tabellen allerede er opdateret.
+- **Liga**: tabel, sidste rundes resultater (klik = referatet i Kamp), næste
+  rundes kampe (fra pairRound – afhænger af modstanderen valgt ved ▶; et fast
+  kampprogram er §10.7) og avis; klik på et hold åbner det i Trup. Under afspilning
+  skjules resultater og avis, og det siges, at tabellen allerede er opdateret.
 Modstanderes stjerner: udfyldte i guld, tomme dæmpet.
 
 ## 11. Udeladt / udskudt
@@ -274,7 +301,7 @@ mod v2.5b-koden:
 | 3-lags anti-spionage (public/private/secrets) | kun visning i klienten; Firestore åben i test mode | med (visning), reel beskyttelse udskudt |
 | Arketyper "låses op når evne-kravet er trænet op" | ingen træning findes; låsning afgøres kun ved fødsel | udskudt (Fredagstræning) |
 | "Kun bedste spiller på banen tæller ved hold-bonus" | arketyper påvirker ikke motoren | udskudt (Fredagstræning-PR) |
-| Mod-kunnen +4–16 %, −3 % rust | stemmer | med |
+| Mod-kunnen +4–16 %, −3 % rust | afviger (v3.6, brugerens valg: 1–5, −1) | med, langsommere |
 | 1 sæson = 5 uger (14 runder), 3 kampe/uge | ingen kalender; man kan spille runde 1 uendeligt | §10.7 |
 | Skader med auto-indskiftning | findes, men med fejl (§5 "Rettet") | rettet |
 | Klumme om runden | kun én kort sætning | §10.3 |

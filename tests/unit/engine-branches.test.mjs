@@ -70,41 +70,44 @@ test('fase-duel i hvert af de 30 ticks (minut 3–90) ved 48 %', () => {
   const { H, A } = arena();
   const m = simulateMatch(H, A, stubRng({ 0.48: true }));
   assert.equal(count(m, 'Fase 1 virker') + count(m, 'Fase 2 pres virker'), 30);
-  assert.equal(m.events.filter((e) => e.label === 'Fase 1 virker').at(-1).min, 90);
+  assert.equal(m.events.filter((e) => e.label === 'Fase 1 virker' || e.label === 'Fase 2 pres virker').at(-1).min, 90);
   assert.equal(m.events.find((e) => e.type === 'HALFTIME').min, 45);
 });
 
-// Opbygning = PAS+BAL (20) + 25·0,03 + 3,5. Pres = INT + STA·0,6 + 25·0,03 + 3,5.
-// Med ude-midtbanens INT 17 (pres 23 mod 20) vinder presset – medmindre en +3-bonus udligner.
-function duel(homePhases, awayPhases, int = 17) {
+// v3.6: Opbygning = PAS+BAL (20) + 25·0,05 + 3,5 = 24,75.
+// Pres = INT + POS·0,85 (8,5) + STA·0,35 (3,5) + 25·0,05 + 3,5 = INT + 16,75.
+// INT 9: pres 25,75 vinder – medmindre opbygningens +3 udligner (27,75). Med den gamle formel
+// (pres INT + STA·0,6 = 19,25) vandt opbygningen altid her, så testene er røde mod den.
+function duel(homePhases, awayPhases, int = 9) {
   const { H, A } = arena({ home: homePhases, away: awayPhases });
   for (const p of mids(A)) p.skills.intercepting = int;
   const m = simulateMatch(H, A, stubRng({ 0.48: true }));
   return { win: count(m, 'Fase 1 virker'), lose: count(m, 'Fase 2 pres virker') };
 }
 
-test('sten-saks-papir: uden bonus vinder presset 23 mod 20', () => {
+test('sten-saks-papir: uden bonus vinder presset 25,75 mod 24,75', () => {
   assert.deepEqual(duel({}, {}), { win: 0, lose: 30 });
 });
-test('SHORT mod LOW_BLOCK giver opbygningen +3 (23 ≥ 23 – lighed tæller for opbygningen)', () => {
+test('SHORT mod LOW_BLOCK giver opbygningen +3 (27,75 mod 25,75)', () => {
   assert.deepEqual(duel({ p1: { passingStyle: 'SHORT', attackFocus: 'LOW_CUTBACKS' } }, { p2: { pressingHeight: 'LOW_BLOCK' } }), { win: 30, lose: 0 });
 });
 test('DIRECT_LONG mod HIGH_GEGENPRESS giver opbygningen +3', () => {
   assert.deepEqual(duel({ p1: { passingStyle: 'DIRECT_LONG' } }, { p2: { pressingHeight: 'HIGH_GEGENPRESS' } }), { win: 30, lose: 0 });
 });
-test('HIGH_GEGENPRESS mod SHORT giver presset +3 (ellers vandt opbygningen 20 mod 19)', () => {
-  assert.deepEqual(duel({ p1: { passingStyle: 'SHORT' } }, { p2: { pressingHeight: 'MID_BLOCK' } }, 13), { win: 30, lose: 0 });
-  assert.deepEqual(duel({ p1: { passingStyle: 'SHORT' } }, { p2: { pressingHeight: 'HIGH_GEGENPRESS' } }, 13), { win: 0, lose: 30 });
+// INT 7: pres 23,75 taber til 24,75 – med +3 vinder presset (26,75).
+test('HIGH_GEGENPRESS mod SHORT giver presset +3 (ellers vandt opbygningen 24,75 mod 23,75)', () => {
+  assert.deepEqual(duel({ p1: { passingStyle: 'SHORT' } }, { p2: { pressingHeight: 'MID_BLOCK' } }, 7), { win: 30, lose: 0 });
+  assert.deepEqual(duel({ p1: { passingStyle: 'SHORT' } }, { p2: { pressingHeight: 'HIGH_GEGENPRESS' } }, 7), { win: 0, lose: 30 });
 });
 test('LOW_BLOCK mod CENTRAL giver presset +3', () => {
-  assert.deepEqual(duel({ p1: { attackFocus: 'CENTRAL' } }, { p2: { pressingHeight: 'LOW_BLOCK' } }, 13), { win: 0, lose: 30 });
-  assert.deepEqual(duel({ p1: { attackFocus: 'LOW_CUTBACKS' } }, { p2: { pressingHeight: 'LOW_BLOCK' } }, 13), { win: 30, lose: 0 });
+  assert.deepEqual(duel({ p1: { attackFocus: 'CENTRAL' } }, { p2: { pressingHeight: 'LOW_BLOCK' } }, 7), { win: 0, lose: 30 });
+  assert.deepEqual(duel({ p1: { attackFocus: 'LOW_CUTBACKS' } }, { p2: { pressingHeight: 'LOW_BLOCK' } }, 7), { win: 30, lose: 0 });
 });
 
 test('offside-fælden: kun når den ikke er OFF, og kun ved 45 %', () => {
   const run = (trap, s45) => {
     const { H, A } = arena({ away: { p2: { offsideTrap: trap } } });
-    for (const p of mids(A)) p.skills.intercepting = 17;
+    for (const p of mids(A)) p.skills.intercepting = 9;
     return simulateMatch(H, A, stubRng({ 0.48: true, 0.45: s45 }));
   };
   assert.equal(count(run('NORMAL', true), 'Offside-fælde virker'), 30);
@@ -122,7 +125,7 @@ test('custom position: 25 %; uden for zonen straffes og springer resten af tick 
   assert.equal(count(out, 'Ude af zone'), 30);
   assert.equal(count(out, 'Fase 1 virker') + count(out, 'Fase 2 pres virker'), 0);
   assert.equal(count(inn, 'Custom pos virker'), 30);
-  assert.equal(count(inn, 'Fase 1 virker'), 30);
+  assert.equal(count(inn, 'Fase 1 virker') + count(inn, 'Fase 2 pres virker'), 30);
 });
 
 // ---------- Frispark og skade ----------
@@ -160,7 +163,7 @@ test('hovedstød: 14 mod 10 + målmand 10·0,38 giver mål; 13 giver vundet luft
   assert.equal(goal.ratings.home.find((r) => r.playerId === goal.scorer).rating, 9.2);
 });
 
-// VAR (next = 0,1 < 0,22): varPulse + vsTrapLong·0,025 + 0,6 > forsvarer.positioning + 0,6.
+// VAR (next = 0,1 < 0,22): varPulse + vsTrapLong·0,045 + 0,6 > forsvarer.positioning + 0,6 (v3.6; før ·0,025).
 function varRun(trap, { awayAttacks = false } = {}) {
   const { H, A } = arena();
   const [att, def] = awayAttacks ? [A, H] : [H, A];
@@ -170,19 +173,19 @@ function varRun(trap, { awayAttacks = false } = {}) {
   const d = slot(def, 1); d.skills.positioning = 11; d.skills.intercepting = 20;
   return { m: simulateMatch(H, A, stubRng({ 0.3: shots(2) }, 0.1)), shooter };
 }
-test('VAR: mod-kunnen mod VAR-linjen afgør (10 + 44·0,025 = 11,1 > 11; uden bonus 10 < 11)', () => {
-  const ok = varRun(44).m, no = varRun(40).m; // 40·0,025 = 1,0 → 11,0 er ikke > 11
+test('VAR: mod-kunnen mod VAR-linjen afgør (10 + 23·0,045 = 11,035 > 11; 22·0,045 = 0,99 → 10,99 < 11)', () => {
+  const ok = varRun(23).m, no = varRun(22).m; // med den gamle faktor 0,025 tabte 23 også
   assert.equal(ok.events.filter((e) => e.type === 'VAR_GOAL').length, 2);
   assert.equal(no.events.filter((e) => e.type === 'VAR_NO_GOAL').length, 2);
   assert.equal(ok.stats.hVarChecks, 2);
   assert.equal(ok.homeVarNet, 2); assert.equal(no.homeVarNet, -2);
-  const { m: okM, shooter } = varRun(44);
+  const { m: okM, shooter } = varRun(23);
   // Startkarakter ved rul 0,1: 6,5 + (0,03 − 0,15) = 6,38; + 2·1,3 = 8,98 → 9,0 (2·1,25 ville give 8,9)
   assert.equal(okM.ratings.home.find((x) => x.playerId === shooter.id).rating, 9);
 });
 test('VAR: fortegn på VAR-netto, når udeholdet angriber', () => {
-  assert.equal(varRun(44, { awayAttacks: true }).m.homeVarNet, -2);
-  assert.equal(varRun(40, { awayAttacks: true }).m.homeVarNet, 2);
+  assert.equal(varRun(23, { awayAttacks: true }).m.homeVarNet, -2);
+  assert.equal(varRun(22, { awayAttacks: true }).m.homeVarNet, 2);
 });
 test('VAR-tjek kun når rullet er under 0,22', () => {
   const { H, A } = arena();
@@ -298,7 +301,7 @@ test('normalizeLeague: ugyldigt indhold repareres, gyldige data og standardværd
   assert.equal(N.teams[5].tactics.baseFormation, BOT_PROFILES[5].form);
   assert.equal(N.teams[6].tactics.conditionalRules.length, 5);
   assert.equal(p.freshness, 70);
-  assert.equal(p.aerialPower, Math.round(Math.max(1, Math.min(20, Math.round((p.heightCm - 168) * 0.7))) * 0.35 + p.jumpingPower * 0.35 + p.skills.strength * 0.15 + p.skills.positioning * 0.15));
+  assert.equal(p.aerialPower, Math.round(Math.max(1, Math.min(20, Math.round((p.heightCm - 163) * 0.7))) * 0.35 + p.jumpingPower * 0.35 + p.skills.strength * 0.15 + p.skills.positioning * 0.15));
   assert.equal(N.leagueMetadata.round, 6); assert.equal(N.teams[1].cashBalance, 123);
 });
 
@@ -427,8 +430,28 @@ test('offside og omstilling: dine egne valg navngives, modstanderens beskrives n
   for (const p of mids(b.H)) p.skills.intercepting = 17;
   const own = simulateMatch(b.H, b.A, stubRng({ 0.48: true, 0.45: (n) => n % 2 === 0 }));
   const ownTexts = own.events.filter((e) => e.category === 'TACTIC' && e.isHome).map((e) => e.text);
-  assert.ok(ownTexts.some((t) => /Din offside-fælde klapper/.test(t)), ownTexts.join(' | '));
+  assert.ok(ownTexts.some((t) => /DIN OFFSIDE-FÆLDE VIRKER/.test(t)), ownTexts.join(' | '));
   assert.ok(ownTexts.some((t) => /Din lynkontra/.test(t)));
+  assert.ok(ownTexts.some((t) => /^✅ \[DIT PRES VIRKER\] Din mellemblok lukker af/.test(t)), ownTexts.join(' | '));
+});
+
+// Brugeren: "Der er ikke en eneste gang i referaterne fra runde 3, at taktikken ikke har virket".
+test('referatet siger fra dit synspunkt, når din taktik IKKE virker – uden at navngive modstanderens stil', () => {
+  // Dit hold (hjemme) har bolden; modstanderen presser hårdt (INT 17) med højt gegenpres.
+  const a = arena({ home: { p1: { passingStyle: 'SHORT' } }, away: { p2: { pressingHeight: 'HIGH_GEGENPRESS' } } });
+  for (const p of mids(a.A)) p.skills.intercepting = 17;
+  const m = simulateMatch(a.H, a.A, stubRng({ 0.48: true }));
+  const fails = m.events.filter((e) => e.label === 'Fase 2 pres virker').map((e) => e.text);
+  assert.equal(fails.length, 30);
+  assert.ok(fails.every((t) => t.startsWith('❌ [DIN OPBYGNING STOPPES] Dine korte pasninger kommer ikke igennem')), fails[0]);
+  assert.ok(fails.every((t) => !/gegenpres|pres(?!set)|blok/i.test(t.replace('[DIN OPBYGNING STOPPES]', ''))), fails[0]);
+  // Pause-analysen tæller dine dueller (15 ticks før pausen; alle tabt).
+  const ht = m.events.find((e) => e.type === 'HALFTIME').text;
+  assert.ok(ht.includes('Din opbygning er kommet igennem 0 af 14 gange'), ht);
+  // To bot-hold: ingen "din/dit" i pause-analysen.
+  const { L } = arena();
+  const bots = simulateMatch(L.teams[2], L.teams[3], stubRng({ 0.48: true }));
+  assert.ok(!/\b(Din|dit)\b/.test(bots.events.find((e) => e.type === 'HALFTIME').text));
 });
 
 test('Hvis-Så til den plan man allerede spiller: tom handling – men en forskel i formation, faser ELLER positioner tæller', () => {
@@ -471,4 +494,134 @@ test('kampen gemmer hvert holds startformation og pladsen pr. karakter – også
   const out = all.find((e) => e.teamId === sub.teamId && e.minIn <= 1 && e.minOut === sub.minIn);
   assert.ok(out, 'den udskiftede spiller findes');
   assert.equal(sub.slot, out.slot);
+});
+
+test('vinder presset duellen, får angriberen ingen chance i samme tick', () => {
+  const run = (int) => {
+    const { H, A } = arena();
+    for (const p of mids(A)) p.skills.intercepting = int;
+    return simulateMatch(H, A, stubRng({ 0.48: true, 0.3: true }));
+  };
+  const lost = run(17), won = run(1); // hjemmeholdet har bolden i alle 30 ticks
+  assert.equal(count(lost, 'Fase 2 pres virker'), 30);
+  assert.equal(lost.stats.hShots, 0);
+  assert.equal(count(won, 'Fase 1 virker'), 30);
+  assert.equal(won.stats.hShots, 30);
+});
+
+test('referatet: alle fire udfald skrives fra dit holds side, bot-kampe neutralt', () => {
+  // Dit hold (hjemme) bygger op og vinder (modstanderens INT 1)
+  let a = arena({ home: { p1: { passingStyle: 'DIRECT_LONG' } } });
+  for (const p of mids(a.A)) p.skills.intercepting = 1;
+  let t = simulateMatch(a.H, a.A, stubRng({ 0.48: true })).events.filter((e) => e.label === 'Fase 1 virker').map((e) => e.text);
+  assert.ok(t.length === 30 && t.every((x) => x.startsWith('✅ [DIN OPBYGNING VIRKER] Dine direkte lange bolde bryder igennem')), t[0]);
+  // Modstanderen (ude) bygger op og bryder dit pres
+  a = arena({ home: { p2: { pressingHeight: 'LOW_BLOCK' } } });
+  for (const p of mids(a.A)) p.skills.passing = 11; // udeholdet har bolden
+  for (const p of mids(a.H)) p.skills.intercepting = 1;
+  t = simulateMatch(a.H, a.A, stubRng({ 0.48: true })).events.filter((e) => e.label === 'Fase 1 virker').map((e) => e.text);
+  assert.ok(t.length === 30 && t.every((x) => x.startsWith('❌ [DIT PRES BRYDES]') && x.includes('din lave blok')), t[0]);
+  // Din opbygning fanges offside (modstanderens fælde navngives ikke)
+  a = arena({ away: { p2: { offsideTrap: 'NORMAL' } } });
+  for (const p of mids(a.A)) p.skills.intercepting = 17;
+  t = simulateMatch(a.H, a.A, stubRng({ 0.48: true, 0.45: true })).events.filter((e) => e.label === 'Offside-fælde virker').map((e) => e.text);
+  assert.ok(t.length === 30 && t.every((x) => x.startsWith('❌ [DIN OPBYGNING STOPPES]') && x.endsWith('fanges offside.') && !/fælde/i.test(x)), t[0]);
+  // To bot-hold: neutral tekst (ingen ❌ og ingen "din/dit") – begge udfald forekommer
+  const { L } = arena();
+  for (const p of [...L.teams[2].squad, ...L.teams[3].squad]) p.skills.intercepting = 20; // hvem der end har bolden, taber den
+  const ev = simulateMatch(L.teams[2], L.teams[3], stubRng({ 0.48: true })).events.filter((e) => e.label === 'Fase 1 virker' || e.label === 'Fase 2 pres virker');
+  assert.ok(ev.some((e) => e.label === 'Fase 2 pres virker') && ev.every((e) => !/❌|\b(DIN|DIT|Din|Dit|Dine|dine|din|dit)\b/.test(e.text)), ev.map((e) => e.text).join(' | ').slice(0, 300));
+});
+
+// ---------- v3.6: fastlåste duel-vægte (Test Managers overlevende mutationer) ----------
+// Arena: opbygning 20 + 25·0,05 + 3,5 = 24,75; pres INT + 8,5 + 3,5 + 25·0,05 + 3,5 = INT + 16,75.
+test('lighed i fase-duellen tæller for opbygningen (INT 8: 24,75 mod 24,75), INT 9 taber', () => {
+  assert.deepEqual(duel({}, {}, 8), { win: 30, lose: 0 });
+  assert.deepEqual(duel({}, {}, 9), { win: 0, lose: 30 });
+});
+test('stilbonussen er præcis 3: INT 11 giver lighed (vinder), INT 12 taber', () => {
+  const sl = [{ p1: { passingStyle: 'SHORT', attackFocus: 'LOW_CUTBACKS' } }, { p2: { pressingHeight: 'LOW_BLOCK' } }];
+  assert.deepEqual(duel(...sl, 11), { win: 30, lose: 0 }); // bonus 2 → taber
+  assert.deepEqual(duel(...sl, 12), { win: 0, lose: 30 }); // bonus 4 → vinder
+});
+test('mod-kunnen vejer præcis 0,05 – og opbygningen bruger playmakerens, presset presserens', () => {
+  const run = (side, int) => {
+    const { H, A } = arena();
+    for (const p of mids(side === 'home' ? H : A)) p.counterTactics = { vsPress: 80, vsLowBlock: 80, vsTrapLong: 80 };
+    // Hjemmeholdet skal stadig have bolden: løft dets øvrige startere, så besiddelses-gennemsnittet
+    // ikke vipper til udeholdet (midtbanens mod-kunnen – playmakerens – røres ikke).
+    if (side === 'away') for (const i of [0, 1, 2, 3, 4, 9, 10]) slot(H, i).counterTactics = { vsPress: 80, vsLowBlock: 80, vsTrapLong: 80 };
+    for (const p of mids(A)) p.skills.intercepting = int;
+    const m = simulateMatch(H, A, stubRng({ 0.48: true }));
+    return count(m, 'Fase 1 virker');
+  };
+  // Playmaker 80: opbygning 27,5. Pres INT + 16,75 → INT 10 taber (26,75), INT 11 vinder (27,75).
+  // Vægt 0,03 gav INT 10 tab; vægt 0,1 gav INT 11 sejr; byttede mod-kunnen-værdier gav begge forkert.
+  assert.equal(run('home', 10), 30);
+  assert.equal(run('home', 11), 0);
+  // Presser 80: pres INT + 19,5 mod 24,75 → INT 5 vinder opbygningen, INT 6 presset.
+  assert.equal(run('away', 5), 30);
+  assert.equal(run('away', 6), 0);
+});
+
+// ---------- v3.6: pause-analysens tællere ----------
+test('pause-analysen tæller dine opbygninger og dit pres hver for sig', () => {
+  const half = (homeHasBall, oppInt, ownInt) => {
+    const { H, A } = arena();
+    if (!homeHasBall) for (const p of mids(A)) p.skills.passing = 11;
+    for (const p of mids(A)) p.skills.intercepting = oppInt;
+    for (const p of mids(H)) p.skills.intercepting = ownInt;
+    return simulateMatch(H, A, stubRng({ 0.48: true })).events.find((e) => e.type === 'HALFTIME').text;
+  };
+  assert.ok(half(true, 1, 10).includes('kommet igennem 14 af 14 gange; dit pres har vundet bolden 0 af 0 gange'), half(true, 1, 10));
+  assert.ok(half(false, 10, 20).includes('kommet igennem 0 af 0 gange; dit pres har vundet bolden 14 af 14 gange'), half(false, 10, 20));
+  assert.ok(half(false, 10, 1).includes('dit pres har vundet bolden 0 af 14 gange'), half(false, 10, 1));
+});
+
+// ---------- v3.6: alle dine stile i referatet ----------
+test('referatet navngiver hver af dine pasningsstile og presshøjder rigtigt – og aldrig modstanderens', () => {
+  const PASS = { SHORT: 'Dine korte pasninger', BALANCED: 'Din balancerede opbygning', DIRECT_LONG: 'Dine direkte lange bolde' };
+  for (const [pass, words] of Object.entries(PASS)) {
+    const a = arena({ home: { p1: { passingStyle: pass, attackFocus: 'LOW_CUTBACKS' } }, away: { p2: { pressingHeight: 'HIGH_GEGENPRESS' } } });
+    for (const p of mids(a.A)) p.skills.intercepting = 1;
+    const t = simulateMatch(a.H, a.A, stubRng({ 0.48: true })).events.filter((e) => e.label === 'Fase 1 virker').map((e) => e.text);
+    assert.ok(t.length === 30 && t.every((x) => x.startsWith(`✅ [DIN OPBYGNING VIRKER] ${words} bryder igennem`) && !/gegenpres|blok/i.test(x)), t[0]);
+  }
+  const PRESS = { LOW_BLOCK: 'din lave blok', MID_BLOCK: 'din mellemblok', HIGH_GEGENPRESS: 'dit høje gegenpres' };
+  for (const [height, words] of Object.entries(PRESS)) {
+    for (const ownInt of [20, 1]) {
+      const a = arena({ home: { p2: { pressingHeight: height } } });
+      for (const p of mids(a.A)) p.skills.passing = 11; // udeholdet har bolden
+      for (const p of mids(a.H)) p.skills.intercepting = ownInt;
+      const t = simulateMatch(a.H, a.A, stubRng({ 0.48: true })).events.filter((e) => e.label === 'Fase 1 virker' || e.label === 'Fase 2 pres virker').map((e) => e.text);
+      const want = ownInt === 20 ? `✅ [DIT PRES VIRKER] ${words[0].toUpperCase() + words.slice(1)} lukker af` : `❌ [DIT PRES BRYDES]`;
+      assert.ok(t.length === 30 && t.every((x) => x.startsWith(want) && x.includes(ownInt === 20 ? words.slice(1) : words)), `${height}/${ownInt}: ${t[0]}`);
+    }
+  }
+  // Din offside-fælde: ✅; to bot-holds offside: neutral
+  const o = arena({ home: { p2: { offsideTrap: 'NORMAL' } } });
+  for (const p of mids(o.A)) p.skills.passing = 11;
+  for (const p of mids(o.H)) p.skills.intercepting = 20;
+  const ot = simulateMatch(o.H, o.A, stubRng({ 0.48: true, 0.45: true })).events.filter((e) => e.label === 'Offside-fælde virker').map((e) => e.text);
+  assert.ok(ot.length === 30 && ot.every((x) => x.startsWith('✅ [DIN OFFSIDE-FÆLDE VIRKER]')), ot[0]);
+  const { L } = arena();
+  for (const t of [L.teams[2], L.teams[3]]) { t.tactics.phases.phase2_defending.offsideTrap = 'NORMAL'; for (const p of t.squad) p.skills.intercepting = 20; }
+  const bt = simulateMatch(L.teams[2], L.teams[3], stubRng({ 0.48: true, 0.45: true })).events.filter((e) => e.label === 'Offside-fælde virker').map((e) => e.text);
+  assert.ok(bt.length === 30 && bt.every((x) => !/❌|✅ \[DIN|\b(din|dit|dine)\b/i.test(x)), bt[0]);
+});
+
+// ---------- v3.6: XP-ledningen fra kampen ----------
+test('mod-XP fra kampen: taktiske sejre og spilletid går ind i XP', () => {
+  const { H, A } = arena();
+  for (const p of mids(A)) p.skills.intercepting = 1; // hjemmeholdet vinder alle 30 opbygninger
+  const m = simulateMatch(H, A, stubRng({ 0.48: true, 0.06: (n) => n === 0, 0.5: true, 0.4: true }));
+  const byId = new Map(m.ratings.home.concat(m.ratings.away).map((e) => [e.playerId, e]));
+  const pm = byId.get(mids(H)[0].id); // stubRng.pick tager første midtbanespiller som playmaker
+  assert.ok(pm.tacticWins >= 25, String(pm.tacticWins));
+  assert.equal(pm.gainedCounterXp, 5); // 2 + 0,5·sejre klemmes til 5
+  // Skaden i 3. minut: den skadede spillede 3 min (min. 10 → 0,2 → 1), indskifteren 87 min (1,9 → 2)
+  const victimEntry = m.ratings.home.concat(m.ratings.away).find((e) => e.injured);
+  const subEntry = m.ratings.home.concat(m.ratings.away).find((e) => e.minIn > 1);
+  assert.equal(victimEntry.gainedCounterXp, 1);
+  assert.equal(subEntry.gainedCounterXp, 2);
 });
