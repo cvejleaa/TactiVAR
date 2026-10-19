@@ -1,6 +1,6 @@
 # Automatisk deploy til Firebase (hosting + Firestore-regler), når CI er grøn på main.
 # Kræver GitHub-secret FIREBASE_SERVICE_ACCOUNT (JSON-nøgle til en servicekonto med rollen
-# "Firebase Admin"). Mangler nøglen, springes deployet over med en besked i loggen.
+# "Firebase Admin"). Mangler nøglen, fejler jobbet (rødt) – intet deployes.
 name: Deploy til Firebase
 
 on:
@@ -81,6 +81,13 @@ jobs:
             sleep 10
           done
           echo "::error::Live version er '$GOT', forventede '$WANT'"; exit 1
+
+      - name: Tjek at databasen er lukket (ikke længere "test mode")
+        if: env.HAS_KEY == 'true'
+        run: |
+          CODE=$(curl -s -o /dev/null -w '%{http_code}' "https://firestore.googleapis.com/v1/projects/tactivar/databases/(default)/documents/tjek/x")
+          echo "Ulogget læsning gav HTTP $CODE"
+          [ "$CODE" = "403" ] || { echo "::error::Firestore svarer $CODE på en ulogget læsning – forventede 403. Er reglerne deployet?"; exit 1; }
 
       - name: Smoke-test mod den live side
         if: env.HAS_KEY == 'true'
