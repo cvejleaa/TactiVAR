@@ -5,7 +5,7 @@
 // Offentligt: alle i ligaen må se det (teams_public).
 export const PUBLIC_FIELDS = ['id', 'name', 'shortName', 'shirtNumber', 'line', 'age', 'heightCm', 'freshness', 'injuryMatchesLeft', 'publicStars', 'roleTier'];
 // Kun holdets ejer (teams_private).
-export const OWNER_FIELDS = ['skills', 'jumpingPower', 'aerialPower', 'archetype', 'weeklyWage', 'marketValue', 'lastRating', 'ratingSum', 'ratingGames', 'counterTactics', 'seasonAgeCounter'];
+export const OWNER_FIELDS = ['skills', 'jumpingPower', 'aerialPower', 'archetype', 'weeklyWage', 'marketValue', 'lastRating', 'ratingSum', 'ratingGames', 'counterTactics', 'seasonAgeCounter', 'distanceSum', 'minutesSum', 'topSpeedMax'];
 // Ingen spiller – kun motoren (teams_secrets).
 export const SECRET_FIELDS = ['varProfile'];
 
@@ -20,7 +20,9 @@ export function viewPlayer(player, viewerOwnsTeam) {
 
 // Karakterarket for én spiller set af en given seer: modstandere får kun stjerner – aldrig
 // den eksakte karakter, mod-kunnen eller optjent XP.
-export const RATING_PRIVATE_FIELDS = ['rating', 'startCounterMastery', 'gainedCounterXp'];
+// Løbedistance og topfart (v3.7) er også private: topfart røber farten (PAC), distance
+// udholdenheden og holdets pres-niveau.
+export const RATING_PRIVATE_FIELDS = ['rating', 'startCounterMastery', 'gainedCounterXp', 'distanceKm', 'topSpeed'];
 export function viewRatingEntry(entry, viewerOwnsTeam) {
   if (viewerOwnsTeam) return { ...entry };
   const out = { ...entry };

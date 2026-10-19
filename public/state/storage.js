@@ -3,10 +3,11 @@
 // i en backup-nøgle, FØR der tilbydes en ny liga, og fejlen vises.
 import { normalizeLeague, normalizeRule } from '../engine/sanitize.js';
 import { COUNTER_KEYS, scaleIntoPool, counterFloor } from '../engine/counter.js';
+import { heightAtQuantile } from '../engine/generator.js';
 
 export const SAVE_KEY = 'tactivar_save';
 export const BACKUP_PREFIX = 'tactivar_backup_';
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 // Migreringer: MIGRATIONS[n] løfter et gemt objekt fra skema n til n+1. Tilføj en ny,
 // hver gang gemme-formatet ændres – sammen med et fixture fra forrige version i
@@ -31,13 +32,46 @@ export const MIGRATIONS = {
       }
       if (Number.isFinite(p.heightCm)) { newHeight.set(p.id, [p.heightCm, p.heightCm - HEIGHT_AND_COUNTER.heightShift]); p.heightCm -= HEIGHT_AND_COUNTER.heightShift; }
     }
-    for (const book of Object.values(d.league?.scouting || {})) for (const [pid, list] of Object.entries(book || {})) {
-      const h = newHeight.get(pid);
-      if (h && Array.isArray(list)) book[pid] = list.map((s) => (typeof s === 'string' ? s.replaceAll(`(${h[0]} cm)`, `(${h[1]} cm)`) : s));
-    }
+    fixHeightTexts(d, newHeight);
     return { ...d, schemaVersion: 3 };
   },
+  // 3 → 4 (v3.7, brugeren: "at skære 5 cm af alle spillere holder ikke … højeste spiller 193 cm"
+  // og dokumentet "Spillerhøjde i Superligaen": ligasnit ≈184, 168–201). Pr. kæde lægges ligaens
+  // spillere på generatorens fordeling efter rang: den højeste forsvarsspiller bliver ved med at
+  // være den højeste, og hele ligaen får Superligaens snit og spredning. Holdprofilen kan ikke
+  // genskabes for en eksisterende liga (snittet bruges).
+  3: (d) => {
+    const byLine = {};
+    for (const t of d.league?.teams || []) for (const p of t.squad || []) if (Number.isFinite(p.heightCm)) (byLine[p.line] ||= []).push(p);
+    const newHeight = new Map();
+    for (const [line, list] of Object.entries(byLine)) {
+      list.sort((a, b) => a.heightCm - b.heightCm || String(a.id).localeCompare(String(b.id)));
+      list.forEach((p, i) => {
+        const h = heightAtQuantile(line, (i + 0.5) / list.length);
+        newHeight.set(p.id, [p.heightCm, h]); p.heightCm = h;
+      });
+    }
+    fixHeightTexts(d, newHeight);
+    return { ...d, schemaVersion: 4 };
+  },
 };
+
+// Højden står i nogle tekster ("Navn (193 cm)"): scouting-indtryk og seneste rundes referat.
+function fixHeightTexts(d, newHeight) {
+  const fix = (pid, s) => { const h = newHeight.get(pid); return h && typeof s === 'string' ? s.replaceAll(`(${h[0]} cm)`, `(${h[1]} cm)`) : s; };
+  for (const book of Object.values(d.league?.scouting || {})) for (const [pid, list] of Object.entries(book || {})) {
+    if (Array.isArray(list)) book[pid] = list.map((s) => fix(pid, s));
+  }
+  // I referatet står spilleren som "#nr Kort Navn (N cm)" – ret pr. spiller.
+  const players = (d.league?.teams || []).flatMap((t) => t.squad || []);
+  for (const m of d.league?.lastRound?.matches || []) for (const e of m.events || []) {
+    if (typeof e.text !== 'string' || !e.text.includes(' cm)')) continue;
+    for (const p of players) {
+      const h = newHeight.get(p.id);
+      if (h) e.text = e.text.replaceAll(`#${p.shirtNumber} ${p.shortName} (${h[0]} cm)`, `#${p.shirtNumber} ${p.shortName} (${h[1]} cm)`);
+    }
+  }
+}
 export const HEIGHT_AND_COUNTER = { counterScale: 0.55, heightShift: 5 };
 
 export function serialize(state, now = Date.now()) {

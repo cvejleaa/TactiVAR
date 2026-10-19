@@ -5,7 +5,7 @@
 import { FORMATIONS, lineOfRole, isOutOfZone } from './formations.js';
 import { masteryVs, counterXpForMatch } from './counter.js';
 import { createSheet, finalizeSheet } from './ratings.js';
-import { describeFinish, describeHeader, describeVarTiming } from './clues.js';
+import { describeFinish, describeHeader, describeVarTiming, describeGoal, goalSpectacle } from './clues.js';
 
 export const MAX_SUBS = 3;
 const PLAN_LETTERS = ['A', 'B', 'C'];
@@ -32,6 +32,11 @@ const YOUR_PRESS = { LOW_BLOCK: 'din lave blok', MID_BLOCK: 'din mellemblok', HI
 const cap = (t) => t[0].toUpperCase() + t.slice(1);
 const TXT = { SHORT: 'korte pasninger', BALANCED: 'balanceret opbygning', DIRECT_LONG: 'direkte lange bolde', LOW_BLOCK: 'lav blok', MID_BLOCK: 'mellemblok', HIGH_GEGENPRESS: 'højt gegenpress' };
 const isAvailable = (p) => !(p.injuryMatchesLeft > 0);
+// Friskhed virker (v3.7): en træt spiller yder 0,85 + 0,15·friskhed/100 (50 % → 92,5 %).
+export const freshFactor = (p) => 0.85 + 0.15 * Math.max(0, Math.min(100, p?.freshness ?? 100)) / 100;
+const avgSkill = (p) => Object.values(p.skills).reduce((a, b) => a + b, 0) / 9;
+// Bots roterer: en starter under 65 % hviles, hvis en frisk (≥ 85 %) bænkspiller i samme kæde
+// højst er 1,5 svagere i gennemsnit. Ellers fik kun den menneskelige manager glæde af rotation.
 
 // Kamplokal side: kopi af taktikken + aktuelle 11 spillere + bænk.
 function prepareSide(team, isHome, notes) {
@@ -40,6 +45,14 @@ function prepareSide(team, isHome, notes) {
   const starters = tactics.lineupSlots.map((id) => byId.get(id));
   const used = new Set(starters.filter(Boolean).map((p) => p.id));
   const bench = () => team.squad.filter((p) => !used.has(p.id) && isAvailable(p));
+  if (team.isBot) starters.forEach((p, slot) => {
+    if (!p || !isAvailable(p) || (p.freshness ?? 100) >= 65) return;
+    const fresh = bench().filter((b) => b.line === p.line && (b.freshness ?? 100) >= 85 && avgSkill(b) >= avgSkill(p) - 1.5);
+    if (!fresh.length) return;
+    const sub = fresh.sort((a, b) => avgSkill(b) - avgSkill(a))[0];
+    notes.push({ isHome, text: `📋 [${team.name}] ${tag(sub)} starter i stedet for en træt ${tag(p)}.` });
+    starters[slot] = sub; used.add(sub.id); used.delete(p.id);
+  });
   starters.forEach((p, slot) => {
     if (p && isAvailable(p)) return;
     const line = p ? p.line : lineOfRole(coordsOf(tactics)[slot].r);
@@ -208,8 +221,8 @@ export function simulateMatch(home, away, rng, opts = {}) {
     let ballLost = false;
     if (rng.chance(0.48)) {
       const pmM = masteryVs(playmaker, def.team), prM = masteryVs(presser, att.team);
-      let build = playmaker.skills.passing + playmaker.skills.ballControl + pmM * MASTERY_WEIGHT + rng.next() * 7;
-      let press = presser.skills.intercepting + presser.skills.positioning * 0.85 + presser.skills.stamina * 0.35 + prM * MASTERY_WEIGHT + rng.next() * 7;
+      let build = (playmaker.skills.passing + playmaker.skills.ballControl) * freshFactor(playmaker) + pmM * MASTERY_WEIGHT + rng.next() * 7;
+      let press = (presser.skills.intercepting + presser.skills.positioning * 0.85 + presser.skills.stamina * 0.35) * freshFactor(presser) + prM * MASTERY_WEIGHT + rng.next() * 7;
       const pass = attPh.phase1_buildUp.passingStyle, focus = attPh.phase1_buildUp.attackFocus, height = defPh.phase2_defending.pressingHeight;
       if (pass === 'SHORT' && height === 'LOW_BLOCK') build += STYLE_BONUS;
       if (pass === 'DIRECT_LONG' && height === 'HIGH_GEGENPRESS') build += STYLE_BONUS;
@@ -285,13 +298,13 @@ export function simulateMatch(home, away, rng, opts = {}) {
       const assist = (bonus) => { if (assister.id !== shooter.id) { sheet.adjust(assister.id, bonus); sheet.bump(assister.id, 'assists'); } };
       const high = attPh.phase1_buildUp.attackFocus === 'HIGH_CROSSES' || attPh.phase1_buildUp.passingStyle === 'DIRECT_LONG';
       if (high && rng.chance(0.55)) {
-        if (shooter.aerialPower + rng.next() * 6 > defender.aerialPower + gk.skills.goalkeeping * 0.38 + rng.next() * 6) {
+        if (shooter.aerialPower * freshFactor(shooter) + rng.next() * 6 > defender.aerialPower * freshFactor(defender) + gk.skills.goalkeeping * 0.38 + rng.next() * 6) {
           scored(); st[k(att, 'AerialWon')]++; st[k(att, 'TacticSuccess')]++;
           sheet.adjust(shooter.id, 1.35); sheet.bump(shooter.id, 'goals'); sheet.bump(shooter.id, 'aerialWins'); assist(0.55);
           sheet.adjust(defender.id, -0.35); sheet.adjust(gk.id, -0.25);
           const prose = describeHeader(shooter.aerialPower);
           observe(shooter, `Luftduel (${min}. min mod ${def.team.name}): ${shooter.shortName} scorede med ${prose}.`);
-          goalsPool.push({ scorer: tag(shooter), teamName: att.team.name, match: `${home.name} - ${away.name}`, min, kind: 'HEADER', spectacle: shooter.aerialPower + (min >= 80 ? 5 : 2) + rng.next() * 4, desc: `Et hovedstødsmål i ${min}. minut: efter et indlæg fra ${tag(assister)} rejste ${tag(shooter)} sig med ${prose}.` });
+          goalsPool.push({ scorer: tag(shooter), teamName: att.team.name, match: `${home.name} - ${away.name}`, min, kind: 'HEADER', spectacle: goalSpectacle('HEADER', { aerialPower: shooter.aerialPower }, min, rng), desc: describeGoal('HEADER', tag(shooter), tag(assister), min, rng) });
           addEv(min, 'HEADER_GOAL', 'HIGHLIGHT', att.isHome, true, `⚽ Hovedstødsmål: ${tag(shooter)}`, `⚽ [${att.team.name} • ${hG}-${aG}] MÅÅÅL! ${tag(shooter)} (${shooter.heightCm} cm) header bolden ind – ${prose}.`);
         } else {
           st[k(def, 'AerialWon')]++;
@@ -306,7 +319,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
           scored(); homeVarNet += att === H ? 1 : -1;
           sheet.adjust(shooter.id, 1.3); sheet.bump(shooter.id, 'goals'); assist(0.5); sheet.adjust(defender.id, -0.35);
           observe(shooter, `VAR-tjek (${min}. min mod ${def.team.name}): ${shooter.shortName} ${timing}.`);
-          goalsPool.push({ scorer: tag(shooter), teamName: att.team.name, match: `${home.name} - ${away.name}`, min, kind: 'VAR', spectacle: 15 + (min >= 80 ? 6 : 2) + rng.next() * 4, desc: `Ren VAR-dramatik i ${min}. minut: ${tag(shooter)} ${timing}, og målet stod ved magt.` });
+          goalsPool.push({ scorer: tag(shooter), teamName: att.team.name, match: `${home.name} - ${away.name}`, min, kind: 'VAR', spectacle: goalSpectacle('VAR', {}, min, rng), desc: describeGoal('VAR', tag(shooter), tag(assister), min, rng) });
           addEv(min, 'VAR_GOAL', 'HIGHLIGHT', att.isHome, true, `📺 VAR: mål godkendt – ${tag(shooter)}`, `📺 [${att.team.name} • ${hG}-${aG}] VAR-KENDELSE: MÅL GODKENDT! ${tag(shooter)} ${timing}.`, `${att.team.name}: mål godkendt`);
         } else {
           homeVarNet += att === H ? -1 : 1;
@@ -314,13 +327,27 @@ export function simulateMatch(home, away, rng, opts = {}) {
           observe(shooter, `VAR-annullering (${min}. min mod ${def.team.name}): ${shooter.shortName} var en anelse for tidligt af sted.`);
           addEv(min, 'VAR_NO_GOAL', 'HIGHLIGHT', att.isHome, true, `📺 VAR: annulleret – ${tag(shooter)}`, `📺 [${att.team.name}] VAR-KENDELSE: MÅLET ANNULLERES! ${tag(defender)} (${def.team.name}) holdt linjen, og ${tag(shooter)} var offside.`, `${att.team.name}: mål annulleret`);
         }
-      } else if (shooter.skills.finishing + rng.next() * 8 > gk.skills.goalkeeping + rng.next() * 8) {
+      } else if (shooter.skills.finishing * freshFactor(shooter) + rng.next() * 8 > gk.skills.goalkeeping * freshFactor(gk) + rng.next() * 8) {
         scored();
-        sheet.adjust(shooter.id, 1.25); sheet.bump(shooter.id, 'goals'); assist(0.5); sheet.adjust(gk.id, -0.3);
+        // Måltypen afgøres ÉT sted og bruges i referat, observation, avis og karakterark (v3.7).
+        // Kontra og cutback følger kun DIT holds valg; for andre hold er de tilfældige (ellers
+        // røbede "lynkontra" modstanderens omstilling). Langskud og dribletur er vægtet af evnerne.
+        const ph1 = attPh.phase1_buildUp, sk = shooter.skills;
+        const counterOk = own(att) ? attPh.phase3_transition.onBallWon === 'FAST_COUNTER' && rng.chance(0.36) : rng.chance(0.14);
+        const cutbackOk = !counterOk && (own(att) ? ph1.attackFocus === 'LOW_CUTBACKS' && rng.chance(0.42) : rng.chance(0.12));
+        let kind = counterOk ? 'COUNTER' : cutbackOk ? 'CUTBACK' : null;
+        if (!kind) {
+          const w = { COMBINATION: 4, LONGSHOT: Math.max(0, sk.finishing - 8) * 0.45, DRIBBLE: Math.max(0, (sk.pace + sk.ballControl) / 2 - 8) * 0.45 };
+          let r = rng.next() * (w.COMBINATION + w.LONGSHOT + w.DRIBBLE);
+          kind = Object.keys(w).find((k) => (r -= w[k]) < 0) || 'COMBINATION';
+        }
+        const solo = kind === 'LONGSHOT' || kind === 'DRIBBLE'; // ingen oplægsgiver
+        sheet.adjust(shooter.id, solo ? 1.4 : 1.25); sheet.bump(shooter.id, 'goals'); if (!solo) assist(0.5); sheet.adjust(gk.id, -0.3);
         const prose = describeFinish(shooter.skills.finishing);
         observe(shooter, `Scoring (${min}. min mod ${def.team.name}): ${shooter.shortName} afsluttede med ${prose}.`);
-        goalsPool.push({ scorer: tag(shooter), teamName: att.team.name, match: `${home.name} - ${away.name}`, min, kind: 'GOAL', spectacle: shooter.skills.finishing + (min >= 80 ? 4 : 1) + rng.next() * 5, desc: `Kombinationsfodbold i ${min}. minut: ${tag(assister)} spillede ${tag(shooter)} fri, og han sluttede af med ${prose}.` });
-        addEv(min, 'GOAL', 'HIGHLIGHT', att.isHome, true, `⚽ Mål: ${tag(shooter)}`, `⚽ [${att.team.name} • ${hG}-${aG}] MÅÅÅL! ${tag(shooter)} overlister målmanden med ${prose}.`);
+        const desc = describeGoal(kind, tag(shooter), tag(assister), min, rng);
+        goalsPool.push({ scorer: tag(shooter), teamName: att.team.name, match: `${home.name} - ${away.name}`, min, kind, spectacle: goalSpectacle(kind, { finishing: sk.finishing, pace: sk.pace, ballControl: sk.ballControl, passing: assister.skills.passing }, min, rng), desc });
+        addEv(min, 'GOAL', 'HIGHLIGHT', att.isHome, true, `⚽ Mål: ${tag(shooter)}`, `⚽ [${att.team.name} • ${hG}-${aG}] MÅÅÅL! ${desc}`);
       } else {
         st[k(att, 'OnTarget')]++;
         sheet.adjust(gk.id, 0.5); sheet.bump(gk.id, 'saves'); sheet.adjust(shooter.id, 0.1);

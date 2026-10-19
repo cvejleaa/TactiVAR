@@ -230,7 +230,7 @@ function syntheticRound(L, { hG = 1, aG = 0, varNet = 1, ratings }) {
   const m = { homeId: H.id, awayId: A.id, homeName: H.name, awayName: A.name, homeGoals: hG, awayGoals: aG, homeVarNet: varNet, ratings: { home: ratings, away: [] }, observations: [], injuries: [], goalsPool: [], stats: { hVarChecks: 0, aVarChecks: 0 } };
   return { round: (L.leagueMetadata.round || 0) + 1, matches: [m], gazette: null };
 }
-test('bogføring: restitution 60–100, bænk +15, stjerner af snittet, mod-XP mod rigtig modstander, VAR-netto', () => {
+test('bogføring: friskhed efter løbet distance (v3.7), bænk +15, stjerner af snittet, mod-XP mod rigtig modstander, VAR-netto', () => {
   const L = createLeague(createRng(2));
   const [H, A] = L.teams;
   const [p, q, bench1, bench2] = [H.squad[0], H.squad[1], H.squad[11], H.squad[12]];
@@ -238,10 +238,11 @@ test('bogføring: restitution 60–100, bænk +15, stjerner af snittet, mod-XP m
   q.skills.stamina = 2; q.freshness = 61;
   bench1.freshness = 90; bench2.freshness = 70;
   const ctBefore = { ...p.counterTactics };
-  const res = syntheticRound(L, { ratings: [{ playerId: p.id, rating: 5, gainedCounterXp: 10 }, { playerId: q.id, rating: 6, gainedCounterXp: 4 }] });
+  const res = syntheticRound(L, { ratings: [{ playerId: p.id, rating: 5, gainedCounterXp: 10, distanceKm: 11.2 }, { playerId: q.id, rating: 6, gainedCounterXp: 4, distanceKm: 10 }] });
   commitRound(L, res, { next: () => 0.5 });
-  assert.equal(p.freshness, 99);      // 100 − max(4, 14 − 5) + 8
-  assert.equal(q.freshness, 60);      // 61 − 13 + 8 = 56 → gulv 60
+  // v3.6 gav 99 og 60 (−max(4, 14 − STA/2) + 8 straks): næsten ingen træthed.
+  assert.equal(p.freshness, 92);      // 100 − round(11,2·(1,5 − 0,30) = 13,4) + 5
+  assert.equal(q.freshness, 52);      // 61 − round(10·(1,5 − 0,06) = 14,4) + 5
   assert.equal(bench1.freshness, 100); assert.equal(bench2.freshness, 85);
   assert.equal(p.ratingSum, 21); assert.equal(p.ratingGames, 3); assert.equal(p.lastRating, 5);
   assert.equal(p.publicStars, starsFromRating(7)); // snit 21/3 = 7,0 → 3 stjerner (sidste karakter 5 ville give 1)
@@ -250,6 +251,9 @@ test('bogføring: restitution 60–100, bænk +15, stjerner af snittet, mod-XP m
   const sH = L.leagueMetadata.standings.find((s) => s.teamId === H.id), sA = L.leagueMetadata.standings.find((s) => s.teamId === A.id);
   assert.equal(sH.varNet, 1); assert.equal(sA.varNet, -1);
   assert.equal(sH.points, 3); assert.equal(sA.lost, 1);
+  const r = syntheticRound(L, { ratings: [{ playerId: q.id, rating: 6, gainedCounterXp: 1, distanceKm: 10 }] }); r.round = 2;
+  commitRound(L, r, { next: () => 0.5 });
+  assert.equal(q.freshness, 50);      // 52 − 14 + 5 = 43 → bund 50
 });
 
 test('stilling sorteres på point, så målforskel, så scorede mål', () => {
@@ -624,4 +628,37 @@ test('mod-XP fra kampen: taktiske sejre og spilletid går ind i XP', () => {
   const subEntry = m.ratings.home.concat(m.ratings.away).find((e) => e.minIn > 1);
   assert.equal(victimEntry.gainedCounterXp, 1);
   assert.equal(subEntry.gainedCounterXp, 2);
+});
+
+// ---------- v3.7: friskhed i kampen og bots, der roterer ----------
+test('friskhed virker: 0,85 + 0,15·friskhed/100; en træt playmaker taber duellen, han ellers vandt', async () => {
+  const { freshFactor } = await import('../../public/engine/match.js');
+  assert.equal(freshFactor({ freshness: 100 }), 1);
+  assert.ok(Math.abs(freshFactor({ freshness: 50 }) - 0.925) < 1e-9);
+  assert.equal(freshFactor({}), 1);
+  // Arena: opbygning 20 + 1,25 + 3,5 = 24,75 mod pres INT 8 → 24,75 (lighed → opbygning vinder).
+  // Med friskhed 90 hos playmakerne: 20·0,985 = 19,7 → 24,45 < 24,75 → presset vinder.
+  const run = (fresh) => { const { H, A } = arena(); for (const p of mids(A)) p.skills.intercepting = 8; for (const p of mids(H)) p.freshness = fresh; return count(simulateMatch(H, A, stubRng({ 0.48: true })), 'Fase 1 virker'); };
+  assert.equal(run(100), 30);
+  assert.equal(run(90), 0);
+});
+
+test('bots hviler en træt starter (< 65 %) for en frisk bænkspiller i samme kæde – dit hold gør ikke', () => {
+  const { L } = arena();
+  const bot = L.teams[2], me = L.teams[0];
+  for (const t of [bot, me]) {
+    const starter = t.squad.find((p) => p.id === t.tactics.lineupSlots[5]);
+    const benchMate = t.squad.find((p) => !t.tactics.lineupSlots.includes(p.id) && p.line === starter.line);
+    starter.freshness = 60; benchMate.freshness = 95; benchMate.skills = { ...starter.skills };
+    t._s = starter; t._b = benchMate;
+  }
+  const m = simulateMatch(me, bot, stubRng({}));
+  const playedIds = new Set([...m.ratings.home, ...m.ratings.away].map((e) => e.playerId));
+  assert.ok(playedIds.has(bot._b.id) && !playedIds.has(bot._s.id), 'botten roterede');
+  assert.ok(playedIds.has(me._s.id) && !playedIds.has(me._b.id), 'dit hold vælger selv');
+  assert.ok(m.events.some((e) => e.text.includes(`starter i stedet for en træt #${bot._s.shirtNumber}`)));
+  // Grænsen: 65 % roterer ikke
+  bot._s.freshness = 65;
+  const m2 = simulateMatch(me, bot, stubRng({}));
+  assert.ok(new Set(m2.ratings.away.map((e) => e.playerId)).has(bot._s.id));
 });

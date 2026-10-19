@@ -4,6 +4,7 @@
 import { h } from './dom.js';
 import { starsEl } from './labels.js';
 import { viewRatingEntry } from '../engine/visibility.js';
+import { GOAL_KIND_LABEL } from '../engine/gazette.js';
 import { FORMATIONS } from '../engine/formations.js';
 import { isStarter, placeLabel, lineupSort } from './lineup.js';
 
@@ -56,6 +57,7 @@ function ratingsTable(list, isOwn, title, formation) {
       h('td', { class: 'icons' }, e.goals ? icon('⚽', e.goals) : null, e.assists ? icon('🅰', e.assists) : null, e.saves ? icon('🧤', e.saves) : null, e.aerialWins ? icon('✈', e.aerialWins) : null,
         e.yellowCard ? icon('🟨') : null, e.injured ? icon('🚑') : null, e.isMotM ? icon('👑') : null),
       h('td', { class: 'rating' }, isOwn ? e.rating.toFixed(1) : starsEl(e.stars)),
+      isOwn ? h('td', { class: 'run', title: 'Løbet distance · topfart (kun dit hold – det røber udholdenhed og fart)' }, e.distanceKm > 0 ? `${e.distanceKm.toFixed(1)} km${e.topSpeed ? ` · ${e.topSpeed.toFixed(1)} km/t` : ''}` : '–') : null,
       isOwn ? h('td', { class: 'xp', title: `${TIP['🧠']} – ved fuld pulje glemmer han lidt af de andre stilarter` }, `+${e.gainedCounterXp} 🧠`) : null)))));
 }
 
@@ -78,7 +80,10 @@ export function renderGazette(g, myTeamId) {
   return h('div', { class: 'panel gazette', id: 'gazette' }, h('h3', {}, '📰 TactiVAR Avisen'),
     h('p', {}, `Runden bød på ${g.totalGoals} scoringer og ${g.totalVarChecks} VAR-tjek på tværs af de 4 stadions. ${g.myResult}`),
     pr ? h('p', { id: 'player-of-round' }, h('strong', { title: 'Bedste karakter i runden' }, '🏆 Rundens spiller: '), `#${pr.shirtNumber} ${pr.shortName} (${pr.teamName}) – `, 'rating' in pr ? `karakter ${pr.rating.toFixed(1)}` : starsEl(pr.stars), feats ? ` • ${feats}` : '') : null,
-    g.goalOfTheRound ? h('p', {}, h('strong', {}, '🚀 Rundens mål: '), g.goalOfTheRound.desc) : null,
+    g.headlines?.length ? h('ul', { class: 'headlines', id: 'headlines' }, g.headlines.map((x) => h('li', {}, x))) : null,
+    g.goalOfTheRound ? h('p', { id: 'goal-of-round' }, h('strong', {}, '🚀 Rundens mål'), GOAL_KIND_LABEL[g.goalOfTheRound.kind] ? ` (${GOAL_KIND_LABEL[g.goalOfTheRound.kind]})` : '', h('strong', {}, ': '), g.goalOfTheRound.desc) : null,
+    g.upset ? h('p', { id: 'upset' }, h('strong', {}, '😮 Rundens overraskelse: '), `${g.upset.winner} (nr. ${g.upset.winnerPos}) slog ${g.upset.loser} (nr. ${g.upset.loserPos}) ${g.upset.score}.`) : null,
+    g.myRunner && g.myRunner.teamId === myTeamId ? h('p', { id: 'my-runner' }, h('strong', {}, '🏃 Dit holds løber: '), `#${g.myRunner.shirtNumber} ${g.myRunner.shortName} – ${g.myRunner.distanceKm.toFixed(1)} km${g.myRunner.topSpeed ? `, topfart ${g.myRunner.topSpeed.toFixed(1)} km/t` : ''}.`) : null,
     !g.goalOfTheRound && g.defensiveAction ? h('p', {}, h('strong', {}, '🛡 Rundens defensive aktion: '), `#${g.defensiveAction.shirtNumber} ${g.defensiveAction.shortName} (${g.defensiveAction.teamName}) holdt nullet.`) : null);
 }
 

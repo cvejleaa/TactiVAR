@@ -67,6 +67,23 @@ export function rollStat(rng, min, max) {
 export const HEIGHT_MID = { GK: 192, DEF: 186, MID: 179.5, ATT: 181 };
 export const HEIGHT_MIN = 168, HEIGHT_MAX = 201;
 export const HEIGHT_ZERO = 166;
+export const HEIGHT_DICE = { GK: 4, DEF: 6, MID: 6, ATT: 6 }; // tre terninger −d..d pr. kæde
+export const HEIGHT_TEAM_MEAN_OFFSET = 0.75;                  // snit af holdprofilen (−1,5…+3)
+
+// Højden ved fraktil q (0–1) i kædens fordeling – den samme fordeling, generatoren trækker fra
+// (holdprofilen sat til sit snit). Bruges, når en eksisterende liga lægges om (skema 3 → 4).
+const diceCdfCache = {};
+function diceSums(d) {
+  if (diceCdfCache[d]) return diceCdfCache[d];
+  const sums = [];
+  for (let a = -d; a <= d; a++) for (let b = -d; b <= d; b++) for (let c = -d; c <= d; c++) sums.push(a + b + c);
+  return (diceCdfCache[d] = sums.sort((x, y) => x - y));
+}
+export function heightAtQuantile(line, q) {
+  const sums = diceSums(HEIGHT_DICE[line] ?? 6);
+  const v = sums[Math.min(sums.length - 1, Math.max(0, Math.floor(q * sums.length)))];
+  return clamp(Math.round((HEIGHT_MID[line] ?? 181) + HEIGHT_TEAM_MEAN_OFFSET) + v, HEIGHT_MIN, HEIGHT_MAX);
+}
 
 export function aerialBreakdown(heightCm, jumpingPower, strength, positioning) {
   // Nulpunkt 166 cm (v3.7): højde-scoren ligger på samme niveau som før v3.6 (nulpunkt 168 ved snit 186).
@@ -95,7 +112,7 @@ export function generatePlayer(rng, line, roleTier, shirtNumber, teamIdx, usedSh
   // Klokkeform om kædens midte plus holdets profil, klemt til Superligaens 168–201 cm.
   // Bred spredning i hver kæde (brugeren: "ikke at alle spillere skal ligge tæt på gns. for deres
   // position"): spredning ≈6,5 cm ude på banen, ≈4,5 cm for målmænd; hele truppen ligner Superligaen.
-  const d = line === 'GK' ? 4 : 6;
+  const d = HEIGHT_DICE[line];
   const heightCm = clamp(Math.round(HEIGHT_MID[line] + heightOffset) + rng.int(-d, d) + rng.int(-d, d) + rng.int(-d, d), HEIGHT_MIN, HEIGHT_MAX);
   const r = (a, b) => rollStat(rng, a, b);
   const jumpingPower = r(bMin - 1, bMax + (line === 'DEF' || line === 'ATT' ? 2 : 0));
@@ -115,7 +132,7 @@ export function generatePlayer(rng, line, roleTier, shirtNumber, teamIdx, usedSh
   const player = {
     id: `plr_t${teamIdx}_${shirtNumber}`, name: `${firstName} ${lastName}`, shortName,
     age, seasonAgeCounter: 1, line, shirtNumber, roleTier,
-    freshness: 100, injuryMatchesLeft: 0, lastRating: 0, ratingSum: 0, ratingGames: 0, publicStars: 0,
+    freshness: 100, injuryMatchesLeft: 0, lastRating: 0, ratingSum: 0, ratingGames: 0, publicStars: 0, distanceSum: 0, minutesSum: 0, topSpeedMax: 0,
     heightCm, jumpingPower, aerialPower: aerialBreakdown(heightCm, jumpingPower, skills.strength, skills.positioning).total,
     skills, varProfile,
     archetype: null,

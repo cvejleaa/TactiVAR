@@ -268,7 +268,7 @@ test('migrering 1 → 2 alene (uden reparation bagefter) løfter skema og regler
 
 // ---------- Skema 3 (v3.6): mod-kunnen-pulje og lavere spillere ----------
 const FIXTURE2 = fs.readFileSync(new URL('../fixtures/save-schema2.json', import.meta.url), 'utf8');
-test('migrering 2 → 3: mod-kunnen ×0,55 inden for puljen, højde −5 cm, scouting følger med – med backup', async () => {
+test('migrering 2 → 4: mod-kunnen ×0,55 inden for puljen, højder lagt om efter rang, scouting følger med – med backup', async () => {
   const { COUNTER_POOL, counterFloor } = await import('../../public/engine/counter.js');
   const old = JSON.parse(FIXTURE2);
   assert.equal(old.schemaVersion, 2);
@@ -285,7 +285,6 @@ test('migrering 2 → 3: mod-kunnen ×0,55 inden for puljen, højde −5 cm, sco
   let checked = 0;
   for (const t of L.teams) for (const p of t.squad) {
     const o = oldPlayers.get(p.id);
-    assert.equal(p.heightCm, o.heightCm - 5, p.shortName);
     const v = Object.values(p.counterTactics), sum = v.reduce((a, b) => a + b);
     assert.ok(sum <= COUNTER_POOL && v.every((x) => x >= counterFloor(p.age)), JSON.stringify(p.counterTactics));
     // Uden puljeklip: præcis round(gammel·0,55) (eller bunden)
@@ -293,10 +292,10 @@ test('migrering 2 → 3: mod-kunnen ×0,55 inden for puljen, højde −5 cm, sco
     if (Object.values(scaled).reduce((a, b) => a + b) <= COUNTER_POOL) { assert.deepEqual(p.counterTactics, scaled); checked++; }
   }
   assert.ok(checked > 100, String(checked));
-  const meanBefore = [...oldPlayers.values()].reduce((a, p) => a + p.heightCm, 0) / oldPlayers.size;
   const meanAfter = L.teams.flatMap((t) => t.squad).reduce((a, p) => a + p.heightCm, 0) / oldPlayers.size;
-  assert.equal(Math.round((meanBefore - meanAfter) * 10) / 10, 5);
-  assert.deepEqual(L.scouting[viewer][tall.id], [`[Forsæson] I træningskampen steg ${tall.shortName} (${tall.heightCm - 5} cm) en hel etage over alle andre.`]);
+  const newTall = L.teams.flatMap((t) => t.squad).find((p) => p.id === tall.id).heightCm;
+  assert.ok(meanAfter >= 183.5 && meanAfter <= 185, String(meanAfter)); // Superligaen ≈184 (v3.6 gav ≈181)
+  assert.deepEqual(L.scouting[viewer][tall.id], [`[Forsæson] I træningskampen steg ${tall.shortName} (${newTall} cm) en hel etage over alle andre.`]);
   assert.equal(L.leagueMetadata.round, old.league.leagueMetadata.round, 'ligaen følger med uændret');
   // Gemt i det nye format: en ny indlæsning migrerer ikke igen (ingen dobbelt nedskalering)
   saveGame(store, r.state);
@@ -305,11 +304,11 @@ test('migrering 2 → 3: mod-kunnen ×0,55 inden for puljen, højde −5 cm, sco
   assert.equal(again.state.league.teams[0].squad[0].heightCm, L.teams[0].squad[0].heightCm);
 });
 
-test('skema 1-fixturet løftes hele vejen til 3', () => {
+test('skema 1-fixturet løftes hele vejen til 4', () => {
   const r = parseSave(FIXTURE);
   assert.ok(r.ok, r.error); assert.equal(r.migratedFrom, 1);
   const p = r.state.league.teams[0].squad[0], o = JSON.parse(FIXTURE).league.teams[0].squad[0];
-  assert.equal(p.heightCm, o.heightCm - 5);
+  assert.ok(Number.isFinite(p.heightCm) && p.heightCm >= 168 && p.heightCm <= 201 && o.heightCm > 0);
 });
 
 test('migrering 2 → 3 alene: værdier over puljen skaleres forholdsmæssigt (rækkefølgen bevares), manglende felter får standard', async () => {
@@ -327,4 +326,32 @@ test('migrering 2 → 3 alene: værdier over puljen skaleres forholdsmæssigt (r
   assert.deepEqual(out.league.teams[0].squad[1].counterTactics, { vsPress: 22, vsLowBlock: 8, vsTrapLong: 8 });
   // uden alder: bund 5 (som en 20-årig) – 20·0,55 = 11
   assert.deepEqual(out.league.teams[0].squad[2].counterTactics, { vsPress: 11, vsLowBlock: 11, vsTrapLong: 11 });
+});
+
+// ---------- Skema 4 (v3.7): højder som i Superligaen ----------
+const FIXTURE3 = fs.readFileSync(new URL('../fixtures/save-schema3.json', import.meta.url), 'utf8');
+test('migrering 3 → 4: rang i hver kæde bevares, ligaen får Superligaens snit og spænd, tekster følger med', async () => {
+  const { MIGRATIONS } = await import('../../public/state/storage.js');
+  const d = JSON.parse(FIXTURE3);
+  assert.equal(d.schemaVersion, 3);
+  const before = new Map(d.league.teams.flatMap((t) => t.squad.map((p) => [p.id, { h: p.heightCm, line: p.line, tag: `#${p.shirtNumber} ${p.shortName}` }])));
+  const hsBefore = [...before.values()].map((x) => x.h);
+  assert.ok(Math.max(...hsBefore) <= 193, 'fixturet er en v3.6-liga (højeste 193)');
+  // En referattekst med højden (som luftduellen skriver den)
+  const someone = d.league.teams[0].squad[3];
+  d.league.lastRound.matches[0].events.push({ text: `✈️ Stærk luftduel: #${someone.shirtNumber} ${someone.shortName} (${someone.heightCm} cm) stiger højest.` });
+  const out = MIGRATIONS[3](d);
+  assert.equal(out.schemaVersion, 4);
+  const players = out.league.teams.flatMap((t) => t.squad);
+  const hs = players.map((p) => p.heightCm), mean = hs.reduce((a, b) => a + b) / hs.length;
+  assert.ok(mean >= 183.5 && mean <= 185, String(mean));            // v3.6: ≈181,5
+  assert.ok(Math.max(...hs) >= 197 && Math.max(...hs) <= 201, String(Math.max(...hs))); // v3.6: 193
+  assert.ok(Math.min(...hs) >= 168, String(Math.min(...hs)));
+  // Rang i kæden bevares: højere før → mindst lige så høj efter
+  for (const line of ['GK', 'DEF', 'MID', 'ATT']) {
+    const ps = players.filter((p) => p.line === line);
+    for (const a of ps) for (const b of ps) if (before.get(a.id).h > before.get(b.id).h) assert.ok(a.heightCm >= b.heightCm, `${line}: ${a.shortName} vs ${b.shortName}`);
+  }
+  const ev = out.league.lastRound.matches[0].events.at(-1).text;
+  assert.ok(ev.includes(`(${players.find((p) => p.id === someone.id).heightCm} cm)`), ev);
 });

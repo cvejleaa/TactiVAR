@@ -20,7 +20,9 @@ export function pairRound(league, opponentIdx) {
 export function playRound(league, opponentIdx, rng) {
   const round = (league.leagueMetadata.round || 0) + 1;
   const matches = pairRound(league, opponentIdx).map(([h, a]) => simulateMatch(league.teams[h], league.teams[a], rng, { round }));
-  return { round, matches, gazette: buildGazette(matches) };
+  // Tabellen FØR runden – til "Rundens overraskelse" (tidligst runde 3; før er pladserne tilfældige).
+  const positions = round >= 3 ? Object.fromEntries(sortStandings(league.leagueMetadata.standings).map((s, i) => [s.teamId, { pos: i + 1, points: s.points }])) : null;
+  return { round, matches, gazette: buildGazette(matches, { positions, round }) };
 }
 
 function applyStanding(standings, m) {
@@ -38,6 +40,14 @@ export const sortStandings = (standings) => standings.slice().sort((a, b) =>
   b.points - a.points || (b.goalsFor - b.goalsAgainst) - (a.goalsFor - a.goalsAgainst) || b.goalsFor - a.goalsFor);
 
 export const SCOUTING_PER_PLAYER = 20;
+
+// Friskhed (v3.7, brugeren: "kun 3 af mine spillere der har under 100% i friskhed"; før
+// −4…9 og straks +8 igen). Kampen koster efter løbet distance – højt pres koster altså mere –
+// og udholdenhed dæmper: km·(1,5 − STA·0,03). Restitution til næste runde +5 (ikke brugt: +15).
+// En fast midtbanespiller med STA 10 (11 km) falder ≈8 pr. runde; bund 50.
+export const REST_PLAYED = 5, REST_BENCH = 15, FRESH_FLOOR = 50;
+export const matchCost = (km, stamina) => Math.round(km * (1.5 - stamina * 0.03));
+export const afterMatchFreshness = (fresh, km, stamina, noise = 0) => Math.max(FRESH_FLOOR, Math.min(100, fresh - Math.max(0, matchCost(km, stamina) + noise) + REST_PLAYED));
 
 // Bogfører en afviklet runde i ligaen (muterer league) – kaldes før der gemmes.
 // Idempotent: en runde, der allerede er bogført (dobbeltklik, genindlæsning midt i
@@ -60,9 +70,11 @@ export function commitRound(league, result, rng) {
         p.ratingSum += r.rating; p.ratingGames += 1;
         p.publicStars = starsFromRating(p.ratingSum / p.ratingGames, starNoise(rng));
         p.counterTactics = applyCounterXp(p.counterTactics, p.age, opp, r.gainedCounterXp);
-        // Restitution: træthed for dem, der spillede.
-        const drop = Math.max(4, 14 - Math.round(p.skills.stamina * 0.5));
-        p.freshness = Math.max(60, Math.min(100, p.freshness - drop + 8));
+        // Støj ±2 på prisen, så udholdenheden ikke kan regnes baglæns af den offentlige friskhed.
+        p.freshness = afterMatchFreshness(p.freshness, r.distanceKm ?? 0, p.skills.stamina, Math.round(rng.next() * 4 - 2));
+        // Sæsontal til spillerkortet (kun ejeren ser dem): km pr. 90 min og bedste topfart.
+        if (r.distanceKm > 0) { p.distanceSum += r.distanceKm; p.minutesSum += Math.max(0, (r.minOut ?? 90) - (r.minIn ?? 1)); }
+        if (r.topSpeed > p.topSpeedMax) p.topSpeedMax = r.topSpeed;
       }
     }
     // Observationer tilfalder de menneskestyrede hold (de kan læse alle rundens referater).
@@ -76,7 +88,7 @@ export function commitRound(league, result, rng) {
     }
   }
   for (const p of players.values()) {
-    if (!played.has(p.id)) p.freshness = Math.min(100, p.freshness + 15);
+    if (!played.has(p.id)) p.freshness = Math.min(100, p.freshness + REST_BENCH);
     // Skader fra før runden heles én kamp; rundens nye skader lægges på nedenfor.
     p.injuryMatchesLeft = Math.max(0, p.injuryMatchesLeft - 1);
   }

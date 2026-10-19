@@ -28,3 +28,14 @@ test('mod-kunnen: startelleverens bedste værdi stiger højst 3 pr. runde i snit
   const gain = s.reduce((a, x) => a + (x[3] - x[0]), 0) / s.length / 3;
   assert.ok(gain > 0 && gain <= 3, String(gain));
 });
+
+// v3.7 (brugeren: "rundens mål er altid VAR-dramatik"): før vandt VAR-mål hver gang.
+test('rundens mål: flere typer vinder, ingen over 50 %, VAR under 40 %; friskheden falder over en sæson', async () => {
+  const { measureSeason } = await import('../../tools/measure-duels.mjs');
+  const r = measureSeason(8, 6);
+  assert.ok(Object.keys(r.kinds).length >= 4, JSON.stringify(r.kinds));
+  assert.ok(Object.values(r.kinds).every((v) => v <= 0.5), JSON.stringify(r.kinds));
+  assert.ok((r.kinds.VAR ?? 0) < 0.4, JSON.stringify(r.kinds));
+  // Før v3.7 lå startelleverne på ≈95–100 % efter flere runder; nu mærkes trætheden
+  assert.ok(r.freshMe < 85, String(r.freshMe));
+});

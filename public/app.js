@@ -81,11 +81,18 @@ function start() {
 }
 
 // Forklaringen på en migrering – både ved indlæsning og ved import af en ældre fil.
+// Startere under 70 % friskhed på dit hold (advarsel ved ▶).
+function tiredStarters() {
+  const t = myTeam();
+  return t.squad.filter((p) => t.tactics.lineupSlots.includes(p.id) && p.freshness < 70).length;
+}
+
 function migrationNotice(from) {
   if (from == null) return '';
   return 'Dit spil er opdateret: ' + [
     from <= 1 ? 'Hvis-Så-regler kan nu sættes til "Bagud/Foran med mindst N mål" og skifte til dine egne planer – "Foran med 1" gælder fra 1 mål og opefter.' : '',
-    from <= 2 ? 'Mod-kunnen er sat ca. 45 % ned (alle hold): hver spiller har nu højst 100 point fordelt på de tre stilarter – lærer han noget nyt, glemmer han lidt af det gamle. Alle spillere er 5 cm lavere (holdsnit tæt på den danske 181 cm).' : '',
+    from <= 2 ? 'Mod-kunnen er sat ca. 45 % ned (alle hold): hver spiller har nu højst 100 point fordelt på de tre stilarter – lærer han noget nyt, glemmer han lidt af det gamle.' : '',
+    from <= 3 ? 'Spillerhøjderne er rettet efter Superliga-målinger (ligasnit ca. 184 cm, 168–201 cm) – hver spiller beholder sin plads i højde-rækkefølgen i sin kæde, og luftduellerne er regnet om. Friskhed betyder nu noget: en kamp koster efter løbet distance, og en træt spiller yder mindre (50 % friskhed ≈ 7,5 % svagere).' : '',
   ].filter(Boolean).join(' ');
 }
 
@@ -129,6 +136,7 @@ function renderControls() {
     // Kampknapperne står i topbaren, så de findes i alle visninger (også når man scouter).
     // Modstandervælgeren står ved ▶, fordi Mod-tallene og knappen begge gælder den valgte modstander.
     h('button', { id: 'play-round', class: 'primary', disabled: !!mc?.playing, onclick: playNextRound }, `▶ Spil runde ${game.league.leagueMetadata.round + 1} mod`),
+    tiredStarters() ? h('span', { class: 'tired', id: 'tired-warning', title: 'Startere under 70 % friskhed yder mindre – overvej at rotere i Trup' }, `⚠ ${tiredStarters()} trætte startere`) : null,
     select(String(game.ui.opponentIdx), teams.map((t, i) => [String(i), t.name]).filter(([i]) => Number(i) !== myIdx()), (v) => change(() => { game.ui.opponentIdx = Number(v); }), { id: 'opponent-select', title: 'Næste modstander', disabled: !!mc?.playing }),
     h('span', { class: 'savestatus' + (view.saveError ? ' failed' : ''), id: 'save-status' }, view.saveError ? '⚠ IKKE gemt' : view.savedAt ? `✔ Gemt kl. ${time(view.savedAt)}` : 'Ikke gemt'),
     h('button', { id: 'save-now', onclick: () => { persist(); render(); } }, '💾 Gem nu'),

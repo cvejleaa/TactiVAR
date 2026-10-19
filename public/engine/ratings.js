@@ -23,12 +23,14 @@ export function createSheet() {
     entries,
     register(player, team, isHome, role, minIn, rng, oppMastery, slot = null) {
       if (entries[player.id]) return entries[player.id];
+      const run = runProfile(player, team, rng);
       entries[player.id] = {
         playerId: player.id, shirtNumber: player.shirtNumber, shortName: player.shortName,
         teamId: team.id, teamName: team.name, isUserTeam: !team.isBot, isHome, role, line: player.line, slot,
         minIn, minOut: 90, rating: START_RATING + (rng.next() * 0.3 - 0.15), stars: 0,
         startCounterMastery: oppMastery, gainedCounterXp: 0,
         goals: 0, assists: 0, saves: 0, aerialWins: 0, tacticWins: 0, yellowCard: false, injured: false, isMotM: false,
+        km90: run.km90, topSpeed: run.topSpeed, distanceKm: 0,
       };
       return entries[player.id];
     },
@@ -43,6 +45,18 @@ export function createSheet() {
   };
 }
 
+// Løb pr. 90 min og topfart (v3.7, brugeren: "hvor langt en spiller løber … og måske deres
+// topfart"). Kæde-basis som i en rigtig liga; udholdenhed og eget pres trækker op/ned.
+export const KM_PER_90 = { GK: 5.5, DEF: 9.8, MID: 11.2, ATT: 10.0 };
+const PRESS_RUN = { HIGH_GEGENPRESS: 1.06, MID_BLOCK: 1, LOW_BLOCK: 0.96 };
+export function runProfile(player, team, rng) {
+  const sta = player.skills?.stamina ?? 10, pac = player.skills?.pace ?? 10;
+  const press = PRESS_RUN[team.tactics?.phases?.phase2_defending?.pressingHeight] ?? 1;
+  const km90 = (KM_PER_90[player.line] ?? 10) * (0.9 + sta * 0.01) * press * (0.96 + rng.next() * 0.08);
+  const topSpeed = Math.round(clamp(25 + pac * 0.45 + (player.line === 'GK' ? -3 : 0) + (rng.next() * 2 - 1), 22, 36) * 10) / 10;
+  return { km90, topSpeed };
+}
+
 // Afslutter karakterarket: clean sheet, afrunding, stjerner, XP-grundlag og MotM.
 export function finalizeSheet(sheet, homeGoals, awayGoals, rng, xpFor) {
   const all = Object.values(sheet.entries);
@@ -53,6 +67,10 @@ export function finalizeSheet(sheet, homeGoals, awayGoals, rng, xpFor) {
     e.rating = Math.round(e.rating * 10) / 10;
     e.stars = starsFromRating(e.rating, starNoise(rng));
     e.gainedCounterXp = xpFor({ minutesPlayed: Math.max(10, e.minOut - e.minIn), tacticWins: e.tacticWins, goals: e.goals });
+    // Løbedistance for spilletiden; rate pr. 90 min fjernes igen (den røber udholdenheden).
+    e.distanceKm = Math.round(e.km90 * (Math.max(0, e.minOut - e.minIn) / 90) * 10) / 10;
+    if (e.minOut - e.minIn < 10) e.topSpeed = null; // for kort tid til en rigtig spurt
+    delete e.km90;
     if (!best || e.rating > best.rating) best = e;
   }
   if (best) best.isMotM = true;
