@@ -101,7 +101,8 @@ export function simulateMatch(home, away, rng, opts = {}) {
   const addEv = (min, type, category, isHome, plot, label, text, varMsg) =>
     events.push({ min, type, category, isHome, plot, label, text, varMsg, hG, aG, stats: { ...st } });
   const observe = (player, text) => observations.push({ playerId: player.id, text });
-  const register = (side, p, role, minIn, slot) => sheet.register(p, side.team, side.isHome, role, minIn, rng, masteryVs(p, other(side).team), slot);
+  // Løbet følger pladsen (v3.8): også en indskifter løber efter den rolle, han kommer ind på.
+  const register = (side, p, role, minIn, slot) => sheet.register(p, side.team, side.isHome, role, minIn, rng, masteryVs(p, other(side).team), slot, slot != null ? coordsOf(side.tactics)[slot].r : role);
 
   for (const side of [H, A]) side.starters.forEach((p, i) => p && register(side, p, coordsOf(side.tactics)[i].r, 1, i));
   // Startformationen gemmes, så karakterarket kan vise spillerne på banen.

@@ -40,9 +40,15 @@ test('rundens mål: flere typer vinder, ingen over 50 %, VAR under 40 %; friskhe
   assert.ok(r.freshMe < 85, String(r.freshMe));
 });
 
-test('andel højintenst løb: markspillere 6–13 % i snit (topdivisioner ≈7–12 %), målmænd under 4 %', async () => {
+test('løb pr. plads følger dokumentet: CM længst, wingbacks/kanter flest HI, stoppere færrest km og HI; målmænd under 4 % HI', async () => {
   const { measureSeason } = await import('../../tools/measure-duels.mjs');
-  const { hi } = measureSeason(4, 1);
-  for (const k of ['DEF', 'MID', 'ATT']) assert.ok(hi[k] >= 6 && hi[k] <= 13, `${k} ${hi[k]}`);
+  const { hi, km } = measureSeason(4, 1);
+  for (const k of ['CB', 'FB', 'CM', 'WB/kant', 'CAM/CF', 'ST']) assert.ok(hi[k] >= 4 && hi[k] <= 15, `${k} ${hi[k]}`);
   assert.ok(hi.GK < 4, `GK ${hi.GK}`);
+  for (const k of ['FB', 'WB/kant', 'CAM/CF', 'ST', 'CB']) assert.ok(km.CM > km[k], `CM ${km.CM} > ${k} ${km[k]}`);
+  for (const k of ['CM', 'CAM/CF', 'ST', 'CB']) assert.ok(hi['WB/kant'] > hi[k], `WB/kant ${hi['WB/kant']} > ${k} ${hi[k]}`);
+  for (const k of ['FB', 'WB/kant', 'CM', 'CAM/CF', 'ST']) assert.ok(km.CB < km[k] && hi.CB < hi[k], `CB under ${k}`);
+  // Røde mod v3.7.1 (pr. kæde): back og stopper løb ens (forskel 0), og CM − CB var ≈1,4 km (nu ≈2,4).
+  assert.ok(hi.FB - hi.CB >= 4, `FB ${hi.FB} − CB ${hi.CB}`);
+  assert.ok(km.CM - km.CB >= 2, `CM ${km.CM} − CB ${km.CB}`);
 });

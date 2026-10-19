@@ -21,9 +21,9 @@ export function createSheet() {
   const entries = {};
   return {
     entries,
-    register(player, team, isHome, role, minIn, rng, oppMastery, slot = null) {
+    register(player, team, isHome, role, minIn, rng, oppMastery, slot = null, runRole = role) {
       if (entries[player.id]) return entries[player.id];
-      const run = runProfile(player, team, rng);
+      const run = runProfile(player, team, rng, runRole);
       entries[player.id] = {
         playerId: player.id, shirtNumber: player.shirtNumber, shortName: player.shortName,
         teamId: team.id, teamName: team.name, isUserTeam: !team.isBot, isHome, role, line: player.line, slot,
@@ -46,22 +46,35 @@ export function createSheet() {
 }
 
 // Løb pr. 90 min og topfart (v3.7, brugeren: "hvor langt en spiller løber … og måske deres
-// topfart"). Kæde-basis som i en rigtig liga; udholdenhed og eget pres trækker op/ned.
-export const KM_PER_90 = { GK: 5.5, DEF: 9.8, MID: 11.2, ATT: 10.0 };
+// topfart"). Fra v3.8 efter PLADSEN i kampen (dokumentet "Spillerhøjde i Superligaen",
+// fysisk belastning): central midtbane løber længst (12+ km), wingbacks og kanter har flest
+// højintense løb, angribere/offensive færre km men eksplosive, midtstoppere færrest km.
+// Udholdenhed og eget pres trækker op/ned; en ukendt rolle falder tilbage på kæden.
+export const RUN_BY_ROLE = {
+  GK: { km: 5.5, hi: 2 },
+  CB: { km: 9.5, hi: 5 },
+  LB: { km: 10.6, hi: 11 }, RB: { km: 10.6, hi: 11 },
+  LWB: { km: 11.0, hi: 13 }, RWB: { km: 11.0, hi: 13 }, LM: { km: 11.0, hi: 13 }, RM: { km: 11.0, hi: 13 }, LW: { km: 11.0, hi: 13 }, RW: { km: 11.0, hi: 13 },
+  CDM: { km: 11.8, hi: 8 }, CM: { km: 11.8, hi: 8 },
+  CAM: { km: 10.8, hi: 10 }, CF: { km: 10.8, hi: 10 },
+  ST: { km: 10.0, hi: 11 },
+};
+const RUN_BY_LINE = { GK: 'GK', DEF: 'CB', MID: 'CM', ATT: 'ST' };
+export const runBase = (role, line) => RUN_BY_ROLE[role] ?? RUN_BY_ROLE[RUN_BY_LINE[line]] ?? { km: 10, hi: 8 };
 const PRESS_RUN = { HIGH_GEGENPRESS: 1.06, MID_BLOCK: 1, LOW_BLOCK: 0.96 };
-export function runProfile(player, team, rng) {
+export function runProfile(player, team, rng, role) {
   const sta = player.skills?.stamina ?? 10, pac = player.skills?.pace ?? 10;
+  const base = runBase(role, player.line);
   const press = PRESS_RUN[team.tactics?.phases?.phase2_defending?.pressingHeight] ?? 1;
-  const km90 = (KM_PER_90[player.line] ?? 10) * (0.9 + sta * 0.01) * press * (0.96 + rng.next() * 0.08);
+  const km90 = base.km * (0.9 + sta * 0.01) * press * (0.96 + rng.next() * 0.08);
   const topSpeed = Math.round(clamp(25 + pac * 0.45 + (player.line === 'GK' ? -3 : 0) + (rng.next() * 2 - 1), 22, 36) * 10) / 10;
   // Andel højintenst løb (over ca. 20 km/t; v3.7.1, brugeren: "hvor stor en andel af deres løb
-  // der er højintense løb"): kæde-basis (topdivisioner ≈7–12 % for markspillere), fart, pres og
-  // friskhed trækker op/ned, ±1 %-point støj, klemt 1–20 %.
+  // der er højintense løb"): rolle-basis, fart, pres og friskhed trækker op/ned,
+  // ±1 %-point støj, klemt 1–20 %.
   const fresh = Math.max(0, Math.min(100, player.freshness ?? 100));
-  const hiShare = Math.round(clamp(((HI_BASE[player.line] ?? 8) + (pac - 10) * 0.4) * (PRESS_HI[team.tactics?.phases?.phase2_defending?.pressingHeight] ?? 1) * (0.8 + 0.2 * fresh / 100) + (rng.next() * 2 - 1), 1, 20) * 10) / 10;
+  const hiShare = Math.round(clamp((base.hi + (pac - 10) * 0.4) * (PRESS_HI[team.tactics?.phases?.phase2_defending?.pressingHeight] ?? 1) * (0.8 + 0.2 * fresh / 100) + (rng.next() * 2 - 1), 1, 20) * 10) / 10;
   return { km90, topSpeed, hiShare };
 }
-export const HI_BASE = { GK: 2, DEF: 7, MID: 9, ATT: 11 };
 const PRESS_HI = { HIGH_GEGENPRESS: 1.15, MID_BLOCK: 1, LOW_BLOCK: 0.9 };
 
 // Afslutter karakterarket: clean sheet, afrunding, stjerner, XP-grundlag og MotM.

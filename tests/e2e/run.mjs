@@ -55,7 +55,7 @@ try {
   check('Ny liga: dit hold vises med 18 spillere', (await rows()) === 18);
   check('Holdvælgeren har 8 hold', (await g.locator('#team-select option').count()) === 8);
   const heads = (await g.locator('#matrix thead th').allTextContents()).map((t) => t.replace(/ [▲▼]$/, ''));
-  check('Regnearkets kolonner i rækkefølge (Alder står hvor den skal)', JSON.stringify(heads.slice(0, 20)) === JSON.stringify(['Pos/#', 'Spiller', 'Kæde', 'Alder', 'Frisk/🚑', 'Højde', 'Spring', '✈ Luft', 'PAC', 'STA', 'STR', 'BAL', 'PAS', 'FIN', 'POS', 'INT', 'GK', 'Gns', '⭐ Vurd', '🧠 Mod']), heads.join('|'));
+  check('Regnearkets kolonner i rækkefølge (Alder står hvor den skal)', JSON.stringify(heads.slice(0, 21)) === JSON.stringify(['Pos/#', 'Spiller', 'Kæde', 'Natur', 'Alder', 'Frisk/🚑', 'Højde', 'Spring', '✈ Luft', 'PAC', 'STA', 'STR', 'BAL', 'PAS', 'FIN', 'POS', 'INT', 'GK', 'Gns', '⭐ Vurd', '🧠 Mod']), heads.join('|'));
   const modCells = await g.locator('#matrix tbody td.modcell').allTextContents();
   check('Mod-kolonnen viser tre egne værdier, ingen % mod en modstander', modCells.length === 18 && modCells.every((t) => /^\d+ · \d+ · \d+$/.test(t)) && !(await g.textContent('body')).match(/mod-kunnen[^.)]*\d+\s*%|mod [A-ZÆØÅ][^:]*: \d+%/i), modCells[0]);
   const used = await g.textContent('#counter-pool #counter-used');
@@ -113,8 +113,8 @@ try {
 
   // Sortering på FIN: højeste afslutning øverst
   await tab('trup');
-  await g.click('#matrix thead th:nth-child(14)');
-  const fins = (await g.locator('#matrix tbody tr td:nth-child(14)').allTextContents()).map(Number);
+  await g.click('#matrix thead th:nth-child(15)');
+  const fins = (await g.locator('#matrix tbody tr td:nth-child(15)').allTextContents()).map(Number);
   check('Sortering på FIN giver højeste først', fins.length === 18 && fins.every((v, i) => i === 0 || fins[i - 1] >= v), fins.join(','));
 
   // Træk en spiller ud af zonen
@@ -217,7 +217,7 @@ try {
 
   // Sorteringsvagten: sortér eget hold på FIN, skift til en modstander – rækkefølgen må ikke røbe FIN
   await tab('trup');
-  await g.click('#matrix thead th:nth-child(14)');
+  await g.click('#matrix thead th:nth-child(15)');
   await tab('liga');
   await g.click('#standings tbody tr:not(.mine)');
   check('Klik på et hold i ligatabellen åbner holdet i Trup', (await g.textContent('#tabs .tab.active')).includes('Trup') && (await g.isVisible('#matrix')));
@@ -230,11 +230,11 @@ try {
   const oppText = await g.textContent('#matrix tbody');
   const lockCells = await g.locator('#matrix tbody td.lockcell').count();
   check('Modstander: 13 skjulte kolonner × 18 spillere vises som 🔒 ??', lockCells === 13 * 18, String(lockCells));
-  const hiddenCols = await g.evaluate(() => [...document.querySelectorAll('#matrix tbody tr')].flatMap((tr) => [...tr.children].slice(6, 18).map((td) => td.textContent)));
+  const hiddenCols = await g.evaluate(() => [...document.querySelectorAll('#matrix tbody tr')].flatMap((tr) => [...tr.children].slice(7, 19).map((td) => td.textContent)));
   check('Modstander: spring, luft, de 9 evner og gennemsnit står som 🔒 ?? (12 × 18 celler)', hiddenCols.length === 12 * 18 && hiddenCols.every((t) => t === '🔒 ??'));
-  check('Modstander: vurdering vises som stjerner, ikke tal', (await g.locator('#matrix tbody tr td:nth-child(19)').allTextContents()).every((t) => /^[★☆]{5}$|^–$/.test(t)));
+  check('Modstander: vurdering vises som stjerner, ikke tal', (await g.locator('#matrix tbody tr td:nth-child(20)').allTextContents()).every((t) => /^[★☆]{5}$|^–$/.test(t)));
   void oppText;
-  await g.click('#matrix thead th:nth-child(14)');
+  await g.click('#matrix thead th:nth-child(15)');
   check('Modstander: sortering på FIN afvises med anti-spionage-besked', (await g.textContent('#notice')).includes('Anti-spionage'));
   check('Modstander: spillerkortet skjuler evner og kontrakt', (await g.locator('#player-card .bars').count()) === 0 && (await g.textContent('#player-card')).includes('🔒 ??'));
   await tab('taktik');
@@ -422,7 +422,7 @@ try {
   check('Migrering: beskeden forklarer puljen på 100, Superliga-højderne og friskheden – og nævner backuppen', ['100 point', 'Superliga', 'Friskhed', 'Hvis-Så', 'backup'].every((x) => migNotice.includes(x)), migNotice);
   await reload(); await reload();
   const mig = await g.evaluate(() => ({ schema: JSON.parse(localStorage.getItem('tactivar_save')).schemaVersion, backups: Object.keys(localStorage).filter((k) => k.startsWith('tactivar_backup_')).length }));
-  check('Migrering: gemmes straks i skema 4, kun én backup trods tre genindlæsninger', mig.schema === 4 && mig.backups === 1, JSON.stringify(mig));
+  check('Migrering: gemmes straks i skema 5, kun én backup trods tre genindlæsninger', mig.schema === 5 && mig.backups === 1, JSON.stringify(mig));
   await tab('liga'); const migHead = await g.textContent('#standings-title'); await tab('trup');
   check('Migrering: ligaen fra skema 1 er intakt (runde 1, 18 spillere)', migHead.includes('efter 1 runde') && (await rows()) === 18);
   // Runden er gemt før v3.5 (uden plads og startformation): Kamp-fanen viser den med listen, uden minibane
@@ -443,6 +443,13 @@ try {
   const fixture4 = fs.readFileSync(new URL('../fixtures/save-schema4.json', import.meta.url), 'utf8');
   await g.evaluate((f) => { for (const k of Object.keys(localStorage)) if (k.startsWith('tactivar_')) localStorage.removeItem(k); localStorage.setItem('tactivar_save', f); }, fixture4);
   await reload();
+  const note4 = await g.textContent('#notice');
+  check('Migrering fra skema 4 (v3.8): beskeden forklarer naturlig position og højde pr. position – ikke friskheden eller puljen igen', note4.includes('naturlig position') && note4.includes('backs og kanter lavere') && !note4.includes('Friskhed betyder') && !note4.includes('100 point'), note4);
+  await tab('trup');
+  const nat = await g.locator('#matrix tbody tr td:nth-child(4)').allTextContents();
+  check('Natur-kolonnen viser en position for alle 18 (MV/CB/Back/CM/Kant/OM/ANG)', nat.length === 18 && nat.every((t) => ['MV', 'CB', 'Back', 'CM', 'Kant', 'OM', 'ANG'].includes(t.trim())), nat.join(','));
+  const pos4 = await g.evaluate(() => { const d = JSON.parse(localStorage.getItem('tactivar_save')); const ps = d.league.teams.flatMap((t) => t.squad); const m = (k) => { const x = ps.filter((p) => p.position === k).map((p) => p.heightCm); return x.reduce((a, b) => a + b) / x.length; }; return { schema: d.schemaVersion, cb: m('CB'), fb: m('FB') }; });
+  check('Migrering fra skema 4: gemt som skema 5, stoppere ≈190 og backs ≈176 cm', pos4.schema === 5 && pos4.cb >= 189 && pos4.cb <= 192 && pos4.fb >= 174.5 && pos4.fb <= 177.5, JSON.stringify(pos4));
   await tab('kamp');
   const old4 = await g.textContent('#match-center');
   check('Gem fra v3.7.0: karakterark og avis uden "undefined"/"NaN" og uden HI-tal', !/undefined|NaN|% HI/.test(old4) && (await g.locator('.ratings td.run').count()) > 0, old4.slice(0, 120));

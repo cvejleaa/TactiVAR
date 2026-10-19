@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRng } from '../../public/engine/rng.js';
 import { FORMATIONS, FORMATION_NAMES, MAX_ANCHOR_RADIUS, isOutOfZone, clampPos, lineOfRole } from '../../public/engine/formations.js';
-import { createLeague, aerialBreakdown, rollStat, TEAM_NAMES, HEIGHT_MID } from '../../public/engine/generator.js';
+import { createLeague, aerialBreakdown, rollStat, TEAM_NAMES, HEIGHT_BY_POS, assignPositions } from '../../public/engine/generator.js';
 import { viewPlayer, canSeeField, viewRatingEntry } from '../../public/engine/visibility.js';
 import { initialCounterTactics, opponentTacticKeys, masteryVs, counterXpForMatch, applyCounterXp, COUNTER_POOL } from '../../public/engine/counter.js';
 import { starsFromRating, createSheet, finalizeSheet } from '../../public/engine/ratings.js';
@@ -485,16 +485,41 @@ test('mod-kunnen start: round((alder−16)·1,2 + POS·0,8) + støj −8..8, kle
   assert.deepEqual(initialCounterTactics(fixedInt(8), 40, 20), { vsPress: 33, vsLowBlock: 33, vsTrapLong: 33 });
 });
 
-test('højde: snit pr. kæde = HEIGHT_MID + holdprofil (±1 cm), bred spredning i hver kæde (brugeren: ikke alle tæt på positionens snit)', () => {
-  const by = { GK: [], DEF: [], MID: [], ATT: [] };
-  for (let seed = 1; seed <= 40; seed++) for (const t of createLeague(createRng(seed)).teams) for (const p of t.squad) by[p.line].push(p.heightCm);
-  for (const [line, hs] of Object.entries(by)) {
-    const mean = hs.reduce((a, b) => a + b) / hs.length, sd = Math.sqrt(hs.reduce((a, h) => a + (h - mean) ** 2, 0) / hs.length);
-    assert.ok(Math.abs(mean - (HEIGHT_MID[line] + 0.75)) <= 1, `${line} snit ${mean}`);
-    if (line === 'GK') assert.ok(sd >= 4 && sd <= 5.3, `GK spredning ${sd}`); // tre terninger −4..4 (≈4,5)
-    else assert.ok(sd >= 6 && sd <= 7.3, `${line} spredning ${sd}`);       // tre terninger −6..6 (≈6,5; v3.6 ≈5,5)
+test('højde pr. naturlig position efter dokumentets tabel (v3.8): snit, spænd og spredning; ligasnit ≈184', () => {
+  const by = {}, all = [];
+  for (let seed = 1; seed <= 40; seed++) for (const t of createLeague(createRng(seed)).teams) for (const p of t.squad) { (by[p.position] ||= []).push(p.heightCm); all.push(p.heightCm); }
+  const stats = (hs) => { const mean = hs.reduce((a, b) => a + b) / hs.length; return { mean, sd: Math.sqrt(hs.reduce((a, h) => a + (h - mean) ** 2, 0) / hs.length), min: Math.min(...hs), max: Math.max(...hs) }; };
+  for (const [pos, hs] of Object.entries(by)) {
+    const t = HEIGHT_BY_POS[pos], s = stats(hs);
+    assert.ok(Math.abs(s.mean - (t.mid + 0.75)) <= 1, `${pos} snit ${s.mean}`);
+    assert.ok(s.min >= t.min && s.max <= t.max, `${pos} spænd ${s.min}–${s.max}`);
+    assert.ok(s.sd >= 2.8 && s.sd <= (t.dice === 4 ? 5 : 4), `${pos} spredning ${s.sd}`); // d=3 ≈3,5; d=4 ≈4,5
   }
-  assert.deepEqual(HEIGHT_MID, { GK: 192, DEF: 186, MID: 179.5, ATT: 181 });
+  // Dokumentet: CB 189–191, backs og kanter 174–177, MV 193–195. v3.7.1 pr. kæde gav FOR ≈186,75 for
+  // både stoppere og backs og MID ≈180,25 for både central og kant – de bånd er røde her.
+  assert.ok(stats(by.CB).mean >= 189 && stats(by.CB).mean <= 191.5, 'CB');
+  assert.ok(stats(by.FB).mean >= 174 && stats(by.FB).mean <= 177, 'FB');
+  assert.ok(stats(by.WM).mean >= 174 && stats(by.WM).mean <= 177, 'WM');
+  assert.ok(stats(by.GK).mean >= 193 && stats(by.GK).mean <= 196, 'GK');
+  const league = stats(all);
+  assert.ok(league.mean >= 183.5 && league.mean <= 185, `ligasnit ${league.mean}`); // Superligaen ≈184
+  assert.ok(league.min >= 169 && league.max <= 201 && league.max >= 198, `spænd ${league.min}–${league.max}`);
+  assert.ok(league.sd >= 6, `hele truppen spreder sig stadig (brugeren: ikke alle tæt på snittet) – ${league.sd}`);
+});
+test('naturlig position: truppen er 2 GK / 3 CB / 3 FB / 3 CM / 2+1 WM / 1 AM / 3 ST, og standard-11 passer til 4-4-2', () => {
+  const t = createLeague(createRng(3)).teams[0];
+  const count = (line, pos) => t.squad.filter((p) => p.line === line && p.position === pos).length;
+  assert.deepEqual([count('GK', 'GK'), count('DEF', 'CB'), count('DEF', 'FB'), count('MID', 'CM'), count('MID', 'WM'), count('MID', 'AM'), count('ATT', 'ST'), count('ATT', 'WM')], [2, 3, 3, 3, 2, 1, 3, 1]);
+  const start = t.tactics.lineupSlots.map((id) => t.squad.find((p) => p.id === id).position);
+  assert.deepEqual(start, ['GK', 'FB', 'CB', 'CB', 'FB', 'WM', 'CM', 'CM', 'WM', 'ST', 'ST']); // LB CB CB RB / LM CM CM RM / ST ST
+});
+test('assignPositions: kun spillere uden position; pr. kæde efter højde (høje → CB/ST, lave → FB/WM, midterste MID → OM)', () => {
+  const mk = (id, line, heightCm, position) => ({ id, line, heightCm, position });
+  const sq = [mk('d1', 'DEF', 180), mk('d2', 'DEF', 192), mk('d3', 'DEF', 175), mk('d4', 'DEF', 186),
+    mk('m1', 'MID', 170), mk('m2', 'MID', 190), mk('m3', 'MID', 185), mk('m4', 'MID', 178), mk('m5', 'MID', 181), mk('m6', 'MID', 188),
+    mk('a1', 'ATT', 175), mk('a2', 'ATT', 190), mk('a3', 'ATT', 182), mk('a4', 'ATT', 186), mk('g', 'GK', 190), mk('x', 'DEF', 170, 'CB')];
+  const pos = Object.fromEntries(assignPositions(sq).map((p) => [p.id, p.position]));
+  assert.deepEqual(pos, { d1: 'FB', d2: 'CB', d3: 'FB', d4: 'CB', m1: 'WM', m2: 'CM', m3: 'CM', m4: 'WM', m5: 'AM', m6: 'CM', a1: 'WM', a2: 'ST', a3: 'ST', a4: 'ST', g: 'GK', x: 'CB' });
 });
 test('forsæson-indtrykket om luftspillet kræver 190 cm (v3.6: 187) og spring 13', () => {
   const vp = { cynicism: 5, theatre: 5, varPulse: 5 };
@@ -503,12 +528,20 @@ test('forsæson-indtrykket om luftspillet kræver 190 cm (v3.6: 187) og spring 1
   assert.ok(!generateScoutingClues('A. B', vp, 190, 12).some((c) => c.includes('en hel etage')));
 });
 
-test('heightAtQuantile: fraktiler af de tre terninger om kædens midte + holdprofilens snit (0,75)', async () => {
+test('heightAtQuantile: fraktiler af de tre terninger om positionens midte + holdprofilens snit (0,75), klemt til spændet', async () => {
   const { heightAtQuantile } = await import('../../public/engine/generator.js');
-  assert.equal(heightAtQuantile('GK', 0.5), 193);    // round(192,75) + median 0
-  assert.equal(heightAtQuantile('MID', 0.5), 180);   // round(180,25)
-  assert.equal(heightAtQuantile('DEF', 0), 169);     // 187 − 18
-  assert.equal(heightAtQuantile('ATT', 0.999), 199); // 182 + 17 (indeks 2194 af 2197)
-  assert.equal(heightAtQuantile('DEF', 0.9999), 201); // 187 + 18 = 205 → loft 201
-  assert.equal(heightAtQuantile('GK', 0), 181);      // 193 − 12
+  const { HEIGHT_V37 } = await import('../../public/state/storage.js');
+  assert.equal(heightAtQuantile('GK', 0.5), 195);    // round(194,75) + median 0 (v3.7: 193)
+  assert.equal(heightAtQuantile('CM', 0.5), 184);    // round(184,25)
+  assert.equal(heightAtQuantile('FB', 0.5), 176);    // round(176,25) (v3.7 FOR: 187)
+  assert.equal(heightAtQuantile('CB', 0.5), 191);
+  assert.equal(heightAtQuantile('FB', 0), 169);      // 176 − 9 = 167 → bund 169
+  assert.equal(heightAtQuantile('CB', 0), 184);      // 191 − 9 = 182 → bund 184
+  assert.equal(heightAtQuantile('ST', 0.9999), 196); // 187 + 12 = 199 → loft 196
+  assert.equal(heightAtQuantile('GK', 0), 188);      // 195 − 9 = 186 → bund 188
+  // v3.7's frosne tabel giver stadig migreringens gamle tal (3 → 4).
+  assert.equal(heightAtQuantile('GK', 0.5, HEIGHT_V37), 193);
+  assert.equal(heightAtQuantile('DEF', 0, HEIGHT_V37), 169);
+  assert.equal(heightAtQuantile('ATT', 0.999, HEIGHT_V37), 199);
+  assert.equal(heightAtQuantile('DEF', 0.9999, HEIGHT_V37), 201);
 });

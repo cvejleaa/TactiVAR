@@ -357,8 +357,9 @@ test('migrering 3 → 4: rang i hver kæde bevares, ligaen får Superligaens sni
 });
 
 test('migrering 3 → 4: en spiller, hvis højde ændres, får rettet ALLE forekomster i scouting og referat; ugyldig højde røres ikke', async () => {
-  const { MIGRATIONS } = await import('../../public/state/storage.js');
-  const { heightAtQuantile } = await import('../../public/engine/generator.js');
+  const { MIGRATIONS, HEIGHT_V37 } = await import('../../public/state/storage.js');
+  const { heightAtQuantile: hq } = await import('../../public/engine/generator.js');
+  const heightAtQuantile = (line, q) => hq(line, q, HEIGHT_V37); // 3 → 4 bruger v3.7's frosne tabel
   const d = JSON.parse(FIXTURE3);
   const all = d.league.teams.flatMap((t) => t.squad);
   const defs = all.filter((p) => p.line === 'DEF').sort((a, b) => a.heightCm - b.heightCm || String(a.id).localeCompare(String(b.id)));
@@ -387,4 +388,60 @@ test('migrering 2 → 3 retter også højden i teksterne (−5 cm)', async () =>
   const out = MIGRATIONS[2](d);
   assert.equal(out.league.scouting[viewer][p.id][0], `${p.shortName} (${p.heightCm} cm)`); // p er muteret: ny højde
   assert.equal(out.league.teams[0].squad[0].heightCm, JSON.parse(FIXTURE2).league.teams[0].squad[0].heightCm - 5);
+});
+
+// ---------- Skema 5 (v3.8): naturlig position og højde pr. position ----------
+const FIXTURE4 = fs.readFileSync(new URL('../fixtures/save-schema4.json', import.meta.url), 'utf8');
+test('migrering 4 → 5: alle får en naturlig position; højde efter dokumentets tabel; rang i positionen bevares; tekster følger med', async () => {
+  const { MIGRATIONS } = await import('../../public/state/storage.js');
+  const { HEIGHT_BY_POS } = await import('../../public/engine/generator.js');
+  const d = JSON.parse(FIXTURE4);
+  assert.equal(d.schemaVersion, 4);
+  assert.ok(d.league.teams.every((t) => t.squad.every((p) => p.position === undefined)), 'fixturet er en v3.7-liga uden positioner');
+  const before = new Map(d.league.teams.flatMap((t) => t.squad.map((p) => [p.id, p.heightCm])));
+  // En spiller i dit hold, hvis højde ændres (findes på en kopi)
+  const probe = MIGRATIONS[4](JSON.parse(FIXTURE4)).league.teams[0].squad;
+  const someone = d.league.teams[0].squad.find((p, i) => probe[i].heightCm !== p.heightCm);
+  const tag = `#${someone.shirtNumber} ${someone.shortName}`, old = someone.heightCm;
+  d.league.lastRound.matches[0].events.push({ text: `✈️ Stærk luftduel: ${tag} (${someone.heightCm} cm) stiger højest.` });
+  const viewer = d.league.teams.find((t) => !t.isBot).id;
+  (d.league.scouting[viewer] ||= {})[someone.id] = [`${someone.shortName} (${someone.heightCm} cm) ruver.`];
+  const out = MIGRATIONS[4](d);
+  assert.equal(out.schemaVersion, 5);
+  for (const t of out.league.teams) {
+    const c = (line, pos) => t.squad.filter((p) => p.line === line && p.position === pos).length;
+    assert.deepEqual([c('GK', 'GK'), c('DEF', 'CB'), c('DEF', 'FB'), c('MID', 'CM'), c('MID', 'AM'), c('MID', 'WM'), c('ATT', 'ST'), c('ATT', 'WM')], [2, 3, 3, 3, 1, 2, 3, 1], t.name);
+    // Pr. hold og kæde: enhver stopper var mindst lige så høj som enhver back før migreringen.
+    for (const [line, hi, lo] of [['DEF', 'CB', 'FB'], ['ATT', 'ST', 'WM']]) {
+      const H = t.squad.filter((p) => p.line === line && p.position === hi), L = t.squad.filter((p) => p.line === line && p.position === lo);
+      for (const a of H) for (const b of L) assert.ok(before.get(a.id) >= before.get(b.id), `${t.name} ${line}`);
+    }
+  }
+  const players = out.league.teams.flatMap((t) => t.squad);
+  for (const pos of Object.keys(HEIGHT_BY_POS)) {
+    const ps = players.filter((p) => p.position === pos);
+    if (!ps.length) continue;
+    const t = HEIGHT_BY_POS[pos], mean = ps.reduce((a, p) => a + p.heightCm, 0) / ps.length;
+    assert.ok(ps.every((p) => p.heightCm >= t.min && p.heightCm <= t.max), pos);
+    assert.ok(Math.abs(mean - (t.mid + 0.75)) <= 1.5, `${pos} snit ${mean}`);
+    // Rang i positionen (over hele ligaen) bevares
+    for (const a of ps) for (const b of ps) if (before.get(a.id) > before.get(b.id)) assert.ok(a.heightCm >= b.heightCm, `${pos}: ${a.shortName} vs ${b.shortName}`);
+  }
+  const cbMean = players.filter((p) => p.position === 'CB').reduce((a, p) => a + p.heightCm, 0) / 24;
+  const fbMean = players.filter((p) => p.position === 'FB').reduce((a, p) => a + p.heightCm, 0) / 24;
+  assert.ok(cbMean - fbMean >= 12, `CB ${cbMean} vs FB ${fbMean} (v3.7: samme kæde-fordeling, forskel ≈5)`);
+  const now = players.find((p) => p.id === someone.id).heightCm;
+  assert.notEqual(now, old, 'testdata: højden ændres');
+  assert.equal(out.league.lastRound.matches[0].events.at(-1).text, `✈️ Stærk luftduel: ${tag} (${now} cm) stiger højest.`);
+  assert.equal(out.league.scouting[viewer][someone.id][0], `${someone.shortName} (${now} cm) ruver.`);
+});
+test('fixture skema 4 indlæses (parseSave) – positioner sat, intet tabt, migreret fra 4', () => {
+  const r = parseSave(FIXTURE4);
+  assert.ok(r.ok, r.error);
+  assert.equal(r.migratedFrom, 4);
+  const d = JSON.parse(FIXTURE4);
+  assert.equal(r.state.league.teams.length, 8);
+  assert.equal(r.state.league.leagueMetadata.round, d.league.leagueMetadata.round);
+  assert.ok(r.state.league.teams.every((t) => t.squad.length === 18 && t.squad.every((p) => ['GK', 'CB', 'FB', 'CM', 'WM', 'AM', 'ST'].includes(p.position))));
+  assert.equal(JSON.stringify(r.state.league.teams[0].tactics.lineupSlots), JSON.stringify(d.league.teams[0].tactics.lineupSlots));
 });

@@ -39,11 +39,19 @@ begrundelse).
   positioning, intercepting, goalkeeping`, vægtet efter kæde (GK goalkeeping
   base+2, andre 1–2; finishing for ikke-ATT 2–9). `rollStat` er
   trekantsfordelt og klemt til 1–20.
-- Højde (v3.7, brugerens dokument "Spillerhøjde i Superligaen": ligasnit ≈184 cm, trupper
-  182,9–187,5, 169–201; v3.6's −5 cm "holder ikke"): kædens midte MV 192, FOR 186, MID 179,5,
-  ANG 181 + holdprofil −1,5…+3 cm; tre terninger −6..6 (MV −4..4), klemt 168–201. Bred spredning
-  i hver kæde (brugeren: ikke alle tæt på positionens snit) – ligasnit ≈184,2, spredning ≈7,5.
-  Skema 3→4 lægger eksisterende ligaer om efter rang i hver kæde (`heightAtQuantile`).
+- **Naturlig position (v3.8)**, offentlig: MV (GK), CB, Back (FB), CM, Kant (WM), OM (AM),
+  ANG (ST). Truppen: 2 MV; forsvar 3 CB + 3 Back; midtbane 3 CM + 2 Kant + 1 OM; angreb 3 ANG
+  + 1 Kant – fordelt pr. trøjenummer, så standard-11'eren passer til 4-4-2 (#2/#5 Back,
+  #3/#4 CB, #6/#10 Kant, #7/#8 CM, #9/#11 ANG; bænk #13 CB, #14 Back, #15 CM, #16 OM, #17 ANG,
+  #18 Kant). Positionen afgør kun højden; løbet i kampen følger PLADSEN (§6), og motoren
+  vælger stadig spillere efter kæde. Tildeles aldrig ud fra evner (de er private).
+- Højde (brugerens dokument "Spillerhøjde i Superligaen": ligasnit ≈184 cm, trupper
+  182,9–187,5, 169–201). Fra v3.8 pr. naturlig position efter dokumentets tabel: midte MV 194
+  (spænd 188–201), CB 190 (184–198), ANG 186,5 (178–196), CM/OM 183,5 (175–192), Back/Kant 175,5
+  (169–183) + holdprofil −1,5…+3 cm; tre terninger −3..3 (ANG og CM/OM −4..4), klemt til
+  positionens spænd. Ligasnit målt ≈184,3, spredning i hele truppen ≥6 (brugeren: ikke alle tæt
+  på snittet). (v3.7 var pr. kæde: MV 192, FOR 186, MID 179,5, ANG 181.)
+  Skema 3→4 brugte v3.7's tabel (frosset i `HEIGHT_V37`); skema 4→5 se §7.
   Springkraft 1–20.
 - **Luftduel** `aerialPower = round(heightScore·0,35 + jump·0,35 +
   strength·0,15 + positioning·0,15)`, `heightScore = clamp(1..20,
@@ -78,7 +86,7 @@ Clues opstår i kampe. **Rettet:** v2.5b gemmer clues på modstanderens
 spillerobjekt; de skal ligge hos den der observerer.
 
 ## 3. Hvem ser hvad (anti-spionage)
-- Offentligt: navn ("F. Efternavn" på banen), rygnummer, kæde, alder, højde, friskhed, skadesstatus 🚑, stjerner (★☆☆☆☆–★★★★★), holdets startformation. Intet andet om andre holds taktik (brugerens beslutning, afviger bevidst fra v2.5): ingen faser, planer, Hvis-Så-regler eller "typisk stil" – heller ikke i ligatabellen, kamphovedet, det taktiske oplæg eller referatet. Et modstanderholds Hvis-Så-skift vises kun som "omorganiserer sig". Referatet navngiver kun dine egne taktikvalg. (Trin 1 lægger teksterne i motoren med det menneskestyrede hold som seer; trin 2 skal gøre dem seer-afhængige.)
+- Offentligt: navn ("F. Efternavn" på banen), rygnummer, kæde, naturlig position, alder, højde, friskhed, skadesstatus 🚑, stjerner (★☆☆☆☆–★★★★★), holdets startformation. Intet andet om andre holds taktik (brugerens beslutning, afviger bevidst fra v2.5): ingen faser, planer, Hvis-Så-regler eller "typisk stil" – heller ikke i ligatabellen, kamphovedet, det taktiske oplæg eller referatet. Et modstanderholds Hvis-Så-skift vises kun som "omorganiserer sig". Referatet navngiver kun dine egne taktikvalg. (Trin 1 lægger teksterne i motoren med det menneskestyrede hold som seer; trin 2 skal gøre dem seer-afhængige.)
 - Kun ejer: 9 evner, spring, luftduel, arketype, løn/værdi, kasse, de præcise fasevalg og Hvis-Så-regler,
   eksakt karakter, mod-kunnen.
 - Ingen: VAR-profil (kun via clues).
@@ -127,7 +135,9 @@ Tick hvert 3. minut (1..90).
   `node tools/measure-duels.mjs 100`) ca. 59 % med ligaens taktikker, ca. 53 % neutralt
   og 71–77 % med den rigtige mod-stil. Vinder forsvaret duellen, er bolden tabt:
   ingen chance for angriberen i samme tick (1,76 → ca. 1,4 mål pr. kamp; hovedstødsmål
-  uændret ca. 0,05 pr. kamp med både gamle og nye højder ved N = 100). Referatet skrives fra brugerens hold: ✅/❌ efter om DIN
+  uændret ca. 0,05 pr. kamp med både gamle og nye højder ved N = 100; v3.8's højde pr.
+  position: 1,43 mål og 0,14 hovedstød pr. kamp mod v3.7.1's 1,39/0,09 ved N = 20 – højere
+  angribere, lavere backs). Referatet skrives fra brugerens hold: ✅/❌ efter om DIN
   taktik virkede, kun dine egne valg navngives; pause-analysen tæller dine dueller.
 - Positions-vurdering 25 %: ude af zone (>28) −0,45 karakter (presspiller
   +0,35), ellers +0,40.
@@ -176,14 +186,19 @@ Tick hvert 3. minut (1..90).
   38 %, dribletur 22 %, VAR 19 %; før vandt VAR altid). Bevidst: at en
   modstanders mål kaldes "dribletur"/"langskud" røber svagt fart/afslutning – på linje med de
   eksisterende ord i describeFinish.
-- **Løbedistance og topfart (v3.7)** pr. karakter: km/90 = kæde-basis (MV 5,5, FOR 9,8, MID
-  11,2, ANG 10,0) · (0,9 + STA·0,01) · pres (gegenpres 1,06, lav blok 0,96) · støj ±4 % ·
+- **Løbedistance og topfart (v3.7; pr. plads fra v3.8)** pr. karakter: km/90 = basis for den
+  PLADS (formationsrolle), spilleren står på – også en indskifter (dokumentets "fysisk
+  belastning"): CM/CDM 11,8 · LWB/RWB/LM/RM/LW/RW 11,0 · CAM/CF 10,8 · LB/RB 10,6 · ST 10,0 ·
+  CB 9,5 · MV 5,5 (uden rolle: kædens plads – FOR = CB, MID = CM, ANG = ST) · (0,9 + STA·0,01) · pres (gegenpres 1,06, lav blok 0,96) · støj ±4 % ·
   min/90; topfart 25 + PAC·0,45 ± 1 (MV −3), mindst 10 min. Private (RATING_PRIVATE_FIELDS);
   spillerkortet viser km pr. 90 min og bedste topfart for sæsonen.
 - **Højintenst løb (v3.7.1**, brugeren: "hvor stor en andel af deres løb der er højintense løb"):
-  andel (over ca. 20 km/t) = (kæde-basis MV 2/FOR 7/MID 9/ANG 11 % + (PAC−10)·0,4) · pres (gegenpres 1,15, lav blok
+  andel (over ca. 20 km/t) = (rolle-basis WB/kant 13, LB/RB 11, ST 11, CAM/CF 10, CM/CDM 8, CB 5,
+  MV 2 % (v3.7.1 pr. kæde: MV 2/FOR 7/MID 9/ANG 11) + (PAC−10)·0,4) · pres (gegenpres 1,15, lav blok
   0,9) · (0,8 + 0,2·friskhed/100) ± 1, klemt 1–20 % (topdivisioner ≈7–12 % for markspillere;
-  målt med `node tools/measure-duels.mjs 20 saeson`: MV 2,3, FOR 7,6, MID 9,9, ANG 11,8 %).
+  målt med `node tools/measure-duels.mjs 20 saeson`, v3.8 – hele kampe: CM 12,1 km / 8,9 % HI,
+  WB/kant 11,2 / 13,8, CAM/CF 11,3 / 10,9, Back 10,9 / 12,2, ANG 10,0 / 11,6, CB 9,7 / 5,5,
+  MV 5,6 / 2,2 – dokumentets rækkefølge: CM længst, wingbacks/kanter flest HI, CB færrest).
   Vises som "N % HI" i karakterarket, "N % højintenst" for dit holds løber og sæsonandelen på
   spillerkortet (egen nævner `hiDistSum`, så v3.7.0-ligaer ikke viser for lavt). Ingen andel under
   10 min spilletid. Privat (røber fart og pres). Bund 1 % (en målmand ligger på ≈2 %).
@@ -217,7 +232,11 @@ Tick hvert 3. minut (1..90).
 - Skema 3 (v3.6) migrerer eksisterende ligaer: mod-kunnen ×0,55 ind i puljen,
   højde −5 cm. Skema 4 (v3.7) lægger højderne om efter rang i hver kæde til Superliga-
   fordelingen (`heightAtQuantile`) – −5 cm-trinnet gælder altså ikke længere i sidste ende;
-  scouting- og referattekster med cm følger med.
+  scouting- og referattekster med cm følger med. Skema 5 (v3.8): hver spiller får en naturlig
+  position – pr. hold og kæde efter højde (de højeste bliver CB/ANG, de laveste Back/Kant, den
+  midterste MID-spiller OM, som BLUEPRINT's forhold; `assignPositions`) – og højden lægges om
+  efter rang i positionen over hele ligaen (`heightAtQuantile(position)`). Bevidst: en kort
+  luftspiller i forsvaret bliver Back og ca. 10 cm lavere.
 - UI (brugerens valg, afviger fra v2.5): kolonne 🧠Mod viser spillerens tre
   egne værdier "gegenpress · lav blok · VAR-linje" (sorterer på gennemsnittet;
   "??" for modstandere) – ingen samlet % mod en bestemt modstander, da den kan
@@ -225,7 +244,7 @@ Tick hvert 3. minut (1..90).
   +XP-badge. Motoren bruger stadig mod-kunnen mod modstanderens stil.
 
 ## 8. Regneark (scouting-matrix)
-20 kolonner: Pos/#, Spiller, Kæde, Alder, Frisk/🚑, Højde (offentlige), Spring, ✈Luft,
+21 kolonner: Pos/#, Spiller, Kæde, Natur (naturlig position, v3.8), Alder, Frisk/🚑, Højde (offentlige), Spring, ✈Luft,
 PAC, STA, STR, BAL, PAS, FIN, POS, INT, GK, Gns, ⭐Vurd, 🧠Mod, Arketype/Note,
 Byt. Klik = sortér, igen = vend; nyt klik på tal-kolonne starter faldende.
 Standard: start-slot 0–10, bænk 100+rygnr. Heatmap 15–20 smaragd, 12–14
@@ -243,8 +262,9 @@ visning". Sortering på kopi med `origIdx`.
   backup-nøgle, FØR der tilbydes ny liga, og fejlen vises. Hver PR, der
   ændrer skemaet, tilføjer et fixture gemt af den forrige version og en
   test, der indlæser det med truppen intakt. Skema 1 → 2 (v3.4, Hvis-Så) og
-  2 → 3 (v3.6, mod-kunnen-pulje og højde) – fixtures `tests/fixtures/save-schema1.json`
-  og `save-schema2.json`.
+  2 → 3 (v3.6, mod-kunnen-pulje og højde), 3 → 4 (v3.7, Superliga-højder), 4 → 5 (v3.8,
+  naturlig position og højde pr. position) – fixtures `tests/fixtures/save-schema1.json` …
+  `save-schema4.json`.
 - Eksport/import af hele spillet som JSON-fil (backup og flytning mellem
   browsere/domæner).
 - Gamle data fra vejleaa.dk kan ikke flyttes (localStorage er bundet til
