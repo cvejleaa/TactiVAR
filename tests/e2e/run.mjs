@@ -353,13 +353,13 @@ try {
   check('Efter slutfløjt: Liga-fanen viser avisen og ingen afspilningsbesked', (await g.isVisible('#gazette')) && (await g.locator('#booked-league').count()) === 0);
   // v3.10: statistik nederst – fire sektioner, tal = gemte data, andre holds private tal findes ikke
   const secs = await g.locator('#stats details.stats-sec > summary').allTextContents();
-  check('Statistik: fire sektioner med "fra runde 1" (spillere åben, resten sammenfoldet)', secs.length === 4 && secs[0].startsWith('Spillere (fra runde 1)') && secs[3].startsWith('Dit hold') && (await g.locator('#stats-players').getAttribute('open')) !== null && (await g.locator('#stats-teams').getAttribute('open')) === null, secs.join(' | '));
+  check('Statistik: fire sektioner med "fra runde 1" (spillere åben, resten sammenfoldet)', secs.length === 4 && secs[0].startsWith('Spillere (fra runde 1)') && secs[3].startsWith('Dit hold (privat, fra runde 1)') && (await g.locator('#stats-players').getAttribute('open')) !== null && (await g.locator('#stats-teams').getAttribute('open')) === null, secs.join(' | '));
   const scorers = await g.locator('#stats .stat-list[data-key="sGoals"] li strong').allTextContents();
   const goalsSaved = await g.evaluate(() => { const L = JSON.parse(localStorage.getItem('tactivar_save')).league; return L.teams.flatMap((t) => t.squad.map((p) => p.sGoals)).filter((n) => n > 0).sort((a, b) => b - a).slice(0, 5); });
   check('Statistik: topscorerlisten matcher de gemte sæsonmål', JSON.stringify(scorers.map((t) => Number(t.trim()))) === JSON.stringify(goalsSaved), `${scorers.join(',')} / ${goalsSaved.join(',')}`);
   await g.click('#stats-teams > summary');
   const teamHead = await g.locator('#team-stats thead th').allTextContents();
-  check('Holdtal: ingen kolonner, der kan røbe taktik (skud/xG/kontra/hjørne/VAR)', teamHead.length === 8 && !teamHead.some((t) => /skud|xg|kontra|hjørne|var/i.test(t)) && (await g.locator('#team-stats tbody tr').count()) === 8, teamHead.join('|'));
+  check('Holdtal: ingen kolonner, der kan røbe taktik (skud/xG/kontra/hjørne/VAR)', teamHead.length === 9 && !teamHead.some((t) => /skud|xg|kontra|hjørne|var-/i.test(t)) && (await g.locator('#team-stats tbody tr').count()) === 8, teamHead.join('|'));
   await g.click('#stats-mine > summary');
   check('Dit hold: afslutninger, xG og frie løb står kun her', (await g.textContent('#my-team-stats')).includes('xG') && (await g.locator('#my-players tbody tr').count()) === 18);
   await g.click('#stats-flow > summary');

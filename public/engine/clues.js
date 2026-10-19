@@ -49,7 +49,7 @@ const GOAL_TEXTS = {
   ],
   COUNTER: [
     (s, a, m) => `Kontra i ${m}. minut: bolden blev erobret, ${a} sendte den i dybden, og ${s} løb fra alle og scorede.`,
-    (s, a, m) => `Fra eget felt til mål på ti sekunder i ${m}. minut – ${s} sluttede kontraen af.`,
+    (s, a, m) => `Fra eget felt til mål på ti sekunder i ${m}. minut – ${a} satte ${s} i gang, og han sluttede kontraen af.`,
     (s, a, m) => `Omstilling i topklasse i ${m}. minut: ${a} fandt ${s}, der kom løbende og trillede den ind.`,
   ],
   CUTBACK: [

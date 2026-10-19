@@ -146,18 +146,20 @@ Tick hvert 3. minut (1..90).
   +0,35), ellers +0,40.
 - Offside-fælde 45 % hvis ikke OFF. Offside-fælde og omstilling nævnes kun i teksten for dit eget hold; hos modstandere står blot "fanges offside" / "erobrer bolden". Offside giver frispark – ingen kontra (bolden er død).
 - **Kontra (v3.9)** – én rigtig mekanisme (det tidligere COUNTER-label er fjernet). Efter vundet
-  pres (ikke offside) og efter en opsnappet dribletur: p = {Få 0,03, Normal 0,08, Mange 0,2}
-  (taberens løb uden bold) · taberens "Ved boldtab" (Genpres 0,7 / Fald tilbage 1) · vinderens
+  pres (ikke offside) og efter en opsnappet dribletur: p = {Få 0,03, Normal 0,08, Mange 0,22}
+  (taberens løb uden bold) · taberens "Ved boldtab" (Genpres 0,6 / Fald tilbage 1) · vinderens
   "Ved erobring" (Lynkontra 1,8 / Hold på bolden 0,4) · (1 + 0,05 pr. LB/RB/LWB/RWB-plads ved
   Mange), afrundet til 3 decimaler (`counterChance`). Findes på alle trin – én kontra røber intet.
-  Afslutning: vinderens angriber FIN + rnd·8 + 1 mod MV GK + rnd·8; mål = COUNTER.
+  Afslutning: vinderens angriber FIN + rnd·8 + 4 mod MV GK + rnd·8; mål = COUNTER, og oplægsgiveren i
+  teksten får assist (v3.10).
   "Hold på bolden" uden kontra giver holdets næste opbygning +2. Genpres koster km ·1,04 for alle
   markspillere (friskhed). Tekster kun for dit hold: Lynkontra + kontra "Din lynkontra sættes
   straks i gang", uden "… løber ind i et organiseret forsvar"; Hold + kontra "Dit hold ser hullet
   og går direkte", uden "Dit hold falder til ro på bolden"; taber du på Mange: "Din RWB … er højt
   oppe efter sit løb". Modstanderens indstilling nævnes aldrig.
-- Frispark 6 % med gult kort (−0,35); heraf skade 40 %, 1–3 kampe, auto-
-  indskiftning fra bænken.
+- Frispark 6 % (−0,35): heraf skade 40 % (1–3 kampe, auto-indskiftning fra bænken, intet kort),
+  ellers taktisk frispark med gult kort. Fra v3.10 desuden gult kort på 21 % af de "stille" frispark
+  (Superligaen ≈ 2 gule pr. hold pr. kamp) – se Dødbolde.
 - Chance 30 % (v3.9: Få 26 %, Normal 30 %, Mange 36 %); xG 0,13–0,35 pr. afslutning. Høje bolde 55 % ved
   HIGH_CROSSES: `aerial + rnd·6 > forsvarer.aerial + gk·0,4 + rnd·…`.
 - VAR-tjek ved roll < 0,22: `varPulse + vsTrapLong·0,025 + rnd·6 > forsvarer.POS + rnd·…`.
@@ -171,8 +173,9 @@ Tick hvert 3. minut (1..90).
   Dødbolds-luftduellen er den samme som i åbent spil, med forsvaret +0,5. "Stille" frispark 58 % pr.
   tick tælles uden hændelse. Gult kort kun ved det taktiske frispark (skade-frisparkets tekst nævner
   intet kort). Kontramål giver assist til den nævnte oplægsgiver; kontra-afslutningen får +4.
-  **Målt** (`node tools/measure-duels.mjs 100`): 2,89 mål pr. kamp (Superligaen ≈ 2,8; v3.9 1,44),
-  22 % af målene på dødbolde, 0,25 straffe pr. kamp (76 % scoret), 4,4 hjørnespark, 20,8 frispark.
+  **Målt** (`node tools/measure-duels.mjs 100`): 2,80 mål pr. kamp (Superligaen ≈ 2,8; v3.9 1,44),
+  23 % af målene på dødbolde, 0,27 straffe pr. kamp (77 % scoret), 4,2 hjørnespark, 20,9 frispark,
+  2,1 gule kort pr. hold pr. kamp (Superligaen ≈ 2).
 - **Fuldtids-analyse (v3.10**, brugeren: "Ved pausen får jeg information om hvordan min opbygning har
   klaret sig, men det får jeg ikke af vide ved fuldtid"): kun din kamp – besiddelse, afslutninger,
   opbygning og pres for hele kampen, dødbolde (frispark i skudafstand, hjørne, straffe) og frispark
@@ -183,14 +186,14 @@ Tick hvert 3. minut (1..90).
   almindelige afslutning (ikke høje bolde/VAR) trækkes en løber blandt de 10 markspillere efter
   pladsens vægt (Få/Normal/Mange): ST/CF 3/3/3, LM/RM/LW/RW/CAM 2/2,5/3, CM/CDM 1/1,5/2,5,
   LB/RB/LWB/RWB 0,2/0,8/2, CB 0,05/0,1/0,3. Løbet: (POS + PAC·0,5)·friskhed + rnd·8 + {−3/0/+4}
-  mod forsvarerens (POS + INT·0,5)·friskhed + rnd·8 + (Få hos forsvaret: +4 – flere bag bolden).
+  mod forsvarerens (POS + INT·0,5)·friskhed + rnd·8 + (Få hos forsvaret: +5 – flere bag bolden).
   Tabt → almindelig afslutning som før. Vundet → beslutning efter zone (pladsen 20 frem: kant
   x < 28/> 72, dybt y ≥ 60, højt y ≤ 35, ellers mellem) og evner over 6: skud FIN·{kant 1, dybt
   0,6, mellem 1,5, højt 3}, aflevering PAS·{3/2,5/1,5/1} (·1,3 fra kanten ved dine lave
   cutbacks), dribletur (PAC+BAL)/2·{2/0,5/1,5/1}. Skud: LONGSHOT (højt oppe COMBINATION).
   Aflevering: modtager ST/CAM/CM afslutter, løberen får oplæg; fra kanten CUTBACK. Dribletur:
   (PAC+BAL)·friskhed + rnd·8 mod (POS + STR·0,5)·friskhed + rnd·8 + 3 – vundet DRIBBLE, tabt =
-  opsnapning (intet skud, kontra-tjek). Afslutningen efter et vundet løb får +3,5. Kun DINE løb
+  opsnapning (intet skud, kontra-tjek). Afslutningen efter et vundet løb får +2 (v3.9: +3,5). Kun DINE løb
   fortælles ("✅ #3 … løber sig fri på kanten og lægger den tværs til #9"); modstanderens mål
   beskrives som før. `freeRuns`/`freeRunsWon` er private ("2/3 fri" i dit karakterark), og en
   linje ved slutfløjt opsummerer dit holds løb og kontraer imod i alt. Mange koster km ·1,03 og
@@ -244,6 +247,10 @@ Tick hvert 3. minut (1..90).
   COUNTER 5,5 + PAC·0,2, VAR 5,5 + rnd·5; målt (`… 60 saeson`): kontra 24 %, VAR 21 %, hovedstød
   14 %, cutback 13 %, dribletur 12 %, langskud 8 %, kombination 7 % – ingen type over 30 %
   (v3.8: langskud 37 %). Langskud er blevet sjældnere med målmandsfordelen.
+  **v3.10:** nye typer PENALTY (3 + rnd·3 – sjældent rundens flotteste), FREEKICK (11 + FIN·0,3 +
+  rnd·4), CORNER og SETPIECE (4 + luft·0,35 + rnd·4); HEADER er nu kun åbent spil. Målt (`… 60
+  saeson`): langskud 22 %, frispark 20 %, dribletur 19 %, cutback 17 %, hjørnespark 8 %, hovedstød
+  4 %, kombination 3 %, kontra 3 %, frisparksindlæg 2 %, VAR 2 % – ingen type over 30 %.
 - **Løbedistance og topfart (v3.7; pr. plads fra v3.8)** pr. karakter: km/90 = basis for den
   PLADS (formationsrolle), spilleren står på – også en indskifter (dokumentets "fysisk
   belastning"): CM/CDM 11,8 · LWB/RWB/LM/RM/LW/RW 11,0 · CAM/CF 10,8 · LB/RB 10,6 · ST 10,0 ·

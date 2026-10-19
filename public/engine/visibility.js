@@ -43,8 +43,9 @@ export function canSeeField(field, viewerOwnsTeam) {
 // Holdtal i statistikken (v3.10, QC): sæsonsummer lægger støjen sammen væk, så tal, der følger en
 // skjult indstilling, vises kun for dit eget hold – skud/xG (løb uden bold), kontraer (omstilling,
 // løb, genpres), hjørnespark og VAR-tjek (høje bolde). Andre hold: det, der ikke røber en indstilling.
-export const TEAM_STATS_PUBLIC = ['sMatches', 'possSum', 'fouls', 'foulsWon', 'yellows', 'penalties', 'penaltyGoals', 'setPieceGoals', 'cleanSheets'];
-export const TEAM_STATS_OWNER = ['shots', 'onTarget', 'xg', 'freeKicks', 'corners', 'headerGoals', 'counterGoals', 'counterGoalsAgainst', 'varChecks'];
+export const TEAM_STATS_PUBLIC = ['sMatches', 'possSum', 'fouls', 'foulsWon', 'yellows', 'penalties', 'penaltyGoals', 'setPieceGoals', 'headerGoals', 'cleanSheets'];
+// Hovedstødsmål er offentlige, fordi spillernes hovedstødsmål er det (summen kan regnes ud).
+export const TEAM_STATS_OWNER = ['shots', 'onTarget', 'xg', 'freeKicks', 'corners', 'counterGoals', 'counterGoalsAgainst', 'varChecks'];
 export function viewTeamStats(row, viewerOwnsTeam) {
   const out = { teamId: row.teamId, teamName: row.teamName };
   for (const k of TEAM_STATS_PUBLIC) out[k] = row[k];

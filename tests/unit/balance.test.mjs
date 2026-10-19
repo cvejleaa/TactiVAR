@@ -58,7 +58,7 @@ test('løb pr. plads følger dokumentet: CM længst, wingbacks/kanter flest HI, 
 // v3.8 havde ingen forskel (netto ens) – hvert krav nedenfor er rødt uden mekanikken.
 test('løb uden bold: Mange er bedst mod Hold på bolden, Få bedst mod Lynkontra; genpres dæmper kontraer', async () => {
   const { measureRuns } = await import('../../tools/measure-duels.mjs');
-  const N = 300; // 2400 kampe pr. opsætning – samme som målingen i spec (Hold +0,08/+0,03/+0,02, Lynkontra −0,14/−0,05/−0,01)
+  const N = 300; // 2400 kampe pr. opsætning – samme som målingen i spec §5 (v3.10: Hold +0,10/−0,06/−0,12, Lynkontra −0,31/−0,16/−0,09)
   const r = (o) => measureRuns(o, N);
   const nH = r({ oppWon: 'KEEP_POSSESSION' }), mH = r({ runs: 'MANY', oppWon: 'KEEP_POSSESSION' });
   const nL = r({ oppWon: 'FAST_COUNTER' }), mL = r({ runs: 'MANY', oppWon: 'FAST_COUNTER' }), fL = r({ runs: 'FEW', oppWon: 'FAST_COUNTER' });

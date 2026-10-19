@@ -59,7 +59,7 @@ export const KEEPER_EDGE = 0;
 // Kun til holdet med bolden i en tick uden boldtab. Pr. tick: straffe 1,1 %, frispark i skudafstand
 // 4,3 % (37 % direkte skud, ellers indlæg); hjørnespark efter redning/clearet luftduel 47 %;
 // "stille" frispark (kun talt) 58 %. Kalibreret med `node tools/measure-duels.mjs N`.
-export const PENALTY_P = 0.011, FREEKICK_P = 0.061, FK_SHOT_P = 0.37, CORNER_P = 0.9, QUIET_FOUL_P = 0.58;
+export const PENALTY_P = 0.011, FREEKICK_P = 0.061, FK_SHOT_P = 0.37, CORNER_P = 0.9, QUIET_FOUL_P = 0.58, QUIET_CARD_P = 0.21;
 export const PENALTY_BONUS = 2.3, FK_SHOT_EDGE = 4, SETPIECE_DEF_EDGE = 0.5;
 // Zonen er der, løbet ender: formationens (eller den trukne) plads rykket 20 frem.
 export function runZone(pos) {
@@ -484,7 +484,17 @@ export function simulateMatch(home, away, rng, opts = {}) {
     }
 
     // "Stille" frispark – kun talt, ingen hændelse (realistisk antal pr. kamp).
-    if (rng.chance(QUIET_FOUL_P)) st[k(def, 'Fouls')]++;
+    if (rng.chance(QUIET_FOUL_P)) {
+      st[k(def, 'Fouls')]++;
+      // Hvert femte giver gult kort (v3.10, QC: ellers ≈0,5 gule pr. hold – Superligaen ≈2).
+      if (rng.chance(QUIET_CARD_P)) {
+        const dRq = def === H ? hR : aR, fouler = rng.pick(dRq.defs.concat(dRq.mids));
+        if (sheet.entries[fouler.id] && !sheet.entries[fouler.id].yellowCard) {
+          sheet.entries[fouler.id].yellowCard = true; sheet.adjust(fouler.id, -0.2);
+          addEv(min, 'FOUL', 'PLAY', def.isHome, false, 'Gult kort', `🟨 [${def.team.name}] Gult kort til ${tag(fouler)} for et frispark.`);
+        }
+      }
+    }
     // Dødbolde til holdet med bolden (v3.10): straffe, frispark i skudafstand – ikke efter tabt bold.
     if (!ballLost && rng.chance(PENALTY_P)) penalty(att, def, att === H ? hR : aR, def === H ? hR : aR, min);
     else if (!ballLost && rng.chance(FREEKICK_P)) freeKick(att, def, att === H ? hR : aR, def === H ? hR : aR, min);

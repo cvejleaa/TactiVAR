@@ -1312,8 +1312,10 @@ test('kampen: også en INDSKIFTER løber efter den plads han kommer ind på (ikk
     for (const [list, team] of [[m.ratings.home, L.teams[0]], [m.ratings.away, L.teams[1]]]) {
       for (const e of list.filter((x) => x.role.startsWith('SUB') && x.hiShare != null)) {
         const pl = team.squad.find((p) => p.id === e.playerId);
-        const exp = (hi) => (hi + (pl.skills.pace - 10) * 0.4) * PRESS_HI[team.tactics.phases.phase2_defending.pressingHeight] * (0.8 + 0.2 * pl.freshness / 100);
         const slotRole = slotRoles(team)[e.slot];
+        // v3.9-prisen for løb uden bold (Mange ·1,08 / Få ·0,94) gælder LB/RB/LWB/RWB/CM/CDM/ST/CF
+        const runsF = ['LB', 'RB', 'LWB', 'RWB', 'CM', 'CDM', 'ST', 'CF'].includes(slotRole) ? ({ FEW: 0.94, NORMAL: 1, MANY: 1.08 }[team.tactics.phases.phase1_buildUp.offBallRuns] ?? 1) : 1;
+        const exp = (hi) => (hi + (pl.skills.pace - 10) * 0.4) * PRESS_HI[team.tactics.phases.phase2_defending.pressingHeight] * runsF * (0.8 + 0.2 * pl.freshness / 100);
         const hiSlot = RUN_HI(slotRole), hiLine = RUN_HI(null, pl.line);
         assert.ok(Math.abs(e.hiShare - exp(hiSlot)) <= 1.05, `${seed} indskifter på ${slotRole} (kæde ${pl.line}): ${e.hiShare} vs forventet ${exp(hiSlot).toFixed(1)}`);
         checked++; if (Math.abs(exp(hiSlot) - exp(hiLine)) >= 3) differing++;
@@ -1749,8 +1751,8 @@ test('statistik: to runder bogføres eksakt – spillertal fra karakterarket, ho
   assert.equal(L.history[1].biggest, null);
   // Synlighed: andre hold ser ikke tal, der følger en skjult indstilling
   const opp = viewTeamStats(sh, false), own = viewTeamStats(sh, true);
-  for (const k of ['shots', 'onTarget', 'xg', 'corners', 'headerGoals', 'counterGoals', 'counterGoalsAgainst', 'varChecks', 'freeKicks']) { assert.ok(!(k in opp), k); assert.ok(k in own, k); }
-  for (const k of ['possSum', 'fouls', 'foulsWon', 'yellows', 'penalties', 'penaltyGoals', 'setPieceGoals', 'cleanSheets', 'sMatches']) assert.equal(opp[k], sh[k], k);
+  for (const k of ['shots', 'onTarget', 'xg', 'corners', 'counterGoals', 'counterGoalsAgainst', 'varChecks', 'freeKicks']) { assert.ok(!(k in opp), k); assert.ok(k in own, k); }
+  for (const k of ['possSum', 'fouls', 'foulsWon', 'yellows', 'penalties', 'penaltyGoals', 'setPieceGoals', 'headerGoals', 'cleanSheets', 'sMatches']) assert.equal(opp[k], sh[k], k); // hovedstødsmål: offentlige pr. spiller → også pr. hold
   const pv = viewPlayer(p, false);
   assert.equal(pv.sGoals, 2); assert.equal(pv.sPenaltyGoals, 1);
   assert.ok(!('freeRunsSum' in pv) && !('freeRunsWonSum' in pv));
@@ -1762,4 +1764,19 @@ test('statistik: historikken har et loft på 60 runder', async () => {
   const [H, A] = L.teams;
   for (let r = 1; r <= HISTORY_MAX + 3; r++) commitRound(L, { round: r, gazette: null, matches: [{ homeId: H.id, awayId: A.id, homeName: H.name, awayName: A.name, homeGoals: 0, awayGoals: 0, homeVarNet: 0, observations: [], injuries: [], goalsPool: [], stats: {}, ratings: { home: [], away: [] } }] }, createRng(r));
   assert.equal(L.history.length, 60); assert.equal(L.history[0].round, 4);
+});
+test('kontramål giver assist til den oplægsgiver, teksten nævner (v3.10 – statistik = referat)', () => {
+  const r = counters({ script: { 0.032: true } });
+  const helper = mids(r.def)[0];
+  assert.equal(r.kinds.length, 30);
+  assert.equal(r.m.ratings.away.find((e) => e.playerId === helper.id).assists, 30);
+  // Alle tre kontra-tekster nævner oplægsgiveren
+  for (const v of [0, 0.4, 0.8]) assert.ok(describeGoal('COUNTER', 'SKYTTE', 'OPLÆG', 10, { next: () => v }).includes('OPLÆG'), String(v));
+});
+test('goalSpectacle for dødbolde (v3.10): straffe lavt, frispark højt, hjørne/indlæg efter luftstyrke', () => {
+  const r = (v) => ({ next: () => v });
+  assert.equal(goalSpectacle('PENALTY', {}, 50, r(0.5)), 4.5);                       // 3 + 1,5
+  assert.equal(goalSpectacle('FREEKICK', { finishing: 14 }, 50, r(0.5)), 17.2);      // 11 + 4,2 + 2
+  assert.equal(goalSpectacle('CORNER', { aerialPower: 14 }, 50, r(0.5)), 10.9);      // 4 + 4,9 + 2
+  assert.equal(goalSpectacle('SETPIECE', { aerialPower: 10 }, 50, r(0.5)), 9.5);     // 4 + 3,5 + 2
 });
