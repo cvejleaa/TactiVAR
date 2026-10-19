@@ -14,3 +14,4 @@
 - Avis/opsummeringer, der viser spillerdata, skal gennem visibility.js – ikke egne "isMine ? tal : stjerner".
 - Filtre skal have paritet med kilden (fx "Kun taktik" viste ikke Hvis-Så-skift, fordi TRIGGER er HIGHLIGHT).
 - Bogfør-før-afspil er rigtigt for data, men spoiler tabellen og de andre kampe – sig det i UI'et.
+- Afledte referattekster, der forgrener sig på modstanderens indstillinger (offside-fælde, omstilling), lækker. Grep på `phases` i match.js ved hver ændring af tekster.

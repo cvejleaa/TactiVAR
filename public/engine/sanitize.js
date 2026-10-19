@@ -6,6 +6,17 @@ import { defaultTactics, defaultStarterIds, emptyStanding, BOT_PROFILES, aerialB
 
 const PLAYER_DEFAULTS = { freshness: 100, injuryMatchesLeft: 0, lastRating: 0, ratingSum: 0, ratingGames: 0, publicStars: 0, seasonAgeCounter: 1, archetype: null };
 
+// Hvis-Så-regel i skema 2: { condition: TRAILING|LEADING|DRAW, margin 1–5, newFormation, newPlan }.
+// Skema 1 havde LEADING_BY_1 (præcis 1 foran) og TRAILING (bagud) uden antal mål.
+export function normalizeRule(r) {
+  if (r.condition === 'LEADING_BY_1') r.condition = 'LEADING';
+  if (!['TRAILING', 'LEADING', 'DRAW'].includes(r.condition)) r.condition = 'TRAILING';
+  r.margin = Math.max(1, Math.min(5, Math.round(Number(r.margin) || 1)));
+  if (!FORMATIONS[r.newFormation]) r.newFormation = '4-4-2';
+  r.newPlan = [0, 1, 2].includes(r.newPlan) ? r.newPlan : null;
+  return r;
+}
+
 function fixTactics(t, starterIds, profile) {
   const def = defaultTactics(starterIds, profile);
   if (!t) return def;
@@ -19,7 +30,7 @@ function fixTactics(t, starterIds, profile) {
     phase3_transition: { ...def.phases.phase3_transition, ...ph.phase3_transition },
   };
   if (!Array.isArray(t.conditionalRules)) t.conditionalRules = def.conditionalRules;
-  t.conditionalRules = t.conditionalRules.slice(0, 5);
+  t.conditionalRules = t.conditionalRules.slice(0, 5).map(normalizeRule);
   return t;
 }
 

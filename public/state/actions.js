@@ -51,8 +51,14 @@ export const MAX_RULES = 5;
 export function addRule(team) {
   const rules = team.tactics.conditionalRules;
   if (rules.length >= MAX_RULES) return false;
-  rules.push({ ruleId: Math.max(0, ...rules.map((r) => r.ruleId)) + 1, minuteTrigger: 75, condition: 'LEADING_BY_1', newFormation: '5-4-1', slotRemapping: IDENTITY.slice() });
+  rules.push({ ruleId: Math.max(0, ...rules.map((r) => r.ruleId)) + 1, minuteTrigger: 75, condition: 'LEADING', margin: 1, newFormation: '5-4-1', newPlan: null, slotRemapping: IDENTITY.slice() });
   return true;
 }
 export const updateRule = (team, i, patch) => Object.assign(team.tactics.conditionalRules[i], patch);
+
+// Den aktive plan holdes lig med live-taktikken, så "Plan A" i en Hvis-Så-regel er
+// præcis det, man ser på tavlen.
+export function syncActivePreset(team, activeIdx) {
+  team.tacticPresets[activeIdx] = structuredClone(team.tactics);
+}
 export const removeRule = (team, i) => team.tactics.conditionalRules.splice(i, 1);

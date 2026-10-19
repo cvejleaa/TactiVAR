@@ -2,7 +2,7 @@
 // din kamp, tidslinje, statistik, karakterark og TactiVAR Avisen. Karakterer for
 // modstandere vises kun som stjerner (engine/visibility.js).
 import { h } from './dom.js';
-import { stars } from './labels.js';
+import { starsEl } from './labels.js';
 import { viewRatingEntry } from '../engine/visibility.js';
 
 export const REPORT_FILTERS = [['all', 'Alle hændelser'], ['tactic', 'Kun taktik'], ['key', 'Kun nøglemomenter']];
@@ -45,7 +45,7 @@ function ratingsTable(list, isOwn, title) {
     h('table', {}, h('tbody', {}, rows.map((e) => h('tr', { class: e.isMotM ? 'motm' : '' },
       h('td', {}, `#${e.shirtNumber} ${e.shortName}`), h('td', { class: 'muted' }, minutes(e)),
       h('td', {}, [e.goals ? '⚽'.repeat(e.goals) : '', e.assists ? '🅰'.repeat(e.assists) : '', e.saves ? `🧤${e.saves}` : '', e.aerialWins ? `✈${e.aerialWins}` : '', e.yellowCard ? '🟨' : '', e.injured ? '🚑' : '', e.isMotM ? '👑' : ''].join(' ')),
-      h('td', { class: 'rating' }, isOwn ? e.rating.toFixed(1) : stars(e.stars)),
+      h('td', { class: 'rating' }, isOwn ? e.rating.toFixed(1) : starsEl(e.stars)),
       isOwn ? h('td', { class: 'xp' }, `+${e.gainedCounterXp} 🧠`) : null)))));
 }
 
@@ -56,7 +56,7 @@ export function renderGazette(g, myTeamId) {
   const feats = pr ? [pr.goals ? `${pr.goals} mål` : '', pr.assists ? `${pr.assists} oplæg` : '', pr.saves ? `${pr.saves} redninger` : ''].filter(Boolean).join(' • ') : '';
   return h('div', { class: 'panel gazette', id: 'gazette' }, h('h3', {}, '📰 TactiVAR Avisen'),
     h('p', {}, `Runden bød på ${g.totalGoals} scoringer og ${g.totalVarChecks} VAR-tjek på tværs af de 4 stadions. ${g.myResult}`),
-    pr ? h('p', { id: 'player-of-round' }, h('strong', {}, '🏆 Rundens spiller: '), `#${pr.shirtNumber} ${pr.shortName} (${pr.teamName}) – ${'rating' in pr ? `karakter ${pr.rating.toFixed(1)}` : stars(pr.stars)}${feats ? ` • ${feats}` : ''}`) : null,
+    pr ? h('p', { id: 'player-of-round' }, h('strong', {}, '🏆 Rundens spiller: '), `#${pr.shirtNumber} ${pr.shortName} (${pr.teamName}) – `, 'rating' in pr ? `karakter ${pr.rating.toFixed(1)}` : starsEl(pr.stars), feats ? ` • ${feats}` : '') : null,
     g.goalOfTheRound ? h('p', {}, h('strong', {}, '🚀 Rundens mål: '), g.goalOfTheRound.desc) : null,
     !g.goalOfTheRound && g.defensiveAction ? h('p', {}, h('strong', {}, '🛡 Rundens defensive aktion: '), `#${g.defensiveAction.shirtNumber} ${g.defensiveAction.shortName} (${g.defensiveAction.teamName}) holdt nullet.`) : null);
 }

@@ -251,7 +251,10 @@ test('Hvis-Så: reglen udløses én gang, for begge hold, og skifter formation',
   const trig = m.events.filter((e) => e.type === 'TRIGGER');
   assert.equal(trig.filter((e) => e.isHome).length, 1);
   assert.equal(trig.filter((e) => !e.isHome).length, 1);
-  assert.ok(trig.every((e) => e.text.includes('til 5-4-1') && e.min === 3));
+  assert.ok(trig.every((e) => e.min === 3));
+  assert.match(trig.find((e) => e.isHome).text, /til 5-4-1/, 'dit eget skift beskrives');
+  const opp = trig.find((e) => !e.isHome).text;
+  assert.match(opp, /omorganiserer sig/); assert.doesNotMatch(opp, /5-4-1|Hvis-Så|minut/, 'modstanderens regel kan ikke læses');
   assert.equal(m.endState.home.formation, '5-4-1');
   assert.equal(m.endState.away.formation, '5-4-1');
   assert.match(m.homeTacticStr, /^4-4-2/, 'kamphovedet viser startformationen');
@@ -277,6 +280,24 @@ test('viewRatingEntry: modstandere ser stjerner, ikke karakter, mod-kunnen eller
   assert.equal(opp.stars, 4); assert.equal(opp.goals, 1);
   for (const k of ['rating', 'startCounterMastery', 'gainedCounterXp']) assert.equal(k in opp, false, k);
   assert.equal(viewRatingEntry(e, true).rating, 7.4);
+});
+
+test('andre holds taktiske overvejelser kan ikke læses – kun deres startformation', () => {
+  const NAMES = /korte pasninger|balanceret opbygning|direkte lange bolde|lav blok|mellemblok|højt gegenpress|Gegenpress|VAR-Linje|Lange Bolde/i;
+  const L = league(41), rng = createRng(41);
+  for (let i = 1; i < 8; i++) {
+    const m = simulateMatch(L.teams[0], L.teams[i], rng);
+    assert.equal(m.awayTacticStr, L.teams[i].tactics.baseFormation, 'modstander: kun formationen');
+    assert.match(m.homeTacticStr, / • /, 'dit eget hold: fuld taktik');
+    const note = m.events.find((e) => e.type === 'TACTIC_NOTE').text;
+    assert.doesNotMatch(note.split('møder')[1], NAMES, note);
+    for (const e of m.events.filter((x) => !x.isHome && x.type === 'TACTIC_WIN')) assert.doesNotMatch(e.text, /korte pasninger|balanceret opbygning|direkte lange bolde/, e.text);
+    // Afledte tekster må ikke afsløre modstanderens offside-fælde eller omstilling
+    for (const e of m.events.filter((x) => !x.isHome && x.category === 'TACTIC')) assert.doesNotMatch(e.text, /offside-fælde|kontra|falder til ro/i, e.text);
+    // bot mod bot: ingen taktiknavne overhovedet
+    const b = simulateMatch(L.teams[i], L.teams[i % 7 + 1], rng);
+    for (const e of b.events) { assert.doesNotMatch(e.text, NAMES, e.text); assert.doesNotMatch(e.text, /offside-fælde|kontra|falder til ro/i, e.text); }
+  }
 });
 
 // ---------- Runder ----------
@@ -382,4 +403,16 @@ test('normalizeLeague melder det, der ikke kan repareres', () => {
   assert.match(problems.join(' '), /7 hold/);
   assert.match(problems.join(' '), /10 spillere/);
   assert.deepEqual(normalizeLeague(null).problems, ['Ligaen mangler hold']);
+});
+
+test('referatet viser ingen mod-kunnen-procent mod modstanderen (kan bruges til at regne deres stil ud)', () => {
+  // Med høj mod-kunnen (90) ville enhver tærskel-besked udløses – testen har altså data.
+  const L = league(42), rng = createRng(42);
+  for (const t of L.teams) for (const p of t.squad) p.counterTactics = { vsPress: 90, vsLowBlock: 90, vsTrapLong: 90 };
+  let duels = 0;
+  for (let i = 1; i < 8; i++) for (const e of simulateMatch(L.teams[0], L.teams[i], rng).events) {
+    if (e.isHome && e.type === 'TACTIC_WIN') duels++;
+    assert.doesNotMatch(e.text, /mod-kunnen|erfaring mod|🧠|\d+\s*%(?! af bolden)/i, e.text);
+  }
+  assert.ok(duels > 20, `for få vundne dueller for dit hold (${duels})`);
 });

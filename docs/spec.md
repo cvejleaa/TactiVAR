@@ -72,7 +72,7 @@ Clues opstår i kampe. **Rettet:** v2.5b gemmer clues på modstanderens
 spillerobjekt; de skal ligge hos den der observerer.
 
 ## 3. Hvem ser hvad (anti-spionage)
-- Offentligt: navn ("F. Efternavn" på banen), rygnummer, kæde, alder, højde, friskhed, skadesstatus 🚑, stjerner (★☆☆☆☆–★★★★★), holdets formation og typiske stil (fx "4-2-3-1 • Gegenpress + VAR-Linje" – som i v2.5, og den afsløres alligevel i referaterne).
+- Offentligt: navn ("F. Efternavn" på banen), rygnummer, kæde, alder, højde, friskhed, skadesstatus 🚑, stjerner (★☆☆☆☆–★★★★★), holdets startformation. Intet andet om andre holds taktik (brugerens beslutning, afviger bevidst fra v2.5): ingen faser, planer, Hvis-Så-regler eller "typisk stil" – heller ikke i ligatabellen, kamphovedet, det taktiske oplæg eller referatet. Et modstanderholds Hvis-Så-skift vises kun som "omorganiserer sig". Referatet navngiver kun dine egne taktikvalg. (Trin 1 lægger teksterne i motoren med det menneskestyrede hold som seer; trin 2 skal gøre dem seer-afhængige.)
 - Kun ejer: 9 evner, spring, luftduel, arketype, løn/værdi, kasse, de præcise fasevalg og Hvis-Så-regler,
   eksakt karakter, mod-kunnen.
 - Ingen: VAR-profil (kun via clues).
@@ -99,11 +99,15 @@ spillerobjekt; de skal ligge hos den der observerer.
   LOW_BLOCK/MID_BLOCK/HIGH_GEGENPRESS, offsideTrap OFF/NORMAL/EXTREME_VAR_LINE,
   tacklingIntensity CAUTIOUS/NORMAL/AGGRESSIVE · Fase 3 onBallWon
   FAST_COUNTER/KEEP_POSSESSION, onBallLost COUNTER_PRESS_5S/DROP_BACK.
-- Hvis-Så: maks 5 one-shot, betingelse TRAILING/LEADING_BY_1/DRAW, felter
-  `{ruleId, minuteTrigger, condition, newFormation, slotRemapping[11]}`.
-  Default 65' TRAILING → 3-4-3. **Rettet:** v2.5b logger kun skiftet og
-  kører kun hjemmeholdets regler — de skal reelt skifte formation, for begge.
-  UI til at redigere minut/betingelse/formation: med.
+- Hvis-Så: maks 5 one-shot. Betingelse "Bagud med mindst N mål", "Foran med
+  mindst N mål" (N = 1–5) eller "Uafgjort" (skema 2; skema 1's "Foran med 1"
+  betød præcis 1 og er migreret til "mindst 1" – brugerens ønske om selv at
+  angive antal mål). Mål: en formation (med `slotRemapping`) ELLER en af holdets
+  planer A/B/C – så skiftes formation, trukne positioner og faser; spillerne
+  beholder pladserne, og de aktive regler kører videre (planens egne regler
+  bruges ikke midt i kampen). Skift til den plan, der allerede spilles, gør
+  intet. Den aktive plan holdes lig med live-taktikken. Reglerne kører for
+  begge hold.
 - Bot-hold har hver sin taktiske profil (`BOT_TACTICAL_PROFILES`).
 
 ## 5. Kampmotor (v2.5b)
@@ -114,7 +118,7 @@ Tick hvert 3. minut (1..90).
   HIGH_GEGENPRESS slår SHORT, LOW_BLOCK slår CENTRAL (bonus afskåret: brug +3).
 - Positions-vurdering 25 %: ude af zone (>28) −0,45 karakter (presspiller
   +0,35), ellers +0,40.
-- Offside-fælde 45 % hvis ikke OFF. Kontra-tekst ved FAST_COUNTER.
+- Offside-fælde 45 % hvis ikke OFF. Offside-fælde og kontra (FAST_COUNTER) nævnes kun i teksten for dit eget hold; hos modstandere står blot "fanges offside" / "erobrer bolden".
 - Frispark 6 % med gult kort (−0,35); heraf skade 40 %, 1–3 kampe, auto-
   indskiftning fra bænken.
 - Chance 30 %; xG 0,13–0,35 pr. afslutning. Høje bolde 55 % ved
@@ -158,8 +162,11 @@ Tick hvert 3. minut (1..90).
   pres, offside-fælde, pasningsstil, angrebsfokus); default 25.
 - XP pr. kamp = `round(min/90·(9 + 2·taktikdueller + (mål?2:0)))`, klemt 4–16;
   primær +XP, sekundær +round(XP·0,6), øvrige −3; bund 25 (≥26 år) ellers 12.
-- UI: dropdown "Mål-Modstander", kolonne 🧠Mod ("??" og usorterbar for
-  modstandere), 3 mod-barer, lilla +XP-badge.
+- UI (brugerens valg, afviger fra v2.5): kolonne 🧠Mod viser spillerens tre
+  egne værdier "gegenpress · lav blok · VAR-linje" (sorterer på gennemsnittet;
+  "??" for modstandere) – ingen samlet % mod en bestemt modstander, da den kan
+  bruges til at regne modstanderens stil ud. 3 mod-barer på spillerkortet, lilla
+  +XP-badge. Motoren bruger stadig mod-kunnen mod modstanderens stil.
 
 ## 8. Regneark (scouting-matrix)
 20 kolonner: Pos/#, Spiller, Kæde, Alder, Frisk/🚑, Højde (offentlige), Spring, ✈Luft,
@@ -226,9 +233,11 @@ avisens hovedperson altid målmanden.
 
 ## 10b. Layout (skal bevares, selv uden Tailwind)
 Mørkt tema (#0f172a, paneler slate-900, lilla VAR-accent, smaragd for gode
-tal). To kolonner: regneark + spillerkort til venstre (7/12), formation,
-bane og taktik til højre (5/12); "⤢ Bred visning" giver regnearket fuld
-bredde. Topbar: klubvælger, gem-status, gem/nulstil. Mobil: én kolonne.
+tal). Regnearket i fuld bredde øverst (ingen sidelæns scroll, fast overskrift,
+egen lodret scroll ved 55 % af skærmhøjden); nedenunder spillerkort | bane |
+taktik + tabel i 3 kolonner (2 under 1300 px, 1 under 800 px). Topbar:
+klubvælger, kampknapper, gem-status, gem/eksport/import/ny liga. Modstanderes
+stjerner: udfyldte i guld, tomme dæmpet.
 
 ## 11. Udeladt / udskudt
 - **Firestore-seeder + API-nøgle-modal** (udeladt i trin 1): seederen skrev

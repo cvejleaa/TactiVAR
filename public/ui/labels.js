@@ -9,11 +9,23 @@ export const PHASE_OPTIONS = {
   onBallWon: [['FAST_COUNTER', 'Lynkontra'], ['KEEP_POSSESSION', 'Hold på bolden']],
   onBallLost: [['COUNTER_PRESS_5S', 'Genpres i 5 sek.'], ['DROP_BACK', 'Fald tilbage']],
 };
-export const CONDITIONS = [['TRAILING', 'Bagud'], ['LEADING_BY_1', 'Foran med 1'], ['DRAW', 'Uafgjort']];
+export const CONDITIONS = [['TRAILING', 'Bagud med mindst'], ['LEADING', 'Foran med mindst'], ['DRAW', 'Uafgjort']];
+export const MARGINS = [1, 2, 3, 4, 5].map((n) => [String(n), `${n} mål`]);
 export const SKILL_LABELS = [
   ['Fysik & luft', [['pace', 'Fart'], ['stamina', 'Udholdenhed'], ['strength', 'Styrke']]],
   ['Teknik', [['ballControl', 'Boldkontrol'], ['passing', 'Pasning'], ['finishing', 'Afslutning']]],
   ['Taktik & defensiv', [['positioning', 'Positionering'], ['intercepting', 'Erobring'], ['goalkeeping', 'Målmandsspil']]],
 ];
 export const stars = (n) => (n > 0 ? '★'.repeat(n) + '☆'.repeat(5 - n) : '–');
+// Samme tekst som stars(), men udfyldte stjerner i guld og tomme dæmpet, så de kan læses.
+export function starsEl(n) {
+  const el = document.createElement('span');
+  el.className = 'stars';
+  el.title = n > 0 ? `${n} af 5 stjerner` : 'Ingen kampe endnu';
+  if (!(n > 0)) { el.textContent = '–'; return el; }
+  const on = document.createElement('span'); on.className = 'star-on'; on.textContent = '★'.repeat(n);
+  const off = document.createElement('span'); off.className = 'star-off'; off.textContent = '☆'.repeat(5 - n);
+  el.append(on, off);
+  return el;
+}
 export const kr = (n) => n.toLocaleString('da-DK') + ' kr.';

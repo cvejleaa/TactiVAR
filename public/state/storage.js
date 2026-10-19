@@ -1,16 +1,22 @@
 // Gem og indlæs spillet i browseren (docs/spec.md §9). Reglen: en ny version må ALDRIG
 // slette ligaen. Ældre skemaer migreres additivt; kan data ikke læses, lægges de rå data
 // i en backup-nøgle, FØR der tilbydes en ny liga, og fejlen vises.
-import { normalizeLeague } from '../engine/sanitize.js';
+import { normalizeLeague, normalizeRule } from '../engine/sanitize.js';
 
 export const SAVE_KEY = 'tactivar_save';
 export const BACKUP_PREFIX = 'tactivar_backup_';
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 // Migreringer: MIGRATIONS[n] løfter et gemt objekt fra skema n til n+1. Tilføj en ny,
 // hver gang gemme-formatet ændres – sammen med et fixture fra forrige version i
 // tests/fixtures/ og en test, der indlæser det (CLAUDE.md, "Farlige kommandoer").
-export const MIGRATIONS = {};
+export const MIGRATIONS = {
+  // 1 → 2: Hvis-Så-regler får antal mål (margin) og kan pege på en plan (newPlan).
+  1: (d) => {
+    for (const t of d.league?.teams || []) for (const tac of [t.tactics, ...(t.tacticPresets || [])]) (tac?.conditionalRules || []).forEach(normalizeRule);
+    return { ...d, schemaVersion: 2 };
+  },
+};
 
 export function serialize(state, now = Date.now()) {
   return JSON.stringify({ schemaVersion: SCHEMA_VERSION, savedAt: now, league: state.league, notes: state.notes, ui: state.ui });
@@ -40,7 +46,8 @@ export function loadGame(storage) {
   try { raw = storage.getItem(SAVE_KEY); } catch (e) { return { status: 'error', error: `Browseren tillader ikke at læse gemte data (${e.message}).`, backupKey: null }; }
   if (raw == null) return { status: 'empty' };
   const r = parseSave(raw);
-  if (r.ok) return { status: 'ok', state: r.state, migratedFrom: r.migratedFrom };
+  // Et ældre skema migreres – de rå data gemmes i backup først, så opdateringen kan fortrydes.
+  if (r.ok) return { status: 'ok', state: r.state, migratedFrom: r.migratedFrom, backupKey: r.migratedFrom != null ? backupRaw(storage, raw) : null };
   const backupKey = backupRaw(storage, raw);
   return { status: 'error', error: r.error, backupKey };
 }
