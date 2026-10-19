@@ -366,6 +366,9 @@ test('Hvis-Så-betingelse: "mindst N" bagud/foran, uafgjort præcis lige', () =>
   assert.equal(ruleConditionMet(R('LEADING', 1), 4, 0), true);
   assert.equal(ruleConditionMet(R('DRAW', 3), 1, 1), true);
   assert.equal(ruleConditionMet(R('DRAW', 1), 2, 1), false);
+  assert.equal(ruleConditionMet(R('DRAW', 1), 0, 1), false, 'uafgjort udløses ikke når man er bagud');
+  assert.equal(ruleConditionMet(R('TRAILING', 0), 0, 1), true, 'margin 0 behandles som 1');
+  assert.equal(ruleConditionMet(R('LEADING', 0), 0, 0), false, 'margin 0 behandles som 1 – ikke "foran med 0"');
   assert.equal(ruleConditionMet(R('TRAILING'), 0, 1), true, 'uden margin = 1');
   assert.equal(ruleConditionMet(R('UKENDT', 1), 0, 5), false);
 });
@@ -383,6 +386,11 @@ test('Hvis-Så til egen plan: formation, trukne positioner og faser skifter; spi
   assert.equal(trig.length, 1);
   assert.match(trig[0].text, /til Plan B \(3-5-2, direkte lange bolde/);
   assert.equal(m.endState.home.formation, '3-5-2', 'planens formation, ikke reglens formation');
+  assert.deepEqual(m.endState.home.customCoords, { 6: { x: 40, y: 40 } }, 'planens trukne positioner');
+  assert.equal(m.endState.home.phases.phase1_buildUp.passingStyle, 'DIRECT_LONG', 'planens faser');
+  m.endState.home.customCoords[6].x = 1; m.endState.home.phases.phase1_buildUp.passingStyle = 'SHORT';
+  assert.equal(H.tacticPresets[1].customCoords[6].x, 40, 'kopi – planen deles ikke med kampen');
+  assert.equal(H.tacticPresets[1].phases.phase1_buildUp.passingStyle, 'DIRECT_LONG');
   assert.deepEqual(m.endState.home.starters, lineup);
   // Planens fase 1 virker fra skiftet: DIRECT_LONG giver høje bolde fremover (BALANCED/CENTRAL gav ingen)
   const m2 = simulateMatch(H, A, stubRng({ 0.3: true, 0.55: true }));
@@ -421,4 +429,28 @@ test('offside og omstilling: dine egne valg navngives, modstanderens beskrives n
   const ownTexts = own.events.filter((e) => e.category === 'TACTIC' && e.isHome).map((e) => e.text);
   assert.ok(ownTexts.some((t) => /Din offside-fælde klapper/.test(t)), ownTexts.join(' | '));
   assert.ok(ownTexts.some((t) => /Din lynkontra/.test(t)));
+});
+
+test('Hvis-Så til den plan man allerede spiller: tom handling – men en forskel i formation, faser ELLER positioner tæller', () => {
+  const run = (tweak) => {
+    const { H, A } = arena();
+    const plan = structuredClone(H.tactics); tweak(plan); H.tacticPresets[2] = plan;
+    H.tactics.conditionalRules = [{ ruleId: 1, minuteTrigger: 3, condition: 'DRAW', margin: 1, newFormation: '4-4-2', newPlan: 2 }];
+    return simulateMatch(H, A, stubRng({})).events.filter((e) => e.type === 'TRIGGER').length;
+  };
+  assert.equal(run(() => {}), 0, 'identisk plan: intet skift logges');
+  assert.equal(run((p) => { p.baseFormation = '4-3-3'; }), 1, 'anden formation');
+  assert.equal(run((p) => { p.phases.phase2_defending.pressingHeight = 'LOW_BLOCK'; }), 1, 'andre faser');
+  assert.equal(run((p) => { p.customCoords = { 7: { x: 30, y: 30 } }; }), 1, 'andre positioner');
+});
+
+test('Hvis-Så: en plan-regel udløses højst én gang, og en ugyldig plan falder tilbage til formationen', () => {
+  const { H, A } = arena();
+  const planB = structuredClone(H.tactics); planB.baseFormation = '3-5-2'; H.tacticPresets[1] = planB;
+  H.tactics.conditionalRules = [{ ruleId: 1, minuteTrigger: 3, condition: 'DRAW', margin: 1, newFormation: '4-4-2', newPlan: 1 }];
+  assert.equal(simulateMatch(H, A, stubRng({})).events.filter((e) => e.type === 'TRIGGER').length, 1);
+  H.tactics.conditionalRules = [{ ruleId: 1, minuteTrigger: 3, condition: 'DRAW', margin: 1, newFormation: '5-4-1', newPlan: 7 }];
+  const m = simulateMatch(H, A, stubRng({}));
+  assert.equal(m.endState.home.formation, '5-4-1');
+  assert.match(m.events.find((e) => e.type === 'TRIGGER').text, /fra 4-4-2 til 5-4-1/);
 });

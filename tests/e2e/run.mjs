@@ -126,6 +126,14 @@ try {
   check('Hvis-Så: antal mål og skift til egen plan gemmes', (await g.inputValue('#rules .rule:nth-of-type(2) .rule-margin')) === '2' && (await g.inputValue('#rules .rule:nth-of-type(2) .rule-target')) === 'plan:2');
   check('Hvis-Så: "Uafgjort" har intet antal mål', (await g.locator('#rules .rule:nth-of-type(1) .rule-margin').count()) === 0);
   check('Hvis-Så: målvælgeren viser dine planer og markerer den aktive', (await g.locator('#rules .rule:nth-of-type(2) .rule-target option', { hasText: 'aktiv nu' }).count()) === 1);
+  // Den aktive plan følger live-taktikken: ændr formation, og "Plan X (…)" i målvælgeren følger med
+  await g.selectOption('#formation', '5-3-2'); await reload();
+  const activeOpt = await g.locator('#rules .rule:nth-of-type(2) .rule-target option', { hasText: 'aktiv nu' }).textContent();
+  check('Hvis-Så: den aktive plan i målvælgeren viser den nye formation', activeOpt.includes('(5-3-2)'), activeOpt);
+  const otherPlan = await g.locator('#rules .rule:nth-of-type(2) .rule-target option[value="plan:1"]').textContent();
+  check('Hvis-Så: de andre planer ændres ikke af det', !otherPlan.includes('aktiv') && !otherPlan.includes('(5-3-2)'), otherPlan);
+  await g.selectOption('#rules .rule:nth-of-type(2) .rule-target', 'form:4-3-3'); await reload();
+  check('Hvis-Så: valg af en formation fjerner plan-målet', (await g.inputValue('#rules .rule:nth-of-type(2) .rule-target')) === 'form:4-3-3');
   await g.click('.presets button:nth-child(2)'); await reload();
   check('Plan-skift gemmes straks', (await g.textContent('.presets button.active')).startsWith('Plan B') && (await g.inputValue('#formation')) === '4-3-3');
   const [s7, s8] = [await nameAt(7), await nameAt(8)];

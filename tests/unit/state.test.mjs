@@ -243,3 +243,22 @@ test('handling: den aktive plan holdes lig med live-taktikken', () => {
   t.tactics.phases.phase1_buildUp.passingStyle = 'SHORT';
   assert.equal(t.tacticPresets[0].phases.phase1_buildUp.passingStyle, 'BALANCED', 'en kopi, ikke samme objekt');
 });
+
+test('normalizeRule: antal mål klemmes til 1–5, ukendt betingelse bliver "bagud", ukendt plan fjernes', async () => {
+  const { normalizeRule } = await import('../../public/engine/sanitize.js');
+  assert.equal(normalizeRule({ condition: 'LEADING', margin: 0 }).margin, 1);
+  assert.equal(normalizeRule({ condition: 'LEADING', margin: 9 }).margin, 5);
+  assert.equal(normalizeRule({ condition: 'LEADING', margin: 'abc' }).margin, 1);
+  assert.equal(normalizeRule({ condition: 'abc' }).condition, 'TRAILING');
+  assert.equal(normalizeRule({ condition: 'DRAW', newPlan: 3 }).newPlan, null);
+  assert.equal(normalizeRule({ condition: 'DRAW', newPlan: 2 }).newPlan, 2);
+});
+
+test('migrering 1 → 2 alene (uden reparation bagefter) løfter skema og regler', async () => {
+  const { MIGRATIONS } = await import('../../public/state/storage.js');
+  const d = JSON.parse(FIXTURE);
+  d.league.teams[0].tactics.conditionalRules = [{ ruleId: 1, minuteTrigger: 70, condition: 'LEADING_BY_1', newFormation: '5-4-1' }];
+  const out = MIGRATIONS[1](d);
+  assert.equal(out.schemaVersion, 2);
+  assert.deepEqual([out.league.teams[0].tactics.conditionalRules[0].condition, out.league.teams[0].tactics.conditionalRules[0].margin], ['LEADING', 1]);
+});

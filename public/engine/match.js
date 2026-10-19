@@ -62,6 +62,8 @@ function customDragged(side) {
 
 const avg = (arr, f) => arr.reduce((a, p) => a + f(p), 0) / Math.max(1, arr.length);
 
+const endOf = (s) => ({ formation: s.tactics.baseFormation, starters: s.starters.map((p) => p.id), customCoords: structuredClone(s.tactics.customCoords), phases: structuredClone(s.tactics.phases) });
+
 export function simulateMatch(home, away, rng, opts = {}) {
   const events = [];
   const lineupNotes = [];
@@ -301,7 +303,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
     homeId: home.id, awayId: away.id, homeName: home.name, awayName: away.name,
     homeTacticStr, awayTacticStr,
     // Formation og opstilling ved slutfløjt (efter Hvis-Så-skifter og indskiftninger).
-    endState: { home: { formation: H.tactics.baseFormation, starters: H.starters.map((p) => p.id) }, away: { formation: A.tactics.baseFormation, starters: A.starters.map((p) => p.id) } },
+    endState: { home: endOf(H), away: endOf(A) },
     homeGoals: hG, awayGoals: aG, homeVarNet,
     events, stats: st, ratings, goalsPool, injuries, observations,
   };
