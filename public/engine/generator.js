@@ -157,8 +157,12 @@ export function createLeague(rng) {
   const teams = TEAM_NAMES.map((_, i) => generateTeam(rng, i));
   // Observationer ligger hos observatøren (dig), ikke på spilleren (spec §2 "Rettet").
   // Ligaen starter med de indtryk, man har fra forsæsonen.
+  // scouting[observatørens hold-id][spiller-id] – i trin 2 bliver det ét dokument pr. bruger.
   const scouting = {};
-  for (const t of teams) for (const p of t.squad) scouting[p.id] = generateScoutingClues(p.shortName, p.varProfile, p.heightCm, p.jumpingPower).map((c) => `[Forsæson] ${c}`);
+  for (const viewer of teams.filter((t) => !t.isBot)) {
+    const book = (scouting[viewer.id] = {});
+    for (const t of teams) for (const p of t.squad) book[p.id] = generateScoutingClues(p.shortName, p.varProfile, p.heightCm, p.jumpingPower).map((c) => `[Forsæson] ${c}`);
+  }
   return {
     leagueMetadata: { id: 'league_div_1', name: 'TactiVAR Superligaen', seasonNumber: 1, footballYear: 1, round: 0, standings: teams.map(emptyStanding) },
     teams,

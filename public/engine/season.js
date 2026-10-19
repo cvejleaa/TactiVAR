@@ -37,8 +37,14 @@ function applyStanding(standings, m) {
 export const sortStandings = (standings) => standings.slice().sort((a, b) =>
   b.points - a.points || (b.goalsFor - b.goalsAgainst) - (a.goalsFor - a.goalsAgainst) || b.goalsFor - a.goalsFor);
 
+export const SCOUTING_PER_PLAYER = 20;
+
 // Bogfører en afviklet runde i ligaen (muterer league) – kaldes før der gemmes.
+// Idempotent: en runde, der allerede er bogført (dobbeltklik, genindlæsning midt i
+// afspilning), afvises, så den aldrig tæller to gange.
 export function commitRound(league, result, rng) {
+  const expected = (league.leagueMetadata.round || 0) + 1;
+  if (result.round !== expected) throw new Error(`Runde ${result.round} kan ikke bogføres – ligaen venter på runde ${expected}.`);
   const byId = new Map(league.teams.map((t) => [t.id, t]));
   const players = new Map(league.teams.flatMap((t) => t.squad.map((p) => [p.id, p])));
   const played = new Set();
@@ -59,8 +65,14 @@ export function commitRound(league, result, rng) {
         p.freshness = Math.max(60, Math.min(100, p.freshness - drop + 8));
       }
     }
-    for (const o of m.observations) {
-      (league.scouting[o.playerId] ||= []).unshift(`[Runde ${result.round}] ${o.text}`);
+    // Observationer tilfalder de menneskestyrede hold (de kan læse alle rundens referater).
+    for (const viewer of league.teams.filter((t) => !t.isBot)) {
+      const book = (league.scouting[viewer.id] ||= {});
+      for (const o of m.observations) {
+        const list = (book[o.playerId] ||= []);
+        list.unshift(`[Runde ${result.round}] ${o.text}`);
+        list.length = Math.min(list.length, SCOUTING_PER_PLAYER);
+      }
     }
   }
   for (const p of players.values()) {

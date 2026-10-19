@@ -18,6 +18,16 @@ export function viewPlayer(player, viewerOwnsTeam) {
   return out;
 }
 
+// Karakterarket for én spiller set af en given seer: modstandere får kun stjerner – aldrig
+// den eksakte karakter, mod-kunnen eller optjent XP.
+export const RATING_PRIVATE_FIELDS = ['rating', 'startCounterMastery', 'gainedCounterXp'];
+export function viewRatingEntry(entry, viewerOwnsTeam) {
+  if (viewerOwnsTeam) return { ...entry };
+  const out = { ...entry };
+  for (const k of RATING_PRIVATE_FIELDS) delete out[k];
+  return out;
+}
+
 // Må seeren sortere/filtrere på dette felt for dette hold? (blokerer "sort-spoofing").
 export function canSeeField(field, viewerOwnsTeam) {
   if (PUBLIC_FIELDS.includes(field)) return true;

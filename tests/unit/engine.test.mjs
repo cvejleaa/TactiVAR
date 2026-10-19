@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createRng } from '../../public/engine/rng.js';
 import { FORMATIONS, FORMATION_NAMES, MAX_ANCHOR_RADIUS, isOutOfZone, clampPos, lineOfRole } from '../../public/engine/formations.js';
 import { createLeague, aerialBreakdown, rollStat, TEAM_NAMES } from '../../public/engine/generator.js';
-import { viewPlayer, canSeeField } from '../../public/engine/visibility.js';
+import { viewPlayer, canSeeField, viewRatingEntry } from '../../public/engine/visibility.js';
 import { initialCounterTactics, opponentTacticKeys, masteryVs, counterXpForMatch, applyCounterXp } from '../../public/engine/counter.js';
 import { starsFromRating, createSheet, finalizeSheet } from '../../public/engine/ratings.js';
 import { describeFinish, describeHeader, describeVarTiming, generateScoutingClues } from '../../public/engine/clues.js';
@@ -231,6 +231,19 @@ test('skadet starter spiller ikke – erstattes i den kamplokale opstilling', ()
   assert.equal(L.teams[0].tactics.lineupSlots[3], star.id, 'lineupSlots må ikke ændres');
 });
 
+test('Hvis-Så: slotRemapping flytter spillerne til nye pladser', () => {
+  const L = league(9);
+  const ids = L.teams[0].tactics.lineupSlots.slice();
+  L.teams[0].tactics.conditionalRules = [{ ruleId: 1, minuteTrigger: 3, condition: 'DRAW', newFormation: '3-4-3', slotRemapping: [0, 1, 2, 3, 5, 6, 7, 4, 8, 9, 10] }];
+  const L2 = league(9);
+  // Uden skader i kampen er slutopstillingen præcis remap'en af startopstillingen.
+  const rng = createRng(2), base = rng;
+  const noInj = { ...base, chance: (p) => (p === 0.06 ? false : base.chance(p)) };
+  const m = simulateMatch(L.teams[0], L2.teams[1], noInj);
+  assert.deepEqual(m.endState.home.starters, [0, 1, 2, 3, 5, 6, 7, 4, 8, 9, 10].map((i) => ids[i]));
+  assert.equal(m.endState.home.formation, '3-4-3');
+});
+
 test('Hvis-Så: reglen udløses én gang, for begge hold, og skifter formation', () => {
   const L = league(8);
   for (const t of [L.teams[0], L.teams[1]]) t.tactics.conditionalRules = [{ ruleId: 1, minuteTrigger: 3, condition: 'DRAW', newFormation: '5-4-1', slotRemapping: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10] }];
@@ -239,6 +252,9 @@ test('Hvis-Så: reglen udløses én gang, for begge hold, og skifter formation',
   assert.equal(trig.filter((e) => e.isHome).length, 1);
   assert.equal(trig.filter((e) => !e.isHome).length, 1);
   assert.ok(trig.every((e) => e.text.includes('til 5-4-1') && e.min === 3));
+  assert.equal(m.endState.home.formation, '5-4-1');
+  assert.equal(m.endState.away.formation, '5-4-1');
+  assert.match(m.homeTacticStr, /^4-4-2/, 'kamphovedet viser startformationen');
   assert.equal(L.teams[0].tactics.conditionalRules[0].used, undefined, 'holdets regel må ikke markeres brugt');
   assert.equal(L.teams[0].tactics.baseFormation, '4-4-2');
 });
@@ -251,6 +267,14 @@ test('anti-spionage: ingen evnetal i referatet, ingen mod-kunnen for bots', () =
     for (const o of m.observations) assert.doesNotMatch(o.text, /\d+\s*\/\s*20|\b\d{1,2}\s*(point|pt)\b/, o.text);
   }
   for (const { m } of botsOnly) for (const e of m.events) assert.doesNotMatch(e.text, /mod-kunnen/i, e.text);
+});
+
+test('viewRatingEntry: modstandere ser stjerner, ikke karakter, mod-kunnen eller XP', () => {
+  const e = { playerId: 'x', rating: 7.4, stars: 4, startCounterMastery: 55, gainedCounterXp: 9, goals: 1 };
+  const opp = viewRatingEntry(e, false);
+  assert.equal(opp.stars, 4); assert.equal(opp.goals, 1);
+  for (const k of ['rating', 'startCounterMastery', 'gainedCounterXp']) assert.equal(k in opp, false, k);
+  assert.equal(viewRatingEntry(e, true).rating, 7.4);
 });
 
 // ---------- Runder ----------
@@ -281,6 +305,16 @@ test('runde bogføres: stilling, karakterer, skader heles først og nye lægges 
   assert.ok(L.lastRound.gazette.playerOfTheRound);
 });
 
+test('en runde kan ikke bogføres to gange', () => {
+  const L = league(17), rng = createRng(1);
+  const res = playRound(L, 1, rng);
+  commitRound(L, res, rng);
+  const snapshot = JSON.stringify(L.leagueMetadata.standings);
+  assert.throws(() => commitRound(L, res, rng), /Runde 1 kan ikke bogføres/);
+  assert.equal(JSON.stringify(L.leagueMetadata.standings), snapshot);
+  assert.equal(playRound(L, 2, rng).round, 2);
+});
+
 test('ny skade i runden bevarer sin fulde længde (rettet v2.5b-fejl)', () => {
   const L = league(13), rng = createRng(6);
   let checked = 0;
@@ -301,7 +335,10 @@ test('observationer lægges hos observatøren med runde-stempel, ikke på spille
   commitRound(L, res, rng);
   const obs = res.matches.flatMap((m) => m.observations);
   assert.ok(obs.length > 0);
-  assert.ok(L.scouting[obs[0].playerId][0].startsWith('[Runde 1]'));
+  const mine = L.scouting[L.teams[0].id];
+  assert.ok(mine[obs[0].playerId][0].startsWith('[Runde 1]'));
+  assert.deepEqual(Object.keys(L.scouting), [L.teams[0].id], 'kun menneskestyrede hold har en scoutingbog');
+  assert.ok(mine[L.teams[5].squad[0].id].length >= 1, 'forsæson-indtryk af alle spillere');
   assert.equal('matchReportClues' in L.teams[0].squad[0], false);
 });
 

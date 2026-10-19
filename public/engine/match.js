@@ -75,7 +75,9 @@ export function simulateMatch(home, away, rng, opts = {}) {
   const hCustom = customDragged(H);
   const customIntro = hCustom.length ? ` Bemærk: ${home.name} har trukket ${tag(hCustom[0].player)} ud af sin grundposition.` : '';
   for (const n of lineupNotes) addEv(1, 'LINEUP', 'TACTIC', n.isHome, false, 'Ændret startopstilling', n.text);
-  addEv(1, 'TACTIC_NOTE', 'TACTIC', true, false, 'Taktisk oplæg', `📋 [TAKTISK OPLÆG] ${home.name} (${tacticStr(H)}) møder ${away.name} (${tacticStr(A)}).${customIntro}${masteryIntro}`);
+  // Kamphovedet viser startformationen – beregnes før et evt. Hvis-Så-skifte.
+  const homeTacticStr = tacticStr(H), awayTacticStr = tacticStr(A);
+  addEv(1, 'TACTIC_NOTE', 'TACTIC', true, false, 'Taktisk oplæg', `📋 [TAKTISK OPLÆG] ${home.name} (${homeTacticStr}) møder ${away.name} (${awayTacticStr}).${customIntro}${masteryIntro}`);
 
   // Indskiftning i den kamplokale kopi. Returnerer indskifteren eller null.
   function substitute(side, slot, min, reason) {
@@ -257,7 +259,9 @@ export function simulateMatch(home, away, rng, opts = {}) {
   return {
     round: opts.round ?? 0,
     homeId: home.id, awayId: away.id, homeName: home.name, awayName: away.name,
-    homeTacticStr: tacticStr(H), awayTacticStr: tacticStr(A),
+    homeTacticStr, awayTacticStr,
+    // Formation og opstilling ved slutfløjt (efter Hvis-Så-skifter og indskiftninger).
+    endState: { home: { formation: H.tactics.baseFormation, starters: H.starters.map((p) => p.id) }, away: { formation: A.tactics.baseFormation, starters: A.starters.map((p) => p.id) } },
     homeGoals: hG, awayGoals: aG, homeVarNet,
     events, stats: st, ratings, goalsPool, injuries, observations,
   };
