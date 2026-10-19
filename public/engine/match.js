@@ -32,11 +32,12 @@ const YOUR_PRESS = { LOW_BLOCK: 'din lave blok', MID_BLOCK: 'din mellemblok', HI
 const cap = (t) => t[0].toUpperCase() + t.slice(1);
 const TXT = { SHORT: 'korte pasninger', BALANCED: 'balanceret opbygning', DIRECT_LONG: 'direkte lange bolde', LOW_BLOCK: 'lav blok', MID_BLOCK: 'mellemblok', HIGH_GEGENPRESS: 'højt gegenpress' };
 const isAvailable = (p) => !(p.injuryMatchesLeft > 0);
-// Friskhed virker (v3.7): en træt spiller yder 0,85 + 0,15·friskhed/100 (50 % → 92,5 %).
-export const freshFactor = (p) => 0.85 + 0.15 * Math.max(0, Math.min(100, p?.freshness ?? 100)) / 100;
+// Friskhed virker (v3.7): en træt spiller yder 0,75 + 0,25·friskhed/100 (75 % → 93,75 %,
+// 50 % → 87,5 %) – stærkt nok til, at det betaler sig at hvile en meget træt spiller.
+export const freshFactor = (p) => 0.75 + 0.25 * Math.max(0, Math.min(100, p?.freshness ?? 100)) / 100;
 const avgSkill = (p) => Object.values(p.skills).reduce((a, b) => a + b, 0) / 9;
-// Bots roterer: en starter under 65 % hviles, hvis en frisk (≥ 85 %) bænkspiller i samme kæde
-// højst er 1,5 svagere i gennemsnit. Ellers fik kun den menneskelige manager glæde af rotation.
+// Bots roterer: en starter under 70 % hviles, hvis en frisk (≥ 85 %) bænkspiller i samme kæde
+// højst er 2 svagere i gennemsnit. Ellers fik kun den menneskelige manager glæde af rotation.
 
 // Kamplokal side: kopi af taktikken + aktuelle 11 spillere + bænk.
 function prepareSide(team, isHome, notes) {
@@ -46,8 +47,8 @@ function prepareSide(team, isHome, notes) {
   const used = new Set(starters.filter(Boolean).map((p) => p.id));
   const bench = () => team.squad.filter((p) => !used.has(p.id) && isAvailable(p));
   if (team.isBot) starters.forEach((p, slot) => {
-    if (!p || !isAvailable(p) || (p.freshness ?? 100) >= 65) return;
-    const fresh = bench().filter((b) => b.line === p.line && (b.freshness ?? 100) >= 85 && avgSkill(b) >= avgSkill(p) - 1.5);
+    if (!p || !isAvailable(p) || (p.freshness ?? 100) >= 70) return;
+    const fresh = bench().filter((b) => b.line === p.line && (b.freshness ?? 100) >= 85 && avgSkill(b) >= avgSkill(p) - 2);
     if (!fresh.length) return;
     const sub = fresh.sort((a, b) => avgSkill(b) - avgSkill(a))[0];
     notes.push({ isHome, text: `📋 [${team.name}] ${tag(sub)} starter i stedet for en træt ${tag(p)}.` });

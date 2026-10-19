@@ -166,22 +166,28 @@ Tick hvert 3. minut (1..90).
   rundens mål er altid VAR-dramatik"): en overskrift pr. kamp (3 varianter pr. udfald),
   😮 Rundens overraskelse (fra runde 3: vinderen ≥3 pladser og ≥3 point under taberen før
   runden), 🏃 Dit holds løber (kun eget hold – km/topfart er private).
-- **Måltyper (v3.7)**, afgjort ét sted pr. mål og brugt i referat, avis og karakterark:
+- **Måltyper (v3.7)**, afgjort ét sted pr. mål og brugt i referat, observation og avis (oplæg/🅰 kun
+  for typer med oplægsgiver):
   LONGSHOT og DRIBBLE (vægtet af FIN / PAC+BAL, intet oplæg), COMBINATION, COUNTER og CUTBACK
   (kun af DIT holds FAST_COUNTER/LOW_CUTBACKS; for andre hold tilfældige 14 %/12 % – anti-
   spionage), HEADER, VAR. Mindst 3 tekster pr. type (clues.js). Fælles skala 0–20
   (`goalSpectacle`); målt: langskud 36 %, VAR 22 %, dribletur 20 %, kontra 8 % … af
-  rundens mål (`node tools/measure-duels.mjs 40 saeson`; før vandt VAR altid).
+  rundens mål (`node tools/measure-duels.mjs 40 saeson`; efter friskheds-kalibreringen: langskud
+  38 %, dribletur 22 %, VAR 19 %; før vandt VAR altid). Bevidst: at en
+  modstanders mål kaldes "dribletur"/"langskud" røber svagt fart/afslutning – på linje med de
+  eksisterende ord i describeFinish.
 - **Løbedistance og topfart (v3.7)** pr. karakter: km/90 = kæde-basis (MV 5,5, FOR 9,8, MID
   11,2, ANG 10,0) · (0,9 + STA·0,01) · pres (gegenpres 1,06, lav blok 0,96) · støj ±4 % ·
   min/90; topfart 25 + PAC·0,45 ± 1 (MV −3), mindst 10 min. Private (RATING_PRIVATE_FIELDS);
   spillerkortet viser km pr. 90 min og bedste topfart for sæsonen.
 - **Friskhed (v3.7**, brugeren: "kun 3 af mine spillere der har under 100%"; kilden
   −max(4, 14 − STA/2) + 8 straks): kampen koster round(km · (1,5 − STA·0,03)) ± 2 (støj, så
-  STA ikke kan regnes baglæns), +5 restitution (bænk +15), bund 50. Virker i kampen: bidrag i
-  duel, afslutning (også målmand) og luftduel · (0,85 + 0,15·friskhed/100). Bots hviler en
-  starter under 65 % for en frisk (≥85 %) bænkspiller i samme kæde, højst 1,5 svagere.
-  Målt over 10 runder: startere uden rotation ≈58 %, bots ≈62 %; mål/kamp 1,46 → 1,42.
+  STA ikke kan regnes baglæns); restitution 35 % af det, der mangler op til 100 (bænk +15
+  oveni), bund 50. Ligevægt for en fast starter ≈ 100 − 1,86·pris: MID ≈76 %, MV ≈85 % (QC:
+  med fast +5 endte alle på 50, og rotation blev en afgift). Virker i kampen: bidrag i duel,
+  afslutning (også målmand) og luftduel · (0,75 + 0,25·friskhed/100) – 50 % ≈ 12,5 % svagere.
+  Bots hviler en starter under 70 % for en frisk (≥85 %) bænkspiller i samme kæde, højst 2
+  svagere. Målt over 10 runder: startelleverne ≈81 % i snit; mål/kamp 1,46 → 1,50.
 
 ## 7. Mod-kunnen (v2.2b)
 - `counterTactics {vsPress, vsLowBlock, vsTrapLong}`, start
@@ -199,7 +205,9 @@ Tick hvert 3. minut (1..90).
   (v3.6, brugeren: "for hurtigt"; kilden gav 4–16, +60 %, −3, bund 25/12 – en
   starter gik fra ~45 til ~70 på 3 runder.)
 - Skema 3 (v3.6) migrerer eksisterende ligaer: mod-kunnen ×0,55 ind i puljen,
-  højde −5 cm (rækkefølgen bevares; luftduel og scouting-tekster følger med).
+  højde −5 cm. Skema 4 (v3.7) lægger højderne om efter rang i hver kæde til Superliga-
+  fordelingen (`heightAtQuantile`) – −5 cm-trinnet gælder altså ikke længere i sidste ende;
+  scouting- og referattekster med cm følger med.
 - UI (brugerens valg, afviger fra v2.5): kolonne 🧠Mod viser spillerens tre
   egne værdier "gegenpress · lav blok · VAR-linje" (sorterer på gennemsnittet;
   "??" for modstandere) – ingen samlet % mod en bestemt modstander, da den kan
