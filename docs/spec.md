@@ -181,12 +181,14 @@ Tick hvert 3. minut (1..90).
   min/90; topfart 25 + PAC·0,45 ± 1 (MV −3), mindst 10 min. Private (RATING_PRIVATE_FIELDS);
   spillerkortet viser km pr. 90 min og bedste topfart for sæsonen.
 - **Højintenst løb (v3.7.1**, brugeren: "hvor stor en andel af deres løb der er højintense løb"):
-  andel = (kæde-basis MV 2/FOR 7/MID 9/ANG 11 % + (PAC−10)·0,4) · pres (gegenpres 1,15, lav blok
+  andel (over ca. 20 km/t) = (kæde-basis MV 2/FOR 7/MID 9/ANG 11 % + (PAC−10)·0,4) · pres (gegenpres 1,15, lav blok
   0,9) · (0,8 + 0,2·friskhed/100) ± 1, klemt 1–20 % (topdivisioner ≈7–12 % for markspillere).
   Vises som "N % HI" i karakterarket, "N % højintenst" for dit holds løber og sæsonandelen på
-  spillerkortet. Privat (røber fart og pres).
+  spillerkortet (egen nævner `hiDistSum`, så v3.7.0-ligaer ikke viser for lavt). Ingen andel under
+  10 min spilletid. Privat (røber fart og pres). Bund 1 % (en målmand ligger på ≈2 %).
 - **Rundens mål viser kampen** (v3.7.1, brugeren: "hvilken kamp var dette i?"): hvert mål får
-  `matchIdx`; avisen linker til netop den kamps referat (ældre runder: kun navnet).
+  `matchIdx` (ældre runder findes via kampens navn); linket – i Liga- og Kamp-fanen – åbner
+  kampen, markerer målet i referatet og ruller frem til det.
 - **Friskhed (v3.7**, brugeren: "kun 3 af mine spillere der har under 100%"; kilden
   −max(4, 14 − STA/2) + 8 straks): kampen koster round(km · (1,5 − STA·0,03)) ± 2 (støj, så
   STA ikke kan regnes baglæns); restitution 35 % af det, der mangler op til 100 (bænk +15

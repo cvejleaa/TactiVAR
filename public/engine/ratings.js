@@ -77,7 +77,8 @@ export function finalizeSheet(sheet, homeGoals, awayGoals, rng, xpFor) {
     // Løbedistance for spilletiden; rate pr. 90 min fjernes igen (den røber udholdenheden).
     e.distanceKm = Math.round(e.km90 * (Math.max(0, e.minOut - e.minIn) / 90) * 10) / 10;
     e.hiKm = Math.round(e.distanceKm * e.hiShare / 100 * 100) / 100;
-    if (e.minOut - e.minIn < 10) e.topSpeed = null; // for kort tid til en rigtig spurt
+    // For kort tid til en rigtig spurt eller en meningsfuld HI-andel (støj på få minutter).
+    if (e.minOut - e.minIn < 10) { e.topSpeed = null; e.hiShare = null; }
     delete e.km90;
     if (!best || e.rating > best.rating) best = e;
   }

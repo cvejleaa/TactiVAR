@@ -359,6 +359,12 @@ try {
     await g.click('#goal-of-round-match');
     const card = await g.textContent(`#match-cards .matchcard:nth-child(${gor.matchIdx + 1})`);
     check('Linket åbner netop den kamps referat i Kamp-fanen', (await g.textContent('#tabs .tab.active')).includes('Kamp') && (await g.locator(`#match-cards .matchcard:nth-child(${gor.matchIdx + 1}).active`).count()) === 1 && card.startsWith(gor.match.split(' - ')[0]), card);
+    const focus = await g.locator('#goal-focus').textContent();
+    check('Målet er markeret i referatet og rullet frem', focus.includes(`${gor.min}'`) && focus.includes(gor.scorer) && (await g.locator('#goal-focus').isVisible()) && (await g.evaluate(() => { const r = document.getElementById('goal-focus').getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight; })), focus);
+    // Også fra avisen inde i Kamp-fanen (vælg først en anden kamp)
+    await g.click(`#match-cards .matchcard:nth-child(${((gor.matchIdx + 1) % 4) + 1})`);
+    await g.click('#match-center #goal-of-round-match');
+    check('Fra avisen i Kamp-fanen: kampen skiftes, og målet markeres', (await g.locator(`#match-cards .matchcard:nth-child(${gor.matchIdx + 1}).active`).count()) === 1 && (await g.locator('#goal-focus').count()) === 1);
   } else check('Runden havde intet mål (intet link at teste)', true);
   await tab('kamp');
   // Hver handling prøves på en frisk side (uden igangværende Match Center).
@@ -430,6 +436,21 @@ try {
   const note2 = await g.textContent('#notice');
   check('Migrering fra skema 2: beskeden nævner 100 point og Superliga-højderne, men ikke Hvis-Så og ikke de 5 cm', note2.includes('100 point') && note2.includes('Superliga') && !note2.includes('Hvis-Så') && !note2.includes('5 cm'), note2);
   const h2 = await g.evaluate(() => { const hs = JSON.parse(localStorage.getItem('tactivar_save')).league.teams.flatMap((t) => t.squad.map((p) => p.heightCm)); return [hs.reduce((a, b) => a + b) / hs.length, Math.min(...hs), Math.max(...hs)]; });
+  // Et gem fra v3.7.0 (skema 4, uden HI-felter og matchIdx): ingen "undefined"/"NaN", ingen 0 % HI,
+  // og linket i Rundens mål findes via kampens navn
+  const fixture4 = fs.readFileSync(new URL('../fixtures/save-schema4.json', import.meta.url), 'utf8');
+  await g.evaluate((f) => { for (const k of Object.keys(localStorage)) if (k.startsWith('tactivar_')) localStorage.removeItem(k); localStorage.setItem('tactivar_save', f); }, fixture4);
+  await reload();
+  await tab('kamp');
+  const old4 = await g.textContent('#match-center');
+  check('Gem fra v3.7.0: karakterark og avis uden "undefined"/"NaN" og uden HI-tal', !/undefined|NaN|% HI/.test(old4) && (await g.locator('.ratings td.run').count()) > 0, old4.slice(0, 120));
+  await g.click('#match-center #goal-of-round-match');
+  const g4 = JSON.parse(fixture4).league.lastRound.gazette.goalOfTheRound;
+  check('Gem fra v3.7.0: Rundens mål linker til kampen fundet ud fra navnet', (await g.textContent('#scoreboard')).includes(g4.match.split(' - ')[0]) && (await g.locator('#goal-focus').count()) === 1);
+  await tab('trup');
+  await g.locator('#matrix tbody tr').first().click();
+  check('Gem fra v3.7.0: spillerkortet viser ikke 0 % højintenst, men at tallet kommer', (await g.textContent('#run-stats')).includes('højintenst: kommer efter næste kamp'));
+
   // Skema 3 (v3.6 – den version, de fleste kommer fra): beskeden handler om højder og friskhed
   const fixture3 = fs.readFileSync(new URL('../fixtures/save-schema3.json', import.meta.url), 'utf8');
   await g.evaluate((f) => { for (const k of Object.keys(localStorage)) if (k.startsWith('tactivar_')) localStorage.removeItem(k); localStorage.setItem('tactivar_save', f); }, fixture3);

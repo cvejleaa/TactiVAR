@@ -216,7 +216,7 @@ function render() {
       // Resultaterne skjules under afspilningen, ligesom avisen (ellers afsløres de).
       league.lastRound && !mc?.playing ? renderLastRound({ round: league.lastRound, myTeamId: mine.id, onOpen: openReport }) : null,
       renderNextRound({ league, pairs: pairRound(league, game.ui.opponentIdx), myTeamId: mine.id }),
-      league.lastRound && !mc?.playing ? renderGazette(league.lastRound.gazette, mine.id, openReport) : null],
+      league.lastRound && !mc?.playing ? renderGazette(league.lastRound.gazette, mine.id, openGoal, league.lastRound.matches) : null],
   }[tab]();
   app.replaceChildren(...[
     h('nav', { class: 'tabs', id: 'tabs' }, TABS.map(([k, label]) => h('button', { id: `tab-${k}`, class: 'tab' + (k === tab ? ' active' : ''), onclick: () => showTab(k) }, label))),
@@ -265,6 +265,14 @@ function openMatchCenter(result, live) {
   if (live) timer = setInterval(() => { mc.shownCount++; if (mc.shownCount >= mc.matches[0].events.length) finishPlayback(); else renderMc(); }, PLAYBACK_MS);
 }
 
+// Link fra avisens "Rundens mål" (Liga- og Kamp-fanen): åbn kampen, markér målet og rul til det.
+function openGoal(i, goal) {
+  mc = lastRoundView(game.league.lastRound); mc.viewIdx = i;
+  mc.focus = { min: goal.min, scorer: goal.scorer };
+  game.ui.tab = 'kamp'; clearSwap(); view.notice = ''; persist(); render();
+  (document.getElementById('goal-focus') || document.getElementById('match-center'))?.scrollIntoView({ block: 'center' });
+}
+
 // Link fra Liga-siden til referatet af én kamp i seneste runde. Under afspilning vises
 // resultaterne slet ikke (vagten står ét sted: i liga-fanens render).
 function openReport(i) {
@@ -277,7 +285,8 @@ function finishPlayback() { clearInterval(timer); timer = null; mc.playing = fal
 const mcHandlers = {
   skip: finishPlayback,
   // Uden igangværende afspilning vises seneste runde; et valg af kamp/filter gemmer den som mc.
-  view: (i) => { mc ||= lastRoundView(game.league.lastRound); mc.viewIdx = i; renderMc(); },
+  view: (i) => { mc ||= lastRoundView(game.league.lastRound); mc.viewIdx = i; mc.focus = null; renderMc(); },
+  openGoal: (i, goal) => openGoal(i, goal),
   filter: (f) => { mc ||= lastRoundView(game.league.lastRound); mc.filter = f; renderMc(); },
 };
 const matchCenterEl = () => renderMatchCenter({ mc, myTeamId: myTeam().id, on: mcHandlers });

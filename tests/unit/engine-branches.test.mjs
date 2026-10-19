@@ -719,6 +719,7 @@ test('finalizeSheet: km for spilletiden, ingen topfart under 10 min, og raten pr
   assert.equal(by.b.distanceKm, 3.6);  // 11,2·29/90 = 3,61
   assert.equal(by.c.distanceKm, 0.6);  // 11,2·5/90 = 0,62
   assert.equal(by.a.topSpeed, 29.5); assert.equal(by.c.topSpeed, null);
+  assert.equal(by.a.hiShare, 9); assert.equal(by.b.hiShare, 9); assert.equal(by.c.hiShare, null); // under 10 min: ingen andel
   for (const e of res.home) assert.ok(!('km90' in e), 'raten pr. 90 min røber udholdenheden');
 });
 
@@ -973,7 +974,11 @@ test('bogføring: km i højintenst løb summeres over sæsonen', () => {
   const L = createLeague(createRng(2)); const p = L.teams[0].squad[0];
   const res = syntheticRound(L, { ratings: [{ playerId: p.id, rating: 6, gainedCounterXp: 1, distanceKm: 11, hiKm: 1.1, topSpeed: 30, minIn: 1, minOut: 90 }] });
   commitRound(L, res, { next: () => 0.5 });
-  assert.equal(p.hiKmSum, 1.1);
+  assert.equal(p.hiKmSum, 1.1); assert.equal(p.hiDistSum, 11);
+  // En runde fra før v3.7.1 (ingen hiKm) tæller med i distancen, men ikke i HI-nævneren
+  const old = syntheticRound(L, { ratings: [{ playerId: p.id, rating: 6, gainedCounterXp: 1, distanceKm: 10, topSpeed: 30, minIn: 1, minOut: 90 }] }); old.round = 2;
+  commitRound(L, old, { next: () => 0.5 });
+  assert.equal(p.distanceSum, 21); assert.equal(p.hiKmSum, 1.1); assert.equal(p.hiDistSum, 11); // andel 10 %, ikke 1,1/21 = 5 %
 });
 test('hvert mål ved, hvilken kamp i runden det faldt i', () => {
   const L = createLeague(createRng(31)), res = playRound(L, 1, createRng(31));

@@ -82,7 +82,10 @@ export function commitRound(league, result, rng) {
         // Støj ±2 på prisen, så udholdenheden ikke kan regnes baglæns af den offentlige friskhed.
         p.freshness = afterMatchFreshness(p.freshness, r.distanceKm ?? 0, p.skills.stamina, Math.round(rng.next() * 4 - 2));
         // Sæsontal til spillerkortet (kun ejeren ser dem): km pr. 90 min og bedste topfart.
-        if (r.distanceKm > 0) { p.distanceSum += r.distanceKm; p.hiKmSum += r.hiKm ?? 0; p.minutesSum += Math.max(0, (r.minOut ?? 90) - (r.minIn ?? 1)); }
+        if (r.distanceKm > 0) { p.distanceSum += r.distanceKm; p.minutesSum += Math.max(0, (r.minOut ?? 90) - (r.minIn ?? 1)); }
+        // HI-andelen har sin egen nævner: kun km fra kampe med HI-data (fra v3.7.1), så
+        // ligaer fra v3.7.0 ikke viser en for lav sæsonandel.
+        if (r.distanceKm > 0 && r.hiKm != null) { p.hiKmSum += r.hiKm; p.hiDistSum += r.distanceKm; }
         if (r.topSpeed > p.topSpeedMax) p.topSpeedMax = r.topSpeed;
       }
     }
