@@ -20,7 +20,7 @@ export const COLUMNS = [
   { key: 'name', label: 'Spiller', field: 'shortName', value: (p) => p.shortName, text: true },
   { key: 'line', label: 'Kæde', field: 'line', value: (p) => ['GK', 'DEF', 'MID', 'ATT'].indexOf(p.line) },
   { key: 'age', label: 'Alder', field: 'age', value: (p) => p.age, num: true },
-  { key: 'fresh', label: 'Frisk/🚑', title: 'Friskhed i % – 🚑 = skadet (antal kampe)', field: 'freshness', value: (p) => (p.injuryMatchesLeft > 0 ? -p.injuryMatchesLeft : p.freshness), num: true },
+  { key: 'fresh', label: 'Frisk/🚑', title: 'Friskhed i % – en træt spiller yder mindre (75 % ≈ 6 %, 50 % ≈ 12,5 % svagere i dueller, afslutninger og luftdueller). En kamp koster efter løbet distance; man kommer sig hurtigere, jo mere træt man er; bænken +15 ekstra – 🚑 = skadet (antal kampe)', field: 'freshness', value: (p) => (p.injuryMatchesLeft > 0 ? -p.injuryMatchesLeft : p.freshness), num: true },
   { key: 'height', label: 'Højde', field: 'heightCm', value: (p) => p.heightCm, num: true },
   { key: 'jump', label: 'Spring', field: 'jumpingPower', value: (p) => p.jumpingPower, num: true, heat: true },
   { key: 'aerial', label: '✈ Luft', title: 'Samlet luftduel/hovedstød', field: 'aerialPower', value: (p) => p.aerialPower, num: true, heat: true },

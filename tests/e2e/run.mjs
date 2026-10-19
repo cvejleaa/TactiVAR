@@ -294,6 +294,10 @@ try {
   const mpOwn = await g.locator('.ratings').nth(0).locator('.mp-token .mp-val').allTextContents();
   const mpOpp = await g.locator('.ratings').nth(1).locator('.mp-token .mp-val').allTextContents();
   check('Minibane: 11 startere pr. hold – egne med karakter, modstanderens kun stjerner', mpOwn.length === 11 && mpOwn.every((t) => /^\d+\.\d$/.test(t)) && mpOpp.length === 11 && mpOpp.every((t) => /^[★☆]{5}$/.test(t)), `${mpOwn.length}/${mpOpp.length}`);
+  const runs = await g.locator('.ratings').nth(0).locator('td.run').allTextContents();
+  check('Karakterark: dit hold har løbet distance og topfart, modstanderen ikke', runs.length >= 11 && runs.filter((t) => /^\d+\.\d km · \d+\.\d km\/t$/.test(t)).length >= 11 && (await g.locator('.ratings').nth(1).locator('td.run').count()) === 0, runs.slice(0, 2).join(' | '));
+  const gzText = await g.textContent('#gazette');
+  check('Avisen: en overskrift pr. kamp og dit holds løber', (await g.locator('#headlines li').count()) === 4 && /Dit holds løber: #\d+ .+ – \d+\.\d km/.test(gzText), gzText.slice(0, 200));
   const iconTitles = await g.evaluate(() => [...document.querySelectorAll('.ratings .ricon')].map((e) => [e.textContent, e.title]));
   check('Ikonerne i karakterarket har mouse-over-tekst', iconTitles.length > 0 && iconTitles.every(([t, ti]) => ti.length > 3 && !ti.includes('undefined')), JSON.stringify(iconTitles.slice(0, 3)));
   const legendTxt = await g.textContent('#icon-legend');
@@ -331,6 +335,13 @@ try {
   await tab('liga');
   check('Ligatabellen er opdateret efter runde 1', stHead.includes('efter 1 runde'), stHead);
   await g.selectOption('#team-select', '2');
+  // Spillerkortet viser sæsonens løb (km pr. 90 min og bedste topfart) for en spiller, der har spillet
+  const card = await g.evaluate(() => { const t = JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((x) => !x.isBot); const p = t.squad.find((x) => x.minutesSum > 0); return { nr: p.shirtNumber, km: (p.distanceSum / p.minutesSum * 90).toFixed(1), ts: p.topSpeedMax.toFixed(1) }; });
+  await g.selectOption('#team-select', '0');
+  await g.locator('#matrix tbody tr', { has: g.locator('td:first-child', { hasText: new RegExp(`#${card.nr}$`) }) }).first().click();
+  const rs = await g.textContent('#run-stats');
+  check('Spillerkortet: km pr. 90 min og topfart for sæsonen', rs.includes(`${card.km} km pr. 90 min`) && rs.includes(`topfart ${card.ts} km/t`), `${rs} (forventet ${card.km} / ${card.ts})`);
+  await tab('liga'); await g.selectOption('#team-select', '2');
   check('Holdvælgeren i Liga-fanen viser holdet i Trup', (await g.textContent('#tabs .tab.active')).includes('Trup') && (await g.textContent('#club-name')) === (await g.locator('#team-select option').nth(2).textContent()));
   await g.selectOption('#team-select', '0');
   await g.locator('#matrix tbody tr:nth-child(2) button').click();
@@ -390,10 +401,10 @@ try {
   await g.evaluate((f) => { for (const k of Object.keys(localStorage)) if (k.startsWith('tactivar_')) localStorage.removeItem(k); localStorage.setItem('tactivar_save', f); }, fixture);
   await reload();
   const migNotice = await g.textContent('#notice');
-  check('Migrering: beskeden forklarer puljen på 100 og de 5 cm – og nævner backuppen', ['100 point', '5 cm lavere', 'Hvis-Så', 'backup'].every((x) => migNotice.includes(x)), migNotice);
+  check('Migrering: beskeden forklarer puljen på 100, Superliga-højderne og friskheden – og nævner backuppen', ['100 point', 'Superliga', 'Friskhed', 'Hvis-Så', 'backup'].every((x) => migNotice.includes(x)), migNotice);
   await reload(); await reload();
   const mig = await g.evaluate(() => ({ schema: JSON.parse(localStorage.getItem('tactivar_save')).schemaVersion, backups: Object.keys(localStorage).filter((k) => k.startsWith('tactivar_backup_')).length }));
-  check('Migrering: gemmes straks i skema 3, kun én backup trods tre genindlæsninger', mig.schema === 3 && mig.backups === 1, JSON.stringify(mig));
+  check('Migrering: gemmes straks i skema 4, kun én backup trods tre genindlæsninger', mig.schema === 4 && mig.backups === 1, JSON.stringify(mig));
   await tab('liga'); const migHead = await g.textContent('#standings-title'); await tab('trup');
   check('Migrering: ligaen fra skema 1 er intakt (runde 1, 18 spillere)', migHead.includes('efter 1 runde') && (await rows()) === 18);
   // Runden er gemt før v3.5 (uden plads og startformation): Kamp-fanen viser den med listen, uden minibane
@@ -407,9 +418,30 @@ try {
   await g.evaluate((f) => { for (const k of Object.keys(localStorage)) if (k.startsWith('tactivar_')) localStorage.removeItem(k); localStorage.setItem('tactivar_save', f); }, fixture2);
   await reload();
   const note2 = await g.textContent('#notice');
-  check('Migrering fra skema 2: beskeden nævner 100 point og 5 cm, men ikke Hvis-Så', note2.includes('100 point') && note2.includes('5 cm lavere') && !note2.includes('Hvis-Så'), note2);
-  const h2 = await g.evaluate((f) => { const a = JSON.parse(f).league.teams[0].squad[0].heightCm, b = JSON.parse(localStorage.getItem('tactivar_save')).league.teams[0].squad[0].heightCm; return [a, b]; }, fixture2);
-  check('Migrering fra skema 2: spillerne er gemt 5 cm lavere', h2[1] === h2[0] - 5, h2.join(' → '));
+  check('Migrering fra skema 2: beskeden nævner 100 point og Superliga-højderne, men ikke Hvis-Så og ikke de 5 cm', note2.includes('100 point') && note2.includes('Superliga') && !note2.includes('Hvis-Så') && !note2.includes('5 cm'), note2);
+  const h2 = await g.evaluate(() => { const hs = JSON.parse(localStorage.getItem('tactivar_save')).league.teams.flatMap((t) => t.squad.map((p) => p.heightCm)); return [hs.reduce((a, b) => a + b) / hs.length, Math.min(...hs), Math.max(...hs)]; });
+  // Skema 3 (v3.6 – den version, de fleste kommer fra): beskeden handler om højder og friskhed
+  const fixture3 = fs.readFileSync(new URL('../fixtures/save-schema3.json', import.meta.url), 'utf8');
+  await g.evaluate((f) => { for (const k of Object.keys(localStorage)) if (k.startsWith('tactivar_')) localStorage.removeItem(k); localStorage.setItem('tactivar_save', f); }, fixture3);
+  await reload();
+  const note3 = await g.textContent('#notice');
+  const dl = g.waitForEvent('download');
+  await g.click('#download-migration-backup');
+  const bk = await dl;
+  check('Migrering: beskeden har en knap, der henter det gamle spil (skema 3) som fil', bk.suggestedFilename().startsWith('tactivar_backup_') && JSON.parse(fs.readFileSync(await bk.path(), 'utf8')).schemaVersion === 3);
+  check('Migrering fra skema 3: beskeden nævner Superliga-højderne og friskheden – ikke puljen eller Hvis-Så', note3.includes('Superliga') && note3.includes('Friskhed') && !note3.includes('100 point') && !note3.includes('Hvis-Så'), note3);
+  // Advarsel ved ▶ om trætte startere (under 70 %)
+  const setStarterFresh = async (v) => { await g.evaluate((val) => { const d = JSON.parse(localStorage.getItem('tactivar_save')); const t = d.league.teams.find((x) => !x.isBot); for (const p of t.squad) p.freshness = 100; t.squad.find((p) => p.id === t.tactics.lineupSlots[6]).freshness = val; localStorage.setItem('tactivar_save', JSON.stringify(d)); }, v); await reload(); };
+  await setStarterFresh(69);
+  check('Advarsel: én starter under 70 % giver "⚠ 1 trætte startere"', (await g.textContent('#tired-warning')).trim() === '⚠ 1 trætte startere');
+  await setStarterFresh(70);
+  check('Ingen advarsel ved 70 %', (await g.locator('#tired-warning').count()) === 0);
+  await g.evaluate(() => { const d = JSON.parse(localStorage.getItem('tactivar_save')); const t = d.league.teams.find((x) => !x.isBot); t.squad.find((p) => !t.tactics.lineupSlots.includes(p.id)).freshness = 10; localStorage.setItem('tactivar_save', JSON.stringify(d)); });
+  await reload();
+  check('En træt bænkspiller giver ingen advarsel', (await g.locator('#tired-warning').count()) === 0);
+  await g.evaluate((f) => { for (const k of Object.keys(localStorage)) if (k.startsWith('tactivar_')) localStorage.removeItem(k); localStorage.setItem('tactivar_save', f); }, fixture2);
+  await reload();
+  check('Migrering fra skema 2: højderne er gemt som i Superligaen (snit ≈184, 168–201)', h2[0] >= 183.5 && h2[0] <= 185 && h2[1] >= 168 && h2[2] <= 201, h2.map((x) => x.toFixed(1)).join(' / '));
 
   // Mislykkes backuppen ved migrering (fuldt lager), overskrives det gamle format ikke – og der advares
   await g.evaluate((f) => { for (const k of Object.keys(localStorage)) if (k.startsWith('tactivar_')) localStorage.removeItem(k); localStorage.setItem('tactivar_save', f); }, fixture);

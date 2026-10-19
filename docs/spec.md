@@ -39,14 +39,16 @@ begrundelse).
   positioning, intercepting, goalkeeping`, vægtet efter kæde (GK goalkeeping
   base+2, andre 1–2; finishing for ikke-ATT 2–9). `rollStat` er
   trekantsfordelt og klemt til 1–20.
-- Højde (v3.6, brugeren: "snit på 186 cm, hvor den gennemsnitlige dansker er 181";
-  kilden: GK/DEF 181–198 jævnt, øvrige 172–195): klokkeform om kædens midte
-  GK 186, FOR 182, MID 178, ANG 181 ± 15 (tre terninger −5..5); truppen 2/6/6/4 giver ≈180,9.
+- Højde (v3.7, brugerens dokument "Spillerhøjde i Superligaen": ligasnit ≈184 cm, trupper
+  182,9–187,5, 169–201; v3.6's −5 cm "holder ikke"): kædens midte MV 192, FOR 186, MID 179,5,
+  ANG 181 + holdprofil −1,5…+3 cm; tre terninger −6..6 (MV −4..4), klemt 168–201. Bred spredning
+  i hver kæde (brugeren: ikke alle tæt på positionens snit) – ligasnit ≈184,2, spredning ≈7,5.
+  Skema 3→4 lægger eksisterende ligaer om efter rang i hver kæde (`heightAtQuantile`).
   Springkraft 1–20.
 - **Luftduel** `aerialPower = round(heightScore·0,35 + jump·0,35 +
   strength·0,15 + positioning·0,15)`, `heightScore = clamp(1..20,
-  round((cm−163)·0,70))` (v3.6: nulpunkt 163, før 168, så luftduellerne ikke
-  svækkes af de lavere spillere). Mellemregningen vises på spillerkortet.
+  round((cm−166)·0,70))` (v3.7: nulpunkt 166 – højde-scoren på niveau med kildens 168 ved
+  snit 186). Mellemregningen vises på spillerkortet.
 - **VAR-profil (skjult for alle, også ejer)**: cynicism 4–18, theatre 3–18,
   varPulse baseMin−1..baseMax+2. Vises som "??" — "Afsløres gennem kampe".
 - Unikt kortnavn pr. hold: "M. Jensen".
@@ -159,12 +161,33 @@ Tick hvert 3. minut (1..90).
   ±0,22: ≥8,35 = 5, ≥7,25 = 4, ≥6,15 = 3, ≥5,15 = 2, ellers 1. Sortering på
   Vurd for modstandere bruger stjerner.
 - MotM 👑 = højeste karakter.
-- Avis: 🏆 Rundens Spiller (højeste karakter på tværs), 🚀 Rundens Mål
-  (`spectacleScore`: hovedstød aerial+(≥80'?5:2)+rnd·4, VAR-mål
-  15+(≥80'?6:2)+rnd·4, ellers FIN+(≥80'?4:1)+rnd·5); ingen mål → Rundens
-  Defensive Aktion; kort klumme.
-- Restitution: startere `freshness − max(4, 14 − round(STA·0,5)) + 8`, klemt
-  60–100; bænk +15.
+- Avis: 🏆 Rundens Spiller (højeste karakter på tværs), 🚀 Rundens Mål, ingen mål →
+  Rundens Defensive Aktion; kort klumme. **v3.7** (brugeren: "avisen er stadig kedelig, og
+  rundens mål er altid VAR-dramatik"): en overskrift pr. kamp (3 varianter pr. udfald),
+  😮 Rundens overraskelse (fra runde 3: vinderen ≥3 pladser og ≥3 point under taberen før
+  runden), 🏃 Dit holds løber (kun eget hold – km/topfart er private).
+- **Måltyper (v3.7)**, afgjort ét sted pr. mål og brugt i referat, observation og avis (oplæg/🅰 kun
+  for typer med oplægsgiver):
+  LONGSHOT og DRIBBLE (vægtet af FIN / PAC+BAL, intet oplæg), COMBINATION, COUNTER og CUTBACK
+  (kun af DIT holds FAST_COUNTER/LOW_CUTBACKS; for andre hold tilfældige 14 %/12 % – anti-
+  spionage), HEADER, VAR. Mindst 3 tekster pr. type (clues.js). Fælles skala 0–20
+  (`goalSpectacle`); målt: langskud 36 %, VAR 22 %, dribletur 20 %, kontra 8 % … af
+  rundens mål (`node tools/measure-duels.mjs 40 saeson`; efter friskheds-kalibreringen: langskud
+  38 %, dribletur 22 %, VAR 19 %; før vandt VAR altid). Bevidst: at en
+  modstanders mål kaldes "dribletur"/"langskud" røber svagt fart/afslutning – på linje med de
+  eksisterende ord i describeFinish.
+- **Løbedistance og topfart (v3.7)** pr. karakter: km/90 = kæde-basis (MV 5,5, FOR 9,8, MID
+  11,2, ANG 10,0) · (0,9 + STA·0,01) · pres (gegenpres 1,06, lav blok 0,96) · støj ±4 % ·
+  min/90; topfart 25 + PAC·0,45 ± 1 (MV −3), mindst 10 min. Private (RATING_PRIVATE_FIELDS);
+  spillerkortet viser km pr. 90 min og bedste topfart for sæsonen.
+- **Friskhed (v3.7**, brugeren: "kun 3 af mine spillere der har under 100%"; kilden
+  −max(4, 14 − STA/2) + 8 straks): kampen koster round(km · (1,5 − STA·0,03)) ± 2 (støj, så
+  STA ikke kan regnes baglæns); restitution 35 % af det, der mangler op til 100 (bænk +15
+  oveni), bund 50. Ligevægt for en fast starter ≈ 100 − 1,86·pris: MID ≈76 %, MV ≈85 % (QC:
+  med fast +5 endte alle på 50, og rotation blev en afgift). Virker i kampen: bidrag i duel,
+  afslutning (også målmand) og luftduel · (0,75 + 0,25·friskhed/100) – 50 % ≈ 12,5 % svagere.
+  Bots hviler en starter under 70 % for en frisk (≥85 %) bænkspiller i samme kæde, højst 2
+  svagere. Målt over 10 runder: startelleverne ≈81 % i snit; mål/kamp 1,46 → 1,50.
 
 ## 7. Mod-kunnen (v2.2b)
 - `counterTactics {vsPress, vsLowBlock, vsTrapLong}`, start
@@ -182,7 +205,9 @@ Tick hvert 3. minut (1..90).
   (v3.6, brugeren: "for hurtigt"; kilden gav 4–16, +60 %, −3, bund 25/12 – en
   starter gik fra ~45 til ~70 på 3 runder.)
 - Skema 3 (v3.6) migrerer eksisterende ligaer: mod-kunnen ×0,55 ind i puljen,
-  højde −5 cm (rækkefølgen bevares; luftduel og scouting-tekster følger med).
+  højde −5 cm. Skema 4 (v3.7) lægger højderne om efter rang i hver kæde til Superliga-
+  fordelingen (`heightAtQuantile`) – −5 cm-trinnet gælder altså ikke længere i sidste ende;
+  scouting- og referattekster med cm følger med.
 - UI (brugerens valg, afviger fra v2.5): kolonne 🧠Mod viser spillerens tre
   egne værdier "gegenpress · lav blok · VAR-linje" (sorterer på gennemsnittet;
   "??" for modstandere) – ingen samlet % mod en bestemt modstander, da den kan

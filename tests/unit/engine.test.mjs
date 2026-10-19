@@ -58,9 +58,8 @@ test('spillernes værdier ligger i kildens intervaller', () => {
   for (const p of all) {
     const [lo, hi] = ranges[p.roleTier];
     assert.ok(p.age >= lo && p.age <= hi, `${p.roleTier} alder ${p.age}`);
-    // v3.6: klokkeform om kædens midte (GK 186, FOR 182, MID 176, ANG 179) ± 15 cm
-    const mid = { GK: 186, DEF: 182, MID: 178, ATT: 181 }[p.line];
-    assert.ok(p.heightCm >= mid - 15 && p.heightCm <= mid + 15, `${p.line} ${p.heightCm}`);
+    // v3.7 (Superligaen): 168–201 cm for alle; målmænd mindst 180
+    assert.ok(p.heightCm >= (p.line === 'GK' ? 180 : 168) && p.heightCm <= 201, `${p.line} ${p.heightCm}`);
     for (const v of Object.values(p.skills)) assert.ok(v >= 1 && v <= 20);
     assert.ok(p.varProfile.cynicism >= 4 && p.varProfile.theatre >= 3);
     const sum = Object.values(p.skills).reduce((a, b) => a + b, 0);
@@ -74,12 +73,12 @@ test('spillernes værdier ligger i kildens intervaller', () => {
   assert.equal(s[3].roleTier, 'STAR'); assert.equal(s[7].roleTier, 'STAR');
 });
 
-test('luftduel-formlen: 188 cm, spring 16, styrke 12, position 13 giver 16 (faktor 0,65 ville give 15)', () => {
-  const b = aerialBreakdown(188, 16, 12, 13); // v3.6: nulpunkt 163 cm (før 168 – så gav 188 cm højde-score 14)
+test('luftduel-formlen: 191 cm, spring 16, styrke 12, position 13 giver 16 (faktor 0,65 ville give 15)', () => {
+  const b = aerialBreakdown(191, 16, 12, 13); // v3.7: nulpunkt 166 cm (v3.6: 163 → score 20; kilden 168 → 16)
   assert.equal(b.heightScore, 18); // round(25 × 0,70 = 17,5)
   assert.equal(b.total, 16);       // 6,30 + 5,60 + 1,80 + 1,95 = 15,65
-  assert.equal(aerialBreakdown(155, 10, 10, 10).heightScore, 1);
-  assert.equal(aerialBreakdown(200, 10, 10, 10).heightScore, 20);
+  assert.equal(aerialBreakdown(158, 10, 10, 10).heightScore, 1);
+  assert.equal(aerialBreakdown(203, 10, 10, 10).heightScore, 20);
 });
 
 test('rollStat er klemt til 1–20', () => {
@@ -457,11 +456,17 @@ test('referatet viser ingen mod-kunnen-procent mod modstanderen (kan bruges til 
   assert.ok(duels > 20, `for få vundne dueller for dit hold (${duels})`);
 });
 
-test('holdsnittet for højde ligger tæt på den danske 181 cm (før ≈186)', () => {
-  const hs = [];
-  for (let seed = 1; seed <= 20; seed++) for (const t of createLeague(createRng(seed)).teams) hs.push(t.squad.reduce((a, p) => a + p.heightCm, 0) / 18);
+test('højde som i Superligaen: ligasnit 183,5–185 (v3.6 gav ≈181), laveste 168–170, højeste 199–201', () => {
+  const hs = [], teams = [];
+  for (let seed = 1; seed <= 40; seed++) for (const t of createLeague(createRng(seed)).teams) { const x = t.squad.map((p) => p.heightCm); hs.push(...x); teams.push(x.reduce((a, b) => a + b) / 18); }
   const mean = hs.reduce((a, b) => a + b) / hs.length;
-  assert.ok(mean >= 180 && mean <= 182, String(mean));
+  assert.ok(mean >= 183.5 && mean <= 185, String(mean));
+  assert.ok(Math.min(...hs) >= 168 && Math.min(...hs) <= 170 && Math.max(...hs) >= 199 && Math.max(...hs) <= 201, `${Math.min(...hs)}–${Math.max(...hs)}`);
+  // Hele ligaen spredes som en rigtig liga (ikke alle tæt på positionens snit): spredning 6,5–8 cm
+  const sdAll = Math.sqrt(hs.reduce((a, h) => a + (h - mean) ** 2, 0) / hs.length);
+  assert.ok(sdAll >= 6.5 && sdAll <= 8, String(sdAll));
+  // Holdprofilerne spreder truppernes snit (Superligaen 182,9–187,5)
+  assert.ok(Math.max(...teams) - Math.min(...teams) >= 4, `${Math.min(...teams)}–${Math.max(...teams)}`);
 });
 
 // ---------- v3.6: startformel, højder og forsæson-indtryk (Test Manager) ----------
@@ -480,20 +485,30 @@ test('mod-kunnen start: round((alder−16)·1,2 + POS·0,8) + støj −8..8, kle
   assert.deepEqual(initialCounterTactics(fixedInt(8), 40, 20), { vsPress: 33, vsLowBlock: 33, vsTrapLong: 33 });
 });
 
-test('højde: snit pr. kæde = HEIGHT_MID (±1 cm), spredning ca. 5,5 cm (tre terninger −5..5)', () => {
+test('højde: snit pr. kæde = HEIGHT_MID + holdprofil (±1 cm), bred spredning i hver kæde (brugeren: ikke alle tæt på positionens snit)', () => {
   const by = { GK: [], DEF: [], MID: [], ATT: [] };
   for (let seed = 1; seed <= 40; seed++) for (const t of createLeague(createRng(seed)).teams) for (const p of t.squad) by[p.line].push(p.heightCm);
   for (const [line, hs] of Object.entries(by)) {
     const mean = hs.reduce((a, b) => a + b) / hs.length, sd = Math.sqrt(hs.reduce((a, h) => a + (h - mean) ** 2, 0) / hs.length);
-    assert.ok(Math.abs(mean - HEIGHT_MID[line]) <= 1, `${line} snit ${mean}`);
-    assert.ok(sd >= 4.9 && sd <= 6.2, `${line} spredning ${sd}`); // to terninger ≈4,5; én bred ≈8,9
+    assert.ok(Math.abs(mean - (HEIGHT_MID[line] + 0.75)) <= 1, `${line} snit ${mean}`);
+    if (line === 'GK') assert.ok(sd >= 4 && sd <= 5.3, `GK spredning ${sd}`); // tre terninger −4..4 (≈4,5)
+    else assert.ok(sd >= 6 && sd <= 7.3, `${line} spredning ${sd}`);       // tre terninger −6..6 (≈6,5; v3.6 ≈5,5)
   }
-  assert.deepEqual(HEIGHT_MID, { GK: 186, DEF: 182, MID: 178, ATT: 181 });
+  assert.deepEqual(HEIGHT_MID, { GK: 192, DEF: 186, MID: 179.5, ATT: 181 });
+});
+test('forsæson-indtrykket om luftspillet kræver 190 cm (v3.6: 187) og spring 13', () => {
+  const vp = { cynicism: 5, theatre: 5, varPulse: 5 };
+  assert.ok(generateScoutingClues('A. B', vp, 190, 13).some((c) => c.includes('en hel etage')));
+  assert.ok(!generateScoutingClues('A. B', vp, 189, 13).some((c) => c.includes('en hel etage')));
+  assert.ok(!generateScoutingClues('A. B', vp, 190, 12).some((c) => c.includes('en hel etage')));
 });
 
-test('forsæson-indtrykket om luftspillet kræver 187 cm (før 190) og spring 13', () => {
-  const vp = { cynicism: 5, theatre: 5, varPulse: 5 };
-  assert.ok(generateScoutingClues('A. B', vp, 187, 13).some((c) => c.includes('en hel etage')));
-  assert.ok(!generateScoutingClues('A. B', vp, 186, 13).some((c) => c.includes('en hel etage')));
-  assert.ok(!generateScoutingClues('A. B', vp, 187, 12).some((c) => c.includes('en hel etage')));
+test('heightAtQuantile: fraktiler af de tre terninger om kædens midte + holdprofilens snit (0,75)', async () => {
+  const { heightAtQuantile } = await import('../../public/engine/generator.js');
+  assert.equal(heightAtQuantile('GK', 0.5), 193);    // round(192,75) + median 0
+  assert.equal(heightAtQuantile('MID', 0.5), 180);   // round(180,25)
+  assert.equal(heightAtQuantile('DEF', 0), 169);     // 187 − 18
+  assert.equal(heightAtQuantile('ATT', 0.999), 199); // 182 + 17 (indeks 2194 af 2197)
+  assert.equal(heightAtQuantile('DEF', 0.9999), 201); // 187 + 18 = 205 → loft 201
+  assert.equal(heightAtQuantile('GK', 0), 181);      // 193 − 12
 });

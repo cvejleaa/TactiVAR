@@ -46,7 +46,7 @@ const phases = (pass, focus, height) => (t) => {
   Object.assign(t.tactics.phases.phase1_buildUp, { passingStyle: pass, attackFocus: focus });
   Object.assign(t.tactics.phases.phase2_defending, { pressingHeight: height, offsideTrap: 'OFF' });
 };
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === `file://${process.argv[1]}` && process.argv[3] !== 'saeson') {
   const pct = (x) => `${(x * 100).toFixed(1)} %`;
   const liga = measure();
   console.log(`Ligaens egne taktikker: fase 1 vinder ${pct(liga.rate)} (${liga.n} dueller, ${ARG_N} ligaer × 3 runder); ${liga.goalsPerMatch.toFixed(2)} mål pr. kamp, heraf ${liga.headersPerMatch.toFixed(2)} hovedstød.`);
@@ -57,4 +57,34 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   console.log(`Rigtig mod-stil til opbygningen (lange bolde mod gegenpres): opbygning vinder ${pct(measure(phases('DIRECT_LONG', 'LOW_CUTBACKS', 'HIGH_GEGENPRESS')).rate)}.`);
   const mean = (i) => (liga.series.reduce((a, s) => a + s[i], 0) / ARG_N).toFixed(1);
   console.log(`Startelleverens bedste mod-kunnen: start ${mean(0)} → runde 1 ${mean(1)} → 2 ${mean(2)} → 3 ${mean(3)}`);
+}
+
+// Sæson-måling (v3.7): hvilke måltyper vinder "Rundens mål", friskhed over 10 runder (bots
+// roterer) og mål pr. kamp tidligt vs. sent. Kør: node tools/measure-duels.mjs [N] saeson
+export function measureSeason(N = ARG_N, rounds = 10) {
+  const kinds = {}, freshMe = [], freshBots = [], goalsEarly = [], goalsLate = [];
+  for (let s = 1; s <= N; s++) {
+    const rng = createRng(s * 104729);
+    const L = createLeague(rng);
+    for (let r = 1; r <= rounds; r++) {
+      const res = playRound(L, 1 + (r % 7), rng);
+      const g = res.gazette.goalOfTheRound; if (g) kinds[g.kind] = (kinds[g.kind] || 0) + 1;
+      const gpm = res.matches.reduce((a, m) => a + m.homeGoals + m.awayGoals, 0) / res.matches.length;
+      (r <= 2 ? goalsEarly : r >= rounds - 1 ? goalsLate : []).push(gpm);
+      commitRound(L, res, rng);
+    }
+    for (const t of L.teams) {
+      const st = t.squad.filter((p) => t.tactics.lineupSlots.includes(p.id));
+      (t.isBot ? freshBots : freshMe).push(st.reduce((a, p) => a + p.freshness, 0) / st.length);
+    }
+  }
+  const mean = (a) => a.reduce((x, y) => x + y, 0) / a.length;
+  const total = Object.values(kinds).reduce((a, b) => a + b, 0);
+  return { kinds: Object.fromEntries(Object.entries(kinds).map(([k, v]) => [k, v / total])), freshMe: mean(freshMe), freshBots: mean(freshBots), goalsEarly: mean(goalsEarly), goalsLate: mean(goalsLate) };
+}
+if (import.meta.url === `file://${process.argv[1]}` && process.argv[3] === 'saeson') {
+  const r = measureSeason();
+  console.log('Rundens mål pr. type:', Object.entries(r.kinds).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${(v * 100).toFixed(0)} %`).join(', '));
+  console.log(`Startelleverens friskhed efter 10 runder: dit hold (roterer ikke her) ${r.freshMe.toFixed(1)} %, bots ${r.freshBots.toFixed(1)} %`);
+  console.log(`Mål pr. kamp: runde 1–2 ${r.goalsEarly.toFixed(2)}, runde 9–10 ${r.goalsLate.toFixed(2)}`);
 }

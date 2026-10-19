@@ -69,6 +69,7 @@ function start() {
     game = r.state; view.savedAt = r.state.savedAt;
     if (r.migratedFrom != null) {
       view.notice = migrationNotice(r.migratedFrom) + (r.backupKey ? ' Det gamle spil ligger som backup i browseren.' : '');
+      view.backupKey = r.backupKey || null; // knap i beskeden: hent den gamle version som fil
       // Gem straks i det nye format (ellers tog hver genindlæsning en ny backup) – men kun
       // når backuppen af det gamle format lykkedes; ellers står det gamle urørt, og der advares.
       if (r.backupKey) persist();
@@ -80,12 +81,19 @@ function start() {
   render();
 }
 
+// Startere under 70 % friskhed på dit hold (advarsel ved ▶) – under en fast starters ligevægt (≈75 %).
+function tiredStarters() {
+  const t = myTeam();
+  return t.squad.filter((p) => t.tactics.lineupSlots.includes(p.id) && p.freshness < 70).length;
+}
+
 // Forklaringen på en migrering – både ved indlæsning og ved import af en ældre fil.
 function migrationNotice(from) {
   if (from == null) return '';
   return 'Dit spil er opdateret: ' + [
     from <= 1 ? 'Hvis-Så-regler kan nu sættes til "Bagud/Foran med mindst N mål" og skifte til dine egne planer – "Foran med 1" gælder fra 1 mål og opefter.' : '',
-    from <= 2 ? 'Mod-kunnen er sat ca. 45 % ned (alle hold): hver spiller har nu højst 100 point fordelt på de tre stilarter – lærer han noget nyt, glemmer han lidt af det gamle. Alle spillere er 5 cm lavere (holdsnit tæt på den danske 181 cm).' : '',
+    from <= 2 ? 'Mod-kunnen er sat ca. 45 % ned (alle hold): hver spiller har nu højst 100 point fordelt på de tre stilarter – lærer han noget nyt, glemmer han lidt af det gamle.' : '',
+    from <= 3 ? 'Spillerhøjderne er rettet efter Superliga-målinger (ligasnit ca. 184 cm, 168–201 cm) – hver spiller beholder sin plads i højde-rækkefølgen i sin kæde, og luftduellerne er regnet om. Friskhed betyder nu noget: en kamp koster efter løbet distance, og en træt spiller yder mindre (50 % friskhed ≈ 12,5 % svagere).' : '',
   ].filter(Boolean).join(' ');
 }
 
@@ -129,6 +137,7 @@ function renderControls() {
     // Kampknapperne står i topbaren, så de findes i alle visninger (også når man scouter).
     // Modstandervælgeren står ved ▶, fordi Mod-tallene og knappen begge gælder den valgte modstander.
     h('button', { id: 'play-round', class: 'primary', disabled: !!mc?.playing, onclick: playNextRound }, `▶ Spil runde ${game.league.leagueMetadata.round + 1} mod`),
+    tiredStarters() ? h('span', { class: 'tired', id: 'tired-warning', title: 'Startere under 70 % friskhed – trætte spillere yder mindre (50 % ≈ 12,5 % svagere). Overvej at rotere i Trup' }, `⚠ ${tiredStarters()} trætte startere`) : null,
     select(String(game.ui.opponentIdx), teams.map((t, i) => [String(i), t.name]).filter(([i]) => Number(i) !== myIdx()), (v) => change(() => { game.ui.opponentIdx = Number(v); }), { id: 'opponent-select', title: 'Næste modstander', disabled: !!mc?.playing }),
     h('span', { class: 'savestatus' + (view.saveError ? ' failed' : ''), id: 'save-status' }, view.saveError ? '⚠ IKKE gemt' : view.savedAt ? `✔ Gemt kl. ${time(view.savedAt)}` : 'Ikke gemt'),
     h('button', { id: 'save-now', onclick: () => { persist(); render(); } }, '💾 Gem nu'),
@@ -211,7 +220,8 @@ function render() {
   }[tab]();
   app.replaceChildren(...[
     h('nav', { class: 'tabs', id: 'tabs' }, TABS.map(([k, label]) => h('button', { id: `tab-${k}`, class: 'tab' + (k === tab ? ' active' : ''), onclick: () => showTab(k) }, label))),
-    view.notice ? h('div', { class: 'notice', id: 'notice' }, view.notice) : null,
+    view.notice ? h('div', { class: 'notice', id: 'notice' }, view.notice,
+      view.backupKey && storage.getItem(view.backupKey) ? h('button', { class: 'mini', id: 'download-migration-backup', onclick: () => download(storage.getItem(view.backupKey), `${view.backupKey}.json`) }, ' ⬇ Hent backup som fil') : null) : null,
     h('div', { class: `tabpane tab-${tab}` }, ...content.filter(Boolean)),
   ].filter(Boolean));
   document.body.dataset.klar = 'ja';

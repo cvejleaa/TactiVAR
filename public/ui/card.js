@@ -27,6 +27,7 @@ export function renderCard({ player: p, team, isOwn, opponent, scouting, note, o
         h('div', { class: 'muted', id: 'counter-used' }, `Erfaring brugt: ${COUNTER_KEYS.reduce((a, k) => a + p.counterTactics[k], 0)}/${COUNTER_POOL} – ved fuld pulje glemmer han lidt af det gamle, når han lærer noget nyt.`)),
       p.archetype ? h('div', { class: 'archbox' }, h('strong', {}, (p.archetype.isUnlocked ? '🌟 ' : '🔒 ') + p.archetype.name), ' – ', p.archetype.description,
         p.archetype.isUnlocked ? null : h('div', { class: 'muted' }, 'Låses op ved: ' + Object.entries(p.archetype.unlockReq).map(([k, v]) => `${k} ${v}`).join(', '))) : null,
+      h('div', { class: 'muted', id: 'run-stats' }, p.minutesSum > 0 ? `🏃 ${(p.distanceSum / p.minutesSum * 90).toFixed(1)} km pr. 90 min · topfart ${p.topSpeedMax.toFixed(1)} km/t (sæsonen)` : '🏃 Løbedata kommer efter første kamp'),
       h('div', { class: 'muted' }, `Løn ${kr(p.weeklyWage)}/uge · Værdi ${kr(p.marketValue)}`),
     ];
   } else {
