@@ -46,7 +46,8 @@ export function loadGame(storage) {
   try { raw = storage.getItem(SAVE_KEY); } catch (e) { return { status: 'error', error: `Browseren tillader ikke at læse gemte data (${e.message}).`, backupKey: null }; }
   if (raw == null) return { status: 'empty' };
   const r = parseSave(raw);
-  if (r.ok) return { status: 'ok', state: r.state, migratedFrom: r.migratedFrom };
+  // Et ældre skema migreres – de rå data gemmes i backup først, så opdateringen kan fortrydes.
+  if (r.ok) return { status: 'ok', state: r.state, migratedFrom: r.migratedFrom, backupKey: r.migratedFrom != null ? backupRaw(storage, raw) : null };
   const backupKey = backupRaw(storage, raw);
   return { status: 'error', error: r.error, backupKey };
 }

@@ -199,7 +199,8 @@ export function simulateMatch(home, away, rng, opts = {}) {
       if (build >= press) {
         st[k(att, 'TacticSuccess')]++;
         sheet.adjust(playmaker.id, 0.35); sheet.bump(playmaker.id, 'tacticWins');
-        const note = !att.team.isBot && pmM >= 50 ? ` 🧠 ${tag(playmaker)}s erfaring mod denne type pres betaler sig.` : ` ${tag(playmaker)} styrer midtbanen.`;
+        // Ingen besked afhængig af mod-kunnen mod modstanderen – den ville røbe deres stil.
+        const note = ` ${tag(playmaker)} styrer midtbanen.`;
         // Kun dit eget holds valg navngives; modstanderens stil beskrives ikke.
         const how = own(att) ? `Dine ${TXT[pass]} bryder igennem ${def.team.name}s pres` : own(def) ? `${att.team.name} spiller sig igennem dit ${TXT[height]}` : `${att.team.name} spiller sig igennem ${def.team.name}s pres`;
         addEv(min, 'TACTIC_WIN', 'TACTIC', att.isHome, false, 'Fase 1 virker', `✅ [FASE 1 VIRKER • ${att.team.name}] ${how}.${note}`);

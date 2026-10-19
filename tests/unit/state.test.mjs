@@ -26,6 +26,7 @@ test('tomt lager giver "empty"; gem og indlæs giver præcis samme spil tilbage'
   assert.deepEqual(saveGame(s, g, 1000), { ok: true, savedAt: 1000 });
   const r = loadGame(s);
   assert.equal(r.status, 'ok');
+  assert.equal(r.backupKey, null, 'ingen backup når intet migreres');
   assert.deepEqual(r.state.league, g.league);
   assert.deepEqual(r.state.notes, g.notes);
   assert.equal(r.state.ui.opponentIdx, 2);
@@ -228,8 +229,10 @@ test('migrering 1 → 2: gamle regler får antal mål; "Foran med 1" bliver "For
     { ruleId: 2, minuteTrigger: 75, condition: 'LEADING_BY_1', newFormation: '5-4-1', slotRemapping: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10] },
   ];
   t0.tacticPresets[1].conditionalRules = [{ ruleId: 1, minuteTrigger: 80, condition: 'LEADING_BY_1', newFormation: '5-4-1' }];
-  const r = loadGame(fakeStorage({ [SAVE_KEY]: JSON.stringify(old) }));
+  const store = fakeStorage({ [SAVE_KEY]: JSON.stringify(old) });
+  const r = loadGame(store);
   assert.equal(r.status, 'ok', r.error); assert.equal(r.migratedFrom, 1);
+  assert.equal(store.getItem(r.backupKey), JSON.stringify(old), 'de rå skema 1-data er gemt i backup før migreringen');
   const rules = r.state.league.teams[0].tactics.conditionalRules;
   assert.deepEqual(rules.map((x) => [x.condition, x.margin, x.newFormation, x.newPlan, x.minuteTrigger]), [['TRAILING', 1, '3-4-3', null, 65], ['LEADING', 1, '5-4-1', null, 75]]);
   assert.equal(r.state.league.teams[0].tacticPresets[1].conditionalRules[0].condition, 'LEADING');

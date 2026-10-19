@@ -407,5 +407,5 @@ test('normalizeLeague melder det, der ikke kan repareres', () => {
 
 test('referatet viser ingen mod-kunnen-procent mod modstanderen (kan bruges til at regne deres stil ud)', () => {
   const L = league(42), rng = createRng(42);
-  for (let i = 1; i < 8; i++) for (const e of simulateMatch(L.teams[0], L.teams[i], rng).events) assert.doesNotMatch(e.text, /\d+\s*%\s*mod-kunnen|mod-kunnen[^.]*\d+\s*%|MOD-KUNNEN:\s*\d/i, e.text);
+  for (let i = 1; i < 8; i++) for (const e of simulateMatch(L.teams[0], L.teams[i], rng).events) assert.doesNotMatch(e.text, /mod-kunnen|erfaring mod|🧠/i, e.text);
 });
