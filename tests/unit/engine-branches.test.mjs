@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRng } from '../../public/engine/rng.js';
 import { createLeague, isArchetypeUnlocked, BOT_PROFILES, ARCHETYPES, defaultStarterIds } from '../../public/engine/generator.js';
-import { simulateMatch } from '../../public/engine/match.js';
+import { simulateMatch, counterChance } from '../../public/engine/match.js';
 import { commitRound, sortStandings, playRound } from '../../public/engine/season.js';
 import { buildGazette } from '../../public/engine/gazette.js';
 import { normalizeLeague } from '../../public/engine/sanitize.js';
@@ -44,7 +44,7 @@ function arena({ home = {}, away = {} } = {}) {
   }
   const setPhases = (t, o) => {
     const ph = t.tactics.phases;
-    Object.assign(ph.phase1_buildUp, { passingStyle: 'BALANCED', attackFocus: 'CENTRAL' }, o.p1);
+    Object.assign(ph.phase1_buildUp, { passingStyle: 'BALANCED', attackFocus: 'CENTRAL', offBallRuns: 'NORMAL' }, o.p1);
     Object.assign(ph.phase2_defending, { pressingHeight: 'MID_BLOCK', offsideTrap: 'OFF', tacklingIntensity: 'NORMAL' }, o.p2);
     Object.assign(ph.phase3_transition, { onBallWon: 'KEEP_POSSESSION', onBallLost: 'DROP_BACK' }, o.p3);
   };
@@ -193,8 +193,8 @@ test('VAR-tjek kun når rullet er under 0,22', () => {
   assert.equal(m.stats.hVarChecks, 0);
 });
 
-test('afslutning: FIN + 4 > GK + 4; mål giver +1,25, oplæg +0,5, målmand −0,3', () => {
-  const run = (fin) => { const { H, A } = arena(); slot(H, 9).skills.finishing = fin; slot(A, 0).skills.goalkeeping = 11; return { H, A, m: simulateMatch(H, A, stubRng({ 0.3: shots(2) })) }; };
+test('afslutning: FIN + 4 > GK + 4 + målmandsfordel 5 (v3.9; før uden); mål giver +1,25, oplæg +0,5, målmand −0,3', () => {
+  const run = (fin) => { const { H, A } = arena(); slot(H, 9).skills.finishing = fin; slot(A, 0).skills.goalkeeping = 6; /* 16 > 15 / 15 > 15 falsk */ return { H, A, m: simulateMatch(H, A, stubRng({ 0.3: shots(2) })) }; };
   const { H, A, m } = run(12);
   assert.equal(m.homeGoals, 2);
   const r = (t, i) => m.ratings[t === H ? 'home' : 'away'].find((x) => x.playerId === slot(t, i).id);
@@ -767,6 +767,7 @@ function goals({ home = {}, away = {}, script = {}, shooterSkills = null, bots =
   if (bots) {
     [H, A] = [a.L.teams[2], a.L.teams[3]];
     for (const t of [H, A]) { for (const p of t.squad) { p.skills = SK(10); p.counterTactics = { vsPress: 25, vsLowBlock: 25, vsTrapLong: 25 }; p.injuryMatchesLeft = 0; } t.tactics.baseFormation = '4-4-2'; t.tactics.customCoords = {}; t.tactics.conditionalRules = []; t.tactics.lineupSlots = t.squad.slice(0, 11).map((p) => p.id); }
+    for (const t of [H, A]) t.tactics.phases.phase1_buildUp.offBallRuns = 'NORMAL';
     Object.assign(H.tactics.phases.phase1_buildUp, { passingStyle: 'BALANCED', attackFocus: 'CENTRAL' }, home.p1);
     Object.assign(H.tactics.phases.phase3_transition, { onBallWon: 'KEEP_POSSESSION' }, home.p3);
   }
@@ -777,19 +778,70 @@ function goals({ home = {}, away = {}, script = {}, shooterSkills = null, bots =
   const assister = m.ratings.home.find((e) => e.playerId === mids(H)[0].id);
   return { m, kinds: m.goalsPool.map((g) => g.kind), assister, H };
 }
-test('måltype: kontra kræver dit holds lynkontra – for bot-hold er den tilfældig (anti-spionage)', () => {
-  assert.ok(goals({ home: { p3: { onBallWon: 'FAST_COUNTER' } }, script: { 0.36: true } }).kinds.every((k) => k === 'COUNTER'));
-  assert.ok(goals({ home: { p3: { onBallWon: 'KEEP_POSSESSION' } }, script: { 0.36: true } }).kinds.every((k) => k !== 'COUNTER'));
-  assert.ok(goals({ home: { p3: { onBallWon: 'FAST_COUNTER' } }, script: {} }).kinds.every((k) => k !== 'COUNTER'));
-  // Bot: dens valg betyder intet – kun 14 %-kastet
-  assert.ok(goals({ bots: true, home: { p3: { onBallWon: 'KEEP_POSSESSION' } }, script: { 0.14: true } }).kinds.every((k) => k === 'COUNTER'));
-  assert.ok(goals({ bots: true, home: { p3: { onBallWon: 'FAST_COUNTER' } }, script: { 0.36: true } }).kinds.every((k) => k !== 'COUNTER'));
+// ---------- v3.9: én rigtig kontra efter vundet pres ----------
+test('counterChance: trin × taberens boldtab × vinderens erobring (× FB/WB ved Mange), afrundet til 3 decimaler', () => {
+  assert.deepEqual(['FEW', 'NORMAL', 'MANY'].map((r) => counterChance(r, 'DROP_BACK', 'KEEP_POSSESSION')), [0.012, 0.032, 0.08]);
+  assert.deepEqual(['FEW', 'NORMAL', 'MANY'].map((r) => counterChance(r, 'DROP_BACK', 'FAST_COUNTER')), [0.054, 0.144, 0.36]);
+  assert.equal(counterChance('NORMAL', 'COUNTER_PRESS_5S', 'KEEP_POSSESSION'), 0.022); // 0,08·0,7·0,4 = 0,0224
+  assert.equal(counterChance('NORMAL', 'COUNTER_PRESS_5S', 'FAST_COUNTER'), 0.101); // 0,08·0,7·1,8 = 0,1008
+  assert.equal(counterChance('MANY', 'DROP_BACK', 'KEEP_POSSESSION', 4), 0.096);    // 0,2·0,4·1,2 for fire FB/WB
+  assert.equal(counterChance('NORMAL', 'DROP_BACK', 'KEEP_POSSESSION', 4), 0.032);  // kun ved Mange
+  assert.ok(counterChance('FEW', 'COUNTER_PRESS_5S', 'KEEP_POSSESSION') > 0, 'kontra findes på alle trin (én kontra røber intet)');
 });
-test('måltype: cutback kræver dine lave cutbacks – for bot-hold tilfældig; kontra går forud', () => {
+// Ude-holdet vinder presset hver gang (INT 20) og kontrer, når kontra-kastet siger ja.
+function counters({ home = {}, away = {}, script = {}, own = 'home' } = {}) {
+  const a = arena({ home, away });
+  const [att, def] = own === 'home' ? [a.H, a.A] : [a.A, a.H];
+  if (own === 'away') for (const p of mids(a.A)) p.skills.passing = 11; // ude-holdet har bolden
+  for (const p of mids(def)) p.skills.intercepting = 20;
+  const m = simulateMatch(a.H, a.A, stubRng({ 0.48: true, ...script }));
+  return { m, kinds: m.goalsPool.map((g) => g.kind), press: m.events.filter((e) => e.label === 'Fase 2 pres virker').map((e) => e.text), att, def };
+}
+test('kontra: vundet pres + kontra-kast → kontramål (COUNTER) for vinderen; uden kast ingen; genpres skifter sandsynligheden', () => {
+  const yes = counters({ script: { 0.032: true } });           // NORMAL · Fald tilbage · Hold på bolden
+  assert.equal(yes.press.length, 30);
+  assert.equal(yes.kinds.length, 30); assert.ok(yes.kinds.every((k) => k === 'COUNTER'));
+  assert.equal(yes.m.awayGoals, 30); assert.equal(yes.m.homeGoals, 0);
+  assert.ok(yes.m.events.filter((e) => e.type === 'GOAL').every((e) => e.text.includes('PÅ KONTRA')));
+  assert.equal(counters({ script: {} }).kinds.length, 0);
+  // Genpres hos taberen: 0,032 udløser ikke længere, 0,022 gør
+  assert.equal(counters({ home: { p3: { onBallLost: 'COUNTER_PRESS_5S' } }, script: { 0.032: true } }).kinds.length, 0);
+  assert.equal(counters({ home: { p3: { onBallLost: 'COUNTER_PRESS_5S' } }, script: { 0.022: true } }).kinds.length, 30);
+  // Taberen på Mange: 0,2·0,4 = 0,08 (4-4-2 har LB og RB: ·1,1 → 0,088)
+  assert.equal(counters({ home: { p1: { offBallRuns: 'MANY' } }, script: { 0.088: true } }).kinds.length, 30);
+  // Reddet kontra: målmand 20 (10 + 4 + 1 < 20·1 + 4)
+  const a = counters({ script: { 0.032: true } });
+  slot(a.att, 0).skills.goalkeeping = 20;
+  const saved = simulateMatch(a.att, a.def, stubRng({ 0.48: true, 0.032: true }));
+  assert.equal(saved.awayGoals, 0); assert.equal(saved.events.filter((e) => e.label === 'Kontra reddet').length, 30);
+});
+test('kontra-teksten: kun DIT holds valg forklares – fire kombinationer; "højt oppe" kun når DU står på Mange', () => {
+  // Dit hold (hjemme) presser og vinder bolden fra ude-holdet
+  const txt = (won, script) => counters({ own: 'away', home: { p3: { onBallWon: won } }, script }).press[0];
+  assert.match(txt('FAST_COUNTER', { 0.144: true }), /Din lynkontra sættes straks i gang\./);
+  assert.match(txt('FAST_COUNTER', {}), /Din lynkontra løber ind i et organiseret forsvar\./);
+  assert.match(txt('KEEP_POSSESSION', { 0.032: true }), /Dit hold ser hullet og går direkte\./);
+  assert.match(txt('KEEP_POSSESSION', {}), /Dit hold falder til ro på bolden\./);
+  // Du taber bolden på Mange: din back nævnes; på Normal intet om løb
+  const many = counters({ home: { p1: { offBallRuns: 'MANY' } }, script: { 0.088: true } }).m.events.find((e) => e.type === 'GOAL').text;
+  assert.match(many, /Din LB #\d+ .+ er højt oppe efter sit løb\./);
+  const normal = counters({ script: { 0.032: true } }).m.events.find((e) => e.type === 'GOAL').text;
+  assert.doesNotMatch(normal, /højt oppe|løb/);
+  // Modstanderen på Mange taber bolden til dig: hans indstilling nævnes aldrig
+  const opp = counters({ own: 'away', away: { p1: { offBallRuns: 'MANY' } }, script: { 0.088: true } });
+  assert.ok(opp.m.events.filter((e) => e.type === 'GOAL').length > 0);
+  for (const e of opp.m.events) assert.doesNotMatch(e.text, /højt oppe|løb uden bold|Mange/, e.text);
+});
+test('måltype: COUNTER kommer kun fra en rigtig kontra – aldrig som label på en almindelig afslutning', () => {
+  for (const won of ['FAST_COUNTER', 'KEEP_POSSESSION']) {
+    const g = goals({ home: { p3: { onBallWon: won } }, script: { 0.36: true, 0.14: true } });
+    assert.ok(g.kinds.length >= 25 && g.kinds.every((k) => k !== 'COUNTER'), g.kinds.join());
+  }
+});
+test('måltype: cutback kræver dine lave cutbacks – for bot-hold tilfældig', () => {
   assert.ok(goals({ home: { p1: { attackFocus: 'LOW_CUTBACKS' } }, script: { 0.42: true } }).kinds.every((k) => k === 'CUTBACK'));
   assert.ok(goals({ home: { p1: { attackFocus: 'CENTRAL' } }, script: { 0.42: true } }).kinds.every((k) => k !== 'CUTBACK'));
   assert.ok(goals({ bots: true, home: { p1: { attackFocus: 'CENTRAL' } }, script: { 0.12: true } }).kinds.every((k) => k === 'CUTBACK'));
-  assert.ok(goals({ home: { p1: { attackFocus: 'LOW_CUTBACKS' }, p3: { onBallWon: 'FAST_COUNTER' } }, script: { 0.36: true, 0.42: true } }).kinds.every((k) => k === 'COUNTER'));
 });
 test('måltype: vægtet af evnerne – langskud/dribletur uden oplæg, kombination med; teksten bruges i referatet', () => {
   // Vægte ved next 0,5: kombination 4, langskud (FIN−8)·0,45, dribletur ((PAC+BAL)/2−8)·0,45.
@@ -869,8 +921,8 @@ test('friskhed virker også i presset: INT 9 vinder frisk (25,75 > 24,75), taber
   assert.equal(run(80), 30);
 });
 test('friskhed virker i afslutningen – både skytte og målmand', () => {
-  // Skytte FIN 10 mod MV 9 (+4 hver): 14 > 13 → mål; skytte 50 %: 8,75 + 4 < 13 → redning.
-  // MV 10 mod FIN 10: 14 > 14 er falsk → redning; MV 50 %: 8,75 + 4 → mål.
+  // v3.9 med målmandsfordel 5: skytte FIN 10 mod MV 4 (+4, +5): 14 > 13 → mål; skytte 50 %: 8,75 + 4 < 13 → redning.
+  // MV 5 mod FIN 10: 14 > 14 er falsk → redning; MV 50 %: 4,375 + 9 < 14 → mål.
   const run = (shFresh, gk, gkFresh) => {
     const { H, A } = arena();
     for (const p of mids(A)) p.skills.intercepting = 1;
@@ -879,8 +931,8 @@ test('friskhed virker i afslutningen – både skytte og målmand', () => {
     const m = simulateMatch(H, A, stubRng({ 0.48: true, 0.3: true }));
     return m.homeGoals;
   };
-  assert.ok(run(100, 9, 100) >= 25); assert.equal(run(50, 9, 100), 0);
-  assert.equal(run(100, 10, 100), 0); assert.ok(run(100, 10, 50) >= 25);
+  assert.ok(run(100, 4, 100) >= 25); assert.equal(run(50, 4, 100), 0);
+  assert.equal(run(100, 5, 100), 0); assert.ok(run(100, 5, 50) >= 25);
 });
 test('friskhed virker i luftduellen – både angriber og forsvarer', () => {
   // Hovedstød: skytte-aerial·f + 3 > forsvarer-aerial·f + MV·0,38 (MV 0) + 3.

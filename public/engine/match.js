@@ -2,7 +2,7 @@
 // skader, observationer og karakterer returneres i resultatet og lægges ind af season.js.
 // Rettet ift. v2.5b: auto-indskiftning sker i en kamplokal kopi (ændrede før lineupSlots
 // permanent), og Hvis-Så-reglerne kører for begge hold og skifter reelt formation.
-import { FORMATIONS, lineOfRole, isOutOfZone } from './formations.js';
+import { FORMATIONS, lineOfRole, isOutOfZone, slotPosition } from './formations.js';
 import { masteryVs, counterXpForMatch } from './counter.js';
 import { createSheet, finalizeSheet } from './ratings.js';
 import { describeFinish, describeHeader, describeVarTiming, describeGoal, goalSpectacle } from './clues.js';
@@ -25,6 +25,61 @@ const tag = (p) => `#${p.shirtNumber} ${p.shortName}`;
 // opbygning vinder ca. 55–60 % med neutrale stile (før: 96,8 % – presset kunne næsten aldrig vinde).
 // Den rigtige mod-stil giver STYLE_BONUS; mod-kunnen (0–100) vejer MASTERY_WEIGHT pr. point.
 export const STYLE_BONUS = 3;
+
+// Kontra efter vundet pres (v3.9, brugeren: løb uden bold "vil koste i defensiven hvis en wb er
+// løbet i position … og skal indregnes i modstanderens muligheder hvis de opsnapper bolden").
+// Findes på ALLE trin (én kontra røber intet), dæmpes af taberens genpres og forstærkes af
+// vinderens lynkontra. Hvert FB/WB-felt hos en taber på "Mange" løfter chancen 5 %.
+export const COUNTER_P = { FEW: 0.03, NORMAL: 0.08, MANY: 0.2 };
+export const COUNTER_LOST = { COUNTER_PRESS_5S: 0.7, DROP_BACK: 1 };
+export const COUNTER_WON = { FAST_COUNTER: 1.8, KEEP_POSSESSION: 0.4 };
+export const COUNTER_FINISH_BONUS = 1;   // ubalanceret forsvar (kalibreres sammen med løbene)
+export const CALM_BUILD_BONUS = 2;       // "Hold på bolden": næste opbygning sidder bedre
+const FB_ROLES = new Set(['LB', 'RB', 'LWB', 'RWB']);
+// Løb uden bold (v3.9, brugeren: "Alle kan være med til at løbe i position og afhængig af hvor
+// man er på banen kan det blive til en dribletur, en aflevering (incl. tværaflevering) eller
+// skud. Beslutningen kan også blive påvirket af spillerens evner til skud eller aflevering").
+export const CHANCE_P = { FEW: 0.26, NORMAL: 0.3, MANY: 0.36 };
+export const RUN_WEIGHT = {
+  ST: { FEW: 3, NORMAL: 3, MANY: 3 }, WIDE: { FEW: 2, NORMAL: 2.5, MANY: 3 }, CM: { FEW: 1, NORMAL: 1.5, MANY: 2.5 },
+  FB: { FEW: 0.2, NORMAL: 0.8, MANY: 2 }, CB: { FEW: 0.05, NORMAL: 0.1, MANY: 0.3 },
+};
+const RUN_GROUP = { ST: 'ST', CF: 'ST', LM: 'WIDE', RM: 'WIDE', LW: 'WIDE', RW: 'WIDE', CAM: 'WIDE', CM: 'CM', CDM: 'CM', LB: 'FB', RB: 'FB', LWB: 'FB', RWB: 'FB', CB: 'CB' };
+export const runGroup = (role) => RUN_GROUP[role] ?? 'CM';
+export const RUN_DUEL_BONUS = { FEW: -3, NORMAL: 0, MANY: 4 };
+export const DRIBBLE_DEF_EDGE = 3;   // forsvareren står bedst i en én-mod-én (PAC+BAL ≈ 20 mod POS+STR·0,5 ≈ 15)
+// Få = flere spillere bag bolden: modstanderens frispilningsløb er sværere at vinde.
+export const RUN_COVER = { FEW: 4, NORMAL: 0, MANY: 0 };
+export const RUN_FINISH_BONUS = 3.5;
+// Målmandens fordel på almindelige afslutninger (v3.9): holder ligaens målniveau, efter at
+// løbene og de rigtige kontraer kom til (kalibreret med `node tools/measure-duels.mjs N loeb`).
+export const KEEPER_EDGE = 5;
+// Zonen er der, løbet ender: formationens (eller den trukne) plads rykket 20 frem.
+export function runZone(pos) {
+  const y = pos.y - 20;
+  return pos.x < 28 || pos.x > 72 ? 'WIDE' : y >= 60 ? 'DEEP' : y <= 35 ? 'HIGH' : 'MID';
+}
+// Beslutningens vægte: skud ~ FIN, aflevering ~ PAS (fra kanten et indlæg/tværaflevering),
+// dribletur ~ (PAC+BAL)/2 – ganget med hvor godt zonen egner sig.
+export const DECISION_ZONE = {
+  SHOT: { WIDE: 1, DEEP: 0.6, MID: 1.5, HIGH: 3 },
+  PASS: { WIDE: 3, DEEP: 2.5, MID: 1.5, HIGH: 1 },
+  DRIBBLE: { WIDE: 2, DEEP: 0.5, MID: 1.5, HIGH: 1 },
+};
+// Evnen tæller over et gulv på 6 (min. 0,5), så en back med afslutning 5 hellere afleverer.
+const over6 = (v) => Math.max(0.5, v - 6);
+export function decisionWeights(sk, zone, cutbackFocus = false) {
+  return {
+    SHOT: over6(sk.finishing) * DECISION_ZONE.SHOT[zone],
+    PASS: over6(sk.passing) * DECISION_ZONE.PASS[zone] * (cutbackFocus && zone === 'WIDE' ? 1.3 : 1),
+    DRIBBLE: over6((sk.pace + sk.ballControl) / 2) * DECISION_ZONE.DRIBBLE[zone],
+  };
+}
+
+export function counterChance(runs, onBallLost, onBallWon, fbCount = 0) {
+  const p = (COUNTER_P[runs] ?? COUNTER_P.NORMAL) * (COUNTER_LOST[onBallLost] ?? 1) * (COUNTER_WON[onBallWon] ?? 1) * (runs === 'MANY' ? 1 + 0.05 * fbCount : 1);
+  return Math.round(p * 1000) / 1000;
+}
 export const MASTERY_WEIGHT = 0.05;
 // Dine egne valg i referatet (grammatisk rigtigt i en sætning om dit hold).
 const YOUR_PASS = { SHORT: 'Dine korte pasninger', BALANCED: 'Din balancerede opbygning', DIRECT_LONG: 'Dine direkte lange bolde' };
@@ -115,7 +170,32 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // startopstilling. Egne valg (det menneskestyrede hold) vises fuldt.
   const own = (s) => !s.team.isBot;
   // Fase-dueller pr. hold til pause-analysen: forsøg/sejre med opbygning og med pres.
-  const duelLog = Object.fromEntries([H, A].map((s) => [s.team.id, { build: 0, buildWon: 0, press: 0, pressWon: 0 }]));
+  const duelLog = Object.fromEntries([H, A].map((s) => [s.team.id, { build: 0, buildWon: 0, press: 0, pressWon: 0, runs: 0, runsWon: 0, runGoals: 0, countersAgainst: 0, counterGoalsAgainst: 0 }]));
+  const fbCount = (side) => coordsOf(side.tactics).filter((c) => FB_ROLES.has(c.r)).length;
+  // Kontra mod et hold, der lige har tabt bolden. Returnerer om der blev scoret.
+  function counterAttack(win, lose, min, wR, lR) {
+    const shooter = rng.pick(wR.atts), gk = lR.gk;
+    duelLog[lose.team.id].countersAgainst++;
+    st[k(win, 'Shots')]++;
+    st[k(win, 'Xg')] += 0.2 + rng.next() * 0.2;
+    // Kun DIT holds egen indstilling må forklare kontraen; modstanderens nævnes aldrig.
+    const fbSlot = own(lose) && lose.tactics.phases.phase1_buildUp.offBallRuns === 'MANY' ? coordsOf(lose.tactics).findIndex((c) => FB_ROLES.has(c.r)) : -1;
+    const why = fbSlot > 0 ? ` Din ${coordsOf(lose.tactics)[fbSlot].r} ${tag(lose.starters[fbSlot])} er højt oppe efter sit løb.` : '';
+    if (shooter.skills.finishing * freshFactor(shooter) + rng.next() * 8 + COUNTER_FINISH_BONUS > gk.skills.goalkeeping * freshFactor(gk) + rng.next() * 8) {
+      if (win === H) hG++; else aG++;
+      st[k(win, 'OnTarget')]++;
+      duelLog[lose.team.id].counterGoalsAgainst++;
+      sheet.adjust(shooter.id, 1.25); sheet.bump(shooter.id, 'goals'); sheet.adjust(gk.id, -0.3);
+      const desc = describeGoal('COUNTER', tag(shooter), tag(rng.pick(wR.mids)), min, rng);
+      goalsPool.push({ scorer: tag(shooter), teamName: win.team.name, match: `${home.name} - ${away.name}`, min, kind: 'COUNTER', spectacle: goalSpectacle('COUNTER', { pace: shooter.skills.pace }, min, rng), desc });
+      addEv(min, 'GOAL', 'HIGHLIGHT', win.isHome, true, `⚽ Kontramål: ${tag(shooter)}`, `⚽ [${win.team.name} • ${hG}-${aG}] MÅÅÅL PÅ KONTRA!${why} ${desc}`);
+      return true;
+    }
+    st[k(win, 'OnTarget')]++;
+    sheet.adjust(gk.id, 0.5); sheet.bump(gk.id, 'saves');
+    addEv(min, 'SAVE', 'PLAY', lose.isHome, false, 'Kontra reddet', `🧤 [${lose.team.name}] ${win.team.name} kontrer, men ${tag(gk)} redder fra ${tag(shooter)}.${why}`);
+    return false;
+  }
   const tacticStr = (s) => { const p = s.tactics.phases; return own(s) ? `${s.tactics.baseFormation} • ${TXT[p.phase1_buildUp.passingStyle]} / ${TXT[p.phase2_defending.pressingHeight]}` : s.tactics.baseFormation; };
   const hCustom = customDragged(H);
   const customIntro = hCustom.length ? ` Bemærk: ${home.name} har trukket ${tag(hCustom[0].player)} ud af sin grundposition.` : '';
@@ -225,6 +305,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
     if (rng.chance(0.48)) {
       const pmM = masteryVs(playmaker, def.team), prM = masteryVs(presser, att.team);
       let build = (playmaker.skills.passing + playmaker.skills.ballControl) * freshFactor(playmaker) + pmM * MASTERY_WEIGHT + rng.next() * 7;
+      if (att.calm) { build += CALM_BUILD_BONUS; att.calm = false; } // "Hold på bolden" efter sidste erobring
       let press = (presser.skills.intercepting + presser.skills.positioning * 0.85 + presser.skills.stamina * 0.35) * freshFactor(presser) + prM * MASTERY_WEIGHT + rng.next() * 7;
       const pass = attPh.phase1_buildUp.passingStyle, focus = attPh.phase1_buildUp.attackFocus, height = defPh.phase2_defending.pressingHeight;
       if (pass === 'SHORT' && height === 'LOW_BLOCK') build += STYLE_BONUS;
@@ -257,11 +338,17 @@ export function simulateMatch(home, away, rng, opts = {}) {
           addEv(min, 'TACTIC_FAIL', 'TACTIC', def.isHome, false, 'Offside-fælde virker', offTxt);
         } else {
           sheet.adjust(presser.id, 0.35); sheet.adjust(playmaker.id, -0.2); sheet.bump(presser.id, 'tacticWins');
-          const counter = !own(def) ? '' : defPh.phase3_transition.onBallWon === 'FAST_COUNTER' ? ' Din lynkontra sættes straks i gang.' : ' Dit hold falder til ro på bolden.';
+          // Kontra (v3.9): afgøres FØR teksten, så "din lynkontra" kun loves, når den kommer.
+          const won = defPh.phase3_transition.onBallWon;
+          const goesCounter = rng.chance(counterChance(attPh.phase1_buildUp.offBallRuns, attPh.phase3_transition.onBallLost, won, fbCount(att)));
+          if (!goesCounter && won === 'KEEP_POSSESSION') def.calm = true;
+          const counter = !own(def) ? '' : won === 'FAST_COUNTER' ? (goesCounter ? ' Din lynkontra sættes straks i gang.' : ' Din lynkontra løber ind i et organiseret forsvar.')
+            : (goesCounter ? ' Dit hold ser hullet og går direkte.' : ' Dit hold falder til ro på bolden.');
           const text = own(def) ? `✅ [DIT PRES VIRKER] ${cap(YOUR_PRESS[height])} lukker af: ${tag(presser)} erobrer bolden fra ${tag(playmaker)} (${att.team.name}).${counter}`
             : own(att) ? `❌ [DIN OPBYGNING STOPPES] ${YOUR_PASS[pass]} kommer ikke igennem: ${tag(presser)} (${def.team.name}) erobrer bolden fra ${tag(playmaker)}.`
             : `🛑 [FASE 1 STOPPER MOD FASE 2] ${tag(presser)} (${def.team.name}) erobrer bolden fra ${tag(playmaker)}.`;
           addEv(min, 'TACTIC_FAIL', 'TACTIC', def.isHome, false, 'Fase 2 pres virker', text);
+          if (goesCounter) counterAttack(def, att, min, defR, attR);
         }
       }
     }
@@ -292,7 +379,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
     }
 
     // Chance (30 %): høje bolde, VAR-tjek eller almindelig afslutning – ikke efter tabt bold.
-    if (!ballLost && rng.chance(0.3)) {
+    if (!ballLost && rng.chance(CHANCE_P[attPh.phase1_buildUp.offBallRuns] ?? CHANCE_P.NORMAL)) {
       const cR = att === H ? hR : aR, dR = def === H ? hR : aR;
       const shooter = rng.pick(cR.atts.concat(cR.mids)), assister = rng.pick(cR.mids), defender = rng.pick(dR.defs), gk = dR.gk;
       st[k(att, 'Shots')]++;
@@ -334,31 +421,91 @@ export function simulateMatch(home, away, rng, opts = {}) {
           observe(shooter, `VAR-annullering (${min}. min mod ${def.team.name}): ${shooter.shortName} var en anelse for tidligt af sted.`);
           addEv(min, 'VAR_NO_GOAL', 'HIGHLIGHT', att.isHome, true, `📺 VAR: annulleret – ${tag(shooter)}`, `📺 [${att.team.name}] VAR-KENDELSE: MÅLET ANNULLERES! ${tag(defender)} (${def.team.name}) holdt linjen, og ${tag(shooter)} var offside.`, `${att.team.name}: mål annulleret`);
         }
-      } else if (shooter.skills.finishing * freshFactor(shooter) + rng.next() * 8 > gk.skills.goalkeeping * freshFactor(gk) + rng.next() * 8) {
-        scored();
-        // Måltypen afgøres ÉT sted og bruges i referat, observation, avis og karakterark (v3.7).
-        // Kontra og cutback følger kun DIT holds valg; for andre hold er de tilfældige (ellers
-        // røbede "lynkontra" modstanderens omstilling). Langskud og dribletur er vægtet af evnerne.
-        const ph1 = attPh.phase1_buildUp, sk = shooter.skills;
-        const counterOk = own(att) ? attPh.phase3_transition.onBallWon === 'FAST_COUNTER' && rng.chance(0.36) : rng.chance(0.14);
-        const cutbackOk = !counterOk && (own(att) ? ph1.attackFocus === 'LOW_CUTBACKS' && rng.chance(0.42) : rng.chance(0.12));
-        let kind = counterOk ? 'COUNTER' : cutbackOk ? 'CUTBACK' : null;
-        if (!kind) {
-          const w = { COMBINATION: 4, LONGSHOT: Math.max(0, sk.finishing - 8) * 0.45, DRIBBLE: Math.max(0, (sk.pace + sk.ballControl) / 2 - 8) * 0.45 };
-          let r = rng.next() * (w.COMBINATION + w.LONGSHOT + w.DRIBBLE);
-          kind = Object.keys(w).find((k) => (r -= w[k]) < 0) || 'COMBINATION';
-        }
-        const solo = kind === 'LONGSHOT' || kind === 'DRIBBLE'; // ingen oplægsgiver
-        sheet.adjust(shooter.id, solo ? 1.4 : 1.25); sheet.bump(shooter.id, 'goals'); if (!solo) assist(0.5); sheet.adjust(gk.id, -0.3);
-        const prose = describeFinish(shooter.skills.finishing);
-        observe(shooter, `Scoring (${min}. min mod ${def.team.name}): ${shooter.shortName} afsluttede med ${prose}.`);
-        const desc = describeGoal(kind, tag(shooter), tag(assister), min, rng);
-        goalsPool.push({ scorer: tag(shooter), teamName: att.team.name, match: `${home.name} - ${away.name}`, min, kind, spectacle: goalSpectacle(kind, { finishing: sk.finishing, pace: sk.pace, ballControl: sk.ballControl, passing: assister.skills.passing }, min, rng), desc });
-        addEv(min, 'GOAL', 'HIGHLIGHT', att.isHome, true, `⚽ Mål: ${tag(shooter)}`, `⚽ [${att.team.name} • ${hG}-${aG}] MÅÅÅL! ${desc}`);
       } else {
-        st[k(att, 'OnTarget')]++;
-        sheet.adjust(gk.id, 0.5); sheet.bump(gk.id, 'saves'); sheet.adjust(shooter.id, 0.1);
-        addEv(min, 'SAVE', 'PLAY', def.isHome, false, 'Redning', `🧤 [${def.team.name}] Flot redning af ${tag(gk)} på afslutning fra ${tag(shooter)} (${att.team.name}).`);
+        // Løb uden bold (v3.9): en markspiller forsøger at løbe sig fri. Vinder han løbet, træffer
+        // han en beslutning (skud/aflevering/dribletur) efter zone og evner; ellers en almindelig
+        // afslutning som før. Kun DIT holds løb fortælles – modstanderens "fri" kan ikke tælles op.
+        const runs = attPh.phase1_buildUp.offBallRuns ?? 'NORMAL';
+        const attC = coordsOf(att.tactics);
+        const pool = att.starters.map((p, i) => ({ p, i })).filter(({ p, i }) => i > 0 && p);
+        const wts = pool.map(({ i }) => RUN_WEIGHT[runGroup(attC[i].r)][runs] ?? 1);
+        let rr = rng.next() * wts.reduce((x, y) => x + y, 0);
+        const pick = pool[Math.max(0, wts.findIndex((w) => (rr -= w) < 0))] ?? pool.at(-1);
+        const runner = pick.p, rs = runner.skills;
+        sheet.bump(runner.id, 'freeRuns'); duelLog[att.team.id].runs++;
+        const runWon = (rs.positioning + rs.pace * 0.5) * freshFactor(runner) + rng.next() * 8 + (RUN_DUEL_BONUS[runs] ?? 0)
+          > (defender.skills.positioning + defender.skills.intercepting * 0.5) * freshFactor(defender) + rng.next() * 8 + (RUN_COVER[defPh.phase1_buildUp.offBallRuns] ?? 0);
+        if (runWon) {
+          sheet.bump(runner.id, 'freeRunsWon'); duelLog[att.team.id].runsWon++; sheet.adjust(runner.id, 0.15);
+          const zone = runZone(slotPosition(att.tactics, pick.i));
+          const w = decisionWeights(rs, zone, attPh.phase1_buildUp.attackFocus === 'LOW_CUTBACKS');
+          let rd = rng.next() * (w.SHOT + w.PASS + w.DRIBBLE);
+          const choice = ['SHOT', 'PASS', 'DRIBBLE'].find((c) => (rd -= w[c]) < 0) || 'SHOT';
+          const where = { WIDE: 'på kanten', DEEP: 'dybt i banen', MID: 'mellem kæderne', HIGH: 'bag forsvaret' }[zone];
+          const yourRun = own(att) ? `✅ ${tag(runner)} løber sig fri ${where}` : '';
+          let finisher = runner, helper = rng.pick(cR.mids.filter((p) => p !== runner).concat(cR.atts.filter((p) => p !== runner))) ?? assister, kind, solo = false, lead = '';
+          if (choice === 'PASS') {
+            finisher = rng.pick(cR.atts.concat(cR.mids).filter((p) => p !== runner)) ?? runner;
+            helper = runner; kind = zone === 'WIDE' ? 'CUTBACK' : 'COMBINATION';
+            lead = yourRun && `${yourRun} og ${zone === 'WIDE' ? 'lægger den tværs til' : 'spiller'} ${tag(finisher)}.`;
+          } else if (choice === 'DRIBBLE') {
+            const beat = (rs.pace + rs.ballControl) * freshFactor(runner) + rng.next() * 8
+              > (defender.skills.positioning + defender.skills.strength * 0.5) * freshFactor(defender) + rng.next() * 8 + DRIBBLE_DEF_EDGE;
+            if (!beat) {
+              // Opsnapning: ingen afslutning – og samme kontra-tjek som efter et vundet pres.
+              st[k(att, 'Shots')]--;
+              sheet.adjust(defender.id, 0.3); sheet.bump(defender.id, 'tacticWins');
+              addEv(min, 'INFO', 'PLAY', def.isHome, false, 'Opsnappet', own(att) ? `❌ ${tag(runner)} løber sig fri ${where}, men ${tag(defender)} (${def.team.name}) tager bolden i driblingen.` : `🛡️ [${def.team.name}] ${tag(defender)} tager bolden fra ${tag(runner)} (${att.team.name}).`);
+              if (rng.chance(counterChance(runs, attPh.phase3_transition.onBallLost, defPh.phase3_transition.onBallWon, fbCount(att)))) counterAttack(def, att, min, dR, cR);
+              continue;
+            }
+            kind = 'DRIBBLE'; solo = true;
+            lead = yourRun && `${yourRun}, dribler ${tag(defender)} af og afslutter selv.`;
+          } else {
+            kind = zone === 'HIGH' ? 'COMBINATION' : 'LONGSHOT'; solo = kind === 'LONGSHOT';
+            lead = yourRun && `${yourRun} og skyder.`;
+          }
+          const fs = finisher.skills;
+          if (fs.finishing * freshFactor(finisher) + rng.next() * 8 + RUN_FINISH_BONUS > gk.skills.goalkeeping * freshFactor(gk) + rng.next() * 8 + KEEPER_EDGE) {
+            scored(); duelLog[att.team.id].runGoals++;
+            sheet.adjust(finisher.id, solo ? 1.4 : 1.25); sheet.bump(finisher.id, 'goals'); sheet.adjust(gk.id, -0.3);
+            if (!solo && helper && helper.id !== finisher.id) { sheet.adjust(helper.id, 0.5); sheet.bump(helper.id, 'assists'); }
+            const prose = describeFinish(fs.finishing);
+            observe(finisher, `Scoring (${min}. min mod ${def.team.name}): ${finisher.shortName} afsluttede med ${prose}.`);
+            const desc = describeGoal(kind, tag(finisher), tag(helper ?? finisher), min, rng);
+            goalsPool.push({ scorer: tag(finisher), teamName: att.team.name, match: `${home.name} - ${away.name}`, min, kind, spectacle: goalSpectacle(kind, { finishing: fs.finishing, pace: fs.pace, ballControl: fs.ballControl, passing: (helper ?? finisher).skills.passing }, min, rng), desc });
+            addEv(min, 'GOAL', 'HIGHLIGHT', att.isHome, true, `⚽ Mål: ${tag(finisher)}`, `⚽ [${att.team.name} • ${hG}-${aG}] MÅÅÅL! ${lead ? lead + ' ' : ''}${desc}`);
+          } else {
+            st[k(att, 'OnTarget')]++;
+            sheet.adjust(gk.id, 0.5); sheet.bump(gk.id, 'saves'); sheet.adjust(finisher.id, 0.1);
+            addEv(min, 'SAVE', 'PLAY', def.isHome, false, 'Redning', `🧤 [${def.team.name}] Flot redning af ${tag(gk)} på afslutning fra ${tag(finisher)} (${att.team.name}).${lead ? ' ' + lead.replace('✅ ', '') : ''}`);
+          }
+        } else if (shooter.skills.finishing * freshFactor(shooter) + rng.next() * 8 > gk.skills.goalkeeping * freshFactor(gk) + rng.next() * 8 + KEEPER_EDGE) {
+          scored();
+          // Måltypen afgøres ÉT sted og bruges i referat, observation, avis og karakterark (v3.7).
+          // Cutback følger kun DIT holds valg; for andre hold er det tilfældigt (ellers røbede det
+          // modstanderens angrebsfokus). Langskud og dribletur er vægtet af evnerne.
+          const ph1 = attPh.phase1_buildUp, sk = shooter.skills;
+          // COUNTER kommer kun fra en rigtig kontra (v3.9) – ikke som et label her.
+          const cutbackOk = own(att) ? ph1.attackFocus === 'LOW_CUTBACKS' && rng.chance(0.42) : rng.chance(0.12);
+          let kind = cutbackOk ? 'CUTBACK' : null;
+          if (!kind) {
+            const w = { COMBINATION: 4, LONGSHOT: Math.max(0, sk.finishing - 8) * 0.45, DRIBBLE: Math.max(0, (sk.pace + sk.ballControl) / 2 - 8) * 0.45 };
+            let r = rng.next() * (w.COMBINATION + w.LONGSHOT + w.DRIBBLE);
+            kind = Object.keys(w).find((k) => (r -= w[k]) < 0) || 'COMBINATION';
+          }
+          const solo = kind === 'LONGSHOT' || kind === 'DRIBBLE'; // ingen oplægsgiver
+          sheet.adjust(shooter.id, solo ? 1.4 : 1.25); sheet.bump(shooter.id, 'goals'); if (!solo) assist(0.5); sheet.adjust(gk.id, -0.3);
+          const prose = describeFinish(shooter.skills.finishing);
+          observe(shooter, `Scoring (${min}. min mod ${def.team.name}): ${shooter.shortName} afsluttede med ${prose}.`);
+          const desc = describeGoal(kind, tag(shooter), tag(assister), min, rng);
+          goalsPool.push({ scorer: tag(shooter), teamName: att.team.name, match: `${home.name} - ${away.name}`, min, kind, spectacle: goalSpectacle(kind, { finishing: sk.finishing, pace: sk.pace, ballControl: sk.ballControl, passing: assister.skills.passing }, min, rng), desc });
+          addEv(min, 'GOAL', 'HIGHLIGHT', att.isHome, true, `⚽ Mål: ${tag(shooter)}`, `⚽ [${att.team.name} • ${hG}-${aG}] MÅÅÅL! ${desc}`);
+        } else {
+          st[k(att, 'OnTarget')]++;
+          sheet.adjust(gk.id, 0.5); sheet.bump(gk.id, 'saves'); sheet.adjust(shooter.id, 0.1);
+          addEv(min, 'SAVE', 'PLAY', def.isHome, false, 'Redning', `🧤 [${def.team.name}] Flot redning af ${tag(gk)} på afslutning fra ${tag(shooter)} (${att.team.name}).`);
+        }
       }
     }
   }

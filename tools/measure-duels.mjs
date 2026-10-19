@@ -9,6 +9,7 @@ import { createRng } from '../public/engine/rng.js';
 import { createLeague } from '../public/engine/generator.js';
 import { playRound, commitRound } from '../public/engine/season.js';
 import { COUNTER_KEYS } from '../public/engine/counter.js';
+import { simulateMatch } from '../public/engine/match.js';
 
 const ARG_N = Number(process.argv[2] || 20);
 const ROLE_GROUP = { CDM: 'CM', LB: 'FB', RB: 'FB', LWB: 'WB/kant', RWB: 'WB/kant', LM: 'WB/kant', RM: 'WB/kant', LW: 'WB/kant', RW: 'WB/kant', CAM: 'CAM/CF', CF: 'CAM/CF' };
@@ -44,11 +45,44 @@ export function measure(setup = null, rounds = 3, N = ARG_N) {
   return { rate: win / (win + fail), n: win + fail, ownWin, ownFail, series, goalsPerMatch: goals / games, headersPerMatch: headers / games };
 }
 
+// Løb uden bold (v3.9): hold A med en given indstilling mod hold B (ligaens egne bots, evt. med
+// tvungen "Ved erobring"), begge baner, frisk start. Mål for/imod pr. kamp for A, kontramål imod.
+export function measureRuns({ runs = 'NORMAL', lost = 'DROP_BACK', oppWon = null } = {}, N = ARG_N) {
+  let gf = 0, ga = 0, cga = 0, games = 0, runsN = 0, runsWon = 0;
+  for (let s = 1; s <= N; s++) {
+    const rng = createRng(s * 104729);
+    const L = createLeague(rng);
+    for (let i = 0; i < 8; i += 2) for (const swap of [false, true]) {
+      const [A, B] = [L.teams[i], L.teams[i + 1]];
+      Object.assign(A.tactics.phases.phase1_buildUp, { offBallRuns: runs });
+      Object.assign(A.tactics.phases.phase3_transition, { onBallLost: lost });
+      B.tactics.phases.phase1_buildUp.offBallRuns = 'NORMAL';
+      if (oppWon) B.tactics.phases.phase3_transition.onBallWon = oppWon;
+      const m = swap ? simulateMatch(B, A, rng) : simulateMatch(A, B, rng);
+      const aHome = !swap;
+      gf += aHome ? m.homeGoals : m.awayGoals; ga += aHome ? m.awayGoals : m.homeGoals; games++;
+      cga += m.goalsPool.filter((g) => g.kind === 'COUNTER' && g.teamName === B.name).length;
+      for (const e of aHome ? m.ratings.home : m.ratings.away) { runsN += e.freeRuns; runsWon += e.freeRunsWon; }
+    }
+  }
+  return { gf: gf / games, ga: ga / games, net: (gf - ga) / games, cga: cga / games, runs: runsN / games, runsWon: runsWon / games, games };
+}
+if (import.meta.url === `file://${process.argv[1]}` && process.argv[3] === 'loeb') {
+  const f = (x) => x.toFixed(2);
+  for (const [label, o] of [['Normal', {}], ['Mange', { runs: 'MANY' }], ['Få', { runs: 'FEW' }],
+    ['Normal mod Hold', { oppWon: 'KEEP_POSSESSION' }], ['Mange mod Hold', { runs: 'MANY', oppWon: 'KEEP_POSSESSION' }],
+    ['Normal mod Lynkontra', { oppWon: 'FAST_COUNTER' }], ['Mange mod Lynkontra', { runs: 'MANY', oppWon: 'FAST_COUNTER' }], ['Få mod Lynkontra', { runs: 'FEW', oppWon: 'FAST_COUNTER' }], ['Få mod Hold', { runs: 'FEW', oppWon: 'KEEP_POSSESSION' }],
+    ['Normal + Genpres', { lost: 'COUNTER_PRESS_5S' }]]) {
+    const r = measureRuns(o);
+    console.log(`${label.padEnd(22)} for ${f(r.gf)} imod ${f(r.ga)} netto ${f(r.net)} · kontramål imod ${f(r.cga)} · løb ${f(r.runs)} (fri ${f(r.runsWon)}) · ${r.games} kampe`);
+  }
+}
+
 const phases = (pass, focus, height) => (t) => {
   Object.assign(t.tactics.phases.phase1_buildUp, { passingStyle: pass, attackFocus: focus });
   Object.assign(t.tactics.phases.phase2_defending, { pressingHeight: height, offsideTrap: 'OFF' });
 };
-if (import.meta.url === `file://${process.argv[1]}` && process.argv[3] !== 'saeson') {
+if (import.meta.url === `file://${process.argv[1]}` && !['saeson', 'loeb'].includes(process.argv[3])) {
   const pct = (x) => `${(x * 100).toFixed(1)} %`;
   const liga = measure();
   console.log(`Ligaens egne taktikker: fase 1 vinder ${pct(liga.rate)} (${liga.n} dueller, ${ARG_N} ligaer × 3 runder); ${liga.goalsPerMatch.toFixed(2)} mål pr. kamp, heraf ${liga.headersPerMatch.toFixed(2)} hovedstød.`);
