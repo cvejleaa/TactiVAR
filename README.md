@@ -1,24 +1,42 @@
-# Projekt-skabelon
+# TactiVAR Manager
 
-Udgangspunkt for nye projekter: gennemgangs-modellen med tre faste roller på
-hver ændring (Test Manager, Quality Control, Release Manager) plus tre
-betingede (Arkitekt på alt større end en enkelt rettelse, Security Reviewer
-og en domæne-rådgiver), som subagenter i `.claude/agents/`, og arbejdsgangen
-i `CLAUDE.md`.
+Fodboldmanager med VAR-tema: skjulte evner, scouting gennem kampreferater,
+taktiktavle med træk og slip, og en liga på 8 hold. Spillet blev startet i
+Gemini (v1.0–v2.5 som én `index.html` på vejleaa.dk) og genopbygges her som
+en rigtig kodebase. Spec og opgørelse over kilden: [`docs/spec.md`](docs/spec.md).
 
-## Nyt projekt fra skabelonen
+- **Live:** https://tactivar.web.app (Firebase Hosting, projekt `tactivar`).
+- **Gammel version:** vejleaa.dk/TacticVar er reserve, indtil den nye har
+  samme funktioner. Dens "Upload/Sync til Firestore" virker ikke længere –
+  bevidst: databasen stod åben for alle, og brugeren har bekræftet, at der
+  ikke ligger data i den.
 
-1. På GitHub: **New repository → Repository template: cvejleaa/skabelon**
-   (kræver at dette repo er markeret som template under Settings →
-   ☑ Template repository).
-2. Åbn det nye repo i Claude Code og sig: *"Gennemgå skabelonens
-   [TILPAS]-markeringer sammen med mig og udfyld dem for det her projekt."*
+## Opbygning
+- `public/` serveres som det er (intet build-trin): `index.html`,
+  `errors.js` (synlig fejlboks), `app.js`, `version.js` (bumpes ved hver
+  ændring af `public/` – CI kræver det), `engine/` (ren spillogik, ingen DOM,
+  seedet tilfældighed). Planlagt: `state/` (gem/indlæs) og `ui/`.
+- `tests/unit/` (node:test), `tests/e2e/` (Playwright mod en lokal server).
+- `tools/check.mjs` (syntaks og imports), `tools/serve.mjs` (lokal server).
+- `firestore.rules`: afviser alt i trin 1 – spillet gemmer i browseren.
 
-## Tilpasnings-tjekliste (det, `[TILPAS]` markerer)
+## Deploy
+Merge til `main` → CI → `deploy.yml` deployer hosting og regler og tjekker,
+at versionen i `public/version.js` er live. Kræver repo-secret
+`FIREBASE_SERVICE_ACCOUNT` (JSON-nøgle til en servicekonto i projektet
+`tactivar` med rollen "Firebase Admin"). Mangler den, fejler deploy-jobbet
+(rødt), så det aldrig ser grønt ud uden at være deployet. Efter deploy køres
+e2e-testen som smoke-test mod tactivar.web.app.
+
+## Kendt gæld
+- `[TILPAS]` i `.claude/agents/` er kun delvist udfyldt (se tjeklisten).
+- Hemmeligholdelse af modstandernes data er kun visuel, indtil trin 2
+  (login + server-motor).
+
+## Tilpasnings-tjekliste (det, `[TILPAS]` stadig markerer)
 
 | Fil | Skal udfyldes |
 |---|---|
-| `CLAUDE.md` | test-/lint-/build-kommandoer nederst, CI-jobbene i trin 4, og sproget i Faste regler |
 | `.claude/agents/release-manager.md` | miljø/workflow-tabellen, sti → kræver-tabellen, lumske deploy-defaults |
 | `.claude/agents/security-reviewer.md` | trusselsbilledet (hvem er den realistiske angriber?) og hvilke stier der udløser rollen |
 | `.claude/agents/quality-control-manager.md` | projektets fælder, invarianter og delte flader |
@@ -32,32 +50,3 @@ skarpere, efterhånden som felterne udfyldes og deres hukommelse i
 `.claude/agent-memory/` vokser. (Reglerne for hukommelsen og modelvalget står
 i `CLAUDE.md`, så de overlever, når denne README skrives om.)
 
-## Bevidst udeladt fra kilden
-
-Skabelonen er afledt af et levende projekts setup. Disse dele er IKKE med —
-som beslutning, ikke forglemmelse:
-
-- **Agent-hukommelsernes indhold** (`.claude/agent-memory/*.md`): projekt-
-  specifik viden. Mappen er med (tom), og hvert projekt bygger sin egen op.
-- **Kildens historiske eksempler** ("hver rolle har blokeret noget ægte",
-  konkrete fejl med navne): de bærende lærestreger er anonymiseret ind i
-  rolle-filerne og CLAUDE.md; resten er projekthistorie. Skriv jeres egne
-  eksempler ind, når de sker — det er dem, der gør reglerne troværdige.
-- **Drift- og vedligeholdelsesdokumenter** (`docs/drift.md` m.fl.): opret
-  projektets egne, når der er drift at dokumentere. Eftersynets punkt 2 og
-  Release Managers fire driftsspørgsmål peger på behovet.
-
-## De tre principper, der bærer det hele
-
-1. **Commit før gennemgang.** Gennemgange og mutationstest ser kun det
-   committede — og mutationers tilbagerulning kan slette ukommitteret
-   arbejde.
-2. **En grøn suite beviser intet i sig selv.** Kun en mutation, der gør den
-   rød, beviser dækning.
-3. **Gennemgangs-rollerne skal kunne blokere — og alle roller skal sige
-   klart fra eller klart god.** (Domæne-rådgiveren er bevidst kun
-   rådgivende.) En rolle, der altid siger "ser fint ud", holder man op med
-   at læse.
-
-*(Slet dette afsnit og skriv projektets egen README, når projektet er i
-gang — men behold tilpasnings-tjeklisten, til den er tom.)*

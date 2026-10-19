@@ -3,7 +3,7 @@ name: test-manager
 description: Test Manager. Gennemgår testdækningen for en ændring FØR den landes — er den dækket, fanger testene reelt fejlen, og hvilke grænsetilfælde mangler. Skal med på ENHVER ændring.
 tools: Read, Edit, Grep, Glob, Bash
 model: sonnet
-effeort: high
+effort: high
 isolation: worktree
 memory: project
 ---

@@ -1,0 +1,13 @@
+:root {
+  --bg: #0f172a; --panel: #111827; --kant: #1f2937; --tekst: #f8fafc; --dæmpet: #94a3b8;
+  --lilla: #9333ea; --grøn: #10b981; --rød: #ef4444; --blå: #7dd3fc;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--tekst); font-family: system-ui, -apple-system, sans-serif; }
+select option { background: var(--bg); color: var(--tekst); }
+.topbar { display: flex; align-items: center; gap: .75rem; padding: .75rem 1rem; background: var(--panel); border-bottom: 1px solid var(--kant); position: sticky; top: 0; z-index: 10; }
+.topbar h1 { font-size: 1.15rem; margin: 0; }
+.badge { background: var(--lilla); color: #fff; font-weight: 900; padding: .15rem .5rem; border-radius: .25rem; font-size: .8rem; letter-spacing: .05em; }
+.muted { color: var(--dæmpet); font-size: .8rem; }
+main { max-width: 80rem; margin: 1rem auto; padding: 0 1rem; }
+.fejlboks { background: #450a0a; color: #fecaca; border: 1px solid var(--rød); padding: .5rem 1rem; font-size: .85rem; }

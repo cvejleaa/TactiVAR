@@ -1,0 +1,11 @@
+rules_version = '2';
+// Trin 1: spillet gemmer alt i browseren og bruger ikke Firestore.
+// Databasen blev oprettet i "test mode" (åben for alle) – den lukkes helt her,
+// indtil trin 2 indfører login og en rigtig adgangsmodel (se docs/spec.md §11).
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

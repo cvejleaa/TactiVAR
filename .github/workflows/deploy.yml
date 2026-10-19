@@ -1,0 +1,101 @@
+# Automatisk deploy til Firebase (hosting + Firestore-regler), når CI er grøn på main.
+# Kræver GitHub-secret FIREBASE_SERVICE_ACCOUNT (JSON-nøgle til en servicekonto med rollen
+# "Firebase Admin"). Mangler nøglen, fejler jobbet (rødt) – intet deployes.
+name: Deploy til Firebase
+
+on:
+  # Deploy kun når CI er grøn på main – en rød build må aldrig komme i luften.
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    env:
+      HAS_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT != '' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Mangler nøgle?
+        if: env.HAS_KEY != 'true'
+        run: |
+          echo "::error::Secret FIREBASE_SERVICE_ACCOUNT mangler – intet er deployet. Se README, afsnittet Deploy."
+          exit 1
+
+      - uses: actions/setup-node@v4
+        if: env.HAS_KEY == 'true'
+        with:
+          node-version: 20
+
+      - name: Skriv servicekonto-nøgle
+        if: env.HAS_KEY == 'true'
+        run: printf '%s' "$KEY" > "$RUNNER_TEMP/sa.json"
+        env:
+          KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+
+      - name: Diagnose af nøgle og rettigheder
+        if: env.HAS_KEY == 'true'
+        run: |
+          EMAIL=$(jq -r .client_email "$RUNNER_TEMP/sa.json")
+          PROJ=$(jq -r .project_id "$RUNNER_TEMP/sa.json")
+          echo "Nøglen tilhører: $EMAIL (oprettet i projekt: $PROJ)"
+          gcloud auth activate-service-account --key-file "$RUNNER_TEMP/sa.json" --quiet
+          echo "--- Roller for kontoen i projektet tactivar ---"
+          gcloud projects get-iam-policy tactivar --flatten="bindings[].members" \
+            --filter="bindings.members:serviceAccount:$EMAIL" --format="value(bindings.role)" \
+            || echo "(kunne ikke læse IAM-politikken – kontoen mangler formentlig projektroller helt)"
+          echo "--- Er Firebase Rules API slået til? ---"
+          gcloud services list --enabled --project tactivar --filter="config.name:firebaserules.googleapis.com" --format="value(config.name)" \
+            || echo "(kunne ikke læse API-listen)"
+          echo "--- Firebase-projekter kontoen kan se ---"
+          npx --yes firebase-tools@13 projects:list --non-interactive || true
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/sa.json
+
+      - name: Deploy hosting og Firestore-regler
+        if: env.HAS_KEY == 'true'
+        run: npx --yes firebase-tools@13 deploy --only hosting,firestore:rules --project tactivar --non-interactive --force
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/sa.json
+
+      - name: Tjek at den nye version er live
+        if: env.HAS_KEY == 'true'
+        run: |
+          WANT=$(node -e "import('./public/version.js').then(m => console.log(m.VERSION))")
+          for i in 1 2 3 4 5 6; do
+            GOT=$(curl -fsS "https://tactivar.web.app/version.js?t=$(date +%s)" | node --input-type=module -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log((s.match(/VERSION\s*=\s*'([^']+)'/)||[])[1]||''))") || true
+            [ "$GOT" = "$WANT" ] && { echo "Live: v$GOT"; exit 0; }
+            sleep 10
+          done
+          echo "::error::Live version er '$GOT', forventede '$WANT'"; exit 1
+
+      - name: Tjek at databasen er lukket (ikke længere "test mode")
+        if: env.HAS_KEY == 'true'
+        run: |
+          CODE=$(curl -s -o /dev/null -w '%{http_code}' "https://firestore.googleapis.com/v1/projects/tactivar/databases/(default)/documents/tjek/x")
+          echo "Ulogget læsning gav HTTP $CODE"
+          [ "$CODE" = "403" ] || { echo "::error::Firestore svarer $CODE på en ulogget læsning – forventede 403. Er reglerne deployet?"; exit 1; }
+
+      - name: Smoke-test mod den live side
+        if: env.HAS_KEY == 'true'
+        run: npm ci --no-audit --no-fund && npm run test:e2e
+        env:
+          BASE_URL: https://tactivar.web.app
+          CHROME_PATH: /usr/bin/google-chrome
+
+      - name: Fjern nøgle
+        if: always()
+        run: rm -f "$RUNNER_TEMP/sa.json"
