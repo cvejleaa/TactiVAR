@@ -335,6 +335,11 @@ try {
   check('Migrering: gemmes straks i skema 2, kun én backup trods tre genindlæsninger', mig.schema === 2 && mig.backups === 1, JSON.stringify(mig));
   await tab('liga'); const migHead = await g.textContent('#standings-title'); await tab('trup');
   check('Migrering: ligaen fra skema 1 er intakt (runde 1, 18 spillere)', migHead.includes('efter 1 runde') && (await rows()) === 18);
+  // Runden er gemt før v3.5 (uden plads og startformation): Kamp-fanen viser den med listen, uden minibane
+  await tab('kamp');
+  const oldRows = await g.locator('.ratings').nth(0).locator('tbody tr td:first-child').allTextContents();
+  check('Gammel runde uden plads: karakterark med gemt rolle, ingen minibane', (await g.isVisible('#match-center')) && (await g.locator('.minipitch').count()) === 0 && oldRows.length >= 11 && oldRows.every((t) => / · \S/.test(t) && !/undefined|null/.test(t)), oldRows.slice(0, 2).join(' | '));
+  await tab('trup');
 
   // Mislykkes backuppen ved migrering (fuldt lager), overskrives det gamle format ikke – og der advares
   await g.evaluate((f) => { for (const k of Object.keys(localStorage)) if (k.startsWith('tactivar_')) localStorage.removeItem(k); localStorage.setItem('tactivar_save', f); }, fixture);
