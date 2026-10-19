@@ -4,7 +4,7 @@
 import { h } from './dom.js';
 import { starsEl } from './labels.js';
 import { viewRatingEntry } from '../engine/visibility.js';
-import { GOAL_KIND_LABEL } from '../engine/gazette.js';
+import { GOAL_KIND_LABEL, goalMatchIdx } from '../engine/gazette.js';
 import { FORMATIONS } from '../engine/formations.js';
 import { isStarter, placeLabel, lineupSort } from './lineup.js';
 
@@ -76,7 +76,7 @@ const legend = (isOwn = true) => h('div', { class: 'muted legend', id: 'icon-leg
 // matches: rundens kampe – bruges til at finde kampen for mål fra før v3.7.1 (uden matchIdx).
 export function renderGazette(g, myTeamId, onOpenMatch = null, matches = null) {
   const goal = g?.goalOfTheRound;
-  const goalIdx = !goal ? -1 : Number.isInteger(goal.matchIdx) ? goal.matchIdx : (matches || []).findIndex((m) => `${m.homeName} - ${m.awayName}` === goal.match);
+  const goalIdx = goalMatchIdx(goal, matches);
   if (!g) return null;
   // Rundens spiller går gennem visibility.js: modstandere vises kun med stjerner.
   const pr = g.playerOfTheRound ? viewRatingEntry(g.playerOfTheRound, g.playerOfTheRound.teamId === myTeamId) : null;

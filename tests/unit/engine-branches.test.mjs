@@ -940,10 +940,10 @@ test('bogføring: km, minutter og bedste topfart summeres over sæsonen; støjen
 test('normalizeLeague giver gamle spillere 0 i km, minutter og topfart (ikke NaN)', () => {
   const L = createLeague(createRng(4));
   const p = L.teams[1].squad[2];
-  delete p.distanceSum; delete p.minutesSum; delete p.topSpeedMax;
+  delete p.distanceSum; delete p.minutesSum; delete p.topSpeedMax; delete p.hiKmSum; delete p.hiDistSum;
   const { league } = normalizeLeague(L);
   const q = league.teams[1].squad[2];
-  assert.deepEqual([q.distanceSum, q.minutesSum, q.topSpeedMax], [0, 0, 0]);
+  assert.deepEqual([q.distanceSum, q.minutesSum, q.topSpeedMax, q.hiKmSum, q.hiDistSum], [0, 0, 0, 0, 0]);
 });
 
 // ---------- v3.7.1: andel højintenst løb og kampen bag "Rundens mål" ----------
@@ -966,6 +966,12 @@ test('finalizeSheet: km i højintenst løb = distance · andel; modstandere ser 
   s.register({ id: 'a', shirtNumber: 1, shortName: 'a', line: 'MID', skills: { stamina: 10, pace: 10 } }, team, true, 'CM', 1, r, 15, 5);
   const e = finalizeSheet(s, 0, 0, r, counterXpForMatch).home[0];
   assert.equal(e.hiShare, 9); assert.equal(e.hiKm, 1); // 11,1 km · 9 % = 0,999
+  // Afrunding til 2 decimaler: 10,5 km · 9,5 % = 0,9975 → 1; 4,3 km · 11 % = 0,473 → 0,47 (1 decimal gav 0,5)
+  const s2 = createSheet();
+  s2.register({ id: 'b', shirtNumber: 2, shortName: 'b', line: 'ATT', skills: { stamina: 10, pace: 10 } }, team, true, 'ST', 56, r, 15, 9);
+  const e2 = finalizeSheet(s2, 0, 0, r, counterXpForMatch).home[0];
+  assert.equal(e2.distanceKm, 3.8); assert.equal(e2.hiKm, 0.42); // 10·34/90 = 3,78 → 3,8; 3,8·11 % = 0,418
+  assert.equal(viewPlayer({ id: 'p', hiKmSum: 3, hiDistSum: 30, skills: {} }, true).hiKmSum, 3);
   const opp = viewRatingEntry(e, false);
   assert.ok(!('hiShare' in opp) && !('hiKm' in opp));
   assert.ok(!('hiKmSum' in viewPlayer({ id: 'p', hiKmSum: 3, skills: {} }, false)));
@@ -979,6 +985,9 @@ test('bogføring: km i højintenst løb summeres over sæsonen', () => {
   const old = syntheticRound(L, { ratings: [{ playerId: p.id, rating: 6, gainedCounterXp: 1, distanceKm: 10, topSpeed: 30, minIn: 1, minOut: 90 }] }); old.round = 2;
   commitRound(L, old, { next: () => 0.5 });
   assert.equal(p.distanceSum, 21); assert.equal(p.hiKmSum, 1.1); assert.equal(p.hiDistSum, 11); // andel 10 %, ikke 1,1/21 = 5 %
+  const third = syntheticRound(L, { ratings: [{ playerId: p.id, rating: 6, gainedCounterXp: 1, distanceKm: 9, hiKm: 0.6, topSpeed: 30, minIn: 1, minOut: 90 }] }); third.round = 3;
+  commitRound(L, third, { next: () => 0.5 });
+  assert.ok(Math.abs(p.hiKmSum - 1.7) < 1e-9); assert.equal(p.hiDistSum, 20); // summeres, overskrives ikke
 });
 test('hvert mål ved, hvilken kamp i runden det faldt i', () => {
   const L = createLeague(createRng(31)), res = playRound(L, 1, createRng(31));
@@ -986,4 +995,15 @@ test('hvert mål ved, hvilken kamp i runden det faldt i', () => {
   assert.ok(all.length > 0);
   for (const [g, i] of all) { assert.equal(g.matchIdx, i); assert.equal(g.match, `${res.matches[i].homeName} - ${res.matches[i].awayName}`); }
   if (res.gazette.goalOfTheRound) assert.ok(Number.isInteger(res.gazette.goalOfTheRound.matchIdx));
+});
+
+test('Rundens mål: kampen findes via matchIdx, ellers via navnet (runder fra før v3.7.1), ellers ukendt', async () => {
+  const { goalMatchIdx } = await import('../../public/engine/gazette.js');
+  const goal = { match: 'A - B', min: 12 };
+  assert.equal(goalMatchIdx({ ...goal, matchIdx: 2 }, []), 2);
+  assert.equal(goalMatchIdx({ ...goal, matchIdx: 0 }, [{ homeName: 'A', awayName: 'B' }, {}]), 0);
+  assert.equal(goalMatchIdx(goal, [{ homeName: 'C', awayName: 'D' }, { homeName: 'A', awayName: 'B' }]), 1);
+  assert.equal(goalMatchIdx(goal, [{ homeName: 'B', awayName: 'A' }]), -1);
+  assert.equal(goalMatchIdx(goal, null), -1);
+  assert.equal(goalMatchIdx(null, []), -1);
 });

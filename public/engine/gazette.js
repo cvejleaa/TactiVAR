@@ -16,6 +16,9 @@ export function headline(m, round = 0) {
   return pick(Math.abs(hG - aG) >= 3 ? HEADLINES.BIG : HEADLINES.WIN)(w, l, s);
 }
 
+// Hvilken kamp i runden et mål faldt i: matchIdx (fra v3.7.1), ellers kampens navn; −1 = ukendt.
+export const goalMatchIdx = (goal, matches) => (!goal ? -1 : Number.isInteger(goal.matchIdx) ? goal.matchIdx : (matches || []).findIndex((m) => `${m.homeName} - ${m.awayName}` === goal.match));
+
 export const GOAL_KIND_LABEL = { LONGSHOT: 'Langskud', DRIBBLE: 'Dribletur', COUNTER: 'Kontra', CUTBACK: 'Cutback', COMBINATION: 'Kombination', HEADER: 'Hovedstød', VAR: 'VAR-drama' };
 
 // positions: teamId → { pos, points } i tabellen FØR runden (tidligst runde 3).
