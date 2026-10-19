@@ -30,6 +30,7 @@ export const STYLE_BONUS = 3;
 // løbet i position … og skal indregnes i modstanderens muligheder hvis de opsnapper bolden").
 // Findes på ALLE trin (én kontra røber intet), dæmpes af taberens genpres og forstærkes af
 // vinderens lynkontra. Hvert FB/WB-felt hos en taber på "Mange" løfter chancen 5 %.
+const RUNS_LABEL = { FEW: 'Få', NORMAL: 'Normal', MANY: 'Mange' };
 export const COUNTER_P = { FEW: 0.03, NORMAL: 0.08, MANY: 0.2 };
 export const COUNTER_LOST = { COUNTER_PRESS_5S: 0.7, DROP_BACK: 1 };
 export const COUNTER_WON = { FAST_COUNTER: 1.8, KEEP_POSSESSION: 0.4 };
@@ -510,6 +511,12 @@ export function simulateMatch(home, away, rng, opts = {}) {
     }
   }
 
+  // Opsummering af løb uden bold – kun dit eget hold (dine valg og dine tal).
+  const meSide = [H, A].find(own);
+  if (meSide) {
+    const d = duelLog[meSide.team.id], runs = meSide.tactics.phases.phase1_buildUp.offBallRuns ?? 'NORMAL';
+    addEv(90, 'INFO', 'TACTIC', meSide.isHome, false, 'Løb uden bold', `🎯 [LØB UDEN BOLD • ${RUNS_LABEL[runs]}] ${d.runs} løb, ${d.runsWon} kom fri (${d.runGoals} mål) · kontraer imod i alt: ${d.countersAgainst} (${d.counterGoalsAgainst} mål).`);
+  }
   const ratings = finalizeSheet(sheet, hG, aG, rng, counterXpForMatch);
   addEv(90, 'END', 'HIGHLIGHT', true, false, 'Slutfløjt', `🏁 SLUTFLØJT! ${home.name} ${hG} - ${aG} ${away.name}.${ratings.motm ? ` Kampens spiller: #${ratings.motm.shirtNumber} ${ratings.motm.shortName} (${ratings.motm.teamName}).` : ''}`);
 

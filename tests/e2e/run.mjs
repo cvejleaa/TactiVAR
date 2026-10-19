@@ -219,6 +219,13 @@ try {
   check('Byt gemmes straks', (await nameAt(7)) === s8 && (await nameAt(8)) === s7);
   await g.selectOption('#tactics select[data-field="onBallWon"]', 'KEEP_POSSESSION'); await reload();
   check('Fasevalg gemmes straks', (await g.inputValue('#tactics select[data-field="onBallWon"]')) === 'KEEP_POSSESSION');
+  // v3.9: løb uden bold i Fase 1 – starter på Normal, gemmes og overlever F5; hjælpeteksten ses
+  check('Løb uden bold: findes i Fase 1 og starter på Normal', (await g.inputValue('#tactics fieldset[data-phase="phase1_buildUp"] select[data-field="offBallRuns"]')) === 'NORMAL');
+  await g.selectOption('#tactics select[data-field="offBallRuns"]', 'MANY'); await reload();
+  check('Løb uden bold: Mange gemmes og overlever F5', (await g.inputValue('#tactics select[data-field="offBallRuns"]')) === 'MANY');
+  const help = await g.locator('#tactics .phase-help').allTextContents();
+  check('Hjælpetekst under Fase 1 (pris for Mange, fordel ved Få) og Fase 3 (genpres koster løb)', help.length === 2 && help[0].includes('kontraer imod') && help[0].includes('Få') && help[1].includes('Genpres') && help[1].includes('friskhed'), help.join(' | '));
+  await g.selectOption('#tactics select[data-field="offBallRuns"]', 'NORMAL');
 
   // Gem-fejl er synlig, aldrig tavs
   await g.evaluate(() => { window.__set = Storage.prototype.setItem; Storage.prototype.setItem = function () { throw new Error('QuotaExceededError'); }; });
@@ -311,6 +318,12 @@ try {
   const runExpect = await g.evaluate(() => { const m = JSON.parse(localStorage.getItem('tactivar_save')).league.lastRound.matches[0]; const own = [m.ratings.home, m.ratings.away].find((l) => l[0].isUserTeam); const e = own.find((x) => x.hiShare != null && x.distanceKm > 0); return `${e.distanceKm.toFixed(1)} km · ${Math.round(e.hiShare)} % HI`; });
   check('Karakterark: HI-andelen er spillerens afrundede tal', runs.some((t) => t.startsWith(runExpect)), runExpect);
   check('Karakterark: dit hold har løbet distance og topfart, modstanderen ikke', runs.length >= 11 && runs.filter((t) => /^\d+\.\d km · \d+ % HI · \d+\.\d km\/t$/.test(t)).length >= 11 && (await g.locator('.ratings').nth(1).locator('td.run').count()) === 0, runs.slice(0, 2).join(' | '));
+  // v3.9: "fri" (løb uden bold) kun for dit hold – og opsummeringen kun i din kamp
+  const fri = await g.locator('.ratings').nth(0).locator('td.fri').allTextContents();
+  const friExpect = await g.evaluate(() => { const m = JSON.parse(localStorage.getItem('tactivar_save')).league.lastRound.matches[0]; const own = [m.ratings.home, m.ratings.away].find((l) => l[0].isUserTeam); return own.filter((e) => e.freeRuns > 0).map((e) => `${e.freeRunsWon}/${e.freeRuns} fri`); });
+  check('Karakterark: "fri" for dit hold matcher de gemte løb, modstanderen har ingen kolonne', fri.length >= 11 && friExpect.length > 0 && friExpect.every((t) => fri.includes(t)) && fri.every((t) => t === '' || /^\d+\/\d+ fri$/.test(t)) && (await g.locator('.ratings').nth(1).locator('td.fri').count()) === 0, `${fri.join(',')} / ${friExpect.join(',')}`);
+  const runSum = await g.textContent('#match-center');
+  check('Opsummering af løb uden bold i din kamp', /🎯 \[LØB UDEN BOLD • Normal\] \d+ løb, \d+ kom fri \(\d+ mål\) · kontraer imod i alt: \d+ \(\d+ mål\)\./.test(runSum), runSum.match(/🎯[^.]*\./)?.[0] ?? 'mangler');
   const gzText = await g.textContent('#gazette');
   check('Avisen: en overskrift pr. kamp og dit holds løber med andel højintenst', (await g.locator('#headlines li').count()) === 4 && /Dit holds løber: #\d+ .+ – \d+\.\d km, \d+ % højintenst/.test(gzText), gzText.slice(0, 200));
   const iconTitles = await g.evaluate(() => [...document.querySelectorAll('.ratings .ricon')].map((e) => [e.textContent, e.title]));

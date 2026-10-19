@@ -22,7 +22,8 @@ export function viewPlayer(player, viewerOwnsTeam) {
 // den eksakte karakter, mod-kunnen eller optjent XP.
 // Løbedistance og topfart (v3.7) er også private: topfart røber farten (PAC), distance
 // udholdenheden og holdets pres-niveau; andelen højintenst løb (v3.7.1) farten og presset.
-export const RATING_PRIVATE_FIELDS = ['rating', 'startCounterMastery', 'gainedCounterXp', 'distanceKm', 'topSpeed', 'hiShare', 'hiKm'];
+export const RATING_PRIVATE_FIELDS = ['rating', 'startCounterMastery', 'gainedCounterXp', 'distanceKm', 'topSpeed', 'hiShare', 'hiKm', 'freeRuns', 'freeRunsWon'];
+// Løb uden bold (v3.9) er private: de røber positionering og fart – og modstanderens indstilling.
 export function viewRatingEntry(entry, viewerOwnsTeam) {
   if (viewerOwnsTeam) return { ...entry };
   const out = { ...entry };
