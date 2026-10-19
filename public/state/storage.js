@@ -2,10 +2,11 @@
 // slette ligaen. Ældre skemaer migreres additivt; kan data ikke læses, lægges de rå data
 // i en backup-nøgle, FØR der tilbydes en ny liga, og fejlen vises.
 import { normalizeLeague, normalizeRule } from '../engine/sanitize.js';
+import { COUNTER_KEYS, fitPool, counterFloor } from '../engine/counter.js';
 
 export const SAVE_KEY = 'tactivar_save';
 export const BACKUP_PREFIX = 'tactivar_backup_';
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 // Migreringer: MIGRATIONS[n] løfter et gemt objekt fra skema n til n+1. Tilføj en ny,
 // hver gang gemme-formatet ændres – sammen med et fixture fra forrige version i
@@ -16,7 +17,28 @@ export const MIGRATIONS = {
     for (const t of d.league?.teams || []) for (const tac of [t.tactics, ...(t.tacticPresets || [])]) (tac?.conditionalRules || []).forEach(normalizeRule);
     return { ...d, schemaVersion: 2 };
   },
+  // 2 → 3 (v3.6, brugerens ønske): mod-kunnen på den nye skala (×0,55, inden for puljen på
+  // 120 – "man kan ikke være god imod alt") og spillerne 5 cm lavere ("snit på 186 cm, hvor
+  // den gennemsnitlige dansker er 181"). Rækkefølgen mellem spillerne bevares; luftduellen
+  // genberegnes af normalizeLeague, og højden i scouting-indtrykkene rettes med.
+  2: (d) => {
+    const newHeight = new Map();
+    for (const t of d.league?.teams || []) for (const p of t.squad || []) {
+      if (p.counterTactics) {
+        const floor = counterFloor(p.age ?? 20);
+        const ct = Object.fromEntries(COUNTER_KEYS.map((k) => [k, Math.max(floor, Math.round((p.counterTactics[k] ?? 15) * HEIGHT_AND_COUNTER.counterScale))]));
+        p.counterTactics = fitPool(ct, COUNTER_KEYS.slice().sort((a, b) => ct[b] - ct[a]), floor);
+      }
+      if (Number.isFinite(p.heightCm)) { newHeight.set(p.id, [p.heightCm, p.heightCm - HEIGHT_AND_COUNTER.heightShift]); p.heightCm -= HEIGHT_AND_COUNTER.heightShift; }
+    }
+    for (const book of Object.values(d.league?.scouting || {})) for (const [pid, list] of Object.entries(book || {})) {
+      const h = newHeight.get(pid);
+      if (h && Array.isArray(list)) book[pid] = list.map((s) => (typeof s === 'string' ? s.replaceAll(`(${h[0]} cm)`, `(${h[1]} cm)`) : s));
+    }
+    return { ...d, schemaVersion: 3 };
+  },
 };
+export const HEIGHT_AND_COUNTER = { counterScale: 0.55, heightShift: 5 };
 
 export function serialize(state, now = Date.now()) {
   return JSON.stringify({ schemaVersion: SCHEMA_VERSION, savedAt: now, league: state.league, notes: state.notes, ui: state.ui });

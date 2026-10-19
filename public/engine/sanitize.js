@@ -49,7 +49,7 @@ export function normalizeLeague(league) {
     if (!Array.isArray(team.squad) || team.squad.length !== 18) { problems.push(`${team.name || team.id} har ${team.squad?.length ?? 0} spillere (forventet 18)`); return; }
     for (const p of team.squad) {
       for (const [k, v] of Object.entries(PLAYER_DEFAULTS)) if (p[k] === undefined) p[k] = v;
-      if (!p.counterTactics) p.counterTactics = { vsPress: 25, vsLowBlock: 25, vsTrapLong: 25 };
+      if (!p.counterTactics) p.counterTactics = { vsPress: 15, vsLowBlock: 15, vsTrapLong: 15 };
       p.aerialPower = aerialBreakdown(p.heightCm, p.jumpingPower, p.skills.strength, p.skills.positioning).total;
     }
     const ids = new Set(team.squad.map((p) => p.id));

@@ -39,10 +39,14 @@ begrundelse).
   positioning, intercepting, goalkeeping`, vægtet efter kæde (GK goalkeeping
   base+2, andre 1–2; finishing for ikke-ATT 2–9). `rollStat` er
   trekantsfordelt og klemt til 1–20.
-- Højde: GK/DEF 181–198 cm, øvrige 172–195. Springkraft 1–20.
+- Højde (v3.6, brugeren: "snit på 186 cm, hvor den gennemsnitlige dansker er 181";
+  kilden: GK/DEF 181–198 jævnt, øvrige 172–195): klokkeform om kædens midte
+  GK 186, FOR 182, MID 176, ANG 179 ± 15 (tre terninger −5..5), holdsnit ≈181.
+  Springkraft 1–20.
 - **Luftduel** `aerialPower = round(heightScore·0,35 + jump·0,35 +
   strength·0,15 + positioning·0,15)`, `heightScore = clamp(1..20,
-  round((cm−168)·0,70))`. Mellemregningen vises på spillerkortet.
+  round((cm−163)·0,70))` (v3.6: nulpunkt 163, før 168, så luftduellerne ikke
+  svækkes af de lavere spillere). Mellemregningen vises på spillerkortet.
 - **VAR-profil (skjult for alle, også ejer)**: cynicism 4–18, theatre 3–18,
   varPulse baseMin−1..baseMax+2. Vises som "??" — "Afsløres gennem kampe".
 - Unikt kortnavn pr. hold: "M. Jensen".
@@ -163,13 +167,21 @@ Tick hvert 3. minut (1..90).
 
 ## 7. Mod-kunnen (v2.2b)
 - `counterTactics {vsPress, vsLowBlock, vsTrapLong}`, start
-  `round((alder−16)·2,2 + POS·1,5) + rnd(−10..+11)`, klemt 12–75.
+  `round((alder−16)·1,2 + POS·0,8) + rnd(−8..+8)`, klemt 5–45, snit ≈18–20
+  (v3.6, brugeren: "startværdierne skal sænkes"; kilden 2,2/1,5/±10, 12–75, snit ≈33).
+- **Pulje (v3.6, brugeren: "man kan ikke være god imod alt"):** summen af de tre er
+  højst 120 (`COUNTER_POOL`). Overskud betales af den stil, der ikke blev trænet,
+  derefter af den sekundære, hver ned til bunden; derefter af den trænede selv.
+  Spillerkortet viser "Erfaring brugt: X/120".
 - Mod en modstander = primær·0,65 + sekundær·0,35 (afledt af modstanderens
-  pres, offside-fælde, pasningsstil, angrebsfokus); default 25.
+  pres, offside-fælde, pasningsstil, angrebsfokus); default 15 (før 25).
+  VAR-linje-bonus = vsTrapLong·0,045 (før ·0,025 – samme effekt på den lavere skala).
 - XP pr. kamp = `round(min/90·(2 + 0,5·taktikdueller + (mål?1:0)))`, klemt 1–5;
-  primær +XP, sekundær +round(XP·0,5), øvrige −1; bund 25 (≥26 år) ellers 12.
-  (v3.6, brugeren: "for hurtigt"; kilden gav 4–16, +60 %, −3 – en starter gik fra
-  ~45 til ~70 på 3 runder. Eksisterende værdier i gemte spil er uændrede.)
+  primær +XP, sekundær +floor(XP·0,5), øvrige −1; bund 15 (≥26 år) ellers 5.
+  (v3.6, brugeren: "for hurtigt"; kilden gav 4–16, +60 %, −3, bund 25/12 – en
+  starter gik fra ~45 til ~70 på 3 runder.)
+- Skema 3 (v3.6) migrerer eksisterende ligaer: mod-kunnen ×0,55 ind i puljen,
+  højde −5 cm (rækkefølgen bevares; luftduel og scouting-tekster følger med).
 - UI (brugerens valg, afviger fra v2.5): kolonne 🧠Mod viser spillerens tre
   egne værdier "gegenpress · lav blok · VAR-linje" (sorterer på gennemsnittet;
   "??" for modstandere) – ingen samlet % mod en bestemt modstander, da den kan
@@ -194,7 +206,9 @@ visning". Sortering på kopi med `origIdx`.
   `sanitizeLeagueData`). Kan data ikke migreres: de rå data lægges i en
   backup-nøgle, FØR der tilbydes ny liga, og fejlen vises. Hver PR, der
   ændrer skemaet, tilføjer et fixture gemt af den forrige version og en
-  test, der indlæser det med truppen intakt.
+  test, der indlæser det med truppen intakt. Skema 1 → 2 (v3.4, Hvis-Så) og
+  2 → 3 (v3.6, mod-kunnen-pulje og højde) – fixtures `tests/fixtures/save-schema1.json`
+  og `save-schema2.json`.
 - Eksport/import af hele spillet som JSON-fil (backup og flytning mellem
   browsere/domæner).
 - Gamle data fra vejleaa.dk kan ikke flyttes (localStorage er bundet til

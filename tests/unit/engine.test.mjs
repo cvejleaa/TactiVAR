@@ -4,7 +4,7 @@ import { createRng } from '../../public/engine/rng.js';
 import { FORMATIONS, FORMATION_NAMES, MAX_ANCHOR_RADIUS, isOutOfZone, clampPos, lineOfRole } from '../../public/engine/formations.js';
 import { createLeague, aerialBreakdown, rollStat, TEAM_NAMES } from '../../public/engine/generator.js';
 import { viewPlayer, canSeeField, viewRatingEntry } from '../../public/engine/visibility.js';
-import { initialCounterTactics, opponentTacticKeys, masteryVs, counterXpForMatch, applyCounterXp } from '../../public/engine/counter.js';
+import { initialCounterTactics, opponentTacticKeys, masteryVs, counterXpForMatch, applyCounterXp, COUNTER_POOL } from '../../public/engine/counter.js';
 import { starsFromRating, createSheet, finalizeSheet } from '../../public/engine/ratings.js';
 import { describeFinish, describeHeader, describeVarTiming, generateScoutingClues } from '../../public/engine/clues.js';
 import { simulateMatch, MAX_SUBS } from '../../public/engine/match.js';
@@ -58,8 +58,9 @@ test('spillernes værdier ligger i kildens intervaller', () => {
   for (const p of all) {
     const [lo, hi] = ranges[p.roleTier];
     assert.ok(p.age >= lo && p.age <= hi, `${p.roleTier} alder ${p.age}`);
-    if (p.line === 'GK' || p.line === 'DEF') assert.ok(p.heightCm >= 181 && p.heightCm <= 198);
-    else assert.ok(p.heightCm >= 172 && p.heightCm <= 195);
+    // v3.6: klokkeform om kædens midte (GK 186, FOR 182, MID 176, ANG 179) ± 15 cm
+    const mid = { GK: 186, DEF: 182, MID: 176, ATT: 179 }[p.line];
+    assert.ok(p.heightCm >= mid - 15 && p.heightCm <= mid + 15, `${p.line} ${p.heightCm}`);
     for (const v of Object.values(p.skills)) assert.ok(v >= 1 && v <= 20);
     assert.ok(p.varProfile.cynicism >= 4 && p.varProfile.theatre >= 3);
     const sum = Object.values(p.skills).reduce((a, b) => a + b, 0);
@@ -73,12 +74,12 @@ test('spillernes værdier ligger i kildens intervaller', () => {
   assert.equal(s[3].roleTier, 'STAR'); assert.equal(s[7].roleTier, 'STAR');
 });
 
-test('luftduel-formlen: 193 cm, spring 16, styrke 12, position 13 giver 16 (faktor 0,65 ville give 15)', () => {
-  const b = aerialBreakdown(193, 16, 12, 13);
+test('luftduel-formlen: 188 cm, spring 16, styrke 12, position 13 giver 16 (faktor 0,65 ville give 15)', () => {
+  const b = aerialBreakdown(188, 16, 12, 13); // v3.6: nulpunkt 163 cm (før 168 – så gav 188 cm højde-score 14)
   assert.equal(b.heightScore, 18); // round(25 × 0,70 = 17,5)
   assert.equal(b.total, 16);       // 6,30 + 5,60 + 1,80 + 1,95 = 15,65
-  assert.equal(aerialBreakdown(160, 10, 10, 10).heightScore, 1);
-  assert.equal(aerialBreakdown(205, 10, 10, 10).heightScore, 20);
+  assert.equal(aerialBreakdown(155, 10, 10, 10).heightScore, 1);
+  assert.equal(aerialBreakdown(200, 10, 10, 10).heightScore, 20);
 });
 
 test('rollStat er klemt til 1–20', () => {
@@ -108,16 +109,24 @@ test('synlighed: modstander ser kun offentlige felter, ejer aldrig VAR-profilen'
 });
 
 // ---------- Mod-kunnen ----------
-test('mod-kunnen: startværdier 12–75 og modstanderens stilart', () => {
+// v3.6 (brugeren: "startværdierne skal sænkes"): før 12–75, ca. 33 i snit.
+test('mod-kunnen: startværdier 5–45 inden for puljen og modstanderens stilart', () => {
   const r = createRng(4);
-  for (let i = 0; i < 300; i++) for (const v of Object.values(initialCounterTactics(r, 17 + (i % 15), 1 + (i % 20)))) assert.ok(v >= 12 && v <= 75);
+  const all = [];
+  for (let i = 0; i < 300; i++) {
+    const ct = initialCounterTactics(r, 17 + (i % 15), 1 + (i % 20));
+    const v = Object.values(ct); all.push(...v);
+    assert.ok(v.every((x) => x >= 5 && x <= 45) && v.reduce((a, b) => a + b) <= COUNTER_POOL, JSON.stringify(ct));
+  }
+  const mean = all.reduce((a, b) => a + b) / all.length;
+  assert.ok(mean >= 12 && mean <= 26, String(mean)); // før ≈ 33
   assert.deepEqual([opponentTacticKeys(phases('SHORT', 'CENTRAL', 'HIGH_GEGENPRESS', 'NORMAL')).primary, opponentTacticKeys(phases('SHORT', 'CENTRAL', 'HIGH_GEGENPRESS', 'NORMAL')).secondary], ['vsPress', 'vsPress']);
   assert.equal(opponentTacticKeys(phases('SHORT', 'CENTRAL', 'LOW_BLOCK', 'NORMAL')).primary, 'vsLowBlock');
   assert.equal(opponentTacticKeys(phases('DIRECT_LONG', 'CENTRAL', 'MID_BLOCK', 'NORMAL')).primary, 'vsTrapLong');
   assert.equal(opponentTacticKeys(phases('SHORT', 'CENTRAL', 'HIGH_GEGENPRESS', 'EXTREME_VAR_LINE')).secondary, 'vsTrapLong');
   const p = { counterTactics: { vsPress: 80, vsLowBlock: 10, vsTrapLong: 40 } };
   assert.equal(masteryVs(p, phases('SHORT', 'CENTRAL', 'HIGH_GEGENPRESS', 'EXTREME_VAR_LINE')), 66); // 80·0,65 + 40·0,35
-  assert.equal(masteryVs({}, phases('SHORT', 'CENTRAL', 'HIGH_GEGENPRESS', 'NORMAL')), 25);
+  assert.equal(masteryVs({}, phases('SHORT', 'CENTRAL', 'HIGH_GEGENPRESS', 'NORMAL')), 15); // v3.6-skala (før 25)
 });
 
 // v3.6 (brugeren: "for hurtigt optjent erfaring"): før gav en hel kamp uden dueller 9 og
@@ -127,20 +136,40 @@ test('mod-XP: 1–5 point; primær +XP, sekundær +50 %, øvrige −1 med alders
   assert.equal(counterXpForMatch({ minutesPlayed: 90, tacticWins: 2, goals: 1 }), 4);
   assert.equal(counterXpForMatch({ minutesPlayed: 90, tacticWins: 9, goals: 1 }), 5);
   assert.equal(counterXpForMatch({ minutesPlayed: 10, tacticWins: 0, goals: 0 }), 1);
-  const opp = phases('SHORT', 'CENTRAL', 'HIGH_GEGENPRESS', 'EXTREME_VAR_LINE'); // primær vsPress, sekundær vsTrapLong
-  assert.deepEqual(applyCounterXp({ vsPress: 50, vsLowBlock: 40, vsTrapLong: 50 }, 30, opp, 4), { vsPress: 54, vsLowBlock: 39, vsTrapLong: 52 });
-  assert.deepEqual(applyCounterXp({ vsPress: 50, vsLowBlock: 25, vsTrapLong: 50 }, 30, opp, 4).vsLowBlock, 25); // bund 25 for ≥26 år
-  assert.deepEqual(applyCounterXp({ vsPress: 98, vsLowBlock: 12, vsTrapLong: 50 }, 20, opp, 4), { vsPress: 100, vsLowBlock: 12, vsTrapLong: 52 });
-  assert.deepEqual(applyCounterXp({ vsPress: 50, vsLowBlock: 40, vsTrapLong: 50 }, 30, opp, 1), { vsPress: 51, vsLowBlock: 39, vsTrapLong: 50 }); // sekundær +50 % af 1 = 0
-  // Afrunding og bund (Test Manager): .5-tilfælde, halv kamp, 0,5 pr. sejr, sekundær floor, alder 26, loft 100.
+  // Afrunding (Test Manager): .5-tilfælde, halv kamp, 0,5 pr. sejr.
   assert.equal(counterXpForMatch({ minutesPlayed: 90, tacticWins: 1, goals: 0 }), 3); // 2,5 → 3 (floor gav 2)
   assert.equal(counterXpForMatch({ minutesPlayed: 45, tacticWins: 0, goals: 1 }), 2); // 1,5 → 2
   assert.equal(counterXpForMatch({ minutesPlayed: 90, tacticWins: 4, goals: 0 }), 4); // 0,25 pr. sejr gav 3
-  assert.equal(applyCounterXp({ vsPress: 50, vsLowBlock: 40, vsTrapLong: 50 }, 30, opp, 3).vsTrapLong, 51); // floor(1,5); ceil/0,6/round gav 52
-  assert.equal(applyCounterXp({ vsPress: 50, vsLowBlock: 40, vsTrapLong: 50 }, 30, opp, 5).vsTrapLong, 52); // floor(2,5); 0,6 gav 53
-  assert.equal(applyCounterXp({ vsPress: 50, vsLowBlock: 25, vsTrapLong: 50 }, 26, opp, 3).vsLowBlock, 25); // 26 år: bund 25
-  assert.equal(applyCounterXp({ vsPress: 50, vsLowBlock: 25, vsTrapLong: 50 }, 25, opp, 3).vsLowBlock, 24); // 25 år: bund 12
-  assert.equal(applyCounterXp({ vsPress: 50, vsLowBlock: 40, vsTrapLong: 99 }, 30, opp, 5).vsTrapLong, 100); // sekundær klemmes
+  const opp = phases('SHORT', 'CENTRAL', 'HIGH_GEGENPRESS', 'EXTREME_VAR_LINE'); // primær vsPress, sekundær vsTrapLong
+  const base = { vsPress: 30, vsLowBlock: 20, vsTrapLong: 30 }; // sum 80 – under puljen
+  assert.deepEqual(applyCounterXp(base, 30, opp, 4), { vsPress: 34, vsLowBlock: 19, vsTrapLong: 32 });
+  assert.deepEqual(applyCounterXp(base, 30, opp, 1), { vsPress: 31, vsLowBlock: 19, vsTrapLong: 30 }); // sekundær floor(0,5) = 0
+  assert.equal(applyCounterXp(base, 30, opp, 3).vsTrapLong, 31); // floor(1,5); ceil/0,6/round gav 32
+  assert.equal(applyCounterXp(base, 30, opp, 5).vsTrapLong, 32); // floor(2,5); 0,6 gav 33
+  // Bund: 15 fra 26 år, ellers 5 (før 25/12)
+  assert.equal(applyCounterXp({ ...base, vsLowBlock: 15 }, 26, opp, 3).vsLowBlock, 15);
+  assert.equal(applyCounterXp({ ...base, vsLowBlock: 15 }, 25, opp, 3).vsLowBlock, 14);
+  assert.equal(applyCounterXp({ ...base, vsLowBlock: 5 }, 20, opp, 3).vsLowBlock, 5);
+  // Loft 100 på primær og sekundær
+  assert.deepEqual(applyCounterXp({ vsPress: 98, vsLowBlock: 5, vsTrapLong: 10 }, 20, opp, 4), { vsPress: 100, vsLowBlock: 5, vsTrapLong: 12 });
+  assert.equal(applyCounterXp({ vsPress: 5, vsLowBlock: 5, vsTrapLong: 99 }, 20, opp, 5).vsTrapLong, 100);
+});
+
+// v3.6 (brugeren: "man kan ikke være god imod alt"): summen af de tre er højst COUNTER_POOL.
+test('mod-kunnen-puljen: erfaring mod én stil koster de andre – ubrugt stil først, så den sekundære', () => {
+  const opp = phases('SHORT', 'CENTRAL', 'HIGH_GEGENPRESS', 'EXTREME_VAR_LINE'); // primær vsPress, sekundær vsTrapLong
+  assert.equal(COUNTER_POOL, 120);
+  // 60+20+40 = 120; +4/+2/−1 = 125 → overskud 5 tages fra den ubrugte (lav blok): 19 → 14 (24 år: bund 5)
+  assert.deepEqual(applyCounterXp({ vsPress: 60, vsLowBlock: 20, vsTrapLong: 40 }, 24, opp, 4), { vsPress: 64, vsLowBlock: 14, vsTrapLong: 42 });
+  // Ubrugt stil allerede i bund (15 for 30 år): den sekundære betaler
+  assert.deepEqual(applyCounterXp({ vsPress: 60, vsLowBlock: 15, vsTrapLong: 45 }, 30, opp, 4), { vsPress: 64, vsLowBlock: 15, vsTrapLong: 41 });
+  // Begge andre i bund: den trænede stil kan ikke vokse forbi puljen
+  assert.deepEqual(applyCounterXp({ vsPress: 90, vsLowBlock: 15, vsTrapLong: 15 }, 30, opp, 5), { vsPress: 90, vsLowBlock: 15, vsTrapLong: 15 });
+  // Over mange kampe mod samme stil: aldrig over puljen, og aldrig høj i alle tre
+  let ct = { vsPress: 40, vsLowBlock: 40, vsTrapLong: 40 };
+  const lowBlockOpp = phases('SHORT', 'CENTRAL', 'LOW_BLOCK', 'OFF');
+  for (let i = 0; i < 60; i++) { ct = applyCounterXp(ct, 24, i % 2 ? opp : lowBlockOpp, 5); assert.ok(Object.values(ct).reduce((a, b) => a + b) <= 120, JSON.stringify(ct)); }
+  assert.ok(Math.min(...Object.values(ct)) <= 30, JSON.stringify(ct));
 });
 
 // ---------- Karakterer ----------
@@ -399,7 +428,7 @@ test('normalizeLeague genskaber manglende felter uden at røre data', () => {
   assert.equal(N.leagueMetadata.standings.length, 8);
   assert.deepEqual(N.scouting, {});
   assert.deepEqual(N.teams[0].tactics.customCoords, {});
-  assert.deepEqual(N.teams[1].squad[0].counterTactics, { vsPress: 25, vsLowBlock: 25, vsTrapLong: 25 });
+  assert.deepEqual(N.teams[1].squad[0].counterTactics, { vsPress: 15, vsLowBlock: 15, vsTrapLong: 15 });
   assert.equal(N.teams[2].tacticPresets.length, 3);
   assert.equal(N.teams[4].tactics.lineupSlots.length, 11);
   assert.equal(N.teams[6].tactics.conditionalRules[0].minuteTrigger, 65);

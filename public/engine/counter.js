@@ -1,14 +1,33 @@
 // Taktisk mod-kunnen: spillernes erfaring mod modstanderens stilarter (docs/spec.md §7).
 export const COUNTER_KEYS = ['vsPress', 'vsLowBlock', 'vsTrapLong'];
 export const COUNTER_LABELS = { vsPress: 'Mod Gegenpress', vsLowBlock: 'Mod Lav Blok', vsTrapLong: 'Mod VAR-Linje & Lange Bolde' };
-const DEFAULT_MASTERY = 25;
+const DEFAULT_MASTERY = 15; // v3.6-skalaen (startværdier ca. 20)
+// Man kan ikke være god mod alt (brugerens ønske, v3.6): de tre værdier deler en pulje.
+export const COUNTER_POOL = 120;
+export const counterFloor = (age) => (age >= 26 ? 15 : 5);
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
+// Startværdier (v3.6, sænket fra ca. 33 i snit / 12–75): ca. 20 i snit, 5–45.
 export function initialCounterTactics(rng, age, positioning) {
-  const base = Math.round((age - 16) * 2.2 + positioning * 1.5);
-  const roll = () => clamp(base + rng.int(-10, 11), 12, 75);
-  return { vsPress: roll(), vsLowBlock: roll(), vsTrapLong: roll() };
+  const base = Math.round((age - 16) * 1.2 + positioning * 0.8);
+  const roll = () => clamp(base + rng.int(-8, 8), 5, 45);
+  const ct = { vsPress: roll(), vsLowBlock: roll(), vsTrapLong: roll() };
+  return fitPool(ct, COUNTER_KEYS.slice().sort((a, b) => ct[b] - ct[a]), counterFloor(age)); // den højeste barberes
+}
+
+// Holder summen inden for puljen: overskuddet trækkes fra nøglerne i rækkefølgen order,
+// hver ned til bunden. Kan de ikke give nok, betaler den sidste nøgle (keep) selv resten.
+export function fitPool(ct, order, floor, keep = null) {
+  const next = { ...ct };
+  let excess = COUNTER_KEYS.reduce((a, k) => a + next[k], 0) - COUNTER_POOL;
+  for (const k of order) {
+    if (excess <= 0) break;
+    const take = Math.min(excess, Math.max(0, next[k] - floor));
+    next[k] -= take; excess -= take;
+  }
+  if (excess > 0 && keep) next[keep] = Math.max(floor, next[keep] - excess);
+  return next;
 }
 
 // Hvilke af modstanderens stilarter, der vejer tungest (kildens getOpponentPrimaryTacticKeys).
@@ -45,15 +64,18 @@ export function counterXpForMatch({ minutesPlayed, tacticWins, goals }) {
   return clamp(xp, 1, 5);
 }
 
-// Primær stil +XP, sekundær +50 %, øvrige ruster −1 (bund 25 for ≥26 år, ellers 12). Returnerer ny værdi.
+// Primær stil +XP, sekundær +50 %, øvrige ruster −1 (bund 15 for ≥26 år, ellers 5). Summen
+// holdes inden for COUNTER_POOL: erfaring mod én stil koster de andre. Returnerer ny værdi.
 export function applyCounterXp(counterTactics, age, oppTeam, gain) {
   const { primary, secondary } = opponentTacticKeys(oppTeam);
-  const floor = age >= 26 ? 25 : 12;
+  const floor = counterFloor(age);
   const next = { ...counterTactics };
   for (const k of COUNTER_KEYS) {
     if (k === primary) next[k] = Math.min(100, next[k] + gain);
     else if (k === secondary) next[k] = Math.min(100, next[k] + Math.floor(gain * 0.5));
     else next[k] = Math.max(floor, next[k] - 1);
   }
-  return next;
+  // Overskud over puljen betales af den stil, der ikke blev trænet, derefter af den sekundære.
+  const unused = COUNTER_KEYS.filter((k) => k !== primary && k !== secondary);
+  return fitPool(next, [...unused, ...(secondary !== primary ? [secondary] : [])], floor, primary);
 }

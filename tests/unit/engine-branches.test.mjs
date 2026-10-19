@@ -163,7 +163,7 @@ test('hovedstød: 14 mod 10 + målmand 10·0,38 giver mål; 13 giver vundet luft
   assert.equal(goal.ratings.home.find((r) => r.playerId === goal.scorer).rating, 9.2);
 });
 
-// VAR (next = 0,1 < 0,22): varPulse + vsTrapLong·0,025 + 0,6 > forsvarer.positioning + 0,6.
+// VAR (next = 0,1 < 0,22): varPulse + vsTrapLong·0,045 + 0,6 > forsvarer.positioning + 0,6 (v3.6; før ·0,025).
 function varRun(trap, { awayAttacks = false } = {}) {
   const { H, A } = arena();
   const [att, def] = awayAttacks ? [A, H] : [H, A];
@@ -173,19 +173,19 @@ function varRun(trap, { awayAttacks = false } = {}) {
   const d = slot(def, 1); d.skills.positioning = 11; d.skills.intercepting = 20;
   return { m: simulateMatch(H, A, stubRng({ 0.3: shots(2) }, 0.1)), shooter };
 }
-test('VAR: mod-kunnen mod VAR-linjen afgør (10 + 44·0,025 = 11,1 > 11; uden bonus 10 < 11)', () => {
-  const ok = varRun(44).m, no = varRun(40).m; // 40·0,025 = 1,0 → 11,0 er ikke > 11
+test('VAR: mod-kunnen mod VAR-linjen afgør (10 + 23·0,045 = 11,035 > 11; 22·0,045 = 0,99 → 10,99 < 11)', () => {
+  const ok = varRun(23).m, no = varRun(22).m; // med den gamle faktor 0,025 tabte 23 også
   assert.equal(ok.events.filter((e) => e.type === 'VAR_GOAL').length, 2);
   assert.equal(no.events.filter((e) => e.type === 'VAR_NO_GOAL').length, 2);
   assert.equal(ok.stats.hVarChecks, 2);
   assert.equal(ok.homeVarNet, 2); assert.equal(no.homeVarNet, -2);
-  const { m: okM, shooter } = varRun(44);
+  const { m: okM, shooter } = varRun(23);
   // Startkarakter ved rul 0,1: 6,5 + (0,03 − 0,15) = 6,38; + 2·1,3 = 8,98 → 9,0 (2·1,25 ville give 8,9)
   assert.equal(okM.ratings.home.find((x) => x.playerId === shooter.id).rating, 9);
 });
 test('VAR: fortegn på VAR-netto, når udeholdet angriber', () => {
-  assert.equal(varRun(44, { awayAttacks: true }).m.homeVarNet, -2);
-  assert.equal(varRun(40, { awayAttacks: true }).m.homeVarNet, 2);
+  assert.equal(varRun(23, { awayAttacks: true }).m.homeVarNet, -2);
+  assert.equal(varRun(22, { awayAttacks: true }).m.homeVarNet, 2);
 });
 test('VAR-tjek kun når rullet er under 0,22', () => {
   const { H, A } = arena();
@@ -301,7 +301,7 @@ test('normalizeLeague: ugyldigt indhold repareres, gyldige data og standardværd
   assert.equal(N.teams[5].tactics.baseFormation, BOT_PROFILES[5].form);
   assert.equal(N.teams[6].tactics.conditionalRules.length, 5);
   assert.equal(p.freshness, 70);
-  assert.equal(p.aerialPower, Math.round(Math.max(1, Math.min(20, Math.round((p.heightCm - 168) * 0.7))) * 0.35 + p.jumpingPower * 0.35 + p.skills.strength * 0.15 + p.skills.positioning * 0.15));
+  assert.equal(p.aerialPower, Math.round(Math.max(1, Math.min(20, Math.round((p.heightCm - 163) * 0.7))) * 0.35 + p.jumpingPower * 0.35 + p.skills.strength * 0.15 + p.skills.positioning * 0.15));
   assert.equal(N.leagueMetadata.round, 6); assert.equal(N.teams[1].cashBalance, 123);
 });
 

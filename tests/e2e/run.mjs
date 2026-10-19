@@ -383,9 +383,12 @@ try {
   // Et gemt spil fra skema 1 migreres, gemmes straks i nyt format og tager kun ÉN backup
   const fixture = fs.readFileSync(new URL('../fixtures/save-schema1.json', import.meta.url), 'utf8');
   await g.evaluate((f) => { for (const k of Object.keys(localStorage)) if (k.startsWith('tactivar_')) localStorage.removeItem(k); localStorage.setItem('tactivar_save', f); }, fixture);
-  await reload(); await reload(); await reload();
+  await reload();
+  const migNotice = await g.textContent('#notice');
+  check('Migrering: beskeden forklarer puljen på 120 og de 5 cm – og nævner backuppen', ['120 point', '5 cm lavere', 'Hvis-Så', 'backup'].every((x) => migNotice.includes(x)), migNotice);
+  await reload(); await reload();
   const mig = await g.evaluate(() => ({ schema: JSON.parse(localStorage.getItem('tactivar_save')).schemaVersion, backups: Object.keys(localStorage).filter((k) => k.startsWith('tactivar_backup_')).length }));
-  check('Migrering: gemmes straks i skema 2, kun én backup trods tre genindlæsninger', mig.schema === 2 && mig.backups === 1, JSON.stringify(mig));
+  check('Migrering: gemmes straks i skema 3, kun én backup trods tre genindlæsninger', mig.schema === 3 && mig.backups === 1, JSON.stringify(mig));
   await tab('liga'); const migHead = await g.textContent('#standings-title'); await tab('trup');
   check('Migrering: ligaen fra skema 1 er intakt (runde 1, 18 spillere)', migHead.includes('efter 1 runde') && (await rows()) === 18);
   // Runden er gemt før v3.5 (uden plads og startformation): Kamp-fanen viser den med listen, uden minibane

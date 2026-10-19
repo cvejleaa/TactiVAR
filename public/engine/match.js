@@ -300,7 +300,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
         }
       } else if (rng.next() < 0.22) {
         st[k(att, 'VarChecks')]++;
-        const trapBonus = (shooter.counterTactics?.vsTrapLong ?? 30) * 0.025;
+        const trapBonus = (shooter.counterTactics?.vsTrapLong ?? 15) * 0.045; // v3.6: samme effekt (≈0,8) på den lavere skala
         const timing = describeVarTiming(shooter.varProfile.varPulse);
         if (shooter.varProfile.varPulse + trapBonus + rng.next() * 6 > defender.skills.positioning + rng.next() * 6) {
           scored(); homeVarNet += att === H ? 1 : -1;

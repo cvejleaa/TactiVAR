@@ -265,3 +265,49 @@ test('migrering 1 → 2 alene (uden reparation bagefter) løfter skema og regler
   assert.equal(out.schemaVersion, 2);
   assert.deepEqual([out.league.teams[0].tactics.conditionalRules[0].condition, out.league.teams[0].tactics.conditionalRules[0].margin], ['LEADING', 1]);
 });
+
+// ---------- Skema 3 (v3.6): mod-kunnen-pulje og lavere spillere ----------
+const FIXTURE2 = fs.readFileSync(new URL('../fixtures/save-schema2.json', import.meta.url), 'utf8');
+test('migrering 2 → 3: mod-kunnen ×0,55 inden for puljen, højde −5 cm, scouting følger med – med backup', async () => {
+  const { COUNTER_POOL, counterFloor } = await import('../../public/engine/counter.js');
+  const old = JSON.parse(FIXTURE2);
+  assert.equal(old.schemaVersion, 2);
+  const oldPlayers = new Map(old.league.teams.flatMap((t) => t.squad.map((p) => [p.id, p])));
+  // Et scouting-indtryk med højden i teksten
+  const tall = [...oldPlayers.values()].find((p) => p.heightCm >= 190);
+  const viewer = old.league.teams.find((t) => !t.isBot).id;
+  old.league.scouting[viewer][tall.id] = [`[Forsæson] I træningskampen steg ${tall.shortName} (${tall.heightCm} cm) en hel etage over alle andre.`];
+  const store = fakeStorage({ [SAVE_KEY]: JSON.stringify(old) });
+  const r = loadGame(store);
+  assert.equal(r.status, 'ok', r.error); assert.equal(r.migratedFrom, 2);
+  assert.equal(store.getItem(r.backupKey), JSON.stringify(old), 'de rå skema 2-data er gemt i backup før migreringen');
+  const L = r.state.league;
+  let checked = 0;
+  for (const t of L.teams) for (const p of t.squad) {
+    const o = oldPlayers.get(p.id);
+    assert.equal(p.heightCm, o.heightCm - 5, p.shortName);
+    const v = Object.values(p.counterTactics), sum = v.reduce((a, b) => a + b);
+    assert.ok(sum <= COUNTER_POOL && v.every((x) => x >= counterFloor(p.age)), JSON.stringify(p.counterTactics));
+    // Uden puljeklip: præcis round(gammel·0,55) (eller bunden)
+    const scaled = Object.fromEntries(Object.entries(o.counterTactics).map(([k, x]) => [k, Math.max(counterFloor(p.age), Math.round(x * 0.55))]));
+    if (Object.values(scaled).reduce((a, b) => a + b) <= COUNTER_POOL) { assert.deepEqual(p.counterTactics, scaled); checked++; }
+  }
+  assert.ok(checked > 100, String(checked));
+  const meanBefore = [...oldPlayers.values()].reduce((a, p) => a + p.heightCm, 0) / oldPlayers.size;
+  const meanAfter = L.teams.flatMap((t) => t.squad).reduce((a, p) => a + p.heightCm, 0) / oldPlayers.size;
+  assert.equal(Math.round((meanBefore - meanAfter) * 10) / 10, 5);
+  assert.deepEqual(L.scouting[viewer][tall.id], [`[Forsæson] I træningskampen steg ${tall.shortName} (${tall.heightCm - 5} cm) en hel etage over alle andre.`]);
+  assert.equal(L.leagueMetadata.round, old.league.leagueMetadata.round, 'ligaen følger med uændret');
+  // Gemt i det nye format: en ny indlæsning migrerer ikke igen (ingen dobbelt nedskalering)
+  saveGame(store, r.state);
+  const again = loadGame(store);
+  assert.equal(again.migratedFrom, null);
+  assert.equal(again.state.league.teams[0].squad[0].heightCm, L.teams[0].squad[0].heightCm);
+});
+
+test('skema 1-fixturet løftes hele vejen til 3', () => {
+  const r = parseSave(FIXTURE);
+  assert.ok(r.ok, r.error); assert.equal(r.migratedFrom, 1);
+  const p = r.state.league.teams[0].squad[0], o = JSON.parse(FIXTURE).league.teams[0].squad[0];
+  assert.equal(p.heightCm, o.heightCm - 5);
+});

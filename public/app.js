@@ -68,7 +68,10 @@ function start() {
   else {
     game = r.state; view.savedAt = r.state.savedAt;
     if (r.migratedFrom != null) {
-      view.notice = r.migratedFrom === 1 ? 'Dit spil er opdateret: Hvis-Så-regler kan nu sættes til "Bagud/Foran med mindst N mål" og skifte til dine egne planer. Dine regler er bevaret – "Foran med 1" gælder nu fra 1 mål og opefter.' : `Dit spil er opdateret fra et ældre gemme-format (skema ${r.migratedFrom}).`;
+      view.notice = [
+        r.migratedFrom <= 1 ? 'Hvis-Så-regler kan nu sættes til "Bagud/Foran med mindst N mål" og skifte til dine egne planer – "Foran med 1" gælder fra 1 mål og opefter.' : '',
+        r.migratedFrom <= 2 ? 'Mod-kunnen er sat ned på den nye skala: hver spiller har højst 120 point fordelt på de tre stilarter – lærer han noget nyt, glemmer han lidt af det gamle. Alle spillere er 5 cm lavere (holdsnit tæt på den danske 181 cm).' : '',
+      ].filter(Boolean).join(' ').replace(/^/, 'Dit spil er opdateret: ') + (r.backupKey ? ' Det gamle spil ligger som backup i browseren.' : '');
       // Gem straks i det nye format (ellers tog hver genindlæsning en ny backup) – men kun
       // når backuppen af det gamle format lykkedes; ellers står det gamle urørt, og der advares.
       if (r.backupKey) persist();
@@ -155,7 +158,6 @@ function render() {
     onSwap: (p) => {
       if (!view.pitchSwapId) { view.pitchSwapId = p.id; view.notice = `🔁 Vælg den spiller, ${p.shortName} skal byttes med (i regnearket, på banen eller på bænken).`; render(); return; }
       const a = view.pitchSwapId; clearSwap(); view.notice = '';
-      if (a === p.id) { render(); return; }
       change(() => act.swapPlayers(team, a, p.id));
     },
   });
