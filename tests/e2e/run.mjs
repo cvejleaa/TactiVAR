@@ -225,6 +225,14 @@ try {
   check('Løb uden bold: Mange gemmes og overlever F5', (await g.inputValue('#tactics select[data-field="offBallRuns"]')) === 'MANY');
   const help = await g.locator('#tactics .phase-help').allTextContents();
   check('Hjælpetekst under Fase 1 (pris for Mange, fordel ved Få) og Fase 3 (genpres koster løb)', help.length === 2 && help[0].includes('kontraer imod') && help[0].includes('Få') && help[1].includes('Genpres') && help[1].includes('friskhed'), help.join(' | '));
+  // Test Manager v3.9: hjælpeteksten må ikke love det modsatte af motoren (retning, ikke bare ord)
+  check('Hjælpeteksten lover det motoren gør (Få: færre kontraer; Lynkontra: flere; Hold: færre; Genpres dæmper; Fald tilbage gratis)',
+    help[0].includes('Mange – flere spillere løber sig fri') && help[0].includes('løber flere km') && help[0].includes('Få – færre løb fremad, færre kontraer imod og mindre slid.')
+    && help[1].includes('Lynkontra giver flere kontraer') && help[1].includes('Hold på bolden giver færre, men styrker jeres næste opbygning')
+    && help[1].includes('Genpres dæmper modstanderens kontraer, men koster løb (friskhed)') && help[1].includes('Fald tilbage koster intet'), help.join(' | '));
+  const runsLabel = await g.locator('#tactics label:has(select[data-field="offBallRuns"])').evaluate((l) => l.firstChild.textContent.trim());
+  const runsOpts = await g.locator('#tactics select[data-field="offBallRuns"] option').evaluateAll((os) => os.map((o) => `${o.value}=${o.textContent}`).join(','));
+  check('Løb uden bold: etiket og valg (Få/Normal/Mange i den rækkefølge)', runsLabel === 'Løb uden bold' && runsOpts === 'FEW=Få,NORMAL=Normal,MANY=Mange', `${runsLabel} / ${runsOpts}`);
   await g.selectOption('#tactics select[data-field="offBallRuns"]', 'NORMAL');
 
   // Gem-fejl er synlig, aldrig tavs
@@ -321,7 +329,7 @@ try {
   // v3.9: "fri" (løb uden bold) kun for dit hold – og opsummeringen kun i din kamp
   const fri = await g.locator('.ratings').nth(0).locator('td.fri').allTextContents();
   const friExpect = await g.evaluate(() => { const m = JSON.parse(localStorage.getItem('tactivar_save')).league.lastRound.matches[0]; const own = [m.ratings.home, m.ratings.away].find((l) => l[0].isUserTeam); return own.filter((e) => e.freeRuns > 0).map((e) => `${e.freeRunsWon}/${e.freeRuns} fri`); });
-  check('Karakterark: "fri" for dit hold matcher de gemte løb, modstanderen har ingen kolonne', fri.length >= 11 && friExpect.length > 0 && friExpect.every((t) => fri.includes(t)) && fri.every((t) => t === '' || /^\d+\/\d+ fri$/.test(t)) && (await g.locator('.ratings').nth(1).locator('td.fri').count()) === 0, `${fri.join(',')} / ${friExpect.join(',')}`);
+  check('Karakterark: "fri" for dit hold matcher de gemte løb, modstanderen har ingen kolonne', fri.length >= 11 && friExpect.length > 0 && JSON.stringify(fri.filter(Boolean).sort()) === JSON.stringify([...friExpect].sort()) /* præcis de spillere med løb – ingen "0/0 fri" til resten */ && fri.every((t) => t === '' || /^\d+\/\d+ fri$/.test(t)) && (await g.locator('.ratings').nth(1).locator('td.fri').count()) === 0, `${fri.join(',')} / ${friExpect.join(',')}`);
   const runSum = await g.textContent('#match-center');
   check('Opsummering af løb uden bold i din kamp', /🎯 \[LØB UDEN BOLD • Normal\] \d+ løb, \d+ kom fri \(\d+ mål\) · kontraer imod i alt: \d+ \(\d+ mål\)\./.test(runSum), runSum.match(/🎯[^.]*\./)?.[0] ?? 'mangler');
   const gzText = await g.textContent('#gazette');
@@ -330,6 +338,7 @@ try {
   check('Ikonerne i karakterarket har mouse-over-tekst', iconTitles.length > 0 && iconTitles.every(([t, ti]) => ti.length > 3 && !ti.includes('undefined')), JSON.stringify(iconTitles.slice(0, 3)));
   const legendTxt = await g.textContent('#icon-legend');
   check('Ikon-forklaring under karakterarket (til touch)', ['⚽ Mål', '🅰 Oplæg', '🧤 Redninger', '👑 Kampens spiller'].every((x) => legendTxt.includes(x)), legendTxt);
+  check('Forklaring af "fri" og HI (rigtig vej rundt: 2/3 = kom fri 2 af 3 gange)', legendTxt.includes('"2/3 fri" = løb uden bold: kom fri 2 af 3 gange') && legendTxt.includes('HI = andel højintenst løb') && legendTxt.endsWith('begge kun dit hold'), legendTxt);
   const por = await g.textContent('#player-of-round');
   const porIsMine = (await g.locator('.ratings').nth(0).textContent()).includes(por.match(/#\d+ [^ ]+ [^ (]+/)[0]);
   check('Avisen kårer rundens spiller – med karakter kun hvis det er din spiller, ellers stjerner', porIsMine ? /karakter \d+\.\d/.test(por) : (/[★☆]{5}/.test(por) && !/karakter/.test(por)), por);

@@ -519,3 +519,15 @@ test('gem fra v3.8 (skema 5, uden offBallRuns): dit hold og dine planer får NOR
   assert.equal(r.state.league.leagueMetadata.round, 2);
   assert.deepEqual(r.state.notes, raw.notes);
 });
+// Test Manager v3.9: fixtureholdets værdier var lig standardværdierne, så "gemt værdi vinder over standard" var ubevist
+test('gem fra v3.9: dit valg af løb uden bold (og pasningsstil) overlever indlæsning – også i planerne og hos en bot', () => {
+  const raw = JSON.parse(FIXTURE5);
+  const me = raw.league.teams.find((t) => !t.isBot), bot = raw.league.teams.find((t) => t.isBot);
+  for (const tac of [me.tactics, ...me.tacticPresets, bot.tactics]) Object.assign(tac.phases.phase1_buildUp, { offBallRuns: 'MANY', passingStyle: 'DIRECT_LONG' });
+  const r = parseSave(JSON.stringify(raw));
+  assert.ok(r.ok, r.error);
+  const m2 = r.state.league.teams.find((t) => !t.isBot), b2 = r.state.league.teams.find((t) => t.id === bot.id);
+  for (const tac of [m2.tactics, ...m2.tacticPresets, b2.tactics]) {
+    assert.equal(tac.phases.phase1_buildUp.offBallRuns, 'MANY'); assert.equal(tac.phases.phase1_buildUp.passingStyle, 'DIRECT_LONG');
+  }
+});
