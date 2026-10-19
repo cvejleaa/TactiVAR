@@ -1,6 +1,7 @@
 // Reparerer en indlæst liga additivt (som v2.5b's sanitizeLeagueData): manglende felter får
 // standardværdier, eksisterende data røres ikke. Grundlaget for migreringsreglen i
 // docs/spec.md §9 – en ny version må aldrig slette ligaen.
+import { TEAM_STAT_DEFAULTS, PLAYER_SEASON_DEFAULTS } from './stats.js';
 import { FORMATIONS } from './formations.js';
 import { defaultTactics, defaultStarterIds, emptyStanding, BOT_PROFILES, aerialBreakdown, assignPositions } from './generator.js';
 
@@ -43,12 +44,16 @@ export function normalizeLeague(league) {
   const md = league.leagueMetadata;
   md.round ??= 0;
   if (!Array.isArray(md.standings) || md.standings.length !== league.teams.length) md.standings = league.teams.map(emptyStanding);
+  for (const s of md.standings) for (const [k, v] of Object.entries(TEAM_STAT_DEFAULTS)) if (s[k] === undefined) s[k] = v;
+  // Statistikken (v3.10) tælles fra næste runde i en eksisterende liga – ældre runder er ikke gemt.
+  league.statsFromRound ??= md.round + 1;
+  if (!Array.isArray(league.history)) league.history = [];
   league.scouting ||= {};
   league.lastRound ??= null;
   league.teams.forEach((team, idx) => {
     if (!Array.isArray(team.squad) || team.squad.length !== 18) { problems.push(`${team.name || team.id} har ${team.squad?.length ?? 0} spillere (forventet 18)`); return; }
     for (const p of team.squad) {
-      for (const [k, v] of Object.entries(PLAYER_DEFAULTS)) if (p[k] === undefined) p[k] = v;
+      for (const [k, v] of Object.entries({ ...PLAYER_DEFAULTS, ...PLAYER_SEASON_DEFAULTS })) if (p[k] === undefined) p[k] = v;
       if (!p.counterTactics) p.counterTactics = { vsPress: 15, vsLowBlock: 15, vsTrapLong: 15 };
       p.aerialPower = aerialBreakdown(p.heightCm, p.jumpingPower, p.skills.strength, p.skills.positioning).total;
     }

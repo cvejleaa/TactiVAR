@@ -446,12 +446,14 @@ test('normalizeLeague melder det, der ikke kan repareres', () => {
 
 test('referatet viser ingen mod-kunnen-procent mod modstanderen (kan bruges til at regne deres stil ud)', () => {
   // Med høj mod-kunnen (90) ville enhver tærskel-besked udløses – testen har altså data.
-  const L = league(42), rng = createRng(42);
-  for (const t of L.teams) for (const p of t.squad) p.counterTactics = { vsPress: 90, vsLowBlock: 90, vsTrapLong: 90 };
   let duels = 0;
-  for (let i = 1; i < 8; i++) for (const e of simulateMatch(L.teams[0], L.teams[i], rng).events) {
-    if (e.isHome && e.type === 'TACTIC_WIN') duels++;
-    assert.doesNotMatch(e.text, /mod-kunnen|erfaring mod|🧠|\d+\s*%(?! af bolden)/i, e.text);
+  for (const seed of [42, 43]) { // to ligaer: nok vundne dueller til at testen har data
+    const L = league(seed), rng = createRng(seed);
+    for (const t of L.teams) for (const p of t.squad) p.counterTactics = { vsPress: 90, vsLowBlock: 90, vsTrapLong: 90 };
+    for (let i = 1; i < 8; i++) for (const e of simulateMatch(L.teams[0], L.teams[i], rng).events) {
+      if (e.isHome && e.type === 'TACTIC_WIN') duels++;
+      assert.doesNotMatch(e.text, /mod-kunnen|erfaring mod|🧠|\d+\s*%(?! af bolden)/i, e.text);
+    }
   }
   assert.ok(duels > 20, `for få vundne dueller for dit hold (${duels})`);
 });

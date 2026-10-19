@@ -29,7 +29,7 @@ export function createSheet() {
         teamId: team.id, teamName: team.name, isUserTeam: !team.isBot, isHome, role, line: player.line, slot,
         minIn, minOut: 90, rating: START_RATING + (rng.next() * 0.3 - 0.15), stars: 0,
         startCounterMastery: oppMastery, gainedCounterXp: 0,
-        goals: 0, assists: 0, saves: 0, aerialWins: 0, tacticWins: 0, freeRuns: 0, freeRunsWon: 0, yellowCard: false, injured: false, isMotM: false,
+        goals: 0, assists: 0, saves: 0, aerialWins: 0, tacticWins: 0, freeRuns: 0, freeRunsWon: 0, headerGoals: 0, penaltyGoals: 0, setPieceGoals: 0, yellowCard: false, injured: false, isMotM: false,
         km90: run.km90, topSpeed: run.topSpeed, hiShare: run.hiShare, distanceKm: 0, hiKm: 0,
       };
       return entries[player.id];
@@ -92,6 +92,8 @@ export function finalizeSheet(sheet, homeGoals, awayGoals, rng, xpFor) {
   for (const e of all) {
     const conceded = e.isHome ? awayGoals : homeGoals;
     if (conceded === 0 && CLEAN_SHEET_ROLES.has(e.role)) e.rating = clamp(e.rating + 0.5, RATING_MIN, RATING_MAX);
+    // Clean sheet i statistikken (v3.10): MV/forsvar, 0 mål imod og mindst 59 spilleminutter (minOut − minIn; en starter har 89).
+    e.cleanSheet = conceded === 0 && CLEAN_SHEET_ROLES.has(e.role) && (e.minOut - e.minIn) >= 59;
     e.rating = Math.round(e.rating * 10) / 10;
     e.stars = starsFromRating(e.rating, starNoise(rng));
     e.gainedCounterXp = xpFor({ minutesPlayed: Math.max(10, e.minOut - e.minIn), tacticWins: e.tacticWins, goals: e.goals });

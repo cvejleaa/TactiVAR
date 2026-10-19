@@ -531,3 +531,42 @@ test('gem fra v3.9: dit valg af løb uden bold (og pasningsstil) overlever indl�
     assert.equal(tac.phases.phase1_buildUp.offBallRuns, 'MANY'); assert.equal(tac.phases.phase1_buildUp.passingStyle, 'DIRECT_LONG');
   }
 });
+
+// ---------- v3.10 (Test Manager): gemt statistik overlever indlæsning ----------
+test('statistik, der allerede er talt, overlever gem og indlæs (indlæsning udfylder kun manglende felter, nulstiller ikke og flytter ikke "fra runde")', () => {
+  const g = game(5);
+  const L = g.league;
+  L.leagueMetadata.round = 6; L.statsFromRound = 3;
+  L.history = [{ round: 3, matches: 4, goals: 9, setPiece: 2, kinds: { PENALTY: 1, LONGSHOT: 8 }, biggest: null, most: { goals: 4, label: 'A 2-2 B' } }];
+  Object.assign(L.leagueMetadata.standings[0], { sMatches: 4, shots: 17, onTarget: 9, xg: 3.5, possSum: 210, fouls: 31, cleanSheets: 2, headerGoals: 3, counterGoalsAgainst: 1 });
+  Object.assign(L.teams[0].squad[0], { sGames: 4, sMinutes: 360, sGoals: 4, sMotm: 2, sSetPieceGoals: 1, freeRunsSum: 7, freeRunsWonSum: 3 });
+  const s = fakeStorage();
+  assert.ok(saveGame(s, g, 1).ok);
+  const r = loadGame(s);
+  assert.equal(r.status, 'ok');
+  assert.equal(r.state.league.statsFromRound, 3);
+  assert.deepEqual(r.state.league.history, L.history);
+  assert.deepEqual(r.state.league.leagueMetadata.standings, L.leagueMetadata.standings);
+  assert.deepEqual(r.state.league.teams[0].squad[0], L.teams[0].squad[0]);
+  // Et gem uden felterne får nuller (og "fra" næste runde), men et delvist gem beholder det, der findes
+  const raw = JSON.parse(s.getItem(SAVE_KEY));
+  delete raw.league.leagueMetadata.standings[0].fouls; delete raw.league.teams[0].squad[0].sMinutes;
+  const r2 = parseSave(JSON.stringify(raw));
+  assert.equal(r2.state.league.leagueMetadata.standings[0].fouls, 0); assert.equal(r2.state.league.leagueMetadata.standings[0].shots, 17);
+  assert.equal(r2.state.league.teams[0].squad[0].sMinutes, 0); assert.equal(r2.state.league.teams[0].squad[0].sGoals, 4);
+});
+
+// ---------- v3.10: statistik i et gem fra v3.9 ----------
+const FIXTURE_V39 = fs.readFileSync(new URL('../fixtures/save-v3.9.json', import.meta.url), 'utf8');
+test('gem fra v3.9: indlæses uden migrering; statistikken starter tom fra næste runde, intet andet ændres', () => {
+  const raw = JSON.parse(FIXTURE_V39);
+  assert.ok(!FIXTURE_V39.includes('statsFromRound') && !FIXTURE_V39.includes('sGoals'), 'fixturet er gemt før v3.10');
+  const r = parseSave(FIXTURE_V39);
+  assert.ok(r.ok, r.error); assert.equal(r.migratedFrom, null);
+  const L = r.state.league;
+  assert.equal(L.statsFromRound, raw.league.leagueMetadata.round + 1); assert.deepEqual(L.history, []);
+  assert.ok(L.teams.every((t) => t.squad.every((p) => p.sGoals === 0 && p.sGames === 0 && p.freeRunsSum === 0)));
+  for (const s of L.leagueMetadata.standings) { assert.equal(s.shots, 0); assert.equal(s.cleanSheets, 0); }
+  // Tabellen er urørt
+  assert.deepEqual(L.leagueMetadata.standings.map((s) => [s.points, s.goalsFor]), raw.league.leagueMetadata.standings.map((s) => [s.points, s.goalsFor]));
+});

@@ -2,6 +2,7 @@
 // Rettet ift. v2.5b: alt bogføres FØR der gemmes; skader, der fandtes før runden, heles
 // med én kamp (spilleren missede kampen), og nye skader lægges på bagefter – så en
 // 1-kamps skade ikke forsvinder i samme runde.
+import { bookMatchStats, roundHistory, HISTORY_MAX } from './stats.js';
 import { simulateMatch } from './match.js';
 import { starsFromRating, starNoise } from './ratings.js';
 import { applyCounterXp } from './counter.js';
@@ -106,6 +107,10 @@ export function commitRound(league, result, rng) {
   }
   for (const m of result.matches) for (const inj of m.injuries) players.get(inj.playerId).injuryMatchesLeft = inj.matches;
 
+  // Sæsonstatistik (v3.10) – fra league.statsFromRound.
+  for (const m of result.matches) bookMatchStats(league, m);
+  (league.history ||= []).push(roundHistory(result.round, result.matches));
+  if (league.history.length > HISTORY_MAX) league.history.splice(0, league.history.length - HISTORY_MAX);
   league.leagueMetadata.round = result.round;
   league.lastRound = { round: result.round, matches: result.matches, gazette: result.gazette };
   return league;

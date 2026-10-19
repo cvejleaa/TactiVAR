@@ -31,10 +31,10 @@ export const STYLE_BONUS = 3;
 // Findes på ALLE trin (én kontra røber intet), dæmpes af taberens genpres og forstærkes af
 // vinderens lynkontra. Hvert FB/WB-felt hos en taber på "Mange" løfter chancen 5 %.
 const RUNS_LABEL = { FEW: 'Få', NORMAL: 'Normal', MANY: 'Mange' };
-export const COUNTER_P = { FEW: 0.03, NORMAL: 0.08, MANY: 0.2 };
-export const COUNTER_LOST = { COUNTER_PRESS_5S: 0.7, DROP_BACK: 1 };
+export const COUNTER_P = { FEW: 0.03, NORMAL: 0.08, MANY: 0.22 };
+export const COUNTER_LOST = { COUNTER_PRESS_5S: 0.6, DROP_BACK: 1 };
 export const COUNTER_WON = { FAST_COUNTER: 1.8, KEEP_POSSESSION: 0.4 };
-export const COUNTER_FINISH_BONUS = 1;   // ubalanceret forsvar (kalibreres sammen med løbene)
+export const COUNTER_FINISH_BONUS = 4;   // ubalanceret forsvar (kalibreres sammen med løbene)
 export const CALM_BUILD_BONUS = 2;       // "Hold på bolden": næste opbygning sidder bedre
 const FB_ROLES = new Set(['LB', 'RB', 'LWB', 'RWB']);
 // Løb uden bold (v3.9, brugeren: "Alle kan være med til at løbe i position og afhængig af hvor
@@ -50,11 +50,17 @@ export const runGroup = (role) => RUN_GROUP[role] ?? 'CM';
 export const RUN_DUEL_BONUS = { FEW: -3, NORMAL: 0, MANY: 4 };
 export const DRIBBLE_DEF_EDGE = 3;   // forsvareren står bedst i en én-mod-én (PAC+BAL ≈ 20 mod POS+STR·0,5 ≈ 15)
 // Få = flere spillere bag bolden: modstanderens frispilningsløb er sværere at vinde.
-export const RUN_COVER = { FEW: 4, NORMAL: 0, MANY: 0 };
-export const RUN_FINISH_BONUS = 3.5;
+export const RUN_COVER = { FEW: 5, NORMAL: 0, MANY: 0 };
+export const RUN_FINISH_BONUS = 2;
 // Målmandens fordel på almindelige afslutninger (v3.9): holder ligaens målniveau, efter at
 // løbene og de rigtige kontraer kom til (kalibreret med `node tools/measure-duels.mjs N loeb`).
-export const KEEPER_EDGE = 5;
+export const KEEPER_EDGE = 0;
+// Dødbolde (v3.10, brugeren: "mål på hovedstød, straffe eller dødbolde. Antallet af frispark").
+// Kun til holdet med bolden i en tick uden boldtab. Pr. tick: straffe 1,1 %, frispark i skudafstand
+// 4,3 % (37 % direkte skud, ellers indlæg); hjørnespark efter redning/clearet luftduel 47 %;
+// "stille" frispark (kun talt) 58 %. Kalibreret med `node tools/measure-duels.mjs N`.
+export const PENALTY_P = 0.011, FREEKICK_P = 0.061, FK_SHOT_P = 0.37, CORNER_P = 0.9, QUIET_FOUL_P = 0.58, QUIET_CARD_P = 0.21;
+export const PENALTY_BONUS = 2.3, FK_SHOT_EDGE = 4, SETPIECE_DEF_EDGE = 0.5;
 // Zonen er der, løbet ender: formationens (eller den trukne) plads rykket 20 frem.
 export function runZone(pos) {
   const y = pos.y - 20;
@@ -150,7 +156,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
   const H = prepareSide(home, true, lineupNotes), A = prepareSide(away, false, lineupNotes);
   const sheet = createSheet();
   const goalsPool = [], injuries = [], observations = [];
-  const st = { hPoss: 10, aPoss: 10, hShots: 0, aShots: 0, hOnTarget: 0, aOnTarget: 0, hXg: 0, aXg: 0, hAerialWon: 0, aAerialWon: 0, hVarChecks: 0, aVarChecks: 0, hTacticSuccess: 0, aTacticSuccess: 0, hFouls: 0, aFouls: 0, hInjuries: 0, aInjuries: 0 };
+  const st = { hPoss: 10, aPoss: 10, hShots: 0, aShots: 0, hOnTarget: 0, aOnTarget: 0, hXg: 0, aXg: 0, hAerialWon: 0, aAerialWon: 0, hVarChecks: 0, aVarChecks: 0, hTacticSuccess: 0, aTacticSuccess: 0, hFouls: 0, aFouls: 0, hInjuries: 0, aInjuries: 0, hCorners: 0, aCorners: 0, hFreeKicks: 0, aFreeKicks: 0, hPenalties: 0, aPenalties: 0, hPenaltyGoals: 0, aPenaltyGoals: 0, hSetPieceGoals: 0, aSetPieceGoals: 0, hHeaderGoals: 0, aHeaderGoals: 0, hCounterGoals: 0, aCounterGoals: 0 };
   let hG = 0, aG = 0, homeVarNet = 0;
   const k = (side, name) => (side.isHome ? 'h' : 'a') + name;
   const other = (side) => (side === H ? A : H);
@@ -190,7 +196,11 @@ export function simulateMatch(home, away, rng, opts = {}) {
       st[k(win, 'OnTarget')]++;
       duelLog[lose.team.id].counterGoalsAgainst++;
       sheet.adjust(shooter.id, 1.25); sheet.bump(shooter.id, 'goals'); sheet.adjust(gk.id, -0.3);
-      const desc = describeGoal('COUNTER', tag(shooter), tag(rng.pick(wR.mids)), min, rng);
+      st[k(win, 'CounterGoals')]++;
+      // Oplægsgiveren, teksten nævner, får også assisten (v3.10 – ellers modsagde statistikken referatet).
+      const helper = rng.pick(wR.mids);
+      if (helper && helper.id !== shooter.id) { sheet.adjust(helper.id, 0.4); sheet.bump(helper.id, 'assists'); }
+      const desc = describeGoal('COUNTER', tag(shooter), tag(helper ?? shooter), min, rng);
       goalsPool.push({ scorer: tag(shooter), teamName: win.team.name, match: `${home.name} - ${away.name}`, min, kind: 'COUNTER', spectacle: goalSpectacle('COUNTER', { pace: shooter.skills.pace }, min, rng), desc });
       addEv(min, 'GOAL', 'HIGHLIGHT', win.isHome, true, `⚽ Kontramål: ${tag(shooter)}`, `⚽ [${win.team.name} • ${hG}-${aG}] MÅÅÅL PÅ KONTRA!${why} ${desc}`);
       return true;
@@ -207,6 +217,96 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // Kamphovedet viser startformationen – beregnes før et evt. Hvis-Så-skifte.
   const homeTacticStr = tacticStr(H), awayTacticStr = tacticStr(A);
   addEv(1, 'TACTIC_NOTE', 'TACTIC', true, false, 'Taktisk oplæg', `📋 [TAKTISK OPLÆG] ${home.name} (${homeTacticStr}) møder ${away.name} (${awayTacticStr}).${customIntro}`);
+
+  // ---------- Luftduel og dødbolde (v3.10) ----------
+  const goalFor = (side) => { if (side === H) hG++; else aG++; st[k(side, 'OnTarget')]++; };
+  const best = (list, f) => list.filter(Boolean).reduce((b, p) => (f(p) > f(b) ? p : b));
+  const outfield = (R) => [...R.defs, ...R.mids, ...R.atts];
+  const SP_KIND = { hjørnespark: 'CORNER', frispark: 'SETPIECE' };
+  const isSetPieceKind = (kind) => kind === 'PENALTY' || kind === 'FREEKICK' || kind === 'CORNER' || kind === 'SETPIECE';
+  // Bogfører et mål af typen kind for skytten (måltype pr. spiller og pr. hold til statistikken).
+  function bookKind(side, scorer, kind) {
+    if (kind === 'HEADER' || kind === 'CORNER' || kind === 'SETPIECE') { sheet.bump(scorer.id, 'headerGoals'); st[k(side, 'HeaderGoals')]++; }
+    if (kind === 'PENALTY') sheet.bump(scorer.id, 'penaltyGoals');
+    if (isSetPieceKind(kind)) { sheet.bump(scorer.id, 'setPieceGoals'); st[k(side, 'SetPieceGoals')]++; }
+  }
+  // Høj bold i feltet: åbent spil (indlæg) eller dødbold (hjørnespark/frisparksindlæg).
+  // Høje bolde tages af en midtstopper, når holdet har en på banen (v3.8); den trukne forsvarer
+  // afgør hvilken – ingen ekstra terning. Dødbolde: forsvaret står klar (+1,5).
+  function aerialDuel(att, def, cR, dR, min, shooter, assister, defender, setPiece = null) {
+    const gk = dR.gk;
+    const aDef = dR.cbs.length ? (dR.cbs.includes(defender) ? defender : dR.cbs[Math.max(0, dR.defs.indexOf(defender)) % dR.cbs.length]) : defender;
+    const kind = setPiece ? SP_KIND[setPiece] : 'HEADER';
+    if (shooter.aerialPower * freshFactor(shooter) + rng.next() * 6 > aDef.aerialPower * freshFactor(aDef) + gk.skills.goalkeeping * 0.38 + rng.next() * 6 + (setPiece ? SETPIECE_DEF_EDGE : 0)) {
+      goalFor(att); st[k(att, 'AerialWon')]++; if (!setPiece) st[k(att, 'TacticSuccess')]++;
+      sheet.adjust(shooter.id, 1.35); sheet.bump(shooter.id, 'goals'); sheet.bump(shooter.id, 'aerialWins');
+      if (assister && assister.id !== shooter.id) { sheet.adjust(assister.id, 0.55); sheet.bump(assister.id, 'assists'); }
+      sheet.adjust(aDef.id, -0.35); sheet.adjust(gk.id, -0.25);
+      bookKind(att, shooter, kind);
+      const prose = describeHeader(shooter.aerialPower);
+      observe(shooter, `Luftduel (${min}. min mod ${def.team.name}): ${shooter.shortName} scorede med ${prose}.`);
+      goalsPool.push({ scorer: tag(shooter), teamName: att.team.name, match: `${home.name} - ${away.name}`, min, kind, spectacle: goalSpectacle(kind, { aerialPower: shooter.aerialPower }, min, rng), desc: describeGoal(kind, tag(shooter), tag(assister ?? shooter), min, rng) });
+      const how = setPiece ? `MÅÅÅL PÅ ${setPiece.toUpperCase()}! ${tag(assister)} slår ${setPiece}et ind, og ${tag(shooter)} (${shooter.heightCm} cm) header bolden ind – ${prose}.`
+        : `MÅÅÅL! ${tag(shooter)} (${shooter.heightCm} cm) header bolden ind – ${prose}.`;
+      addEv(min, 'HEADER_GOAL', 'HIGHLIGHT', att.isHome, true, `⚽ Hovedstødsmål: ${tag(shooter)}`, `⚽ [${att.team.name} • ${hG}-${aG}] ${how}`);
+      return true;
+    }
+    st[k(def, 'AerialWon')]++;
+    sheet.adjust(aDef.id, 0.4); sheet.bump(aDef.id, 'aerialWins');
+    addEv(min, 'INFO', 'PLAY', def.isHome, false, 'Luftduel i feltet', setPiece
+      ? `✈️ [${def.team.name} forsvar] ${setPiece === 'hjørnespark' ? 'Hjørnespark' : 'Frisparksindlæg'}: ${tag(aDef)} (${aDef.heightCm} cm) stiger højest og clearer foran ${tag(shooter)}.`
+      : `✈️ [${def.team.name} forsvar] Stærk luftduel: ${tag(aDef)} (${aDef.heightCm} cm) stiger højest og clearer foran ${tag(shooter)}.`);
+    return false;
+  }
+  // Dødboldens hovedstødsspiller: en af de tre bedste i luften (også stopperne går med op).
+  const headerTarget = (R, taker) => rng.pick(outfield(R).filter((p) => p && p !== taker).sort((a, b) => b.aerialPower - a.aerialPower).slice(0, 3));
+  function corner(att, def, cR, dR, min) {
+    st[k(att, 'Corners')]++; st[k(att, 'Shots')]++; st[k(att, 'Xg')] += 0.04; // hovedstødet er en afslutning
+    const taker = best(outfield(cR), (p) => p.skills.passing);
+    aerialDuel(att, def, cR, dR, min, headerTarget(cR, taker), taker, rng.pick(dR.defs), 'hjørnespark');
+  }
+  function penalty(att, def, cR, dR, min) {
+    const taker = best(outfield(cR), (p) => p.skills.finishing), fouled = rng.pick(cR.atts.concat(cR.mids)), fouler = rng.pick(dR.defs), gk = dR.gk;
+    st[k(def, 'Fouls')]++; st[k(att, 'Penalties')]++; st[k(att, 'Shots')]++; st[k(att, 'Xg')] += 0.76;
+    sheet.adjust(fouler.id, -0.3);
+    const why = `${tag(fouled)} fældes i feltet af ${tag(fouler)} (${def.team.name})`;
+    if (taker.skills.finishing * freshFactor(taker) + rng.next() * 8 + PENALTY_BONUS > gk.skills.goalkeeping * freshFactor(gk) + rng.next() * 8) {
+      goalFor(att); st[k(att, 'PenaltyGoals')]++;
+      sheet.adjust(taker.id, 1.0); sheet.bump(taker.id, 'goals'); sheet.adjust(gk.id, -0.1);
+      bookKind(att, taker, 'PENALTY');
+      const desc = describeGoal('PENALTY', tag(taker), tag(fouled), min, rng);
+      goalsPool.push({ scorer: tag(taker), teamName: att.team.name, match: `${home.name} - ${away.name}`, min, kind: 'PENALTY', spectacle: goalSpectacle('PENALTY', {}, min, rng), desc });
+      addEv(min, 'GOAL', 'HIGHLIGHT', att.isHome, true, `⚽ Straffespark: ${tag(taker)}`, `⚽ [${att.team.name} • ${hG}-${aG}] STRAFFESPARK – MÅL! ${why}, og ${tag(taker)} sender bolden sikkert i nettet.`);
+    } else {
+      st[k(att, 'OnTarget')]++;
+      sheet.adjust(gk.id, 0.8); sheet.bump(gk.id, 'saves'); sheet.adjust(taker.id, -0.4);
+      addEv(min, 'SAVE', 'HIGHLIGHT', def.isHome, true, `🧤 Straffe reddet: ${tag(gk)}`, `🧤 [${def.team.name}] STRAFFESPARK REDDET! ${why}, men ${tag(gk)} redder fra ${tag(taker)}.`);
+    }
+  }
+  function freeKick(att, def, cR, dR, min) {
+    const fouler = rng.pick(dR.defs.concat(dR.mids)), gk = dR.gk;
+    st[k(def, 'Fouls')]++; st[k(att, 'FreeKicks')]++;
+    if (rng.chance(FK_SHOT_P)) {
+      const taker = best(outfield(cR), (p) => p.skills.finishing + p.skills.passing);
+      st[k(att, 'Shots')]++; st[k(att, 'Xg')] += 0.07;
+      if (taker.skills.finishing * freshFactor(taker) + rng.next() * 8 > gk.skills.goalkeeping * freshFactor(gk) + rng.next() * 8 + FK_SHOT_EDGE) {
+        goalFor(att);
+        sheet.adjust(taker.id, 1.4); sheet.bump(taker.id, 'goals'); sheet.adjust(gk.id, -0.3);
+        bookKind(att, taker, 'FREEKICK');
+        const desc = describeGoal('FREEKICK', tag(taker), tag(taker), min, rng);
+        goalsPool.push({ scorer: tag(taker), teamName: att.team.name, match: `${home.name} - ${away.name}`, min, kind: 'FREEKICK', spectacle: goalSpectacle('FREEKICK', { finishing: taker.skills.finishing }, min, rng), desc });
+        addEv(min, 'GOAL', 'HIGHLIGHT', att.isHome, true, `⚽ Frisparksmål: ${tag(taker)}`, `⚽ [${att.team.name} • ${hG}-${aG}] FRISPARKSMÅL! Frispark efter ${tag(fouler)}s (${def.team.name}) forseelse – ${desc}`);
+      } else {
+        st[k(att, 'OnTarget')]++;
+        sheet.adjust(gk.id, 0.4); sheet.bump(gk.id, 'saves');
+        addEv(min, 'SAVE', 'PLAY', def.isHome, false, 'Frispark reddet', `🧤 [${def.team.name}] ${tag(gk)} redder ${tag(taker)}s frispark (${att.team.name}) fra kanten af feltet.`);
+      }
+      return;
+    }
+    const taker = best(outfield(cR), (p) => p.skills.passing);
+    st[k(att, 'Shots')]++; st[k(att, 'Xg')] += 0.1;
+    aerialDuel(att, def, cR, dR, min, headerTarget(cR, taker), taker, rng.pick(dR.defs), 'frispark');
+  }
 
   // Indskiftning i den kamplokale kopi. Returnerer indskifteren eller null.
   function substitute(side, slot, min, reason) {
@@ -365,7 +465,6 @@ export function simulateMatch(home, away, rng, opts = {}) {
       const victim = victimSide.starters[slot], fouler = rng.pick(fR.defs.concat(fR.mids));
       st[k(foulSide, 'Fouls')]++;
       sheet.adjust(fouler.id, -0.35);
-      if (sheet.entries[fouler.id]) sheet.entries[fouler.id].yellowCard = true;
       if (rng.chance(0.4)) {
         const matches = rng.int(1, 3);
         st[k(victimSide, 'Injuries')]++;
@@ -378,12 +477,29 @@ export function simulateMatch(home, away, rng, opts = {}) {
           addEv(min, 'INFO', 'PLAY', victimSide.isHome, false, 'Ingen indskiftning', `[${victimSide.team.name}] Ingen indskiftning mulig – holdet spiller videre med ${tag(victim)} haltende.`);
         }
       } else {
+        // Gult kort kun her – skade-frisparkets tekst nævner intet kort (v3.10).
+        if (sheet.entries[fouler.id]) sheet.entries[fouler.id].yellowCard = true;
         addEv(min, 'FOUL', 'PLAY', foulSide.isHome, false, 'Frispark', `🟨 [${foulSide.team.name}] Taktisk frispark og gult kort til ${tag(fouler)}.`);
       }
     }
 
+    // "Stille" frispark – kun talt, ingen hændelse (realistisk antal pr. kamp).
+    if (rng.chance(QUIET_FOUL_P)) {
+      st[k(def, 'Fouls')]++;
+      // Hvert femte giver gult kort (v3.10, QC: ellers ≈0,5 gule pr. hold – Superligaen ≈2).
+      if (rng.chance(QUIET_CARD_P)) {
+        const dRq = def === H ? hR : aR, fouler = rng.pick(dRq.defs.concat(dRq.mids));
+        if (sheet.entries[fouler.id] && !sheet.entries[fouler.id].yellowCard) {
+          sheet.entries[fouler.id].yellowCard = true; sheet.adjust(fouler.id, -0.2);
+          addEv(min, 'FOUL', 'PLAY', def.isHome, false, 'Gult kort', `🟨 [${def.team.name}] Gult kort til ${tag(fouler)} for et frispark.`);
+        }
+      }
+    }
+    // Dødbolde til holdet med bolden (v3.10): straffe, frispark i skudafstand – ikke efter tabt bold.
+    if (!ballLost && rng.chance(PENALTY_P)) penalty(att, def, att === H ? hR : aR, def === H ? hR : aR, min);
+    else if (!ballLost && rng.chance(FREEKICK_P)) freeKick(att, def, att === H ? hR : aR, def === H ? hR : aR, min);
     // Chance (30 %): høje bolde, VAR-tjek eller almindelig afslutning – ikke efter tabt bold.
-    if (!ballLost && rng.chance(CHANCE_P[attPh.phase1_buildUp.offBallRuns] ?? CHANCE_P.NORMAL)) {
+    else if (!ballLost && rng.chance(CHANCE_P[attPh.phase1_buildUp.offBallRuns] ?? CHANCE_P.NORMAL)) {
       const cR = att === H ? hR : aR, dR = def === H ? hR : aR;
       const shooter = rng.pick(cR.atts.concat(cR.mids)), assister = rng.pick(cR.mids), defender = rng.pick(dR.defs), gk = dR.gk;
       st[k(att, 'Shots')]++;
@@ -393,23 +509,8 @@ export function simulateMatch(home, away, rng, opts = {}) {
       const assist = (bonus) => { if (assister.id !== shooter.id) { sheet.adjust(assister.id, bonus); sheet.bump(assister.id, 'assists'); } };
       const high = attPh.phase1_buildUp.attackFocus === 'HIGH_CROSSES' || attPh.phase1_buildUp.passingStyle === 'DIRECT_LONG';
       if (high && rng.chance(0.55)) {
-        // Høje bolde i feltet tages af en midtstopper, når holdet har en på banen (v3.8: med
-        // backs på ≈175 cm gav en tilfældig forsvarer næsten tre gange så mange hovedstødsmål).
-        // Samme trukne forsvarer afgør hvilken stopper – ingen ekstra terning.
-        const aDef = dR.cbs.length ? (dR.cbs.includes(defender) ? defender : dR.cbs[Math.max(0, dR.defs.indexOf(defender)) % dR.cbs.length]) : defender;
-        if (shooter.aerialPower * freshFactor(shooter) + rng.next() * 6 > aDef.aerialPower * freshFactor(aDef) + gk.skills.goalkeeping * 0.38 + rng.next() * 6) {
-          scored(); st[k(att, 'AerialWon')]++; st[k(att, 'TacticSuccess')]++;
-          sheet.adjust(shooter.id, 1.35); sheet.bump(shooter.id, 'goals'); sheet.bump(shooter.id, 'aerialWins'); assist(0.55);
-          sheet.adjust(aDef.id, -0.35); sheet.adjust(gk.id, -0.25);
-          const prose = describeHeader(shooter.aerialPower);
-          observe(shooter, `Luftduel (${min}. min mod ${def.team.name}): ${shooter.shortName} scorede med ${prose}.`);
-          goalsPool.push({ scorer: tag(shooter), teamName: att.team.name, match: `${home.name} - ${away.name}`, min, kind: 'HEADER', spectacle: goalSpectacle('HEADER', { aerialPower: shooter.aerialPower }, min, rng), desc: describeGoal('HEADER', tag(shooter), tag(assister), min, rng) });
-          addEv(min, 'HEADER_GOAL', 'HIGHLIGHT', att.isHome, true, `⚽ Hovedstødsmål: ${tag(shooter)}`, `⚽ [${att.team.name} • ${hG}-${aG}] MÅÅÅL! ${tag(shooter)} (${shooter.heightCm} cm) header bolden ind – ${prose}.`);
-        } else {
-          st[k(def, 'AerialWon')]++;
-          sheet.adjust(aDef.id, 0.4); sheet.bump(aDef.id, 'aerialWins');
-          addEv(min, 'INFO', 'PLAY', def.isHome, false, 'Luftduel i feltet', `✈️ [${def.team.name} forsvar] Stærk luftduel: ${tag(aDef)} (${aDef.heightCm} cm) stiger højest og clearer foran ${tag(shooter)}.`);
-        }
+        // Indlæg i åbent spil – samme luftduel som dødboldene. Clearet bold kan give hjørnespark.
+        if (!aerialDuel(att, def, cR, dR, min, shooter, assister, defender) && rng.chance(CORNER_P)) corner(att, def, cR, dR, min);
       } else if (rng.next() < 0.22) {
         st[k(att, 'VarChecks')]++;
         const trapBonus = (shooter.counterTactics?.vsTrapLong ?? 15) * 0.045; // v3.6: samme effekt (≈0,8) på den lavere skala
@@ -473,7 +574,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
           }
           const fs = finisher.skills;
           if (fs.finishing * freshFactor(finisher) + rng.next() * 8 + RUN_FINISH_BONUS > gk.skills.goalkeeping * freshFactor(gk) + rng.next() * 8 + KEEPER_EDGE) {
-            scored(); duelLog[att.team.id].runGoals++;
+            scored(); duelLog[att.team.id].runGoals++; bookKind(att, finisher, kind);
             sheet.adjust(finisher.id, solo ? 1.4 : 1.25); sheet.bump(finisher.id, 'goals'); sheet.adjust(gk.id, -0.3);
             if (!solo && helper && helper.id !== finisher.id) { sheet.adjust(helper.id, 0.5); sheet.bump(helper.id, 'assists'); }
             const prose = describeFinish(fs.finishing);
@@ -485,6 +586,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
             st[k(att, 'OnTarget')]++;
             sheet.adjust(gk.id, 0.5); sheet.bump(gk.id, 'saves'); sheet.adjust(finisher.id, 0.1);
             addEv(min, 'SAVE', 'PLAY', def.isHome, false, 'Redning', `🧤 [${def.team.name}] Flot redning af ${tag(gk)} på afslutning fra ${tag(finisher)} (${att.team.name}).${lead ? ' ' + lead.replace('✅ ', '') : ''}`);
+            if (rng.chance(CORNER_P)) corner(att, def, cR, dR, min);
           }
         } else if (shooter.skills.finishing * freshFactor(shooter) + rng.next() * 8 > gk.skills.goalkeeping * freshFactor(gk) + rng.next() * 8 + KEEPER_EDGE) {
           scored();
@@ -501,6 +603,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
             kind = Object.keys(w).find((k) => (r -= w[k]) < 0) || 'COMBINATION';
           }
           const solo = kind === 'LONGSHOT' || kind === 'DRIBBLE'; // ingen oplægsgiver
+          bookKind(att, shooter, kind);
           sheet.adjust(shooter.id, solo ? 1.4 : 1.25); sheet.bump(shooter.id, 'goals'); if (!solo) assist(0.5); sheet.adjust(gk.id, -0.3);
           const prose = describeFinish(shooter.skills.finishing);
           observe(shooter, `Scoring (${min}. min mod ${def.team.name}): ${shooter.shortName} afsluttede med ${prose}.`);
@@ -511,16 +614,23 @@ export function simulateMatch(home, away, rng, opts = {}) {
           st[k(att, 'OnTarget')]++;
           sheet.adjust(gk.id, 0.5); sheet.bump(gk.id, 'saves'); sheet.adjust(shooter.id, 0.1);
           addEv(min, 'SAVE', 'PLAY', def.isHome, false, 'Redning', `🧤 [${def.team.name}] Flot redning af ${tag(gk)} på afslutning fra ${tag(shooter)} (${att.team.name}).`);
+          if (rng.chance(CORNER_P)) corner(att, def, cR, dR, min);
         }
       }
     }
   }
 
-  // Opsummering af løb uden bold – kun dit eget hold (dine valg og dine tal).
+  // Fuldtids-analyse (v3.10, brugeren: "Ved pausen får jeg information om hvordan min opbygning
+  // har klaret sig, men det får jeg ikke af vide ved fuldtid") – kun dit hold, dine valg og tal.
   const meSide = [H, A].find(own);
   if (meSide) {
     const d = duelLog[meSide.team.id], runs = meSide.tactics.phases.phase1_buildUp.offBallRuns ?? 'NORMAL';
-    addEv(90, 'INFO', 'TACTIC', meSide.isHome, false, 'Løb uden bold', `🎯 [LØB UDEN BOLD • ${RUNS_LABEL[runs]}] ${d.runs} løb, ${d.runsWon} kom fri (${d.runGoals} mål) · kontraer imod i alt: ${d.countersAgainst} (${d.counterGoalsAgainst} mål).`);
+    const p = meSide.isHome ? 'h' : 'a', poss = Math.round((st[p + 'Poss'] / (st.hPoss + st.aPoss)) * 100);
+    const [myG, oppG] = meSide.isHome ? [hG, aG] : [aG, hG];
+    addEv(90, 'FULLTIME', 'TACTIC', meSide.isHome, false, 'Fuldtids-analyse',
+      `📊 [90' FULDTIDS-ANALYSE] ${myG}-${oppG} til dig. Du havde ${poss}% af bolden og ${st[p + 'Shots']} afslutninger (${st[p + 'OnTarget']} på mål). Din opbygning kom igennem ${d.buildWon} af ${d.build} gange; dit pres vandt bolden ${d.pressWon} af ${d.press} gange.`
+      + ` Dødbolde: ${st[p + 'FreeKicks']} frispark i skudafstand, ${st[p + 'Corners']} hjørnespark, ${st[p + 'Penalties']} straffe (${st[p + 'PenaltyGoals']} mål) · frispark begået ${st[p + 'Fouls']}, tilkendt ${st[(p === 'h' ? 'a' : 'h') + 'Fouls']}.`
+      + ` 🎯 Løb uden bold (${RUNS_LABEL[runs]}): ${d.runs} løb, ${d.runsWon} kom fri (${d.runGoals} mål) · kontraer imod i alt: ${d.countersAgainst} (${d.counterGoalsAgainst} mål).`);
   }
   const ratings = finalizeSheet(sheet, hG, aG, rng, counterXpForMatch);
   addEv(90, 'END', 'HIGHLIGHT', true, false, 'Slutfløjt', `🏁 SLUTFLØJT! ${home.name} ${hG} - ${aG} ${away.name}.${ratings.motm ? ` Kampens spiller: #${ratings.motm.shirtNumber} ${ratings.motm.shortName} (${ratings.motm.teamName}).` : ''}`);

@@ -49,7 +49,7 @@ const GOAL_TEXTS = {
   ],
   COUNTER: [
     (s, a, m) => `Kontra i ${m}. minut: bolden blev erobret, ${a} sendte den i dybden, og ${s} løb fra alle og scorede.`,
-    (s, a, m) => `Fra eget felt til mål på ti sekunder i ${m}. minut – ${s} sluttede kontraen af.`,
+    (s, a, m) => `Fra eget felt til mål på ti sekunder i ${m}. minut – ${a} satte ${s} i gang, og han sluttede kontraen af.`,
     (s, a, m) => `Omstilling i topklasse i ${m}. minut: ${a} fandt ${s}, der kom løbende og trillede den ind.`,
   ],
   CUTBACK: [
@@ -61,6 +61,26 @@ const GOAL_TEXTS = {
     (s, a, m) => `Kombinationsfodbold i ${m}. minut: ${a} spillede ${s} fri, og han sluttede sikkert af.`,
     (s, a, m) => `Tre hurtige afleveringer i ${m}. minut, og ${s} kunne score efter oplæg fra ${a}.`,
     (s, a, m) => `${a} og ${s} spillede væggen i ${m}. minut, og ${s} gjorde det færdigt.`,
+  ],
+  PENALTY: [
+    (s, a, m) => `Straffespark i ${m}. minut: ${a} blev fældet i feltet, og ${s} sendte målmanden den forkerte vej.`,
+    (s, a, m) => `${s} var iskold fra pletten i ${m}. minut, efter at ${a} var blevet lagt ned i feltet.`,
+    (s, a, m) => `Kold, rolig, mål: ${s} scorede på straffespark i ${m}. minut.`,
+  ],
+  FREEKICK: [
+    (s, a, m) => `Et frispark for vitrineskabet i ${m}. minut: ${s} krøllede bolden over muren og op i hjørnet.`,
+    (s, a, m) => `${s} sendte et frispark ind under overliggeren i ${m}. minut – målmanden nåede kun at se efter den.`,
+    (s, a, m) => `Direkte frispark i ${m}. minut: ${s} fandt det lange hjørne fra 22 meter.`,
+  ],
+  CORNER: [
+    (s, a, m) => `Hjørnespark i ${m}. minut: ${a} slog bolden ind, og ${s} stangede den i mål.`,
+    (s, a, m) => `${s} vandt luftduellen på ${a}s hjørnespark i ${m}. minut og headede ind.`,
+    (s, a, m) => `Dødboldsstyrke i ${m}. minut: hjørnespark fra ${a}, hovedstød fra ${s}.`,
+  ],
+  SETPIECE: [
+    (s, a, m) => `Frisparksindlæg i ${m}. minut: ${a} lagde bolden ind, og ${s} headede den i mål.`,
+    (s, a, m) => `${s} kom først på ${a}s frispark i ${m}. minut og nikkede ind.`,
+    (s, a, m) => `Indøvet dødbold i ${m}. minut: frispark fra ${a}, hovedstød fra ${s}.`,
   ],
   HEADER: [
     (s, a, m) => `Et hovedstødsmål i ${m}. minut: efter et indlæg fra ${a} rejste ${s} sig over alle.`,
@@ -90,6 +110,10 @@ export function goalSpectacle(kind, { finishing = 10, pace = 10, ballControl = 1
     CUTBACK: 8 + passing * 0.3 + r * 4,   // v3.9: en flot tværaflevering kan nå avisen (før 6 + PAS·0,15)
     COMBINATION: 5 + passing * 0.2 + r * 4,
     HEADER: 5 + aerialPower * 0.4 + r * 4,
+    PENALTY: 3 + r * 3,                        // v3.10: et straffespark er sjældent rundens flotteste
+    FREEKICK: 11 + finishing * 0.3 + r * 4,
+    CORNER: 4 + aerialPower * 0.35 + r * 4,
+    SETPIECE: 4 + aerialPower * 0.35 + r * 4,
     VAR: 5.5 + r * 5,   // v3.9 (før 7 + …): færre langskud efter målmandsfordelen – VAR må ikke tage over igen
   }[kind] ?? 5;
   return Math.min(20, Math.round((base + late) * 10) / 10);
