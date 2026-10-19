@@ -19,7 +19,7 @@ let view = { viewTeamIdx: 0, sortCol: 'pos', sortDesc: false, filter: 'all', wid
 
 // Skift af hold/visning afbryder et påbegyndt byt, så et senere klik aldrig bytter uden varsel.
 const clearSwap = () => { view.swapId = null; view.pitchSwapId = null; };
-function showTeam(idx) { view.viewTeamIdx = idx; view.sortCol = 'pos'; view.sortDesc = false; clearSwap(); view.notice = ''; view.selectedPlayerId = game.league.teams[idx].squad[0].id; render(); }
+function showTeam(idx) { view.viewTeamIdx = idx; clearSwap(); view.notice = ''; view.selectedPlayerId = game.league.teams[idx].squad[0].id; render(); }
 
 const app = document.getElementById('app');
 const controls = document.getElementById('controls');
@@ -34,11 +34,16 @@ function newGame() {
 
 function persist() {
   const r = saveGame(storage, game);
-  if (r.ok) view.savedAt = r.savedAt; else window.tactivarFejl?.(r.error);
+  if (r.ok) { view.savedAt = r.savedAt; view.saveError = null; }
+  else { view.saveError = r.error; window.tactivarFejl?.(r.error); }
 }
 
-// Én ændring = ændr, gem, tegn igen.
-function change(fn) { fn(); persist(); render(); }
+// Én ændring af eget hold = ændr, gem, tegn igen. Modstanderhold kan aldrig ændres –
+// det afgøres her, ét sted, uanset hvilken knap der kaldte.
+function change(fn, team = null) {
+  if (team && team.isBot) { view.notice = '🔒 Du kan kun ændre dit eget hold.'; render(); return; }
+  fn(); persist(); render();
+}
 
 function start() {
   const r = loadGame(storage);
@@ -58,7 +63,7 @@ function renderLoadError(r) {
     r.backupKey ? h('p', {}, `Dine data er IKKE slettet: de er gemt i browseren under "${r.backupKey}". Hent dem som fil, og send filen med, hvis du vil have dem reddet.`) : null,
     r.backupKey ? h('button', { id: 'download-backup', onclick: () => download(storage.getItem(r.backupKey), `${r.backupKey}.json`) }, '⬇ Hent backup som fil') : null,
     h('div', { class: 'row' },
-      h('button', { id: 'start-new', onclick: () => { const g = newGame(); resetGame(storage, g); game = g; view.viewTeamIdx = myIdx(); render(); } }, '🎲 Start en ny liga'),
+      h('button', { id: 'start-new', onclick: () => { const g = newGame(); const res = resetGame(storage, g); if (!res.ok) { window.tactivarFejl?.(res.error); return; } game = g; view.viewTeamIdx = myIdx(); render(); } }, '🎲 Start en ny liga'),
       importButton())));
   document.body.dataset.klar = 'ja';
 }
@@ -68,7 +73,9 @@ function importButton() {
     const file = e.target.files[0]; if (!file) return;
     const r = importGame(await file.text());
     if (!r.ok) { window.tactivarFejl?.(`Import mislykkedes: ${r.error}`); return; }
-    resetGame(storage, r.state); game = r.state; view.viewTeamIdx = myIdx(); view.notice = `Spillet er importeret fra ${file.name}.`; persist(); render();
+    const res = resetGame(storage, r.state);
+    if (!res.ok) { window.tactivarFejl?.(res.error); return; }
+    game = r.state; view.viewTeamIdx = myIdx(); view.notice = `Spillet er importeret fra ${file.name}.${res.backupKey ? ` Det tidligere spil ligger som backup (${res.backupKey}).` : ''}`; view.savedAt = res.savedAt; render();
   } });
   return h('span', {}, input, h('button', { onclick: () => input.click() }, '⬆ Importér'));
 }
@@ -86,13 +93,15 @@ function renderControls() {
   controls.replaceChildren(
     select(String(view.viewTeamIdx), teams.map((t, i) => [String(i), (t.isBot ? '' : '★ ') + t.name]), (v) => showTeam(Number(v)), { id: 'team-select', title: 'Vælg hold at se' }),
     h('button', { id: 'wide-toggle', onclick: () => { view.wide = !view.wide; render(); } }, view.wide ? '⤡ Smal visning' : '⤢ Bred visning'),
-    h('span', { class: 'savestatus', id: 'save-status' }, view.savedAt ? `✔ Gemt kl. ${time(view.savedAt)}` : 'Ikke gemt'),
+    h('span', { class: 'savestatus' + (view.saveError ? ' failed' : ''), id: 'save-status' }, view.saveError ? '⚠ IKKE gemt' : view.savedAt ? `✔ Gemt kl. ${time(view.savedAt)}` : 'Ikke gemt'),
     h('button', { id: 'save-now', onclick: () => { persist(); render(); } }, '💾 Gem nu'),
     h('button', { id: 'export', onclick: exportFile }, '⬇ Eksportér'),
     importButton(),
     h('button', { id: 'new-league', onclick: () => {
       if (!confirm('Start en helt ny liga? Det nuværende spil gemmes som backup i browseren.')) return;
-      const g = newGame(); const r = resetGame(storage, g); game = g; view = { ...view, viewTeamIdx: myIdx(), selectedPlayerId: null, notice: r.backupKey ? `Ny liga startet. Det gamle spil ligger som backup (${r.backupKey}).` : 'Ny liga startet.' }; view.savedAt = r.savedAt; render();
+      const g = newGame(); const r = resetGame(storage, g);
+      if (!r.ok) { window.tactivarFejl?.(r.error); return; }
+      game = g; view = { ...view, viewTeamIdx: myIdx(), selectedPlayerId: null, notice: r.backupKey ? `Ny liga startet. Det gamle spil ligger som backup (${r.backupKey}).` : 'Ny liga startet.' }; view.savedAt = r.savedAt; render();
     } }, '🎲 Ny liga'));
 }
 
@@ -122,7 +131,7 @@ function render() {
     onSwap: (p) => {
       if (!view.swapId) { view.swapId = p.id; view.notice = `🔁 Vælg den spiller, ${p.shortName} skal byttes med.`; render(); return; }
       const a = view.swapId; clearSwap(); view.notice = '';
-      change(() => act.swapPlayers(team, a, p.id));
+      change(() => act.swapPlayers(team, a, p.id), team);
     },
   });
 
@@ -132,18 +141,18 @@ function render() {
   const pitch = h('div', { class: 'panel' }, h('h3', {}, `Taktiktavle – ${team.tactics.baseFormation}`),
     renderPitch({ team, isOwn, ui: view,
       onSelect: (p, own) => { view.selectedPlayerId = p.id; view.pitchSwapId = own ? (view.pitchSwapId === p.id ? null : p.id) : null; view.notice = view.pitchSwapId ? `🔁 Klik på en anden brik for at bytte ${p.shortName}s plads.` : ''; render(); },
-      onTokenSwap: (a, b) => { clearSwap(); view.notice = ''; change(() => act.swapPlayers(team, a, b)); },
-      onMove: (slot, pos) => { clearSwap(); change(() => act.moveSlot(team, slot, pos)); } }),
+      onTokenSwap: (a, b) => { clearSwap(); view.notice = ''; change(() => act.swapPlayers(team, a, b), team); },
+      onMove: (slot, pos) => { clearSwap(); change(() => act.moveSlot(team, slot, pos), team); } }),
     isOwn ? h('div', { class: 'muted help' }, 'Træk = justér position (målmanden står fast) · Klik på to brikker = byt plads · Bænkspillere skiftes ind med 🔁 i regnearket') : null);
 
   const tactics = renderTactics({ team, isOwn, ui: game.ui, on: {
-    formation: (f) => change(() => act.setFormation(team, f)),
-    preset: (i) => change(() => { act.switchPreset(team, game.ui.activePresetIndex, i); game.ui.activePresetIndex = i; }),
-    resetDrag: () => change(() => act.resetDrag(team)),
-    phase: (ph, f, v) => change(() => act.setPhase(team, ph, f, v)),
-    rule: (i, patch) => change(() => act.updateRule(team, i, patch)),
-    addRule: () => change(() => act.addRule(team)),
-    removeRule: (i) => change(() => act.removeRule(team, i)),
+    formation: (f) => change(() => act.setFormation(team, f), team),
+    preset: (i) => change(() => { act.switchPreset(team, game.ui.activePresetIndex, i); game.ui.activePresetIndex = i; }, team),
+    resetDrag: () => change(() => act.resetDrag(team), team),
+    phase: (ph, f, v) => change(() => act.setPhase(team, ph, f, v), team),
+    rule: (i, patch) => change(() => act.updateRule(team, i, patch), team),
+    addRule: () => change(() => act.addRule(team), team),
+    removeRule: (i) => change(() => act.removeRule(team, i), team),
   } });
 
   const standings = renderStandings({ league, viewTeamId: team.id, onPick: (id) => showTeam(league.teams.findIndex((t) => t.id === id)) });

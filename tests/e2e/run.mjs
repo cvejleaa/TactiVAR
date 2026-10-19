@@ -109,6 +109,35 @@ try {
   check('Et påbegyndt byt afbrydes af sortering (intet byt uden varsel)', (await nameAt(4)) === n4 && (await nameAt(5)) === n5);
   await g.click('#matrix thead th:nth-child(1)');
 
+  // Hver ændring gemmes STRAKS: genindlæs efter hver enkelt handling
+  const reload = async () => { await g.reload(); await g.waitForSelector('body[data-klar="ja"]'); };
+  await g.selectOption('#formation', '3-5-2'); await reload();
+  check('Formation gemmes straks', (await g.inputValue('#formation')) === '3-5-2');
+  await g.click('#add-rule'); await reload();
+  check('Ny Hvis-Så-regel gemmes straks', (await g.locator('#rules .rule').count()) === 2);
+  await g.click('.presets button:nth-child(2)'); await reload();
+  check('Plan-skift gemmes straks', (await g.textContent('.presets button.active')).startsWith('Plan B') && (await g.inputValue('#formation')) === '4-3-3');
+  const [s7, s8] = [await nameAt(7), await nameAt(8)];
+  await g.click('#pitch .token[data-slot="7"]'); await g.click('#pitch .token[data-slot="8"]'); await reload();
+  check('Byt gemmes straks', (await nameAt(7)) === s8 && (await nameAt(8)) === s7);
+  await g.selectOption('#tactics select[data-field="onBallWon"]', 'KEEP_POSSESSION'); await reload();
+  check('Fasevalg gemmes straks', (await g.inputValue('#tactics select[data-field="onBallWon"]')) === 'KEEP_POSSESSION');
+
+  // Gem-fejl er synlig, aldrig tavs
+  await g.evaluate(() => { window.__set = Storage.prototype.setItem; Storage.prototype.setItem = function () { throw new Error('QuotaExceededError'); }; });
+  await g.selectOption('#tactics select[data-field="onBallWon"]', 'FAST_COUNTER');
+  check('Gem-fejl vises i fejlboksen og som "IKKE gemt"', (await g.isVisible('#fejlboks')) && (await g.textContent('#save-status')).includes('IKKE gemt'));
+  await g.evaluate(() => { Storage.prototype.setItem = window.__set; document.getElementById('fejlboks').hidden = true; document.getElementById('fejlboks').replaceChildren(); });
+  await g.click('#save-now');
+  check('"Gem nu" gemmer igen efter fejlen', (await g.textContent('#save-status')).includes('Gemt kl.'));
+
+  // Sorteringsvagten: sortér eget hold på FIN, skift til en modstander – rækkefølgen må ikke røbe FIN
+  await g.click('#matrix thead th:nth-child(14)');
+  await g.click('#standings tbody tr:not(.mine)');
+  const posCol = await g.locator('#matrix tbody tr td:nth-child(1)').allTextContents();
+  check('Modstanderens tabel falder tilbage til opstillingsorden, ikke skjult FIN-orden', posCol[0].startsWith('GK') && !(await g.textContent('#matrix thead')).includes('FIN ▼'));
+  await g.selectOption('#team-select', '0');
+
   // Anti-spionage på et modstanderhold
   await g.selectOption('#team-select', '1');
   const oppText = await g.textContent('#matrix tbody');
@@ -123,9 +152,25 @@ try {
   check('Modstander: spillerkortet skjuler evner og kontrakt', (await g.locator('#player-card .bars').count()) === 0 && (await g.textContent('#player-card')).includes('🔒 ??'));
   check('Modstander: faser og Hvis-Så-regler er skjulte', (await g.locator('#tactics fieldset').count()) === 0);
   check('Modstander: kun dit hold kan trækkes på banen', (await g.locator('#pitch .token.draggable').count()) === 0);
+  check('Modstander: formationen kan ikke ændres og der er ingen byt-knapper', (await g.isDisabled('#formation')) && (await g.locator('#matrix tbody button').count()) === 0);
+  const oppBefore = await g.locator('#pitch .token[data-slot="2"] .token-name').textContent();
+  await g.click('#pitch .token[data-slot="2"]'); await g.click('#pitch .token[data-slot="3"]');
+  check('Modstander: klik på to brikker bytter ikke', (await g.locator('#pitch .token[data-slot="2"] .token-name').textContent()) === oppBefore);
   check('Ligatabellen viser holdenes typiske stil', (await g.textContent('#standings')).includes('•'));
   await g.click('#wide-toggle');
   check('Bred visning kan slås til og fra på et bot-hold', (await g.locator('.grid.wide').count()) === 1 && (await g.click('#wide-toggle'), (await g.locator('.grid.wide').count()) === 0));
+
+  // Ny liga og import tager backup af det nuværende spil
+  await g.selectOption('#team-select', '0');
+  const savedBefore = await g.evaluate(() => localStorage.getItem('tactivar_save'));
+  g.once('dialog', (d) => d.accept());
+  await g.click('#new-league');
+  const backups = async () => g.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('tactivar_backup_')).map((k) => localStorage.getItem(k)));
+  check('Ny liga: det gamle spil ligger i backup', (await backups()).includes(savedBefore));
+  const exported = await g.evaluate(() => localStorage.getItem('tactivar_save'));
+  await g.setInputFiles('#import-file', { name: 'gammel.json', mimeType: 'application/json', buffer: Buffer.from(savedBefore) });
+  await g.waitForFunction(() => document.getElementById('notice')?.textContent.includes('importeret'));
+  check('Import: indlæser filen og lægger det forrige spil i backup', (await backups()).includes(exported) && (await rows()) === 18);
 
   // Ødelagt gemt spil: aldrig tom side, data bevaret i backup
   await g.evaluate(() => localStorage.setItem('tactivar_save', '{"schemaVersion":1,"league":{"teams":[]}}'));

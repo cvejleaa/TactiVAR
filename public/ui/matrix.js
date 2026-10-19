@@ -34,7 +34,11 @@ export function renderMatrix({ team, isOwn, opponent, ui, notes, onSort, onSelec
   const slotOf = (p) => team.tactics.lineupSlots.indexOf(p.id);
   const ctx = { team, isOwn, opponent, slotOf };
   const roles = FORMATIONS[team.tactics.baseFormation];
-  const col = COLUMNS.find((c) => c.key === ui.sortCol) || COLUMNS[0];
+  // Vagten mod "sort-spoofing": en skjult kolonne kan aldrig være sorteringsnøgle for en
+  // seer, der ikke må se den – uanset hvad UI-tilstanden siger.
+  const wanted = COLUMNS.find((c) => c.key === ui.sortCol) || COLUMNS[0];
+  const col = canSeeField(wanted.field, isOwn) ? wanted : COLUMNS[0];
+  const desc = col === wanted ? ui.sortDesc : false;
   const rows = team.squad
     .filter((p) => {
       const s = slotOf(p);
@@ -48,7 +52,7 @@ export function renderMatrix({ team, isOwn, opponent, ui, notes, onSort, onSelec
     .map((p) => ({ p, v: col.value(p, ctx) }))
     .sort((a, b) => {
       const d = col.text ? String(a.v).localeCompare(String(b.v), 'da') : a.v - b.v;
-      return (ui.sortDesc ? -d : d) || a.p.shirtNumber - b.p.shirtNumber;
+      return (desc ? -d : d) || a.p.shirtNumber - b.p.shirtNumber;
     });
 
   const head = h('tr', {}, COLUMNS.map((c) => {
@@ -56,7 +60,7 @@ export function renderMatrix({ team, isOwn, opponent, ui, notes, onSort, onSelec
     return h('th', {
       title: c.title || c.label, class: (c.key === col.key ? 'sorted ' : '') + (allowed ? 'sortable' : 'locked'),
       onclick: () => (allowed ? onSort(c) : onBlocked(c)),
-    }, c.label, c.key === col.key ? (ui.sortDesc ? ' ▼' : ' ▲') : '');
+    }, c.label, c.key === col.key ? (desc ? ' ▼' : ' ▲') : '');
   }), h('th', {}, 'Arketype/Note'), isOwn ? h('th', {}, 'Byt') : null);
 
   const body = rows.map(({ p }) => {

@@ -22,7 +22,7 @@ export function parseSave(text) {
   try { data = JSON.parse(text); } catch { return { ok: false, error: 'Den gemte fil er ikke gyldig JSON.' }; }
   if (!data || typeof data !== 'object') return { ok: false, error: 'Den gemte fil er tom.' };
   const from = Number(data.schemaVersion);
-  if (!Number.isInteger(from) || from < 1) return { ok: false, error: 'Den gemte fil har ingen gyldig skema-version.' };
+  if (!Number.isInteger(from) || from < 0) return { ok: false, error: 'Den gemte fil har ingen gyldig skema-version.' };
   if (from > SCHEMA_VERSION) return { ok: false, error: `Den gemte fil er fra en nyere version (skema ${from}) end denne side (skema ${SCHEMA_VERSION}). Genindlæs siden.` };
   for (let v = from; v < SCHEMA_VERSION; v++) {
     if (!MIGRATIONS[v]) return { ok: false, error: `Der findes ingen migrering fra skema ${v}.` };
@@ -55,11 +55,16 @@ export function saveGame(storage, state, now = Date.now()) {
   catch (e) { return { ok: false, error: `Spillet kunne ikke gemmes (${e.message}).` }; }
 }
 
-// Ny liga: den eksisterende gemte fil lægges i backup først, så "Nulstil" kan fortrydes.
+// Ny liga/import: den eksisterende gemte fil lægges i backup først, så det kan fortrydes.
+// Mislykkes backuppen (fx fuldt lager), afbrydes det – det gamle spil overskrives aldrig uden backup.
 export function resetGame(storage, newState, now = Date.now()) {
   let raw = null;
   try { raw = storage.getItem(SAVE_KEY); } catch { /* intet at tage backup af */ }
-  const backupKey = raw != null ? backupRaw(storage, raw, now) : null;
+  let backupKey = null;
+  if (raw != null) {
+    backupKey = backupRaw(storage, raw, now);
+    if (!backupKey) return { ok: false, error: 'Det nuværende spil kunne ikke sikkerhedskopieres (er browserens lager fuldt?). Intet er ændret – eksportér spillet først.', backupKey: null };
+  }
   const saved = saveGame(storage, newState, now);
   return { ...saved, backupKey };
 }

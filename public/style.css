@@ -59,3 +59,4 @@ fieldset.phase legend { color: var(--dæmpet); padding: 0 .3rem; }
 .rule { display: flex; flex-wrap: wrap; gap: .3rem; align-items: center; width: 100%; } .rule input { width: 3.5rem; }
 .standings tr.mine td { color: var(--grøn); } .standings tr.viewing { outline: 1px solid var(--lilla); } .standings td:nth-child(2) { text-align: left; } .pts { font-weight: 800; }
 .errorpanel { border-color: var(--rød); }
+.savestatus.failed { color: var(--rød); font-weight: 800; }

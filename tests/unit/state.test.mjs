@@ -142,3 +142,66 @@ test('Hvis-Så: højst 5 regler; ny regel har gyldig remap', () => {
   assert.equal(new Set(t.tactics.conditionalRules.map((x) => x.ruleId)).size, 5);
   act.removeRule(t, 0); assert.equal(t.tactics.conditionalRules.length, 4);
 });
+
+// ---------- Test Managers fund ----------
+test('ny liga/import afbrydes, hvis backuppen mislykkes – det gamle spil overskrives aldrig', () => {
+  const s = fakeStorage({ [SAVE_KEY]: FIXTURE });
+  const realSet = s.setItem;
+  s.setItem = (k, v) => { if (k.startsWith(BACKUP_PREFIX)) throw new Error('QuotaExceededError'); realSet(k, v); };
+  const r = resetGame(s, game(9), 5000);
+  assert.equal(r.ok, false); assert.match(r.error, /sikkerhedskopieres/);
+  assert.equal(s.getItem(SAVE_KEY), FIXTURE);
+});
+
+test('backup-nøgler er unikke pr. tidspunkt; to nulstillinger giver to backups', () => {
+  const s = fakeStorage({ [SAVE_KEY]: FIXTURE });
+  const a = resetGame(s, game(1), 1000).backupKey, b = resetGame(s, game(2), 2000).backupKey;
+  assert.notEqual(a, b);
+  assert.equal(s.getItem(a), FIXTURE);
+  assert.notEqual(s.getItem(b), FIXTURE);
+});
+
+test('skema-version kræves; ui og noter får standardværdier; migratedFrom er null på nyeste skema', () => {
+  const ok = JSON.parse(FIXTURE);
+  assert.equal(parseSave(JSON.stringify({ ...ok, schemaVersion: undefined })).ok, false);
+  assert.equal(parseSave(JSON.stringify({ ...ok, schemaVersion: '1' })).ok, true);
+  const r = parseSave(JSON.stringify({ ...ok, ui: undefined, notes: 'x' }));
+  assert.deepEqual(r.state.ui, { activePresetIndex: 0, opponentIdx: 1 });
+  assert.deepEqual(r.state.notes, {});
+  assert.equal(r.migratedFrom, null);
+});
+
+test('migreringer køres i rækkefølge fra det gemte skema', async () => {
+  const mod = await import('../../public/state/storage.js');
+  const data = JSON.parse(FIXTURE);
+  // Et skema-0-fixture, som en (test-)migrering løfter til skema 1.
+  mod.MIGRATIONS[0] = (d) => ({ ...d, schemaVersion: 1, notes: { ...d.notes, migreret: 'ja' } });
+  try {
+    const r = mod.parseSave(JSON.stringify({ ...data, schemaVersion: 0 }));
+    assert.equal(r.ok, true); assert.equal(r.migratedFrom, 0); assert.equal(r.state.notes.migreret, 'ja');
+  } finally { delete mod.MIGRATIONS[0]; }
+});
+
+test('browser der nægter læsning giver en fejl, ikke en tom liga', () => {
+  const r = loadGame({ getItem: () => { throw new Error('SecurityError'); }, setItem: () => {} });
+  assert.equal(r.status, 'error'); assert.match(r.error, /tillader ikke/);
+});
+
+test('handlinger: plan-skift bevarer den aktuelle opstilling; updateRule, removeRule(i), resetDrag, moveSlot > 10', () => {
+  const t = createLeague(createRng(3)).teams[0];
+  act.swapPlayers(t, t.tactics.lineupSlots[1], t.squad[12].id);
+  const lineup = t.tactics.lineupSlots.slice();
+  act.switchPreset(t, 0, 2);
+  assert.deepEqual(t.tactics.lineupSlots, lineup, 'opstillingen følger holdet, ikke planen');
+  act.addRule(t); act.addRule(t);
+  const ids = t.tactics.conditionalRules.map((r) => r.ruleId);
+  act.updateRule(t, 1, { minuteTrigger: 80, condition: 'DRAW' });
+  assert.equal(t.tactics.conditionalRules[1].minuteTrigger, 80); assert.equal(t.tactics.conditionalRules[1].condition, 'DRAW');
+  act.removeRule(t, 1);
+  assert.deepEqual(t.tactics.conditionalRules.map((r) => r.ruleId), [ids[0], ids[2]]);
+  const r = t.tactics.conditionalRules.at(-1); r.slotRemapping[0] = 5;
+  act.addRule(t);
+  assert.equal(t.tactics.conditionalRules.at(-1).slotRemapping[0], 0, 'nye regler deler ikke remap-array');
+  t.tactics.customCoords = { 3: { x: 1, y: 1 } }; act.resetDrag(t); assert.deepEqual(t.tactics.customCoords, {});
+  assert.equal(act.moveSlot(t, 11, { x: 50, y: 50 }), false);
+});
