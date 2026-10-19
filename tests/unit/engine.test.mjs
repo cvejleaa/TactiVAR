@@ -470,7 +470,11 @@ const fixedInt = (v) => ({ int: (a, b) => Math.max(a, Math.min(b, v)) });
 test('mod-kunnen start: round((alder−16)·1,2 + POS·0,8) + støj −8..8, klemt 5–45 og skaleret ind i puljen', () => {
   // 26 år, POS 10: 12 + 8 = 20 (kildens 2,2/1,5 gav 37)
   assert.deepEqual(initialCounterTactics(fixedInt(0), 26, 10), { vsPress: 20, vsLowBlock: 20, vsTrapLong: 20 });
-  assert.deepEqual(initialCounterTactics(fixedInt(8), 26, 10), { vsPress: 28, vsLowBlock: 28, vsTrapLong: 28 }); // støj højst +8
+  assert.deepEqual(initialCounterTactics(fixedInt(99), 26, 10), { vsPress: 28, vsLowBlock: 28, vsTrapLong: 28 }); // støj højst +8 (kilden +11)
+  assert.deepEqual(initialCounterTactics(fixedInt(-99), 26, 10), { vsPress: 12, vsLowBlock: 12, vsTrapLong: 12 }); // og mindst −8 (kilden −10)
+  // Loft 45 pr. værdi, før puljen: 53 → 45, 37, 37 = 119 → ·100/119 = 38, 31, 31 (med loft 75: 42, 29, 29)
+  const seq = (vals) => { let i = 0; return { int: (a, b) => Math.max(a, Math.min(b, vals[i++])) }; };
+  assert.deepEqual(initialCounterTactics(seq([8, -8, -8]), 40, 20), { vsPress: 38, vsLowBlock: 31, vsTrapLong: 31 });
   assert.deepEqual(initialCounterTactics(fixedInt(-9), 17, 1), { vsPress: 5, vsLowBlock: 5, vsTrapLong: 5 }); // 2 − 8 → bund 5
   // 40 år, POS 20: 28,8 + 16 = 44,8 → 45 (+8 → 53 → klemt 45); 3·45 = 135 > 100 → ·100/135 = 33,3 → 33·3 = 99
   assert.deepEqual(initialCounterTactics(fixedInt(8), 40, 20), { vsPress: 33, vsLowBlock: 33, vsTrapLong: 33 });
