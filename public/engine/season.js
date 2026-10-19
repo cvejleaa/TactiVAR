@@ -50,10 +50,11 @@ export const SCOUTING_PER_PLAYER = 20;
 
 // Friskhed (v3.7, brugeren: "kun 3 af mine spillere der har under 100% i friskhed"; før
 // −4…9 og straks +8 igen). Kampen koster efter løbet distance – højt pres koster altså mere –
-// og udholdenhed dæmper: km·(1,5 − STA·0,03). Restitution til næste runde: 35 % af det, der
-// mangler op til 100 (ikke brugt: +15 oveni) – jo mere træt, jo hurtigere kommer han sig.
-// Ligevægt for en fast starter f = 100 − 1,86·pris (QC: med fast +5 endte alle på bunden, og
-// rotation blev en fast afgift): MID STA 10 (pris ≈13) ≈76 %, STA 20 (≈10) ≈81 %, målmand ≈85 %.
+// og udholdenhed dæmper: km·(1,5 − STA·0,03). Restitution til næste runde: 41 % af det, der
+// mangler op til 100 (v3.10.1, brugeren: "næsten alle mine spillere er langt nede i friskhed" –
+// valgt ≈80 %; før 35 %; ikke brugt: +15 oveni) – jo mere træt, jo hurtigere kommer han sig.
+// Ligevægt for en fast starter f = 100 − 1,44·pris (QC: med fast +5 endte alle på bunden, og
+// rotation blev en fast afgift): CM (pris ≈14) ≈80 %, STA 20 (≈10) ≈86 %, målmand ≈88 %.
 export const REST_SHARE = 0.41, REST_BENCH = 15, FRESH_FLOOR = 50;
 export const matchCost = (km, stamina) => Math.round(km * (1.5 - stamina * 0.03));
 export const restore = (f) => Math.min(100, f + Math.round(REST_SHARE * (100 - f)));
