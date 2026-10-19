@@ -204,10 +204,12 @@ export function simulateMatch(home, away, rng, opts = {}) {
         st[k(def, 'TacticSuccess')]++;
         if (defPh.phase2_defending.offsideTrap !== 'OFF' && rng.chance(0.45)) {
           sheet.adjust(back.id, 0.4); sheet.adjust(striker.id, -0.25); sheet.bump(back.id, 'tacticWins');
-          addEv(min, 'TACTIC_FAIL', 'TACTIC', def.isHome, false, 'Offside-fælde virker', `🛑 [FASE 2 VIRKER • ${def.team.name}] Offside-fælden klapper, og ${tag(striker)} fanges. ${tag(back)} dirigerer linjen perfekt.`);
+          // Kun din egen offside-fælde navngives; hos modstandere er det blot en offside.
+          const offTxt = own(def) ? `Din offside-fælde klapper, og ${tag(striker)} fanges. ${tag(back)} dirigerer linjen perfekt.` : `${tag(striker)} (${att.team.name}) fanges offside.`;
+          addEv(min, 'TACTIC_FAIL', 'TACTIC', def.isHome, false, 'Offside-fælde virker', `🛑 [FASE 2 VIRKER • ${def.team.name}] ${offTxt}`);
         } else {
           sheet.adjust(presser.id, 0.35); sheet.adjust(playmaker.id, -0.2); sheet.bump(presser.id, 'tacticWins');
-          const counter = defPh.phase3_transition.onBallWon === 'FAST_COUNTER' ? ' Holdet sætter straks en lynhurtig kontra.' : ' Holdet falder til ro på bolden.';
+          const counter = !own(def) ? '' : defPh.phase3_transition.onBallWon === 'FAST_COUNTER' ? ' Din lynkontra sættes straks i gang.' : ' Dit hold falder til ro på bolden.';
           addEv(min, 'TACTIC_FAIL', 'TACTIC', def.isHome, false, 'Fase 2 pres virker', `🛑 [FASE 1 STOPPER MOD FASE 2] ${tag(presser)} (${def.team.name}) erobrer bolden fra ${tag(playmaker)}.${counter}`);
         }
       }

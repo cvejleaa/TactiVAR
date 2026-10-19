@@ -87,4 +87,3 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .stars { font-size: .95rem; letter-spacing: .05em; white-space: nowrap; }
 .star-on { color: #fbbf24; text-shadow: 0 0 1px #000; } .star-off { color: #475569; }
 .tablewrap-x { overflow-x: auto; }
-.standings td.style { white-space: normal; font-size: .68rem; text-align: left; min-width: 7rem; }

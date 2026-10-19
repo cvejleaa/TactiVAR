@@ -404,3 +404,21 @@ test('Hvis-Så med "Bagud med 2": udløses ikke ved 0-1, men ved 0-2', () => {
   assert.equal(two.awayGoals, 2);
   assert.equal(two.events.filter((e) => e.type === 'TRIGGER').length, 1);
 });
+
+test('offside og omstilling: dine egne valg navngives, modstanderens beskrives neutralt', () => {
+  // Modstanderen (ude) forsvarer med offside-fælde og lynkontra
+  const a = arena({ away: { p2: { offsideTrap: 'NORMAL' }, p3: { onBallWon: 'FAST_COUNTER' } } });
+  for (const p of mids(a.A)) p.skills.intercepting = 17;
+  const opp = simulateMatch(a.H, a.A, stubRng({ 0.48: true, 0.45: (n) => n % 2 === 0 }));
+  const oppTexts = opp.events.filter((e) => e.category === 'TACTIC' && !e.isHome).map((e) => e.text);
+  assert.ok(oppTexts.some((t) => /fanges offside/.test(t)) && oppTexts.some((t) => /erobrer bolden/.test(t)));
+  assert.ok(oppTexts.every((t) => !/offside-fælde|kontra|falder til ro/i.test(t)), oppTexts.join(' | '));
+  // Dit hold (hjemme) forsvarer: dine valg står i teksten
+  const b = arena({ home: { p2: { offsideTrap: 'NORMAL' }, p3: { onBallWon: 'FAST_COUNTER' } } });
+  for (const p of mids(b.A)) p.skills.passing = 11; // udeholdet har bolden
+  for (const p of mids(b.H)) p.skills.intercepting = 17;
+  const own = simulateMatch(b.H, b.A, stubRng({ 0.48: true, 0.45: (n) => n % 2 === 0 }));
+  const ownTexts = own.events.filter((e) => e.category === 'TACTIC' && e.isHome).map((e) => e.text);
+  assert.ok(ownTexts.some((t) => /Din offside-fælde klapper/.test(t)), ownTexts.join(' | '));
+  assert.ok(ownTexts.some((t) => /Din lynkontra/.test(t)));
+});

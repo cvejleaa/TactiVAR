@@ -118,7 +118,7 @@ Tick hvert 3. minut (1..90).
   HIGH_GEGENPRESS slår SHORT, LOW_BLOCK slår CENTRAL (bonus afskåret: brug +3).
 - Positions-vurdering 25 %: ude af zone (>28) −0,45 karakter (presspiller
   +0,35), ellers +0,40.
-- Offside-fælde 45 % hvis ikke OFF. Kontra-tekst ved FAST_COUNTER.
+- Offside-fælde 45 % hvis ikke OFF. Offside-fælde og kontra (FAST_COUNTER) nævnes kun i teksten for dit eget hold; hos modstandere står blot "fanges offside" / "erobrer bolden".
 - Frispark 6 % med gult kort (−0,35); heraf skade 40 %, 1–3 kampe, auto-
   indskiftning fra bænken.
 - Chance 30 %; xG 0,13–0,35 pr. afslutning. Høje bolde 55 % ved
