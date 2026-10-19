@@ -162,8 +162,11 @@ Tick hvert 3. minut (1..90).
   pres, offside-fælde, pasningsstil, angrebsfokus); default 25.
 - XP pr. kamp = `round(min/90·(9 + 2·taktikdueller + (mål?2:0)))`, klemt 4–16;
   primær +XP, sekundær +round(XP·0,6), øvrige −3; bund 25 (≥26 år) ellers 12.
-- UI: dropdown "Mål-Modstander", kolonne 🧠Mod ("??" og usorterbar for
-  modstandere), 3 mod-barer, lilla +XP-badge.
+- UI (brugerens valg, afviger fra v2.5): kolonne 🧠Mod viser spillerens tre
+  egne værdier "gegenpress · lav blok · VAR-linje" (sorterer på gennemsnittet;
+  "??" for modstandere) – ingen samlet % mod en bestemt modstander, da den kan
+  bruges til at regne modstanderens stil ud. 3 mod-barer på spillerkortet, lilla
+  +XP-badge. Motoren bruger stadig mod-kunnen mod modstanderens stil.
 
 ## 8. Regneark (scouting-matrix)
 20 kolonner: Pos/#, Spiller, Kæde, Alder, Frisk/🚑, Højde (offentlige), Spring, ✈Luft,

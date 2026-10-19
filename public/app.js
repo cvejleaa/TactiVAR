@@ -125,7 +125,7 @@ function render() {
 
   const opponentPick = isOwn ? h('div', { class: 'panel row', id: 'opponent-bar' },
     h('label', {}, '🎯 Næste modstander ', select(String(game.ui.opponentIdx), league.teams.map((t, i) => [String(i), t.name]).filter(([i]) => Number(i) !== myIdx()), (v) => change(() => { game.ui.opponentIdx = Number(v); }), { id: 'opponent-select' })),
-    h('span', { class: 'muted' }, `🧠 Mod-kolonnen viser dine spilleres mod-kunnen mod ${opponent.name}`)) : null;
+    h('span', { class: 'muted' }, '🧠 Mod-kolonnen: erfaring mod gegenpress · lav blok · VAR-linje & lange bolde')) : null;
 
   const matrix = renderMatrix({
     team, isOwn, opponent, ui: { ...view }, notes: game.notes,

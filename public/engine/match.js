@@ -86,13 +86,12 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // startopstilling. Egne valg (det menneskestyrede hold) vises fuldt.
   const own = (s) => !s.team.isBot;
   const tacticStr = (s) => { const p = s.tactics.phases; return own(s) ? `${s.tactics.baseFormation} • ${TXT[p.phase1_buildUp.passingStyle]} / ${TXT[p.phase2_defending.pressingHeight]}` : s.tactics.baseFormation; };
-  const masteryIntro = !home.isBot ? ` Din Start-11 har i gennemsnit 🧠 ${hAvg}% Mod-Kunnen mod ${away.name}.` : '';
   const hCustom = customDragged(H);
   const customIntro = hCustom.length ? ` Bemærk: ${home.name} har trukket ${tag(hCustom[0].player)} ud af sin grundposition.` : '';
   for (const n of lineupNotes) addEv(1, 'LINEUP', 'TACTIC', n.isHome, false, 'Ændret startopstilling', n.text);
   // Kamphovedet viser startformationen – beregnes før et evt. Hvis-Så-skifte.
   const homeTacticStr = tacticStr(H), awayTacticStr = tacticStr(A);
-  addEv(1, 'TACTIC_NOTE', 'TACTIC', true, false, 'Taktisk oplæg', `📋 [TAKTISK OPLÆG] ${home.name} (${homeTacticStr}) møder ${away.name} (${awayTacticStr}).${customIntro}${masteryIntro}`);
+  addEv(1, 'TACTIC_NOTE', 'TACTIC', true, false, 'Taktisk oplæg', `📋 [TAKTISK OPLÆG] ${home.name} (${homeTacticStr}) møder ${away.name} (${awayTacticStr}).${customIntro}`);
 
   // Indskiftning i den kamplokale kopi. Returnerer indskifteren eller null.
   function substitute(side, slot, min, reason) {
@@ -196,7 +195,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
       if (build >= press) {
         st[k(att, 'TacticSuccess')]++;
         sheet.adjust(playmaker.id, 0.35); sheet.bump(playmaker.id, 'tacticWins');
-        const note = !att.team.isBot && pmM >= 50 ? ` 🧠 [MOD-KUNNEN: ${pmM}%] ${tag(playmaker)} kender ${def.team.name}s pres og finder vejen igennem.` : ` ${tag(playmaker)} styrer midtbanen.`;
+        const note = !att.team.isBot && pmM >= 50 ? ` 🧠 ${tag(playmaker)}s erfaring mod denne type pres betaler sig.` : ` ${tag(playmaker)} styrer midtbanen.`;
         // Kun dit eget holds valg navngives; modstanderens stil beskrives ikke.
         const how = own(att) ? `Dine ${TXT[pass]} bryder igennem ${def.team.name}s pres` : own(def) ? `${att.team.name} spiller sig igennem dit ${TXT[height]}` : `${att.team.name} spiller sig igennem ${def.team.name}s pres`;
         addEv(min, 'TACTIC_WIN', 'TACTIC', att.isHome, false, 'Fase 1 virker', `✅ [FASE 1 VIRKER • ${att.team.name}] ${how}.${note}`);

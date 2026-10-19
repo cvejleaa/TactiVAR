@@ -3,7 +3,7 @@
 import { h, LOCK } from './dom.js';
 import { LINE, SKILL_LABELS, kr, starsEl } from './labels.js';
 import { aerialBreakdown } from '../engine/generator.js';
-import { COUNTER_KEYS, COUNTER_LABELS, masteryVs } from '../engine/counter.js';
+import { COUNTER_KEYS, COUNTER_LABELS } from '../engine/counter.js';
 
 const dk = (v) => v.toLocaleString('da-DK', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const bar = (label, v, max = 20) => h('div', { class: 'bar' }, h('span', { class: 'bar-label' }, label),
@@ -23,7 +23,7 @@ export function renderCard({ player: p, team, isOwn, opponent, scouting, note, o
       h('div', { class: 'aerial', id: 'aerial-breakdown' },
         h('h4', {}, `✈ Luftduel: ${a.total}/20`),
         h('div', { class: 'muted' }, `Højde-score ${a.heightScore} (${p.heightCm} cm) × 0,35 = ${dk(a.wHeight)} · Spring ${p.jumpingPower} × 0,35 = ${dk(a.wJump)} · Styrke ${p.skills.strength} × 0,15 = ${dk(a.wStr)} · Position ${p.skills.positioning} × 0,15 = ${dk(a.wPos)} → ${dk(a.exact)}`)),
-      h('div', { class: 'bar-group' }, h('h4', {}, `🧠 Mod-kunnen (mod ${opponent.name}: ${masteryVs(p, opponent)}%)`), COUNTER_KEYS.map((k) => bar(COUNTER_LABELS[k], p.counterTactics[k], 100))),
+      h('div', { class: 'bar-group' }, h('h4', {}, '🧠 Mod-kunnen (erfaring mod modstanderes stilarter)'), COUNTER_KEYS.map((k) => bar(COUNTER_LABELS[k], p.counterTactics[k], 100))),
       p.archetype ? h('div', { class: 'archbox' }, h('strong', {}, (p.archetype.isUnlocked ? '🌟 ' : '🔒 ') + p.archetype.name), ' – ', p.archetype.description,
         p.archetype.isUnlocked ? null : h('div', { class: 'muted' }, 'Låses op ved: ' + Object.entries(p.archetype.unlockReq).map(([k, v]) => `${k} ${v}`).join(', '))) : null,
       h('div', { class: 'muted' }, `Løn ${kr(p.weeklyWage)}/uge · Værdi ${kr(p.marketValue)}`),

@@ -54,6 +54,8 @@ try {
   check('Holdvælgeren har 8 hold', (await g.locator('#team-select option').count()) === 8);
   const heads = (await g.locator('#matrix thead th').allTextContents()).map((t) => t.replace(/ [▲▼]$/, ''));
   check('Regnearkets kolonner i rækkefølge (Alder står hvor den skal)', JSON.stringify(heads.slice(0, 20)) === JSON.stringify(['Pos/#', 'Spiller', 'Kæde', 'Alder', 'Frisk/🚑', 'Højde', 'Spring', '✈ Luft', 'PAC', 'STA', 'STR', 'BAL', 'PAS', 'FIN', 'POS', 'INT', 'GK', 'Gns', '⭐ Vurd', '🧠 Mod']), heads.join('|'));
+  const modCells = await g.locator('#matrix tbody td.modcell').allTextContents();
+  check('Mod-kolonnen viser tre egne værdier, ingen % mod en modstander', modCells.length === 18 && modCells.every((t) => /^\d+ · \d+ · \d+$/.test(t)) && !(await g.textContent('#player-card')).match(/mod-kunnen[^)]*\d+%/i), modCells[0]);
   check('Spillerkortet viser 9 evne-barer og luftduel-udregningen', (await g.locator('#player-card .bars .bar').count()) === 9 && (await g.textContent('#aerial-breakdown')).includes('× 0,35'));
   check('Tre fase-paneler og Hvis-Så-regler', (await g.locator('#tactics fieldset[data-phase]').count()) === 3 && (await g.locator('#rules .rule').count()) === 1);
   const bodyText = await g.textContent('body');

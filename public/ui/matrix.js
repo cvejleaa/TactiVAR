@@ -4,7 +4,11 @@ import { h, LOCK } from './dom.js';
 import { LINE, starsEl } from './labels.js';
 import { canSeeField } from '../engine/visibility.js';
 import { FORMATIONS } from '../engine/formations.js';
-import { masteryVs } from '../engine/counter.js';
+import { COUNTER_KEYS } from '../engine/counter.js';
+
+// Mod-kunnen vises som spillerens tre egne værdier – ikke som én % mod en bestemt
+// modstander, for den kunne bruges til at regne modstanderens stil ud (brugerens valg).
+const modAvg = (p) => COUNTER_KEYS.reduce((a, k) => a + p.counterTactics[k], 0) / 3;
 
 const avgSkill = (p) => Object.values(p.skills).reduce((a, b) => a + b, 0) / 9;
 const avgRating = (p) => (p.ratingGames ? p.ratingSum / p.ratingGames : 0);
@@ -23,7 +27,7 @@ export const COLUMNS = [
     .map(([k, label, title]) => ({ key: k, label, title, field: 'skills', value: (p) => p.skills[k], num: true, heat: true })),
   { key: 'avg', label: 'Gns', title: 'Gennemsnit af de 9 kerne-evner', field: 'skills', value: avgSkill, num: true, fmt: (v) => v.toFixed(1) },
   { key: 'rating', label: '⭐ Vurd', title: 'Eget hold: gennemsnitlig karakter. Modstandere: stjerner', field: 'publicStars', value: (p, c) => (c.isOwn ? avgRating(p) : p.publicStars), num: true },
-  { key: 'mod', label: '🧠 Mod', title: 'Mod-kunnen mod den valgte modstander', field: 'counterTactics', value: (p, c) => masteryVs(p, c.opponent), num: true },
+  { key: 'mod', label: '🧠 Mod', title: 'Mod-kunnen: mod gegenpress / mod lav blok / mod VAR-linje & lange bolde (sorterer på gennemsnittet)', field: 'counterTactics', value: modAvg, num: true },
 ];
 
 export const FILTERS = [['all', 'Alle (18)'], ['start', 'Start-11'], ['bench', 'Bænk'], ['GK', 'MÅL'], ['DEF', 'FOR'], ['MID', 'MID'], ['ATT', 'ANG']];
@@ -73,7 +77,7 @@ export function renderMatrix({ team, isOwn, opponent, ui, notes, onSort, onSelec
       if (c.key === 'fresh') return h('td', { class: cls }, p.injuryMatchesLeft > 0 ? h('span', { class: 'injury' }, `🚑 ${p.injuryMatchesLeft}`) : `${p.freshness}%`);
       if (c.key === 'height') return h('td', { class: cls }, `${p.heightCm} cm`);
       if (c.key === 'rating') return h('td', { class: cls }, isOwn ? (avgRating(p) ? avgRating(p).toFixed(1) : '–') : starsEl(p.publicStars));
-      if (c.key === 'mod') return h('td', { class: cls }, `${masteryVs(p, opponent)}%`);
+      if (c.key === 'mod') return h('td', { class: cls + ' modcell', title: 'Mod gegenpress / lav blok / VAR-linje & lange bolde' }, COUNTER_KEYS.map((k) => p.counterTactics[k]).join(' · '));
       const v = c.value(p, ctx);
       return h('td', { class: cls + (c.heat ? ' ' + heatClass(v) : '') }, c.fmt ? c.fmt(v) : v);
     });
