@@ -8,7 +8,7 @@ import { initialCounterTactics, opponentTacticKeys, masteryVs, counterXpForMatch
 import { starsFromRating, createSheet, finalizeSheet } from '../../public/engine/ratings.js';
 import { describeFinish, describeHeader, describeVarTiming, generateScoutingClues } from '../../public/engine/clues.js';
 import { simulateMatch, MAX_SUBS } from '../../public/engine/match.js';
-import { playRound, commitRound, pairRound } from '../../public/engine/season.js';
+import { playRound, commitRound, pairRound, SCOUTING_PER_PLAYER } from '../../public/engine/season.js';
 import { normalizeLeague } from '../../public/engine/sanitize.js';
 
 const league = (seed = 1) => createLeague(createRng(seed));
@@ -303,6 +303,17 @@ test('runde bogføres: stilling, karakterer, skader heles først og nye lægges 
   assert.equal(p0.ratingGames, 1); assert.equal(p0.lastRating, r0.rating);
   assert.equal(L.leagueMetadata.round, 1);
   assert.ok(L.lastRound.gazette.playerOfTheRound);
+});
+
+test('scoutingbogen holder højst 20 indtryk pr. spiller, nyeste først', () => {
+  const L = league(18), rng = createRng(3);
+  for (let r = 0; r < 40; r++) commitRound(L, playRound(L, 1 + (r % 7), rng), rng);
+  const lists = Object.values(L.scouting[L.teams[0].id]);
+  assert.equal(SCOUTING_PER_PLAYER, 20);
+  assert.ok(lists.some((l) => l.length === 20), 'testdata skal ramme loftet');
+  assert.ok(lists.every((l) => l.length <= 20));
+  const full = lists.find((l) => l.length === 20);
+  assert.ok(Number(full[0].match(/Runde (\d+)/)[1]) > Number(full[19].match(/Runde (\d+)/)?.[1] ?? 0));
 });
 
 test('en runde kan ikke bogføres to gange', () => {
