@@ -21,11 +21,11 @@ export function createSheet() {
   const entries = {};
   return {
     entries,
-    register(player, team, isHome, role, minIn, rng, oppMastery) {
+    register(player, team, isHome, role, minIn, rng, oppMastery, slot = null) {
       if (entries[player.id]) return entries[player.id];
       entries[player.id] = {
         playerId: player.id, shirtNumber: player.shirtNumber, shortName: player.shortName,
-        teamId: team.id, teamName: team.name, isUserTeam: !team.isBot, isHome, role, line: player.line,
+        teamId: team.id, teamName: team.name, isUserTeam: !team.isBot, isHome, role, line: player.line, slot,
         minIn, minOut: 90, rating: START_RATING + (rng.next() * 0.3 - 0.15), stars: 0,
         startCounterMastery: oppMastery, gainedCounterXp: 0,
         goals: 0, assists: 0, saves: 0, aerialWins: 0, tacticWins: 0, yellowCard: false, injured: false, isMotM: false,

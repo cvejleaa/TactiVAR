@@ -78,9 +78,11 @@ export function simulateMatch(home, away, rng, opts = {}) {
   const addEv = (min, type, category, isHome, plot, label, text, varMsg) =>
     events.push({ min, type, category, isHome, plot, label, text, varMsg, hG, aG, stats: { ...st } });
   const observe = (player, text) => observations.push({ playerId: player.id, text });
-  const register = (side, p, role, minIn) => sheet.register(p, side.team, side.isHome, role, minIn, rng, masteryVs(p, other(side).team));
+  const register = (side, p, role, minIn, slot) => sheet.register(p, side.team, side.isHome, role, minIn, rng, masteryVs(p, other(side).team), slot);
 
-  for (const side of [H, A]) side.starters.forEach((p, i) => p && register(side, p, coordsOf(side.tactics)[i].r, 1));
+  for (const side of [H, A]) side.starters.forEach((p, i) => p && register(side, p, coordsOf(side.tactics)[i].r, 1, i));
+  // Startformationen gemmes, så karakterarket kan vise spillerne på banen.
+  const startFormations = { home: H.tactics.baseFormation, away: A.tactics.baseFormation };
   const hAvg = Math.round(avg(H.starters, (p) => masteryVs(p, away)));
   const aAvg = Math.round(avg(A.starters, (p) => masteryVs(p, home)));
 
@@ -105,7 +107,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
     side.subsUsed++;
     side.starters[slot] = sub; side.used.add(sub.id);
     sheet.entries[out.id].minOut = min;
-    register(side, sub, `SUB (${out.line})`, min);
+    register(side, sub, `SUB (${out.line})`, min, slot);
     addEv(min, 'SUB', 'HIGHLIGHT', side.isHome, true, `🔄 ${tag(sub)} ind for ${tag(out)}`, `🔄 [${side.team.name}] ${reason}: ${tag(sub)} erstatter ${tag(out)}.`);
     return sub;
   }
@@ -304,7 +306,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
   return {
     round: opts.round ?? 0,
     homeId: home.id, awayId: away.id, homeName: home.name, awayName: away.name,
-    homeTacticStr, awayTacticStr,
+    homeTacticStr, awayTacticStr, startFormations,
     // Formation og opstilling ved slutfløjt (efter Hvis-Så-skifter og indskiftninger).
     endState: { home: endOf(H), away: endOf(A) },
     homeGoals: hG, awayGoals: aG, homeVarNet,

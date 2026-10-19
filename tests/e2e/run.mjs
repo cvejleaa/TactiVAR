@@ -50,6 +50,8 @@ try {
   const fresh = async () => { const c = await browser.newContext({ viewport: { width: 1400, height: 1000 } }); const pg = await c.newPage(); pg.on('pageerror', (e) => fejl.push(e.message)); await pg.goto(BASE + '/'); await pg.waitForSelector('body[data-klar="ja"]'); return pg; };
   let g = await fresh();
   const rows = () => g.locator('#matrix tbody tr').count();
+  const tab = async (k) => { await g.click(`#tab-${k}`); await g.waitForSelector(`.tabpane.tab-${k}`); };
+  check('Fire faner, Trup er åben fra start', (await g.locator('#tabs .tab').count()) === 4 && (await g.textContent('#tabs .tab.active')).includes('Trup'));
   check('Ny liga: dit hold vises med 18 spillere', (await rows()) === 18);
   check('Holdvælgeren har 8 hold', (await g.locator('#team-select option').count()) === 8);
   const heads = (await g.locator('#matrix thead th').allTextContents()).map((t) => t.replace(/ [▲▼]$/, ''));
@@ -57,18 +59,31 @@ try {
   const modCells = await g.locator('#matrix tbody td.modcell').allTextContents();
   check('Mod-kolonnen viser tre egne værdier, ingen % mod en modstander', modCells.length === 18 && modCells.every((t) => /^\d+ · \d+ · \d+$/.test(t)) && !(await g.textContent('body')).match(/mod-kunnen[^.)]*\d+\s*%|mod [A-ZÆØÅ][^:]*: \d+%/i), modCells[0]);
   check('Spillerkortet viser 9 evne-barer og luftduel-udregningen', (await g.locator('#player-card .bars .bar').count()) === 9 && (await g.textContent('#aerial-breakdown')).includes('× 0,35'));
+  check('Trup-fanen viser ikke banen og taktikken', (await g.locator('#pitch').count()) === 0 && (await g.locator('#tactics').count()) === 0);
+  await tab('taktik');
+  check('Taktik-fanen: bane, spillerkort og taktik – men ikke regnearket', (await g.isVisible('#pitch')) && (await g.isVisible('#player-card')) && (await g.locator('#matrix').count()) === 0);
   check('Tre fase-paneler og Hvis-Så-regler', (await g.locator('#tactics fieldset[data-phase]').count()) === 3 && (await g.locator('#rules .rule').count()) === 1);
   const bodyText = await g.textContent('body');
   check('Ingen rå skabelon-rester (${, undefined, NaN, null) på siden', !/\$\{|undefined|NaN|\bnull\b/.test(bodyText));
   const optColors = await g.evaluate(() => { const o = document.querySelector('#team-select option'); const cs = getComputedStyle(o); return [cs.color, cs.backgroundColor]; });
   check('Holdvælgerens valgmuligheder er ikke hvid-på-hvid', optColors[0] !== optColors[1], optColors.join(' / '));
 
+  // Modstandervælgeren: aldrig eget hold, og valget gemmes straks
+  const oppOpts = await g.locator('#opponent-select option').allTextContents();
+  const ownName = (await g.locator('#team-select option', { hasText: '★' }).textContent()).replace('★ ', '');
+  check('Modstandervælgeren har de 7 andre hold, ikke dit eget', oppOpts.length === 7 && !oppOpts.includes(ownName), oppOpts.join('|'));
+  await g.selectOption('#opponent-select', '2'); await g.reload(); await g.waitForSelector('body[data-klar="ja"]');
+  check('Modstandervalget gemmes straks', (await g.inputValue('#opponent-select')) === '2');
+  await g.selectOption('#opponent-select', '1');
+
   // Sortering på FIN: højeste afslutning øverst
+  await tab('trup');
   await g.click('#matrix thead th:nth-child(14)');
   const fins = (await g.locator('#matrix tbody tr td:nth-child(14)').allTextContents()).map(Number);
   check('Sortering på FIN giver højeste først', fins.length === 18 && fins.every((v, i) => i === 0 || fins[i - 1] >= v), fins.join(','));
 
   // Træk en spiller ud af zonen
+  await tab('taktik');
   await g.locator('#pitch').scrollIntoViewIfNeeded();
   const tok = g.locator('#pitch .token[data-slot="6"]');
   const box = await tok.boundingBox(); const pbox = await g.locator('#pitch').boundingBox();
@@ -84,17 +99,21 @@ try {
   // Fasevalg, note og bytte – og alt overlever genindlæsning
   await g.selectOption('#tactics select[data-field="pressingHeight"]', 'HIGH_GEGENPRESS');
   await g.fill('#note-input', 'Stærk i luften');
+  await tab('trup');
   const firstName = await g.locator('#matrix tbody tr:first-child td:nth-child(2)').textContent();
   const namesBefore = (await g.locator('#matrix tbody tr td:nth-child(2)').allTextContents()).sort().join();
   check('Gem-status viser klokkeslæt', /Gemt kl\. \d\d/.test(await g.textContent('#save-status')));
   await g.reload(); await g.waitForSelector('body[data-klar="ja"]');
   check('Efter F5: stadig 18 spillere – de samme', (await rows()) === 18 && (await g.locator('#matrix tbody tr td:nth-child(2)').allTextContents()).sort().join() === namesBefore);
+  check('Efter F5: den valgte fane huskes', (await g.textContent('#tabs .tab.active')).includes('Trup'));
+  await tab('taktik');
   check('Efter F5: trukket position bevaret', (await g.locator('#pitch .token[data-slot="6"]').textContent()).includes('Ude af zone'));
   check('Efter F5: fasevalg bevaret', (await g.inputValue('#tactics select[data-field="pressingHeight"]')) === 'HIGH_GEGENPRESS');
   check('Efter F5: note bevaret', (await g.inputValue('#note-input')) === 'Stærk i luften');
   void firstName;
 
   // Bytte start ⇄ bænk
+  await tab('trup');
   const posOf = async (name) => g.locator('#matrix tbody tr', { hasText: name }).locator('td:first-child').textContent();
   const starter = (await g.locator('#matrix tbody tr:nth-child(2) td:nth-child(2)').textContent());
   const bench = (await g.locator('#matrix tbody tr:nth-child(14) td:nth-child(2)').textContent());
@@ -103,14 +122,25 @@ try {
   check('Byt: bænkspilleren overtager pladsen', (await posOf(bench)).startsWith('LB') && (await posOf(starter)).startsWith('BÆNK'));
 
   // Byt på banen: klik på to brikker (som i v2.5)
+  await tab('taktik');
   const nameAt = async (slot) => (await g.locator(`#pitch .token[data-slot="${slot}"] .token-name`).textContent());
   const [n2, n3] = [await nameAt(2), await nameAt(3)];
   await g.click('#pitch .token[data-slot="2"]'); await g.click('#pitch .token[data-slot="3"]');
   check('Klik på to brikker bytter deres pladser', (await nameAt(2)) === n3 && (await nameAt(3)) === n2);
   const [n4, n5] = [await nameAt(4), await nameAt(5)];
-  await g.click('#pitch .token[data-slot="4"]'); await g.click('#matrix thead th:nth-child(4)'); await g.click('#pitch .token[data-slot="5"]');
-  check('Et påbegyndt byt afbrydes af sortering (intet byt uden varsel)', (await nameAt(4)) === n4 && (await nameAt(5)) === n5);
-  await g.click('#matrix thead th:nth-child(1)');
+  await g.click('#pitch .token[data-slot="4"]'); await tab('trup'); await tab('taktik'); await g.click('#pitch .token[data-slot="5"]');
+  check('Et påbegyndt byt afbrydes af fanebyt (intet byt uden varsel)', (await nameAt(4)) === n4 && (await nameAt(5)) === n5);
+  await g.click('#pitch .token[data-slot="5"]'); // klik igen = fravælg
+  // Indskiftning fra bænken under banen – uden at forlade Taktik
+  await g.locator('#bench .bench-p').first().click(); await g.locator('#bench .bench-p').first().click();
+  check('Bænken: klik igen på samme bænkspiller fravælger', (await g.locator('#bench .bench-p.active').count()) === 0 && (await g.locator('#notice').count()) === 0);
+  const benchBtn = g.locator('#bench .bench-p').first();
+  const benchName = (await benchBtn.textContent()).replace(/^#\d+ /, '').replace(/ · \w+$/, '');
+  await benchBtn.click(); await g.click('#pitch .token[data-slot="4"]');
+  check('Bænken: klik bænkspiller og så brik skifter ind', (await nameAt(4)) === benchName && (await g.locator('#bench .bench-p', { hasText: n4 }).count()) === 1, `${benchName} / ${await nameAt(4)}`);
+  await g.click('#pitch .token[data-slot="5"]'); await g.locator('#bench .bench-p').first().click();
+  check('Bænken: klik brik og så bænkspiller skifter også ind', (await nameAt(5)) !== n5);
+  await tab('trup'); await g.click('#matrix thead th:nth-child(1)'); await tab('taktik');
 
   // Hver ændring gemmes STRAKS: genindlæs efter hver enkelt handling
   const reload = async () => { await g.reload(); await g.waitForSelector('body[data-klar="ja"]'); };
@@ -151,8 +181,11 @@ try {
   check('"Gem nu" gemmer igen efter fejlen', (await g.textContent('#save-status')).includes('Gemt kl.'));
 
   // Sorteringsvagten: sortér eget hold på FIN, skift til en modstander – rækkefølgen må ikke røbe FIN
+  await tab('trup');
   await g.click('#matrix thead th:nth-child(14)');
+  await tab('liga');
   await g.click('#standings tbody tr:not(.mine)');
+  check('Klik på et hold i ligatabellen åbner holdet i Trup', (await g.textContent('#tabs .tab.active')).includes('Trup') && (await g.isVisible('#matrix')));
   const posCol = await g.locator('#matrix tbody tr td:nth-child(1)').allTextContents();
   check('Modstanderens tabel falder tilbage til opstillingsorden, ikke skjult FIN-orden', posCol[0].startsWith('GK') && !(await g.textContent('#matrix thead')).includes('FIN ▼'));
   await g.selectOption('#team-select', '0');
@@ -169,18 +202,23 @@ try {
   await g.click('#matrix thead th:nth-child(14)');
   check('Modstander: sortering på FIN afvises med anti-spionage-besked', (await g.textContent('#notice')).includes('Anti-spionage'));
   check('Modstander: spillerkortet skjuler evner og kontrakt', (await g.locator('#player-card .bars').count()) === 0 && (await g.textContent('#player-card')).includes('🔒 ??'));
+  await tab('taktik');
   check('Modstander: faser og Hvis-Så-regler er skjulte', (await g.locator('#tactics fieldset').count()) === 0);
+  check('Modstander: ingen bænkrække under banen', (await g.locator('#bench').count()) === 0);
   check('Modstander: kun dit hold kan trækkes på banen', (await g.locator('#pitch .token.draggable').count()) === 0);
   check('Modstander: formationen kan ikke ændres og der er ingen byt-knapper', (await g.isDisabled('#formation')) && (await g.locator('#matrix tbody button').count()) === 0);
   check('Modstander: ingen Plan A/B/C og ingen "Nulstil træk" (ville afsløre og ændre deres taktik)', (await g.locator('#tactics .presets').count()) === 0 && (await g.locator('#reset-drag').count()) === 0);
   const oppBefore = await g.locator('#pitch .token[data-slot="2"] .token-name').textContent();
   await g.click('#pitch .token[data-slot="2"]'); await g.click('#pitch .token[data-slot="3"]');
   check('Modstander: klik på to brikker bytter ikke', (await g.locator('#pitch .token[data-slot="2"] .token-name').textContent()) === oppBefore);
+  await tab('liga');
   check('Ligatabellen viser ikke andre holds taktiske stil', !(await g.textContent('#standings')).includes('•') && !(await g.textContent('#standings')).includes('Gegenpress'));
-  // Layout: regnearket i fuld bredde uden sidelæns scroll; 3/2/1 kolonner nedenunder
-  const colsAt = async (w) => { await g.setViewportSize({ width: w, height: 900 }); return g.evaluate(() => getComputedStyle(document.querySelector('.cols')).gridTemplateColumns.split(' ').length); };
-  check('Layout: 3 kolonner ved 1400 px, 2 ved 1000 px, 1 ved 700 px', (await colsAt(1400)) === 3 && (await colsAt(1000)) === 2 && (await colsAt(700)) === 1);
+  // Layout: Taktik har bane | kort+taktik ved siden af hinanden, stablet på smal skærm
+  await tab('taktik');
+  const colsAt = async (w) => { await g.setViewportSize({ width: w, height: 900 }); return g.evaluate(() => getComputedStyle(document.querySelector('.tactics-layout')).gridTemplateColumns.split(' ').length); };
+  check('Layout: Taktik har 2 kolonner ved 1400 px og 1 ved 700 px', (await colsAt(1400)) === 2 && (await colsAt(700)) === 1);
   await g.setViewportSize({ width: 1400, height: 1000 });
+  await tab('trup');
   const sideScroll = await g.evaluate(() => { const w = document.querySelector('.tablewrap'); return w.scrollWidth - w.clientWidth; });
   check('Layout: regnearket kræver ikke sidelæns scroll ved 1400 px', sideScroll <= 1, `${sideScroll}px`);
   check('Layout: siden selv scroller ikke sidelæns', await g.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
@@ -188,10 +226,16 @@ try {
   // ---------- Kampe: Match Center ----------
   await g.selectOption('#team-select', '0');
   await g.selectOption('#team-select', '3'); // kampknappen findes også, mens man scouter
+  check('Kamp-fanen før første runde: tom tilstand med vejledning', await (async () => { await tab('kamp'); return (await g.textContent('#no-matches')).includes('Spil runde'); })());
+  await tab('trup');
   await g.click('#play-round');
   await g.waitForSelector('#match-center');
-  check('Under afspilning kan runden ikke startes igen', await g.isDisabled('#play-round'));
+  check('▶ Spil runde åbner Kamp-fanen', (await g.textContent('#tabs .tab.active')).includes('Kamp'));
+  check('Under afspilning kan runden ikke startes igen, og modstanderen kan ikke skiftes', (await g.isDisabled('#play-round')) && (await g.isDisabled('#opponent-select')));
   check('Under afspilning: besked om at runden er bogført, og de andre resultater er skjulte', (await g.isVisible('#booked-note')) && !/\d-\d/.test(await g.locator('#match-cards .matchcard:nth-child(2)').textContent()));
+  await tab('liga');
+  check('Under afspilning: Liga-fanen siger, at tabellen allerede er opdateret – og avisen venter', (await g.isVisible('#booked-league')) && (await g.locator('#gazette').count()) === 0);
+  await tab('kamp');
   await g.click('#skip');
   check('Runden har 4 kampe', (await g.locator('#match-cards .matchcard').count()) === 4);
   const mcText = await g.textContent('#match-center');
@@ -205,6 +249,16 @@ try {
   const starColors = await g.evaluate(() => { const s = document.querySelector('.ratings .star-on'), o = document.querySelector('.ratings .star-off'); return s && o ? [getComputedStyle(s).color, getComputedStyle(o).color] : null; });
   check('Stjerner er læsbare: udfyldte og tomme har forskellig farve', !!starColors && starColors[0] !== starColors[1], String(starColors));
   check('Karakterark: eget hold eksakte karakterer, modstander kun stjerner', ownRatings.every((t) => /^\d+\.\d$/.test(t)) && oppRatings.length >= 11 && oppRatings.every((t) => /^[★☆]{5}$/.test(t)));
+  // Karakterark: opstillingsorden med plads efter navnet, minibane og ikon-forklaring
+  const ownRows = await g.locator('.ratings').nth(0).locator('tbody tr td:first-child').allTextContents();
+  check('Karakterark: plads efter navnet, målmanden først', ownRows.length >= 11 && /· GK$/.test(ownRows[0]) && ownRows.every((t) => / · \S/.test(t)), ownRows.slice(0, 3).join(' | '));
+  const mpOwn = await g.locator('.ratings').nth(0).locator('.mp-token .mp-val').allTextContents();
+  const mpOpp = await g.locator('.ratings').nth(1).locator('.mp-token .mp-val').allTextContents();
+  check('Minibane: 11 startere pr. hold – egne med karakter, modstanderens kun stjerner', mpOwn.length === 11 && mpOwn.every((t) => /^\d+\.\d$/.test(t)) && mpOpp.length === 11 && mpOpp.every((t) => /^[★☆]{5}$/.test(t)), `${mpOwn.length}/${mpOpp.length}`);
+  const iconTitles = await g.evaluate(() => [...document.querySelectorAll('.ratings .ricon')].map((e) => [e.textContent, e.title]));
+  check('Ikonerne i karakterarket har mouse-over-tekst', iconTitles.length > 0 && iconTitles.every(([t, ti]) => ti.length > 3 && !ti.includes('undefined')), JSON.stringify(iconTitles.slice(0, 3)));
+  const legendTxt = await g.textContent('#icon-legend');
+  check('Ikon-forklaring under karakterarket (til touch)', ['⚽ Mål', '🅰 Oplæg', '🧤 Redninger', '👑 Kampens spiller'].every((x) => legendTxt.includes(x)), legendTxt);
   const por = await g.textContent('#player-of-round');
   const porIsMine = (await g.locator('.ratings').nth(0).textContent()).includes(por.match(/#\d+ [^ ]+ [^ (]+/)[0]);
   check('Avisen kårer rundens spiller – med karakter kun hvis det er din spiller, ellers stjerner', porIsMine ? /karakter \d+\.\d/.test(por) : (/[★☆]{5}/.test(por) && !/karakter/.test(por)), por);
@@ -213,23 +267,40 @@ try {
   check('Filteret "Kun nøglemomenter" viser færre hændelser', (await g.locator('#feed .ev').count()) < allEvents);
   await g.click('#match-cards .matchcard:nth-child(2)');
   check('De øvrige kampe kan åbnes', (await g.textContent('#scoreboard')).includes((await g.textContent('#match-cards .matchcard:nth-child(2)')).split(' ')[0]));
-  await g.click('#close-mc');
+  check('Match Center har ingen Luk-knap (Kamp-fanen er dens plads)', (await g.locator('#close-mc').count()) === 0);
+  await tab('liga');
   const stHead = await g.textContent('#standings-title');
+  check('Efter slutfløjt: Liga-fanen viser avisen og ingen afspilningsbesked', (await g.isVisible('#gazette')) && (await g.locator('#booked-league').count()) === 0);
   check('Ligatabellen er opdateret efter runde 1', stHead.includes('efter 1 runde'), stHead);
+  await g.selectOption('#team-select', '2');
+  check('Holdvælgeren i Liga-fanen viser holdet i Trup', (await g.textContent('#tabs .tab.active')).includes('Trup') && (await g.textContent('#club-name')) === (await g.locator('#team-select option').nth(2).textContent()));
+  await g.selectOption('#team-select', '0');
+  await g.locator('#matrix tbody tr:nth-child(2) button').click();
+  check('Påbegyndt byt viser besked', (await g.textContent('#notice')).includes('Vælg den spiller'));
   await reload();
-  check('Efter F5: runden er gemt og kan genses', (await g.isVisible('#open-last')) && (await g.textContent('#play-round')).includes('runde 2'));
-  await g.click('#open-last');
-  check('"Se runde" genviser runden færdigspillet (ikke live)', (await g.isVisible('#match-center')) && (await g.locator('#skip').count()) === 0 && (await g.textContent('#match-center')).includes('runde 1'));
-  await g.click('#close-mc');
+  check('Efter F5: runden er gemt', (await g.textContent('#play-round')).includes('runde 2'));
+  await tab('kamp');
+  check('Kamp-fanen genviser seneste runde færdigspillet (ikke live)', (await g.isVisible('#match-center')) && (await g.locator('#skip').count()) === 0 && (await g.textContent('#match-center')).includes('runde 1'));
+  const evAll = await g.locator('#feed .ev').count();
+  // Hver handling prøves på en frisk side (uden igangværende Match Center).
+  await g.click('#match-cards .matchcard:nth-child(3)');
+  const card3 = (await g.locator('#match-cards .matchcard:nth-child(3).active').count()) === 1;
+  await reload();
+  await g.click('#match-center .toolbar button:nth-child(3)');
+  check('Efter F5: Kamp-fanen kan skifte kamp og filter', card3 && (await g.locator('#match-center .toolbar button:nth-child(3).active').count()) === 1 && (await g.locator('#feed .ev').count()) < evAll);
+  await tab('liga'); // runde 2 startes fra en anden fane end Kamp
 
   // Runden er bogført og gemt FØR afspilningen: luk/genindlæs midt i kampen
   await g.click('#play-round');
   await g.waitForSelector('#skip');
+  check('▶ Spil runde afbryder et påbegyndt byt og fjerner beskeden', (await g.locator('#notice').count()) === 0);
   const liveCard = await g.textContent('#match-cards .matchcard:nth-child(1)');
   check('Under afspilning viser kort 1 live-stillingen fra 0-0, ikke slutresultatet', /0-0/.test(liveCard), liveCard);
   await reload();
+  check('Genindlæst midt i afspilningen: Kamp-fanen viser runde 2 færdigspillet', (await g.textContent('#tabs .tab.active')).includes('Kamp') && (await g.textContent('#match-center')).includes('runde 2') && (await g.locator('#skip').count()) === 0);
+  await tab('liga');
   const head2 = await g.textContent('#standings-title');
-  check('Genindlæst midt i afspilningen: runde 2 er alligevel bogført og gemt', head2.includes('efter 2 runde') && (await g.textContent('#open-last')).includes('runde 2'), head2);
+  check('Genindlæst midt i afspilningen: runde 2 er alligevel bogført og gemt', head2.includes('efter 2 runde'), head2);
 
   // Avisen med faste data – begge grene, uafhængigt af tilfældighed
   const gaz = await g.evaluate(async () => {
@@ -245,6 +316,7 @@ try {
 
   // Mislykkes backuppen ved "Ny liga" (fuldt lager), står det gamle spil urørt – også efter næste gem
   await g.selectOption('#team-select', '0');
+  await tab('trup');
   const keep = await g.evaluate(() => localStorage.getItem('tactivar_save'));
   const clubBefore = await g.textContent('#club-name');
   await g.evaluate(() => { window.__set2 = Storage.prototype.setItem; Storage.prototype.setItem = function (k, v) { if (k.startsWith('tactivar_backup_')) throw new Error('QuotaExceededError'); return window.__set2.call(this, k, v); }; });
@@ -261,7 +333,13 @@ try {
   await reload(); await reload(); await reload();
   const mig = await g.evaluate(() => ({ schema: JSON.parse(localStorage.getItem('tactivar_save')).schemaVersion, backups: Object.keys(localStorage).filter((k) => k.startsWith('tactivar_backup_')).length }));
   check('Migrering: gemmes straks i skema 2, kun én backup trods tre genindlæsninger', mig.schema === 2 && mig.backups === 1, JSON.stringify(mig));
-  check('Migrering: ligaen fra skema 1 er intakt (runde 1, 18 spillere)', (await g.textContent('#standings-title')).includes('efter 1 runde') && (await rows()) === 18);
+  await tab('liga'); const migHead = await g.textContent('#standings-title'); await tab('trup');
+  check('Migrering: ligaen fra skema 1 er intakt (runde 1, 18 spillere)', migHead.includes('efter 1 runde') && (await rows()) === 18);
+  // Runden er gemt før v3.5 (uden plads og startformation): Kamp-fanen viser den med listen, uden minibane
+  await tab('kamp');
+  const oldRows = await g.locator('.ratings').nth(0).locator('tbody tr td:first-child').allTextContents();
+  check('Gammel runde uden plads: karakterark med gemt rolle, ingen minibane', (await g.isVisible('#match-center')) && (await g.locator('.minipitch').count()) === 0 && oldRows.length >= 11 && oldRows.every((t) => / · \S/.test(t) && !/undefined|null/.test(t)), oldRows.slice(0, 2).join(' | '));
+  await tab('trup');
 
   // Mislykkes backuppen ved migrering (fuldt lager), overskrives det gamle format ikke – og der advares
   await g.evaluate((f) => { for (const k of Object.keys(localStorage)) if (k.startsWith('tactivar_')) localStorage.removeItem(k); localStorage.setItem('tactivar_save', f); }, fixture);
@@ -276,11 +354,15 @@ try {
 
   // Ny liga og import tager backup af det nuværende spil
   await g.selectOption('#team-select', '0');
+  await g.click('#play-round'); await g.click('#skip'); // en runde i Kamp-fanen, som Ny liga skal fjerne
+  await tab('trup');
   const savedBefore = await g.evaluate(() => localStorage.getItem('tactivar_save'));
   g.once('dialog', (d) => d.accept());
   await g.click('#new-league');
   const backups = async () => g.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('tactivar_backup_')).map((k) => localStorage.getItem(k)));
   check('Ny liga: det gamle spil ligger i backup', (await backups()).includes(savedBefore));
+  await tab('kamp');
+  check('Ny liga: Kamp-fanen viser ikke den gamle ligas runde', (await g.locator('#match-center').count()) === 0 && (await g.isVisible('#no-matches')));
   const exported = await g.evaluate(() => localStorage.getItem('tactivar_save'));
   await g.setInputFiles('#import-file', { name: 'gammel.json', mimeType: 'application/json', buffer: Buffer.from(savedBefore) });
   await g.waitForFunction(() => document.getElementById('notice')?.textContent.includes('importeret'));
