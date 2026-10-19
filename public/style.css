@@ -18,11 +18,17 @@ button { cursor: pointer; } button:hover { background: #334155; }
 button.mini { padding: .15rem .45rem; font-size: .75rem; } button.active { background: var(--lilla); border-color: var(--lilla); }
 select:disabled, input:disabled { opacity: .55; }
 .savestatus { font-size: .75rem; color: var(--grøn); }
-.layout { display: flex; flex-direction: column; gap: 1rem; }
-.cols { display: grid; gap: 1rem; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-areas: "card pitch tac"; align-items: start; }
-.c-card { grid-area: card; } .c-pitch { grid-area: pitch; } .c-tac { grid-area: tac; }
-@media (max-width: 1300px) { .cols { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-areas: "pitch tac" "card tac"; } }
-@media (max-width: 800px) { .cols { grid-template-columns: 1fr; grid-template-areas: "pitch" "card" "tac"; } }
+/* Faner: Trup / Taktik / Kamp / Liga – ét emne ad gangen. */
+.tabs { display: flex; flex-wrap: wrap; gap: .3rem; margin-bottom: 1rem; border-bottom: 1px solid var(--kant); }
+.tab { border: 1px solid transparent; border-bottom: none; border-radius: .5rem .5rem 0 0; background: transparent; padding: .45rem 1rem; font-weight: 700; color: var(--dæmpet); }
+.tab.active { background: var(--panel); border-color: var(--kant); color: var(--tekst); }
+.tabpane { display: flex; flex-direction: column; gap: 1rem; }
+.tactics-layout { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+.tab-taktik .pitch { max-height: 78vh; margin: 0 auto; }
+@media (max-width: 900px) { .tactics-layout { grid-template-columns: 1fr; } }
+.bench { margin-top: .5rem; display: flex; flex-wrap: wrap; gap: .3rem; align-items: center; } .bench h4 { margin: 0 .3rem 0 0; }
+.bench-p.injured { color: #fda4af; }
+.empty { text-align: center; padding: 2rem; color: var(--dæmpet); }
 section { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
 .panel { background: var(--panel); border: 1px solid var(--kant); border-radius: .6rem; padding: .75rem 1rem; }
 .panel h2, .panel h3, .panel h4 { margin: 0 0 .4rem; } .panel h3 { font-size: .95rem; } .panel h4 { font-size: .8rem; color: var(--dæmpet); }
@@ -87,3 +93,12 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .stars { font-size: .95rem; letter-spacing: .05em; white-space: nowrap; }
 .star-on { color: #fbbf24; text-shadow: 0 0 1px #000; } .star-off { color: #475569; }
 .tablewrap-x { overflow-x: auto; }
+
+.ratings .place { color: var(--dæmpet); font-weight: 400; } .ratings td.icons { text-align: left; } .ricon { cursor: help; margin-right: .15rem; }
+.legend { margin-top: .5rem; line-height: 1.5; }
+.minipitch-wrap { margin: .3rem 0 .6rem; }
+.minipitch { position: relative; aspect-ratio: 68 / 60; max-width: 26rem; margin: .3rem auto 0; background: repeating-linear-gradient(0deg, #15803d, #15803d 8%, #166534 8%, #166534 16%); border: 1px solid #ffffff90; border-radius: .3rem; }
+.mp-token { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; font-size: .6rem; text-shadow: 0 1px 2px #000; white-space: nowrap; }
+.mp-val { background: var(--bg); border: 1px solid #fff; border-radius: .3rem; padding: 0 .25rem; font-weight: 800; font-size: .72rem; }
+.mp-val .stars { font-size: .62rem; } .mp-token.motm .mp-val { border-color: #fbbf24; box-shadow: 0 0 0 2px #fbbf2488; }
+.ratings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-top: 1rem; } @media (max-width: 900px) { .ratings-grid { grid-template-columns: 1fr; } }

@@ -233,11 +233,22 @@ avisens hovedperson altid målmanden.
 
 ## 10b. Layout (skal bevares, selv uden Tailwind)
 Mørkt tema (#0f172a, paneler slate-900, lilla VAR-accent, smaragd for gode
-tal). Regnearket i fuld bredde øverst (ingen sidelæns scroll, fast overskrift,
-egen lodret scroll ved 55 % af skærmhøjden); nedenunder spillerkort | bane |
-taktik + tabel i 3 kolonner (2 under 1300 px, 1 under 800 px). Topbar:
-klubvælger, kampknapper, gem-status, gem/eksport/import/ny liga. Modstanderes
-stjerner: udfyldte i guld, tomme dæmpet.
+tal). Topbar: klubvælger, ▶ Spil runde + modstandervælger (står sammen, fordi
+Mod-tal og knap gælder den valgte modstander), gem-status, gem/eksport/import/ny
+liga. Under topbaren fire faner (v3.5, brugerens valg); den valgte fane gemmes i
+`ui.tab` (ukendt værdi → Trup, intet skemaskift):
+- **Trup**: klubhoved, regnearket i fuld bredde (ingen sidelæns scroll, egen
+  lodret scroll ved 55 %), spillerkort.
+- **Taktik**: bane + bænkrække (klik bænk → klik brik = skift ind) | spillerkort
+  + formation/planer/faser/Hvis-Så. 2 kolonner, 1 under 900 px.
+- **Kamp**: Match Center for igangværende eller seneste runde (tom tilstand før
+  runde 1). ▶ skifter hertil. Karakterark side om side: opstillingsorden med
+  pladsen efter navnet (naturlig kæde i parentes ved afvigelse, indskiftere
+  "ind på X"), minibane "Startopstilling" med karakter/stjerner, ikoner med
+  mouse-over + forklaring under (touch).
+- **Liga**: tabel + avis; klik på et hold åbner det i Trup. Under afspilning
+  siges det, at tabellen allerede er opdateret.
+Modstanderes stjerner: udfyldte i guld, tomme dæmpet.
 
 ## 11. Udeladt / udskudt
 - **Firestore-seeder + API-nøgle-modal** (udeladt i trin 1): seederen skrev

@@ -15,3 +15,5 @@
 - Filtre skal have paritet med kilden (fx "Kun taktik" viste ikke Hvis-Så-skift, fordi TRIGGER er HIGHLIGHT).
 - Bogfør-før-afspil er rigtigt for data, men spoiler tabellen og de andre kampe – sig det i UI'et.
 - Afledte referattekster, der forgrener sig på modstanderens indstillinger (offside-fælde, omstilling), lækker. Grep på `phases` i match.js ved hver ændring af tekster.
+
+- Faner: en handling må ikke kræve en anden fane end den, dens hjælpetekst står i (v3.5: bænk under banen, kort i Taktik).

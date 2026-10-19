@@ -12,10 +12,14 @@ import { renderPitch } from './ui/pitch.js';
 import { renderTactics } from './ui/tactics.js';
 import { renderStandings } from './ui/standings.js';
 import { playRound, commitRound } from './engine/season.js';
-import { renderMatchCenter } from './ui/matchcenter.js';
+import { renderMatchCenter, renderGazette } from './ui/matchcenter.js';
 
 export const PLAYBACK_MS = 420;
 let mc = null;            // Match Center: { round, matches, gazette, viewIdx, filter, shownCount, playing }
+const TABS = [['trup', '👥 Trup'], ['taktik', '📋 Taktik'], ['kamp', '📺 Kamp'], ['liga', '🏆 Liga']];
+// Seneste runde vist færdigspillet (Kamp-fanen uden igangværende afspilning).
+const lastRoundView = (r) => ({ round: r.round, matches: r.matches, gazette: r.gazette, viewIdx: 0, filter: 'all', shownCount: Infinity, playing: false });
+function showTab(k) { game.ui.tab = k; clearSwap(); view.notice = ''; persist(); render(); window.scrollTo(0, 0); }
 let timer = null;
 
 const storage = window.localStorage;
@@ -105,8 +109,9 @@ function renderControls() {
   controls.replaceChildren(...[
     select(String(view.viewTeamIdx), teams.map((t, i) => [String(i), (t.isBot ? '' : '★ ') + t.name]), (v) => showTeam(Number(v)), { id: 'team-select', title: 'Vælg hold at se' }),
     // Kampknapperne står i topbaren, så de findes i alle visninger (også når man scouter).
-    h('button', { id: 'play-round', class: 'primary', disabled: !!mc?.playing, onclick: playNextRound }, `▶ Spil runde ${game.league.leagueMetadata.round + 1} mod ${teams[game.ui.opponentIdx].name}`),
-    game.league.lastRound && !mc ? h('button', { id: 'open-last', onclick: () => openMatchCenter(game.league.lastRound, false) }, `📺 Se runde ${game.league.lastRound.round}`) : null,
+    // Modstandervælgeren står ved ▶, fordi Mod-tallene og knappen begge gælder den valgte modstander.
+    h('button', { id: 'play-round', class: 'primary', disabled: !!mc?.playing, onclick: playNextRound }, `▶ Spil runde ${game.league.leagueMetadata.round + 1} mod`),
+    select(String(game.ui.opponentIdx), teams.map((t, i) => [String(i), t.name]).filter(([i]) => Number(i) !== myIdx()), (v) => change(() => { game.ui.opponentIdx = Number(v); }), { id: 'opponent-select', title: 'Næste modstander', disabled: !!mc?.playing }),
     h('span', { class: 'savestatus' + (view.saveError ? ' failed' : ''), id: 'save-status' }, view.saveError ? '⚠ IKKE gemt' : view.savedAt ? `✔ Gemt kl. ${time(view.savedAt)}` : 'Ikke gemt'),
     h('button', { id: 'save-now', onclick: () => { persist(); render(); } }, '💾 Gem nu'),
     h('button', { id: 'export', onclick: exportFile }, '⬇ Eksportér'),
@@ -132,10 +137,6 @@ function render() {
     h('div', {}, h('h2', { id: 'club-name' }, team.name), h('div', { class: 'muted' }, isOwn ? 'Dit hold – alle egne data er synlige' : 'Modstanderhold – kun offentlige data og stjerner')),
     h('div', { class: 'right' }, h('div', { class: 'muted' }, 'Klubkasse'), h('strong', {}, isOwn ? kr(team.cashBalance) : '🔒 Skjult')));
 
-  const opponentPick = isOwn ? h('div', { class: 'panel row', id: 'opponent-bar' },
-    h('label', {}, '🎯 Næste modstander ', select(String(game.ui.opponentIdx), league.teams.map((t, i) => [String(i), t.name]).filter(([i]) => Number(i) !== myIdx()), (v) => change(() => { game.ui.opponentIdx = Number(v); }), { id: 'opponent-select' })),
-    h('span', { class: 'muted' }, '🧠 Mod-kolonnen: erfaring mod gegenpress · lav blok · VAR-linje & lange bolde')) : null;
-
   const matrix = renderMatrix({
     team, isOwn, opponent, ui: { ...view }, notes: game.notes,
     onSort: (c) => { if (view.sortCol === c.key) view.sortDesc = !view.sortDesc; else { view.sortCol = c.key; view.sortDesc = !!c.num; } clearSwap(); view.notice = ''; render(); },
@@ -157,7 +158,8 @@ function render() {
       onSelect: (p, own) => { view.selectedPlayerId = p.id; view.pitchSwapId = own ? (view.pitchSwapId === p.id ? null : p.id) : null; view.notice = view.pitchSwapId ? `🔁 Klik på en anden brik for at bytte ${p.shortName}s plads.` : ''; render(); },
       onTokenSwap: (a, b) => { clearSwap(); view.notice = ''; change(() => act.swapPlayers(team, a, b)); },
       onMove: (slot, pos) => { clearSwap(); change(() => act.moveSlot(team, slot, pos)); } }),
-    isOwn ? h('div', { class: 'muted help' }, 'Træk = justér position (målmanden står fast) · Klik på to brikker = byt plads · Bænkspillere skiftes ind med 🔁 i regnearket') : null);
+    isOwn ? renderBench(team) : null,
+    isOwn ? h('div', { class: 'muted help' }, 'Træk = justér position (målmanden står fast) · Klik på to brikker = byt plads · Klik på en bænkspiller og så en brik = skift ind') : null);
 
   const tactics = renderTactics({ team, isOwn, ui: game.ui, on: {
     formation: (f) => change(() => act.setFormation(team, f)),
@@ -169,20 +171,40 @@ function render() {
     removeRule: (i) => change(() => act.removeRule(team, i)),
   } });
 
-  const standings = renderStandings({ league, viewTeamId: team.id, onPick: (id) => showTeam(league.teams.findIndex((t) => t.id === id)) });
+  const standings = renderStandings({ league, viewTeamId: team.id, onPick: (id) => { game.ui.tab = 'trup'; persist(); showTeam(league.teams.findIndex((t) => t.id === id)); } });
 
+  // Faner: ét emne ad gangen (brugerens ønske: "et noget rodet layout").
+  const tab = TABS.some(([k]) => k === game.ui.tab) ? game.ui.tab : 'trup';
+  const shown = mc || (league.lastRound ? lastRoundView(league.lastRound) : null);
+  const content = {
+    trup: [header, matrix, card],
+    // Kortet står også i Taktik, så et klik på en brik viser spilleren uden fanebyt.
+    taktik: [h('div', { class: 'tactics-layout' }, h('section', {}, pitch), h('section', {}, card, tactics))],
+    kamp: [shown ? renderMatchCenter({ mc: shown, myTeamId: mine.id, on: mcHandlers }) : h('div', { class: 'panel empty', id: 'no-matches' }, 'Ingen kampe spillet endnu. Vælg modstander i topbaren og tryk ▶ Spil runde.')],
+    liga: [mc?.playing ? h('div', { class: 'notice', id: 'booked-league' }, '📺 Runden spilles i Kamp-fanen – tabellen herunder er allerede opdateret med den.') : null,
+      standings, league.lastRound && !mc?.playing ? renderGazette(league.lastRound.gazette, mine.id) : null],
+  }[tab];
   app.replaceChildren(...[
+    h('nav', { class: 'tabs', id: 'tabs' }, TABS.map(([k, label]) => h('button', { id: `tab-${k}`, class: 'tab' + (k === tab ? ' active' : ''), onclick: () => showTab(k) }, label))),
     view.notice ? h('div', { class: 'notice', id: 'notice' }, view.notice) : null,
-    mc ? matchCenterEl() : null,
-    // Regnearket i fuld bredde øverst (intet sidelæns scroll); spillerkort, bane og
-    // taktik + tabel side om side nedenunder.
-    h('div', { class: 'layout' },
-      h('section', { class: 'top' }, header, opponentPick, matrix),
-      h('div', { class: 'cols' },
-        h('section', { class: 'c-card' }, card),
-        h('section', { class: 'c-pitch' }, pitch),
-        h('section', { class: 'c-tac' }, tactics, standings)))].filter(Boolean));
+    h('div', { class: `tabpane tab-${tab}` }, ...content.filter(Boolean)),
+  ].filter(Boolean));
   document.body.dataset.klar = 'ja';
+}
+
+// Bænken under banen: klik bænkspiller → klik brik (eller omvendt) = skift ind.
+function renderBench(team) {
+  const bench = team.squad.filter((p) => !team.tactics.lineupSlots.includes(p.id));
+  return h('div', { class: 'bench', id: 'bench' }, h('h4', {}, 'Bænk'), bench.map((p) => h('button', {
+    class: 'mini bench-p' + (view.pitchSwapId === p.id ? ' active' : '') + (p.injuryMatchesLeft > 0 ? ' injured' : ''), dataset: { pid: p.id },
+    title: `${p.name} (${p.line})${p.injuryMatchesLeft > 0 ? ` – skadet i ${p.injuryMatchesLeft} kamp(e)` : ''}`,
+    onclick: () => {
+      const a = view.pitchSwapId;
+      if (a && a !== p.id && team.tactics.lineupSlots.includes(a)) { clearSwap(); view.notice = ''; change(() => act.swapPlayers(team, a, p.id)); return; }
+      view.selectedPlayerId = p.id; view.pitchSwapId = a === p.id ? null : p.id;
+      view.notice = view.pitchSwapId ? `🔁 Klik på den brik, ${p.shortName} skal skiftes ind for.` : ''; render();
+    },
+  }, `#${p.shirtNumber} ${p.shortName} · ${p.line}`)));
 }
 
 // ---------- Kampe ----------
@@ -193,6 +215,7 @@ function playNextRound() {
   const rng = createRng(randomSeed());
   const result = playRound(game.league, game.ui.opponentIdx, rng);
   commitRound(game.league, result, rng);
+  game.ui.tab = 'kamp'; // gemmes med runden, så F5 midt i afspilningen lander i Kamp
   persist();
   openMatchCenter(result, true);
 }
@@ -200,8 +223,9 @@ function playNextRound() {
 function openMatchCenter(result, live) {
   clearInterval(timer);
   mc = { round: result.round, matches: result.matches, gazette: result.gazette, viewIdx: 0, filter: 'all', shownCount: live ? 1 : Infinity, playing: live };
+  game.ui.tab = 'kamp';
   render();
-  document.getElementById('match-center')?.scrollIntoView({ block: 'start' });
+  window.scrollTo(0, 0);
   if (live) timer = setInterval(() => { mc.shownCount++; if (mc.shownCount >= mc.matches[0].events.length) finishPlayback(); else renderMc(); }, PLAYBACK_MS);
 }
 
@@ -209,9 +233,9 @@ function finishPlayback() { clearInterval(timer); timer = null; mc.playing = fal
 
 const mcHandlers = {
   skip: finishPlayback,
-  close: () => { clearInterval(timer); mc = null; render(); },
-  view: (i) => { mc.viewIdx = i; renderMc(); },
-  filter: (f) => { mc.filter = f; renderMc(); },
+  // Uden igangværende afspilning vises seneste runde; et valg af kamp/filter gemmer den som mc.
+  view: (i) => { mc ||= lastRoundView(game.league.lastRound); mc.viewIdx = i; renderMc(); },
+  filter: (f) => { mc ||= lastRoundView(game.league.lastRound); mc.filter = f; renderMc(); },
 };
 const matchCenterEl = () => renderMatchCenter({ mc, myTeamId: myTeam().id, on: mcHandlers });
 // Under afspilning tegnes kun Match Center om (ikke hele siden).
