@@ -33,8 +33,8 @@ begrundelse).
   ROTATION, #14 DEF TALENT, #15 MID ROTATION, #16–18 (afskåret: fordel MID/ATT
   TALENT/ROTATION).
 - Rolle-tiers: STAR 24–28 år, evner 11–15, arketype-chance 0,75 · TALENT 17–19
-  år, 6–10 · ROTATION 21–28 år, 7–11 · STARTER 21–27 år, 9–13, chance 0,30.
-  (TALENT/ROTATION-chance afskåret: brug 0,15/0,20.)
+  år, 6–10, chance 0,55 · ROTATION 21–28 år, 7–11 · STARTER 21–27 år, 9–13
+  (begge chance 0,25 – kildens kode; prosaen sagde 0,30).
 - 9 evner (1–20): `pace, stamina, strength, ballControl, passing, finishing,
   positioning, intercepting, goalkeeping`, vægtet efter kæde (GK goalkeeping
   base+2, andre 1–2; finishing for ikke-ATT 2–9). `rollStat` er
@@ -83,6 +83,8 @@ spillerobjekt; de skal ligge hos den der observerer.
   server-motor — **udskudt** til trin 2.
 
 ## 4. Taktik
+- Koordinater: kilden har kun målmand og bagkæde (resten afskåret); de øvrige
+  pladser er fastsat i samme stil i `public/engine/formations.js`.
 - 10 formationer: 4-4-2, 4-3-3, 4-2-3-1, 3-5-2, 3-4-3, 5-3-2, 5-4-1, 4-1-4-1,
   4-4-1-1, 4-3-1-2 (x/y i %, rolle GK/LB/CB/RB/LWB/RWB/CDM/CM/LM/RM/CAM/…).
 - Træk og slip "Rolle-Anker & Frit Træk": GK (slot 0) kan ikke trækkes,
