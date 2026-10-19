@@ -4,7 +4,7 @@
 
 export function generateScoutingClues(shortName, varProfile, heightCm, jumpingPower) {
   const clues = [];
-  if (heightCm >= 187 && jumpingPower >= 13) clues.push(`I træningskampen steg ${shortName} (${heightCm} cm) en hel etage over alle andre ved hjørnesparkene.`);
+  if (heightCm >= 190 && jumpingPower >= 13) clues.push(`I træningskampen steg ${shortName} (${heightCm} cm) en hel etage over alle andre ved hjørnesparkene.`);
   if (varProfile.theatre >= 14) clues.push(`Dommeren måtte advare ${shortName} efter et teatralsk fald i feltet – VAR så ikke på det.`);
   else if (varProfile.theatre <= 6) clues.push(`${shortName} nægtede at smide sig i feltet trods et tydeligt hiv i trøjen – utroligt ærlig.`);
   if (varProfile.cynicism >= 14) clues.push(`Hård tackling med knopperne forrest fra ${shortName}! Kun en snæver VAR-vurdering holdt det på gult.`);

@@ -60,12 +60,16 @@ export function rollStat(rng, min, max) {
   return clamp(Math.round(min + ((rng.next() + rng.next()) / 2) * (max - min)), 1, 20);
 }
 
-// Truppen er 2 MÅL, 6 FOR, 6 MID, 4 ANG: (2·186 + 6·182 + 6·178 + 4·181)/18 ≈ 180,9 cm.
-export const HEIGHT_MID = { GK: 186, DEF: 182, MID: 178, ATT: 181 };
-export const HEIGHT_ZERO = 163;
+// Højde efter Superligaen (v3.7, brugerens dokument "Spillerhøjde i Superligaen": ligasnit
+// ≈184 cm, trupper 182,9–187,5, laveste 169, højeste 201 – målmænd 190–200, midtstoppere
+// 185–195, lavest på kanterne). Truppen er 2 MÅL, 6 FOR, 6 MID, 4 ANG:
+// (2·192 + 6·186 + 6·179,5 + 4·181)/18 ≈ 183,4 + holdprofil (−1,5…+3, snit +0,75) ≈ 184.
+export const HEIGHT_MID = { GK: 192, DEF: 186, MID: 179.5, ATT: 181 };
+export const HEIGHT_MIN = 168, HEIGHT_MAX = 201;
+export const HEIGHT_ZERO = 166;
 
 export function aerialBreakdown(heightCm, jumpingPower, strength, positioning) {
-  // Nulpunkt 163 cm (v3.6; før 168): spillerne blev 5 cm lavere, luftduellerne skal ikke svækkes.
+  // Nulpunkt 166 cm (v3.7): højde-scoren ligger på samme niveau som før v3.6 (nulpunkt 168 ved snit 186).
   const heightScore = clamp(Math.round((heightCm - HEIGHT_ZERO) * 0.7), 1, 20);
   const wHeight = heightScore * 0.35, wJump = jumpingPower * 0.35, wStr = strength * 0.15, wPos = positioning * 0.15;
   const exact = wHeight + wJump + wStr + wPos;
@@ -77,7 +81,7 @@ export function isArchetypeUnlocked(arch, player) {
   return Object.entries(arch.unlockReq).every(([k, v]) => (stats[k] || 0) >= v);
 }
 
-export function generatePlayer(rng, line, roleTier, shirtNumber, teamIdx, usedShortNames) {
+export function generatePlayer(rng, line, roleTier, shirtNumber, teamIdx, usedShortNames, heightOffset = 0) {
   const t = TIERS[roleTier];
   const [bMin, bMax] = t.stat;
   const age = rng.int(t.age[0], t.age[1]);
@@ -88,9 +92,11 @@ export function generatePlayer(rng, line, roleTier, shirtNumber, teamIdx, usedSh
   } while (usedShortNames.has(shortName));
   usedShortNames.add(shortName);
 
-  // Højde (v3.6, brugeren: "snit på 186 cm, hvor den gennemsnitlige dansker er 181"):
-  // klokkeform om kædens midte, holdsnit ca. 181–182 (før jævnt 181–198 / 172–195).
-  const heightCm = HEIGHT_MID[line] + rng.int(-5, 5) + rng.int(-5, 5) + rng.int(-5, 5); // spredning ca. 5–6 cm
+  // Klokkeform om kædens midte plus holdets profil, klemt til Superligaens 168–201 cm.
+  // Bred spredning i hver kæde (brugeren: "ikke at alle spillere skal ligge tæt på gns. for deres
+  // position"): spredning ≈6,5 cm ude på banen, ≈4,5 cm for målmænd; hele truppen ligner Superligaen.
+  const d = line === 'GK' ? 4 : 6;
+  const heightCm = clamp(Math.round(HEIGHT_MID[line] + heightOffset) + rng.int(-d, d) + rng.int(-d, d) + rng.int(-d, d), HEIGHT_MIN, HEIGHT_MAX);
   const r = (a, b) => rollStat(rng, a, b);
   const jumpingPower = r(bMin - 1, bMax + (line === 'DEF' || line === 'ATT' ? 2 : 0));
   const skills = {
@@ -146,7 +152,9 @@ export function defaultTactics(starterIds, profile) {
 
 export function generateTeam(rng, idx) {
   const used = new Set();
-  const squad = BLUEPRINT.map(([line, tier], i) => generatePlayer(rng, line, tier, i + 1, idx, used));
+  // Holdprofil: fysisk "power-hold" op til +3 cm, tekniske hold ned til −1,5 cm (Superligaen 182,9–187,5).
+  const heightOffset = rng.int(-3, 6) / 2;
+  const squad = BLUEPRINT.map(([line, tier], i) => generatePlayer(rng, line, tier, i + 1, idx, used, heightOffset));
   const starters = defaultStarterIds(squad);
   const isBot = idx !== 0;
   const own = isBot ? BOT_PROFILES[idx] : BOT_PROFILES[0];

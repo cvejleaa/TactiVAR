@@ -301,7 +301,7 @@ test('normalizeLeague: ugyldigt indhold repareres, gyldige data og standardværd
   assert.equal(N.teams[5].tactics.baseFormation, BOT_PROFILES[5].form);
   assert.equal(N.teams[6].tactics.conditionalRules.length, 5);
   assert.equal(p.freshness, 70);
-  assert.equal(p.aerialPower, Math.round(Math.max(1, Math.min(20, Math.round((p.heightCm - 163) * 0.7))) * 0.35 + p.jumpingPower * 0.35 + p.skills.strength * 0.15 + p.skills.positioning * 0.15));
+  assert.equal(p.aerialPower, Math.round(Math.max(1, Math.min(20, Math.round((p.heightCm - 166) * 0.7))) * 0.35 + p.jumpingPower * 0.35 + p.skills.strength * 0.15 + p.skills.positioning * 0.15));
   assert.equal(N.leagueMetadata.round, 6); assert.equal(N.teams[1].cashBalance, 123);
 });
 
