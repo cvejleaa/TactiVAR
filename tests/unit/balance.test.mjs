@@ -72,10 +72,15 @@ test('løb uden bold: Mange er bedst mod Hold på bolden, Få bedst mod Lynkontr
   const drop = r({}), press = r({ lost: 'COUNTER_PRESS_5S' });
   assert.ok(drop.cga > 0 && press.cga > 0 && press.cga <= drop.cga * 0.85, `kontramål imod ${press.cga} mod ${drop.cga}`);
 });
-test('ligaens målniveau holder v3.8 (1,41 ± 0,06) efter løb og kontraer', async () => {
+test('målniveau som Superligaen (v3.10: 2,6–3,0 mål pr. kamp; v3.9 gav 1,44) med realistiske dødbolde', async () => {
   const { measure } = await import('../../tools/measure-duels.mjs');
-  const g = measure(null, 3, 60).goalsPerMatch;
-  assert.ok(g >= 1.35 && g <= 1.5, String(g));
+  const r = measure(null, 3, 60);
+  assert.ok(r.goalsPerMatch >= 2.6 && r.goalsPerMatch <= 3.0, `mål pr. kamp ${r.goalsPerMatch}`);
+  assert.ok(r.setPieceShare >= 0.18 && r.setPieceShare <= 0.35, `dødboldmål ${r.setPieceShare}`);       // Superligaen ≈ 25–30 %
+  assert.ok(r.penaltiesPerMatch >= 0.15 && r.penaltiesPerMatch <= 0.45, `straffe ${r.penaltiesPerMatch}`); // ≈ 0,3
+  assert.ok(r.penaltyRate >= 0.7 && r.penaltyRate <= 0.85, `straffe scoret ${r.penaltyRate}`);            // ≈ 75–78 %
+  assert.ok(r.foulsPerMatch >= 15 && r.foulsPerMatch <= 30, `frispark ${r.foulsPerMatch}`);               // ≈ 20–25
+  assert.ok(r.cornersPerMatch >= 3, `hjørnespark ${r.cornersPerMatch}`);
 });
 test('Rundens mål: bred fordeling – cutback ≥ 8 %, dribletur ≥ 9 %, ingen type over 30 % (v3.8: langskud 37 %, cutback 3 %)', async () => {
   const { measureSeason } = await import('../../tools/measure-duels.mjs');

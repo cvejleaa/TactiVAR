@@ -19,7 +19,7 @@ const isFail = (e) => e.label === 'Fase 2 pres virker' || e.label === 'Offside-f
 
 // setup(team, i) kan sætte faser før hver runde; returnerer andel fase 1-sejre (alle hold).
 export function measure(setup = null, rounds = 3, N = ARG_N) {
-  let win = 0, fail = 0, ownWin = 0, ownFail = 0, goals = 0, games = 0, headers = 0;
+  let win = 0, fail = 0, ownWin = 0, ownFail = 0, goals = 0, games = 0, headers = 0, pens = 0, penGoals = 0, setPiece = 0, corners = 0, fouls = 0, freeKicks = 0;
   const series = [];
   for (let s = 1; s <= N; s++) {
     const rng = createRng(s * 7919);
@@ -31,7 +31,12 @@ export function measure(setup = null, rounds = 3, N = ARG_N) {
     for (let r = 0; r < rounds; r++) {
       if (setup) L.teams.forEach(setup);
       const res = playRound(L, 1, rng);
-      for (const m of res.matches) { goals += m.homeGoals + m.awayGoals; games++; headers += m.events.filter((e) => e.type === 'HEADER_GOAL').length; }
+      for (const m of res.matches) {
+        goals += m.homeGoals + m.awayGoals; games++; headers += m.events.filter((e) => e.type === 'HEADER_GOAL').length;
+        const s = m.stats;
+        pens += s.hPenalties + s.aPenalties; penGoals += s.hPenaltyGoals + s.aPenaltyGoals; setPiece += s.hSetPieceGoals + s.aSetPieceGoals;
+        corners += s.hCorners + s.aCorners; fouls += s.hFouls + s.aFouls; freeKicks += s.hFreeKicks + s.aFreeKicks;
+      }
       for (const m of res.matches) for (const e of m.events) {
         const mine = (e.isHome ? m.homeId : m.awayId) === me.id;
         if (isWin(e)) { win++; if (mine) ownWin++; }
@@ -42,7 +47,8 @@ export function measure(setup = null, rounds = 3, N = ARG_N) {
     }
     series.push(ser);
   }
-  return { rate: win / (win + fail), n: win + fail, ownWin, ownFail, series, goalsPerMatch: goals / games, headersPerMatch: headers / games };
+  return { rate: win / (win + fail), n: win + fail, ownWin, ownFail, series, goalsPerMatch: goals / games, headersPerMatch: headers / games,
+    penaltiesPerMatch: pens / games, penaltyRate: pens ? penGoals / pens : 0, setPieceShare: goals ? setPiece / goals : 0, cornersPerMatch: corners / games, foulsPerMatch: fouls / games, freeKicksPerMatch: freeKicks / games };
 }
 
 // Løb uden bold (v3.9): hold A med en given indstilling mod hold B (ligaens egne bots, evt. med
@@ -86,6 +92,7 @@ if (import.meta.url === `file://${process.argv[1]}` && !['saeson', 'loeb'].inclu
   const pct = (x) => `${(x * 100).toFixed(1)} %`;
   const liga = measure();
   console.log(`Ligaens egne taktikker: fase 1 vinder ${pct(liga.rate)} (${liga.n} dueller, ${ARG_N} ligaer × 3 runder); ${liga.goalsPerMatch.toFixed(2)} mål pr. kamp, heraf ${liga.headersPerMatch.toFixed(2)} hovedstød.`);
+  console.log(`Dødbolde: ${(liga.setPieceShare * 100).toFixed(0)} % af målene; straffe ${liga.penaltiesPerMatch.toFixed(2)} pr. kamp (${(liga.penaltyRate * 100).toFixed(0)} % scoret); hjørnespark ${liga.cornersPerMatch.toFixed(1)}, frispark begået ${liga.foulsPerMatch.toFixed(1)}, frispark i skudafstand ${liga.freeKicksPerMatch.toFixed(2)} pr. kamp.`);
   console.log(`Neutralt (balanceret/lave cutbacks mod mellemblok): fase 1 vinder ${pct(measure(phases('BALANCED', 'LOW_CUTBACKS', 'MID_BLOCK')).rate)}.`);
   // Alle spiller korte pasninger centralt mod højt gegenpress: presset har den rigtige mod-stil.
   console.log(`Rigtig mod-stil til presset (korte pasninger mod gegenpres): pres vinder ${pct(1 - measure(phases('SHORT', 'LOW_CUTBACKS', 'HIGH_GEGENPRESS')).rate)}.`);
