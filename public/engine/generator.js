@@ -117,6 +117,13 @@ export function generatePlayer(rng, line, roleTier, shirtNumber, teamIdx, usedSh
   return player;
 }
 
+// Standardopstilling: truppens 11 første sorteret efter kæde (MÅL, FOR, MID, ANG), så
+// kæderne lander på formationens pladser (kildens trup har #9 ANG før #10 MID).
+const LINE_ORDER = { GK: 0, DEF: 1, MID: 2, ATT: 3 };
+export function defaultStarterIds(squad) {
+  return squad.slice(0, 11).map((p, i) => [p, i]).sort((a, b) => LINE_ORDER[a[0].line] - LINE_ORDER[b[0].line] || a[1] - b[1]).map(([p]) => p.id);
+}
+
 export function defaultTactics(starterIds, profile) {
   const p = profile || BOT_PROFILES[0];
   return {
@@ -133,7 +140,7 @@ export function defaultTactics(starterIds, profile) {
 export function generateTeam(rng, idx) {
   const used = new Set();
   const squad = BLUEPRINT.map(([line, tier], i) => generatePlayer(rng, line, tier, i + 1, idx, used));
-  const starters = squad.slice(0, 11).map((p) => p.id);
+  const starters = defaultStarterIds(squad);
   const isBot = idx !== 0;
   const own = isBot ? BOT_PROFILES[idx] : BOT_PROFILES[0];
   const tactics = defaultTactics(starters, own);

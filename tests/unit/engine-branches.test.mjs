@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRng } from '../../public/engine/rng.js';
-import { createLeague, isArchetypeUnlocked, BOT_PROFILES, ARCHETYPES } from '../../public/engine/generator.js';
+import { createLeague, isArchetypeUnlocked, BOT_PROFILES, ARCHETYPES, defaultStarterIds } from '../../public/engine/generator.js';
 import { simulateMatch } from '../../public/engine/match.js';
 import { commitRound, sortStandings } from '../../public/engine/season.js';
 import { buildGazette } from '../../public/engine/gazette.js';
@@ -291,8 +291,8 @@ test('normalizeLeague: ugyldigt indhold repareres, gyldige data og standardværd
   const p = L.teams[1].squad[4]; p.freshness = 70; p.aerialPower = 1;
   L.leagueMetadata.round = 6; L.teams[1].cashBalance = 123;
   const { league: N } = normalizeLeague(L);
-  assert.deepEqual(N.teams[3].tactics.lineupSlots, t3.squad.slice(0, 11).map((x) => x.id));
-  assert.deepEqual(N.teams[4].tactics.lineupSlots, t4.squad.slice(0, 11).map((x) => x.id));
+  assert.deepEqual(N.teams[3].tactics.lineupSlots, defaultStarterIds(t3.squad));
+  assert.deepEqual(N.teams[4].tactics.lineupSlots, defaultStarterIds(t4.squad));
   assert.equal(N.teams[2].tactics.baseFormation, BOT_PROFILES[2].form); // holdets egen profil, ikke profil 0
   assert.equal(N.teams[2].tacticPresets.length, 3);
   assert.equal(N.teams[5].tactics.baseFormation, BOT_PROFILES[5].form);
@@ -303,6 +303,14 @@ test('normalizeLeague: ugyldigt indhold repareres, gyldige data og standardværd
 });
 
 // ---------- Generator ----------
+test('standardopstillingen sorteres efter kæde: 4-4-2 får MÅL, 4 FOR, 4 MID, 2 ANG på sine pladser', () => {
+  const L = createLeague(createRng(6));
+  const t = L.teams[0];
+  const lines = t.tactics.lineupSlots.map((id) => t.squad.find((p) => p.id === id).line);
+  assert.deepEqual(lines, ['GK', 'DEF', 'DEF', 'DEF', 'DEF', 'MID', 'MID', 'MID', 'MID', 'ATT', 'ATT']);
+  assert.deepEqual(t.tactics.lineupSlots.map((id) => t.squad.find((p) => p.id === id).shirtNumber), [1, 2, 3, 4, 5, 6, 7, 8, 10, 9, 11]);
+});
+
 test('truppens opbygning pr. plads og bot-profil pr. hold', () => {
   const L = createLeague(createRng(4));
   const expected = ['GK STARTER', 'DEF STARTER', 'DEF STARTER', 'DEF STAR', 'DEF STARTER', 'MID STARTER', 'MID STARTER', 'MID STAR', 'ATT STARTER', 'MID STARTER', 'ATT STARTER',

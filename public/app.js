@@ -1,9 +1,150 @@
+// TactiVAR Manager – binder motor, gem og brugerflade sammen.
 import { VERSION } from './version.js';
+import { createRng, randomSeed } from './engine/rng.js';
+import { createLeague } from './engine/generator.js';
+import { loadGame, saveGame, resetGame, exportGame, importGame } from './state/storage.js';
+import * as act from './state/actions.js';
+import { h, select } from './ui/dom.js';
+import { kr } from './ui/labels.js';
+import { renderMatrix } from './ui/matrix.js';
+import { renderCard } from './ui/card.js';
+import { renderPitch } from './ui/pitch.js';
+import { renderTactics } from './ui/tactics.js';
+import { renderStandings } from './ui/standings.js';
+import { opponentTacticKeys } from './engine/counter.js';
 
-document.getElementById('version').textContent = 'v' + VERSION;
+const storage = window.localStorage;
+let game = null;          // { league, notes, ui } – det der gemmes
+let view = { viewTeamIdx: 0, sortCol: 'pos', sortDesc: false, filter: 'all', wide: false, selectedPlayerId: null, swapId: null, notice: '', savedAt: null };
+
 const app = document.getElementById('app');
-app.replaceChildren();
-const p = document.createElement('p');
-p.textContent = 'Genopbygning i gang – spillet flyttes over fra den gamle version trin for trin.';
-app.append(p);
-document.body.dataset.klar = 'ja';
+const controls = document.getElementById('controls');
+document.getElementById('version').textContent = 'v' + VERSION;
+
+const myIdx = () => game.league.teams.findIndex((t) => !t.isBot);
+const myTeam = () => game.league.teams[myIdx()];
+
+function newGame() {
+  return { league: createLeague(createRng(randomSeed())), notes: {}, ui: { activePresetIndex: 0, opponentIdx: 1 } };
+}
+
+function persist() {
+  const r = saveGame(storage, game);
+  if (r.ok) view.savedAt = r.savedAt; else window.tactivarFejl?.(r.error);
+}
+
+// Én ændring = ændr, gem, tegn igen.
+function change(fn) { fn(); persist(); render(); }
+
+function start() {
+  const r = loadGame(storage);
+  if (r.status === 'ok') { game = r.state; view.savedAt = r.state.savedAt; if (r.migratedFrom) view.notice = `Dit spil er opdateret fra et ældre gemme-format (skema ${r.migratedFrom}).`; }
+  else if (r.status === 'empty') { game = newGame(); persist(); }
+  else return renderLoadError(r);
+  view.viewTeamIdx = myIdx();
+  view.selectedPlayerId = myTeam().squad[3].id;
+  render();
+}
+
+function renderLoadError(r) {
+  controls.replaceChildren();
+  app.replaceChildren(h('div', { class: 'panel errorpanel', id: 'load-error' },
+    h('h2', {}, '⚠ Det gemte spil kunne ikke indlæses'),
+    h('p', {}, r.error),
+    r.backupKey ? h('p', {}, `Dine data er IKKE slettet: de er gemt i browseren under "${r.backupKey}" og kan hentes frem igen.`) : null,
+    h('div', { class: 'row' },
+      h('button', { onclick: () => { const g = newGame(); resetGame(storage, g); game = g; view.viewTeamIdx = myIdx(); render(); } }, '🎲 Start en ny liga'),
+      importButton())));
+  document.body.dataset.klar = 'ja';
+}
+
+function importButton() {
+  const input = h('input', { type: 'file', accept: '.json,application/json', hidden: true, id: 'import-file', onchange: async (e) => {
+    const file = e.target.files[0]; if (!file) return;
+    const r = importGame(await file.text());
+    if (!r.ok) { window.tactivarFejl?.(`Import mislykkedes: ${r.error}`); return; }
+    resetGame(storage, r.state); game = r.state; view.viewTeamIdx = myIdx(); view.notice = `Spillet er importeret fra ${file.name}.`; persist(); render();
+  } });
+  return h('span', {}, input, h('button', { onclick: () => input.click() }, '⬆ Importér'));
+}
+
+function exportFile() {
+  const blob = new Blob([exportGame(game)], { type: 'application/json' });
+  const a = h('a', { href: URL.createObjectURL(blob), download: `tactivar-${new Date().toISOString().slice(0, 10)}.json` });
+  document.body.append(a); a.click(); a.remove();
+}
+
+const time = (ms) => new Date(ms).toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+function renderControls() {
+  const teams = game.league.teams;
+  controls.replaceChildren(
+    select(String(view.viewTeamIdx), teams.map((t, i) => [String(i), (t.isBot ? '' : '★ ') + t.name]), (v) => { view.viewTeamIdx = Number(v); view.sortCol = 'pos'; view.sortDesc = false; view.selectedPlayerId = teams[v].squad[0].id; view.swapId = null; render(); }, { id: 'team-select', title: 'Vælg hold at se' }),
+    h('span', { class: 'savestatus', id: 'save-status' }, view.savedAt ? `✔ Gemt kl. ${time(view.savedAt)}` : 'Ikke gemt'),
+    h('button', { id: 'save-now', onclick: () => { persist(); render(); } }, '💾 Gem nu'),
+    h('button', { id: 'export', onclick: exportFile }, '⬇ Eksportér'),
+    importButton(),
+    h('button', { id: 'new-league', onclick: () => {
+      if (!confirm('Start en helt ny liga? Det nuværende spil gemmes som backup i browseren.')) return;
+      const g = newGame(); const r = resetGame(storage, g); game = g; view = { ...view, viewTeamIdx: myIdx(), selectedPlayerId: null, notice: r.backupKey ? `Ny liga startet. Det gamle spil ligger som backup (${r.backupKey}).` : 'Ny liga startet.' }; view.savedAt = r.savedAt; render();
+    } }, '🎲 Ny liga'));
+}
+
+function render() {
+  const league = game.league;
+  const team = league.teams[view.viewTeamIdx];
+  const isOwn = !team.isBot;
+  const opponent = league.teams[game.ui.opponentIdx] || league.teams[1];
+  const selected = team.squad.find((p) => p.id === view.selectedPlayerId) || null;
+  const mine = myTeam();
+  renderControls();
+
+  const header = h('div', { class: 'panel clubhead' },
+    h('div', {}, h('h2', { id: 'club-name' }, team.name), h('div', { class: 'muted' }, isOwn ? 'Dit hold – alle egne data er synlige' : 'Modstanderhold – kun offentlige data og stjerner')),
+    h('div', { class: 'right' }, h('div', { class: 'muted' }, 'Klubkasse'), h('strong', {}, isOwn ? kr(team.cashBalance) : '🔒 Skjult')));
+
+  const opponentPick = isOwn ? h('div', { class: 'panel row', id: 'opponent-bar' },
+    h('label', {}, '🎯 Næste modstander ', select(String(game.ui.opponentIdx), league.teams.map((t, i) => [String(i), t.name]).filter(([i]) => Number(i) !== myIdx()), (v) => change(() => { game.ui.opponentIdx = Number(v); }), { id: 'opponent-select' })),
+    h('span', { class: 'muted' }, `🧠 Mod-kolonnen måler mod-kunnen mod ${opponentTacticKeys(opponent).label}`),
+    h('button', { class: 'mini', onclick: () => { view.wide = !view.wide; render(); } }, view.wide ? '⤡ Smal visning' : '⤢ Bred regnearks-visning')) : null;
+
+  const matrix = renderMatrix({
+    team, isOwn, opponent, ui: { ...view }, notes: game.notes,
+    onSort: (c) => { if (view.sortCol === c.key) view.sortDesc = !view.sortDesc; else { view.sortCol = c.key; view.sortDesc = !!c.num; } view.notice = ''; render(); },
+    onBlocked: (c) => { view.notice = `🔒 Anti-spionage: du kan ikke sortere ${team.name} på "${c.label}" – det er skjult information.`; render(); },
+    onSelect: (p) => { view.selectedPlayerId = p.id; render(); },
+    onFilter: (f) => { view.filter = f; render(); },
+    onSwap: (p) => {
+      if (!view.swapId) { view.swapId = p.id; view.notice = `🔁 Vælg den spiller, ${p.shortName} skal byttes med.`; render(); return; }
+      const a = view.swapId; view.swapId = null; view.notice = '';
+      change(() => act.swapPlayers(team, a, p.id));
+    },
+  });
+
+  const card = renderCard({ player: selected, team, isOwn, opponent, scouting: league.scouting[mine.id]?.[selected?.id], note: selected ? game.notes[selected.id] : '',
+    onNote: (v) => { game.notes[selected.id] = v; persist(); renderControls(); } });
+
+  const pitch = h('div', { class: 'panel' }, h('h3', {}, `Taktiktavle – ${team.tactics.baseFormation}`),
+    renderPitch({ team, isOwn, ui: view, onSelect: (p) => { view.selectedPlayerId = p.id; render(); }, onMove: (slot, pos) => change(() => act.moveSlot(team, slot, pos)) }));
+
+  const tactics = renderTactics({ team, isOwn, ui: game.ui, on: {
+    formation: (f) => change(() => act.setFormation(team, f)),
+    preset: (i) => change(() => { act.switchPreset(team, game.ui.activePresetIndex, i); game.ui.activePresetIndex = i; }),
+    resetDrag: () => change(() => act.resetDrag(team)),
+    phase: (ph, f, v) => change(() => act.setPhase(team, ph, f, v)),
+    rule: (i, patch) => change(() => act.updateRule(team, i, patch)),
+    addRule: () => change(() => act.addRule(team)),
+    removeRule: (i) => change(() => act.removeRule(team, i)),
+  } });
+
+  const standings = renderStandings({ league, viewTeamId: team.id, onPick: (id) => { view.viewTeamIdx = league.teams.findIndex((t) => t.id === id); view.sortCol = 'pos'; view.sortDesc = false; render(); } });
+
+  app.replaceChildren(...[
+    view.notice ? h('div', { class: 'notice', id: 'notice' }, view.notice) : null,
+    h('div', { class: 'grid' + (view.wide ? ' wide' : '') },
+      h('section', { class: 'col-left' }, header, opponentPick, matrix, card),
+      h('section', { class: 'col-right' }, pitch, tactics, standings))].filter(Boolean));
+  document.body.dataset.klar = 'ja';
+}
+
+start();
