@@ -12,8 +12,17 @@ const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 export function initialCounterTactics(rng, age, positioning) {
   const base = Math.round((age - 16) * 1.2 + positioning * 0.8);
   const roll = () => clamp(base + rng.int(-8, 8), 5, 45);
-  const ct = { vsPress: roll(), vsLowBlock: roll(), vsTrapLong: roll() };
-  return fitPool(ct, COUNTER_KEYS.slice().sort((a, b) => ct[b] - ct[a]), counterFloor(age)); // den højeste barberes
+  return scaleIntoPool({ vsPress: roll(), vsLowBlock: roll(), vsTrapLong: roll() }, counterFloor(age));
+}
+
+// Over puljen: alle tre skaleres forholdsmæssigt ned (rækkefølgen mellem stilene bevares),
+// og afrundingsresten barberes af den højeste. Bruges ved start og ved migrering.
+export function scaleIntoPool(ct, floor) {
+  const sum = COUNTER_KEYS.reduce((a, k) => a + ct[k], 0);
+  if (sum <= COUNTER_POOL) return { ...ct };
+  const f = COUNTER_POOL / sum;
+  const next = Object.fromEntries(COUNTER_KEYS.map((k) => [k, Math.max(floor, Math.round(ct[k] * f))]));
+  return fitPool(next, COUNTER_KEYS.slice().sort((a, b) => next[b] - next[a]), floor);
 }
 
 // Holder summen inden for puljen: overskuddet trækkes fra nøglerne i rækkefølgen order,

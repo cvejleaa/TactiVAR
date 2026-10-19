@@ -58,9 +58,11 @@ try {
   check('Regnearkets kolonner i rækkefølge (Alder står hvor den skal)', JSON.stringify(heads.slice(0, 20)) === JSON.stringify(['Pos/#', 'Spiller', 'Kæde', 'Alder', 'Frisk/🚑', 'Højde', 'Spring', '✈ Luft', 'PAC', 'STA', 'STR', 'BAL', 'PAS', 'FIN', 'POS', 'INT', 'GK', 'Gns', '⭐ Vurd', '🧠 Mod']), heads.join('|'));
   const modCells = await g.locator('#matrix tbody td.modcell').allTextContents();
   check('Mod-kolonnen viser tre egne værdier, ingen % mod en modstander', modCells.length === 18 && modCells.every((t) => /^\d+ · \d+ · \d+$/.test(t)) && !(await g.textContent('body')).match(/mod-kunnen[^.)]*\d+\s*%|mod [A-ZÆØÅ][^:]*: \d+%/i), modCells[0]);
-  const used = await g.textContent('#counter-used');
+  const used = await g.textContent('#counter-pool #counter-used');
   const usedN = Number(used.match(/Erfaring brugt: (\d+)\/100/)?.[1]);
-  check('Spillerkortet viser puljen: erfaring brugt X/100 og hvad der sker, når den er fuld', usedN > 0 && usedN <= 100 && used.includes('glemmer'), used);
+  const shown = (await g.textContent('#player-card h3')).match(/^#(\d+)/)[1];
+  const expectSum = await g.evaluate((nr) => { const t = JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((x) => !x.isBot); const p = t.squad.find((x) => String(x.shirtNumber) === nr); return p.counterTactics.vsPress + p.counterTactics.vsLowBlock + p.counterTactics.vsTrapLong; }, shown);
+  check('Spillerkortet viser puljen: erfaring brugt = summen af de tre værdier /100, og hvad der sker, når den er fuld', usedN === expectSum && used.includes('glemmer'), `${used} (forventet ${expectSum})`);
   check('Spillerkortet viser 9 evne-barer og luftduel-udregningen', (await g.locator('#player-card .bars .bar').count()) === 9 && (await g.textContent('#aerial-breakdown')).includes('× 0,35'));
   // Opstilling i Trup: regneark, bane, bænk og kort på samme fane – men ikke taktik-indstillingerne
   check('Trup-fanen har regneark, bane, bænk og spillerkort – men ikke taktikken', (await g.isVisible('#matrix')) && (await g.isVisible('#pitch')) && (await g.isVisible('#bench')) && (await g.isVisible('#player-card')) && (await g.locator('#tactics').count()) === 0);
@@ -399,6 +401,15 @@ try {
   const oldRows = await g.locator('.ratings').nth(0).locator('tbody tr td:first-child').allTextContents();
   check('Gammel runde uden plads: karakterark med gemt rolle, ingen minibane', (await g.isVisible('#match-center')) && (await g.locator('.minipitch').count()) === 0 && oldRows.length >= 11 && oldRows.every((t) => / · \S/.test(t) && !/undefined|null/.test(t)), oldRows.slice(0, 2).join(' | '));
   await tab('trup');
+
+  // Skema 2 (brugerens egen liga før v3.6): beskeden nævner puljen og højden – ikke Hvis-Så
+  const fixture2 = fs.readFileSync(new URL('../fixtures/save-schema2.json', import.meta.url), 'utf8');
+  await g.evaluate((f) => { for (const k of Object.keys(localStorage)) if (k.startsWith('tactivar_')) localStorage.removeItem(k); localStorage.setItem('tactivar_save', f); }, fixture2);
+  await reload();
+  const note2 = await g.textContent('#notice');
+  check('Migrering fra skema 2: beskeden nævner 100 point og 5 cm, men ikke Hvis-Så', note2.includes('100 point') && note2.includes('5 cm lavere') && !note2.includes('Hvis-Så'), note2);
+  const h2 = await g.evaluate((f) => { const a = JSON.parse(f).league.teams[0].squad[0].heightCm, b = JSON.parse(localStorage.getItem('tactivar_save')).league.teams[0].squad[0].heightCm; return [a, b]; }, fixture2);
+  check('Migrering fra skema 2: spillerne er gemt 5 cm lavere', h2[1] === h2[0] - 5, h2.join(' → '));
 
   // Mislykkes backuppen ved migrering (fuldt lager), overskrives det gamle format ikke – og der advares
   await g.evaluate((f) => { for (const k of Object.keys(localStorage)) if (k.startsWith('tactivar_')) localStorage.removeItem(k); localStorage.setItem('tactivar_save', f); }, fixture);

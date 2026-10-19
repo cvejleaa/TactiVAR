@@ -2,7 +2,7 @@
 // slette ligaen. Ældre skemaer migreres additivt; kan data ikke læses, lægges de rå data
 // i en backup-nøgle, FØR der tilbydes en ny liga, og fejlen vises.
 import { normalizeLeague, normalizeRule } from '../engine/sanitize.js';
-import { COUNTER_KEYS, fitPool, counterFloor } from '../engine/counter.js';
+import { COUNTER_KEYS, scaleIntoPool, counterFloor } from '../engine/counter.js';
 
 export const SAVE_KEY = 'tactivar_save';
 export const BACKUP_PREFIX = 'tactivar_backup_';
@@ -25,9 +25,9 @@ export const MIGRATIONS = {
     const newHeight = new Map();
     for (const t of d.league?.teams || []) for (const p of t.squad || []) {
       if (p.counterTactics) {
-        const floor = counterFloor(p.age ?? 20);
+        const floor = counterFloor(Number.isFinite(p.age) ? p.age : 20);
         const ct = Object.fromEntries(COUNTER_KEYS.map((k) => [k, Math.max(floor, Math.round((p.counterTactics[k] ?? 15) * HEIGHT_AND_COUNTER.counterScale))]));
-        p.counterTactics = fitPool(ct, COUNTER_KEYS.slice().sort((a, b) => ct[b] - ct[a]), floor);
+        p.counterTactics = scaleIntoPool(ct, floor);
       }
       if (Number.isFinite(p.heightCm)) { newHeight.set(p.id, [p.heightCm, p.heightCm - HEIGHT_AND_COUNTER.heightShift]); p.heightCm -= HEIGHT_AND_COUNTER.heightShift; }
     }

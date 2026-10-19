@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRng } from '../../public/engine/rng.js';
 import { FORMATIONS, FORMATION_NAMES, MAX_ANCHOR_RADIUS, isOutOfZone, clampPos, lineOfRole } from '../../public/engine/formations.js';
-import { createLeague, aerialBreakdown, rollStat, TEAM_NAMES } from '../../public/engine/generator.js';
+import { createLeague, aerialBreakdown, rollStat, TEAM_NAMES, HEIGHT_MID } from '../../public/engine/generator.js';
 import { viewPlayer, canSeeField, viewRatingEntry } from '../../public/engine/visibility.js';
 import { initialCounterTactics, opponentTacticKeys, masteryVs, counterXpForMatch, applyCounterXp, COUNTER_POOL } from '../../public/engine/counter.js';
 import { starsFromRating, createSheet, finalizeSheet } from '../../public/engine/ratings.js';
@@ -462,4 +462,34 @@ test('holdsnittet for højde ligger tæt på den danske 181 cm (før ≈186)', (
   for (let seed = 1; seed <= 20; seed++) for (const t of createLeague(createRng(seed)).teams) hs.push(t.squad.reduce((a, p) => a + p.heightCm, 0) / 18);
   const mean = hs.reduce((a, b) => a + b) / hs.length;
   assert.ok(mean >= 180 && mean <= 182, String(mean));
+});
+
+// ---------- v3.6: startformel, højder og forsæson-indtryk (Test Manager) ----------
+// rng-stub: int(a, b) returnerer altid v (klemt til [a, b]).
+const fixedInt = (v) => ({ int: (a, b) => Math.max(a, Math.min(b, v)) });
+test('mod-kunnen start: round((alder−16)·1,2 + POS·0,8) + støj −8..8, klemt 5–45 og skaleret ind i puljen', () => {
+  // 26 år, POS 10: 12 + 8 = 20 (kildens 2,2/1,5 gav 37)
+  assert.deepEqual(initialCounterTactics(fixedInt(0), 26, 10), { vsPress: 20, vsLowBlock: 20, vsTrapLong: 20 });
+  assert.deepEqual(initialCounterTactics(fixedInt(8), 26, 10), { vsPress: 28, vsLowBlock: 28, vsTrapLong: 28 }); // støj højst +8
+  assert.deepEqual(initialCounterTactics(fixedInt(-9), 17, 1), { vsPress: 5, vsLowBlock: 5, vsTrapLong: 5 }); // 2 − 8 → bund 5
+  // 40 år, POS 20: 28,8 + 16 = 44,8 → 45 (+8 → 53 → klemt 45); 3·45 = 135 > 100 → ·100/135 = 33,3 → 33·3 = 99
+  assert.deepEqual(initialCounterTactics(fixedInt(8), 40, 20), { vsPress: 33, vsLowBlock: 33, vsTrapLong: 33 });
+});
+
+test('højde: snit pr. kæde = HEIGHT_MID (±1 cm), spredning ca. 5,5 cm (tre terninger −5..5)', () => {
+  const by = { GK: [], DEF: [], MID: [], ATT: [] };
+  for (let seed = 1; seed <= 40; seed++) for (const t of createLeague(createRng(seed)).teams) for (const p of t.squad) by[p.line].push(p.heightCm);
+  for (const [line, hs] of Object.entries(by)) {
+    const mean = hs.reduce((a, b) => a + b) / hs.length, sd = Math.sqrt(hs.reduce((a, h) => a + (h - mean) ** 2, 0) / hs.length);
+    assert.ok(Math.abs(mean - HEIGHT_MID[line]) <= 1, `${line} snit ${mean}`);
+    assert.ok(sd >= 4.9 && sd <= 6.2, `${line} spredning ${sd}`); // to terninger ≈4,5; én bred ≈8,9
+  }
+  assert.deepEqual(HEIGHT_MID, { GK: 186, DEF: 182, MID: 178, ATT: 181 });
+});
+
+test('forsæson-indtrykket om luftspillet kræver 187 cm (før 190) og spring 13', () => {
+  const vp = { cynicism: 5, theatre: 5, varPulse: 5 };
+  assert.ok(generateScoutingClues('A. B', vp, 187, 13).some((c) => c.includes('en hel etage')));
+  assert.ok(!generateScoutingClues('A. B', vp, 186, 13).some((c) => c.includes('en hel etage')));
+  assert.ok(!generateScoutingClues('A. B', vp, 187, 12).some((c) => c.includes('en hel etage')));
 });

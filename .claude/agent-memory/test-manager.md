@@ -15,3 +15,6 @@
 - XP: gain=4 giver samme sekundær for 0,4/0,5/0,6 og round/floor/ceil -> brug gain 3/5. Tjek ledningen ratings.js xpFor(minutter, tacticWins, goals): alle tre kan nulstilles med grøn suite.
 - e2e '.mine'-klasse testes kun hvor mit hold tilfældigvis står som a/hjemme -> asymmetriske mutationer overlever; test begge sider.
 - Ækvivalent mutation: Math.max(1, rule.margin || 1) – ||1 skjuler max(0..) for margin 0; brug negativ margin (-2).
+- Scratchpad deles på tværs af kørsler: tjek at harness-filen ikke findes i forvejen (Bash-heredoc kan lykkes selvom svaret er "afvist"; Edit med tom old_string fejler hvis filen findes) -> brug ny undermappe med unikt navn, ellers kører en GAMMEL mutationsliste mod koden. Kør `git checkout -- public` efter afbrudt harness.
+- v3.6 mod-kunnen-pulje/skema 3: kun skema 1-fixturet køres i e2e -> migreringsbeskeden for skema 2 (brugerens egen liga!) er utestet (`<= 2` -> `<= 1` overlever). Startformlen (alderfaktor, positioning-vægt, rng-spændvidde, klem 45, fitPool-kaldet) testes kun af bånd 5–45 + middel 12–26 -> alle overlever. HEIGHT_MID testes kun ±15 -> holdsnit 181 er ubevist. Kortets "Erfaring brugt X/120" har ingen test.
+- fitPool: `keep`-klemmen (Math.max(floor,..)) og `break excess<=0` er ÆKVIVALENTE mutationer (matematisk umulige at ramme) – spild ikke tid.

@@ -311,3 +311,20 @@ test('skema 1-fixturet løftes hele vejen til 3', () => {
   const p = r.state.league.teams[0].squad[0], o = JSON.parse(FIXTURE).league.teams[0].squad[0];
   assert.equal(p.heightCm, o.heightCm - 5);
 });
+
+test('migrering 2 → 3 alene: værdier over puljen skaleres forholdsmæssigt (rækkefølgen bevares), manglende felter får standard', async () => {
+  const { MIGRATIONS } = await import('../../public/state/storage.js');
+  const d = JSON.parse(FIXTURE2);
+  const [a, b, c] = d.league.teams[0].squad;
+  a.age = 30; a.counterTactics = { vsPress: 90, vsLowBlock: 80, vsTrapLong: 70 };
+  b.age = 22; b.counterTactics = { vsPress: 40 };
+  delete c.age; c.counterTactics = { vsPress: 20, vsLowBlock: 20, vsTrapLong: 20 };
+  const out = MIGRATIONS[2](d);
+  assert.equal(out.schemaVersion, 3);
+  // ×0,55: 50, 44, 39 (sum 133) → ·100/133: 38, 33, 29 = 100
+  assert.deepEqual(out.league.teams[0].squad[0].counterTactics, { vsPress: 38, vsLowBlock: 33, vsTrapLong: 29 });
+  // manglende nøgler regnes som 15 → ·0,55 = 8
+  assert.deepEqual(out.league.teams[0].squad[1].counterTactics, { vsPress: 22, vsLowBlock: 8, vsTrapLong: 8 });
+  // uden alder: bund 5 (som en 20-årig) – 20·0,55 = 11
+  assert.deepEqual(out.league.teams[0].squad[2].counterTactics, { vsPress: 11, vsLowBlock: 11, vsTrapLong: 11 });
+});
