@@ -44,7 +44,7 @@ const GOAL_TEXTS = {
   ],
   DRIBBLE: [
     (s, a, m) => `En dribletur for historiebøgerne i ${m}. minut: ${s} snoede sig forbi tre mand og satte bolden roligt ind.`,
-    (s, a, m) => `${s} tog sagen i egen hånd i ${m}. minut, driblede ind fra kanten og afsluttede selv.`,
+    (s, a, m) => `${s} tog sagen i egen hånd i ${m}. minut, driblede sig forbi sin mand og afsluttede selv.`,
     (s, a, m) => `Ren individuel klasse i ${m}. minut: ${s} vendte forsvareren rundt på en tallerken og scorede.`,
   ],
   COUNTER: [

@@ -822,9 +822,19 @@ test('kontra-teksten: kun DIT holds valg forklares – fire kombinationer; "høj
   assert.match(txt('FAST_COUNTER', {}), /Din lynkontra løber ind i et organiseret forsvar\./);
   assert.match(txt('KEEP_POSSESSION', { 0.032: true }), /Dit hold ser hullet og går direkte\./);
   assert.match(txt('KEEP_POSSESSION', {}), /Dit hold falder til ro på bolden\./);
-  // Du taber bolden på Mange: din back nævnes; på Normal intet om løb
-  const many = counters({ home: { p1: { offBallRuns: 'MANY' } }, script: { 0.088: true } }).m.events.find((e) => e.type === 'GOAL').text;
-  assert.match(many, /Din LB #\d+ .+ er højt oppe efter sit løb\./);
+  // Du taber bolden på Mange: den back, der faktisk har løbet frem, nævnes – ingen løb, intet navn
+  const noRuns = counters({ home: { p1: { offBallRuns: 'MANY' } }, script: { 0.088: true } }).m.events.find((e) => e.type === 'GOAL').text;
+  assert.doesNotMatch(noRuns, /højt oppe/, 'ingen back har løbet i den kamp');
+  // 3-5-2 på Mange: hver anden tick en chance, hvor terningen 0,5 lægger løbet på RWB (vægt 7,9–9,9
+  // af 18,9); de andre ticks tabes presset og der kontres (0,2·0,4·1,1 for LWB+RWB = 0,088)
+  const a = arena({ home: { p1: { offBallRuns: 'MANY' } } });
+  a.H.tactics.baseFormation = '3-5-2';
+  for (const p of mids(a.A)) p.skills.intercepting = 20;
+  const mm = simulateMatch(a.H, a.A, stubRng({ 0.48: (n) => n % 2 === 1, 0.36: true, 0.088: true }));
+  const rwb = slot(a.H, 7);
+  assert.ok(mm.ratings.home.find((e) => e.playerId === rwb.id).freeRuns > 0);
+  const many = mm.events.filter((e) => e.type === 'GOAL' && e.text.includes('KONTRA')).at(-1).text;
+  assert.match(many, new RegExp(`Din RWB #${rwb.shirtNumber} ${rwb.shortName} er højt oppe efter sit løb\\.`));
   const normal = counters({ script: { 0.032: true } }).m.events.find((e) => e.type === 'GOAL').text;
   assert.doesNotMatch(normal, /højt oppe|løb/);
   // Modstanderen på Mange taber bolden til dig: hans indstilling nævnes aldrig
@@ -876,6 +886,43 @@ test('løb: tabt løb (forsvareren følger med) → almindelig chance som før, 
   assert.ok(r.kinds.length === 30 && r.kinds.every((k) => k === 'COMBINATION'));
   for (const t of r.goals) assert.doesNotMatch(t, /fri/);
 });
+test('løb: kun DINE lave cutbacks vægter afleveringen fra kanten – en bots fokus påvirker ikke måltypen (anti-spionage)', () => {
+  // Kant: skud 0,5 · aflevering 4·3 (·1,3 = 15,6) · dribling 7·2 → uden fokus dribling, med fokus aflevering
+  const rm = { finishing: 4, passing: 10, pace: 13, ballControl: 13 }; // FIN 4: skudvægt 0,5, men nok til at score (4 + 4 + 3,5 > 1 + 4 + 5)
+  const base = decide({ rm }).kinds; assert.ok(base.length >= 25 && base.every((k) => k === 'DRIBBLE'), 'uden fokus: ' + base.join());
+  const mine = decide({ rm, script: {} });
+  const own = (() => { const a = arena({ home: { p1: { attackFocus: 'LOW_CUTBACKS' } } }); Object.assign(slot(a.H, 8).skills, rm); for (const p of mids(a.A)) p.skills.passing = 1; for (const i of [1, 2, 3, 4]) Object.assign(slot(a.A, i).skills, { positioning: 1, intercepting: 1, strength: 1 }); slot(a.A, 0).skills.goalkeeping = 1; return a; })();
+  const ownKinds = simulateMatch(own.H, own.A, stubRng({ 0.3: true })).goalsPool.map((g) => g.kind);
+  assert.ok(ownKinds.length >= 25 && ownKinds.every((k) => k === 'CUTBACK'), ownKinds.join());
+  own.H.isBot = true; // samme hold som bot: fokus må ikke ændre noget
+  const botKinds = simulateMatch(own.H, own.A, stubRng({ 0.3: true })).goalsPool.map((g) => g.kind);
+  assert.ok(botKinds.length >= 25 && botKinds.every((k) => k === 'DRIBBLE'), botKinds.join());
+  assert.ok(mine.kinds.length >= 25);
+});
+test('anti-spionage i koden: ingen referattekst læser modstanderens løb uden bold – kun egne (own) eller udfaldet', async () => {
+  const fs = await import('node:fs');
+  const src = fs.readFileSync(new URL('../../public/engine/match.js', import.meta.url), 'utf8');
+  const reads = src.split('\n').filter((l) => /offBallRuns/.test(l) && !/^\s*\/\//.test(l));
+  assert.ok(reads.length >= 4, 'testdata: feltet læses');
+  // Hver læsning er enten mekanik (sandsynlighed/vægt) eller bag own(...): ingen tekst-skabelon på samme linje uden own
+  for (const l of reads) if (/`/.test(l)) assert.match(l, /own\(/, l);
+  // Teksten "højt oppe" står kun i grenen for dit eget hold
+  const hoj = src.split('\n').filter((l) => l.includes('højt oppe'));
+  assert.ok(hoj.length >= 1 && src.includes("own(lose) && lose.tactics.phases.phase1_buildUp.offBallRuns === 'MANY'"));
+});
+test('Hvis-Så-planskift bærer løb uden bold med: skift til en plan på Mange giver Mange-chancen (0,36)', () => {
+  const a = arena();
+  a.H.tacticPresets = [structuredClone(a.H.tactics), structuredClone(a.H.tactics), structuredClone(a.H.tactics)];
+  a.H.tacticPresets[1].phases.phase1_buildUp.offBallRuns = 'MANY';
+  a.H.tactics.conditionalRules = [{ ruleId: 1, minuteTrigger: 45, condition: 'DRAW', margin: 1, newFormation: '4-4-2', newPlan: 1, slotRemapping: null }];
+  const seen = [];
+  const rng = { ...stubRng(), chance: (p) => { seen.push(p); return false; } };
+  simulateMatch(a.H, a.A, rng);
+  // Hjemme har bolden hele kampen: chance-kast 0,3 før minut 45, 0,36 efter skiftet
+  assert.ok(seen.includes(0.3) && seen.includes(0.36), [...new Set(seen)].join(','));
+  assert.ok(seen.indexOf(0.36) > seen.lastIndexOf(0.3));
+});
+
 test('løb: modstanderens løb fortælles aldrig – kun handlingen', () => {
   const a = arena();
   for (const p of mids(a.A)) p.skills.passing = 11;           // ude-holdet har bolden

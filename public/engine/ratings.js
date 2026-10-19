@@ -74,13 +74,13 @@ export function runProfile(player, team, rng, role) {
   const ph = team.tactics?.phases;
   const runsF = RUNS_ROLES.has(role) ? ph?.phase1_buildUp?.offBallRuns ?? 'NORMAL' : 'NORMAL';
   const genpres = ph?.phase3_transition?.onBallLost === 'COUNTER_PRESS_5S' && player.line !== 'GK' ? 1.04 : 1;
-  const km90 = base.km * (0.9 + sta * 0.01) * press * RUNS_KM[runsF] * genpres * (0.96 + rng.next() * 0.08);
+  const km90 = base.km * (0.9 + sta * 0.01) * press * (RUNS_KM[runsF] ?? 1) * genpres * (0.96 + rng.next() * 0.08);
   const topSpeed = Math.round(clamp(25 + pac * 0.45 + (player.line === 'GK' ? -3 : 0) + (rng.next() * 2 - 1), 22, 36) * 10) / 10;
   // Andel højintenst løb (over ca. 20 km/t; v3.7.1, brugeren: "hvor stor en andel af deres løb
   // der er højintense løb"): rolle-basis, fart, pres og friskhed trækker op/ned,
   // ±1 %-point støj, klemt 1–20 %.
   const fresh = Math.max(0, Math.min(100, player.freshness ?? 100));
-  const hiShare = Math.round(clamp((base.hi + (pac - 10) * 0.4) * (PRESS_HI[team.tactics?.phases?.phase2_defending?.pressingHeight] ?? 1) * RUNS_HI[runsF] * (0.8 + 0.2 * fresh / 100) + (rng.next() * 2 - 1), 1, 20) * 10) / 10;
+  const hiShare = Math.round(clamp((base.hi + (pac - 10) * 0.4) * (PRESS_HI[team.tactics?.phases?.phase2_defending?.pressingHeight] ?? 1) * (RUNS_HI[runsF] ?? 1) * (0.8 + 0.2 * fresh / 100) + (rng.next() * 2 - 1), 1, 20) * 10) / 10;
   return { km90, topSpeed, hiShare };
 }
 const PRESS_HI = { HIGH_GEGENPRESS: 1.15, MID_BLOCK: 1, LOW_BLOCK: 0.9 };

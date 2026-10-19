@@ -180,7 +180,10 @@ export function simulateMatch(home, away, rng, opts = {}) {
     st[k(win, 'Shots')]++;
     st[k(win, 'Xg')] += 0.2 + rng.next() * 0.2;
     // Kun DIT holds egen indstilling må forklare kontraen; modstanderens nævnes aldrig.
-    const fbSlot = own(lose) && lose.tactics.phases.phase1_buildUp.offBallRuns === 'MANY' ? coordsOf(lose.tactics).findIndex((c) => FB_ROLES.has(c.r)) : -1;
+    // Den back/wingback, der har løbet mest frem i kampen – kun nævnt, hvis han faktisk har løbet.
+    const fbSlots = own(lose) && lose.tactics.phases.phase1_buildUp.offBallRuns === 'MANY' ? coordsOf(lose.tactics).map((c, i) => i).filter((i) => i > 0 && FB_ROLES.has(coordsOf(lose.tactics)[i].r) && lose.starters[i]) : [];
+    const runsOf = (i) => sheet.entries[lose.starters[i].id]?.freeRuns ?? 0;
+    const fbSlot = fbSlots.filter((i) => runsOf(i) > 0).sort((x, y) => runsOf(y) - runsOf(x))[0] ?? -1;
     const why = fbSlot > 0 ? ` Din ${coordsOf(lose.tactics)[fbSlot].r} ${tag(lose.starters[fbSlot])} er højt oppe efter sit løb.` : '';
     if (shooter.skills.finishing * freshFactor(shooter) + rng.next() * 8 + COUNTER_FINISH_BONUS > gk.skills.goalkeeping * freshFactor(gk) + rng.next() * 8) {
       if (win === H) hG++; else aG++;
@@ -384,7 +387,8 @@ export function simulateMatch(home, away, rng, opts = {}) {
       const cR = att === H ? hR : aR, dR = def === H ? hR : aR;
       const shooter = rng.pick(cR.atts.concat(cR.mids)), assister = rng.pick(cR.mids), defender = rng.pick(dR.defs), gk = dR.gk;
       st[k(att, 'Shots')]++;
-      st[k(att, 'Xg')] += 0.13 + rng.next() * 0.22;
+      const shotXg = 0.13 + rng.next() * 0.22;
+      st[k(att, 'Xg')] += shotXg;
       const scored = () => { if (att === H) hG++; else aG++; st[k(att, 'OnTarget')]++; };
       const assist = (bonus) => { if (assister.id !== shooter.id) { sheet.adjust(assister.id, bonus); sheet.bump(assister.id, 'assists'); } };
       const high = attPh.phase1_buildUp.attackFocus === 'HIGH_CROSSES' || attPh.phase1_buildUp.passingStyle === 'DIRECT_LONG';
@@ -439,7 +443,8 @@ export function simulateMatch(home, away, rng, opts = {}) {
         if (runWon) {
           sheet.bump(runner.id, 'freeRunsWon'); duelLog[att.team.id].runsWon++; sheet.adjust(runner.id, 0.15);
           const zone = runZone(slotPosition(att.tactics, pick.i));
-          const w = decisionWeights(rs, zone, attPh.phase1_buildUp.attackFocus === 'LOW_CUTBACKS');
+          // Kun DIT holds angrebsfokus vægter (ellers røbede cutback-andelen modstanderens fokus).
+          const w = decisionWeights(rs, zone, own(att) && attPh.phase1_buildUp.attackFocus === 'LOW_CUTBACKS');
           let rd = rng.next() * (w.SHOT + w.PASS + w.DRIBBLE);
           const choice = ['SHOT', 'PASS', 'DRIBBLE'].find((c) => (rd -= w[c]) < 0) || 'SHOT';
           const where = { WIDE: 'på kanten', DEEP: 'dybt i banen', MID: 'mellem kæderne', HIGH: 'bag forsvaret' }[zone];
@@ -454,7 +459,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
               > (defender.skills.positioning + defender.skills.strength * 0.5) * freshFactor(defender) + rng.next() * 8 + DRIBBLE_DEF_EDGE;
             if (!beat) {
               // Opsnapning: ingen afslutning – og samme kontra-tjek som efter et vundet pres.
-              st[k(att, 'Shots')]--;
+              st[k(att, 'Shots')]--; st[k(att, 'Xg')] -= shotXg;
               sheet.adjust(defender.id, 0.3); sheet.bump(defender.id, 'tacticWins');
               addEv(min, 'INFO', 'PLAY', def.isHome, false, 'Opsnappet', own(att) ? `❌ ${tag(runner)} løber sig fri ${where}, men ${tag(defender)} (${def.team.name}) tager bolden i driblingen.` : `🛡️ [${def.team.name}] ${tag(defender)} tager bolden fra ${tag(runner)} (${att.team.name}).`);
               if (rng.chance(counterChance(runs, attPh.phase3_transition.onBallLost, defPh.phase3_transition.onBallWon, fbCount(att)))) counterAttack(def, att, min, dR, cR);
