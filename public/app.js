@@ -28,7 +28,14 @@ let view = { viewTeamIdx: 0, sortCol: 'pos', sortDesc: false, filter: 'all', sel
 
 // Skift af hold/visning afbryder et påbegyndt byt, så et senere klik aldrig bytter uden varsel.
 const clearSwap = () => { view.swapId = null; view.pitchSwapId = null; };
-function showTeam(idx) { view.viewTeamIdx = idx; clearSwap(); view.notice = ''; view.selectedPlayerId = game.league.teams[idx].squad[0].id; render(); }
+// Holdvælgeren viser holdet i Trup, hvis man står i Kamp/Liga (der ville valget ellers ikke ses).
+function showTeam(idx) {
+  view.viewTeamIdx = idx; clearSwap(); view.notice = ''; view.selectedPlayerId = game.league.teams[idx].squad[0].id;
+  if (game.ui.tab === 'kamp' || game.ui.tab === 'liga') { game.ui.tab = 'trup'; persist(); }
+  render();
+}
+// Et nyt spil (ny liga/import) må ikke vise den gamle ligas runde i Kamp-fanen.
+function dropMatchView() { clearInterval(timer); timer = null; mc = null; }
 
 const app = document.getElementById('app');
 const controls = document.getElementById('controls');
@@ -79,7 +86,7 @@ function renderLoadError(r) {
     r.backupKey ? h('p', {}, `Dine data er IKKE slettet: de er gemt i browseren under "${r.backupKey}". Hent dem som fil, og send filen med, hvis du vil have dem reddet.`) : null,
     r.backupKey ? h('button', { id: 'download-backup', onclick: () => download(storage.getItem(r.backupKey), `${r.backupKey}.json`) }, '⬇ Hent backup som fil') : null,
     h('div', { class: 'row' },
-      h('button', { id: 'start-new', onclick: () => { const g = newGame(); const res = resetGame(storage, g); if (!res.ok) { window.tactivarFejl?.(res.error); return; } game = g; view.viewTeamIdx = myIdx(); render(); } }, '🎲 Start en ny liga'),
+      h('button', { id: 'start-new', onclick: () => { const g = newGame(); const res = resetGame(storage, g); if (!res.ok) { window.tactivarFejl?.(res.error); return; } dropMatchView(); game = g; view.viewTeamIdx = myIdx(); render(); } }, '🎲 Start en ny liga'),
       importButton())));
   document.body.dataset.klar = 'ja';
 }
@@ -91,7 +98,7 @@ function importButton() {
     if (!r.ok) { window.tactivarFejl?.(`Import mislykkedes: ${r.error}`); return; }
     const res = resetGame(storage, r.state);
     if (!res.ok) { window.tactivarFejl?.(res.error); return; }
-    game = r.state; view.viewTeamIdx = myIdx(); view.notice = `Spillet er importeret fra ${file.name}.${res.backupKey ? ` Det tidligere spil ligger som backup (${res.backupKey}).` : ''}`; view.savedAt = res.savedAt; render();
+    dropMatchView(); game = r.state; view.viewTeamIdx = myIdx(); view.notice = `Spillet er importeret fra ${file.name}.${res.backupKey ? ` Det tidligere spil ligger som backup (${res.backupKey}).` : ''}`; view.savedAt = res.savedAt; render();
   } });
   return h('span', {}, input, h('button', { onclick: () => input.click() }, '⬆ Importér'));
 }
@@ -120,7 +127,7 @@ function renderControls() {
       if (!confirm('Start en helt ny liga? Det nuværende spil gemmes som backup i browseren.')) return;
       const g = newGame(); const r = resetGame(storage, g);
       if (!r.ok) { window.tactivarFejl?.(r.error); return; }
-      game = g; view = { ...view, viewTeamIdx: myIdx(), selectedPlayerId: null, notice: r.backupKey ? `Ny liga startet. Det gamle spil ligger som backup (${r.backupKey}).` : 'Ny liga startet.' }; view.savedAt = r.savedAt; render();
+      dropMatchView(); game = g; view = { ...view, viewTeamIdx: myIdx(), selectedPlayerId: null, notice: r.backupKey ? `Ny liga startet. Det gamle spil ligger som backup (${r.backupKey}).` : 'Ny liga startet.' }; view.savedAt = r.savedAt; render();
     } }, '🎲 Ny liga')].filter(Boolean));
 }
 
@@ -171,7 +178,7 @@ function render() {
     removeRule: (i) => change(() => act.removeRule(team, i)),
   } });
 
-  const standings = renderStandings({ league, viewTeamId: team.id, onPick: (id) => { game.ui.tab = 'trup'; persist(); showTeam(league.teams.findIndex((t) => t.id === id)); } });
+  const standings = renderStandings({ league, viewTeamId: team.id, onPick: (id) => showTeam(league.teams.findIndex((t) => t.id === id)) });
 
   // Faner: ét emne ad gangen (brugerens ønske: "et noget rodet layout").
   const tab = TABS.some(([k]) => k === game.ui.tab) ? game.ui.tab : 'trup';
@@ -212,6 +219,7 @@ function renderBench(team) {
 // før bogføringen) – lukkes fanen midt i, er runden alligevel talt med én gang.
 // Knappen er spærret under afspilning (det er vagten mod at starte to runder).
 function playNextRound() {
+  clearSwap(); view.notice = '';
   const rng = createRng(randomSeed());
   const result = playRound(game.league, game.ui.opponentIdx, rng);
   commitRound(game.league, result, rng);

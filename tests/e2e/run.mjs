@@ -260,6 +260,11 @@ try {
   await tab('liga');
   const stHead = await g.textContent('#standings-title');
   check('Ligatabellen er opdateret efter runde 1', stHead.includes('efter 1 runde'), stHead);
+  await g.selectOption('#team-select', '2');
+  check('Holdvælgeren i Liga-fanen viser holdet i Trup', (await g.textContent('#tabs .tab.active')).includes('Trup') && (await g.textContent('#club-name')) === (await g.locator('#team-select option').nth(2).textContent()));
+  await g.selectOption('#team-select', '0');
+  await g.locator('#matrix tbody tr:nth-child(2) button').click();
+  check('Påbegyndt byt viser besked', (await g.textContent('#notice')).includes('Vælg den spiller'));
   await reload();
   check('Efter F5: runden er gemt', (await g.textContent('#play-round')).includes('runde 2'));
   await tab('kamp');
@@ -268,6 +273,7 @@ try {
   // Runden er bogført og gemt FØR afspilningen: luk/genindlæs midt i kampen
   await g.click('#play-round');
   await g.waitForSelector('#skip');
+  check('▶ Spil runde afbryder et påbegyndt byt og fjerner beskeden', (await g.locator('#notice').count()) === 0);
   const liveCard = await g.textContent('#match-cards .matchcard:nth-child(1)');
   check('Under afspilning viser kort 1 live-stillingen fra 0-0, ikke slutresultatet', /0-0/.test(liveCard), liveCard);
   await reload();
@@ -323,11 +329,15 @@ try {
 
   // Ny liga og import tager backup af det nuværende spil
   await g.selectOption('#team-select', '0');
+  await g.click('#play-round'); await g.click('#skip'); // en runde i Kamp-fanen, som Ny liga skal fjerne
+  await tab('trup');
   const savedBefore = await g.evaluate(() => localStorage.getItem('tactivar_save'));
   g.once('dialog', (d) => d.accept());
   await g.click('#new-league');
   const backups = async () => g.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('tactivar_backup_')).map((k) => localStorage.getItem(k)));
   check('Ny liga: det gamle spil ligger i backup', (await backups()).includes(savedBefore));
+  await tab('kamp');
+  check('Ny liga: Kamp-fanen viser ikke den gamle ligas runde', (await g.locator('#match-center').count()) === 0 && (await g.isVisible('#no-matches')));
   const exported = await g.evaluate(() => localStorage.getItem('tactivar_save'));
   await g.setInputFiles('#import-file', { name: 'gammel.json', mimeType: 'application/json', buffer: Buffer.from(savedBefore) });
   await g.waitForFunction(() => document.getElementById('notice')?.textContent.includes('importeret'));
