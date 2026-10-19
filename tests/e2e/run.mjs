@@ -166,7 +166,7 @@ try {
   const oppBefore = await g.locator('#pitch .token[data-slot="2"] .token-name').textContent();
   await g.click('#pitch .token[data-slot="2"]'); await g.click('#pitch .token[data-slot="3"]');
   check('Modstander: klik på to brikker bytter ikke', (await g.locator('#pitch .token[data-slot="2"] .token-name').textContent()) === oppBefore);
-  check('Ligatabellen viser holdenes typiske stil', (await g.textContent('#standings')).includes('•'));
+  check('Ligatabellen viser ikke andre holds taktiske stil', !(await g.textContent('#standings')).includes('•') && !(await g.textContent('#standings')).includes('Gegenpress'));
   // Layout: regnearket i fuld bredde uden sidelæns scroll; 3/2/1 kolonner nedenunder
   const colsAt = async (w) => { await g.setViewportSize({ width: w, height: 900 }); return g.evaluate(() => getComputedStyle(document.querySelector('.cols')).gridTemplateColumns.split(' ').length); };
   check('Layout: 3 kolonner ved 1400 px, 2 ved 1000 px, 1 ved 700 px', (await colsAt(1400)) === 3 && (await colsAt(1000)) === 2 && (await colsAt(700)) === 1);

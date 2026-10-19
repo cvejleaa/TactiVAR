@@ -11,7 +11,6 @@ import { renderCard } from './ui/card.js';
 import { renderPitch } from './ui/pitch.js';
 import { renderTactics } from './ui/tactics.js';
 import { renderStandings } from './ui/standings.js';
-import { opponentTacticKeys } from './engine/counter.js';
 import { playRound, commitRound } from './engine/season.js';
 import { renderMatchCenter } from './ui/matchcenter.js';
 
@@ -126,7 +125,7 @@ function render() {
 
   const opponentPick = isOwn ? h('div', { class: 'panel row', id: 'opponent-bar' },
     h('label', {}, '🎯 Næste modstander ', select(String(game.ui.opponentIdx), league.teams.map((t, i) => [String(i), t.name]).filter(([i]) => Number(i) !== myIdx()), (v) => change(() => { game.ui.opponentIdx = Number(v); }), { id: 'opponent-select' })),
-    h('span', { class: 'muted' }, `🧠 Mod-kolonnen måler mod-kunnen mod ${opponent.name}s typiske stil: ${opponentTacticKeys(opponent).label}`)) : null;
+    h('span', { class: 'muted' }, `🧠 Mod-kolonnen viser dine spilleres mod-kunnen mod ${opponent.name}`)) : null;
 
   const matrix = renderMatrix({
     team, isOwn, opponent, ui: { ...view }, notes: game.notes,

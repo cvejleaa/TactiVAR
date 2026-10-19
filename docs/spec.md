@@ -72,7 +72,7 @@ Clues opstår i kampe. **Rettet:** v2.5b gemmer clues på modstanderens
 spillerobjekt; de skal ligge hos den der observerer.
 
 ## 3. Hvem ser hvad (anti-spionage)
-- Offentligt: navn ("F. Efternavn" på banen), rygnummer, kæde, alder, højde, friskhed, skadesstatus 🚑, stjerner (★☆☆☆☆–★★★★★), holdets formation og typiske stil (fx "4-2-3-1 • Gegenpress + VAR-Linje" – som i v2.5, og den afsløres alligevel i referaterne).
+- Offentligt: navn ("F. Efternavn" på banen), rygnummer, kæde, alder, højde, friskhed, skadesstatus 🚑, stjerner (★☆☆☆☆–★★★★★), holdets startformation. Intet andet om andre holds taktik (brugerens beslutning, afviger bevidst fra v2.5): ingen faser, planer, Hvis-Så-regler eller "typisk stil" – heller ikke i ligatabellen, kamphovedet, det taktiske oplæg eller referatet. Et modstanderholds Hvis-Så-skift vises kun som "omorganiserer sig". Referatet navngiver kun dine egne taktikvalg. (Trin 1 lægger teksterne i motoren med det menneskestyrede hold som seer; trin 2 skal gøre dem seer-afhængige.)
 - Kun ejer: 9 evner, spring, luftduel, arketype, løn/værdi, kasse, de præcise fasevalg og Hvis-Så-regler,
   eksakt karakter, mod-kunnen.
 - Ingen: VAR-profil (kun via clues).

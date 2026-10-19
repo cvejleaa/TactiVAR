@@ -3,7 +3,7 @@
 // Rettet ift. v2.5b: auto-indskiftning sker i en kamplokal kopi (ændrede før lineupSlots
 // permanent), og Hvis-Så-reglerne kører for begge hold og skifter reelt formation.
 import { FORMATIONS, lineOfRole, isOutOfZone } from './formations.js';
-import { masteryVs, opponentTacticKeys, counterXpForMatch } from './counter.js';
+import { masteryVs, counterXpForMatch } from './counter.js';
 import { createSheet, finalizeSheet } from './ratings.js';
 import { describeFinish, describeHeader, describeVarTiming } from './clues.js';
 
@@ -82,8 +82,11 @@ export function simulateMatch(home, away, rng, opts = {}) {
   const hAvg = Math.round(avg(H.starters, (p) => masteryVs(p, away)));
   const aAvg = Math.round(avg(A.starters, (p) => masteryVs(p, home)));
 
-  const tacticStr = (s) => { const p = s.tactics.phases; return `${s.tactics.baseFormation} • ${TXT[p.phase1_buildUp.passingStyle]} / ${TXT[p.phase2_defending.pressingHeight]}`; };
-  const masteryIntro = !home.isBot ? ` Din Start-11 har i gennemsnit 🧠 ${hAvg}% Mod-Kunnen mod ${opponentTacticKeys(away).label}.` : '';
+  // Andre holds taktiske overvejelser (faser, Hvis-Så) må ikke kunne læses – kun deres
+  // startopstilling. Egne valg (det menneskestyrede hold) vises fuldt.
+  const own = (s) => !s.team.isBot;
+  const tacticStr = (s) => { const p = s.tactics.phases; return own(s) ? `${s.tactics.baseFormation} • ${TXT[p.phase1_buildUp.passingStyle]} / ${TXT[p.phase2_defending.pressingHeight]}` : s.tactics.baseFormation; };
+  const masteryIntro = !home.isBot ? ` Din Start-11 har i gennemsnit 🧠 ${hAvg}% Mod-Kunnen mod ${away.name}.` : '';
   const hCustom = customDragged(H);
   const customIntro = hCustom.length ? ` Bemærk: ${home.name} har trukket ${tag(hCustom[0].player)} ud af sin grundposition.` : '';
   for (const n of lineupNotes) addEv(1, 'LINEUP', 'TACTIC', n.isHome, false, 'Ændret startopstilling', n.text);
@@ -124,7 +127,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
         side.tactics.customCoords = structuredClone(plan.customCoords || {});
         side.tactics.phases = structuredClone(plan.phases);
         const name = `Plan ${PLAN_LETTERS[rule.newPlan]}`;
-        addEv(min, 'TRIGGER', 'HIGHLIGHT', side.isHome, true, `${side.team.name} skifter til ${name}`, `📋 [${side.team.name} • Hvis-Så] I ${min}. minut skifter holdet fra ${from} til ${name} (${plan.baseFormation}, ${TXT[plan.phases.phase1_buildUp.passingStyle]} / ${TXT[plan.phases.phase2_defending.pressingHeight]}).`);
+        announceShift(side, min, `${side.team.name} skifter til ${name}`, `📋 [${side.team.name} • Hvis-Så] I ${min}. minut skifter holdet fra ${from} til ${name} (${plan.baseFormation}, ${TXT[plan.phases.phase1_buildUp.passingStyle]} / ${TXT[plan.phases.phase2_defending.pressingHeight]}).`);
         return;
       }
       if (!FORMATIONS[rule.newFormation]) return;
@@ -136,8 +139,15 @@ export function simulateMatch(home, away, rng, opts = {}) {
       }
       side.tactics.baseFormation = rule.newFormation;
       side.tactics.customCoords = {};
-      addEv(min, 'TRIGGER', 'HIGHLIGHT', side.isHome, true, `${side.team.name} skifter til ${rule.newFormation}`, `📋 [${side.team.name} • Hvis-Så] I ${min}. minut skifter holdet fra ${from} til ${rule.newFormation}.`);
+      announceShift(side, min, `${side.team.name} skifter til ${rule.newFormation}`, `📋 [${side.team.name} • Hvis-Så] I ${min}. minut skifter holdet fra ${from} til ${rule.newFormation}.`);
     });
+  }
+
+  // Et modstanderholds Hvis-Så-skift kan ses på banen, men ikke læses: ingen regel,
+  // intet minut-kriterium, ingen ny formation.
+  function announceShift(side, min, label, text) {
+    if (own(side)) addEv(min, 'TRIGGER', 'HIGHLIGHT', side.isHome, true, label, text);
+    else addEv(min, 'TRIGGER', 'HIGHLIGHT', side.isHome, true, `${side.team.name} omorganiserer sig`, `🔁 [${side.team.name}] Holdet omorganiserer sig på banen.`);
   }
 
   for (let min = 3; min <= 90; min += 3) {
@@ -187,7 +197,9 @@ export function simulateMatch(home, away, rng, opts = {}) {
         st[k(att, 'TacticSuccess')]++;
         sheet.adjust(playmaker.id, 0.35); sheet.bump(playmaker.id, 'tacticWins');
         const note = !att.team.isBot && pmM >= 50 ? ` 🧠 [MOD-KUNNEN: ${pmM}%] ${tag(playmaker)} kender ${def.team.name}s pres og finder vejen igennem.` : ` ${tag(playmaker)} styrer midtbanen.`;
-        addEv(min, 'TACTIC_WIN', 'TACTIC', att.isHome, false, 'Fase 1 virker', `✅ [FASE 1 VIRKER • ${att.team.name}] ${TXT[pass]} bryder igennem ${def.team.name}s ${TXT[height]}.${note}`);
+        // Kun dit eget holds valg navngives; modstanderens stil beskrives ikke.
+        const how = own(att) ? `Dine ${TXT[pass]} bryder igennem ${def.team.name}s pres` : own(def) ? `${att.team.name} spiller sig igennem dit ${TXT[height]}` : `${att.team.name} spiller sig igennem ${def.team.name}s pres`;
+        addEv(min, 'TACTIC_WIN', 'TACTIC', att.isHome, false, 'Fase 1 virker', `✅ [FASE 1 VIRKER • ${att.team.name}] ${how}.${note}`);
       } else {
         st[k(def, 'TacticSuccess')]++;
         if (defPh.phase2_defending.offsideTrap !== 'OFF' && rng.chance(0.45)) {
