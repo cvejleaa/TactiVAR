@@ -41,7 +41,6 @@ export const sortStandings = (standings) => standings.slice().sort((a, b) =>
 export function commitRound(league, result, rng) {
   const byId = new Map(league.teams.map((t) => [t.id, t]));
   const players = new Map(league.teams.flatMap((t) => t.squad.map((p) => [p.id, p])));
-  const injuredBefore = new Set([...players.values()].filter((p) => p.injuryMatchesLeft > 0).map((p) => p.id));
   const played = new Set();
 
   for (const m of result.matches) {
@@ -66,7 +65,8 @@ export function commitRound(league, result, rng) {
   }
   for (const p of players.values()) {
     if (!played.has(p.id)) p.freshness = Math.min(100, p.freshness + 15);
-    if (injuredBefore.has(p.id)) p.injuryMatchesLeft = Math.max(0, p.injuryMatchesLeft - 1);
+    // Skader fra før runden heles én kamp; rundens nye skader lægges på nedenfor.
+    p.injuryMatchesLeft = Math.max(0, p.injuryMatchesLeft - 1);
   }
   for (const m of result.matches) for (const inj of m.injuries) players.get(inj.playerId).injuryMatchesLeft = inj.matches;
 

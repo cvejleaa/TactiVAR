@@ -5,7 +5,8 @@ import { FORMATIONS, FORMATION_NAMES, MAX_ANCHOR_RADIUS, isOutOfZone, clampPos, 
 import { createLeague, aerialBreakdown, rollStat, TEAM_NAMES } from '../../public/engine/generator.js';
 import { viewPlayer, canSeeField } from '../../public/engine/visibility.js';
 import { initialCounterTactics, opponentTacticKeys, masteryVs, counterXpForMatch, applyCounterXp } from '../../public/engine/counter.js';
-import { starsFromRating } from '../../public/engine/ratings.js';
+import { starsFromRating, createSheet, finalizeSheet } from '../../public/engine/ratings.js';
+import { describeFinish, describeHeader, describeVarTiming, generateScoutingClues } from '../../public/engine/clues.js';
 import { simulateMatch, MAX_SUBS } from '../../public/engine/match.js';
 import { playRound, commitRound, pairRound } from '../../public/engine/season.js';
 import { normalizeLeague } from '../../public/engine/sanitize.js';
@@ -125,7 +126,8 @@ test('mod-XP: 4–16 point; primær +XP, sekundær +60 %, øvrige −3 med alder
   assert.equal(counterXpForMatch({ minutesPlayed: 90, tacticWins: 9, goals: 1 }), 16);
   assert.equal(counterXpForMatch({ minutesPlayed: 10, tacticWins: 0, goals: 0 }), 4);
   const opp = phases('SHORT', 'CENTRAL', 'HIGH_GEGENPRESS', 'EXTREME_VAR_LINE'); // primær vsPress, sekundær vsTrapLong
-  assert.deepEqual(applyCounterXp({ vsPress: 50, vsLowBlock: 26, vsTrapLong: 50 }, 30, opp, 10), { vsPress: 60, vsLowBlock: 25, vsTrapLong: 56 });
+  assert.deepEqual(applyCounterXp({ vsPress: 50, vsLowBlock: 40, vsTrapLong: 50 }, 30, opp, 10), { vsPress: 60, vsLowBlock: 37, vsTrapLong: 56 });
+  assert.deepEqual(applyCounterXp({ vsPress: 50, vsLowBlock: 26, vsTrapLong: 50 }, 30, opp, 10).vsLowBlock, 25); // bund 25 for ≥26 år
   assert.deepEqual(applyCounterXp({ vsPress: 95, vsLowBlock: 13, vsTrapLong: 50 }, 20, opp, 10), { vsPress: 100, vsLowBlock: 12, vsTrapLong: 56 });
 });
 
@@ -133,6 +135,27 @@ test('mod-XP: 4–16 point; primær +XP, sekundær +60 %, øvrige −3 med alder
 test('stjernegrænser 8,35 / 7,25 / 6,15 / 5,15', () => {
   const cases = [[8.35, 5], [8.34, 4], [7.25, 4], [7.24, 3], [6.15, 3], [6.14, 2], [5.15, 2], [5.14, 1], [3.5, 1], [0, 0]];
   for (const [r, s] of cases) assert.equal(starsFromRating(r), s, `karakter ${r}`);
+});
+
+test('clean sheet: +0,5 til GK/CB/LB/RB, kun når holdet ikke lukker mål ind', () => {
+  const fixed = { next: () => 0.5 }; // startkarakter præcis 6,5
+  const mk = () => { const s = createSheet(); const team = { id: 'h', name: 'H', isBot: false };
+    s.register({ id: 'gk', shirtNumber: 1, shortName: 'G', line: 'GK' }, team, true, 'GK', 1, fixed, 25);
+    s.register({ id: 'st', shirtNumber: 9, shortName: 'S', line: 'ATT' }, team, true, 'ST', 1, fixed, 25); return s; };
+  const xp = () => 9;
+  const clean = finalizeSheet(mk(), 0, 0, fixed, xp).home, conceded = finalizeSheet(mk(), 0, 1, fixed, xp).home;
+  assert.equal(clean.find((e) => e.playerId === 'gk').rating, 7);
+  assert.equal(conceded.find((e) => e.playerId === 'gk').rating, 6.5);
+  assert.equal(clean.find((e) => e.playerId === 'st').rating, 6.5);
+});
+
+test('prosa om skjulte og private evner indeholder aldrig tal', () => {
+  for (let v = 1; v <= 20; v++) {
+    // Centimeter er tilladt (højde er offentlig, "2 cm på den rigtige side" er prosa); alle andre tal er ikke.
+    const noNum = (t) => assert.doesNotMatch(t.replace(/\d+ cm/g, ''), /\d/, t);
+    [describeFinish(v), describeHeader(v), describeVarTiming(v)].forEach(noNum);
+    generateScoutingClues('A. B', { theatre: v, cynicism: v, varPulse: v }, 192, v).forEach(noNum);
+  }
 });
 
 // ---------- Kampmotor ----------
@@ -176,6 +199,26 @@ test('skade giver indskiftning fra bænken af samme kæde og maks 3 skift', () =
     assert.ok(m.events.filter((e) => e.type === 'SUB' && e.isHome).length <= MAX_SUBS);
   }
   assert.ok(seen > 10, `kun ${seen} skadesskift set – testen har for lidt data`);
+});
+
+test('maks 3 skift pr. hold, og første skift er fra samme kæde', () => {
+  const L = league(22), base = createRng(3);
+  // Tving frispark og skade i hvert tick, så der er langt flere skader end skift.
+  const rng = { ...base, chance: (p) => (p === 0.06 || p === 0.4 ? true : base.chance(p)) };
+  const m = simulateMatch(L.teams[0], L.teams[1], rng);
+  assert.ok(m.injuries.length > 8);
+  for (const list of [m.ratings.home, m.ratings.away]) {
+    const subs = list.filter((r) => r.role.startsWith('SUB'));
+    assert.equal(subs.length, MAX_SUBS);
+    assert.equal(subs.sort((a, b) => a.minIn - b.minIn)[0].role, `SUB (${subs[0].line})`);
+  }
+  for (const side of [true, false]) {
+    const firstSub = m.events.find((e) => e.type === 'SUB' && e.isHome === side);
+    const outInj = m.injuries.find((i) => i.min === firstSub.min && i.teamId === (side ? L.teams[0].id : L.teams[1].id));
+    const out = L.teams.flatMap((t) => t.squad).find((p) => p.id === outInj.playerId);
+    const inn = (side ? m.ratings.home : m.ratings.away).find((r) => r.minIn === firstSub.min);
+    assert.equal(inn.line, out.line, 'indskifteren skal komme fra samme kæde');
+  }
 });
 
 test('skadet starter spiller ikke – erstattes i den kamplokale opstilling', () => {
@@ -267,7 +310,7 @@ test('normalizeLeague genskaber manglende felter uden at røre data', () => {
   const L = league(15);
   const keep = L.teams[3].squad[2].skills.passing;
   delete L.leagueMetadata.standings; delete L.scouting; delete L.teams[0].tactics.customCoords;
-  delete L.teams[1].squad[0].counterTactics; delete L.teams[2].tacticPresets; L.teams[4].tactics.lineupSlots = ['x'];
+  delete L.teams[1].squad[0].counterTactics; delete L.teams[6].tactics.conditionalRules; delete L.teams[2].tacticPresets; L.teams[4].tactics.lineupSlots = ['x'];
   const { league: N, problems } = normalizeLeague(L);
   assert.deepEqual(problems, []);
   assert.equal(N.leagueMetadata.standings.length, 8);
@@ -276,6 +319,7 @@ test('normalizeLeague genskaber manglende felter uden at røre data', () => {
   assert.deepEqual(N.teams[1].squad[0].counterTactics, { vsPress: 25, vsLowBlock: 25, vsTrapLong: 25 });
   assert.equal(N.teams[2].tacticPresets.length, 3);
   assert.equal(N.teams[4].tactics.lineupSlots.length, 11);
+  assert.equal(N.teams[6].tactics.conditionalRules[0].minuteTrigger, 65);
   assert.equal(N.teams[3].squad[2].skills.passing, keep);
 });
 
