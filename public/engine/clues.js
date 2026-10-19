@@ -44,11 +44,11 @@ const GOAL_TEXTS = {
   ],
   DRIBBLE: [
     (s, a, m) => `En dribletur for historiebøgerne i ${m}. minut: ${s} snoede sig forbi tre mand og satte bolden roligt ind.`,
-    (s, a, m) => `${s} tog sagen i egen hånd i ${m}. minut, driblede ind fra kanten og afsluttede selv.`,
+    (s, a, m) => `${s} tog sagen i egen hånd i ${m}. minut, driblede sig forbi sin mand og afsluttede selv.`,
     (s, a, m) => `Ren individuel klasse i ${m}. minut: ${s} vendte forsvareren rundt på en tallerken og scorede.`,
   ],
   COUNTER: [
-    (s, a, m) => `Lynkontra i ${m}. minut: bolden blev erobret, ${a} sendte den i dybden, og ${s} løb fra alle og scorede.`,
+    (s, a, m) => `Kontra i ${m}. minut: bolden blev erobret, ${a} sendte den i dybden, og ${s} løb fra alle og scorede.`,
     (s, a, m) => `Fra eget felt til mål på ti sekunder i ${m}. minut – ${s} sluttede kontraen af.`,
     (s, a, m) => `Omstilling i topklasse i ${m}. minut: ${a} fandt ${s}, der kom løbende og trillede den ind.`,
   ],
@@ -85,12 +85,12 @@ export function goalSpectacle(kind, { finishing = 10, pace = 10, ballControl = 1
   const late = min >= 80 ? 3 : 0, r = rng.next();
   const base = {
     LONGSHOT: 10 + finishing * 0.25 + r * 4,
-    DRIBBLE: 8 + (pace + ballControl) * 0.15 + r * 4,
-    COUNTER: 7 + pace * 0.2 + r * 4,
-    CUTBACK: 6 + passing * 0.15 + r * 4,
+    DRIBBLE: 9 + (pace + ballControl) * 0.17 + r * 4,   // v3.9 (før 8 + ·0,15)
+    COUNTER: 5.5 + pace * 0.2 + r * 4,   // v3.9: rigtige kontraer er hyppigere (før 7 + …)
+    CUTBACK: 8 + passing * 0.3 + r * 4,   // v3.9: en flot tværaflevering kan nå avisen (før 6 + PAS·0,15)
     COMBINATION: 5 + passing * 0.2 + r * 4,
     HEADER: 5 + aerialPower * 0.4 + r * 4,
-    VAR: 7 + r * 5,
+    VAR: 5.5 + r * 5,   // v3.9 (før 7 + …): færre langskud efter målmandsfordelen – VAR må ikke tage over igen
   }[kind] ?? 5;
   return Math.min(20, Math.round((base + late) * 10) / 10);
 }

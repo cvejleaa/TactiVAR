@@ -5,9 +5,11 @@ import { FORMATION_NAMES } from '../engine/formations.js';
 import { MAX_RULES } from '../state/actions.js';
 
 const PHASES = [
-  ['phase1_buildUp', 'Fase 1 – Opbygning & indlæg', [['passingStyle', 'Pasningsstil'], ['attackFocus', 'Angrebsfokus']]],
+  ['phase1_buildUp', 'Fase 1 – Opbygning & indlæg', [['passingStyle', 'Pasningsstil'], ['attackFocus', 'Angrebsfokus'], ['offBallRuns', 'Løb uden bold']],
+    'Løb uden bold: Mange – flere spillere løber sig fri (også backs og wingbacks), men holdet står ubalanceret, når bolden tabes, og løber flere km. Få – færre løb fremad, færre kontraer imod og mindre slid.'],
   ['phase2_defending', 'Fase 2 – Pres, offside & tacklinger', [['pressingHeight', 'Pres'], ['offsideTrap', 'Offside-fælde'], ['tacklingIntensity', 'Tacklinger']]],
-  ['phase3_transition', 'Fase 3 – De første 5 sekunder', [['onBallWon', 'Ved erobring'], ['onBallLost', 'Ved boldtab']]],
+  ['phase3_transition', 'Fase 3 – De første 5 sekunder', [['onBallWon', 'Ved erobring'], ['onBallLost', 'Ved boldtab']],
+    'Ved erobring: Lynkontra giver flere kontraer, når I vinder bolden; Hold på bolden giver færre, men styrker jeres næste opbygning. Ved boldtab: Genpres dæmper modstanderens kontraer, men koster løb (friskhed); Fald tilbage koster intet.'],
 ];
 
 const PLAN_NAMES = ['Plan A', 'Plan B', 'Plan C'];
@@ -31,8 +33,9 @@ export function renderTactics({ team, isOwn, ui, on }) {
       isOwn ? h('div', { class: 'presets' }, ['Plan A', 'Plan B', 'Plan C'].map((l, i) => h('button', { class: 'mini' + (ui.activePresetIndex === i ? ' active' : ''), onclick: () => on.preset(i) }, l + (ui.activePresetIndex === i ? ' (aktiv)' : '')))) : null,
       isOwn ? h('button', { class: 'mini', id: 'reset-drag', onclick: on.resetDrag }, '↺ Nulstil træk') : null),
     !isOwn ? h('div', { class: 'lockbox' }, 'Du ser kun modstanderens startopstilling. 🔒 Deres faser, planer og Hvis-Så-regler er skjulte.') : null,
-    !isOwn ? null : PHASES.map(([phase, title, fields]) => h('fieldset', { class: 'phase', dataset: { phase } }, h('legend', {}, title),
-      fields.map(([f, label]) => h('label', {}, label + ' ', select(t.phases[phase][f], PHASE_OPTIONS[f], (v) => on.phase(phase, f, v), { disabled, dataset: { field: f } }))))),
+    !isOwn ? null : PHASES.map(([phase, title, fields, help]) => h('fieldset', { class: 'phase', dataset: { phase } }, h('legend', {}, title),
+      fields.map(([f, label]) => h('label', {}, label + ' ', select(t.phases[phase][f], PHASE_OPTIONS[f], (v) => on.phase(phase, f, v), { disabled, dataset: { field: f } }))),
+      help ? h('p', { class: 'muted phase-help' }, help) : null)),
     !isOwn ? null : h('fieldset', { class: 'phase rules', id: 'rules' }, h('legend', {}, `Hvis-Så-regler (maks ${MAX_RULES}, hver udløses højst én gang pr. kamp)`),
       t.conditionalRules.map((r, i) => h('div', { class: 'rule' },
         'Fra minut ', h('input', { type: 'number', min: 1, max: 89, value: String(r.minuteTrigger), disabled, onchange: (e) => on.rule(i, { minuteTrigger: Math.max(1, Math.min(89, Number(e.target.value) || 1)) }) }),

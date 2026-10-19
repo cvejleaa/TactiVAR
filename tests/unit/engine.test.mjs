@@ -332,10 +332,10 @@ test('andre holds taktiske overvejelser kan ikke læses – kun deres startforma
     assert.doesNotMatch(note.split('møder')[1], NAMES, note);
     for (const e of m.events.filter((x) => !x.isHome && x.type === 'TACTIC_WIN')) assert.doesNotMatch(e.text, /korte pasninger|balanceret opbygning|direkte lange bolde/, e.text);
     // Afledte tekster må ikke afsløre modstanderens offside-fælde eller omstilling
-    for (const e of m.events.filter((x) => !x.isHome && x.category === 'TACTIC')) assert.doesNotMatch(e.text, /offside-fælde|kontra|falder til ro/i, e.text);
+    for (const e of m.events.filter((x) => !x.isHome && x.category === 'TACTIC')) assert.doesNotMatch(e.text, /offside-fælde|lynkontra|falder til ro|ser hullet|højt oppe/i, e.text);
     // bot mod bot: ingen taktiknavne overhovedet
     const b = simulateMatch(L.teams[i], L.teams[i % 7 + 1], rng);
-    for (const e of b.events) { assert.doesNotMatch(e.text, NAMES, e.text); assert.doesNotMatch(e.text, /offside-fælde|kontra|falder til ro/i, e.text); }
+    for (const e of b.events) { assert.doesNotMatch(e.text, NAMES, e.text); assert.doesNotMatch(e.text, /offside-fælde|lynkontra|falder til ro|ser hullet|højt oppe|Din |Dit /i, e.text); } // en kontra er en hændelse – kun navngivne valg er forbudt
   }
 });
 

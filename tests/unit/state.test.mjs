@@ -497,3 +497,37 @@ test('HEIGHT_V37 er v3.7\'s fordeling, frosset (bogstavelig) – migreringen 3 �
   assert.deepEqual([0.1, 0.9].map((q) => heightAtQuantile('GK', q, HEIGHT_V37)), [187, 199]);
   assert.deepEqual([0.1, 0.9].map((q) => heightAtQuantile('MID', q, HEIGHT_V37)), [171, 189]);
 });
+
+// ---------- v3.9: løb uden bold (intet skemabump – fixTactics spreder feltet ind) ----------
+const FIXTURE5 = fs.readFileSync(new URL('../fixtures/save-schema5.json', import.meta.url), 'utf8');
+test('gem fra v3.8 (skema 5, uden offBallRuns): dit hold og dine planer får NORMAL, bots profilens værdi; intet andet ændres', async () => {
+  const { BOT_PROFILES } = await import('../../public/engine/generator.js');
+  const raw = JSON.parse(FIXTURE5);
+  assert.equal(raw.schemaVersion, 5);
+  assert.ok(!FIXTURE5.includes('offBallRuns'), 'fixturet er gemt før v3.9');
+  const r = parseSave(FIXTURE5);
+  assert.ok(r.ok, r.error);
+  assert.equal(r.migratedFrom, null);
+  const teams = r.state.league.teams;
+  const me = teams.find((t) => !t.isBot);
+  for (const tac of [me.tactics, ...me.tacticPresets]) assert.equal(tac.phases.phase1_buildUp.offBallRuns, 'NORMAL');
+  teams.forEach((t, i) => { if (t.isBot) assert.equal(t.tactics.phases.phase1_buildUp.offBallRuns, BOT_PROFILES[i].runs, t.name); });
+  // Bots er ikke alle ens: mindst én af hver
+  assert.deepEqual([...new Set(teams.filter((t) => t.isBot).map((t) => t.tactics.phases.phase1_buildUp.offBallRuns))].sort(), ['FEW', 'MANY', 'NORMAL']);
+  // Det gemte er urørt: pasningsstil, runde, noter
+  assert.equal(me.tactics.phases.phase1_buildUp.passingStyle, raw.league.teams.find((t) => !t.isBot).tactics.phases.phase1_buildUp.passingStyle);
+  assert.equal(r.state.league.leagueMetadata.round, 2);
+  assert.deepEqual(r.state.notes, raw.notes);
+});
+// Test Manager v3.9: fixtureholdets værdier var lig standardværdierne, så "gemt værdi vinder over standard" var ubevist
+test('gem fra v3.9: dit valg af løb uden bold (og pasningsstil) overlever indlæsning – også i planerne og hos en bot', () => {
+  const raw = JSON.parse(FIXTURE5);
+  const me = raw.league.teams.find((t) => !t.isBot), bot = raw.league.teams.find((t) => t.isBot);
+  for (const tac of [me.tactics, ...me.tacticPresets, bot.tactics]) Object.assign(tac.phases.phase1_buildUp, { offBallRuns: 'MANY', passingStyle: 'DIRECT_LONG' });
+  const r = parseSave(JSON.stringify(raw));
+  assert.ok(r.ok, r.error);
+  const m2 = r.state.league.teams.find((t) => !t.isBot), b2 = r.state.league.teams.find((t) => t.id === bot.id);
+  for (const tac of [m2.tactics, ...m2.tacticPresets, b2.tactics]) {
+    assert.equal(tac.phases.phase1_buildUp.offBallRuns, 'MANY'); assert.equal(tac.phases.phase1_buildUp.passingStyle, 'DIRECT_LONG');
+  }
+});

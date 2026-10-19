@@ -65,15 +65,17 @@ const TIERS = {
 };
 
 // Bot-holdenes taktiske profiler (v2.5b BOT_TACTICAL_PROFILES; tackling/omstilling fastsat).
+// runs = løb uden bold (v3.9): gegenpres-hold mange, lav blok få, resten normal. Profil 0 er
+// KUN brugerens hold (idx 0) – den skal stå på NORMAL.
 export const BOT_PROFILES = [
-  { form: '4-4-2', pass: 'BALANCED', focus: 'CENTRAL', press: 'MID_BLOCK', offside: 'NORMAL', tackle: 'NORMAL', won: 'FAST_COUNTER', lost: 'DROP_BACK' },
-  { form: '4-2-3-1', pass: 'SHORT', focus: 'LOW_CUTBACKS', press: 'HIGH_GEGENPRESS', offside: 'EXTREME_VAR_LINE', tackle: 'AGGRESSIVE', won: 'KEEP_POSSESSION', lost: 'COUNTER_PRESS_5S' },
-  { form: '5-3-2', pass: 'DIRECT_LONG', focus: 'HIGH_CROSSES', press: 'LOW_BLOCK', offside: 'OFF', tackle: 'CAUTIOUS', won: 'FAST_COUNTER', lost: 'DROP_BACK' },
-  { form: '4-3-3', pass: 'SHORT', focus: 'CENTRAL', press: 'HIGH_GEGENPRESS', offside: 'EXTREME_VAR_LINE', tackle: 'NORMAL', won: 'KEEP_POSSESSION', lost: 'COUNTER_PRESS_5S' },
-  { form: '3-5-2', pass: 'BALANCED', focus: 'HIGH_CROSSES', press: 'MID_BLOCK', offside: 'NORMAL', tackle: 'NORMAL', won: 'FAST_COUNTER', lost: 'DROP_BACK' },
-  { form: '4-4-2', pass: 'DIRECT_LONG', focus: 'HIGH_CROSSES', press: 'MID_BLOCK', offside: 'NORMAL', tackle: 'AGGRESSIVE', won: 'FAST_COUNTER', lost: 'DROP_BACK' },
-  { form: '5-4-1', pass: 'DIRECT_LONG', focus: 'CENTRAL', press: 'LOW_BLOCK', offside: 'OFF', tackle: 'CAUTIOUS', won: 'FAST_COUNTER', lost: 'DROP_BACK' },
-  { form: '3-4-3', pass: 'BALANCED', focus: 'LOW_CUTBACKS', press: 'HIGH_GEGENPRESS', offside: 'NORMAL', tackle: 'AGGRESSIVE', won: 'KEEP_POSSESSION', lost: 'COUNTER_PRESS_5S' },
+  { form: '4-4-2', pass: 'BALANCED', focus: 'CENTRAL', press: 'MID_BLOCK', offside: 'NORMAL', tackle: 'NORMAL', won: 'FAST_COUNTER', lost: 'DROP_BACK', runs: 'NORMAL' },
+  { form: '4-2-3-1', pass: 'SHORT', focus: 'LOW_CUTBACKS', press: 'HIGH_GEGENPRESS', offside: 'EXTREME_VAR_LINE', tackle: 'AGGRESSIVE', won: 'KEEP_POSSESSION', lost: 'COUNTER_PRESS_5S', runs: 'MANY' },
+  { form: '5-3-2', pass: 'DIRECT_LONG', focus: 'HIGH_CROSSES', press: 'LOW_BLOCK', offside: 'OFF', tackle: 'CAUTIOUS', won: 'FAST_COUNTER', lost: 'DROP_BACK', runs: 'FEW' },
+  { form: '4-3-3', pass: 'SHORT', focus: 'CENTRAL', press: 'HIGH_GEGENPRESS', offside: 'EXTREME_VAR_LINE', tackle: 'NORMAL', won: 'KEEP_POSSESSION', lost: 'COUNTER_PRESS_5S', runs: 'MANY' },
+  { form: '3-5-2', pass: 'BALANCED', focus: 'HIGH_CROSSES', press: 'MID_BLOCK', offside: 'NORMAL', tackle: 'NORMAL', won: 'FAST_COUNTER', lost: 'DROP_BACK', runs: 'NORMAL' },
+  { form: '4-4-2', pass: 'DIRECT_LONG', focus: 'HIGH_CROSSES', press: 'MID_BLOCK', offside: 'NORMAL', tackle: 'AGGRESSIVE', won: 'FAST_COUNTER', lost: 'DROP_BACK', runs: 'NORMAL' },
+  { form: '5-4-1', pass: 'DIRECT_LONG', focus: 'CENTRAL', press: 'LOW_BLOCK', offside: 'OFF', tackle: 'CAUTIOUS', won: 'FAST_COUNTER', lost: 'DROP_BACK', runs: 'FEW' },
+  { form: '3-4-3', pass: 'BALANCED', focus: 'LOW_CUTBACKS', press: 'HIGH_GEGENPRESS', offside: 'NORMAL', tackle: 'AGGRESSIVE', won: 'KEEP_POSSESSION', lost: 'COUNTER_PRESS_5S', runs: 'MANY' },
 ];
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -192,7 +194,7 @@ export function defaultTactics(starterIds, profile) {
   return {
     baseFormation: p.form, lineupSlots: starterIds.slice(), customCoords: {},
     phases: {
-      phase1_buildUp: { passingStyle: p.pass, attackFocus: p.focus },
+      phase1_buildUp: { passingStyle: p.pass, attackFocus: p.focus, offBallRuns: p.runs ?? 'NORMAL' },
       phase2_defending: { pressingHeight: p.press, offsideTrap: p.offside, tacklingIntensity: p.tackle },
       phase3_transition: { onBallWon: p.won, onBallLost: p.lost },
     },
