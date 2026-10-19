@@ -175,8 +175,8 @@ function render() {
 // ---------- Kampe ----------
 // Runden afvikles og bogføres + gemmes FØR afspilningen (rettet ift. v2.5b, der gemte
 // før bogføringen) – lukkes fanen midt i, er runden alligevel talt med én gang.
+// Knappen er spærret under afspilning (det er vagten mod at starte to runder).
 function playNextRound() {
-  if (mc?.playing) return;
   const rng = createRng(randomSeed());
   const result = playRound(game.league, game.ui.opponentIdx, rng);
   commitRound(game.league, result, rng);

@@ -192,6 +192,30 @@ try {
   check('Ligatabellen er opdateret efter runde 1', stHead.includes('efter 1 runde'), stHead);
   await reload();
   check('Efter F5: runden er gemt og kan genses', (await g.isVisible('#open-last')) && (await g.textContent('#play-round')).includes('runde 2'));
+  await g.click('#open-last');
+  check('"Se runde" genviser runden færdigspillet (ikke live)', (await g.isVisible('#match-center')) && (await g.locator('#skip').count()) === 0 && (await g.textContent('#match-center')).includes('runde 1'));
+  await g.click('#close-mc');
+
+  // Runden er bogført og gemt FØR afspilningen: luk/genindlæs midt i kampen
+  await g.click('#play-round');
+  await g.waitForSelector('#skip');
+  const liveCard = await g.textContent('#match-cards .matchcard:nth-child(1)');
+  check('Under afspilning viser kort 1 live-stillingen fra 0-0, ikke slutresultatet', /0-0/.test(liveCard), liveCard);
+  await reload();
+  const head2 = await g.locator('#standings').locator('xpath=..').locator('h3').textContent();
+  check('Genindlæst midt i afspilningen: runde 2 er alligevel bogført og gemt', head2.includes('efter 2 runde') && (await g.textContent('#open-last')).includes('runde 2'), head2);
+
+  // Avisen med faste data – begge grene, uafhængigt af tilfældighed
+  const gaz = await g.evaluate(async () => {
+    const { renderGazette } = await import('/ui/matchcenter.js');
+    const base = { totalGoals: 3, totalVarChecks: 1, myResult: 'X', goalOfTheRound: null, defensiveAction: null };
+    const p = { playerId: 'p', shirtNumber: 9, shortName: 'A. B', teamName: 'T', rating: 8.7, stars: 5, goals: 2, assists: 1, saves: 0, startCounterMastery: 60, gainedCounterXp: 10 };
+    const mine = renderGazette({ ...base, playerOfTheRound: { ...p, teamId: 'me' } }, 'me').querySelector('#player-of-round').textContent;
+    const theirs = renderGazette({ ...base, playerOfTheRound: { ...p, teamId: 'them' } }, 'me').querySelector('#player-of-round').textContent;
+    return { mine, theirs };
+  });
+  check('Avisen: din spiller vises med karakter', gaz.mine.includes('karakter 8.7') && gaz.mine.includes('2 mål'), gaz.mine);
+  check('Avisen: modstanderens spiller kun med stjerner – aldrig karakteren', gaz.theirs.includes('★★★★★') && !gaz.theirs.includes('8.7') && !gaz.theirs.includes('karakter'), gaz.theirs);
 
   // Mislykkes backuppen ved "Ny liga" (fuldt lager), står det gamle spil urørt – også efter næste gem
   await g.selectOption('#team-select', '0');
