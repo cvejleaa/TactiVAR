@@ -62,3 +62,12 @@ export function roundHistory(round, matches) {
   const setPiece = Object.entries(kinds).filter(([k]) => SET_PIECE.has(k)).reduce((a, [, v]) => a + v, 0);
   return { round, matches: matches.length, goals, setPiece, kinds, biggest, most };
 }
+
+// Sæsonens løb pr. spiller – samme tal på spillerkortet og i "Dit hold" (én formel, så de ikke driver).
+export function runStats(p) {
+  return {
+    km90: p.minutesSum > 0 ? p.distanceSum / p.minutesSum * 90 : null,
+    hiPct: p.hiDistSum > 0 ? Math.round(p.hiKmSum / p.hiDistSum * 100) : null,
+    top: p.topSpeedMax > 0 ? p.topSpeedMax : null,
+  };
+}

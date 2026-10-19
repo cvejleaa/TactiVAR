@@ -3,6 +3,7 @@
 import { h, LOCK } from './dom.js';
 import { LINE, POSITION_FULL, SKILL_LABELS, kr, starsEl } from './labels.js';
 import { aerialBreakdown } from '../engine/generator.js';
+import { runStats } from '../engine/stats.js';
 import { COUNTER_KEYS, COUNTER_LABELS, COUNTER_POOL } from '../engine/counter.js';
 
 const dk = (v) => v.toLocaleString('da-DK', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -18,6 +19,7 @@ export function renderCard({ player: p, team, isOwn, opponent, scouting, note, o
   let body;
   if (isOwn) {
     const a = aerialBreakdown(p.heightCm, p.jumpingPower, p.skills.strength, p.skills.positioning);
+    const run = runStats(p);
     body = [
       h('div', { class: 'bars' }, SKILL_LABELS.map(([group, list]) => h('div', { class: 'bar-group' }, h('h4', {}, group), list.map(([k, l]) => bar(l, p.skills[k]))))),
       h('div', { class: 'aerial', id: 'aerial-breakdown' },
@@ -27,7 +29,7 @@ export function renderCard({ player: p, team, isOwn, opponent, scouting, note, o
         h('div', { class: 'muted', id: 'counter-used' }, `Erfaring brugt: ${COUNTER_KEYS.reduce((a, k) => a + p.counterTactics[k], 0)}/${COUNTER_POOL} – ved fuld pulje glemmer han lidt af det gamle, når han lærer noget nyt.`)),
       p.archetype ? h('div', { class: 'archbox' }, h('strong', {}, (p.archetype.isUnlocked ? '🌟 ' : '🔒 ') + p.archetype.name), ' – ', p.archetype.description,
         p.archetype.isUnlocked ? null : h('div', { class: 'muted' }, 'Låses op ved: ' + Object.entries(p.archetype.unlockReq).map(([k, v]) => `${k} ${v}`).join(', '))) : null,
-      h('div', { class: 'muted', id: 'run-stats' }, p.minutesSum > 0 ? `🏃 ${(p.distanceSum / p.minutesSum * 90).toFixed(1)} km pr. 90 min · ${p.hiDistSum > 0 ? `${Math.round(p.hiKmSum / p.hiDistSum * 100)} % højintenst` : 'højintenst: kommer efter næste kamp'} · topfart ${p.topSpeedMax.toFixed(1)} km/t (sæsonen)` : '🏃 Løbedata kommer efter første kamp'),
+      h('div', { class: 'muted', id: 'run-stats' }, run.km90 != null ? `🏃 ${run.km90.toFixed(1)} km pr. 90 min · ${run.hiPct != null ? `${run.hiPct} % højintenst` : 'højintenst: kommer efter næste kamp'} · topfart ${p.topSpeedMax.toFixed(1)} km/t (sæsonen)` : '🏃 Løbedata kommer efter første kamp'),
       h('div', { class: 'muted' }, `Løn ${kr(p.weeklyWage)}/uge · Værdi ${kr(p.marketValue)}`),
     ];
   } else {

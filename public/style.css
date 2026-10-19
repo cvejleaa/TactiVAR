@@ -120,3 +120,14 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .ratings td.run { color: var(--blå); white-space: nowrap; font-size: .72rem; }
 .linklike { background: none; border: none; padding: 0; color: var(--blå); text-decoration: underline; cursor: pointer; font: inherit; }
 .ev.focus { background: #78350f66; outline: 1px solid #fbbf24; border-radius: .25rem; }
+
+/* Statistik (v3.10) */
+.stats-sec { margin: .5rem 0; }
+.stats-sec > summary { cursor: pointer; font-weight: 600; padding: .3rem 0; }
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); gap: .5rem 1rem; }
+.stat-list h4 { margin: .4rem 0 .2rem; }
+.stat-list ol { margin: 0; padding-left: 1.4rem; }
+.stat-list li.mine, #team-stats tr.mine td { color: var(--grøn); }
+.round-bars { display: grid; gap: .15rem; max-width: 40rem; }
+.round-bar { display: grid; grid-template-columns: 2.5rem 1fr 2rem; align-items: center; gap: .4rem; font-size: .85rem; }
+.rb-fill { display: block; height: .7rem; background: var(--grøn); border-radius: .2rem; min-width: 2px; }

@@ -1,4 +1,5 @@
 // TactiVAR Manager – binder motor, gem og brugerflade sammen.
+import { renderStats } from './ui/stats.js';
 import { VERSION } from './version.js';
 import { createRng, randomSeed } from './engine/rng.js';
 import { createLeague } from './engine/generator.js';
@@ -217,7 +218,9 @@ function render() {
       // Resultaterne skjules under afspilningen, ligesom avisen (ellers afsløres de).
       league.lastRound && !mc?.playing ? renderLastRound({ round: league.lastRound, myTeamId: mine.id, onOpen: openReport }) : null,
       renderNextRound({ league, pairs: pairRound(league, game.ui.opponentIdx), myTeamId: mine.id }),
-      league.lastRound && !mc?.playing ? renderGazette(league.lastRound.gazette, mine.id, openGoal, league.lastRound.matches) : null],
+      league.lastRound && !mc?.playing ? renderGazette(league.lastRound.gazette, mine.id, openGoal, league.lastRound.matches) : null,
+      // Statistikken skjules også under afspilningen (den er bogført og ville afsløre runden).
+      !mc?.playing ? renderStats({ league, myTeamId: mine.id }) : null],
   }[tab]();
   app.replaceChildren(...[
     h('nav', { class: 'tabs', id: 'tabs' }, TABS.map(([k, label]) => h('button', { id: `tab-${k}`, class: 'tab' + (k === tab ? ' active' : ''), onclick: () => showTab(k) }, label))),
