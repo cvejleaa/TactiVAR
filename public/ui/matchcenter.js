@@ -4,7 +4,8 @@
 import { h } from './dom.js';
 import { starsEl } from './labels.js';
 import { viewRatingEntry } from '../engine/visibility.js';
-import { FORMATIONS, lineOfRole } from '../engine/formations.js';
+import { FORMATIONS } from '../engine/formations.js';
+import { isStarter, placeLabel, lineupSort } from './lineup.js';
 
 export const REPORT_FILTERS = [['all', 'Alle hændelser'], ['tactic', 'Kun taktik'], ['key', 'Kun nøglemomenter']];
 const KEY_TYPES = new Set(['GOAL', 'HEADER_GOAL', 'VAR_GOAL', 'VAR_NO_GOAL', 'INJURY', 'SUB', 'TRIGGER', 'END', 'HALFTIME']);
@@ -46,25 +47,8 @@ const TIP = Object.fromEntries(RATING_ICONS);
 // Mål og oplæg gentages (⚽⚽); redninger og luftdueller står som tal (🧤4).
 const REPEAT = new Set(['⚽', '🅰']);
 const icon = (sym, n = 0) => h('span', { class: 'ricon', title: TIP[sym] + (n ? `: ${n}` : '') }, !n ? sym : REPEAT.has(sym) ? sym.repeat(n) : `${sym}${n}`);
-const LINE_ORDER = { GK: 0, DEF: 1, MID: 2, ATT: 3 };
-
-// Pladsen i startformationen (fx "DM"); en indskifter får pladsen, han kom ind på. Den
-// naturlige kæde vises kun, når den afviger fra pladsens (en forsvarsspiller på en midtbaneplads).
-// Gamle runder uden plads (før v3.5) viser rollen, som den blev gemt.
-const isStarter = (e) => e.minIn <= 1;
-const slotRole = (e, formation) => (e.slot != null && formation ? FORMATIONS[formation]?.[e.slot]?.r : null);
-function placeLabel(e, formation) {
-  const r = slotRole(e, formation);
-  if (!r) return e.role;
-  if (!isStarter(e)) return `ind på ${r}`;
-  const ln = lineOfRole(r);
-  return ln && ln !== e.line ? `${r} (${e.line})` : r;
-}
-
 function ratingsTable(list, isOwn, title, formation) {
-  // Opstillingsorden: startere efter plads (målmand → angreb), indskiftere til sidst.
-  const order = (e) => (isStarter(e) && e.slot != null ? e.slot : 100 + (LINE_ORDER[e.line] ?? 4) * 10 + e.minIn / 100);
-  const rows = list.slice().sort((a, b) => order(a) - order(b)).map((e) => ({ ...viewRatingEntry(e, isOwn), place: placeLabel(e, formation) }));
+  const rows = lineupSort(list).map((e) => ({ ...viewRatingEntry(e, isOwn), place: placeLabel(e, formation) }));
   return h('div', { class: 'ratings' }, h('h4', {}, title),
     formation && rows.some((e) => isStarter(e) && e.slot != null) ? miniPitch(rows.filter(isStarter), formation, isOwn) : null,
     h('table', {}, h('tbody', {}, rows.map((e) => h('tr', { class: e.isMotM ? 'motm' : '' },

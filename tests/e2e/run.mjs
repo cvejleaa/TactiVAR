@@ -68,6 +68,14 @@ try {
   const optColors = await g.evaluate(() => { const o = document.querySelector('#team-select option'); const cs = getComputedStyle(o); return [cs.color, cs.backgroundColor]; });
   check('Holdvælgerens valgmuligheder er ikke hvid-på-hvid', optColors[0] !== optColors[1], optColors.join(' / '));
 
+  // Modstandervælgeren: aldrig eget hold, og valget gemmes straks
+  const oppOpts = await g.locator('#opponent-select option').allTextContents();
+  const ownName = (await g.locator('#team-select option', { hasText: '★' }).textContent()).replace('★ ', '');
+  check('Modstandervælgeren har de 7 andre hold, ikke dit eget', oppOpts.length === 7 && !oppOpts.includes(ownName), oppOpts.join('|'));
+  await g.selectOption('#opponent-select', '2'); await g.reload(); await g.waitForSelector('body[data-klar="ja"]');
+  check('Modstandervalget gemmes straks', (await g.inputValue('#opponent-select')) === '2');
+  await g.selectOption('#opponent-select', '1');
+
   // Sortering på FIN: højeste afslutning øverst
   await tab('trup');
   await g.click('#matrix thead th:nth-child(14)');
@@ -124,6 +132,8 @@ try {
   check('Et påbegyndt byt afbrydes af fanebyt (intet byt uden varsel)', (await nameAt(4)) === n4 && (await nameAt(5)) === n5);
   await g.click('#pitch .token[data-slot="5"]'); // klik igen = fravælg
   // Indskiftning fra bænken under banen – uden at forlade Taktik
+  await g.locator('#bench .bench-p').first().click(); await g.locator('#bench .bench-p').first().click();
+  check('Bænken: klik igen på samme bænkspiller fravælger', (await g.locator('#bench .bench-p.active').count()) === 0 && (await g.locator('#notice').count()) === 0);
   const benchBtn = g.locator('#bench .bench-p').first();
   const benchName = (await benchBtn.textContent()).replace(/^#\d+ /, '').replace(/ · \w+$/, '');
   await benchBtn.click(); await g.click('#pitch .token[data-slot="4"]');
@@ -194,6 +204,7 @@ try {
   check('Modstander: spillerkortet skjuler evner og kontrakt', (await g.locator('#player-card .bars').count()) === 0 && (await g.textContent('#player-card')).includes('🔒 ??'));
   await tab('taktik');
   check('Modstander: faser og Hvis-Så-regler er skjulte', (await g.locator('#tactics fieldset').count()) === 0);
+  check('Modstander: ingen bænkrække under banen', (await g.locator('#bench').count()) === 0);
   check('Modstander: kun dit hold kan trækkes på banen', (await g.locator('#pitch .token.draggable').count()) === 0);
   check('Modstander: formationen kan ikke ændres og der er ingen byt-knapper', (await g.isDisabled('#formation')) && (await g.locator('#matrix tbody button').count()) === 0);
   check('Modstander: ingen Plan A/B/C og ingen "Nulstil træk" (ville afsløre og ændre deres taktik)', (await g.locator('#tactics .presets').count()) === 0 && (await g.locator('#reset-drag').count()) === 0);
@@ -223,7 +234,7 @@ try {
   check('Under afspilning kan runden ikke startes igen, og modstanderen kan ikke skiftes', (await g.isDisabled('#play-round')) && (await g.isDisabled('#opponent-select')));
   check('Under afspilning: besked om at runden er bogført, og de andre resultater er skjulte', (await g.isVisible('#booked-note')) && !/\d-\d/.test(await g.locator('#match-cards .matchcard:nth-child(2)').textContent()));
   await tab('liga');
-  check('Under afspilning: Liga-fanen siger, at tabellen allerede er opdateret', await g.isVisible('#booked-league'));
+  check('Under afspilning: Liga-fanen siger, at tabellen allerede er opdateret – og avisen venter', (await g.isVisible('#booked-league')) && (await g.locator('#gazette').count()) === 0);
   await tab('kamp');
   await g.click('#skip');
   check('Runden har 4 kampe', (await g.locator('#match-cards .matchcard').count()) === 4);
@@ -259,6 +270,7 @@ try {
   check('Match Center har ingen Luk-knap (Kamp-fanen er dens plads)', (await g.locator('#close-mc').count()) === 0);
   await tab('liga');
   const stHead = await g.textContent('#standings-title');
+  check('Efter slutfløjt: Liga-fanen viser avisen og ingen afspilningsbesked', (await g.isVisible('#gazette')) && (await g.locator('#booked-league').count()) === 0);
   check('Ligatabellen er opdateret efter runde 1', stHead.includes('efter 1 runde'), stHead);
   await g.selectOption('#team-select', '2');
   check('Holdvælgeren i Liga-fanen viser holdet i Trup', (await g.textContent('#tabs .tab.active')).includes('Trup') && (await g.textContent('#club-name')) === (await g.locator('#team-select option').nth(2).textContent()));
@@ -269,6 +281,11 @@ try {
   check('Efter F5: runden er gemt', (await g.textContent('#play-round')).includes('runde 2'));
   await tab('kamp');
   check('Kamp-fanen genviser seneste runde færdigspillet (ikke live)', (await g.isVisible('#match-center')) && (await g.locator('#skip').count()) === 0 && (await g.textContent('#match-center')).includes('runde 1'));
+  const evAll = await g.locator('#feed .ev').count();
+  await g.click('#match-center .toolbar button:nth-child(3)');
+  await g.click('#match-cards .matchcard:nth-child(3)');
+  check('Efter F5: Kamp-fanen kan skifte kamp og filter', (await g.locator('#match-cards .matchcard:nth-child(3).active').count()) === 1 && (await g.locator('#match-center .toolbar button:nth-child(3).active').count()) === 1 && evAll > 0);
+  await tab('liga'); // runde 2 startes fra en anden fane end Kamp
 
   // Runden er bogført og gemt FØR afspilningen: luk/genindlæs midt i kampen
   await g.click('#play-round');

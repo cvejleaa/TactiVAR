@@ -454,3 +454,21 @@ test('Hvis-Så: en plan-regel udløses højst én gang, og en ugyldig plan falde
   assert.equal(m.endState.home.formation, '5-4-1');
   assert.match(m.events.find((e) => e.type === 'TRIGGER').text, /fra 4-4-2 til 5-4-1/);
 });
+
+// ---------- Karakterark: plads og startformationer (v3.5) ----------
+test('kampen gemmer hvert holds startformation og pladsen pr. karakter – også indskifterens', () => {
+  const { H, A } = arena();
+  A.tactics.baseFormation = '4-2-3-1';
+  // Skade ved første frispark → skadesskift.
+  const m = simulateMatch(H, A, stubRng({ 0.06: (n) => n === 0, 0.5: true, 0.4: true }));
+  assert.deepEqual(m.startFormations, { home: '4-4-2', away: '4-2-3-1' });
+  const all = [...m.ratings.home, ...m.ratings.away];
+  for (const [side, t] of [['home', H], ['away', A]]) {
+    for (const e of m.ratings[side].filter((x) => x.minIn <= 1)) assert.equal(e.slot, t.tactics.lineupSlots.indexOf(e.playerId), e.shortName);
+  }
+  const sub = all.find((e) => e.minIn > 1);
+  assert.ok(sub, 'skaden gav en indskiftning');
+  const out = all.find((e) => e.teamId === sub.teamId && e.minIn <= 1 && e.minOut === sub.minIn);
+  assert.ok(out, 'den udskiftede spiller findes');
+  assert.equal(sub.slot, out.slot);
+});
