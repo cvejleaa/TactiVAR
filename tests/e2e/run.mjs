@@ -255,6 +255,14 @@ try {
   check('…og det næste gem gemmer stadig det gamle spil', JSON.parse(await g.evaluate(() => localStorage.getItem('tactivar_save'))).league.leagueMetadata.round === JSON.parse(keep).league.leagueMetadata.round && (await g.textContent('#club-name')) === clubBefore);
   await g.evaluate(() => { Storage.prototype.setItem = window.__set2; document.getElementById('fejlboks').hidden = true; document.getElementById('fejlboks').replaceChildren(); });
 
+  // Et gemt spil fra skema 1 migreres, gemmes straks i nyt format og tager kun ÉN backup
+  const fixture = fs.readFileSync(new URL('../fixtures/save-schema1.json', import.meta.url), 'utf8');
+  await g.evaluate((f) => { for (const k of Object.keys(localStorage)) if (k.startsWith('tactivar_')) localStorage.removeItem(k); localStorage.setItem('tactivar_save', f); }, fixture);
+  await reload(); await reload(); await reload();
+  const mig = await g.evaluate(() => ({ schema: JSON.parse(localStorage.getItem('tactivar_save')).schemaVersion, backups: Object.keys(localStorage).filter((k) => k.startsWith('tactivar_backup_')).length }));
+  check('Migrering: gemmes straks i skema 2, kun én backup trods tre genindlæsninger', mig.schema === 2 && mig.backups === 1, JSON.stringify(mig));
+  check('Migrering: ligaen fra skema 1 er intakt (runde 1, 18 spillere)', (await g.textContent('#standings-title')).includes('efter 1 runde') && (await rows()) === 18);
+
   // Ny liga og import tager backup af det nuværende spil
   await g.selectOption('#team-select', '0');
   const savedBefore = await g.evaluate(() => localStorage.getItem('tactivar_save'));
