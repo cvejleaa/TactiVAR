@@ -72,8 +72,8 @@ Clues opstår i kampe. **Rettet:** v2.5b gemmer clues på modstanderens
 spillerobjekt; de skal ligge hos den der observerer.
 
 ## 3. Hvem ser hvad (anti-spionage)
-- Offentligt: navn ("F. Efternavn" på banen), rygnummer, kæde, alder, højde, friskhed, skadesstatus 🚑, stjerner (★☆☆☆☆–★★★★★).
-- Kun ejer: 9 evner, spring, luftduel, arketype, løn/værdi, kasse, taktik,
+- Offentligt: navn ("F. Efternavn" på banen), rygnummer, kæde, alder, højde, friskhed, skadesstatus 🚑, stjerner (★☆☆☆☆–★★★★★), holdets formation og typiske stil (fx "4-2-3-1 • Gegenpress + VAR-Linje" – som i v2.5, og den afsløres alligevel i referaterne).
+- Kun ejer: 9 evner, spring, luftduel, arketype, løn/værdi, kasse, de præcise fasevalg og Hvis-Så-regler,
   eksakt karakter, mod-kunnen.
 - Ingen: VAR-profil (kun via clues).
 - Modstandere vises med "🔒 ??"; sortering på skjulte kolonner hos et
@@ -172,7 +172,7 @@ visning". Sortering på kopi med `origIdx`.
 ## 9. Noter og persistens
 - Private manager-noter pr. spiller-id (også modstandere), ikon i tabellen.
 - localStorage, auto-gem ved hver ændring, overlever F5, **synlig gem-status
-  med klokkeslæt** og knappen "💾 Gem Taktik Nu" (kvitteringen var svaret på
+  med klokkeslæt** og knappen "💾 Gem nu" (kvitteringen var svaret på
   klagen "nulstiller ved refresh"). "🎲 Nulstil & Rul Ny Liga" kræver bekræftelse.
 - **En ny version må aldrig slette ligaen.** Hvert skema-bump har en additiv
   migrering (nye felter får standardværdier, som v2.5b's

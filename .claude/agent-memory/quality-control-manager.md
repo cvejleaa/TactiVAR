@@ -10,3 +10,4 @@
   står på N−1) – dobbeltklik og genindlæsning midt i afspilning.
 - Resultatobjekter må ikke bære skjulte tal ud til UI ufiltreret: alt der vises
   for en modstander går gennem engine/visibility.js (viewPlayer, viewRatingEntry).
+- En knap i et panel, der kun vises i én tilstand (fx eget hold), forsvinder i den anden. Tjek at hver til/fra-knap kan slås fra igen i alle visninger.

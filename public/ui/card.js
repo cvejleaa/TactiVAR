@@ -5,6 +5,7 @@ import { LINE, SKILL_LABELS, kr, stars } from './labels.js';
 import { aerialBreakdown } from '../engine/generator.js';
 import { COUNTER_KEYS, COUNTER_LABELS, masteryVs } from '../engine/counter.js';
 
+const dk = (v) => v.toLocaleString('da-DK', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const bar = (label, v, max = 20) => h('div', { class: 'bar' }, h('span', { class: 'bar-label' }, label),
   h('span', { class: 'bar-track' }, h('span', { class: 'bar-fill', style: { width: `${Math.round((v / max) * 100)}%` } })), h('span', { class: 'bar-val' }, String(v)));
 
@@ -21,7 +22,7 @@ export function renderCard({ player: p, team, isOwn, opponent, scouting, note, o
       h('div', { class: 'bars' }, SKILL_LABELS.map(([group, list]) => h('div', { class: 'bar-group' }, h('h4', {}, group), list.map(([k, l]) => bar(l, p.skills[k]))))),
       h('div', { class: 'aerial', id: 'aerial-breakdown' },
         h('h4', {}, `✈ Luftduel: ${a.total}/20`),
-        h('div', { class: 'muted' }, `Højde-score ${a.heightScore} (${p.heightCm} cm) × 0,35 = ${a.wHeight.toFixed(2)} · Spring ${p.jumpingPower} × 0,35 = ${a.wJump.toFixed(2)} · Styrke ${p.skills.strength} × 0,15 = ${a.wStr.toFixed(2)} · Position ${p.skills.positioning} × 0,15 = ${a.wPos.toFixed(2)} → ${a.exact.toFixed(2)}`)),
+        h('div', { class: 'muted' }, `Højde-score ${a.heightScore} (${p.heightCm} cm) × 0,35 = ${dk(a.wHeight)} · Spring ${p.jumpingPower} × 0,35 = ${dk(a.wJump)} · Styrke ${p.skills.strength} × 0,15 = ${dk(a.wStr)} · Position ${p.skills.positioning} × 0,15 = ${dk(a.wPos)} → ${dk(a.exact)}`)),
       h('div', { class: 'bar-group' }, h('h4', {}, `🧠 Mod-kunnen (mod ${opponent.name}: ${masteryVs(p, opponent)}%)`), COUNTER_KEYS.map((k) => bar(COUNTER_LABELS[k], p.counterTactics[k], 100))),
       p.archetype ? h('div', { class: 'archbox' }, h('strong', {}, (p.archetype.isUnlocked ? '🌟 ' : '🔒 ') + p.archetype.name), ' – ', p.archetype.description,
         p.archetype.isUnlocked ? null : h('div', { class: 'muted' }, 'Låses op ved: ' + Object.entries(p.archetype.unlockReq).map(([k, v]) => `${k} ${v}`).join(', '))) : null,

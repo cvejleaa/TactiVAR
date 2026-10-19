@@ -3,7 +3,7 @@
 import { h } from './dom.js';
 import { FORMATIONS, MAX_ANCHOR_RADIUS, slotPosition, isOutOfZone, clampPos } from '../engine/formations.js';
 
-export function renderPitch({ team, isOwn, ui, onMove, onSelect }) {
+export function renderPitch({ team, isOwn, ui, onMove, onSelect, onTokenSwap }) {
   const coords = FORMATIONS[team.tactics.baseFormation];
   const byId = new Map(team.squad.map((p) => [p.id, p]));
   const pitch = h('div', { class: 'pitch', id: 'pitch' }, h('div', { class: 'pitch-line mid' }), h('div', { class: 'pitch-box top' }), h('div', { class: 'pitch-box bottom' }));
@@ -16,11 +16,16 @@ export function renderPitch({ team, isOwn, ui, onMove, onSelect }) {
     const out = isOutOfZone(team.tactics, slot);
     const custom = !!team.tactics.customCoords?.[slot];
     const token = h('div', {
-      class: `token${out ? ' out' : custom ? ' custom' : ''}${ui.selectedPlayerId === pid ? ' selected' : ''}${p?.injuryMatchesLeft > 0 ? ' injured' : ''}`,
+      class: `token${out ? ' out' : custom ? ' custom' : ''}${ui.selectedPlayerId === pid ? ' selected' : ''}${ui.pitchSwapId === pid ? ' swapping' : ''}${p?.injuryMatchesLeft > 0 ? ' injured' : ''}`,
       style: { left: pos.x + '%', top: pos.y + '%' }, dataset: { slot: String(slot) }, title: `${coords[slot].r} – ${p ? p.name : '?'}`,
     }, h('span', { class: 'token-num' }, p ? String(p.shirtNumber) : '?'), h('span', { class: 'token-name' }, p ? p.shortName : '?'),
       out ? h('span', { class: 'token-flag' }, '⚠ Ude af zone (-20%)') : custom ? h('span', { class: 'token-flag ok' }, '✅ Custom pos') : null);
-    token.addEventListener('click', () => p && onSelect(p));
+    token.addEventListener('click', () => {
+      if (!p || token.dataset.dragged) { delete token.dataset.dragged; return; }
+      // Eget hold: første klik vælger, klik på en anden brik bytter de to (som i v2.5).
+      if (isOwn && ui.pitchSwapId && ui.pitchSwapId !== pid) onTokenSwap(ui.pitchSwapId, pid);
+      else onSelect(p, isOwn);
+    });
     if (isOwn && slot > 0) attachDrag(token, pitch, anchorRing, coords[slot], slot, onMove);
     pitch.append(token);
   });
@@ -45,7 +50,7 @@ function attachDrag(token, pitch, ring, anchor, slot, onMove) {
     const up = () => {
       token.removeEventListener('pointermove', move); token.removeEventListener('pointerup', up);
       ring.hidden = true;
-      if (moved && last) onMove(slot, { x: Math.round(last.x * 10) / 10, y: Math.round(last.y * 10) / 10 });
+      if (moved && last) { token.dataset.dragged = '1'; onMove(slot, { x: Math.round(last.x * 10) / 10, y: Math.round(last.y * 10) / 10 }); }
     };
     token.addEventListener('pointermove', move); token.addEventListener('pointerup', up);
   });

@@ -99,6 +99,16 @@ try {
   await g.locator('#matrix tbody tr', { hasText: bench }).locator('button').click();
   check('Byt: bænkspilleren overtager pladsen', (await posOf(bench)).startsWith('LB') && (await posOf(starter)).startsWith('BÆNK'));
 
+  // Byt på banen: klik på to brikker (som i v2.5)
+  const nameAt = async (slot) => (await g.locator(`#pitch .token[data-slot="${slot}"] .token-name`).textContent());
+  const [n2, n3] = [await nameAt(2), await nameAt(3)];
+  await g.click('#pitch .token[data-slot="2"]'); await g.click('#pitch .token[data-slot="3"]');
+  check('Klik på to brikker bytter deres pladser', (await nameAt(2)) === n3 && (await nameAt(3)) === n2);
+  const [n4, n5] = [await nameAt(4), await nameAt(5)];
+  await g.click('#pitch .token[data-slot="4"]'); await g.click('#matrix thead th:nth-child(4)'); await g.click('#pitch .token[data-slot="5"]');
+  check('Et påbegyndt byt afbrydes af sortering (intet byt uden varsel)', (await nameAt(4)) === n4 && (await nameAt(5)) === n5);
+  await g.click('#matrix thead th:nth-child(1)');
+
   // Anti-spionage på et modstanderhold
   await g.selectOption('#team-select', '1');
   const oppText = await g.textContent('#matrix tbody');
@@ -113,6 +123,9 @@ try {
   check('Modstander: spillerkortet skjuler evner og kontrakt', (await g.locator('#player-card .bars').count()) === 0 && (await g.textContent('#player-card')).includes('🔒 ??'));
   check('Modstander: faser og Hvis-Så-regler er skjulte', (await g.locator('#tactics fieldset').count()) === 0);
   check('Modstander: kun dit hold kan trækkes på banen', (await g.locator('#pitch .token.draggable').count()) === 0);
+  check('Ligatabellen viser holdenes typiske stil', (await g.textContent('#standings')).includes('•'));
+  await g.click('#wide-toggle');
+  check('Bred visning kan slås til og fra på et bot-hold', (await g.locator('.grid.wide').count()) === 1 && (await g.click('#wide-toggle'), (await g.locator('.grid.wide').count()) === 0));
 
   // Ødelagt gemt spil: aldrig tom side, data bevaret i backup
   await g.evaluate(() => localStorage.setItem('tactivar_save', '{"schemaVersion":1,"league":{"teams":[]}}'));
@@ -120,7 +133,8 @@ try {
   check('Ødelagt gemt spil: synlig fejl med backup-nøgle i stedet for tom side', (await g.isVisible('#load-error')) && (await g.textContent('#load-error')).includes('tactivar_backup_'));
   const backupOk = await g.evaluate(() => Object.keys(localStorage).some((k) => k.startsWith('tactivar_backup_') && localStorage.getItem(k).includes('"teams":[]')));
   check('Ødelagt gemt spil: de rå data ligger i backup', backupOk);
-  await g.click('#load-error button');
+  check('Ødelagt gemt spil: knap til at hente backuppen som fil', await g.isVisible('#download-backup'));
+  await g.click('#start-new');
   await g.waitForSelector('#matrix');
   check('Ny liga fra fejlsiden giver 18 spillere', (await rows()) === 18);
   check('Ingen sidefejl under hele forløbet', fejl.length === 0, fejl.join(' | '));

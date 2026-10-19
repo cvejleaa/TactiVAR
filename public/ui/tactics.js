@@ -19,7 +19,7 @@ export function renderTactics({ team, isOwn, ui, on }) {
       h('label', {}, 'Formation ', select(t.baseFormation, formations, on.formation, { id: 'formation', disabled })),
       isOwn ? h('div', { class: 'presets' }, ['Plan A', 'Plan B', 'Plan C'].map((l, i) => h('button', { class: 'mini' + (ui.activePresetIndex === i ? ' active' : ''), onclick: () => on.preset(i) }, l + (ui.activePresetIndex === i ? ' (aktiv)' : '')))) : null,
       isOwn ? h('button', { class: 'mini', id: 'reset-drag', onclick: on.resetDrag }, '↺ Nulstil træk') : null),
-    !isOwn ? h('div', { class: 'lockbox' }, '🔒 Modstanderens faser og Hvis-Så-regler er skjulte – læs kampreferaterne for at aflure dem.') : null,
+    !isOwn ? h('div', { class: 'lockbox' }, 'Modstanderens formation og typiske stil er offentlige. 🔒 De præcise faser og Hvis-Så-regler er skjulte – læs kampreferaterne for at aflure dem.') : null,
     !isOwn ? null : PHASES.map(([phase, title, fields]) => h('fieldset', { class: 'phase', dataset: { phase } }, h('legend', {}, title),
       fields.map(([f, label]) => h('label', {}, label + ' ', select(t.phases[phase][f], PHASE_OPTIONS[f], (v) => on.phase(phase, f, v), { disabled, dataset: { field: f } }))))),
     !isOwn ? null : h('fieldset', { class: 'phase rules', id: 'rules' }, h('legend', {}, `Hvis-Så-regler (maks ${MAX_RULES}, hver udløses højst én gang pr. kamp)`),
