@@ -69,6 +69,7 @@ function start() {
     game = r.state; view.savedAt = r.state.savedAt;
     if (r.migratedFrom != null) {
       view.notice = migrationNotice(r.migratedFrom) + (r.backupKey ? ' Det gamle spil ligger som backup i browseren.' : '');
+      view.backupKey = r.backupKey || null; // knap i beskeden: hent den gamle version som fil
       // Gem straks i det nye format (ellers tog hver genindlæsning en ny backup) – men kun
       // når backuppen af det gamle format lykkedes; ellers står det gamle urørt, og der advares.
       if (r.backupKey) persist();
@@ -219,7 +220,8 @@ function render() {
   }[tab]();
   app.replaceChildren(...[
     h('nav', { class: 'tabs', id: 'tabs' }, TABS.map(([k, label]) => h('button', { id: `tab-${k}`, class: 'tab' + (k === tab ? ' active' : ''), onclick: () => showTab(k) }, label))),
-    view.notice ? h('div', { class: 'notice', id: 'notice' }, view.notice) : null,
+    view.notice ? h('div', { class: 'notice', id: 'notice' }, view.notice,
+      view.backupKey && storage.getItem(view.backupKey) ? h('button', { class: 'mini', id: 'download-migration-backup', onclick: () => download(storage.getItem(view.backupKey), `${view.backupKey}.json`) }, ' ⬇ Hent backup som fil') : null) : null,
     h('div', { class: `tabpane tab-${tab}` }, ...content.filter(Boolean)),
   ].filter(Boolean));
   document.body.dataset.klar = 'ja';

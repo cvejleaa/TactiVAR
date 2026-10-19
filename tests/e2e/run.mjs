@@ -425,6 +425,10 @@ try {
   await g.evaluate((f) => { for (const k of Object.keys(localStorage)) if (k.startsWith('tactivar_')) localStorage.removeItem(k); localStorage.setItem('tactivar_save', f); }, fixture3);
   await reload();
   const note3 = await g.textContent('#notice');
+  const dl = g.waitForEvent('download');
+  await g.click('#download-migration-backup');
+  const bk = await dl;
+  check('Migrering: beskeden har en knap, der henter det gamle spil (skema 3) som fil', bk.suggestedFilename().startsWith('tactivar_backup_') && JSON.parse(fs.readFileSync(await bk.path(), 'utf8')).schemaVersion === 3);
   check('Migrering fra skema 3: beskeden nævner Superliga-højderne og friskheden – ikke puljen eller Hvis-Så', note3.includes('Superliga') && note3.includes('Friskhed') && !note3.includes('100 point') && !note3.includes('Hvis-Så'), note3);
   // Advarsel ved ▶ om trætte startere (under 70 %)
   const setStarterFresh = async (v) => { await g.evaluate((val) => { const d = JSON.parse(localStorage.getItem('tactivar_save')); const t = d.league.teams.find((x) => !x.isBot); for (const p of t.squad) p.freshness = 100; t.squad.find((p) => p.id === t.tactics.lineupSlots[6]).freshness = val; localStorage.setItem('tactivar_save', JSON.stringify(d)); }, v); await reload(); };
