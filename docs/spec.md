@@ -182,7 +182,8 @@ Tick hvert 3. minut (1..90).
   spillerkortet viser km pr. 90 min og bedste topfart for sæsonen.
 - **Højintenst løb (v3.7.1**, brugeren: "hvor stor en andel af deres løb der er højintense løb"):
   andel (over ca. 20 km/t) = (kæde-basis MV 2/FOR 7/MID 9/ANG 11 % + (PAC−10)·0,4) · pres (gegenpres 1,15, lav blok
-  0,9) · (0,8 + 0,2·friskhed/100) ± 1, klemt 1–20 % (topdivisioner ≈7–12 % for markspillere).
+  0,9) · (0,8 + 0,2·friskhed/100) ± 1, klemt 1–20 % (topdivisioner ≈7–12 % for markspillere;
+  målt med `node tools/measure-duels.mjs 20 saeson`: MV 2,3, FOR 7,6, MID 9,9, ANG 11,8 %).
   Vises som "N % HI" i karakterarket, "N % højintenst" for dit holds løber og sæsonandelen på
   spillerkortet (egen nævner `hiDistSum`, så v3.7.0-ligaer ikke viser for lavt). Ingen andel under
   10 min spilletid. Privat (røber fart og pres). Bund 1 % (en målmand ligger på ≈2 %).

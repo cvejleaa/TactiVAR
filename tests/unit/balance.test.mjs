@@ -39,3 +39,10 @@ test('rundens mål: flere typer vinder, ingen over 50 %, VAR under 40 %; friskhe
   // Før v3.7 lå startelleverne på ≈95–100 % efter flere runder; nu mærkes trætheden
   assert.ok(r.freshMe < 85, String(r.freshMe));
 });
+
+test('andel højintenst løb: markspillere 6–13 % i snit (topdivisioner ≈7–12 %), målmænd under 4 %', async () => {
+  const { measureSeason } = await import('../../tools/measure-duels.mjs');
+  const { hi } = measureSeason(4, 1);
+  for (const k of ['DEF', 'MID', 'ATT']) assert.ok(hi[k] >= 6 && hi[k] <= 13, `${k} ${hi[k]}`);
+  assert.ok(hi.GK < 4, `GK ${hi.GK}`);
+});

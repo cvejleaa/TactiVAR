@@ -78,7 +78,7 @@ export function finalizeSheet(sheet, homeGoals, awayGoals, rng, xpFor) {
     e.distanceKm = Math.round(e.km90 * (Math.max(0, e.minOut - e.minIn) / 90) * 10) / 10;
     e.hiKm = Math.round(e.distanceKm * e.hiShare / 100 * 100) / 100;
     // For kort tid til en rigtig spurt eller en meningsfuld HI-andel (støj på få minutter).
-    if (e.minOut - e.minIn < 10) { e.topSpeed = null; e.hiShare = null; }
+    if (e.minOut - e.minIn < 10) { e.topSpeed = null; e.hiShare = null; e.hiKm = null; } // tæller heller ikke i sæsonens HI-andel
     delete e.km90;
     if (!best || e.rating > best.rating) best = e;
   }

@@ -720,6 +720,7 @@ test('finalizeSheet: km for spilletiden, ingen topfart under 10 min, og raten pr
   assert.equal(by.c.distanceKm, 0.6);  // 11,2·5/90 = 0,62
   assert.equal(by.a.topSpeed, 29.5); assert.equal(by.c.topSpeed, null);
   assert.equal(by.a.hiShare, 9); assert.equal(by.b.hiShare, 9); assert.equal(by.c.hiShare, null); // under 10 min: ingen andel
+  assert.equal(by.c.hiKm, null); assert.ok(by.b.hiKm > 0); // og ingen HI-km til sæsonsummen
   for (const e of res.home) assert.ok(!('km90' in e), 'raten pr. 90 min røber udholdenheden');
 });
 

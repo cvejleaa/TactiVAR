@@ -80,11 +80,20 @@ export function measureSeason(N = ARG_N, rounds = 10) {
   }
   const mean = (a) => a.reduce((x, y) => x + y, 0) / a.length;
   const total = Object.values(kinds).reduce((a, b) => a + b, 0);
-  return { kinds: Object.fromEntries(Object.entries(kinds).map(([k, v]) => [k, v / total])), freshMe: mean(freshMe), freshBots: mean(freshBots), goalsEarly: mean(goalsEarly), goalsLate: mean(goalsLate) };
+  // Andel højintenst løb pr. kæde i alle hele kampe (v3.7.1) – til sammenligning med topdivisioner.
+  const hi = {};
+  for (let s = 1; s <= Math.min(N, 10); s++) {
+    const rng = createRng(s * 7);
+    const L = createLeague(rng);
+    const res = playRound(L, 1, rng);
+    for (const m of res.matches) for (const e of [...m.ratings.home, ...m.ratings.away]) if (e.hiShare != null && e.minIn <= 1 && e.minOut === 90) (hi[e.line] ||= []).push(e.hiShare);
+  }
+  return { kinds: Object.fromEntries(Object.entries(kinds).map(([k, v]) => [k, v / total])), freshMe: mean(freshMe), freshBots: mean(freshBots), goalsEarly: mean(goalsEarly), goalsLate: mean(goalsLate), hi: Object.fromEntries(Object.entries(hi).map(([k, v]) => [k, mean(v)])) };
 }
 if (import.meta.url === `file://${process.argv[1]}` && process.argv[3] === 'saeson') {
   const r = measureSeason();
   console.log('Rundens mål pr. type:', Object.entries(r.kinds).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${(v * 100).toFixed(0)} %`).join(', '));
   console.log(`Startelleverens friskhed efter 10 runder: dit hold (roterer ikke her) ${r.freshMe.toFixed(1)} %, bots ${r.freshBots.toFixed(1)} %`);
   console.log(`Mål pr. kamp: runde 1–2 ${r.goalsEarly.toFixed(2)}, runde 9–10 ${r.goalsLate.toFixed(2)}`);
+  console.log('Andel højintenst løb (hele kampe):', ['GK', 'DEF', 'MID', 'ATT'].map((k) => `${k} ${r.hi[k]?.toFixed(1)} %`).join(', '));
 }
