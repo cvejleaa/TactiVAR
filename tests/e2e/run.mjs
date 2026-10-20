@@ -577,6 +577,11 @@ try {
   await reload();
   const noBackup = await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).schemaVersion);
   check('Migrering uden mulig backup: det gamle format står urørt, og der advares', noBackup === 1 && (await g.textContent('#fejlboks')).includes('kunne ikke tages backup'));
+  // …også efter et gem og en ændring (Release Manager v3.11: før overskrev første klik den gamle fil uden backup)
+  await g.click('#save-now');
+  await g.click('#tab-taktik'); await g.selectOption('#tactics select[data-field="pressingHeight"]', 'LOW_BLOCK');
+  const stillOld = await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).schemaVersion);
+  check('Migrering uden mulig backup: gem og ændringer overskriver ikke den gamle fil – gem-status siger IKKE gemt', stillOld === 1 && (await g.textContent('#save-status')).includes('IKKE gemt') && (await g.textContent('#fejlboks')).includes('IKKE gemt'), String(stillOld));
   const fresh2 = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
   const g2 = await fresh2.newPage(); await g2.goto(BASE + '/'); await g2.waitForSelector('body[data-klar="ja"]');
   await g.close();

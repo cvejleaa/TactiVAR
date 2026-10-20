@@ -3,7 +3,7 @@ import { renderStats } from './ui/stats.js';
 import { VERSION } from './version.js';
 import { createRng, randomSeed } from './engine/rng.js';
 import { createLeague } from './engine/generator.js';
-import { loadGame, saveGame, resetGame, exportGame, importGame } from './state/storage.js';
+import { loadGame, saveGame, resetGame, exportGame, importGame, backupRaw, SAVE_KEY } from './state/storage.js';
 import * as act from './state/actions.js';
 import { h, select } from './ui/dom.js';
 import { kr } from './ui/labels.js';
@@ -39,7 +39,7 @@ function showTeam(idx) {
   render();
 }
 // Et nyt spil (ny liga/import) må ikke vise den gamle ligas runde i Kamp-fanen.
-function dropMatchView() { clearInterval(timer); timer = null; mc = null; }
+function dropMatchView() { clearInterval(timer); timer = null; mc = null; pendingRaw = null; } // nyt spil: den gamle fil er taget backup af (resetGame)
 
 const app = document.getElementById('app');
 const controls = document.getElementById('controls');
@@ -52,7 +52,21 @@ function newGame() {
   return { league: createLeague(createRng(randomSeed())), notes: {}, ui: { activePresetIndex: 0 } };
 }
 
+// Et migreret spil, hvis gamle fil ikke kunne tages backup af (fuldt lager): den gamle fil må
+// ikke overskrives, før backuppen er lykkedes – hvert gem prøver igen (Release Manager v3.11:
+// ellers slettede første klik den gamle liga uden backup).
+let pendingRaw = null;
+
 function persist() {
+  if (pendingRaw) {
+    const key = backupRaw(storage, pendingRaw);
+    if (!key) {
+      view.saveError = 'Det gamle spil kunne ikke tages backup af';
+      window.tactivarFejl?.('Spillet er IKKE gemt: det gamle spil kunne ikke tages backup af (er browserens lager fuldt?). Eksportér med ⬇ Eksportér, og ryd plads i browseren.');
+      return;
+    }
+    pendingRaw = null; view.backupKey = key;
+  }
   const r = saveGame(storage, game);
   if (r.ok) { view.savedAt = r.savedAt; view.saveError = null; }
   else { view.saveError = r.error; window.tactivarFejl?.(r.error); }
@@ -75,7 +89,7 @@ function start() {
       // Gem straks i det nye format (ellers tog hver genindlæsning en ny backup) – men kun
       // når backuppen af det gamle format lykkedes; ellers står det gamle urørt, og der advares.
       if (r.backupKey) persist();
-      else window.tactivarFejl?.('Dit spil er opdateret, men der kunne ikke tages backup af det gamle format (er browserens lager fuldt?). Eksportér spillet med ⬇ Eksportér som sikkerhed.');
+      else { pendingRaw = storage.getItem(SAVE_KEY); window.tactivarFejl?.('Dit spil er opdateret, men der kunne ikke tages backup af det gamle format (er browserens lager fuldt?). Eksportér spillet med ⬇ Eksportér som sikkerhed.'); }
     }
   }
   view.viewTeamIdx = myIdx();
