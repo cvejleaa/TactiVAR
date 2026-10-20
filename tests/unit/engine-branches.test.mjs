@@ -2166,3 +2166,18 @@ test('kampstatistik: gule kort tælles løbende (st.*Yellows) og passer med kara
   const side = t.m.stats.hYellows + t.m.stats.aYellows;
   assert.equal(side, 1); assert.equal([...t.m.ratings.home, ...t.m.ratings.away].filter((e) => e.yellowCard).length, 1);
 });
+
+// v3.10.1 Test Manager: ovenstående summerer siderne og kører taktisk frispark kun ÉN gang – side (foulende, ikke ofret)
+// og "højst ét pr. spiller" i den taktiske gren var ubevist.
+test('kampstatistik: taktisk frispark – gult kort tælles på det foulende hold og højst ét pr. spiller', () => {
+  const once = (victimIsHome) => sp({ script: { 0.06: (n) => n === 0, 0.5: (n) => victimIsHome && n === 0 } });
+  const a = once(false);                 // ofret = ude → hjemmeholdet foulede
+  assert.equal(a.m.stats.hYellows, 1); assert.equal(a.m.stats.aYellows, 0);
+  assert.equal(a.m.ratings.home.filter((e) => e.yellowCard).length, 1); assert.equal(a.m.ratings.away.filter((e) => e.yellowCard).length, 0);
+  const b = once(true);                  // ofret = hjemme → udeholdet foulede
+  assert.equal(b.m.stats.aYellows, 1); assert.equal(b.m.stats.hYellows, 0);
+  assert.equal(b.m.ratings.away.filter((e) => e.yellowCard).length, 1); assert.equal(b.m.ratings.home.filter((e) => e.yellowCard).length, 0);
+  const many = sp({ script: { 0.06: true } });   // 30 taktiske frispark, samme spiller hver gang (pick = første)
+  assert.equal(many.m.stats.hYellows + many.m.stats.aYellows, 1, 'samme spiller får ikke gult kort igen');
+  assert.equal([...many.m.ratings.home, ...many.m.ratings.away].filter((e) => e.yellowCard).length, 1);
+});

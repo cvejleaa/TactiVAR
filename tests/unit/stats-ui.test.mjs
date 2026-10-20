@@ -152,3 +152,19 @@ test('dit hold (privat): pr.-kamp-tal, sæsonsummer og spillertabellen med snit,
   const fresh = world();
   assert.equal(byId(render(fresh.L, fresh.me), 'my-team-stats').textContent, 'Kommer efter første runde.');
 });
+
+// v3.10.1 Test Manager: listetesten sammenlignede med shortTeam() selv, så ordlisten var ubevist (hvert ord kunne fjernes).
+// Pinnet bogstaveligt for ALLE otte holdnavne + ord der ikke må fjernes + fallback til hele navnet.
+test('shortTeam: fjerner FC/IF/BK/United/Boldklub/Rovers/Tacticians – og kun dem; aldrig et tomt navn', async () => {
+  const { TEAM_NAMES } = await import('../../public/engine/generator.js');
+  assert.deepEqual(TEAM_NAMES.map(shortTeam), ['Bibamus', 'Vejleå', 'Ølstykke', 'Lyngby', 'Nordkysten', 'Furesø', 'Roskilde', 'Kronborg']);
+  assert.equal(shortTeam('Aalborg City Rangers'), 'Aalborg City Rangers');
+  assert.equal(shortTeam('FC'), 'FC', 'tomt resultat → hele navnet');
+  assert.equal(shortTeam('FC Rovers'), 'FC Rovers');
+});
+test('spillerlister: spillerens fulde navn og nummer står i title på navnecellen (afkortet tekst kan ikke ses)', () => {
+  const { L, me } = world();
+  const p = me.squad[3]; p.sGoals = 4; p.sGames = 4;
+  const row = items(list(render(L, me), 'sGoals'))[0];
+  assert.equal(row.children[1].attrs.title, `#${p.shirtNumber} ${p.shortName}`);
+});
