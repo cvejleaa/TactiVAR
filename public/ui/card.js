@@ -10,7 +10,7 @@ const dk = (v) => v.toLocaleString('da-DK', { minimumFractionDigits: 2, maximumF
 const bar = (label, v, max = 20) => h('div', { class: 'bar' }, h('span', { class: 'bar-label' }, label),
   h('span', { class: 'bar-track' }, h('span', { class: 'bar-fill', style: { width: `${Math.round((v / max) * 100)}%` } })), h('span', { class: 'bar-val' }, String(v)));
 
-export function renderCard({ player: p, team, isOwn, opponent, scouting, note, onNote }) {
+export function renderCard({ player: p, team, isOwn, scouting, note, onNote }) {
   if (!p) return h('div', { class: 'panel muted' }, 'Klik på en spiller for at se spillerkortet.');
   const head = h('div', { class: 'card-head' },
     h('h3', {}, `#${p.shirtNumber} ${p.name}`),
@@ -29,7 +29,7 @@ export function renderCard({ player: p, team, isOwn, opponent, scouting, note, o
         h('div', { class: 'muted', id: 'counter-used' }, `Erfaring brugt: ${COUNTER_KEYS.reduce((a, k) => a + p.counterTactics[k], 0)}/${COUNTER_POOL} – ved fuld pulje glemmer han lidt af det gamle, når han lærer noget nyt.`)),
       p.archetype ? h('div', { class: 'archbox' }, h('strong', {}, (p.archetype.isUnlocked ? '🌟 ' : '🔒 ') + p.archetype.name), ' – ', p.archetype.description,
         p.archetype.isUnlocked ? null : h('div', { class: 'muted' }, 'Låses op ved: ' + Object.entries(p.archetype.unlockReq).map(([k, v]) => `${k} ${v}`).join(', '))) : null,
-      h('div', { class: 'muted', id: 'run-stats' }, run.km90 != null ? `🏃 ${run.km90.toFixed(1)} km pr. 90 min · ${run.hiPct != null ? `${run.hiPct} % højintenst` : 'højintenst: kommer efter næste kamp'} · topfart ${p.topSpeedMax.toFixed(1)} km/t (sæsonen)` : '🏃 Løbedata kommer efter første kamp'),
+      h('div', { class: 'muted', id: 'run-stats' }, run.km90 != null ? `🏃 ${run.km90.toFixed(1)} km pr. 90 min · ${run.hiPct != null ? `${run.hiPct} % højintenst` : 'højintenst: kommer efter næste kamp'} · topfart ${p.topSpeedMax.toFixed(1)} km/t (alle kampe)` : '🏃 Løbedata kommer efter første kamp'),
       h('div', { class: 'muted' }, `Løn ${kr(p.weeklyWage)}/uge · Værdi ${kr(p.marketValue)}`),
     ];
   } else {

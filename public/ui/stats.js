@@ -40,7 +40,7 @@ function playerLists(league, myTeamId) {
     list('⚽ Topscorere', 'sGoals'), list('🅰 Flest oplæg', 'sAssists'), list('👑 Kampens spiller', 'sMotm'),
     list('🗣 Hovedstødsmål', 'sHeaderGoals'), list('🎯 Straffemål', 'sPenaltyGoals'), list('🧱 Dødboldmål', 'sSetPieceGoals'),
     list('🧤 Clean sheets', 'sCleanSheets'), list('🟨 Gule kort', 'sYellow'),
-    listTable('⭐ Bedste vurdering (hele sæsonen)', 'publicStars', starRows, (v) => starsEl(v.publicStars), myTeamId));
+    listTable('⭐ Bedste vurdering (alle kampe)', 'publicStars', starRows, (v) => starsEl(v.publicStars), myTeamId));
 }
 
 function teamTable(league, myTeamId) {
@@ -54,8 +54,9 @@ function teamTable(league, myTeamId) {
 }
 
 function leagueFlow(league) {
-  const hist = league.history || [];
-  if (!hist.length) return h('p', { class: 'muted' }, 'Kommer efter første runde.');
+  // Kun indeværende sæson (v3.11); afsluttede sæsoner står under Tidligere sæsoner.
+  const hist = (league.history || []).filter((r) => r.round >= (league.seasonStartRound ?? 1));
+  if (!hist.length) return h('p', { class: 'muted' }, 'Kommer efter sæsonens første runde.');
   const max = Math.max(1, ...hist.map((r) => r.goals));
   const kinds = {};
   for (const r of hist) for (const [k, v] of Object.entries(r.kinds || {})) kinds[k] = (kinds[k] ?? 0) + v;
@@ -81,12 +82,12 @@ function myTeam(league, myTeamId) {
       ? `Fra runde ${league.statsFromRound ?? 1}, pr. kamp: ${(s.shots / n).toFixed(1)} afslutninger (${(s.onTarget / n).toFixed(1)} på mål), xG ${(s.xg / n).toFixed(2)}, ${(s.corners / n).toFixed(1)} hjørnespark, ${(s.freeKicks / n).toFixed(1)} frispark i skudafstand. I alt: kontramål ${s.counterGoals} for / ${s.counterGoalsAgainst} imod, ${s.varChecks} VAR-tjek.`
       : 'Kommer efter første runde.'),
     h('div', { class: 'tablewrap-x' }, h('table', { class: 'standings', id: 'my-players' },
-      h('thead', {}, h('tr', {}, ['Spiller', `Kampe (fra R${league.statsFromRound ?? 1})`, 'Snit (sæson)', 'km/90 (sæson)', '% HI (sæson)', `Fri (fra R${league.statsFromRound ?? 1})`, 'Friskhed'].map((x) => h('th', {}, x)))),
+      h('thead', {}, h('tr', {}, ['Spiller', `Kampe (fra R${league.statsFromRound ?? 1})`, 'Snit (i alt)', 'km/90 (i alt)', '% HI (i alt)', `Fri (fra R${league.statsFromRound ?? 1})`, 'Friskhed'].map((x) => h('th', {}, x)))),
       h('tbody', {}, team.squad.map((p) => { const r = runStats(p); return h('tr', {},
         h('td', {}, `#${p.shirtNumber} ${p.shortName}`), h('td', {}, p.sGames), h('td', {}, p.ratingGames ? (p.ratingSum / p.ratingGames).toFixed(1) : '–'),
         h('td', {}, r.km90 != null ? r.km90.toFixed(1) : '–'), h('td', {}, r.hiPct != null ? `${r.hiPct} %` : '–'),
         h('td', {}, p.freeRunsSum ? `${p.freeRunsWonSum}/${p.freeRunsSum}` : '–'), h('td', {}, `${p.freshness} %`)); })))),
-    h('p', { class: 'muted' }, `Kun du ser disse tal – de røber evner og dine taktiske valg. Kampe og frie løb tælles fra runde ${league.statsFromRound ?? 1}; snit, km og HI gælder hele sæsonen.`));
+    h('p', { class: 'muted' }, `Kun du ser disse tal – de røber evner og dine taktiske valg. Kampe og frie løb tælles fra runde ${league.statsFromRound ?? 1}; snit, km og HI gælder alle hans kampe (de nulstilles ikke ved sæsonskifte).`));
 }
 
 export function renderStats({ league, myTeamId }) {

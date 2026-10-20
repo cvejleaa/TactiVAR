@@ -15,7 +15,7 @@ function fakeStorage(initial = {}, { failWrite = false } = {}) {
     map: m,
   };
 }
-const game = (seed = 1) => ({ league: createLeague(createRng(seed)), notes: { x: 'note' }, ui: { activePresetIndex: 0, opponentIdx: 2 } });
+const game = (seed = 1) => ({ league: createLeague(createRng(seed)), notes: { x: 'note' }, ui: { activePresetIndex: 2 } });
 const FIXTURE = fs.readFileSync(new URL('../fixtures/save-schema1.json', import.meta.url), 'utf8');
 
 // ---------- Gem og indlæs ----------
@@ -29,7 +29,7 @@ test('tomt lager giver "empty"; gem og indlæs giver præcis samme spil tilbage'
   assert.equal(r.backupKey, null, 'ingen backup når intet migreres');
   assert.deepEqual(r.state.league, g.league);
   assert.deepEqual(r.state.notes, g.notes);
-  assert.equal(r.state.ui.opponentIdx, 2);
+  assert.equal(r.state.ui.activePresetIndex, 2);
   assert.equal(r.state.savedAt, 1000);
   assert.equal(JSON.parse(s.getItem(SAVE_KEY)).schemaVersion, SCHEMA_VERSION);
 });
@@ -167,7 +167,7 @@ test('skema-version kræves; ui og noter får standardværdier; migratedFrom er 
   assert.equal(parseSave(JSON.stringify({ ...ok, schemaVersion: undefined })).ok, false);
   assert.equal(parseSave(JSON.stringify({ ...ok, schemaVersion: '1' })).ok, true);
   const r = parseSave(JSON.stringify({ ...ok, ui: undefined, notes: 'x' }));
-  assert.deepEqual(r.state.ui, { activePresetIndex: 0, opponentIdx: 1 });
+  assert.deepEqual(r.state.ui, { activePresetIndex: 0 }); // opponentIdx forsvandt med kampprogrammet (v3.11)
   assert.deepEqual(r.state.notes, {});
   assert.equal(r.migratedFrom, 1, 'fixture fra skema 1 migreres');
   assert.equal(parseSave(serialize(r.state)).migratedFrom, null, 'nyeste skema migreres ikke');
@@ -507,7 +507,7 @@ test('gem fra v3.8 (skema 5, uden offBallRuns): dit hold og dine planer får NOR
   assert.ok(!FIXTURE5.includes('offBallRuns'), 'fixturet er gemt før v3.9');
   const r = parseSave(FIXTURE5);
   assert.ok(r.ok, r.error);
-  assert.equal(r.migratedFrom, null);
+  assert.equal(r.migratedFrom, 5, 'skema 5 → 6 (kampprogram, v3.11)');
   const teams = r.state.league.teams;
   const me = teams.find((t) => !t.isBot);
   for (const tac of [me.tactics, ...me.tacticPresets]) assert.equal(tac.phases.phase1_buildUp.offBallRuns, 'NORMAL');
@@ -562,11 +562,60 @@ test('gem fra v3.9: indlæses uden migrering; statistikken starter tom fra næst
   const raw = JSON.parse(FIXTURE_V39);
   assert.ok(!FIXTURE_V39.includes('statsFromRound') && !FIXTURE_V39.includes('sGoals'), 'fixturet er gemt før v3.10');
   const r = parseSave(FIXTURE_V39);
-  assert.ok(r.ok, r.error); assert.equal(r.migratedFrom, null);
+  assert.ok(r.ok, r.error); assert.equal(r.migratedFrom, 5);
   const L = r.state.league;
   assert.equal(L.statsFromRound, raw.league.leagueMetadata.round + 1); assert.deepEqual(L.history, []);
   assert.ok(L.teams.every((t) => t.squad.every((p) => p.sGoals === 0 && p.sGames === 0 && p.freeRunsSum === 0)));
   for (const s of L.leagueMetadata.standings) { assert.equal(s.shots, 0); assert.equal(s.cleanSheets, 0); }
-  // Tabellen er urørt
-  assert.deepEqual(L.leagueMetadata.standings.map((s) => [s.points, s.goalsFor]), raw.league.leagueMetadata.standings.map((s) => [s.points, s.goalsFor]));
+  // Tabellen er arkiveret uændret som sæson 1 (v3.11)
+  const sorted = (rows) => rows.map((s) => [s.teamId, s.points, s.goalsFor]).sort((a, b) => a[0].localeCompare(b[0]));
+  assert.deepEqual(sorted(L.seasons[0].table), sorted(raw.league.leagueMetadata.standings));
+});
+
+// ---------- v3.11: kampprogram og sæsonslut – gem fra den live v3.10.1 ----------
+const FIXTURE_V3101 = fs.readFileSync(new URL('../fixtures/save-v3.10.1.json', import.meta.url), 'utf8');
+test('gem fra v3.10.1 (skema 5): tabellen arkiveres som sæson 1 uden program, sæson 2 starter med program og nulstillet sæsonstatistik; spillere, friskhed og forløb er uændrede', async () => {
+  const { buildSchedule, isValidSchedule } = await import('../../public/engine/schedule.js');
+  const { pairRound, playRound, commitRound } = await import('../../public/engine/season.js');
+  const raw = JSON.parse(FIXTURE_V3101);
+  assert.equal(raw.schemaVersion, 5); assert.ok(!FIXTURE_V3101.includes('"schedule"'), 'gemt før v3.11');
+  const round = raw.league.leagueMetadata.round;
+  assert.ok(round >= 6);
+  // Fixturet har forsvarere med clean sheets (den gamle regel) – det er dem, brugeren klagede over
+  const rawPlayers = raw.league.teams.flatMap((t) => t.squad);
+  assert.ok(rawPlayers.some((p) => p.line !== 'GK' && p.sCleanSheets > 0));
+  const r = parseSave(FIXTURE_V3101);
+  assert.ok(r.ok, r.error); assert.equal(r.migratedFrom, 5);
+  const L = r.state.league, md = L.leagueMetadata;
+  // Arkivet: sæson 1, runde 1–6, den gamle tabel sorteret
+  assert.equal(L.seasons.length, 1);
+  const [s1] = L.seasons;
+  assert.deepEqual([s1.seasonNumber, s1.fromRound, s1.toRound, s1.programmed], [1, 1, round, false]);
+  assert.equal(s1.statsFrom, raw.league.statsFromRound, 'spillertallene gælder fra statistikkens start');
+  const want = raw.league.leagueMetadata.standings.slice().sort((a, b) => b.points - a.points || (b.goalsFor - b.goalsAgainst) - (a.goalsFor - a.goalsAgainst) || b.goalsFor - a.goalsFor);
+  assert.deepEqual(s1.table.map((x) => [x.teamId, x.points, x.played]), want.map((x) => [x.teamId, x.points, x.played]));
+  const topGoals = Math.max(...rawPlayers.map((p) => p.sGoals));
+  assert.equal(s1.topScorer.goals, topGoals);
+  // Ny sæson
+  assert.equal(md.seasonNumber, 2); assert.equal(L.seasonStartRound, round + 1); assert.equal(L.statsFromRound, round + 1); assert.equal(md.round, round);
+  assert.ok(md.standings.every((s) => s.played === 0 && s.points === 0 && s.cleanSheets === 0));
+  assert.ok(L.teams.every((t) => t.squad.every((p) => p.sGames === 0 && p.sCleanSheets === 0)));
+  // Programmet: gyldigt, deterministisk (holdenes rækkefølge), og to indlæsninger giver det samme
+  assert.ok(isValidSchedule(L.schedule, L.teams));
+  assert.deepEqual(L.schedule, buildSchedule(L.teams.map((t) => t.id)));
+  assert.deepEqual(parseSave(FIXTURE_V3101).state.league.schedule, L.schedule);
+  // Uændret: friskhed, karaktersnit, forløbet og noter
+  const players = L.teams.flatMap((t) => t.squad);
+  assert.deepEqual(players.map((p) => [p.id, p.freshness, p.ratingSum, p.heightCm]), rawPlayers.map((p) => [p.id, p.freshness, p.ratingSum, p.heightCm]));
+  assert.deepEqual(L.history, raw.league.history);
+  assert.deepEqual(r.state.notes, raw.notes);
+  assert.ok(!('opponentIdx' in r.state.ui));
+  // Næste runde er programmets runde 1, og der kan spilles videre: kun målmænd får clean sheets
+  const idx = new Map(L.teams.map((t, i) => [t.id, i]));
+  assert.deepEqual(pairRound(L).slice().sort(), L.schedule[0].map(([h, a]) => [idx.get(h), idx.get(a)]).sort());
+  const rng = createRng(3);
+  for (let i = 0; i < 6; i++) commitRound(L, playRound(L, rng), rng);
+  const cs = (pred) => L.teams.flatMap((t) => t.squad).filter(pred).reduce((a, p) => a + p.sCleanSheets, 0);
+  assert.ok(cs((p) => p.line === 'GK') > 0, 'målmænd får clean sheets');
+  assert.equal(cs((p) => p.line !== 'GK'), 0, 'ingen andre');
 });

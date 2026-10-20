@@ -33,11 +33,14 @@ export function buildGazette(matches, { positions = null, round = 0 } = {}) {
   }
   players.sort((a, b) => b.rating - a.rating || (b.goals * 2 + b.assists) - (a.goals * 2 + a.assists));
   goals.sort((a, b) => b.spectacle - a.spectacle);
+  // Din kamp står først (pairRound); fra v3.11 kan du også være udehold.
   const my = matches[0];
-  const myResult = my.homeGoals > my.awayGoals
-    ? `${my.homeName} leverede et taktisk mesterstykke med ${my.homeGoals}-${my.awayGoals} over ${my.awayName}.`
-    : my.homeGoals < my.awayGoals
-      ? `Modstanderen ${my.awayName} lykkedes med deres kampplan og vandt ${my.awayGoals}-${my.homeGoals} over ${my.homeName}.`
+  const away = my.ratings.away.some((e) => e.isUserTeam) && !my.ratings.home.some((e) => e.isUserTeam);
+  const [me, opp, myG, oppG] = away ? [my.awayName, my.homeName, my.awayGoals, my.homeGoals] : [my.homeName, my.awayName, my.homeGoals, my.awayGoals];
+  const myResult = myG > oppG
+    ? `${me} leverede et taktisk mesterstykke med ${myG}-${oppG} over ${opp}${away ? ' på udebane' : ''}.`
+    : myG < oppG
+      ? `Modstanderen ${opp} lykkedes med deres kampplan og vandt ${oppG}-${myG} over ${me}.`
       : `En intens taktisk skakmat mellem ${my.homeName} og ${my.awayName} endte ${my.homeGoals}-${my.awayGoals}.`;
   const defensive = goals.length ? null : players.find((p) => p.saves > 0 || p.tacticWins > 0) || players[0];
 

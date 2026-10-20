@@ -3,6 +3,7 @@
 // docs/spec.md §9 – en ny version må aldrig slette ligaen.
 import { TEAM_STAT_DEFAULTS, PLAYER_SEASON_DEFAULTS } from './stats.js';
 import { FORMATIONS } from './formations.js';
+import { buildSchedule, isValidSchedule, SEASON_ROUNDS } from './schedule.js';
 import { defaultTactics, defaultStarterIds, emptyStanding, BOT_PROFILES, aerialBreakdown, assignPositions } from './generator.js';
 
 const PLAYER_DEFAULTS = { freshness: 100, injuryMatchesLeft: 0, lastRating: 0, ratingSum: 0, ratingGames: 0, publicStars: 0, seasonAgeCounter: 1, archetype: null, distanceSum: 0, minutesSum: 0, topSpeedMax: 0, hiKmSum: 0, hiDistSum: 0 };
@@ -50,6 +51,12 @@ export function normalizeLeague(league) {
   if (!Array.isArray(league.history)) league.history = [];
   league.scouting ||= {};
   league.lastRound ??= null;
+  // Kampprogrammet (v3.11): et ugyldigt eller manglende program genskabes deterministisk (holdenes
+  // rækkefølge), og sæsonens start lægges, så næste runde altid er en af sæsonens 14.
+  if (!isValidSchedule(league.schedule, league.teams)) league.schedule = buildSchedule(league.teams.map((t) => t.id));
+  const next = md.round + 1 - league.seasonStartRound;
+  if (!Number.isInteger(league.seasonStartRound) || next < 0 || next >= SEASON_ROUNDS) league.seasonStartRound = md.round + 1;
+  if (!Array.isArray(league.seasons)) league.seasons = [];
   league.teams.forEach((team, idx) => {
     if (!Array.isArray(team.squad) || team.squad.length !== 18) { problems.push(`${team.name || team.id} har ${team.squad?.length ?? 0} spillere (forventet 18)`); return; }
     for (const p of team.squad) {

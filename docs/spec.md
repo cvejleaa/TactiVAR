@@ -21,7 +21,8 @@ begrundelse).
 | Hold-id | `team_div1_N` | med |
 | Runde | 4 kampe pr. runde, alle simuleres med fuld motor | med |
 | Stilling | sejr 3, uafgjort 1; sortering point → målforskel; kolonner K/V/U/T/Mål/VAR(±)/Point; klik på hold = scout | med |
-| Kampprogram | 14 runder Berger-tabel hjemme/ude (v2.5b parrer altid i samme indeksrækkefølge, og eget hold er altid hjemme) | tabt |
+| Kampprogram | 14 runder Berger-program hjemme/ude (`public/engine/schedule.js`, v3.11): alle møder alle én gang hjemme og én gang ude, runde 8–14 er runde 1–7 spejlet, højst 2 hjemme/ude i træk. Holdrækkefølgen blandes pr. liga (seedet af spillerne, ikke ligaens rng). Ingen modstandervælger; din kamp står først i runden. Ingen hjemmebanefordel – hjemme/ude er kun, hvor kampen spilles | med |
+| Sæson | Efter sæsonens runde 14 arkiveres tabel, mester, din placering, topscorer og din bedste (flest kåringer, så mål) i `league.seasons`; tabel og sæsonstatistik nulstilles, `seasonNumber` +1, `seasonStartRound`/`statsFromRound` = næste runde. Spillere, friskhed og ligaens forløb bevares. Aldring kommer med træningen | med (v3.11) |
 | Kalender | 3 kampe/uge tir/tor/søn, fredag træning+økonomi, sæson = 5 uger, fodboldår = 2 sæsoner, +1 år alder pr. fodboldår | udskudt |
 | Klubkasse | 5.000.000 kr. | med (vises; ingen økonomi endnu) |
 
@@ -226,7 +227,8 @@ Tick hvert 3. minut (1..90).
 - Start 6,5 (±0,15), klemt 3,5–10,0. Hovedstødsmål +1,35, VAR-mål +1,30, mål
   +1,25, oplæg +0,55, redning +0,50 (skytte +0,10), annulleret VAR-mål −0,40
   (forsvarer +0,45), vundet luftduel +0,40, mål imod forsvarer −0,35 / GK
-  −0,25, clean sheet +0,50 til GK/CB/LB/RB.
+  −0,25, clean sheet +0,50 til GK/CB/LB/RB (karakteren; i statistikken tæller clean sheet
+  kun for målmanden – §8b).
 - Deltagerliste med minutter (også skadede og indskiftere).
 - Eget hold eksakt karakter; modstandere 1–5 stjerner af karakter + støj
   ±0,22: ≥8,35 = 5, ≥7,25 = 4, ≥6,15 = 3, ≥5,15 = 2, ellers 1. Sortering på
@@ -259,7 +261,7 @@ Tick hvert 3. minut (1..90).
   belastning"): CM/CDM 11,8 · LWB/RWB/LM/RM/LW/RW 11,0 · CAM/CF 10,8 · LB/RB 10,6 · ST 10,0 ·
   CB 9,5 · MV 5,5 (uden rolle: kædens plads – FOR = CB, MID = CM, ANG = ST) · (0,9 + STA·0,01) · pres (gegenpres 1,06, lav blok 0,96) · støj ±4 % ·
   min/90; topfart 25 + PAC·0,45 ± 1 (MV −3), mindst 10 min. Private (RATING_PRIVATE_FIELDS);
-  spillerkortet viser km pr. 90 min og bedste topfart for sæsonen.
+  spillerkortet viser km pr. 90 min og bedste topfart for alle hans kampe (nulstilles ikke ved sæsonskifte).
 - **Højintenst løb (v3.7.1**, brugeren: "hvor stor en andel af deres løb der er højintense løb"):
   andel (over ca. 20 km/t) = (rolle-basis WB/kant 13, LB/RB 11, ST 11, CAM/CF 10, CM/CDM 8, CB 5,
   MV 2 % (v3.7.1 pr. kæde: MV 2/FOR 7/MID 9/ANG 11) + (PAC−10)·0,4) · pres (gegenpres 1,15, lav blok
@@ -328,9 +330,10 @@ Liga-fanen, fire sammenfoldede sektioner (skjult under afspilning, ligesom avise
 navn · kort holdnavn (fuldt i title) · værdi – i højst tre kolonner, uden ombrud; dit hold markeret
 med grøn kant:
 1. **Spillere** (top 5): mål, oplæg, Kampens spiller, hovedstøds-, straffe- og dødboldmål, clean
-   sheets (MV/forsvar, 0 imod, mindst 59 spilleminutter – en starter har 89), gule kort, bedste vurdering (offentlige stjerner for alle).
+   sheets (kun målmanden – plads 0, så også en MV skiftet ind ved skade; v3.11, brugeren: "Det er
+   kun målmanden der får Clean sheet" – 0 imod, mindst 59 spilleminutter, en starter har 89), gule kort, bedste vurdering (offentlige stjerner for alle).
 2. **Holdtal**: bold %, frispark begået/tilkendt, gule kort, straffe (mål), dødboldmål, clean sheets.
-3. **Ligaens forløb**: mål pr. runde (søjler), måltyper, største sejr, målrigeste kamp.
+3. **Ligaens forløb** (indeværende sæson, v3.11): mål pr. runde (søjler), måltyper, største sejr, målrigeste kamp.
 4. **Dit hold (privat)**: afslutninger, xG, hjørnespark, frispark i skudafstand, hovedstødsmål,
    kontramål for/imod, VAR-tjek; pr. spiller kampe, snit, km/90, % HI, frie løb, friskhed.
 Tællere: `public/engine/stats.js` (pr. spiller fladt på spilleren, pr. hold på tabelrækken,
@@ -353,8 +356,11 @@ referaterne).
   ændrer skemaet, tilføjer et fixture gemt af den forrige version og en
   test, der indlæser det med truppen intakt. Skema 1 → 2 (v3.4, Hvis-Så) og
   2 → 3 (v3.6, mod-kunnen-pulje og højde), 3 → 4 (v3.7, Superliga-højder), 4 → 5 (v3.8,
-  naturlig position og højde pr. position) – fixtures `tests/fixtures/save-schema1.json` …
-  `save-schema4.json`.
+  naturlig position og højde pr. position), 5 → 6 (v3.11, kampprogram: den hidtidige tabel
+  arkiveres som "Sæson 1 (uden program)", sæson 2 starter med program og nulstillet
+  sæsonstatistik; programmet bygges deterministisk af holdenes rækkefølge) – fixtures
+  `tests/fixtures/save-schema1.json` … `save-schema5.json`, `save-v3.9.json`, `save-v3.10.1.json`
+  (gemt af den live v3.10.1).
 - Eksport/import af hele spillet som JSON-fil (backup og flytning mellem
   browsere/domæner).
 - Gamle data fra vejleaa.dk kan ikke flyttes (localStorage er bundet til
@@ -397,12 +403,12 @@ avisens hovedperson altid målmanden.
    `TEAM_FORMATION_MEMORY_CAP = 230`, bænk-bund 60 %, trigger til rusten
    formation (<50 %) advarer; barometer Skarp 80–100 / Indkøring 55–79 /
    Rusten <55; kolonne "Rut".
-7. Kampprogram: 14 runder Berger hjemme/ude.
+7. ~~Kampprogram: 14 runder Berger hjemme/ude.~~ Med i v3.11 (§1).
 
 ## 10b. Layout (skal bevares, selv uden Tailwind)
 Mørkt tema (#0f172a, paneler slate-900, lilla VAR-accent, smaragd for gode
-tal). Topbar: klubvælger, ▶ Spil runde + modstandervælger (står sammen, fordi
-Mod-tal og knap gælder den valgte modstander), gem-status, gem/eksport/import/ny
+tal). Topbar: klubvælger, "▶ Spil runde N af 14 mod X (hjemme/ude)" efter programmet
+og "🔍 X" (åbner modstanderens trup til scouting), gem-status, gem/eksport/import/ny
 liga. Under topbaren fire faner (v3.5, brugerens valg); den valgte fane gemmes i
 `ui.tab` (ukendt værdi → Trup, intet skemaskift):
 - **Trup** (opstilling, v3.6): klubhoved, regnearket i fuld bredde (ingen sidelæns
@@ -416,10 +422,11 @@ liga. Under topbaren fire faner (v3.5, brugerens valg); den valgte fane gemmes i
   pladsen efter navnet (naturlig kæde i parentes ved afvigelse, indskiftere
   "ind på X"), minibane "Startopstilling" med karakter/stjerner, ikoner med
   mouse-over + forklaring under (touch).
-- **Liga**: tabel, sidste rundes resultater (klik = referatet i Kamp), næste
-  rundes kampe (fra pairRound – afhænger af modstanderen valgt ved ▶; et fast
-  kampprogram er §10.7) og avis; klik på et hold åbner det i Trup. Under afspilning
-  skjules resultater og avis, og det siges, at tabellen allerede er opdateret.
+- **Liga**: tabel ("sæson N, efter X af 14 runder"), sidste rundes resultater (klik =
+  referatet i Kamp), kampprogrammet (næste runde i den rækkefølge, ▶ spiller den; "Dit
+  program" med 14 linjer H/U, modstander og din score først; hele programmet og tidligere
+  sæsoner sammenfoldet) og avis; klik på et hold åbner det i Trup. Under afspilning
+  skjules resultater, program, statistik og avis, og det siges, at tabellen allerede er opdateret.
 Modstanderes stjerner: udfyldte i guld, tomme dæmpet.
 
 ## 11. Udeladt / udskudt
@@ -447,7 +454,7 @@ mod v2.5b-koden:
 | Arketyper "låses op når evne-kravet er trænet op" | ingen træning findes; låsning afgøres kun ved fødsel | udskudt (Fredagstræning) |
 | "Kun bedste spiller på banen tæller ved hold-bonus" | arketyper påvirker ikke motoren | udskudt (Fredagstræning-PR) |
 | Mod-kunnen +4–16 %, −3 % rust | afviger (v3.6, brugerens valg: 1–5, −1) | med, langsommere |
-| 1 sæson = 5 uger (14 runder), 3 kampe/uge | ingen kalender; man kan spille runde 1 uendeligt | §10.7 |
+| 1 sæson = 5 uger (14 runder), 3 kampe/uge | 14-runders program og sæsonslut (v3.11); ingen ugedage | delvis (v3.11) |
 | Skader med auto-indskiftning | findes, men med fejl (§5 "Rettet") | rettet |
 | Klumme om runden | kun én kort sætning | §10.3 |
 

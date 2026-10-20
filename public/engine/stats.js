@@ -60,7 +60,9 @@ export function roundHistory(round, matches) {
     if (!most || n > most.goals) most = { goals: n, label };
   }
   const setPiece = Object.entries(kinds).filter(([k]) => SET_PIECE.has(k)).reduce((a, [, v]) => a + v, 0);
-  return { round, matches: matches.length, goals, setPiece, kinds, biggest, most };
+  // Resultaterne (v3.11) til kampprogrammet: hold-id og score pr. kamp.
+  const results = matches.map((m) => ({ h: m.homeId, a: m.awayId, hG: m.homeGoals, aG: m.awayGoals }));
+  return { round, matches: matches.length, goals, setPiece, kinds, biggest, most, results };
 }
 
 // Sæsonens løb pr. spiller – samme tal på spillerkortet og i "Dit hold" (én formel, så de ikke driver).

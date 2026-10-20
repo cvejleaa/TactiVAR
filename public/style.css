@@ -143,3 +143,9 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .round-bars { display: grid; gap: .15rem; max-width: 40rem; }
 .round-bar { display: grid; grid-template-columns: 2.5rem 1fr 2rem; align-items: center; gap: .4rem; font-size: .85rem; }
 .rb-fill { display: block; height: .7rem; background: var(--grøn); border-radius: .2rem; min-width: 2px; }
+/* Kampprogram (v3.11) */
+.my-schedule { border-collapse: collapse; width: 100%; max-width: 32rem; }
+.my-schedule td { padding: .2rem .5rem; border-bottom: 1px solid #334155; }
+.my-schedule tr.next { outline: 2px solid var(--grøn); }
+.my-schedule tr.won .st-val { color: var(--grøn); } .my-schedule tr.lost .st-val { color: #f87171; }
+.past-table { margin: .2rem 0 .8rem 1.2rem; } .past-table li.mine, .season-end { color: var(--grøn); }

@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { createRng } from '../../public/engine/rng.js';
 import { createLeague, isArchetypeUnlocked, BOT_PROFILES, ARCHETYPES, defaultStarterIds } from '../../public/engine/generator.js';
 import { simulateMatch, counterChance, runZone, runGroup, decisionWeights, RUN_WEIGHT } from '../../public/engine/match.js';
-import { commitRound, sortStandings, playRound } from '../../public/engine/season.js';
+import { commitRound, sortStandings, playPairs, fixedPairs } from '../../public/engine/season.js';
 import { buildGazette } from '../../public/engine/gazette.js';
 import { normalizeLeague } from '../../public/engine/sanitize.js';
 import { applyCounterXp } from '../../public/engine/counter.js';
@@ -1080,7 +1080,7 @@ test('tabellen før runden: placering og point, kun fra runde 3', async () => {
   const { tableBefore } = await import('../../public/engine/season.js');
   const L = createLeague(createRng(8)), rng = createRng(8);
   assert.equal(tableBefore(L, 1), null); assert.equal(tableBefore(L, 2), null);
-  for (let r = 0; r < 2; r++) commitRound(L, playRound(L, 1, rng), rng);
+  for (let r = 0; r < 2; r++) commitRound(L, playPairs(L, fixedPairs(L, 1), rng), rng);
   const t = tableBefore(L, 3), sorted = sortStandings(L.leagueMetadata.standings);
   assert.deepEqual(t[sorted[0].teamId], { pos: 1, points: sorted[0].points });
   assert.deepEqual(t[sorted[7].teamId], { pos: 8, points: sorted[7].points });
@@ -1244,7 +1244,7 @@ test('bogføring: km i højintenst løb summeres over sæsonen', () => {
   assert.ok(Math.abs(p.hiKmSum - 1.7) < 1e-9); assert.equal(p.hiDistSum, 20); // summeres, overskrives ikke
 });
 test('hvert mål ved, hvilken kamp i runden det faldt i', () => {
-  const L = createLeague(createRng(31)), res = playRound(L, 1, createRng(31));
+  const L = createLeague(createRng(31)), res = playPairs(L, fixedPairs(L, 1), createRng(31));
   const all = res.matches.flatMap((m, i) => m.goalsPool.map((g) => [g, i]));
   assert.ok(all.length > 0);
   for (const [g, i] of all) { assert.equal(g.matchIdx, i); assert.equal(g.match, `${res.matches[i].homeName} - ${res.matches[i].awayName}`); }
@@ -1747,7 +1747,7 @@ test('statistik: to runder bogføres eksakt – spillertal fra karakterarket, ho
     [2, 14, 8, 2.468, 120, 18, 24, 10, 2, 2, 4, 2, 2, 2, 1, 1]);
   assert.deepEqual([sa.counterGoals, sa.cleanSheets, sa.possSum], [2, 1, 80]);
   assert.equal(L.history.length, 2);
-  assert.deepEqual(L.history[0], { round: 1, matches: 1, goals: 3, setPiece: 2, kinds: { PENALTY: 1, CORNER: 1, LONGSHOT: 1 }, biggest: { diff: 1, label: `${H.name} 2-1 ${A.name}` }, most: { goals: 3, label: `${H.name} 2-1 ${A.name}` } });
+  assert.deepEqual(L.history[0], { round: 1, matches: 1, goals: 3, setPiece: 2, kinds: { PENALTY: 1, CORNER: 1, LONGSHOT: 1 }, biggest: { diff: 1, label: `${H.name} 2-1 ${A.name}` }, most: { goals: 3, label: `${H.name} 2-1 ${A.name}` }, results: [{ h: H.id, a: A.id, hG: 2, aG: 1 }] });
   assert.equal(L.history[1].biggest, null);
   // Synlighed: andre hold ser ikke tal, der følger en skjult indstilling
   const opp = viewTeamStats(sh, false), own = viewTeamStats(sh, true);
@@ -2050,27 +2050,34 @@ test('fuldtids-analysen er en nøglehændelse i referatets filter (og ikke blot 
 });
 
 // ---------- Test Manager v3.10: clean sheet, statistik, synlighed, tekster ----------
-test('cleanSheet i karakterarket: MV/CB/LB/RB, 0 mål imod og mindst 60 minutter (starter: minIn 1 → 59 + 1); hvert hold regnes mod sine egne mål imod', () => {
+test('cleanSheet i statistikken: kun målmanden (plads 0), 0 mål imod og mindst 60 minutter (starter: minIn 1 → 59 + 1); hvert hold regnes mod sine egne mål imod', () => {
+  // v3.11 (brugeren: "Det er kun målmanden der får Clean sheet"): før fik CB/LB/RB det også –
+  // den gamle regel giver cb60/lb61/rb/acb true og gør testen rød.
   const r = { next: () => 0.5 };
   const mkTeam = (id) => ({ id, name: id, isBot: false, tactics: { phases: { phase2_defending: { pressingHeight: 'MID_BLOCK' } } } });
   const mk = (id) => ({ id, shirtNumber: 1, shortName: id, line: 'DEF', skills: { stamina: 10, pace: 10 } });
+  const slotOf = (role) => (role === 'GK' || role === 'SUB (GK)' ? 0 : 1);
   const s = createSheet(), th = mkTeam('h'), ta = mkTeam('a');
-  const add = (id, role, minOut, team = th, isHome = true, minIn = 1) => { s.register(mk(id), team, isHome, role, minIn, r, 15, 1).minOut = minOut; };
-  add('gk', 'GK', 90); add('cb60', 'CB', 60); add('cb59', 'CB', 59); add('lb61', 'LB', 61); add('rb', 'RB', 90); add('lwb', 'LWB', 90);
-  add('cm', 'CM', 90); add('st', 'ST', 90); add('sub', 'SUB (DEF)', 90, th, true, 31); add('cb20', 'CB', 20);
+  const add = (id, role, minOut, team = th, isHome = true, minIn = 1) => { s.register(mk(id), team, isHome, role, minIn, r, 15, slotOf(role)).minOut = minOut; };
+  add('gk', 'GK', 90); add('cb60', 'CB', 60); add('rb', 'RB', 90);
   add('agk', 'GK', 90, ta, false); add('acb', 'CB', 90, ta, false);
   const cs = (list) => Object.fromEntries(list.map((e) => [e.playerId, e.cleanSheet]));
-  // 0-1: hjemmeholdet har lukket 1 ind (ingen clean sheet), udeholdet 0 (MV og CB har)
+  // 0-1: hjemmeholdet har lukket 1 ind (ingen clean sheet), udeholdet 0 (kun MV har)
   const res = finalizeSheet(s, 0, 1, r, counterXpForMatch);
   assert.ok(Object.values(cs(res.home)).every((v) => v === false), JSON.stringify(cs(res.home)));
-  assert.deepEqual(cs(res.away), { agk: true, acb: true });
-  // 0-0: positiv liste – kun de fire roller med mindst 60 minutter (cb60 = 59 + 1 ja, cb59 = 58 + 1 nej)
+  assert.deepEqual(cs(res.away), { agk: true, acb: false });
+  // 0-0: positiv liste – kun plads 0 med mindst 60 minutter; en målmand skiftet ind ved skade
+  // (rollen 'SUB (GK)') tæller, når han spillede nok: ind i 31. = 59 minutter ja, ind i 32. nej;
+  // en målmand ud efter 58 minutter nej.
   const s2 = createSheet();
-  const add2 = (id, role, minOut, minIn = 1) => { s2.register(mk(id), th, true, role, minIn, r, 15, 1).minOut = minOut; };
-  add2('gk', 'GK', 90); add2('cb60', 'CB', 60); add2('cb59', 'CB', 59); add2('lb61', 'LB', 61); add2('rb', 'RB', 90); add2('lwb', 'LWB', 90);
-  add2('cm', 'CM', 90); add2('st', 'ST', 90); add2('sub', 'SUB (DEF)', 90, 31); add2('cb20', 'CB', 20);
+  const add2 = (id, role, minOut, minIn = 1) => { s2.register(mk(id), th, true, role, minIn, r, 15, slotOf(role)).minOut = minOut; };
+  add2('gk', 'GK', 90); add2('cb60', 'CB', 60); add2('lb61', 'LB', 61); add2('rb', 'RB', 90); add2('lwb', 'LWB', 90);
+  add2('cm', 'CM', 90); add2('st', 'ST', 90); add2('sub', 'SUB (DEF)', 90, 31); add2('subgk', 'SUB (GK)', 90, 31); add2('subgk2', 'SUB (GK)', 90, 32); add2('gk58', 'GK', 59);
   assert.deepEqual(cs(finalizeSheet(s2, 0, 0, r, counterXpForMatch).home),
-    { gk: true, cb60: true, cb59: false, lb61: true, rb: true, lwb: false, cm: false, st: false, sub: false, cb20: false });
+    { gk: true, cb60: false, lb61: false, rb: false, lwb: false, cm: false, st: false, sub: false, subgk: true, subgk2: false, gk58: false });
+  // Karakterbonussen for clean sheet gælder stadig forsvaret (spec §5) – kun statistikken er ændret
+  const s4 = createSheet(); s4.register(mk('cb'), th, true, 'CB', 1, r, 15, 1).minOut = 90;
+  assert.equal(finalizeSheet(s4, 0, 0, r, counterXpForMatch).home[0].rating, 7.0);
   // Mål imod fra den anden side: 1-0 hjemme → udeholdet lukkede 1 ind
   const s3 = createSheet(); s3.register(mk('x'), ta, false, 'GK', 1, r, 15, 0); s3.register(mk('y'), th, true, 'GK', 1, r, 15, 0);
   const r3 = finalizeSheet(s3, 1, 0, r, counterXpForMatch);
@@ -2100,7 +2107,8 @@ test('statistik: flere kampe pr. runde – største sejr/målrigeste (uafgjort: 
   commitRound(L, rnd(2, [mk(T1, T0, 0, 2), mk(T2, T3, 1, 3)]), createRng(1));
   commitRound(L, rnd(3, [mk(T0, T2, 1, 1), mk(T1, T3, 1, 1)]), createRng(1));
   assert.deepEqual(L.history[0], { round: 1, matches: 2, goals: 7, setPiece: 4, kinds: { PENALTY: 1, CORNER: 1, HEADER: 1, FREEKICK: 1, SETPIECE: 1, LONGSHOT: 2 },
-    biggest: { diff: 3, label: `${T0.name} 3-0 ${T1.name}` }, most: { goals: 4, label: `${T2.name} 2-2 ${T3.name}` } });   // HEADER og LONGSHOT er ikke dødbolde
+    biggest: { diff: 3, label: `${T0.name} 3-0 ${T1.name}` }, most: { goals: 4, label: `${T2.name} 2-2 ${T3.name}` },
+    results: [{ h: T0.id, a: T1.id, hG: 3, aG: 0 }, { h: T2.id, a: T3.id, hG: 2, aG: 2 }] });   // HEADER og LONGSHOT er ikke dødbolde
   assert.deepEqual(L.history[1].biggest, { diff: 2, label: `${T1.name} 0-2 ${T0.name}` }, 'udesejr tæller, og ved lighed står den første');
   assert.deepEqual(L.history[1].most, { goals: 4, label: `${T2.name} 1-3 ${T3.name}` });
   assert.equal(L.history[2].biggest, null); assert.deepEqual(L.history[2].most, { goals: 2, label: `${T0.name} 1-1 ${T2.name}` }, 'ved lighed står den første');

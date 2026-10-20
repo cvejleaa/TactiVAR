@@ -7,7 +7,7 @@
 //  3. hvordan dit holds mod-kunnen udvikler sig over 3 runder.
 import { createRng } from '../public/engine/rng.js';
 import { createLeague } from '../public/engine/generator.js';
-import { playRound, commitRound } from '../public/engine/season.js';
+import { playPairs, fixedPairs, commitRound } from '../public/engine/season.js';
 import { COUNTER_KEYS } from '../public/engine/counter.js';
 import { simulateMatch } from '../public/engine/match.js';
 
@@ -30,7 +30,7 @@ export function measure(setup = null, rounds = 3, N = ARG_N) {
     const ser = [avg()];
     for (let r = 0; r < rounds; r++) {
       if (setup) L.teams.forEach(setup);
-      const res = playRound(L, 1, rng);
+      const res = playPairs(L, fixedPairs(L, 1), rng);
       for (const m of res.matches) {
         goals += m.homeGoals + m.awayGoals; games++; headers += m.events.filter((e) => e.type === 'HEADER_GOAL').length;
         const s = m.stats;
@@ -110,7 +110,7 @@ export function measureSeason(N = ARG_N, rounds = 10) {
     const rng = createRng(s * 104729);
     const L = createLeague(rng);
     for (let r = 1; r <= rounds; r++) {
-      const res = playRound(L, 1 + (r % 7), rng);
+      const res = playPairs(L, fixedPairs(L, 1 + (r % 7)), rng);
       const g = res.gazette.goalOfTheRound; if (g) kinds[g.kind] = (kinds[g.kind] || 0) + 1;
       const gpm = res.matches.reduce((a, m) => a + m.homeGoals + m.awayGoals, 0) / res.matches.length;
       (r <= 2 ? goalsEarly : r >= rounds - 1 ? goalsLate : []).push(gpm);
@@ -129,7 +129,7 @@ export function measureSeason(N = ARG_N, rounds = 10) {
   for (let s = 1; s <= Math.min(N, 10); s++) {
     const rng = createRng(s * 7);
     const L = createLeague(rng);
-    const res = playRound(L, 1, rng);
+    const res = playPairs(L, fixedPairs(L, 1), rng);
     for (const m of res.matches) for (const e of [...m.ratings.home, ...m.ratings.away]) if (e.hiShare != null && e.minIn <= 1 && e.minOut === 90) { (hi[ROLE_GROUP[e.role] ?? e.role] ||= []).push(e.hiShare); (km[ROLE_GROUP[e.role] ?? e.role] ||= []).push(e.distanceKm); }
   }
   const avgOf = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, mean(v)]));

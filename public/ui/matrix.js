@@ -36,9 +36,9 @@ export const FILTERS = [['all', 'Alle (18)'], ['start', 'Start-11'], ['bench', '
 
 const heatClass = (v) => (v >= 15 ? 'heat-4' : v >= 12 ? 'heat-3' : v >= 8 ? 'heat-2' : 'heat-1');
 
-export function renderMatrix({ team, isOwn, opponent, ui, notes, onSort, onSelect, onSwap, onFilter, onBlocked }) {
+export function renderMatrix({ team, isOwn, ui, notes, onSort, onSelect, onSwap, onFilter, onBlocked }) {
   const slotOf = (p) => team.tactics.lineupSlots.indexOf(p.id);
-  const ctx = { team, isOwn, opponent, slotOf };
+  const ctx = { team, isOwn, slotOf };
   const roles = FORMATIONS[team.tactics.baseFormation];
   // Vagten mod "sort-spoofing": en skjult kolonne kan aldrig være sorteringsnøgle for en
   // seer, der ikke må se den – uanset hvad UI-tilstanden siger.
