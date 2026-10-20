@@ -31,14 +31,15 @@ export function renderSchedule({ league, pairs, myTeamId }) {
       return h('tr', { class: (k === nextK ? 'next ' : '') + (my == null ? '' : my > 0 ? 'won' : my < 0 ? 'lost' : 'drawn') },
         h('td', {}, `R${k}`), h('td', { title: home ? 'Hjemme' : 'Ude' }, home ? 'H' : 'U'), h('td', {}, name.get(home ? aId : hId)), h('td', { class: 'st-val' }, score));
     }))),
-    h('p', { class: 'muted' }, 'Din score står først. Alle møder alle hjemme og ude; der er ingen hjemmebanefordel.'),
+    h('p', { class: 'muted' }, 'H = hjemme, U = ude. Din score står først (i Hele programmet står hjemmeholdets først). Alle møder alle hjemme og ude; der er ingen hjemmebanefordel.'),
     h('details', { class: 'stats-sec', id: 'full-schedule' }, h('summary', {}, 'Hele programmet'),
       league.schedule.map((ps, i) => h('div', {}, h('h4', {}, `Runde ${i + 1}`), h('div', { class: 'fixtures' }, ps.map(([a, b]) => fixture(a, b, resultOf(i + 1, a, b))))))),
     league.seasons?.length ? h('details', { class: 'stats-sec', id: 'past-seasons' }, h('summary', {}, 'Tidligere sæsoner'),
       league.seasons.slice().reverse().map((s) => h('div', { class: 'past-season' },
         h('h4', {}, `Sæson ${s.seasonNumber}${s.programmed ? '' : ' (uden program)'} – runde ${s.fromRound}–${s.toRound}`),
-        h('p', {}, [s.champion ? `🏆 Mester: ${s.champion.teamName} (${s.champion.points} point).` : '', s.myPos ? `Din placering: nr. ${s.myPos}.` : '',
+        h('p', {}, [s.champion ? (s.programmed ? `🏆 Mester: ${s.champion.teamName} (${s.champion.points} point).` : `Førende ved afslutningen: ${s.champion.teamName} (${s.champion.points} point).`) : '', s.myPos ? `Din placering: nr. ${s.myPos}.` : '',
           s.topScorer ? `Topscorer: #${s.topScorer.shirtNumber} ${s.topScorer.shortName} (${s.topScorer.teamName}), ${s.topScorer.goals} mål.` : '',
-          s.myBest ? `Din bedste: #${s.myBest.shirtNumber} ${s.myBest.shortName} (${s.myBest.motm}× kampens spiller, ${s.myBest.goals} mål).` : ''].filter(Boolean).join(' ')),
+          s.myBest ? `Din bedste: #${s.myBest.shirtNumber} ${s.myBest.shortName} (${s.myBest.motm}× kampens spiller, ${s.myBest.goals} mål).` : '',
+          s.statsFrom > s.fromRound ? `Spillertallene gælder fra runde ${s.statsFrom}.` : ''].filter(Boolean).join(' ')),
         h('ol', { class: 'past-table' }, s.table.map((r) => h('li', { class: r.teamId === myTeamId ? 'mine' : '' }, `${r.teamName} – ${r.points} p (${r.goalsFor}-${r.goalsAgainst})`)))))) : null);
 }

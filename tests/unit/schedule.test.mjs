@@ -83,7 +83,7 @@ test('sæsonslut efter runde 14: tabel og sæsonstatistik arkiveres og nulstille
   // Lige før nulstillingen: et snapshot af det, der skal arkiveres, kan ikke tages her – men tabellen er gemt i arkivet
   const [s1] = L.seasons;
   assert.equal(L.seasons.length, 1);
-  assert.equal(s1.seasonNumber, 1); assert.equal(s1.programmed, true); assert.equal(s1.fromRound, 1); assert.equal(s1.toRound, 14);
+  assert.equal(s1.seasonNumber, 1); assert.equal(s1.programmed, true); assert.equal(s1.fromRound, 1); assert.equal(s1.toRound, 14); assert.equal(s1.statsFrom, 1);
   assert.equal(s1.table.length, 8);
   assert.ok(s1.table.every((r) => r.played === 14), 'alle spillede 14');
   assert.equal(s1.table.reduce((a, r) => a + r.goalsFor, 0), s1.goals, 'mål i tabellen = mål i forløbet');

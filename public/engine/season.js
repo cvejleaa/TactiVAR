@@ -148,7 +148,7 @@ export function endSeason(league, toRound, programmed) {
   const mine = league.teams.find((t) => !t.isBot);
   const hist = (league.history || []).filter((r) => r.round >= league.seasonStartRound && r.round <= toRound);
   const summary = {
-    seasonNumber: md.seasonNumber, fromRound: league.seasonStartRound, toRound, programmed,
+    seasonNumber: md.seasonNumber, fromRound: league.seasonStartRound, toRound, programmed, statsFrom: league.statsFromRound ?? league.seasonStartRound,
     table, champion: table[0] ? { teamId: table[0].teamId, teamName: table[0].teamName, points: table[0].points } : null,
     myPos: mine ? table.findIndex((s) => s.teamId === mine.id) + 1 : null,
     topScorer: who(all.filter((p) => p.sGoals > 0).sort(byGoals)[0]),

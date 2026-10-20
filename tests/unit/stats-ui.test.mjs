@@ -150,11 +150,11 @@ test('dit hold (privat): pr.-kamp-tal, sæsonsummer og spillertabellen med snit,
   assert.equal(byId(root, 'my-team-stats').textContent, 'Fra runde 3, pr. kamp: 12.5 afslutninger (5.0 på mål), xG 1.50, 5.5 hjørnespark, 2.5 frispark i skudafstand. I alt: kontramål 3 for / 2 imod, 9 VAR-tjek.');
   const rows = all(byId(root, 'my-players'), (e) => e.tag === 'tr' && e.children[0].tag === 'td');
   assert.equal(rows.length, 18);
-  assert.deepEqual(all(byId(root, 'my-players'), (e) => e.tag === 'th').map((t) => t.textContent), ['Spiller', 'Kampe (fra R3)', 'Snit (sæson)', 'km/90 (sæson)', '% HI (sæson)', 'Fri (fra R3)', 'Friskhed']);
+  assert.deepEqual(all(byId(root, 'my-players'), (e) => e.tag === 'th').map((t) => t.textContent), ['Spiller', 'Kampe (fra R3)', 'Snit (i alt)', 'km/90 (i alt)', '% HI (i alt)', 'Fri (fra R3)', 'Friskhed']);
   assert.deepEqual(cells(rows[4]), [`#${p.shirtNumber} ${p.shortName}`, '3', '6.8', '10.5', '25 %', '3/8', '62 %']);   // snit 27/4 = 6,75 → 6,8 · 42/360·90 = 10,5 km
   assert.deepEqual(cells(rows[5]).slice(1), [String(me.squad[5].sGames), '–', '–', '–', '–', `${me.squad[5].freshness} %`]);
   assert.ok(!byId(root, 'stats-mine').textContent.includes('99'), 'modstanderens spillere vises ikke');
-  assert.ok(byId(root, 'stats-mine').textContent.endsWith('Kun du ser disse tal – de røber evner og dine taktiske valg. Kampe og frie løb tælles fra runde 3; snit, km og HI gælder hele sæsonen.'));
+  assert.ok(byId(root, 'stats-mine').textContent.endsWith('Kun du ser disse tal – de røber evner og dine taktiske valg. Kampe og frie løb tælles fra runde 3; snit, km og HI gælder alle hans kampe (de nulstilles ikke ved sæsonskifte).'));
   assert.ok(byId(root, 'stats-teams').textContent.endsWith('Bold % er snit pr. kamp. Afslutninger, xG, hjørnespark, kontraer og VAR-tjek ses kun for dit eget hold (under "Dit hold") – summeret over sæsonen kunne de røbe et holds taktik.'));
   // Før første runde
   const fresh = world();

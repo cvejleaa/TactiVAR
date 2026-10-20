@@ -591,6 +591,7 @@ test('gem fra v3.10.1 (skema 5): tabellen arkiveres som sæson 1 uden program, s
   assert.equal(L.seasons.length, 1);
   const [s1] = L.seasons;
   assert.deepEqual([s1.seasonNumber, s1.fromRound, s1.toRound, s1.programmed], [1, 1, round, false]);
+  assert.equal(s1.statsFrom, raw.league.statsFromRound, 'spillertallene gælder fra statistikkens start');
   const want = raw.league.leagueMetadata.standings.slice().sort((a, b) => b.points - a.points || (b.goalsFor - b.goalsAgainst) - (a.goalsFor - a.goalsAgainst) || b.goalsFor - a.goalsFor);
   assert.deepEqual(s1.table.map((x) => [x.teamId, x.points, x.played]), want.map((x) => [x.teamId, x.points, x.played]));
   const topGoals = Math.max(...rawPlayers.map((p) => p.sGoals));

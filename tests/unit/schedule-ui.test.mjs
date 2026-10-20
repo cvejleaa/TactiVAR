@@ -65,7 +65,7 @@ test('kampprogrammet: tidligere sæsoner med mester, din placering, topscorer og
   const L = createLeague(createRng(9)), me = L.teams.find((t) => !t.isBot), bot = L.teams.find((t) => t.isBot);
   const row = (t, points) => ({ teamId: t.id, teamName: t.name, played: 14, won: 0, drawn: 0, lost: 0, goalsFor: points + 1, goalsAgainst: 3, points });
   L.seasons = [
-    { seasonNumber: 1, fromRound: 1, toRound: 6, programmed: false, table: [row(bot, 12), row(me, 9)], champion: { teamId: bot.id, teamName: bot.name, points: 12 }, myPos: 2,
+    { seasonNumber: 1, fromRound: 1, toRound: 6, programmed: false, statsFrom: 4, table: [row(bot, 12), row(me, 9)], champion: { teamId: bot.id, teamName: bot.name, points: 12 }, myPos: 2,
       topScorer: { shirtNumber: 9, shortName: 'A. Topp', teamName: bot.name, goals: 7 }, myBest: { shirtNumber: 10, shortName: 'B. Bedst', motm: 3, goals: 2 } },
     { seasonNumber: 2, fromRound: 7, toRound: 20, programmed: true, table: [row(me, 30), row(bot, 25)], champion: { teamId: me.id, teamName: me.name, points: 30 }, myPos: 1, topScorer: null, myBest: null },
   ];
@@ -75,7 +75,7 @@ test('kampprogrammet: tidligere sæsoner med mester, din placering, topscorer og
   assert.deepEqual(heads, ['Sæson 2 – runde 7–20', 'Sæson 1 (uden program) – runde 1–6']);
   const ps = all(past, (e) => e.tag === 'p').map((x) => x.textContent);
   assert.equal(ps[0], `🏆 Mester: ${me.name} (30 point). Din placering: nr. 1.`);
-  assert.equal(ps[1], `🏆 Mester: ${bot.name} (12 point). Din placering: nr. 2. Topscorer: #9 A. Topp (${bot.name}), 7 mål. Din bedste: #10 B. Bedst (3× kampens spiller, 2 mål).`);
+  assert.equal(ps[1], `Førende ved afslutningen: ${bot.name} (12 point). Din placering: nr. 2. Topscorer: #9 A. Topp (${bot.name}), 7 mål. Din bedste: #10 B. Bedst (3× kampens spiller, 2 mål). Spillertallene gælder fra runde 4.`);
   const lis = all(past, (e) => e.tag === 'li');
   assert.deepEqual(lis.slice(2).map((l) => [l.textContent, l.className]), [[`${bot.name} – 12 p (13-3)`, ''], [`${me.name} – 9 p (10-3)`, 'mine']]);
 });
