@@ -14,25 +14,33 @@ const openSecs = new Set(['stats-players']);
 const section = (id, title, ...body) => h('details', { class: 'stats-sec', id, open: openSecs.has(id),
   ontoggle: (e) => { if (e.target.open) openSecs.add(id); else openSecs.delete(id); } }, h('summary', {}, title), ...body);
 
+// Holdnavnet uden "FC"/"IF"/"BK" o.l., så en række ikke brydes ("FC Vejleå" → "Vejleå").
+const SHORT_DROP = new Set(['FC', 'IF', 'BK', 'United', 'Boldklub', 'Rovers', 'Tacticians']);
+export const shortTeam = (name) => name.split(' ').filter((w) => !SHORT_DROP.has(w)).join(' ') || name;
+
+// Én liste = én lille tabel: placering · #nr Navn · hold · værdi (højrestillet).
+function listTable(title, key, rows, value, myTeamId) {
+  return h('div', { class: 'stat-list', dataset: { key } }, h('h4', {}, title),
+    rows.length ? h('table', { class: 'stat-table' }, h('tbody', {}, rows.map(({ v, team }, i) => h('tr', { class: team.id === myTeamId ? 'mine' : '' },
+      h('td', { class: 'st-rank' }, `${i + 1}.`),
+      h('td', { class: 'st-name', title: `#${v.shirtNumber} ${v.shortName}` }, `#${v.shirtNumber} ${v.shortName}`),
+      h('td', { class: 'st-team', title: team.name }, shortTeam(team.name)),
+      h('td', { class: 'st-val' }, value(v))))))
+      : h('p', { class: 'muted' }, 'Ingen endnu.'));
+}
+
 function playerLists(league, myTeamId) {
   // Hver spiller set med seerens rettigheder: private felter er helt fraværende.
   const all = league.teams.flatMap((t) => t.squad.map((p) => ({ v: viewPlayer(p, t.id === myTeamId), team: t })));
-  const list = (title, key, unit = '') => {
-    const rows = all.filter(({ v }) => (v[key] ?? 0) > 0).sort((a, b) => b.v[key] - a.v[key] || b.v.sGames - a.v.sGames).slice(0, TOP);
-    return h('div', { class: 'stat-list', dataset: { key } }, h('h4', {}, title),
-      rows.length ? h('ol', {}, rows.map(({ v, team }) => h('li', { class: team.id === myTeamId ? 'mine' : '' },
-        h('span', {}, `#${v.shirtNumber} ${v.shortName}`), h('span', { class: 'muted' }, ` ${team.name}`), h('strong', {}, ` ${v[key]}${unit}`))))
-        : h('p', { class: 'muted' }, 'Ingen endnu.'));
-  };
-  // "Bedste snit": offentlige stjerner for alle (eksakte karakterer ville røbe andre hold).
+  const top = (key) => all.filter(({ v }) => (v[key] ?? 0) > 0).sort((a, b) => b.v[key] - a.v[key] || b.v.sGames - a.v.sGames).slice(0, TOP);
+  const list = (title, key) => listTable(title, key, top(key), (v) => String(v[key]), myTeamId);
+  // "Bedste vurdering": offentlige stjerner for alle (eksakte karakterer ville røbe andre hold).
   const starRows = all.filter(({ v }) => v.publicStars > 0 && (v.sGames ?? 0) > 0).sort((a, b) => b.v.publicStars - a.v.publicStars || b.v.sGames - a.v.sGames).slice(0, TOP);
   return h('div', { class: 'stat-grid' },
     list('⚽ Topscorere', 'sGoals'), list('🅰 Flest oplæg', 'sAssists'), list('👑 Kampens spiller', 'sMotm'),
     list('🗣 Hovedstødsmål', 'sHeaderGoals'), list('🎯 Straffemål', 'sPenaltyGoals'), list('🧱 Dødboldmål', 'sSetPieceGoals'),
     list('🧤 Clean sheets', 'sCleanSheets'), list('🟨 Gule kort', 'sYellow'),
-    h('div', { class: 'stat-list', dataset: { key: 'publicStars' } }, h('h4', {}, '⭐ Bedste vurdering (hele sæsonen)'),
-      starRows.length ? h('ol', {}, starRows.map(({ v, team }) => h('li', { class: team.id === myTeamId ? 'mine' : '' }, h('span', {}, `#${v.shirtNumber} ${v.shortName}`), h('span', { class: 'muted' }, ` ${team.name} `), starsEl(v.publicStars))))
-        : h('p', { class: 'muted' }, 'Ingen endnu.')));
+    listTable('⭐ Bedste vurdering (hele sæsonen)', 'publicStars', starRows, (v) => starsEl(v.publicStars), myTeamId));
 }
 
 function teamTable(league, myTeamId) {

@@ -121,13 +121,25 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .linklike { background: none; border: none; padding: 0; color: var(--blå); text-decoration: underline; cursor: pointer; font: inherit; }
 .ev.focus { background: #78350f66; outline: 1px solid #fbbf24; border-radius: .25rem; }
 
-/* Statistik (v3.10) */
+/* Statistik (v3.10; læsbar fra v3.10.1 – brugeren: "noget rod og ikke til at læse") */
 .stats-sec { margin: .5rem 0; }
 .stats-sec > summary { cursor: pointer; font-weight: 600; padding: .3rem 0; }
-.stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); gap: .5rem 1rem; }
-.stat-list h4 { margin: .4rem 0 .2rem; }
-.stat-list ol { margin: 0; padding-left: 1.4rem; }
-.stat-list li.mine, #team-stats tr.mine td { color: var(--grøn); }
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(20rem, 100%), 1fr)); gap: .75rem 1.5rem; max-width: 72rem; }
+@media (min-width: 72rem) { .stat-grid { grid-template-columns: repeat(3, 1fr); } }
+.stat-list { background: var(--bg); border: 1px solid var(--kant); border-radius: .5rem; padding: .5rem .75rem; }
+.stat-list h4 { margin: 0 0 .35rem; font-size: .9rem; }
+.stat-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: .85rem; }
+.stat-table td { padding: .2rem .25rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-bottom: 1px solid var(--kant); }
+.stat-table tr:last-child td { border-bottom: 0; }
+.stat-table .st-rank { width: 1.8rem; color: var(--dæmpet); }
+.stat-table .st-team { width: 28%; color: var(--dæmpet); font-size: .78rem; text-align: left; }
+.stat-table .st-name { text-align: left; }
+.stat-table tbody tr { cursor: default; } .stat-table tbody tr:hover { background: none; }
+.stat-table .st-val { width: 2.75rem; text-align: right; font-weight: 700; overflow: visible; }
+.stat-list[data-key="publicStars"] .st-val { width: 5.75rem; } /* fem stjerner skal kunne stå helt */
+.stat-table tr.mine td:first-child { box-shadow: inset 3px 0 0 var(--grøn); }
+#team-stats td, #team-stats th, #my-players td, #my-players th { white-space: nowrap; }
+#team-stats tr.mine td { color: var(--grøn); }
 .round-bars { display: grid; gap: .15rem; max-width: 40rem; }
 .round-bar { display: grid; grid-template-columns: 2.5rem 1fr 2rem; align-items: center; gap: .4rem; font-size: .85rem; }
 .rb-fill { display: block; height: .7rem; background: var(--grøn); border-radius: .2rem; min-width: 2px; }

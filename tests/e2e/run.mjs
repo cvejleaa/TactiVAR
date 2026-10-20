@@ -307,6 +307,14 @@ try {
   check('Runden har 4 kampe', (await g.locator('#match-cards .matchcard').count()) === 4);
   const mcText = await g.textContent('#match-center');
   check('Referatet indeholder slutfløjt, statistik og karakterark', mcText.includes('SLUTFLØJT') && (await g.isVisible('#match-stats')) && (await g.locator('.ratings').count()) === 2);
+  // v3.10.1: dødbolde og gule kort i statistikken til højre – tallene = kampens gemte statistik
+  const statRows = await g.locator('#match-stats tbody tr').evaluateAll((trs) => trs.map((tr) => [...tr.children].map((c) => c.textContent)));
+  const statSaved = await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.lastRound.matches[0].stats);
+  const rowOf = (label) => statRows.find((r) => r[1] === label);
+  check('Kampstatistik: frispark i skudafstand, hjørnespark, straffe (mål) og gule kort som i den gemte kamp',
+    rowOf('Hjørnespark')?.[0] === String(statSaved.hCorners) && rowOf('Hjørnespark')?.[2] === String(statSaved.aCorners)
+    && rowOf('Frispark i skudafstand')?.[0] === String(statSaved.hFreeKicks) && rowOf('Straffe (mål)')?.[0] === `${statSaved.hPenalties} (${statSaved.hPenaltyGoals})`
+    && rowOf('Gule kort')?.[2] === String(statSaved.aYellows) && !!rowOf('Frispark begået / skader'), JSON.stringify(statRows.slice(-5)));
   const feedText = await g.textContent('#feed');
   check('Referatet: ingen evnetal og ingen interne koder', !/\b(FIN|PAS|POS|INT|STA|STR|BAL|PAC)\s*[:=]?\s*\d/.test(feedText) && !/BALANCED|MID_BLOCK|HIGH_GEGENPRESS/.test(mcText));
   const score = (await g.textContent('#score')).trim();
@@ -354,7 +362,7 @@ try {
   // v3.10: statistik nederst – fire sektioner, tal = gemte data, andre holds private tal findes ikke
   const secs = await g.locator('#stats details.stats-sec > summary').allTextContents();
   check('Statistik: fire sektioner med "fra runde 1" (spillere åben, resten sammenfoldet)', secs.length === 4 && secs[0].startsWith('Spillere (fra runde 1)') && secs[3].startsWith('Dit hold (privat, fra runde 1)') && (await g.locator('#stats-players').getAttribute('open')) !== null && (await g.locator('#stats-teams').getAttribute('open')) === null, secs.join(' | '));
-  const scorers = await g.locator('#stats .stat-list[data-key="sGoals"] li strong').allTextContents();
+  const scorers = await g.locator('#stats .stat-list[data-key="sGoals"] td.st-val').allTextContents();
   const goalsSaved = await g.evaluate(() => { const L = JSON.parse(localStorage.getItem('tactivar_save')).league; return L.teams.flatMap((t) => t.squad.map((p) => p.sGoals)).filter((n) => n > 0).sort((a, b) => b - a).slice(0, 5); });
   check('Statistik: topscorerlisten matcher de gemte sæsonmål', JSON.stringify(scorers.map((t) => Number(t.trim()))) === JSON.stringify(goalsSaved), `${scorers.join(',')} / ${goalsSaved.join(',')}`);
   await g.click('#stats-teams > summary');

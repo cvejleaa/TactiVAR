@@ -156,7 +156,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
   const H = prepareSide(home, true, lineupNotes), A = prepareSide(away, false, lineupNotes);
   const sheet = createSheet();
   const goalsPool = [], injuries = [], observations = [];
-  const st = { hPoss: 10, aPoss: 10, hShots: 0, aShots: 0, hOnTarget: 0, aOnTarget: 0, hXg: 0, aXg: 0, hAerialWon: 0, aAerialWon: 0, hVarChecks: 0, aVarChecks: 0, hTacticSuccess: 0, aTacticSuccess: 0, hFouls: 0, aFouls: 0, hInjuries: 0, aInjuries: 0, hCorners: 0, aCorners: 0, hFreeKicks: 0, aFreeKicks: 0, hPenalties: 0, aPenalties: 0, hPenaltyGoals: 0, aPenaltyGoals: 0, hSetPieceGoals: 0, aSetPieceGoals: 0, hHeaderGoals: 0, aHeaderGoals: 0, hCounterGoals: 0, aCounterGoals: 0 };
+  const st = { hPoss: 10, aPoss: 10, hShots: 0, aShots: 0, hOnTarget: 0, aOnTarget: 0, hXg: 0, aXg: 0, hAerialWon: 0, aAerialWon: 0, hVarChecks: 0, aVarChecks: 0, hTacticSuccess: 0, aTacticSuccess: 0, hFouls: 0, aFouls: 0, hInjuries: 0, aInjuries: 0, hCorners: 0, aCorners: 0, hFreeKicks: 0, aFreeKicks: 0, hPenalties: 0, aPenalties: 0, hPenaltyGoals: 0, aPenaltyGoals: 0, hSetPieceGoals: 0, aSetPieceGoals: 0, hHeaderGoals: 0, aHeaderGoals: 0, hCounterGoals: 0, aCounterGoals: 0, hYellows: 0, aYellows: 0 };
   let hG = 0, aG = 0, homeVarNet = 0;
   const k = (side, name) => (side.isHome ? 'h' : 'a') + name;
   const other = (side) => (side === H ? A : H);
@@ -478,7 +478,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
         }
       } else {
         // Gult kort kun her – skade-frisparkets tekst nævner intet kort (v3.10).
-        if (sheet.entries[fouler.id]) sheet.entries[fouler.id].yellowCard = true;
+        if (sheet.entries[fouler.id] && !sheet.entries[fouler.id].yellowCard) { sheet.entries[fouler.id].yellowCard = true; st[k(foulSide, 'Yellows')]++; }
         addEv(min, 'FOUL', 'PLAY', foulSide.isHome, false, 'Frispark', `🟨 [${foulSide.team.name}] Taktisk frispark og gult kort til ${tag(fouler)}.`);
       }
     }
@@ -490,7 +490,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
       if (rng.chance(QUIET_CARD_P)) {
         const dRq = def === H ? hR : aR, fouler = rng.pick(dRq.defs.concat(dRq.mids));
         if (sheet.entries[fouler.id] && !sheet.entries[fouler.id].yellowCard) {
-          sheet.entries[fouler.id].yellowCard = true; sheet.adjust(fouler.id, -0.2);
+          sheet.entries[fouler.id].yellowCard = true; sheet.adjust(fouler.id, -0.2); st[k(def, 'Yellows')]++;
           addEv(min, 'FOUL', 'PLAY', def.isHome, false, 'Gult kort', `🟨 [${def.team.name}] Gult kort til ${tag(fouler)} for et frispark.`);
         }
       }

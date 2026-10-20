@@ -86,6 +86,9 @@ Clues opstår i kampe. **Rettet:** v2.5b gemmer clues på modstanderens
 spillerobjekt; de skal ligge hos den der observerer.
 
 ## 3. Hvem ser hvad (anti-spionage)
+- Kampstatistikken i Match Center (v3.10.1: også frispark i skudafstand, hjørnespark, straffe (mål)
+  og gule kort) er tal fra én kamp, hvor hver hændelse står i referatet – offentlig for begge hold.
+  Kun SÆSONsummer, der følger en skjult indstilling, er private (§8b).
 - Offentligt: navn ("F. Efternavn" på banen), rygnummer, kæde, naturlig position, alder, højde, friskhed, skadesstatus 🚑, stjerner (★☆☆☆☆–★★★★★), holdets startformation. Intet andet om andre holds taktik (brugerens beslutning, afviger bevidst fra v2.5): ingen faser, planer, Hvis-Så-regler eller "typisk stil" – heller ikke i ligatabellen, kamphovedet, det taktiske oplæg eller referatet. Et modstanderholds Hvis-Så-skift vises kun som "omorganiserer sig". Referatet navngiver kun dine egne taktikvalg. (Trin 1 lægger teksterne i motoren med det menneskestyrede hold som seer; trin 2 skal gøre dem seer-afhængige.)
 - Kun ejer: 9 evner, spring, luftduel, arketype, løn/værdi, kasse, de præcise fasevalg og Hvis-Så-regler,
   eksakt karakter, mod-kunnen.
@@ -272,12 +275,14 @@ Tick hvert 3. minut (1..90).
   kampen, markerer målet i referatet og ruller frem til det.
 - **Friskhed (v3.7**, brugeren: "kun 3 af mine spillere der har under 100%"; kilden
   −max(4, 14 − STA/2) + 8 straks): kampen koster round(km · (1,5 − STA·0,03)) ± 2 (støj, så
-  STA ikke kan regnes baglæns); restitution 35 % af det, der mangler op til 100 (bænk +15
-  oveni), bund 50. Ligevægt for en fast starter ≈ 100 − 1,86·pris: MID ≈76 %, MV ≈85 % (QC:
+  STA ikke kan regnes baglæns); restitution 41 % af det, der mangler op til 100 (v3.10.1 –
+  brugeren efter 17 runder: "næsten alle mine spillere er langt nede i friskhed", valgt ≈80 %;
+  v3.7–v3.10: 35 %) (bænk +15 oveni), bund 50. Ligevægt for en fast starter ≈ 100 − 1,44·pris:
+  CM ≈80 % (før ≈75 %), MV ≈88 % (QC:
   med fast +5 endte alle på 50, og rotation blev en afgift). Virker i kampen: bidrag i duel,
   afslutning (også målmand) og luftduel · (0,75 + 0,25·friskhed/100) – 50 % ≈ 12,5 % svagere.
   Bots hviler en starter under 70 % for en frisk (≥85 %) bænkspiller i samme kæde, højst 2
-  svagere. Målt over 10 runder: startelleverne ≈81 % i snit; mål/kamp 1,46 → 1,50.
+  svagere. Målt over 10 runder (`… 30 saeson`): startelleverne ≈85 % i snit (v3.10: ≈81 %).
 
 ## 7. Mod-kunnen (v2.2b)
 - `counterTactics {vsPress, vsLowBlock, vsTrapLong}`, start
@@ -318,7 +323,10 @@ visning". Sortering på kopi med `origIdx`.
 
 ## 8b. Statistik på Liga-fanen (v3.10)
 Brugeren: "Jeg vil gerne have noget statistik med på liga siden af al mulig slags". Nederst på
-Liga-fanen, fire sammenfoldede sektioner (skjult under afspilning, ligesom avisen):
+Liga-fanen, fire sammenfoldede sektioner (skjult under afspilning, ligesom avisen). Fra v3.10.1
+(brugeren: "noget rod og ikke til at læse") er hver spillerliste en lille tabel – placering · #nr
+navn · kort holdnavn (fuldt i title) · værdi – i højst tre kolonner, uden ombrud; dit hold markeret
+med grøn kant:
 1. **Spillere** (top 5): mål, oplæg, Kampens spiller, hovedstøds-, straffe- og dødboldmål, clean
    sheets (MV/forsvar, 0 imod, mindst 59 spilleminutter – en starter har 89), gule kort, bedste vurdering (offentlige stjerner for alle).
 2. **Holdtal**: bold %, frispark begået/tilkendt, gule kort, straffe (mål), dødboldmål, clean sheets.

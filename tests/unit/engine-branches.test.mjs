@@ -241,8 +241,8 @@ test('bogføring: friskhed efter løbet distance (v3.7), bænk +15, stjerner af 
   const res = syntheticRound(L, { ratings: [{ playerId: p.id, rating: 5, gainedCounterXp: 10, distanceKm: 11.2 }, { playerId: q.id, rating: 6, gainedCounterXp: 4, distanceKm: 10 }] });
   commitRound(L, res, { next: () => 0.5 });
   // v3.6 gav 99 og 60 (−max(4, 14 − STA/2) + 8 straks): næsten ingen træthed.
-  assert.equal(p.freshness, 92);      // 100 − round(11,2·(1,5 − 0,30) = 13,4) = 87; + round(0,35·13) = 5
-  assert.equal(q.freshness, 66);      // 61 − round(10·(1,5 − 0,06) = 14,4) = 47; + round(0,35·53) = 19
+  assert.equal(p.freshness, 92);      // 100 − round(11,2·(1,5 − 0,30) = 13,4) = 87; + round(0,41·13) = 5
+  assert.equal(q.freshness, 69);      // 61 − round(10·(1,5 − 0,06) = 14,4) = 47; + round(0,41·53) = 22 (v3.10.1; 0,35 gav 66)
   assert.equal(bench1.freshness, 100); assert.equal(bench2.freshness, 85);
   assert.equal(p.ratingSum, 21); assert.equal(p.ratingGames, 3); assert.equal(p.lastRating, 5);
   assert.equal(p.publicStars, starsFromRating(7)); // snit 21/3 = 7,0 → 3 stjerner (sidste karakter 5 ville give 1)
@@ -253,10 +253,10 @@ test('bogføring: friskhed efter løbet distance (v3.7), bænk +15, stjerner af 
   assert.equal(sH.points, 3); assert.equal(sA.lost, 1);
   let r = syntheticRound(L, { ratings: [{ playerId: q.id, rating: 6, gainedCounterXp: 1, distanceKm: 10 }] }); r.round = 2;
   commitRound(L, r, { next: () => 0.5 });
-  assert.equal(q.freshness, 69);      // 66 − 14 = 52; + round(0,35·48) = 17 (jo mere træt, jo mere restitution)
+  assert.equal(q.freshness, 73);      // 69 − 14 = 55; + round(0,41·45) = 18 (jo mere træt, jo mere restitution)
   r = syntheticRound(L, { ratings: [{ playerId: q.id, rating: 6, gainedCounterXp: 1, distanceKm: 40 }] }); r.round = 3;
   commitRound(L, r, { next: () => 0.5 });
-  assert.equal(q.freshness, 50);      // 69 − 58 = 11; + 31 = 42 → bund 50
+  assert.equal(q.freshness, 50);      // 73 − 58 = 15; + round(0,41·85) = 35 → 50 (bunden 50)
 });
 
 test('stilling sorteres på point, så målforskel, så scorede mål', () => {
@@ -1176,10 +1176,10 @@ test('bogføring: km, minutter og bedste topfart summeres over sæsonen; støjen
   const p = H.squad[0];
   p.skills.stamina = 10; p.freshness = 100;
   const round = (n, km, ts, minIn, minOut, rng) => { const res = syntheticRound(L, { ratings: [{ playerId: p.id, rating: 6, gainedCounterXp: 1, distanceKm: km, topSpeed: ts, minIn, minOut }] }); res.round = n; commitRound(L, res, rng); };
-  round(1, 11.2, 31.5, 1, 90, { next: () => 0 });   // støj round(0·4 − 2) = −2: pris 13 − 2 = 11 → 89; + round(0,35·11) = 4 → 93
-  assert.equal(p.freshness, 93);
-  round(2, 5.6, 29, 46, 90, { next: () => 1 });     // støj +2: pris round(6,72) = 7 + 2 = 9 → 84; + round(5,6) = 6 → 90
-  assert.equal(p.freshness, 90);
+  round(1, 11.2, 31.5, 1, 90, { next: () => 0 });   // støj round(0·4 − 2) = −2: pris 13 − 2 = 11 → 89; + round(0,41·11) = 5 → 94
+  assert.equal(p.freshness, 94);
+  round(2, 5.6, 29, 46, 90, { next: () => 1 });     // støj +2: pris round(6,72) = 7 + 2 = 9 → 85; + round(0,41·15) = 6 → 91
+  assert.equal(p.freshness, 91);
   assert.ok(Math.abs(p.distanceSum - 16.8) < 1e-9);
   assert.equal(p.minutesSum, 89 + 44);
   assert.equal(p.topSpeedMax, 31.5, 'en lavere topfart ændrer ikke sæsonens bedste');
@@ -2157,3 +2157,27 @@ test('avisens etiketter for alle måltyper (også de fire dødbolde)', async () 
   assert.deepEqual(GOAL_KIND_LABEL, { LONGSHOT: 'Langskud', DRIBBLE: 'Dribletur', COUNTER: 'Kontra', CUTBACK: 'Cutback', COMBINATION: 'Kombination', HEADER: 'Hovedstød', VAR: 'VAR-drama', PENALTY: 'Straffespark', FREEKICK: 'Frispark', CORNER: 'Hjørnespark', SETPIECE: 'Frisparksindlæg' });
 });
 
+test('kampstatistik: gule kort tælles løbende (st.*Yellows) og passer med karakterarkene; højst ét gult pr. spiller', () => {
+  const g = sp({ script: { 0.58: true, 0.21: true } });          // stille frispark + kort i hver tick – samme forsvarer
+  assert.equal(g.m.stats.aYellows, 1);
+  assert.equal(g.m.ratings.away.filter((e) => e.yellowCard).length, 1);
+  assert.equal(g.m.events.filter((e) => e.label === 'Gult kort').length, 1);
+  const t = sp({ script: { 0.06: (n) => n === 0 } });             // taktisk frispark
+  const side = t.m.stats.hYellows + t.m.stats.aYellows;
+  assert.equal(side, 1); assert.equal([...t.m.ratings.home, ...t.m.ratings.away].filter((e) => e.yellowCard).length, 1);
+});
+
+// v3.10.1 Test Manager: ovenstående summerer siderne og kører taktisk frispark kun ÉN gang – side (foulende, ikke ofret)
+// og "højst ét pr. spiller" i den taktiske gren var ubevist.
+test('kampstatistik: taktisk frispark – gult kort tælles på det foulende hold og højst ét pr. spiller', () => {
+  const once = (victimIsHome) => sp({ script: { 0.06: (n) => n === 0, 0.5: (n) => victimIsHome && n === 0 } });
+  const a = once(false);                 // ofret = ude → hjemmeholdet foulede
+  assert.equal(a.m.stats.hYellows, 1); assert.equal(a.m.stats.aYellows, 0);
+  assert.equal(a.m.ratings.home.filter((e) => e.yellowCard).length, 1); assert.equal(a.m.ratings.away.filter((e) => e.yellowCard).length, 0);
+  const b = once(true);                  // ofret = hjemme → udeholdet foulede
+  assert.equal(b.m.stats.aYellows, 1); assert.equal(b.m.stats.hYellows, 0);
+  assert.equal(b.m.ratings.away.filter((e) => e.yellowCard).length, 1); assert.equal(b.m.ratings.home.filter((e) => e.yellowCard).length, 0);
+  const many = sp({ script: { 0.06: true } });   // 30 taktiske frispark, samme spiller hver gang (pick = første)
+  assert.equal(many.m.stats.hYellows + many.m.stats.aYellows, 1, 'samme spiller får ikke gult kort igen');
+  assert.equal([...many.m.ratings.home, ...many.m.ratings.away].filter((e) => e.yellowCard).length, 1);
+});
