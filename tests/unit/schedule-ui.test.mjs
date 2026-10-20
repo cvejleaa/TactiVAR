@@ -79,3 +79,62 @@ test('kampprogrammet: tidligere sæsoner med mester, din placering, topscorer og
   const lis = all(past, (e) => e.tag === 'li');
   assert.deepEqual(lis.slice(2).map((l) => [l.textContent, l.className]), [[`${bot.name} – 12 p (13-3)`, ''], [`${me.name} – 9 p (10-3)`, 'mine']]);
 });
+
+// ---------- Test Manager v3.11: huller fundet ved mutationstest ----------
+// Dit program, når du er udehold: score først hos dig, rækkefarve fra din side, "mine"-markering og tomme/udfyldte resultater i det fulde program.
+test('kampprogrammet: udekampe vises med din score først og din farve, din kamp er markeret i hele programmet, kampe uden resultat er dæmpet', () => {
+  const L = createLeague(createRng(8)), me = L.teams.find((t) => !t.isBot), name = (id) => L.teams.find((t) => t.id === id).name;
+  L.leagueMetadata.round = 13;
+  // Udfald fra MIT synspunkt pr. runde (cyklus V, T, U) – med forskellig score hjemme og ude, så ombyttede sider ses
+  const OUT = ['V', 'T', 'U'], SCORE = { home: { V: [2, 0], T: [0, 1], U: [1, 1] }, away: { V: [0, 2], T: [3, 1], U: [2, 2] } };
+  const want = [], seen = { home: 0, away: 0 }; // udfaldet cykler for sig hjemme og ude, så alle seks kombinationer forekommer
+  L.history = Array.from({ length: 13 }, (_, i) => {
+    const round = i + 1;
+    return {
+      round, results: L.schedule[i].map(([h, a], j) => {
+        if (!(h === me.id || a === me.id)) return { h, a, hG: 5 + j, aG: 6 + j };
+        const home = h === me.id, out = OUT[seen[home ? 'home' : 'away']++ % 3], [hG, aG] = SCORE[home ? 'home' : 'away'][out];
+        want.push({ k: round, home, out, text: home ? `${hG}-${aG}` : `${aG}-${hG}` });
+        return { h, a, hG, aG };
+      }),
+    };
+  });
+  const el = renderSchedule({ league: L, pairs: pairRound(L), myTeamId: me.id });
+  assert.ok(want.some((w) => !w.home && w.out === 'V') && want.some((w) => !w.home && w.out === 'T') && want.some((w) => w.home && w.out === 'T'), 'fixturet dækker udesejr, udenederlag og hjemmenederlag');
+  const rows = all(byId(el, 'my-schedule'), (e) => e.tag === 'tr');
+  want.forEach((w) => {
+    const tr = rows[w.k - 1], c = cells(tr);
+    assert.equal(c[3], w.text, `runde ${w.k} (${w.home ? 'hjemme' : 'ude'}): din score først`);
+    assert.equal(tr.className.trim(), { V: 'won', T: 'lost', U: 'drawn' }[w.out], `runde ${w.k} (${w.home ? 'hjemme' : 'ude'}, ${w.out})`);
+  });
+  assert.equal(cells(rows[13])[3], '–'); assert.equal(rows[13].className.trim(), 'next');
+  // Hele programmet: 14 overskrifter, præcis én "mine"-kamp pr. runde (også som udehold), resultater kun for spillede runder
+  const full = byId(el, 'full-schedule');
+  assert.deepEqual(all(full, (e) => e.tag === 'h4').map((x) => x.textContent), Array.from({ length: 14 }, (_, i) => `Runde ${i + 1}`));
+  const fx = all(full, (e) => e.className.split(' ').includes('fixture'));
+  assert.equal(fx.length, 56);
+  fx.forEach((f, n) => {
+    const k = Math.floor(n / 4), [h, a] = L.schedule[k][n % 4], isMine = h === me.id || a === me.id;
+    assert.equal(f.className.split(' ').includes('mine'), isMine, `runde ${k + 1}: ${name(h)}–${name(a)}`);
+    const score = f.children[1];
+    if (k < 13) { assert.ok(/^\d+-\d+$/.test(score.textContent), score.textContent); assert.ok(!score.className.includes('muted'), 'spillet kamp er ikke dæmpet'); }
+    else { assert.equal(score.textContent, '–'); assert.ok(score.className.split(' ').includes('muted'), 'kamp uden resultat er dæmpet'); }
+  });
+  // Næste runde (runde 14): din kamp er markeret, uanset hjemme/ude, og alle er dæmpet (intet resultat endnu)
+  const nf = all(byId(el, 'next-round'), (e) => e.className.split(' ').includes('fixture'));
+  assert.equal(nf.filter((f) => f.className.split(' ').includes('mine')).length, 1);
+  assert.ok(nf.every((f) => f.children[1].className.split(' ').includes('muted')));
+});
+
+// Avisen ved sæsonslut (public/ui/matchcenter.js renderGazette)
+test('avisen ved sæsonslut: titel med sæsonnummer, mester med point, din placering, topscorer og afslutning – og intet uden seasonEnd', async () => {
+  const { renderGazette } = await import('../../public/ui/matchcenter.js');
+  const base = { totalGoals: 7, totalVarChecks: 3, myResult: 'Resultat.' };
+  const end = { seasonNumber: 4, champion: { teamName: 'Mester FC', points: 33 }, myPos: 2, topScorer: { shirtNumber: 9, shortName: 'A. Topp', teamName: 'Hold B', goals: 17 } };
+  const p = (g) => byId(renderGazette(g, 'x'), 'season-end');
+  assert.equal(p({ ...base, seasonEnd: end }).textContent,
+    '🏆 Sæson 4 er slut: Mester FC er mester med 33 point. Du sluttede nr. 2. Topscorer: #9 A. Topp (Hold B), 17 mål. En ny sæson starter med nulstillet tabel – se Tidligere sæsoner på Liga-fanen.');
+  assert.equal(p({ ...base, seasonEnd: { seasonNumber: 1, champion: null, myPos: null, topScorer: null } }).textContent,
+    '🏆 Sæson 1 er slut: En ny sæson starter med nulstillet tabel – se Tidligere sæsoner på Liga-fanen.');
+  assert.equal(p(base), undefined, 'ingen sæsonslut-linje midt i sæsonen');
+});
