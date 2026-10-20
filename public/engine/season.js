@@ -7,26 +7,40 @@ import { simulateMatch } from './match.js';
 import { starsFromRating, starNoise } from './ratings.js';
 import { applyCounterXp } from './counter.js';
 import { buildGazette } from './gazette.js';
+import { SEASON_ROUNDS, seasonRoundOf } from './schedule.js';
+import { emptyStanding } from './generator.js';
+import { PLAYER_SEASON_DEFAULTS } from './stats.js';
 
-// v2.5b-parring: dit hold (index 0) hjemme mod den valgte modstander, de øvrige i rækkefølge.
-// Erstattes af et Berger-program (spec §10.7) med samme signatur.
-export function pairRound(league, opponentIdx) {
-  const teams = league.teams;
-  const pairs = [[0, opponentIdx]];
-  const rest = teams.map((_, i) => i).filter((i) => i !== 0 && i !== opponentIdx);
+// Næste rundes kampe efter programmet (v3.11) som [hjemmeIdx, udeIdx]. Kampen med et
+// menneskestyret hold står først: avisen, afspilningen og Kamp-fanens første kort bygger på det.
+export function pairRound(league) {
+  const idx = new Map(league.teams.map((t, i) => [t.id, i]));
+  const r = seasonRoundOf(league, league.leagueMetadata.round + 1);
+  const pairs = league.schedule[r - 1].map(([a, b]) => [idx.get(a), idx.get(b)]);
+  const human = (p) => p.some((i) => !league.teams[i].isBot);
+  return [...pairs.filter(human), ...pairs.filter((p) => !human(p))];
+}
+
+// Tabellen FØR runden – til "Rundens overraskelse" (tidligst sæsonens runde 3; før er pladserne tilfældige).
+export function tableBefore(league, round) {
+  if (seasonRoundOf(league, round) < 3) return null;
+  return Object.fromEntries(sortStandings(league.leagueMetadata.standings).map((s, i) => [s.teamId, { pos: i + 1, points: s.points }]));
+}
+
+export const playRound = (league, rng) => playPairs(league, pairRound(league), rng);
+
+// Den gamle parring (før v3.11): hold 0 hjemme mod en fast modstander, de øvrige i rækkefølge.
+// Kun til måleværktøjet og tests, så målingerne kan gentages tal for tal med playPairs.
+export function fixedPairs(league, opponentIdx) {
+  const rest = league.teams.map((_, i) => i).filter((i) => i !== 0 && i !== opponentIdx), pairs = [[0, opponentIdx]];
   for (let i = 0; i + 1 < rest.length; i += 2) pairs.push([rest[i], rest[i + 1]]);
   return pairs;
 }
 
-// Tabellen FØR runden – til "Rundens overraskelse" (tidligst runde 3; før er pladserne tilfældige).
-export function tableBefore(league, round) {
-  if (round < 3) return null;
-  return Object.fromEntries(sortStandings(league.leagueMetadata.standings).map((s, i) => [s.teamId, { pos: i + 1, points: s.points }]));
-}
-
-export function playRound(league, opponentIdx, rng) {
+// Spiller faste par – måleværktøjet og tests styrer selv parringen.
+export function playPairs(league, pairs, rng) {
   const round = (league.leagueMetadata.round || 0) + 1;
-  const matches = pairRound(league, opponentIdx).map(([h, a]) => simulateMatch(league.teams[h], league.teams[a], rng, { round }));
+  const matches = pairs.map(([h, a]) => simulateMatch(league.teams[h], league.teams[a], rng, { round }));
   // Hvert mål ved, hvilken kamp i runden det faldt i (avisen linker til referatet, v3.7.1).
   matches.forEach((m, i) => m.goalsPool.forEach((g) => { g.matchIdx = i; }));
   return { round, matches, gazette: buildGazette(matches, { positions: tableBefore(league, round), round }) };
@@ -114,5 +128,39 @@ export function commitRound(league, result, rng) {
   if (league.history.length > HISTORY_MAX) league.history.splice(0, league.history.length - HISTORY_MAX);
   league.leagueMetadata.round = result.round;
   league.lastRound = { round: result.round, matches: result.matches, gazette: result.gazette };
+  if (seasonRoundOf(league, result.round) === SEASON_ROUNDS) {
+    const end = endSeason(league, result.round, true);
+    if (result.gazette) result.gazette.seasonEnd = end;
+  }
   return league;
+}
+
+// Sæsonslut (v3.11): tabellen og sæsonopgørelsen arkiveres, og tabel og sæsonstatistik starter
+// forfra. Spillerne, friskheden og ligaens forløb (history) bevares. programmed = false for
+// sæsonen før kampprogrammet (migreringen fra skema 5).
+export function endSeason(league, toRound, programmed) {
+  const md = league.leagueMetadata;
+  const table = sortStandings(md.standings).map(({ teamId, teamName, played, won, drawn, lost, goalsFor, goalsAgainst, points }) => ({ teamId, teamName, played, won, drawn, lost, goalsFor, goalsAgainst, points }));
+  const teamOf = new Map(league.teams.flatMap((t) => t.squad.map((p) => [p.id, t])));
+  const all = league.teams.flatMap((t) => t.squad);
+  const who = (p) => (p ? { playerId: p.id, teamId: teamOf.get(p.id).id, teamName: teamOf.get(p.id).name, shirtNumber: p.shirtNumber, shortName: p.shortName, goals: p.sGoals, motm: p.sMotm } : null);
+  const byGoals = (a, b) => b.sGoals - a.sGoals || b.sAssists - a.sAssists;
+  const mine = league.teams.find((t) => !t.isBot);
+  const hist = (league.history || []).filter((r) => r.round >= league.seasonStartRound && r.round <= toRound);
+  const summary = {
+    seasonNumber: md.seasonNumber, fromRound: league.seasonStartRound, toRound, programmed,
+    table, champion: table[0] ? { teamId: table[0].teamId, teamName: table[0].teamName, points: table[0].points } : null,
+    myPos: mine ? table.findIndex((s) => s.teamId === mine.id) + 1 : null,
+    topScorer: who(all.filter((p) => p.sGoals > 0).sort(byGoals)[0]),
+    // Dit holds bedste: flest kåringer som kampens spiller, så mål.
+    myBest: mine ? who(mine.squad.filter((p) => p.sGames > 0).sort((a, b) => b.sMotm - a.sMotm || byGoals(a, b))[0]) : null,
+    goals: hist.reduce((a, r) => a + r.goals, 0), matches: hist.reduce((a, r) => a + r.matches, 0),
+  };
+  (league.seasons ||= []).push(summary);
+  md.standings = league.teams.map(emptyStanding);
+  for (const t of league.teams) for (const p of t.squad) Object.assign(p, PLAYER_SEASON_DEFAULTS);
+  md.seasonNumber = (md.seasonNumber || 1) + 1;
+  league.statsFromRound = toRound + 1;
+  league.seasonStartRound = toRound + 1;
+  return summary;
 }

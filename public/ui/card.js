@@ -10,7 +10,7 @@ const dk = (v) => v.toLocaleString('da-DK', { minimumFractionDigits: 2, maximumF
 const bar = (label, v, max = 20) => h('div', { class: 'bar' }, h('span', { class: 'bar-label' }, label),
   h('span', { class: 'bar-track' }, h('span', { class: 'bar-fill', style: { width: `${Math.round((v / max) * 100)}%` } })), h('span', { class: 'bar-val' }, String(v)));
 
-export function renderCard({ player: p, team, isOwn, opponent, scouting, note, onNote }) {
+export function renderCard({ player: p, team, isOwn, scouting, note, onNote }) {
   if (!p) return h('div', { class: 'panel muted' }, 'Klik på en spiller for at se spillerkortet.');
   const head = h('div', { class: 'card-head' },
     h('h3', {}, `#${p.shirtNumber} ${p.name}`),

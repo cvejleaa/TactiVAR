@@ -4,7 +4,7 @@ import { sortStandings } from '../engine/season.js';
 
 export function renderStandings({ league, onPick, viewTeamId }) {
   const rows = sortStandings(league.leagueMetadata.standings);
-  return h('div', { class: 'panel' }, h('h3', { id: 'standings-title' }, `${league.leagueMetadata.name} – efter ${league.leagueMetadata.round} runde(r)`),
+  return h('div', { class: 'panel' }, h('h3', { id: 'standings-title' }, `${league.leagueMetadata.name} – sæson ${league.leagueMetadata.seasonNumber}, efter ${league.leagueMetadata.round + 1 - league.seasonStartRound} af ${league.schedule.length} runder`),
     h('div', { class: 'tablewrap-x' }, h('table', { class: 'standings', id: 'standings' },
       h('thead', {}, h('tr', {}, ['#', 'Hold', 'K', 'V', 'U', 'T', 'Mål', 'VAR ±', 'P'].map((x) => h('th', {}, x)))),
       h('tbody', {}, rows.map((s, i) => h('tr', { class: (s.isBot ? '' : 'mine ') + (s.teamId === viewTeamId ? 'viewing' : ''), onclick: () => onPick(s.teamId), title: 'Klik for at scoute holdet' },

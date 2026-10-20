@@ -4,10 +4,12 @@
 import { normalizeLeague, normalizeRule } from '../engine/sanitize.js';
 import { COUNTER_KEYS, scaleIntoPool, counterFloor } from '../engine/counter.js';
 import { heightAtQuantile, assignPositions } from '../engine/generator.js';
+import { buildSchedule } from '../engine/schedule.js';
+import { endSeason } from '../engine/season.js';
 
 export const SAVE_KEY = 'tactivar_save';
 export const BACKUP_PREFIX = 'tactivar_backup_';
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 // Migreringer: MIGRATIONS[n] løfter et gemt objekt fra skema n til n+1. Tilføj en ny,
 // hver gang gemme-formatet ændres – sammen med et fixture fra forrige version i
@@ -75,6 +77,22 @@ export const MIGRATIONS = {
     fixHeightTexts(d, newHeight);
     return { ...d, schemaVersion: 5 };
   },
+  // 5 → 6 (v3.11, brugeren: "Kampprogram"): ligaen får et fast program på 14 runder. Tabellen,
+  // der indtil nu bare er vokset, arkiveres som sæson 1 (uden program), og sæson 2 starter med
+  // programmet og nulstillet sæsonstatistik – dermed forsvinder også forsvarernes clean sheets
+  // (brugeren: "Det er kun målmanden der får Clean sheet"; fra nu tæller kun plads 0, ratings.js).
+  // Spillere, friskhed og ligaens forløb bevares. Programmet bygges ud fra holdenes rækkefølge
+  // (ingen tilfældighed), så to indlæsninger af samme fil giver samme program.
+  5: (d) => {
+    const L = d.league;
+    if (!L || !Array.isArray(L.teams)) return { ...d, schemaVersion: 6 };
+    const md = (L.leagueMetadata ||= {});
+    md.seasonNumber ||= 1;
+    L.seasonStartRound = 1;
+    if ((md.round || 0) > 0 && Array.isArray(md.standings)) endSeason(L, md.round, false);
+    L.schedule = buildSchedule(L.teams.map((t) => t.id));
+    return { ...d, schemaVersion: 6 };
+  },
 };
 // v3.7's fordeling pr. kæde – frosset, så migreringen 3 → 4 altid giver de samme højder.
 export const HEIGHT_V37 = {
@@ -118,7 +136,7 @@ export function parseSave(text) {
   }
   const { league, problems } = normalizeLeague(data.league);
   if (!league || problems.length) return { ok: false, error: `Ligaen kunne ikke repareres: ${problems.join('; ')}` };
-  const ui = { activePresetIndex: 0, opponentIdx: 1, ...data.ui };
+  const { opponentIdx, ...ui } = { activePresetIndex: 0, ...data.ui }; // modstandervælgeren findes ikke længere (v3.11)
   return { ok: true, state: { league, notes: data.notes && typeof data.notes === 'object' ? data.notes : {}, ui, savedAt: data.savedAt ?? null }, migratedFrom: from < SCHEMA_VERSION ? from : null };
 }
 

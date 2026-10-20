@@ -123,9 +123,17 @@ test('ligaens forløb: overskrift, søjler (bredde i forhold til rundens mål), 
   assert.deepEqual(kinds, ['Langskud: 9 (50 %)', 'Kombination: 5 (28 %)', 'Straffespark: 2 (11 %)', 'Hjørnespark: 1 (6 %)', 'Frispark: 1 (6 %)']);
   const ps = all(byId(flow, 'stats-flow'), (e) => e.tag === 'p').map((p) => p.textContent);
   assert.ok(ps.includes('Største sejr: E 4-0 F') && ps.includes('Målrigeste kamp: C 3-2 D'), ps.join(' | '));
+  // Kun indeværende sæson (v3.11): ny sæson fra runde 4 → runde 3 hører til den afsluttede
+  L.seasonStartRound = 4;
+  const f2 = render(L, me);
+  assert.equal(byId(f2, 'flow-summary').textContent, '6 mål i 4 kampe (1.50 pr. kamp) · 17 % på dødbolde.');
+  assert.deepEqual(all(byId(f2, 'round-bars'), (e) => e.className === 'round-bar').map((b) => b.attrs.title), ['Runde 4: 6 mål']);
+  L.seasonStartRound = 5;
+  assert.equal(all(byId(render(L, me), 'stats-flow'), (e) => e.tag === 'p')[0].textContent, 'Kommer efter sæsonens første runde.');
+  L.seasonStartRound = 1;
   // Ingen runder endnu
   L.history = [];
-  assert.equal(all(byId(render(L, me), 'stats-flow'), (e) => e.tag === 'p')[0].textContent, 'Kommer efter første runde.');
+  assert.equal(all(byId(render(L, me), 'stats-flow'), (e) => e.tag === 'p')[0].textContent, 'Kommer efter sæsonens første runde.');
   // Ingen sejre (kun uafgjorte): ingen "Største sejr"-linje
   L.history = [{ round: 3, matches: 1, goals: 0, setPiece: 0, kinds: {}, biggest: null, most: { goals: 0, label: 'A 0-0 B' } }];
   assert.ok(!byId(render(L, me), 'stats-flow').textContent.includes('Største sejr'));

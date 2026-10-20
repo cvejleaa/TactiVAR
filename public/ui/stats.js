@@ -54,8 +54,9 @@ function teamTable(league, myTeamId) {
 }
 
 function leagueFlow(league) {
-  const hist = league.history || [];
-  if (!hist.length) return h('p', { class: 'muted' }, 'Kommer efter første runde.');
+  // Kun indeværende sæson (v3.11); afsluttede sæsoner står under Tidligere sæsoner.
+  const hist = (league.history || []).filter((r) => r.round >= (league.seasonStartRound ?? 1));
+  if (!hist.length) return h('p', { class: 'muted' }, 'Kommer efter sæsonens første runde.');
   const max = Math.max(1, ...hist.map((r) => r.goals));
   const kinds = {};
   for (const r of hist) for (const [k, v] of Object.entries(r.kinds || {})) kinds[k] = (kinds[k] ?? 0) + v;

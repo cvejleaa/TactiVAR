@@ -108,13 +108,20 @@ try {
   const optColors = await g.evaluate(() => { const o = document.querySelector('#team-select option'); const cs = getComputedStyle(o); return [cs.color, cs.backgroundColor]; });
   check('Holdvælgerens valgmuligheder er ikke hvid-på-hvid', optColors[0] !== optColors[1], optColors.join(' / '));
 
-  // Modstandervælgeren: aldrig eget hold, og valget gemmes straks
-  const oppOpts = await g.locator('#opponent-select option').allTextContents();
-  const ownName = (await g.locator('#team-select option', { hasText: '★' }).textContent()).replace('★ ', '');
-  check('Modstandervælgeren har de 7 andre hold, ikke dit eget', oppOpts.length === 7 && !oppOpts.includes(ownName), oppOpts.join('|'));
-  await g.selectOption('#opponent-select', '2'); await g.reload(); await g.waitForSelector('body[data-klar="ja"]');
-  check('Modstandervalget gemmes straks', (await g.inputValue('#opponent-select')) === '2');
-  await g.selectOption('#opponent-select', '1');
+  // Kampprogrammet (v3.11): ingen modstandervælger; knappen nævner programmets næste modstander
+  // (regnet direkte fra det gemte program, ikke via pairRound) og hjemme/ude.
+  const nextOf = () => g.evaluate(() => {
+    const L = JSON.parse(localStorage.getItem('tactivar_save')).league, me = L.teams.find((t) => !t.isBot);
+    const k = L.leagueMetadata.round + 2 - L.seasonStartRound, name = (id) => L.teams.find((t) => t.id === id).name;
+    const pairs = L.schedule[k - 1], [hId, aId] = pairs.find((p) => p.includes(me.id));
+    return { k, opp: name(hId === me.id ? aId : hId), home: hId === me.id, me: me.name, fixtures: pairs.map(([h, a]) => `${name(h)}–${name(a)}`) };
+  });
+  const nx1 = await nextOf();
+  check('Ingen modstandervælger – knappen viser programmets næste modstander og hjemme/ude', (await g.locator('#opponent-select').count()) === 0
+    && (await g.textContent('#play-round')) === `▶ Spil runde ${nx1.k} af 14 mod ${nx1.opp} (${nx1.home ? 'hjemme' : 'ude'})` && nx1.k === 1, await g.textContent('#play-round'));
+  await g.click('#next-opponent');
+  check('Klik på modstanderens navn ved ▶ åbner hans trup til scouting', (await g.textContent('#club-name')) === nx1.opp && (await g.textContent('#tabs .tab.active')).includes('Trup'));
+  await g.reload(); await g.waitForSelector('body[data-klar="ja"]'); // tilbage til dit hold med startvalget (testene herunder bygger på det)
 
   // Sortering på FIN: højeste afslutning øverst
   await tab('trup');
@@ -290,22 +297,28 @@ try {
   await g.selectOption('#team-select', '0');
   await g.selectOption('#team-select', '3'); // kampknappen findes også, mens man scouter
   await tab('liga');
-  const oppName = (await g.locator('#opponent-select option:checked').textContent()).trim();
   const nextFx = await g.locator('#next-round .fixture').allTextContents();
-  check('Liga før runde 1: næste rundes 4 kampe, din kamp mod den valgte modstander – ingen resultater endnu', nextFx.length === 4 && (await g.locator('#next-round .fixture.mine').textContent()).includes(oppName) && (await g.locator('#last-round').count()) === 0, nextFx.join(' | '));
+  const nx = await nextOf();
+  check('Liga før runde 1: programmets 4 kampe (samme retning), din kamp først – ingen resultater endnu', nextFx.length === 4
+    && JSON.stringify(nextFx.slice().sort()) === JSON.stringify(nx.fixtures.slice().sort()) && nextFx[0].includes(nx.me) && (await g.locator('#next-round .fixture.mine').textContent()).includes(nx.opp)
+    && (await g.locator('#last-round').count()) === 0 && (await g.locator('#my-schedule tr').count()) === 14 && (await g.locator('#my-schedule tr.next').count()) === 1, nextFx.join(' | '));
   check('Kamp-fanen før første runde: tom tilstand med vejledning', await (async () => { await tab('kamp'); return (await g.textContent('#no-matches')).includes('Spil runde'); })());
   await tab('trup');
   await g.click('#play-round');
   await g.waitForSelector('#match-center');
   check('▶ Spil runde åbner Kamp-fanen', (await g.textContent('#tabs .tab.active')).includes('Kamp'));
-  check('Under afspilning kan runden ikke startes igen, og modstanderen kan ikke skiftes', (await g.isDisabled('#play-round')) && (await g.isDisabled('#opponent-select')));
+  check('Under afspilning kan runden ikke startes igen', await g.isDisabled('#play-round'));
+  const played = await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.lastRound.matches.map((m) => `${m.homeName}–${m.awayName}`));
+  check('Det spillede er præcis de kampe, Liga-fanen viste før ▶ – samme retning og rækkefølge', JSON.stringify(played) === JSON.stringify(nextFx), played.join(' | '));
   check('Under afspilning: besked om at runden er bogført, og de andre resultater er skjulte', (await g.isVisible('#booked-note')) && !/\d-\d/.test(await g.locator('#match-cards .matchcard:nth-child(2)').textContent()));
   await tab('liga');
-  check('Under afspilning: Liga-fanen siger, at tabellen allerede er opdateret – og avisen og resultaterne venter', (await g.isVisible('#booked-league')) && (await g.locator('#gazette').count()) === 0 && (await g.locator('#last-round').count()) === 0 && (await g.locator('#stats').count()) === 0); // statistikken ville afsløre runden
+  check('Under afspilning: Liga-fanen siger, at tabellen allerede er opdateret – og avisen og resultaterne venter', (await g.isVisible('#booked-league')) && (await g.locator('#gazette').count()) === 0 && (await g.locator('#last-round').count()) === 0 && (await g.locator('#stats').count()) === 0 && (await g.locator('#schedule').count()) === 0); // statistikken og programmet ville afsløre runden
   await tab('kamp');
   await g.click('#skip');
   check('Runden har 4 kampe', (await g.locator('#match-cards .matchcard').count()) === 4);
   const mcText = await g.textContent('#match-center');
+  // Dit hold kan være hjemme eller ude (programmet) – karakterarkene står hjemme, ude.
+  const own = await g.evaluate(() => (JSON.parse(localStorage.getItem('tactivar_save')).league.lastRound.matches[0].ratings.home[0].isUserTeam ? 0 : 1));
   check('Referatet indeholder slutfløjt, statistik og karakterark', mcText.includes('SLUTFLØJT') && (await g.isVisible('#match-stats')) && (await g.locator('.ratings').count()) === 2);
   // v3.10.1: dødbolde og gule kort i statistikken til højre – tallene = kampens gemte statistik
   const statRows = await g.locator('#match-stats tbody tr').evaluateAll((trs) => trs.map((tr) => [...tr.children].map((c) => c.textContent)));
@@ -319,25 +332,25 @@ try {
   check('Referatet: ingen evnetal og ingen interne koder', !/\b(FIN|PAS|POS|INT|STA|STR|BAL|PAC)\s*[:=]?\s*\d/.test(feedText) && !/BALANCED|MID_BLOCK|HIGH_GEGENPRESS/.test(mcText));
   const score = (await g.textContent('#score')).trim();
   check('Resultattavlen svarer til slutfløjtet', mcText.includes(`${score.replace(' - ', ' - ')}`) && /\d+ - \d+/.test(score));
-  const oppRatings = await g.locator('.ratings').nth(1).locator('td.rating').allTextContents();
-  const ownRatings = await g.locator('.ratings').nth(0).locator('td.rating').allTextContents();
+  const oppRatings = await g.locator('.ratings').nth(1 - own).locator('td.rating').allTextContents();
+  const ownRatings = await g.locator('.ratings').nth(own).locator('td.rating').allTextContents();
   const starColors = await g.evaluate(() => { const s = document.querySelector('.ratings .star-on'), o = document.querySelector('.ratings .star-off'); return s && o ? [getComputedStyle(s).color, getComputedStyle(o).color] : null; });
   check('Stjerner er læsbare: udfyldte og tomme har forskellig farve', !!starColors && starColors[0] !== starColors[1], String(starColors));
   check('Karakterark: eget hold eksakte karakterer, modstander kun stjerner', ownRatings.every((t) => /^\d+\.\d$/.test(t)) && oppRatings.length >= 11 && oppRatings.every((t) => /^[★☆]{5}$/.test(t)));
   // Karakterark: opstillingsorden med plads efter navnet, minibane og ikon-forklaring
-  const ownRows = await g.locator('.ratings').nth(0).locator('tbody tr td:first-child').allTextContents();
+  const ownRows = await g.locator('.ratings').nth(own).locator('tbody tr td:first-child').allTextContents();
   check('Karakterark: plads efter navnet, målmanden først', ownRows.length >= 11 && /· GK$/.test(ownRows[0]) && ownRows.every((t) => / · \S/.test(t)), ownRows.slice(0, 3).join(' | '));
-  const mpOwn = await g.locator('.ratings').nth(0).locator('.mp-token .mp-val').allTextContents();
-  const mpOpp = await g.locator('.ratings').nth(1).locator('.mp-token .mp-val').allTextContents();
+  const mpOwn = await g.locator('.ratings').nth(own).locator('.mp-token .mp-val').allTextContents();
+  const mpOpp = await g.locator('.ratings').nth(1 - own).locator('.mp-token .mp-val').allTextContents();
   check('Minibane: 11 startere pr. hold – egne med karakter, modstanderens kun stjerner', mpOwn.length === 11 && mpOwn.every((t) => /^\d+\.\d$/.test(t)) && mpOpp.length === 11 && mpOpp.every((t) => /^[★☆]{5}$/.test(t)), `${mpOwn.length}/${mpOpp.length}`);
-  const runs = await g.locator('.ratings').nth(0).locator('td.run').allTextContents();
+  const runs = await g.locator('.ratings').nth(own).locator('td.run').allTextContents();
   const runExpect = await g.evaluate(() => { const m = JSON.parse(localStorage.getItem('tactivar_save')).league.lastRound.matches[0]; const own = [m.ratings.home, m.ratings.away].find((l) => l[0].isUserTeam); const e = own.find((x) => x.hiShare != null && x.distanceKm > 0); return `${e.distanceKm.toFixed(1)} km · ${Math.round(e.hiShare)} % HI`; });
   check('Karakterark: HI-andelen er spillerens afrundede tal', runs.some((t) => t.startsWith(runExpect)), runExpect);
-  check('Karakterark: dit hold har løbet distance og topfart, modstanderen ikke', runs.length >= 11 && runs.filter((t) => /^\d+\.\d km · \d+ % HI · \d+\.\d km\/t$/.test(t)).length >= 11 && (await g.locator('.ratings').nth(1).locator('td.run').count()) === 0, runs.slice(0, 2).join(' | '));
+  check('Karakterark: dit hold har løbet distance og topfart, modstanderen ikke', runs.length >= 11 && runs.filter((t) => /^\d+\.\d km · \d+ % HI · \d+\.\d km\/t$/.test(t)).length >= 11 && (await g.locator('.ratings').nth(1 - own).locator('td.run').count()) === 0, runs.slice(0, 2).join(' | '));
   // v3.9: "fri" (løb uden bold) kun for dit hold – og opsummeringen kun i din kamp
-  const fri = await g.locator('.ratings').nth(0).locator('td.fri').allTextContents();
+  const fri = await g.locator('.ratings').nth(own).locator('td.fri').allTextContents();
   const friExpect = await g.evaluate(() => { const m = JSON.parse(localStorage.getItem('tactivar_save')).league.lastRound.matches[0]; const own = [m.ratings.home, m.ratings.away].find((l) => l[0].isUserTeam); return own.filter((e) => e.freeRuns > 0).map((e) => `${e.freeRunsWon}/${e.freeRuns} fri`); });
-  check('Karakterark: "fri" for dit hold matcher de gemte løb, modstanderen har ingen kolonne', fri.length >= 11 && JSON.stringify(fri.filter(Boolean).sort()) === JSON.stringify([...friExpect].sort()) /* præcis de spillere med løb – ingen "0/0 fri" til resten; tilfældig liga: ca. hver 5. kamp uden løb, så står alle tomme (unit-testene dækker indholdet) */ && fri.every((t) => t === '' || /^\d+\/\d+ fri$/.test(t)) && (await g.locator('.ratings').nth(1).locator('td.fri').count()) === 0, `${fri.join(',')} / ${friExpect.join(',')}`);
+  check('Karakterark: "fri" for dit hold matcher de gemte løb, modstanderen har ingen kolonne', fri.length >= 11 && JSON.stringify(fri.filter(Boolean).sort()) === JSON.stringify([...friExpect].sort()) /* præcis de spillere med løb – ingen "0/0 fri" til resten; tilfældig liga: ca. hver 5. kamp uden løb, så står alle tomme (unit-testene dækker indholdet) */ && fri.every((t) => t === '' || /^\d+\/\d+ fri$/.test(t)) && (await g.locator('.ratings').nth(1 - own).locator('td.fri').count()) === 0, `${fri.join(',')} / ${friExpect.join(',')}`);
   const runSum = await g.textContent('#match-center');
   check('Fuldtids-analyse med løb uden bold i din kamp', /📊 \[90' FULDTIDS-ANALYSE\] \d+-\d+ til dig\. Du havde \d+% af bolden og \d+ afslutninger \(\d+ på mål\)\. Din opbygning kom igennem \d+ af \d+ gange; dit pres vandt bolden \d+ af \d+ gange\. Dødbolde: \d+ frispark i skudafstand, \d+ hjørnespark, \d+ straffe \(\d+ mål\) · frispark begået \d+, tilkendt \d+\. 🎯 Løb uden bold \(Normal\): \d+ løb, \d+ kom fri \(\d+ mål\) · kontraer imod i alt: \d+ \(\d+ mål\)\./.test(runSum), runSum.match(/🎯[^.]*\./)?.[0] ?? 'mangler');
   const gzText = await g.textContent('#gazette');
@@ -348,7 +361,7 @@ try {
   check('Ikon-forklaring under karakterarket (til touch)', ['⚽ Mål', '🅰 Oplæg', '🧤 Redninger', '👑 Kampens spiller'].every((x) => legendTxt.includes(x)), legendTxt);
   check('Forklaring af "fri" og HI (rigtig vej rundt: 2/3 = kom fri 2 af 3 gange)', legendTxt.includes('"2/3 fri" = løb uden bold: kom fri 2 af 3 gange') && legendTxt.includes('HI = andel højintenst løb') && legendTxt.endsWith('begge kun dit hold'), legendTxt);
   const por = await g.textContent('#player-of-round');
-  const porIsMine = (await g.locator('.ratings').nth(0).textContent()).includes(por.match(/#\d+ [^ ]+ [^ (]+/)[0]);
+  const porIsMine = (await g.locator('.ratings').nth(own).textContent()).includes(por.match(/#\d+ [^ ]+ [^ (]+/)[0]);
   check('Avisen kårer rundens spiller – med karakter kun hvis det er din spiller, ellers stjerner', porIsMine ? /karakter \d+\.\d/.test(por) : (/[★☆]{5}/.test(por) && !/karakter/.test(por)), por);
   const allEvents = await g.locator('#feed .ev').count();
   await g.click('#match-center .toolbar button:nth-child(3)');
@@ -376,24 +389,27 @@ try {
   check('Ligaens forløb: mål i alt = historikken', flow.startsWith(`${flowGoals} mål i 4 kampe`) && (await g.locator('#round-bars .round-bar').count()) === 1, flow);
   const res = await g.locator('#last-round .fixture').allTextContents();
   check('Liga: sidste rundes 4 resultater med link til referat', res.length === 4 && res.every((t) => /\d+-\d+/.test(t) && t.includes('Referat')), res.join(' | '));
-  check('Liga: næste runde er runde 2', (await g.textContent('#next-round h3')).includes('runde 2'));
+  check('Liga: næste runde er sæsonens runde 2 af 14', (await g.textContent('#next-round-title')).includes('runde 2 af 14'));
   // Resultater og parringer svarer præcist til det gemte spil (navne, retning, score, runde)
   const fromSave = await g.evaluate(async () => {
     const save = JSON.parse(localStorage.getItem('tactivar_save'));
-    const { pairRound } = await import('/engine/season.js');
-    const L = save.league, me = L.teams.find((t) => !t.isBot).name;
+    const L = save.league, me = L.teams.find((t) => !t.isBot).name, name = (id) => L.teams.find((t) => t.id === id).name;
     return { round: L.lastRound.round, me, results: L.lastRound.matches.map((m) => `${m.homeName}${m.homeGoals}-${m.awayGoals}${m.awayName}📺 Referat`),
-      next: pairRound(L, save.ui.opponentIdx).map(([a, b]) => `${L.teams[a].name}–${L.teams[b].name}`) };
+      next: L.schedule[1].map(([h, a]) => `${name(h)}–${name(a)}`) };
   });
   check('Liga: resultaterne er sidste rundes kampe med rigtig retning og score', JSON.stringify(res) === JSON.stringify(fromSave.results) && (await g.textContent('#last-round h3')).includes(`runde ${fromSave.round}`), `${res[0]} / ${fromSave.results[0]}`);
-  check('Liga: næste runde er de parringer, der faktisk spilles', JSON.stringify(await g.locator('#next-round .fixture').allTextContents()) === JSON.stringify(fromSave.next));
+  const shownNext = await g.locator('#next-round .fixture').allTextContents();
+  check('Liga: næste runde er programmets runde 2 (samme retning), din kamp først', JSON.stringify(shownNext.slice().sort()) === JSON.stringify(fromSave.next.slice().sort()) && shownNext[0].includes(fromSave.me), shownNext.join(' | '));
+  const myRow1 = await g.locator('#my-schedule tr').first().locator('td').allTextContents();
+  const myScore = await g.evaluate(() => { const L = JSON.parse(localStorage.getItem('tactivar_save')).league, m = L.lastRound.matches[0], home = m.ratings.home[0].isUserTeam; return home ? `${m.homeGoals}-${m.awayGoals}` : `${m.awayGoals}-${m.homeGoals}`; });
+  check('Dit program: runde 1 med din score først og H/U; runde 2 er markeret som næste', myRow1[0] === 'R1' && myRow1[3] === myScore && ['H', 'U'].includes(myRow1[1]) && (await g.locator('#my-schedule tr').nth(1).getAttribute('class')).includes('next'), myRow1.join('|'));
   const mineRes = await g.locator('#last-round .fixture.mine').allTextContents(), mineNext = await g.locator('#next-round .fixture.mine').allTextContents();
   check('Liga: præcis én kamp markeret som din – i begge lister', mineRes.length === 1 && mineRes[0].includes(fromSave.me) && mineNext.length === 1 && mineNext[0].includes(fromSave.me) && res.filter((t) => t.includes(fromSave.me)).length === 1);
   const third = await g.locator('#last-round .fixture').nth(2).locator('.fx-team').first().textContent();
   await g.locator('#last-round .fixture').nth(2).click();
   check('Klik på et resultat åbner netop den kamps referat i Kamp-fanen', (await g.textContent('#tabs .tab.active')).includes('Kamp') && (await g.locator('#match-cards .matchcard:nth-child(3).active').count()) === 1 && (await g.textContent('#scoreboard')).includes(third) && (await g.locator('#match-center .toolbar button:nth-child(1).active').count()) === 1);
   await tab('liga');
-  check('Ligatabellen er opdateret efter runde 1', stHead.includes('efter 1 runde'), stHead);
+  check('Ligatabellen er opdateret efter runde 1', stHead.includes('sæson 1, efter 1 af 14 runder'), stHead);
   await g.selectOption('#team-select', '2');
   // Spillerkortet viser sæsonens løb (km pr. 90 min og bedste topfart) for en spiller, der har spillet
   const card = await g.evaluate(() => { const t = JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((x) => !x.isBot); const p = t.squad.find((x) => x.minutesSum > 0 && x.hiDistSum > 0); return { nr: p.shirtNumber, km: (p.distanceSum / p.minutesSum * 90).toFixed(1), ts: p.topSpeedMax.toFixed(1), hi: Math.round(p.hiKmSum / p.hiDistSum * 100) }; });
@@ -407,7 +423,7 @@ try {
   await g.locator('#matrix tbody tr:nth-child(2) button').click();
   check('Påbegyndt byt viser besked', (await g.textContent('#notice')).includes('Vælg den spiller'));
   await reload();
-  check('Efter F5: runden er gemt', (await g.textContent('#play-round')).includes('runde 2'));
+  check('Efter F5: runden er gemt', (await g.textContent('#play-round')).includes('runde 2 af 14'));
   await tab('kamp');
   check('Kamp-fanen genviser seneste runde færdigspillet (ikke live)', (await g.isVisible('#match-center')) && (await g.locator('#skip').count()) === 0 && (await g.textContent('#match-center')).includes('runde 1'));
   const evAll = await g.locator('#feed .ev').count();
@@ -445,7 +461,7 @@ try {
   check('Genindlæst midt i afspilningen: Kamp-fanen viser runde 2 færdigspillet', (await g.textContent('#tabs .tab.active')).includes('Kamp') && (await g.textContent('#match-center')).includes('runde 2') && (await g.locator('#skip').count()) === 0);
   await tab('liga');
   const head2 = await g.textContent('#standings-title');
-  check('Genindlæst midt i afspilningen: runde 2 er alligevel bogført og gemt', head2.includes('efter 2 runde'), head2);
+  check('Genindlæst midt i afspilningen: runde 2 er alligevel bogført og gemt', head2.includes('efter 2 af 14 runder'), head2);
 
   // Avisen med faste data – begge grene, uafhængigt af tilfældighed
   const gaz = await g.evaluate(async () => {
@@ -477,15 +493,19 @@ try {
   await g.evaluate((f) => { for (const k of Object.keys(localStorage)) if (k.startsWith('tactivar_')) localStorage.removeItem(k); localStorage.setItem('tactivar_save', f); }, fixture);
   await reload();
   const migNotice = await g.textContent('#notice');
-  check('Migrering: beskeden forklarer puljen på 100, Superliga-højderne, friskheden og den naturlige position (alle trin fra skema 1 op) – og nævner backuppen', ['100 point', 'Superliga', 'Friskhed', 'Hvis-Så', 'naturlig position', 'backup'].every((x) => migNotice.includes(x)), migNotice);
+  check('Migrering: beskeden forklarer puljen på 100, Superliga-højderne, friskheden, den naturlige position og kampprogrammet (alle trin fra skema 1 op) – og nævner backuppen', ['100 point', 'Superliga', 'Friskhed', 'Hvis-Så', 'naturlig position', 'kampprogram', 'Sæson 1 (uden program)', 'backup'].every((x) => migNotice.includes(x)), migNotice);
   await reload(); await reload();
   const mig = await g.evaluate(() => ({ schema: JSON.parse(localStorage.getItem('tactivar_save')).schemaVersion, backups: Object.keys(localStorage).filter((k) => k.startsWith('tactivar_backup_')).length }));
-  check('Migrering: gemmes straks i skema 5, kun én backup trods tre genindlæsninger', mig.schema === 5 && mig.backups === 1, JSON.stringify(mig));
-  await tab('liga'); const migHead = await g.textContent('#standings-title'); await tab('trup');
-  check('Migrering: ligaen fra skema 1 er intakt (runde 1, 18 spillere)', migHead.includes('efter 1 runde') && (await rows()) === 18);
+  check('Migrering: gemmes straks i skema 6, kun én backup trods tre genindlæsninger', mig.schema === 6 && mig.backups === 1, JSON.stringify(mig));
+  await tab('liga'); const migHead = await g.textContent('#standings-title');
+  await g.click('#past-seasons > summary');
+  const past = await g.textContent('#past-seasons');
+  await tab('trup');
+  check('Migrering: ligaen fra skema 1 er intakt (18 spillere); runde 1 er arkiveret som sæson 1, og sæson 2 starter', migHead.includes('sæson 2, efter 0 af 14 runder') && past.includes('Sæson 1 (uden program) – runde 1–1') && (await rows()) === 18, `${migHead} / ${past.slice(0, 80)}`);
+  check('Migrering: ▶ spiller programmets runde 1 i sæson 2', (await g.textContent('#play-round')).startsWith('▶ Spil runde 1 af 14 mod '));
   // Runden er gemt før v3.5 (uden plads og startformation): Kamp-fanen viser den med listen, uden minibane
   await tab('kamp');
-  const oldRows = await g.locator('.ratings').nth(0).locator('tbody tr td:first-child').allTextContents();
+  const oldRows = await g.locator('.ratings').nth(own).locator('tbody tr td:first-child').allTextContents();
   check('Gammel runde uden plads: karakterark med gemt rolle, ingen minibane', (await g.isVisible('#match-center')) && (await g.locator('.minipitch').count()) === 0 && oldRows.length >= 11 && oldRows.every((t) => / · \S/.test(t) && !/undefined|null/.test(t)), oldRows.slice(0, 2).join(' | '));
   await tab('trup');
 
@@ -507,7 +527,7 @@ try {
   const nat = await g.locator('#matrix tbody tr td:nth-child(4)').allTextContents();
   check('Natur-kolonnen viser en position for alle 18 (MV/CB/Back/CM/Kant/OM/ANG)', nat.length === 18 && nat.every((t) => ['MV', 'CB', 'Back', 'CM', 'Kant', 'OM', 'ANG'].includes(t.trim())), nat.join(','));
   const pos4 = await g.evaluate(() => { const d = JSON.parse(localStorage.getItem('tactivar_save')); const ps = d.league.teams.flatMap((t) => t.squad); const m = (k) => { const x = ps.filter((p) => p.position === k).map((p) => p.heightCm); return x.reduce((a, b) => a + b) / x.length; }; return { schema: d.schemaVersion, cb: m('CB'), fb: m('FB') }; });
-  check('Migrering fra skema 4: gemt som skema 5, stoppere ≈190 og backs ≈176 cm', pos4.schema === 5 && pos4.cb >= 189 && pos4.cb <= 192 && pos4.fb >= 174.5 && pos4.fb <= 177.5, JSON.stringify(pos4));
+  check('Migrering fra skema 4: gemt som skema 6, stoppere ≈190 og backs ≈176 cm', pos4.schema === 6 && pos4.cb >= 189 && pos4.cb <= 192 && pos4.fb >= 174.5 && pos4.fb <= 177.5, JSON.stringify(pos4));
   await tab('kamp');
   const old4 = await g.textContent('#match-center');
   check('Gem fra v3.7.0: karakterark og avis uden "undefined"/"NaN" og uden HI-tal', !/undefined|NaN|% HI/.test(old4) && (await g.locator('.ratings td.run').count()) > 0, old4.slice(0, 120));
@@ -518,13 +538,14 @@ try {
   await g.locator('#matrix tbody tr').first().click();
   check('Gem fra v3.7.0: spillerkortet viser ikke 0 % højintenst, men at tallet kommer', (await g.textContent('#run-stats')).includes('højintenst: kommer efter næste kamp'));
 
-  // v3.10: et gem fra v3.9 (runde 2) – ingen migreringsbesked, statistikken starter tom fra runde 3
+  // v3.10: et gem fra v3.9 (runde 2) – kun v3.11's kampprogram-besked, statistikken starter tom fra runde 3
   const fixtureV39 = fs.readFileSync(new URL('../fixtures/save-v3.9.json', import.meta.url), 'utf8');
   await g.evaluate((f) => { for (const k of Object.keys(localStorage)) if (k.startsWith('tactivar_')) localStorage.removeItem(k); localStorage.setItem('tactivar_save', f); }, fixtureV39);
   await reload();
+  const v39note = await g.textContent('#notice'); // fanebyt fjerner beskeden
   await tab('liga');
   const v39secs = await g.locator('#stats details.stats-sec > summary').allTextContents();
-  check('Gem fra v3.9: ingen migreringsbesked; statistikken tæller fra runde 3 og er tom', (await g.locator('#notice').count()) === 0 && v39secs[0] === 'Spillere (fra runde 3)' && (await g.locator('#stats .stat-list[data-key="sGoals"]').textContent()).includes('Ingen endnu') && (await g.locator('#fejlboks').isHidden()), v39secs.join(' | '));
+  check('Gem fra v3.9: kun kampprogram-beskeden; statistikken tæller fra runde 3 og er tom', v39note.startsWith('Dit spil er opdateret: Nu spilles der efter et fast kampprogram') && !v39note.includes('naturlig position') && v39secs[0] === 'Spillere (fra runde 3)' && (await g.locator('#stats .stat-list[data-key="sGoals"]').textContent()).includes('Ingen endnu') && (await g.locator('#fejlboks').isHidden()), v39secs.join(' | '));
   await tab('trup');
 
   // Skema 3 (v3.6 – den version, de fleste kommer fra): beskeden handler om højder og friskhed

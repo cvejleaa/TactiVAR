@@ -89,6 +89,11 @@ export function renderGazette(g, myTeamId, onOpenMatch = null, matches = null) {
   const pr = g.playerOfTheRound ? viewRatingEntry(g.playerOfTheRound, g.playerOfTheRound.teamId === myTeamId) : null;
   const feats = pr ? [pr.goals ? `${pr.goals} mål` : '', pr.assists ? `${pr.assists} oplæg` : '', pr.saves ? `${pr.saves} redninger` : ''].filter(Boolean).join(' • ') : '';
   return h('div', { class: 'panel gazette', id: 'gazette' }, h('h3', {}, '📰 TactiVAR Avisen'),
+    // Sæsonslut (v3.11): mesteren og din placering står øverst.
+    g.seasonEnd ? h('p', { id: 'season-end', class: 'season-end' }, h('strong', {}, `🏆 Sæson ${g.seasonEnd.seasonNumber} er slut: `),
+      [g.seasonEnd.champion ? `${g.seasonEnd.champion.teamName} er mester med ${g.seasonEnd.champion.points} point.` : '', g.seasonEnd.myPos ? `Du sluttede nr. ${g.seasonEnd.myPos}.` : '',
+        g.seasonEnd.topScorer ? `Topscorer: #${g.seasonEnd.topScorer.shirtNumber} ${g.seasonEnd.topScorer.shortName} (${g.seasonEnd.topScorer.teamName}), ${g.seasonEnd.topScorer.goals} mål.` : '',
+        'En ny sæson starter med nulstillet tabel – se Tidligere sæsoner på Liga-fanen.'].filter(Boolean).join(' ')) : null,
     h('p', {}, `Runden bød på ${g.totalGoals} scoringer og ${g.totalVarChecks} VAR-tjek på tværs af de 4 stadions. ${g.myResult}`),
     pr ? h('p', { id: 'player-of-round' }, h('strong', { title: 'Bedste karakter i runden' }, '🏆 Rundens spiller: '), `#${pr.shirtNumber} ${pr.shortName} (${pr.teamName}) – `, 'rating' in pr ? `karakter ${pr.rating.toFixed(1)}` : starsEl(pr.stars), feats ? ` • ${feats}` : '') : null,
     g.headlines?.length ? h('ul', { class: 'headlines', id: 'headlines' }, g.headlines.map((x) => h('li', {}, x))) : null,

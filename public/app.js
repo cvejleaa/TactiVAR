@@ -13,7 +13,8 @@ import { renderPitch } from './ui/pitch.js';
 import { renderTactics } from './ui/tactics.js';
 import { renderStandings } from './ui/standings.js';
 import { playRound, commitRound, pairRound } from './engine/season.js';
-import { renderLastRound, renderNextRound } from './ui/rounds.js';
+import { seasonRoundOf } from './engine/schedule.js';
+import { renderLastRound, renderSchedule } from './ui/rounds.js';
 import { renderMatchCenter, renderGazette } from './ui/matchcenter.js';
 
 export const PLAYBACK_MS = 420;
@@ -48,7 +49,7 @@ const myIdx = () => game.league.teams.findIndex((t) => !t.isBot);
 const myTeam = () => game.league.teams[myIdx()];
 
 function newGame() {
-  return { league: createLeague(createRng(randomSeed())), notes: {}, ui: { activePresetIndex: 0, opponentIdx: 1 } };
+  return { league: createLeague(createRng(randomSeed())), notes: {}, ui: { activePresetIndex: 0 } };
 }
 
 function persist() {
@@ -95,6 +96,7 @@ function migrationNotice(from) {
     from <= 1 ? 'Hvis-Så-regler kan nu sættes til "Bagud/Foran med mindst N mål" og skifte til dine egne planer – "Foran med 1" gælder fra 1 mål og opefter.' : '',
     from <= 2 ? 'Mod-kunnen er sat ca. 45 % ned (alle hold): hver spiller har nu højst 100 point fordelt på de tre stilarter – lærer han noget nyt, glemmer han lidt af det gamle.' : '',
     from <= 3 ? 'Spillerhøjderne er rettet efter Superliga-målinger (ligasnit ca. 184 cm, 168–201 cm) – hver spiller beholder sin plads i højde-rækkefølgen i sin kæde, og luftduellerne er regnet om. Friskhed betyder nu noget: en kamp koster efter løbet distance, og en træt spiller yder mindre (50 % friskhed ≈ 12,5 % svagere).' : '',
+    from <= 5 ? 'Nu spilles der efter et fast kampprogram: 14 runder, hvor alle møder alle hjemme og ude – se det på Liga-fanen. Modstandervælgeren er væk; ▶ spiller altid programmets næste runde. Tabellen indtil nu er arkiveret som "Sæson 1 (uden program)" under Tidligere sæsoner, og en ny sæson starter med nulstillet tabel og sæsonstatistik (spillere og friskhed er uændrede). Clean sheets tælles kun for målmænd.' : '',
     from <= 4 ? 'Hver spiller har nu en naturlig position (kolonnen "Natur"), og højden følger Superliga-dokumentets tabel pr. position: midtstoppere og målmænd højere, backs og kanter lavere. Den højeste i hver position er stadig den højeste – i hver kæde blev de højeste til stoppere/angribere og de laveste til backs/kanter. Luftduellerne er regnet om. Løbene i kampen følger nu den plads, spilleren står på (CM løber længst, kanter og wingbacks har flest højintense løb) – sæsonens km og andel højintenst på spillerkortet blander indtil videre den gamle og den nye beregning.' : '',
   ].filter(Boolean).join(' ');
 }
@@ -132,15 +134,21 @@ const exportFile = () => download(exportGame(game), `tactivar-${new Date().toISO
 
 const time = (ms) => new Date(ms).toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
+// Din næste kamp efter programmet: sæsonens runde, modstander og hjemme/ude.
+function nextMatch() {
+  const L = game.league, mine = myIdx(), pair = pairRound(L).find((p) => p.includes(mine));
+  return { k: seasonRoundOf(L, L.leagueMetadata.round + 1), opp: L.teams[pair[0] === mine ? pair[1] : pair[0]], home: pair[0] === mine };
+}
+
 function renderControls() {
-  const teams = game.league.teams;
+  const teams = game.league.teams, next = nextMatch();
   controls.replaceChildren(...[
     select(String(view.viewTeamIdx), teams.map((t, i) => [String(i), (t.isBot ? '' : '★ ') + t.name]), (v) => showTeam(Number(v)), { id: 'team-select', title: 'Vælg hold at se' }),
     // Kampknapperne står i topbaren, så de findes i alle visninger (også når man scouter).
-    // Modstandervælgeren står ved ▶, fordi Mod-tallene og knappen begge gælder den valgte modstander.
-    h('button', { id: 'play-round', class: 'primary', disabled: !!mc?.playing, onclick: playNextRound }, `▶ Spil runde ${game.league.leagueMetadata.round + 1} mod`),
+    // Modstanderen følger programmet (v3.11); navnet ved siden af åbner hans trup til scouting.
+    h('button', { id: 'play-round', class: 'primary', disabled: !!mc?.playing, onclick: playNextRound }, `▶ Spil runde ${next.k} af ${game.league.schedule.length} mod ${next.opp.name} (${next.home ? 'hjemme' : 'ude'})`),
+    h('button', { id: 'next-opponent', class: 'mini', title: `Scout ${next.opp.name}`, onclick: () => { game.ui.tab = 'trup'; persist(); showTeam(teams.indexOf(next.opp)); } }, `🔍 ${next.opp.name}`),
     tiredStarters() ? h('span', { class: 'tired', id: 'tired-warning', title: 'Startere under 70 % friskhed – trætte spillere yder mindre (50 % ≈ 12,5 % svagere). Overvej at rotere i Trup' }, `⚠ ${tiredStarters()} trætte startere`) : null,
-    select(String(game.ui.opponentIdx), teams.map((t, i) => [String(i), t.name]).filter(([i]) => Number(i) !== myIdx()), (v) => change(() => { game.ui.opponentIdx = Number(v); }), { id: 'opponent-select', title: 'Næste modstander', disabled: !!mc?.playing }),
     h('span', { class: 'savestatus' + (view.saveError ? ' failed' : ''), id: 'save-status' }, view.saveError ? '⚠ IKKE gemt' : view.savedAt ? `✔ Gemt kl. ${time(view.savedAt)}` : 'Ikke gemt'),
     h('button', { id: 'save-now', onclick: () => { persist(); render(); } }, '💾 Gem nu'),
     h('button', { id: 'export', onclick: exportFile }, '⬇ Eksportér'),
@@ -157,7 +165,6 @@ function render() {
   const league = game.league;
   const team = league.teams[view.viewTeamIdx];
   const isOwn = !team.isBot;
-  const opponent = league.teams[game.ui.opponentIdx] || league.teams[1];
   const selected = team.squad.find((p) => p.id === view.selectedPlayerId) || null;
   const mine = myTeam();
   renderControls();
@@ -167,7 +174,7 @@ function render() {
     h('div', { class: 'right' }, h('div', { class: 'muted' }, 'Klubkasse'), h('strong', {}, isOwn ? kr(team.cashBalance) : '🔒 Skjult')));
 
   const matrix = renderMatrix({
-    team, isOwn, opponent, ui: { ...view, swapId: view.pitchSwapId }, notes: game.notes,
+    team, isOwn, ui: { ...view, swapId: view.pitchSwapId }, notes: game.notes,
     onSort: (c) => { if (view.sortCol === c.key) view.sortDesc = !view.sortDesc; else { view.sortCol = c.key; view.sortDesc = !!c.num; } clearSwap(); view.notice = ''; render(); },
     onBlocked: (c) => { view.notice = `🔒 Anti-spionage: du kan ikke sortere ${team.name} på "${c.label}" – det er skjult information.`; render(); },
     onSelect: (p) => { view.selectedPlayerId = p.id; render(); },
@@ -179,7 +186,7 @@ function render() {
     },
   });
 
-  const card = renderCard({ player: selected, team, isOwn, opponent, scouting: league.scouting[mine.id]?.[selected?.id], note: selected ? game.notes[selected.id] : '',
+  const card = renderCard({ player: selected, team, isOwn, scouting: league.scouting[mine.id]?.[selected?.id], note: selected ? game.notes[selected.id] : '',
     onNote: (v) => { game.notes[selected.id] = v; persist(); renderControls(); } });
 
   const pitch = h('div', { class: 'panel' }, h('h3', {}, `Taktiktavle – ${team.tactics.baseFormation}`),
@@ -212,12 +219,13 @@ function render() {
     trup: () => [header, matrix, h('div', { class: 'tactics-layout lineup-layout' }, h('section', {}, pitch), h('section', {}, card))],
     // Kortet står også i Taktik, så et klik på en brik viser spilleren uden fanebyt.
     taktik: () => [h('div', { class: 'tactics-layout' }, h('section', {}, pitch), h('section', {}, card, tactics))],
-    kamp: () => [shown ? renderMatchCenter({ mc: shown, myTeamId: mine.id, on: mcHandlers }) : h('div', { class: 'panel empty', id: 'no-matches' }, 'Ingen kampe spillet endnu. Vælg modstander i topbaren og tryk ▶ Spil runde.')],
+    kamp: () => [shown ? renderMatchCenter({ mc: shown, myTeamId: mine.id, on: mcHandlers }) : h('div', { class: 'panel empty', id: 'no-matches' }, 'Ingen kampe spillet endnu. Tryk ▶ Spil runde i topbaren – modstanderen følger kampprogrammet på Liga-fanen.')],
     liga: () => [mc?.playing ? h('div', { class: 'notice', id: 'booked-league' }, '📺 Runden spilles i Kamp-fanen – tabellen herunder er allerede opdateret med den.') : null,
       standings,
       // Resultaterne skjules under afspilningen, ligesom avisen (ellers afsløres de).
       league.lastRound && !mc?.playing ? renderLastRound({ round: league.lastRound, myTeamId: mine.id, onOpen: openReport }) : null,
-      renderNextRound({ league, pairs: pairRound(league, game.ui.opponentIdx), myTeamId: mine.id }),
+      // Programmet skjules også under afspilningen (det viser den bogførte rundes resultat).
+      !mc?.playing ? renderSchedule({ league, pairs: pairRound(league), myTeamId: mine.id }) : null,
       league.lastRound && !mc?.playing ? renderGazette(league.lastRound.gazette, mine.id, openGoal, league.lastRound.matches) : null,
       // Statistikken skjules også under afspilningen (den er bogført og ville afsløre runden).
       !mc?.playing ? renderStats({ league, myTeamId: mine.id }) : null],
@@ -253,7 +261,7 @@ function renderBench(team) {
 function playNextRound() {
   clearSwap(); view.notice = '';
   const rng = createRng(randomSeed());
-  const result = playRound(game.league, game.ui.opponentIdx, rng);
+  const result = playRound(game.league, rng);
   commitRound(game.league, result, rng);
   game.ui.tab = 'kamp'; // gemmes med runden, så F5 midt i afspilningen lander i Kamp
   persist();

@@ -2,6 +2,7 @@
 import { initialCounterTactics } from './counter.js';
 import { TEAM_STAT_DEFAULTS, PLAYER_SEASON_DEFAULTS } from './stats.js';
 import { generateScoutingClues } from './clues.js';
+import { buildSchedule, shuffledIds } from './schedule.js';
 
 export const TEAM_NAMES = ['Bibamus United', 'FC Vejleå', 'Ølstykke IF', 'Lyngby Tacticians', 'Nordkysten BK', 'Furesø Boldklub', 'Roskilde Rovers', 'Kronborg United'];
 
@@ -242,6 +243,8 @@ export function createLeague(rng) {
   return {
     leagueMetadata: { id: 'league_div_1', name: 'TactiVAR Superligaen', seasonNumber: 1, footballYear: 1, round: 0, standings: teams.map(emptyStanding) },
     statsFromRound: 1, history: [],
+    // Kampprogram (v3.11): sæsonen starter i runde 1; seasons er arkivet over afsluttede sæsoner.
+    schedule: buildSchedule(shuffledIds(teams)), seasonStartRound: 1, seasons: [],
     teams,
     scouting,
     lastRound: null,

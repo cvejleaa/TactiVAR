@@ -8,7 +8,7 @@ import { initialCounterTactics, opponentTacticKeys, masteryVs, counterXpForMatch
 import { starsFromRating, createSheet, finalizeSheet } from '../../public/engine/ratings.js';
 import { describeFinish, describeHeader, describeVarTiming, generateScoutingClues } from '../../public/engine/clues.js';
 import { simulateMatch, MAX_SUBS } from '../../public/engine/match.js';
-import { playRound, commitRound, pairRound, SCOUTING_PER_PLAYER } from '../../public/engine/season.js';
+import { playPairs, fixedPairs, commitRound, SCOUTING_PER_PLAYER } from '../../public/engine/season.js';
 import { normalizeLeague } from '../../public/engine/sanitize.js';
 
 const league = (seed = 1) => createLeague(createRng(seed));
@@ -340,17 +340,11 @@ test('andre holds taktiske overvejelser kan ikke læses – kun deres startforma
 });
 
 // ---------- Runder ----------
-test('parring: dit hold mod valgt modstander, alle 8 hold spiller én gang', () => {
-  const pairs = pairRound(league(), 3);
-  assert.deepEqual(pairs[0], [0, 3]);
-  assert.deepEqual(pairs.flat().sort(), [0, 1, 2, 3, 4, 5, 6, 7]);
-});
-
 test('runde bogføres: stilling, karakterer, skader heles først og nye lægges på bagefter', () => {
   const L = league(12), rng = createRng(5);
   const pre = L.teams[2].squad[16]; // bænkspiller med eksisterende 1-kamps skade
   pre.injuryMatchesLeft = 1;
-  const res = playRound(L, 1, rng);
+  const res = playPairs(L, fixedPairs(L, 1), rng);
   commitRound(L, res, rng);
   assert.equal(pre.injuryMatchesLeft, 0);
   const st = L.leagueMetadata.standings;
@@ -369,7 +363,7 @@ test('runde bogføres: stilling, karakterer, skader heles først og nye lægges 
 
 test('scoutingbogen holder højst 20 indtryk pr. spiller, nyeste først', () => {
   const L = league(18), rng = createRng(3);
-  for (let r = 0; r < 80; r++) commitRound(L, playRound(L, 1 + (r % 7), rng), rng); // 80 runder: nok indtryk til loftet
+  for (let r = 0; r < 80; r++) commitRound(L, playPairs(L, fixedPairs(L, 1 + (r % 7)), rng), rng); // 80 runder: nok indtryk til loftet
   const lists = Object.values(L.scouting[L.teams[0].id]);
   assert.equal(SCOUTING_PER_PLAYER, 20);
   assert.ok(lists.some((l) => l.length === 20), 'testdata skal ramme loftet');
@@ -380,19 +374,19 @@ test('scoutingbogen holder højst 20 indtryk pr. spiller, nyeste først', () => 
 
 test('en runde kan ikke bogføres to gange', () => {
   const L = league(17), rng = createRng(1);
-  const res = playRound(L, 1, rng);
+  const res = playPairs(L, fixedPairs(L, 1), rng);
   commitRound(L, res, rng);
   const snapshot = JSON.stringify(L.leagueMetadata.standings);
   assert.throws(() => commitRound(L, res, rng), /Runde 1 kan ikke bogføres/);
   assert.equal(JSON.stringify(L.leagueMetadata.standings), snapshot);
-  assert.equal(playRound(L, 2, rng).round, 2);
+  assert.equal(playPairs(L, fixedPairs(L, 2), rng).round, 2);
 });
 
 test('ny skade i runden bevarer sin fulde længde (rettet v2.5b-fejl)', () => {
   const L = league(13), rng = createRng(6);
   let checked = 0;
   for (let r = 0; r < 15 && checked < 3; r++) {
-    const res = playRound(L, 1 + (r % 7), rng);
+    const res = playPairs(L, fixedPairs(L, 1 + (r % 7)), rng);
     commitRound(L, res, rng);
     for (const m of res.matches) for (const inj of m.injuries) {
       const p = L.teams.flatMap((t) => t.squad).find((x) => x.id === inj.playerId);
@@ -404,7 +398,7 @@ test('ny skade i runden bevarer sin fulde længde (rettet v2.5b-fejl)', () => {
 
 test('observationer lægges hos observatøren med runde-stempel, ikke på spilleren', () => {
   const L = league(14), rng = createRng(7);
-  const res = playRound(L, 2, rng);
+  const res = playPairs(L, fixedPairs(L, 2), rng);
   commitRound(L, res, rng);
   const obs = res.matches.flatMap((m) => m.observations);
   assert.ok(obs.length > 0);
