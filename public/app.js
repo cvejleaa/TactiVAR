@@ -54,7 +54,7 @@ function newGame() {
 
 // Nyt i en version, der ikke ændrer gemme-formatet (vises én gang, ved første indlæsning).
 const NEWS = {
-  '3.12.0': 'Nyt i kampene: angrebsfokus bestemmer nu, hvordan chancerne kommer – "Lave cutbacks" giver rigtige cutbacks fra baglinjen, "Høje indlæg" indlæg til den, der står i feltet. "Direkte lange bolde" tvinger ikke længere chancerne op i luften. Luftduellerne er regnet om: dine hovedstødsspillere kan nu vinde dem, og et vundet hovedstød kan stadig reddes. Forsvaret har en modgift: lav blok mod indlæg, højt gegenpres mod cutbacks. Fuldtids-analysen viser dit angreb og dit felt.',
+  '3.12.0': 'Nyt i kampene: Angrebsfokus bestemmer nu, hvordan chancerne kommer – "Lave cutbacks" giver rigtige cutbacks fra baglinjen, og "Direkte lange bolde" tvinger ikke længere chancerne op i luften. Bolden går til den, der står nærmest, hvor den spilles hen (også dine trukne positioner). Dine hovedstødsspillere kan nu vinde luftduellerne. Modgift: lav blok mod indlæg, højt gegenpres mod cutbacks. Se dit angreb og dit felt i fuldtids-analysen.',
 };
 
 // Et migreret spil, hvis gamle fil ikke kunne tages backup af (fuldt lager): den gamle fil må

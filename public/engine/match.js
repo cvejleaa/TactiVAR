@@ -72,9 +72,9 @@ export const FOCUS_SHARE = { HIGH_CROSSES: 0.52, LOW_CUTBACKS: 0.38, LONG_BALL: 
 // fart (CROSS_EDGE); 2) hovedstødet mod keeperen (HEADER_GK_EDGE).
 // En clearet høj bold eller en lukket kant giver hjørnespark med CROSS_CORNER_P (en redning: CORNER_P).
 export const CROSS_CORNER_P = 0.35;
-export const CROSS_EDGE = 1, HEADER_GK_EDGE = 1.5;
+export const CROSS_EDGE = 1, HEADER_GK_EDGE = 0;
 // Cutback (v3.12): kantspilleren mod backen; vundet → lagt lavt tilbage til en fri afslutter.
-export const CUTBACK_FINISH_BONUS = 3.5, CUTBACK_DEF_EDGE = -2;
+export const CUTBACK_FINISH_BONUS = 5, CUTBACK_DEF_EDGE = -2;
 // Modgiften (v3.12, Spilføreren): lav blok fylder feltet (stærk mod indlæg, men pladsen ved
 // straffesparkspletten står åben); højt gegenpres lukker kanten, før den når baglinjen.
 export const BOX_BONUS = { LOW_BLOCK: 1, MID_BLOCK: 0, HIGH_GEGENPRESS: 0 };    // CB'en i luftduellen (åbent spil)
@@ -83,8 +83,8 @@ export const FLANK_BONUS = { LOW_BLOCK: -2, MID_BLOCK: 0, HIGH_GEGENPRESS: 3 }; 
 // hen"): spillerne bevæger sig ikke live – hver står på sin (evt. trukne) plads, og vægten er
 // exp(−afstand/RECEIVE_SPREAD)·evne, så den nærmeste oftest, men ikke altid, når bolden.
 // Pladserne er i holdets egne koordinater (lille y = fremme ved modstanderens mål).
-export const RECEIVE_SPREAD = 12;
-export const SPOT = { CROSS: { x: 50, y: 16 }, CUTBACK: { x: 50, y: 28 }, GOAL: { x: 50, y: 10 } };
+export const RECEIVE_SPREAD = 16, RECEIVE_BASE = 10;
+export const SPOT = { CROSS: { x: 50, y: 16 }, CUTBACK: { x: 50, y: 28 }, GOAL: { x: 50, y: 20 } };
 const FOCUS_LABEL = { CENTRAL: 'Centralt', HIGH_CROSSES: 'Høje indlæg', LOW_CUTBACKS: 'Lave cutbacks' };
 const PASS_LABEL = { SHORT: 'korte pasninger', BALANCED: 'balanceret', DIRECT_LONG: 'direkte lange bolde' };
 // Zonen er der, løbet ender: formationens (eller den trukne) plads rykket 20 frem.
@@ -176,6 +176,15 @@ const avg = (arr, f) => arr.reduce((a, p) => a + f(p), 0) / Math.max(1, arr.leng
 
 const endOf = (s) => ({ formation: s.tactics.baseFormation, starters: s.starters.map((p) => p.id), customCoords: structuredClone(s.tactics.customCoords), phases: structuredClone(s.tactics.phases) });
 
+// Fuldtids-analysens angrebsdel (QC v3.12): kun de dele, dine valg (eller kampen) gav – ellers
+// stod der "0 cutbacks, 0 høje bolde" til et centralt hold. Cutbacks fra løb på kanten tæller med.
+function attackLine(d, ph) {
+  const parts = [];
+  if (ph.attackFocus === 'LOW_CUTBACKS' || d.cutbacks) parts.push(`${d.cutbacks} cutbacks (${d.cutbackGoals} mål, ${d.cutbacksBlocked} stoppet ved kanten)`);
+  if (ph.attackFocus === 'HIGH_CROSSES' || ph.passingStyle === 'DIRECT_LONG' || d.crosses) parts.push(`${d.crosses} høje bolde (${d.crossesWon} vundne luftdueller, ${d.headerGoals} hovedstødsmål)`);
+  return parts.length ? parts.join(', ') : 'ingen cutbacks eller høje bolde';
+}
+
 export function simulateMatch(home, away, rng, opts = {}) {
   const events = [];
   const lineupNotes = [];
@@ -208,7 +217,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // Modtageren: spilleren nær det sted, bolden spilles hen (se RECEIVE_SPREAD). exclude = afleveren.
   function receiver(side, spot, skill, exclude = null) {
     const cand = side.starters.map((p, i) => ({ p, i })).filter(({ p, i }) => i > 0 && p && p !== exclude);
-    const w = cand.map(({ p, i }) => { const pos = slotPosition(side.tactics, i); return Math.exp(-Math.hypot(pos.x - spot.x, pos.y - spot.y) / RECEIVE_SPREAD) * Math.max(0.5, skill(p)); });
+    const w = cand.map(({ p, i }) => { const pos = slotPosition(side.tactics, i); return Math.exp(-Math.hypot(pos.x - spot.x, pos.y - spot.y) / RECEIVE_SPREAD) * (RECEIVE_BASE + Math.max(0, skill(p))); });
     let r = rng.next() * w.reduce((a, b) => a + b, 0);
     return (cand[w.findIndex((x) => (r -= x) < 0)] ?? cand.at(-1)).p;
   }
@@ -713,7 +722,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
       + ` 🎯 Løb uden bold (${RUNS_LABEL[runs]}): ${d.runs} løb, ${d.runsWon} kom fri (${d.runGoals} mål) · kontraer imod i alt: ${d.countersAgainst} (${d.counterGoalsAgainst} mål).`
       // v3.12 (brugeren: "ikke en eneste reference til cutbacks"): dit angreb efter dine valg og
       // dit felt – modstanderens indstilling navngives ikke, kun hvad dit forsvar mødte.
-      + ` ⚔️ Angreb (${FOCUS_LABEL[ph.attackFocus] ?? ph.attackFocus} · ${PASS_LABEL[ph.passingStyle] ?? ph.passingStyle}): ${d.cutbacks} cutbacks (${d.cutbackGoals} mål, ${d.cutbacksBlocked} stoppet ved kanten), ${d.crosses} høje bolde (${d.crossesWon} vundne luftdueller, ${d.headerGoals} hovedstødsmål).`
+      + ` ⚔️ Angreb (${FOCUS_LABEL[ph.attackFocus] ?? ph.attackFocus} · ${PASS_LABEL[ph.passingStyle] ?? ph.passingStyle}): ${attackLine(d, ph)}.`
       + ` 🛡️ Dit felt: modstanderens cutbacks stoppet ${o.cutbacksBlocked} af ${o.cutbacks}, luftdueller vundet ${o.crosses - o.crossesWon} af ${o.crosses}.`);
   }
   const ratings = finalizeSheet(sheet, hG, aG, rng, counterXpForMatch);
