@@ -65,21 +65,21 @@ function aer({ shAir, cbAir = 10, gk = 10, press = 'MID_BLOCK', shFresh = 100, g
   const m = simulateMatch(a.H, a.A, stubRng({ 0.3: shots(2), ...(focus === 'HIGH_CROSSES' ? { 0.52: true } : { 0.15: true }), ...script }));
   return { a, m, d: m.duelLog[a.H.id] };
 }
-test('hovedstødet mod keeperen (trin 2): 11,25 reddes (15,25 < 15,5), 11,5 er uafgjort og reddes, 11,75 scorer – HEADER_GK_EDGE præcis 1,5 (dræber =1, =2, >=)', () => {
-  // Trin 1: luft + 3 + CROSS_EDGE 1 > CB 10 + 3. Trin 2: luft + 4 > MV 10 + 4 + 1,5. Hele tal kan ikke skelne 1 fra 1,5.
+test('hovedstødet mod keeperen (trin 2): 9,75 reddes (13,75 < 14), 10 er uafgjort og reddes, 10,25 scorer – HEADER_GK_EDGE præcis 0 (dræber 0,5, −0,5, >=)', () => {
+  // Trin 1: luft + 3 + CROSS_EDGE 1 > CB 10 + 3. Trin 2: luft + 4 > MV 10 + 4 + 0 (QC-kalibreringen; før 1,5).
   const saved = (v) => { const r = aer({ shAir: v }); return [r.m.homeGoals, count(r.m, 'Hovedstød reddet'), r.m.stats.hOnTarget, r.d.crossesWon]; };
-  assert.deepEqual(saved(11.25), [0, 2, 2, 2]);
-  assert.deepEqual(saved(11.5), [0, 2, 2, 2], 'uafgjort (15,5 = 15,5) er en redning');
-  assert.deepEqual(saved(11.75), [2, 0, 2, 2]);
+  assert.deepEqual(saved(9.75), [0, 2, 2, 2]);
+  assert.deepEqual(saved(10), [0, 2, 2, 2], 'uafgjort (14 = 14) er en redning');
+  assert.deepEqual(saved(10.25), [2, 0, 2, 2]);
 });
 test('friskhed i trin 2: skyttens og målmandens friskhed tæller i hovedstødet mod keeperen (dræber fjernet fresh på skytte/MV i trin 2)', () => {
-  // Skytte 12 frisk: 16 > 15,5 → mål. Skytte 12 ved 50 % (·0,875 = 10,5): trin 1 14,5 > 13 vinder, trin 2 14,5 < 15,5 → redning.
-  assert.equal(aer({ shAir: 12 }).m.homeGoals, 2);
-  const tired = aer({ shAir: 12, shFresh: 50 });
+  // Skytte 11 frisk: 15 > 14 → mål. Skytte 11 ved 50 % (·0,875 = 9,625): trin 1 13,625 > 13 vinder, trin 2 13,625 < 14 → redning.
+  assert.equal(aer({ shAir: 11 }).m.homeGoals, 2);
+  const tired = aer({ shAir: 11, shFresh: 50 });
   assert.deepEqual([tired.m.homeGoals, count(tired.m, 'Hovedstød reddet'), tired.d.crossesWon], [0, 2, 2]);
-  // MV 10 frisk: 15 < 15,5 → redning. MV ved 50 % (8,75 + 5,5 = 14,25 < 15) → mål.
-  assert.equal(aer({ shAir: 11 }).m.homeGoals, 0);
-  assert.equal(aer({ shAir: 11, gkFresh: 50 }).m.homeGoals, 2);
+  // MV 10 frisk: 14 = 14 → redning. MV ved 50 % (8,75 + 4 = 12,75 < 14) → mål.
+  assert.equal(aer({ shAir: 10 }).m.homeGoals, 0);
+  assert.equal(aer({ shAir: 10, gkFresh: 50 }).m.homeGoals, 2);
 });
 test('lav blok: CB\'en får præcis +1 i åbent spil (10,01 vinder mod lav blok 14,01 > 14, ikke mod 2) – BOX_BONUS dræber LOW_BLOCK=2', () => {
   assert.equal(aer({ shAir: 10.01, press: 'LOW_BLOCK', gk: 1 }).d.crossesWon, 2);
@@ -88,7 +88,7 @@ test('lav blok: CB\'en får præcis +1 i åbent spil (10,01 vinder mod lav blok 
 });
 test('et reddet hovedstød giver hjørne med CORNER_P 0,9 (ikke 0,35); en clearet bold med 0,35 – og en vundet duel som mål giver intet', () => {
   const corners = (shAir, script) => aer({ shAir, script }).m.stats.hCorners;
-  assert.equal(corners(11.25, { 0.9: true }), 2); assert.equal(corners(11.25, { 0.35: true }), 0);     // reddet
+  assert.equal(corners(9.75, { 0.9: true }), 2); assert.equal(corners(9.75, { 0.35: true }), 0);       // reddet
   assert.equal(corners(9, { 0.35: true }), 2); assert.equal(corners(9, { 0.9: true }), 0);              // clearet (9 + 4 = 13 ≤ 13)
   assert.equal(corners(12, { 0.9: true, 0.35: true }), 0);                                               // mål
 });
@@ -101,7 +101,7 @@ test('luftduel-tekster: dit hold nævner kilden (Dit indlæg / Din lange bold), 
     const b = clr({ ...o });
     assert.ok(b.length === 2 && b.every((e) => /^✈️ \[.+ forsvar\] Stærk luftduel: #\d+ /.test(e.text) && !/Dit indlæg|Din lange|Dit |Din /.test(e.text)), b[0]?.text);
   }
-  const sv = aer({ shAir: 11.25 }).m.events.filter((e) => e.label === 'Hovedstød reddet');
+  const sv = aer({ shAir: 9.75 }).m.events.filter((e) => e.label === 'Hovedstød reddet');
   assert.ok(sv.length === 2 && sv.every((e) => e.isHome === false && /^🧤 \[.+\] #\d+ .+ redder hovedstødet fra #\d+ .+ \(.+, \d+ cm\), der vandt luftduellen\.$/.test(e.text)), sv[0]?.text);
 });
 test('dødbold-hovedstød tæller ikke som åbent spil i duelLog (headerGoals/crosses/crossesWon forbliver 0)', () => {
@@ -157,7 +157,7 @@ test('indlægget slås fra kanten (88,30) af den bedste afleverer, aldrig af hov
   assert.equal(pas.assistOf(8), 2);
   // Samme spiller er både hovedstødsspiller og bedste afleverer: indlægget slås af en anden (exclude)
   const same = run((a) => {
-    Object.assign(slot(a.H, 8), { aerialPower: 30 }); slot(a.H, 8).skills.passing = 40; slot(a.H, 10).skills.passing = 10;
+    Object.assign(slot(a.H, 8), { aerialPower: 30 }); slot(a.H, 8).skills.passing = 60; slot(a.H, 10).skills.passing = 40;   // vægt 10 + evne (QC-kalibreringen)
     a.H.tactics.customCoords = { 8: { x: 50, y: 16 } };
   });
   assert.ok(same.scorerIs(8)); assert.equal(same.assistOf(8), 0); assert.equal(same.assistOf(10), 2);
@@ -309,7 +309,7 @@ test('fuldtids-analysen: dit angreb (forsøg/mål/stoppet, høje bolde/vundne/ho
   // Samme kamp set fra forsvarets side: en bot angriber dig. Du har ikke selv noget angreb (Centralt · balanceret).
   const def = mixedMatch({ meIsAttacker: false });
   assert.equal(def.ft.isHome, false);
-  assert.ok(def.ft.text.endsWith(' ⚔️ Angreb (Centralt · balanceret): 0 cutbacks (0 mål, 0 stoppet ved kanten), 0 høje bolde (0 vundne luftdueller, 0 hovedstødsmål). 🛡️ Dit felt: modstanderens cutbacks stoppet 1 af 4, luftdueller vundet 1 af 3.'), def.ft.text);
+  assert.ok(def.ft.text.endsWith(' ⚔️ Angreb (Centralt · balanceret): ingen cutbacks eller høje bolde. 🛡️ Dit felt: modstanderens cutbacks stoppet 1 af 4, luftdueller vundet 1 af 3.'), def.ft.text);
 });
 test('fuldtids-analysen nævner alle ni kombinationer af fokus og pasningsstil med de rigtige danske navne', () => {
   const F = { CENTRAL: 'Centralt', HIGH_CROSSES: 'Høje indlæg', LOW_CUTBACKS: 'Lave cutbacks' };
