@@ -149,3 +149,9 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .my-schedule tr.next { outline: 2px solid var(--grøn); }
 .my-schedule tr.won .st-val { color: var(--grøn); } .my-schedule tr.lost .st-val { color: #f87171; }
 .past-table { margin: .2rem 0 .8rem 1.2rem; } .past-table li.mine, .season-end { color: var(--grøn); }
+/* Øjebliksbillede ved mål (v3.12.1) */
+.snap-btn { margin-left: .35rem; padding: 0 .3rem; }
+.ev.snapped { outline: 2px solid var(--grøn); }
+.mp-token.scorer .mp-val { border-color: var(--grøn); box-shadow: 0 0 0 2px #22c55e88; }
+.mp-token.assist .mp-val { border-color: #60a5fa; }
+.mp-ball { position: absolute; transform: translate(-50%, -50%); color: #fff; font-size: .9rem; text-shadow: 0 0 3px #000; pointer-events: none; }

@@ -368,6 +368,40 @@ try {
   const por = await g.textContent('#player-of-round');
   const porIsMine = (await g.locator('.ratings').nth(own).textContent()).includes(por.match(/#\d+ [^ ]+ [^ (]+/)[0]);
   check('Avisen kårer rundens spiller – med karakter kun hvis det er din spiller, ellers stjerner', porIsMine ? /karakter \d+\.\d/.test(por) : (/[★☆]{5}/.test(por) && !/karakter/.test(por)), por);
+  // v3.12.1: 📍 ved mål i åbent spil viser dit holds positioner i øjeblikket på minibanen
+  const snapSaved = await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.lastRound.matches[0].events.filter((e) => e.snapshot).length);
+  const pins = await g.locator('#feed .snap-btn').count();
+  check('📍 står ved præcis de mål, der har et gemt øjebliksbillede', pins === snapSaved, `${pins} / ${snapSaved}`);
+  if (pins > 0) {
+    const before = await g.locator('.ratings').nth(own).locator('.mp-token').evaluateAll((ts) => ts.map((t) => t.style.left + ',' + t.style.top).join('|'));
+    await g.locator('#feed .snap-btn').first().click();
+    const after = await g.locator('#snap-pitch .mp-token').evaluateAll((ts) => ts.map((t) => t.style.left + ',' + t.style.top).join('|'));
+    check('Klik på 📍: minibanen viser øjebliksbilledet (11 brikker, bolden, flyttet fra startpladserne)', (await g.locator('#snap-pitch .mp-token').count()) === 11 && (await g.locator('#snap-ball').count()) === 1 && after !== before && (await g.locator('#feed .ev.snapped').count()) === 1, after.slice(0, 80));
+    await g.click('#snap-back');
+    check('↩ Startopstilling går tilbage til minibanen fra kampstart', (await g.locator('#snap-pitch').count()) === 0 && (await g.locator('.ratings').nth(own).locator('.mp-token').count()) === 11);
+  }
+  // Med faste data: dit mål (scorer og oplæg markeret) og et mål imod (kun dit forsvar) – uafhængigt af tilfældighed
+  const snapT = await g.evaluate(async () => {
+    const { renderMatchCenter } = await import('/ui/matchcenter.js');
+    const { createLeague } = await import('/engine/generator.js');
+    const { simulateMatch } = await import('/engine/match.js');
+    const { createRng } = await import('/engine/rng.js');
+    for (let seed = 1; seed < 400; seed++) {
+      const L = createLeague(createRng(seed)), me = L.teams.find((t) => !t.isBot), opp = L.teams.find((t) => t.isBot);
+      const m = simulateMatch(me, opp, createRng(seed + 1000));
+      const mineI = m.events.findIndex((e) => e.snapshot?.attacking && e.snapshot.assist), theirI = m.events.findIndex((e) => e.snapshot && !e.snapshot.attacking);
+      if (mineI < 0 || theirI < 0) continue;
+      const draw = (snap) => renderMatchCenter({ mc: { round: 1, matches: [m], gazette: null, viewIdx: 0, filter: 'all', shownCount: 0, playing: false, snap }, myTeamId: me.id, on: { snapshot: () => {}, view: () => {}, filter: () => {}, skip: () => {} } });
+      const ownIds = new Set(me.squad.map((p) => p.id)), oppNames = opp.squad.map((p) => p.shortName);
+      const read = (el) => { const sp = el.querySelector('#snap-pitch'); return sp && { title: sp.querySelector('#snap-title').textContent, n: sp.querySelectorAll('.mp-token').length, scorer: sp.querySelectorAll('.mp-token.scorer').length, assist: sp.querySelectorAll('.mp-token.assist').length, ball: !!sp.querySelector('#snap-ball'), pitches: el.querySelectorAll('#snap-pitch').length, oppName: oppNames.some((n) => sp.textContent.includes(n)), pins: el.querySelectorAll('.snap-btn').length }; };
+      const ev = m.events[theirI].snapshot;
+      return { a: read(draw(mineI)), b: read(draw(theirI)), none: (() => { const el = draw(null); return { pitches: el.querySelectorAll('#snap-pitch').length, pins: el.querySelectorAll('.snap-btn').length, want: m.events.filter((e) => e.snapshot).length }; })(), ownOnly: ev.pts.every(([id]) => ownIds.has(id)) && ev.scorer === null && ev.pts.length === 11 };
+    }
+    return null;
+  });
+  check('Øjebliksbillede, dit mål: 11 brikker, scorer ⚽ og oplæg 🅰 markeret, bolden vist', !!snapT && snapT.a?.n === 11 && snapT.a.scorer === 1 && snapT.a.assist === 1 && snapT.a.ball && snapT.a.pitches === 1 && /mål af #\d+ .+: sådan stod I/.test(snapT.a.title), JSON.stringify(snapT?.a));
+  check('Øjebliksbillede, mål imod: kun dit forsvar (ingen scorer, ingen af modstanderens spillere) – gemt uden modstanderens positioner', !!snapT && snapT.b?.n === 11 && snapT.b.scorer === 0 && !snapT.b.oppName && snapT.b.title.includes('modstanderens spillere vises ikke') && snapT.ownOnly, JSON.stringify(snapT?.b));
+  check('Uden valgt mål: intet øjebliksbillede, men 📍 ved hvert mål med billede', !!snapT && snapT.none.pitches === 0 && snapT.none.pins === snapT.none.want && snapT.none.want >= 2, JSON.stringify(snapT?.none));
   const allEvents = await g.locator('#feed .ev').count();
   await g.click('#match-center .toolbar button:nth-child(3)');
   check('Filteret "Kun nøglemomenter" viser færre hændelser', (await g.locator('#feed .ev').count()) < allEvents);
@@ -549,6 +583,7 @@ try {
   await reload();
   const v39note = await g.textContent('#notice'); // fanebyt fjerner beskeden
   check('Nyt i v3.12 vises én gang efter opdateringen (sammen med migreringen)', v39note.includes('"Lave cutbacks" giver rigtige cutbacks') && v39note.includes('Direkte lange bolde'), v39note.slice(-200));
+  check('Hopper man over en version, får man begge nyheder i rækkefølge (3.12.0 før 3.12.1)', v39note.indexOf('"Lave cutbacks"') >= 0 && v39note.indexOf('"Lave cutbacks"') < v39note.indexOf('Spillerne rykker nu med'), v39note.slice(-300));
   // Test Manager v3.12: nyheden skal være GEMT straks – ellers vises den igen efter F5, hvis man ikke har gjort andet (fanebyt gemmer også)
   await reload();
   check('Nyt i v3.12 er gemt straks: ikke igen efter F5 uden anden handling', (await g.locator('#notice').count()) === 0);

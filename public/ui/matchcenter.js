@@ -54,10 +54,12 @@ const TIP = Object.fromEntries(RATING_ICONS);
 // Mål og oplæg gentages (⚽⚽); redninger og luftdueller står som tal (🧤4).
 const REPEAT = new Set(['⚽', '🅰']);
 const icon = (sym, n = 0) => h('span', { class: 'ricon', title: TIP[sym] + (n ? `: ${n}` : '') }, !n ? sym : REPEAT.has(sym) ? sym.repeat(n) : `${sym}${n}`);
-function ratingsTable(list, isOwn, title, formation) {
+function ratingsTable(list, isOwn, title, formation, snap = null, onSnap = null) {
   const rows = lineupSort(list).map((e) => ({ ...viewRatingEntry(e, isOwn), place: placeLabel(e, formation) }));
   return h('div', { class: 'ratings' }, h('h4', {}, title),
-    formation && rows.some((e) => isStarter(e) && e.slot != null) ? miniPitch(rows.filter(isStarter), formation, isOwn) : null,
+    // Øjebliksbillede ved et mål (kun dit hold, v3.12.1) – ellers startopstillingen.
+    isOwn && snap ? snapPitch(rows, snap, onSnap)
+      : formation && rows.some((e) => isStarter(e) && e.slot != null) ? miniPitch(rows.filter(isStarter), formation, isOwn) : null,
     h('table', {}, h('tbody', {}, rows.map((e) => h('tr', { class: e.isMotM ? 'motm' : '' },
       h('td', {}, `#${e.shirtNumber} ${e.shortName}`, h('span', { class: 'place' }, ` · ${e.place}`)), h('td', { class: 'muted' }, minutes(e)),
       h('td', { class: 'icons' }, e.goals ? icon('⚽', e.goals) : null, e.assists ? icon('🅰', e.assists) : null, e.saves ? icon('🧤', e.saves) : null, e.aerialWins ? icon('✈', e.aerialWins) : null,
@@ -75,6 +77,25 @@ function miniPitch(rows, formation, isOwn) {
     h('div', { class: 'minipitch' }, rows.filter((e) => e.slot != null && coords[e.slot]).map((e) => h('div', {
       class: 'mp-token' + (e.isMotM ? ' motm' : ''), style: { left: coords[e.slot].x + '%', top: coords[e.slot].y + '%' }, title: `${coords[e.slot].r} – #${e.shirtNumber} ${e.shortName}`,
     }, h('span', { class: 'mp-val' }, isOwn ? e.rating.toFixed(1) : starsEl(e.stars)), h('span', { class: 'mp-name' }, `${coords[e.slot].r} ${e.shortName}`)))));
+}
+
+// Hvor dit hold stod, da et mål faldt (v3.12.1, brugeren: "Vi måler hvor langt de løber … løbe uden
+// bold" – og valgte at kunne SE det). Brikkerne findes via spiller-id (også indskiftere); scoreren og
+// oplægsgiveren markeres, bolden står, hvor den kom. Ved et mål imod: dit forsvar i øjeblikket.
+function snapPitch(rows, { ev, snap }, onSnap) {
+  const byId = new Map(rows.map((e) => [e.playerId, e]));
+  const who = (id) => byId.get(id);
+  const sc = who(snap.scorer);
+  const head = snap.attacking ? `${ev.min}' – mål${sc ? ` af #${sc.shirtNumber} ${sc.shortName}` : ''}: sådan stod I` : `${ev.min}' – mål imod: sådan stod dit forsvar (modstanderens spillere vises ikke)`;
+  return h('div', { class: 'minipitch-wrap', id: 'snap-pitch' }, h('div', { class: 'row' }, h('strong', { id: 'snap-title' }, head),
+    h('button', { class: 'mini', id: 'snap-back', onclick: () => onSnap(null) }, '↩ Startopstilling')),
+    h('div', { class: 'minipitch' },
+      snap.pts.map(([id, x, y]) => { const e = who(id); if (!e) return null;
+        const mark = id === snap.scorer ? ' scorer' : id === snap.assist ? ' assist' : '';
+        return h('div', { class: 'mp-token' + mark, dataset: { pid: id }, style: { left: x + '%', top: y + '%' }, title: `#${e.shirtNumber} ${e.shortName}${mark === ' scorer' ? ' – målscorer' : mark === ' assist' ? ' – oplæg' : ''}` },
+          h('span', { class: 'mp-val' }, id === snap.scorer ? '⚽' : id === snap.assist ? '🅰' : `#${e.shirtNumber}`), h('span', { class: 'mp-name' }, e.shortName)); }),
+      h('div', { class: 'mp-ball', id: 'snap-ball', title: 'Bolden', style: { left: snap.ball[0] + '%', top: snap.ball[1] + '%' } }, '●')),
+    h('div', { class: 'muted' }, snap.attacking ? 'Spillerne rykker med i kampen: frem når I har bolden, mod boldsiden – og løb uden bold fører flere ind i feltet.' : 'Dit forsvar står efter dit pres og boldsiden.'));
 }
 
 const legend = (isOwn = true) => h('div', { class: 'muted legend', id: 'icon-legend' }, RATING_ICONS.map(([s, t]) => `${s} ${t}`).join(' · ') + ' · HI = andel højintenst løb (over ca. 20 km/t) · "2/3 fri" = løb uden bold: kom fri 2 af 3 gange – begge kun dit hold');
@@ -108,7 +129,8 @@ export function renderGazette(g, myTeamId, onOpenMatch = null, matches = null) {
     !g.goalOfTheRound && g.defensiveAction ? h('p', {}, h('strong', {}, '🛡 Rundens defensive aktion: '), `#${g.defensiveAction.shirtNumber} ${g.defensiveAction.shortName} (${g.defensiveAction.teamName}) holdt nullet.`) : null);
 }
 
-// mc = { round, matches, gazette, viewIdx, filter, shownCount, playing }
+const snapOf = (m, mc) => (mc.snap != null && m.events[mc.snap]?.snapshot ? { ev: m.events[mc.snap], snap: m.events[mc.snap].snapshot } : null);
+// mc = { round, matches, gazette, viewIdx, filter, shownCount, playing, snap }
 export function renderMatchCenter({ mc, myTeamId, on }) {
   const m = mc.matches[mc.viewIdx];
   const all = m.events;
@@ -134,12 +156,14 @@ export function renderMatchCenter({ mc, myTeamId, on }) {
       h('div', {}, h('div', { class: 'toolbar' }, REPORT_FILTERS.map(([v, l]) => h('button', { class: 'mini' + (mc.filter === v ? ' active' : ''), onclick: () => on.filter(v) }, l))),
         // Et mål åbnet fra avisen markeres i referatet (samme minut, samme målscorer).
         h('div', { class: 'feed', id: 'feed' }, feed.map((e) => { const focus = mc.focus && /GOAL/.test(e.type) && e.min === mc.focus.min && e.text.includes(mc.focus.scorer);
-          return h('div', { class: `ev ${e.category.toLowerCase()} ${e.type.toLowerCase()}${focus ? ' focus' : ''}`, id: focus ? 'goal-focus' : null }, h('span', { class: 'ev-min' }, `${e.min}'`), e.text); }))),
+          // Mål med øjebliksbillede (kun efter slutfløjt): 📍 viser, hvor dit hold stod.
+          const pin = e.snapshot && !mc.playing ? h('button', { class: 'mini snap-btn', title: e.snapshot.attacking ? 'Se hvor dit hold stod, da målet faldt' : 'Se hvor dit forsvar stod, da målet faldt', onclick: () => on.snapshot(all.indexOf(e)) }, '📍') : null;
+          return h('div', { class: `ev ${e.category.toLowerCase()} ${e.type.toLowerCase()}${focus ? ' focus' : ''}${mc.snap === all.indexOf(e) ? ' snapped' : ''}`, id: focus ? 'goal-focus' : null }, h('span', { class: 'ev-min' }, `${e.min}'`), e.text, pin); }))),
       h('div', {}, statsRows(m, last.stats))),
     // Karakterarkene side om side under referatet (stablet på smal skærm).
     mc.playing ? null : h('div', { class: 'ratings-grid' },
-      ratingsTable(m.ratings.home, isOwnSide('home'), `${m.homeName} – karakterer`, m.startFormations?.home),
-      ratingsTable(m.ratings.away, isOwnSide('away'), `${m.awayName} – karakterer`, m.startFormations?.away)),
+      ratingsTable(m.ratings.home, isOwnSide('home'), `${m.homeName} – karakterer`, m.startFormations?.home, snapOf(m, mc), on.snapshot),
+      ratingsTable(m.ratings.away, isOwnSide('away'), `${m.awayName} – karakterer`, m.startFormations?.away, snapOf(m, mc), on.snapshot)),
     mc.playing ? null : legend(),
     mc.playing ? null : renderGazette(mc.gazette, myTeamId, on.openGoal, mc.matches));
 }

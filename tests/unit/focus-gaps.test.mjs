@@ -48,7 +48,8 @@ const count = (m, label) => m.events.filter((e) => e.label === label).length;
 const homeBall = (a) => { for (const i of [5, 6, 7, 8]) Object.assign(slot(a.A, i).skills, { passing: 0, ballControl: 0 }); };   // hjemmeholdet har altid bolden, uanset egne PAS/BAL
 const noRotation = (t) => { for (const b of t.squad.slice(11)) b.skills = SK(1); };   // bot-rotation af en træt starter
 // Alle markspillere sættes langt væk (så de ikke vægter), udvalgte pladser trækkes derhen, man vil have.
-const FAR = { x: 50, y: 80 };
+// v3.12.1: positionerne rykker med (positions.js) – med bolden op til ~20 frem – så "langt væk" er helt nede.
+const FAR = { x: 50, y: 95 };
 function layout(t, spots) {
   t.tactics.customCoords = {};
   for (let i = 1; i <= 10; i++) t.tactics.customCoords[i] = spots[i] ?? FAR;
@@ -66,7 +67,7 @@ function aer({ shAir, cbAir = 10, gk = 10, press = 'MID_BLOCK', shFresh = 100, g
   return { a, m, d: m.duelLog[a.H.id] };
 }
 test('hovedstødet mod keeperen (trin 2): 9,75 reddes (13,75 < 14), 10 er uafgjort og reddes, 10,25 scorer – HEADER_GK_EDGE præcis 0 (dræber 0,5, −0,5, >=)', () => {
-  // Trin 1: luft + 3 + CROSS_EDGE 1 > CB 10 + 3. Trin 2: luft + 4 > MV 10 + 4 + 0 (QC-kalibreringen; før 1,5).
+  // Trin 1: luft + 3 + CROSS_EDGE 2 (v3.12.1; før 1) > CB 10 + 3. Trin 2: luft + 4 > MV 10 + 4 + 0 (QC-kalibreringen; før 1,5).
   const saved = (v) => { const r = aer({ shAir: v }); return [r.m.homeGoals, count(r.m, 'Hovedstød reddet'), r.m.stats.hOnTarget, r.d.crossesWon]; };
   assert.deepEqual(saved(9.75), [0, 2, 2, 2]);
   assert.deepEqual(saved(10), [0, 2, 2, 2], 'uafgjort (14 = 14) er en redning');
@@ -81,19 +82,20 @@ test('friskhed i trin 2: skyttens og målmandens friskhed tæller i hovedstødet
   assert.equal(aer({ shAir: 10 }).m.homeGoals, 0);
   assert.equal(aer({ shAir: 10, gkFresh: 50 }).m.homeGoals, 2);
 });
-test('lav blok: CB\'en får præcis +1 i åbent spil (10,01 vinder mod lav blok 14,01 > 14, ikke mod 2) – BOX_BONUS dræber LOW_BLOCK=2', () => {
-  assert.equal(aer({ shAir: 10.01, press: 'LOW_BLOCK', gk: 1 }).d.crossesWon, 2);
-  assert.equal(aer({ shAir: 10, press: 'LOW_BLOCK', gk: 1 }).d.crossesWon, 0);
-  assert.equal(aer({ shAir: 10, press: 'MID_BLOCK', gk: 1 }).d.crossesWon, 2);
+// v3.12.1: CROSS_EDGE 1 → 2 – tærsklen flytter fra 10 til 9.
+test('lav blok: CB\'en får præcis +1 i åbent spil (9,01 vinder mod lav blok 14,01 > 14, ikke mod 2) – BOX_BONUS dræber LOW_BLOCK=2', () => {
+  assert.equal(aer({ shAir: 9.01, press: 'LOW_BLOCK', gk: 1 }).d.crossesWon, 2);
+  assert.equal(aer({ shAir: 9, press: 'LOW_BLOCK', gk: 1 }).d.crossesWon, 0);
+  assert.equal(aer({ shAir: 9, press: 'MID_BLOCK', gk: 1 }).d.crossesWon, 2);
 });
 test('et reddet hovedstød giver hjørne med CORNER_P 0,9 (ikke 0,35); en clearet bold med 0,35 – og en vundet duel som mål giver intet', () => {
   const corners = (shAir, script) => aer({ shAir, script }).m.stats.hCorners;
   assert.equal(corners(9.75, { 0.9: true }), 2); assert.equal(corners(9.75, { 0.35: true }), 0);       // reddet
-  assert.equal(corners(9, { 0.35: true }), 2); assert.equal(corners(9, { 0.9: true }), 0);              // clearet (9 + 4 = 13 ≤ 13)
+  assert.equal(corners(8, { 0.35: true }), 2); assert.equal(corners(8, { 0.9: true }), 0);              // clearet (8 + 3 + 2 = 13 ≤ 13)
   assert.equal(corners(12, { 0.9: true, 0.35: true }), 0);                                               // mål
 });
 test('luftduel-tekster: dit hold nævner kilden (Dit indlæg / Din lange bold), en bot gør det aldrig; reddet hovedstød og clearing står på forsvarets side', () => {
-  const clr = (o) => aer({ shAir: 9, ...o }).m.events.filter((e) => e.label === 'Luftduel i feltet');
+  const clr = (o) => aer({ shAir: 8, ...o }).m.events.filter((e) => e.label === 'Luftduel i feltet');
   const cross = clr({}), long = clr({ focus: 'CENTRAL', pass: 'DIRECT_LONG' });
   assert.ok(cross.length === 2 && cross.every((e) => /^✈️ \[.+ forsvar\] Dit indlæg: #\d+ .+ \(\d+ cm\) stiger højest og clearer foran #\d+ /.test(e.text) && e.isHome === false), cross[0]?.text);
   assert.ok(long.length === 2 && long.every((e) => /^✈️ \[.+ forsvar\] Din lange bold: #\d+ /.test(e.text) && e.isHome === false), long[0]?.text);
@@ -182,7 +184,7 @@ test('skytten i almindeligt spil vælges efter afslutning (ikke pasning) og ikke
   const y = run(14, 6, 6, 6);                        // vægte 14 og 6: r = 10 → første. Uden evne (1 og 1): anden
   assert.deepEqual(y.scorers, [tg(slot(y.a.H, 9)), tg(slot(y.a.H, 9))]);
 });
-test('modtagerens vægt har et gulv på 0,5 (evne 0 vælges, hvis han står alene på stedet) – og gulvet er ikke 5 (evne 4 mod 1 vejer 4:1)', () => {
+test('modtagerens vægt er RECEIVE_BASE 10 + evne (evne 0 vælges, hvis han står alene på stedet) – og evnen tæller (1 mod 10 vejer 11:20)', () => {
   const who = (aerial, spots) => {
     const a = arena({ home: { p1: { attackFocus: 'HIGH_CROSSES' } } });
     for (const p of a.H.squad) p.aerialPower = 3;
@@ -196,8 +198,8 @@ test('modtagerens vægt har et gulv på 0,5 (evne 0 vælges, hvis han står alen
   // Alene på stedet med luftstyrke 0 (vægt 0,5) mod 9 andre langt væk med 3 (≈0,115 i alt): ham med 0 tager hovedstødet
   const zero = who({ 7: 0 }, { 7: { x: 50, y: 16 } });
   assert.ok(zero.text.includes(tg(slot(zero.a.H, 7))), zero.text);
-  // To på samme sted: luftstyrke 1 (plads 7) og 4 (plads 8): vægte 1 og 4 → r = 2,5 → plads 8. Med gulv 5 var begge 5, og plads 7 tog den.
-  const four = who({ 7: 1, 8: 4 }, { 7: { x: 50, y: 16 }, 8: { x: 50, y: 16 } });
+  // To på samme sted: luftstyrke 1 (plads 7) og 10 (plads 8): vægte 11 og 20 → plads 8. Uden evne i vægten tog plads 7 den.
+  const four = who({ 7: 1, 8: 10 }, { 7: { x: 50, y: 16 }, 8: { x: 50, y: 16 } });
   assert.ok(four.text.includes(tg(slot(four.a.H, 8))), four.text);
 });
 
@@ -219,8 +221,11 @@ test('cutback: flanken følger terningen (next < 0,5 = venstre kant) og backen s
   const setup = (a) => { strongBacks()(a); for (const i of [5, 8]) Object.assign(slot(a.H, i).skills, { pace: 20, ballControl: 20 }); };
   const right = cb({ next: 0.5, setup }), left = cb({ next: 0.4, setup });
   assert.equal(right.blocked.length, 2); assert.equal(left.blocked.length, 2);
-  for (const e of right.blocked) assert.ok(e.text.includes(`${tg(slot(right.a.A, 1))} (`) && e.text.includes(`lukker kanten mod ${tg(slot(right.a.H, 8))}.`), e.text);
-  for (const e of left.blocked) assert.ok(e.text.includes(`${tg(slot(left.a.A, 4))} (`) && e.text.includes(`lukker kanten mod ${tg(slot(left.a.H, 5))}.`), e.text);
+  // v3.12.1: forsvaret forskydes mod boldsiden, så den nærmeste kan være backen eller stopperen på DEN side –
+  // aldrig én fra den modsatte side.
+  const side = (r, ids, w) => r.blocked.every((e) => ids.some((i) => e.text.includes(`${tg(slot(r.a.A, i))} (`)) && e.text.includes(`lukker kanten mod ${tg(slot(r.a.H, w))}.`));
+  assert.ok(side(right, [1, 2], 8), right.blocked[0].text); assert.ok(!side(right, [3, 4], 8));
+  assert.ok(side(left, [3, 4], 5), left.blocked[0].text); assert.ok(!side(left, [1, 2], 5));
 });
 test('cutback: kantspilleren vælges efter PAC+BAL (begge dele) og backen efter PAC+POS (begge dele) – en anden med højere ene evne stjæler dem ikke', () => {
   const who = (hs, as) => cb({ setup: (a) => {
