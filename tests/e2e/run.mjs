@@ -53,6 +53,7 @@ try {
   const tab = async (k) => { await g.click(`#tab-${k}`); await g.waitForSelector(`.tabpane.tab-${k}`); };
   check('Fire faner, Trup er åben fra start', (await g.locator('#tabs .tab').count()) === 4 && (await g.textContent('#tabs .tab.active')).includes('Trup'));
   check('Ny liga: dit hold vises med 18 spillere', (await rows()) === 18);
+  check('Ny liga: ingen "Nyt i kampene"-besked (den er til dem, der opdaterer et gammelt gem)', (await g.locator('#notice').count()) === 0);
   check('Holdvælgeren har 8 hold', (await g.locator('#team-select option').count()) === 8);
   const heads = (await g.locator('#matrix thead th').allTextContents()).map((t) => t.replace(/ [▲▼]$/, ''));
   check('Regnearkets kolonner i rækkefølge (Alder står hvor den skal)', JSON.stringify(heads.slice(0, 21)) === JSON.stringify(['Pos/#', 'Spiller', 'Kæde', 'Natur', 'Alder', 'Frisk/🚑', 'Højde', 'Spring', '✈ Luft', 'PAC', 'STA', 'STR', 'BAL', 'PAS', 'FIN', 'POS', 'INT', 'GK', 'Gns', '⭐ Vurd', '🧠 Mod']), heads.join('|'));
@@ -233,7 +234,7 @@ try {
   const help = await g.locator('#tactics .phase-help').allTextContents();
   check('Hjælpetekst under Fase 1 (fokus og pasningsstil, pris for Mange, fordel ved Få), Fase 2 (modgiften) og Fase 3 (genpres koster løb)', help.length === 3 && help[0].includes('kontraer imod') && help[0].includes('Få') && help[2].includes('Genpres') && help[2].includes('friskhed'), help.join(' | '));
   check('Hjælpeteksten forklarer fokus mod pasningsstil (v3.12) og modgiften i Fase 2',
-    help[0].startsWith('Angrebsfokus bestemmer, hvordan chancerne kommer') && help[0].includes('Pasningsstil bestemmer, hvordan bolden kommer frem')
+    help[0].startsWith('Angrebsfokus bestemmer, hvordan chancerne kommer') && help[0].includes('Pasningsstil bestemmer, hvordan bolden kommer frem') && help[0].includes('direkte lange bolde giver også nogle høje bolde')
     && help[1].includes('lav blok fylder feltet og vinder flere luftdueller mod indlæg, men giver plads til cutbacks') && help[1].includes('højt gegenpres lukker kanten'), help.join(' | '));
   // Test Manager v3.9: hjælpeteksten må ikke love det modsatte af motoren (retning, ikke bare ord)
   check('Hjælpeteksten lover det motoren gør (Få: færre kontraer; Lynkontra: flere; Hold: færre; Genpres dæmper; Fald tilbage gratis)',
@@ -548,6 +549,9 @@ try {
   await reload();
   const v39note = await g.textContent('#notice'); // fanebyt fjerner beskeden
   check('Nyt i v3.12 vises én gang efter opdateringen (sammen med migreringen)', v39note.includes('"Lave cutbacks" giver rigtige cutbacks') && v39note.includes('Direkte lange bolde'), v39note.slice(-200));
+  // Test Manager v3.12: nyheden skal være GEMT straks – ellers vises den igen efter F5, hvis man ikke har gjort andet (fanebyt gemmer også)
+  await reload();
+  check('Nyt i v3.12 er gemt straks: ikke igen efter F5 uden anden handling', (await g.locator('#notice').count()) === 0);
   await tab('liga');
   const v39secs = await g.locator('#stats details.stats-sec > summary').allTextContents();
   check('Gem fra v3.9: kun kampprogram-beskeden; statistikken tæller fra runde 3 og er tom', v39note.startsWith('Dit spil er opdateret: Nu spilles der efter et fast kampprogram') && !v39note.includes('naturlig position') && v39secs[0] === 'Spillere (fra runde 3)' && (await g.locator('#stats .stat-list[data-key="sGoals"]').textContent()).includes('Ingen endnu') && (await g.locator('#fejlboks').isHidden()), v39secs.join(' | '));
