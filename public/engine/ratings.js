@@ -66,7 +66,7 @@ const PRESS_RUN = { HIGH_GEGENPRESS: 1.06, MID_BLOCK: 1, LOW_BLOCK: 0.96 };
 // Mange: backs/wingbacks, centrale og angribere løber mere (km ·1,03, HI ·1,08); Få: ·0,98 / ·0,94.
 // Genpres ved boldtab: alle markspillere km ·1,04.
 const RUNS_KM = { FEW: 0.98, NORMAL: 1, MANY: 1.03 }, RUNS_HI = { FEW: 0.94, NORMAL: 1, MANY: 1.08 };
-const RUNS_ROLES = new Set(['LB', 'RB', 'LWB', 'RWB', 'CM', 'CDM', 'ST', 'CF']);
+export const RUNS_ROLES = new Set(['LB', 'RB', 'LWB', 'RWB', 'CM', 'CDM', 'ST', 'CF']);
 export function runProfile(player, team, rng, role) {
   const sta = player.skills?.stamina ?? 10, pac = player.skills?.pace ?? 10;
   const base = runBase(role, player.line);

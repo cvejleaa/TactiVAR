@@ -53,8 +53,11 @@ function newGame() {
 }
 
 // Nyt i en version, der ikke ændrer gemme-formatet (vises én gang, ved første indlæsning).
+// a nyere end b ("3.12.1" > "3.12.0"); en ukendt/manglende version er ældst.
+const newerThan = (a, b) => { const x = String(a ?? '0').split('.').map(Number), y = String(b ?? '0').split('.').map(Number); for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); return false; };
 const NEWS = {
   '3.12.0': 'Nyt i kampene: Angrebsfokus bestemmer nu, hvordan chancerne kommer – "Lave cutbacks" giver rigtige cutbacks fra baglinjen, og "Direkte lange bolde" tvinger ikke længere chancerne op i luften. Bolden går til den, der står nærmest, hvor den spilles hen (også dine trukne positioner). Dine hovedstødsspillere kan nu vinde luftduellerne. Modgift: lav blok mod indlæg, højt gegenpres mod cutbacks. Se dit angreb og dit felt i fuldtids-analysen.',
+  '3.12.1': 'Spillerne rykker nu med i kampen: frem når I har bolden og mod boldsiden – og løb uden bold fører flere ind i feltet, så også midtbanen og backs kommer til at score. Målene fordeler sig nu tæt på Superligaens: flere fra midtbanen og forsvaret, langskud fra kanten af feltet, færre kontramål. Efter slutfløjt kan du trykke 📍 ved et mål fra åbent spil eller kontra for at se, hvor dit hold stod.',
 };
 
 // Et migreret spil, hvis gamle fil ikke kunne tages backup af (fuldt lager): den gamle fil må
@@ -98,7 +101,9 @@ function start() {
     }
   }
   if (game.ui.seenVersion !== VERSION) {
-    if (NEWS[VERSION] && r.status === 'ok') view.notice = [view.notice, NEWS[VERSION]].filter(Boolean).join(' ');
+    // Alle nyheder siden den version, spilleren sidst så (v3.12.1: hopper man fra 3.11 til 3.12.1, får man også 3.12.0's).
+    const news = Object.keys(NEWS).filter((v) => newerThan(v, game.ui.seenVersion) && !newerThan(v, VERSION)).sort((a, b) => (newerThan(a, b) ? 1 : -1)).map((v) => NEWS[v]);
+    if (news.length && r.status === 'ok') view.notice = [view.notice, ...news].filter(Boolean).join(' ');
     game.ui.seenVersion = VERSION; persist();
   }
   view.viewTeamIdx = myIdx();
@@ -320,7 +325,9 @@ function finishPlayback() { clearInterval(timer); timer = null; mc.playing = fal
 const mcHandlers = {
   skip: finishPlayback,
   // Uden igangværende afspilning vises seneste runde; et valg af kamp/filter gemmer den som mc.
-  view: (i) => { mc ||= lastRoundView(game.league.lastRound); mc.viewIdx = i; mc.focus = null; renderMc(); },
+  view: (i) => { mc ||= lastRoundView(game.league.lastRound); mc.viewIdx = i; mc.focus = null; mc.snap = null; renderMc(); },
+  // Øjebliksbillede ved et mål (v3.12.1): vis på dit holds minibane og rul derhen; null = startopstillingen.
+  snapshot: (i) => { mc ||= lastRoundView(game.league.lastRound); mc.snap = i; renderMc(); if (i != null) document.getElementById('snap-pitch')?.scrollIntoView({ block: 'center' }); },
   openGoal: (i, goal) => openGoal(i, goal),
   filter: (f) => { mc ||= lastRoundView(game.league.lastRound); mc.filter = f; renderMc(); },
 };

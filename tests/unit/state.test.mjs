@@ -619,3 +619,29 @@ test('gem fra v3.10.1 (skema 5): tabellen arkiveres som sæson 1 uden program, s
   assert.ok(cs((p) => p.line === 'GK') > 0, 'målmænd får clean sheets');
   assert.equal(cs((p) => p.line !== 'GK'), 0, 'ingen andre');
 });
+
+// ---------- v3.12.1: gem fra den live v3.12.0 (skema 6, ingen øjebliksbilleder) ----------
+// Lavet med v3.12.0-koden (a5178f6): ny liga, 3 runder, serialize. Release Manager: det nye felt
+// event.snapshot er valgfrit – et gammelt gem skal indlæses uden migrering og kunne spilles videre.
+const FIXTURE_V3120 = fs.readFileSync(new URL('../fixtures/save-v3.12.0.json', import.meta.url), 'utf8');
+test('gem fra v3.12.0 (skema 6): indlæses uden migrering, gamle runder har ingen billeder og viser ingen 📍 – næste runde får billeder', async () => {
+  const { playRound, commitRound } = await import('../../public/engine/season.js');
+  const raw = JSON.parse(FIXTURE_V3120);
+  assert.equal(raw.schemaVersion, 6); assert.equal(raw.ui.seenVersion, '3.12.0');
+  assert.ok(!FIXTURE_V3120.includes('"snapshot"'), 'gemt før v3.12.1');
+  const r = parseSave(FIXTURE_V3120);
+  assert.ok(r.ok, r.error); assert.ok(!r.migratedFrom, 'ingen migrering');
+  const L = r.state.league;
+  assert.equal(L.leagueMetadata.round, 3);
+  assert.deepEqual(L.lastRound.matches.map((m) => m.homeGoals + m.awayGoals), raw.league.lastRound.matches.map((m) => m.homeGoals + m.awayGoals));
+  // Visningen (ingen 📍, startopstillingen) prøves i e2e mod samme fixture
+  const goalsInOld = L.lastRound.matches[0].events.filter((e) => /GOAL/.test(e.type)).length;
+  assert.ok(goalsInOld > 0, 'den gamle kamp har mål (ellers beviser testen intet)');
+  assert.ok(L.lastRound.matches.every((m) => m.events.every((e) => e.snapshot === undefined)));
+  // Videre med den nye motor: billeder ved dit holds mål i åbent spil
+  const rng = createRng(5);
+  let snaps = 0;
+  for (let i = 0; i < 4; i++) { const res = playRound(L, rng); snaps += res.matches[0].events.filter((e) => e.snapshot).length; commitRound(L, res, rng); }
+  assert.ok(snaps > 0, `billeder i de næste runder: ${snaps}`);
+  assert.equal(L.leagueMetadata.round, 7);
+});

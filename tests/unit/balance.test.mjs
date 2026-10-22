@@ -120,3 +120,26 @@ test('angrebsfokus mærkes: cutbacks ≥ 1 pr. kamp, angriberen vinder 35–55 %
   const xLow = measureFocus({ focus: 'HIGH_CROSSES', oppPress: 'LOW_BLOCK' }, N), xMid = measureFocus({ focus: 'HIGH_CROSSES', oppPress: 'MID_BLOCK' }, N);
   assert.ok(xLow.crossWinRate < xMid.crossWinRate - 0.08, `luftdueller ${xLow.crossWinRate} mod ${xMid.crossWinRate}`);
 });
+// v3.12.1 (brugeren: dokumentet "Spillerhøjde i Superligaen" har nu statistik for "hvem og hvordan mål
+// bliver scoret"): angreb 45–50 %, midtbane 30–35 %, forsvar 15–20 %; åbent spil 60–65 %, dødbolde
+// 25–30 %, kontra 8–12 %, langskud 8–10 %. Båndene har lidt luft om dokumentets tal; v3.12.0 målt med
+// samme opsætning: angreb 75 %, midtbane 15 %, forsvar 10 %, kontra 19 %, langskud 4 % – rødt overalt.
+test('målene fordeler sig som i Superligaen: angreb 44–56 %, midtbane 25–38 %, forsvar 14–24 %; kontra 7–14 %, langskud 6–12 %, dødbolde 20–32 %', async () => {
+  const { measureGoalMix } = await import('../../tools/measure-duels.mjs');
+  const r = measureGoalMix(150);
+  const band = (k, lo, hi) => assert.ok(r[k] >= lo && r[k] <= hi, `${k} ${r[k].toFixed(3)} (bånd ${lo}–${hi})`);
+  band('ATT', 0.44, 0.56); band('MID', 0.25, 0.38); band('DEF', 0.14, 0.24);
+  band('counter', 0.07, 0.14); band('longshot', 0.06, 0.12); band('setPiece', 0.2, 0.32);
+  assert.ok(r.goalsPerMatch >= 2.6 && r.goalsPerMatch <= 3.0, `mål pr. kamp ${r.goalsPerMatch}`);
+});
+// QC v3.12.1 (B1, "efterprøv på dét, den rammer"): langskudsbonussen må ikke gøre det bedre at stå uden
+// for feltet. Med fast +7 (før LONGSHOT_CAP) målt med samme værktøj: 4-4-2 1,36, 4-4-1-1 1,78 (+0,42),
+// ST trukket til y 32 1,64 (+0,28) – begge røde mod grænsen 0,15. Med loftet: +0,06 og ±0,00.
+test('langskud belønner ikke en angriber uden for feltet: 4-4-1-1 og en trukket ST scorer højst 0,15 mere end 4-4-2', async () => {
+  const { measureFormations } = await import('../../tools/measure-duels.mjs');
+  const r = Object.fromEntries(measureFormations(200).map((x) => [x.formation, x]));
+  const base = r['4-4-2'].for;
+  assert.ok(base > 1, `4-4-2 scorer ${base} (data)`);
+  assert.ok(r['4-4-1-1'].for - base <= 0.15, `4-4-1-1 ${r['4-4-1-1'].for} mod 4-4-2 ${base}`);
+  assert.ok(r['4-4-2 + ST trukket til y 32'].for - base <= 0.15, `trukket ST ${r['4-4-2 + ST trukket til y 32'].for} mod ${base}`);
+});

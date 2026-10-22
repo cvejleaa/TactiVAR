@@ -52,6 +52,9 @@ function arena({ home = {}, away = {} } = {}) {
   return { L, H, A };
 }
 // 4-4-2: plads 0 GK, 1–4 forsvar, 5–8 midtbane, 9–10 angreb.
+// v3.12.1: skytten er den, der står nærmest i øjeblikket (positions.js). Til tests af selve afslutningen:
+// alle andre markspillere trækkes helt ned, så plads i er skytten.
+const onlyShooter = (t, i = 9) => { t.tactics.customCoords = Object.fromEntries([1, 2, 3, 4, 5, 6, 7, 8, 9, 10].filter((j) => j !== i).map((j) => [j, { x: 50, y: 95 }])); };
 const slot = (t, i) => t.squad.find((p) => p.id === t.tactics.lineupSlots[i]);
 const mids = (t) => [5, 6, 7, 8].map((i) => slot(t, i));
 const count = (m, label) => m.events.filter((e) => e.label === label).length;
@@ -157,14 +160,15 @@ test('chancetype efter angrebsfokus: indlæg ved HIGH_CROSSES (0,52), lange bold
 });
 
 // Luftduellen i to trin (v3.12; før vandt angriberen ≈4 % mod CB + keeperens evne·0,38, og en vundet
-// duel var altid mål). Rul 0,5: trin 1 = luft + 3 + CROSS_EDGE 1 > CB 10 + 3; trin 2 = luft + 4 > MV 10 + 4 + HEADER_GK_EDGE 0.
-test('luftduel i to trin: 12 vinder og scorer (16 > 14), 10 vinder men reddes (14 = 14), 9 taber til CB\'en (13 = 13); keeperens evne tæller ikke i duellen', () => {
+// duel var altid mål). Rul 0,5: trin 1 = luft + 3 + CROSS_EDGE 2 > CB 10 + 3; trin 2 = luft + 4 > MV 10 + 4 + HEADER_GK_EDGE 0.
+// v3.12.1: CROSS_EDGE 1 → 2 (dokumentets målfordeling) – 9 vandt ikke med 1 (13 = 13), vinder nu (14 > 13); 8 taber.
+test('luftduel i to trin: 12 vinder og scorer (16 > 14), 10 vinder men reddes (14 = 14), 8 taber til CB\'en (13 = 13); keeperens evne tæller ikke i duellen', () => {
   const run = (att) => {
     const { H, A } = arena({ home: { p1: { attackFocus: 'HIGH_CROSSES' } } });
     slot(H, 9).aerialPower = att; for (const i of [1, 2, 3, 4]) slot(A, i).aerialPower = 10;
     return { m: simulateMatch(H, A, stubRng({ 0.3: shots(2), 0.52: true })), id: slot(H, 9).id, gk: slot(A, 0).id };
   };
-  const goal = run(12), saved = run(10), cleared = run(9);
+  const goal = run(12), saved = run(10), cleared = run(8);
   const r = (x, id) => x.m.ratings.home.concat(x.m.ratings.away).find((e) => e.playerId === id);
   assert.deepEqual([goal.m.homeGoals, goal.m.stats.hAerialWon, goal.m.stats.aAerialWon, goal.m.duelLog[goal.m.homeId].headerGoals], [2, 2, 0, 2]);
   assert.deepEqual([saved.m.homeGoals, saved.m.stats.hAerialWon, saved.m.stats.hOnTarget, count(saved.m, 'Hovedstød reddet')], [0, 2, 2, 2]);
@@ -183,7 +187,7 @@ function varRun(trap, { awayAttacks = false } = {}) {
   const [att, def] = awayAttacks ? [A, H] : [H, A];
   if (awayAttacks) for (const p of mids(A)) p.skills.passing = 11;
   // Skytten er den, der står nær målet (v3.12, tilfældig vægtet) – alle får samme VAR-evner.
-  for (const i of [5, 6, 7, 8, 9, 10]) { slot(att, i).varProfile.varPulse = 10; slot(att, i).counterTactics.vsTrapLong = trap; }
+  for (let i = 1; i <= 10; i++) { slot(att, i).varProfile.varPulse = 10; slot(att, i).counterTactics.vsTrapLong = trap; }
   const d = slot(def, 1); d.skills.positioning = 11; d.skills.intercepting = 20;
   const m = simulateMatch(H, A, stubRng({ 0.3: shots(2) }, 0.1));
   const shooter = [att.squad.find((p) => (awayAttacks ? m.ratings.away : m.ratings.home).some((e) => e.playerId === p.id && e.goals > 0))].find(Boolean) ?? slot(att, 9);
@@ -197,7 +201,9 @@ test('VAR: mod-kunnen mod VAR-linjen afgør (10 + 23·0,045 = 11,035 > 11; 22·0
   assert.equal(ok.homeVarNet, 2); assert.equal(no.homeVarNet, -2);
   const { m: okM, shooter } = varRun(23);
   // Startkarakter ved rul 0,1: 6,5 + (0,03 − 0,15) = 6,38; + 2·1,3 = 8,98 → 9,0 (2·1,25 ville give 8,9)
-  assert.equal(okM.ratings.home.find((x) => x.playerId === shooter.id).rating, 9);
+  // (rul 0,1 vælger den første i rækken – kan være en stopper/back, der også får +0,5 for clean sheet)
+  const se = okM.ratings.home.find((x) => x.playerId === shooter.id);
+  assert.equal(Math.round((se.rating - (['GK', 'CB', 'LB', 'RB'].includes(se.role) ? 0.5 : 0)) * 10) / 10, 9);
 });
 test('VAR: fortegn på VAR-netto, når udeholdet angriber', () => {
   assert.equal(varRun(23, { awayAttacks: true }).m.homeVarNet, -2);
@@ -209,8 +215,8 @@ test('VAR-tjek kun når rullet er under 0,22', () => {
   assert.equal(m.stats.hVarChecks, 0);
 });
 
-test('afslutning: FIN + 4 > GK + 4 + KEEPER_EDGE 3 (v3.12: skytten står nær målet, så målmanden fik 3 tilbage; v3.10 havde 0); mål giver +1,25, oplæg +0,5, målmand −0,3', () => {
-  const run = (fin) => { const { H, A } = arena(); slot(H, 9).skills.finishing = fin; slot(A, 0).skills.goalkeeping = 8; /* 16 > 15 / 15 > 15 falsk */ return { H, A, m: simulateMatch(H, A, stubRng({ 0.3: shots(2) })) }; };
+test('afslutning: FIN + 4 > GK + 4 + KEEPER_EDGE 3,5 (v3.12.1; v3.10 havde 0); mål giver +1,25, oplæg +0,5, målmand −0,3', () => {
+  const run = (fin) => { const { H, A } = arena(); onlyShooter(H); slot(H, 9).skills.finishing = fin; slot(A, 0).skills.goalkeeping = 7.5; /* 16 > 15 / 15 > 15 falsk; med 2,5 var 11 mål */ return { H, A, m: simulateMatch(H, A, stubRng({ 0.3: shots(2) })) }; };
   const { H, A, m } = run(12);
   assert.equal(m.homeGoals, 2);
   const r = (t, i) => m.ratings[t === H ? 'home' : 'away'].find((x) => x.playerId === slot(t, i).id);
@@ -777,7 +783,7 @@ test('describeGoal: tre varianter pr. type, valgt af rng; ukendt type bliver kom
 // ---------- #2 Måltyper i kampen ----------
 // Hjemmeholdet har bolden og vinder alle opbygninger (INT 1); chance i alle 30 ticks (0,3);
 // next = 0,5 → ingen VAR (≥ 0,22), afslutning 20 + 4 > MV 1 + 4 → mål hver gang.
-function goals({ home = {}, away = {}, script = {}, shooterSkills = null, bots = false } = {}) {
+function goals({ home = {}, away = {}, script = {}, shooterSkills = null, bots = false, shooterAt = null, gk = 1 } = {}) {
   const a = arena({ home, away });
   let [H, A] = [a.H, a.A];
   if (bots) {
@@ -788,7 +794,9 @@ function goals({ home = {}, away = {}, script = {}, shooterSkills = null, bots =
     Object.assign(H.tactics.phases.phase3_transition, { onBallWon: 'KEEP_POSSESSION' }, home.p3);
   }
   for (const p of mids(A)) p.skills.intercepting = 1;
-  slot(A, 0).skills.goalkeeping = 1;
+  slot(A, 0).skills.goalkeeping = gk;
+  onlyShooter(H);   // v3.12.1: skytten er plads 9
+  if (shooterAt) H.tactics.customCoords[9] = shooterAt;
   if (shooterSkills) Object.assign(slot(H, 9).skills, shooterSkills);
   const m = simulateMatch(H, A, stubRng({ 0.48: true, 0.3: true, ...script }));
   const assister = m.ratings.home.find((e) => e.playerId === mids(H)[0].id);
@@ -875,7 +883,8 @@ test('løb: kanten med god pasning løber sig fri og lægger den tværs → CUTB
   const r = decide({ rm: { passing: 20, finishing: 1 } });  // skud 0,5 · aflevering 14·3 · dribling 4·2
   assert.equal(r.kinds.length, 30); assert.ok(r.kinds.every((k) => k === 'CUTBACK'), r.kinds.join());
   assert.equal(r.rmE.freeRuns, 30); assert.equal(r.rmE.freeRunsWon, 30); assert.equal(r.rmE.assists, 30); assert.equal(r.rmE.goals, 0);
-  assert.equal(r.m.ratings.home.find((e) => e.playerId === slot(r.a.H, 9).id).goals, 30);
+  const sc = r.m.ratings.home.find((e) => e.goals === 30);   // modtageren står nær straffesparkspletten (v3.12.1)
+  assert.ok(sc && sc.playerId !== slot(r.a.H, 8).id);
   assert.match(r.goals[0], /✅ #\d+ .+ løber sig fri på kanten og lægger den tværs til #\d+/);
 });
 test('løb: god afslutning → skud selv (fra kanten et langskud, ingen oplæg); god fart+boldkontrol → dribletur', () => {
@@ -899,7 +908,8 @@ test('løb: tabt dribletur er en opsnapning – ingen afslutning, ingen redning,
 test('løb: tabt løb (forsvareren følger med) → almindelig chance som før, intet "fri" i referatet', () => {
   const r = decide({ def: { positioning: 20, intercepting: 20 }, gk: 1 });
   assert.equal(r.rmE.freeRuns, 30); assert.equal(r.rmE.freeRunsWon, 0);
-  assert.ok(r.kinds.length === 30 && r.kinds.every((k) => k === 'COMBINATION'));
+  // Almindelig afslutning: kombination eller langskud efter skyttens plads (v3.12.1) – aldrig løbets cutback/dribletur.
+  assert.ok(r.kinds.length === 30 && r.kinds.every((k) => k === 'COMBINATION' || k === 'LONGSHOT'), r.kinds.join());
   for (const t of r.goals) assert.doesNotMatch(t, /fri/);
 });
 test('løb: lave cutbacks vægter afleveringen fra kanten for ALLE hold (v3.12, brugerens valg) – men kun dit hold får fokus nævnt i teksten', () => {
@@ -1043,12 +1053,14 @@ test('måltype CUTBACK kommer kun fra en rigtig cutback (v3.12): den almindelige
   const botCb = simulateMatch(b.H, b.A, stubRng({ 0.48: true, 0.3: true, 0.38: true })).goalsPool.map((g) => g.kind);
   assert.ok(botCb.length >= 25 && botCb.every((x) => x === 'CUTBACK'), botCb.join());
 });
-test('måltype: vægtet af evnerne – langskud/dribletur uden oplæg, kombination med; teksten bruges i referatet', () => {
-  // Vægte ved next 0,5: kombination 4, langskud (FIN−8)·0,45, dribletur ((PAC+BAL)/2−8)·0,45.
-  const comb = goals();                                          // 4 / 0,9 / 0,9 → r = 2,9 → kombination
+// v3.12.1 (dokumentet "Mål": langskud 8–10 %): langskud = skytten står uden for feltet (levende y ≥ LONGSHOT_Y 24);
+// før v3.12.1 vægtet af FIN. ST (y 20) med bolden: 20 − 6 = 14 → inde; trukket til y 34: 34 − 6 = 28 → ude.
+test('måltype: langskud efter skyttens plads, dribletur/kombination efter evnerne – langskud/dribletur uden oplæg, kombination med', () => {
+  // Inde i feltet, vægte ved next 0,5: kombination 4, dribletur ((PAC+BAL)/2−8)·0,45.
+  const comb = goals({ shooterSkills: { finishing: 20 } });      // 4 / 0,9 → r = 2,45 → kombination – FIN alene giver intet langskud
   assert.ok(comb.kinds.length >= 25 && comb.kinds.every((k) => k === 'COMBINATION'), comb.kinds.join());
   assert.ok(comb.assister.assists > 0);
-  const lng = goals({ shooterSkills: { finishing: 20 } });       // 4 / 5,4 / 0,9 → r = 5,15 → langskud
+  const lng = goals({ shooterSkills: { finishing: 20 }, shooterAt: { x: 50, y: 34 } });   // uden for feltet → langskud
   assert.ok(lng.kinds.length >= 25 && lng.kinds.every((k) => k === 'LONGSHOT'), lng.kinds.join());
   assert.equal(lng.assister.assists, 0, 'et langskud har ingen oplægsgiver');
   const drb = goals({ shooterSkills: { pace: 20, ballControl: 20, finishing: 10 } }); // 4 / 0,9 / 5,4 → r = 5,15 → dribletur
@@ -1059,9 +1071,49 @@ test('måltype: vægtet af evnerne – langskud/dribletur uden oplæg, kombinati
   assert.ok(ev.text.includes(g.desc) && !/Kombinationsfodbold/.test(ev.text), ev.text);
   assert.equal(g.spectacle, goalSpectacle('LONGSHOT', { finishing: 20 }, g.min, { next: () => 0.5 }));
   // Skytten får +1,4 for et solomål (+1,25 med oplæg): ét mål i 1. tick, start 6,5
-  const one = (sk) => { const x = goals({ shooterSkills: sk, script: { 0.3: (n) => n === 0 } }); return x.m.ratings.home.find((e) => e.playerId === slot(x.H, 9).id).rating; };
-  assert.equal(one({ finishing: 20 }), 7.9); // 6,5 + 1,4
+  const one = (sk, at = null) => { const x = goals({ shooterSkills: sk, shooterAt: at, script: { 0.3: (n) => n === 0 } }); return x.m.ratings.home.find((e) => e.playerId === slot(x.H, 9).id).rating; };
+  assert.equal(one({ finishing: 20 }, { x: 50, y: 34 }), 7.9); // 6,5 + 1,4
   assert.equal(one(null), 7.8);              // 6,5 + 1,25 = 7,75 → 7,8
+});
+// QC v3.12.1 (B1): langskuddets værdi er min(FIN + 8, 13). Rul 0,5: skud + 4 mod MV + 4 + 3,5.
+// God afslutter (FIN 16) mod MV 11: i feltet 20 > 18,5 → mål; uden for feltet 13 + 4 = 17 < 18,5 → redning
+// (med fast +7 var det 27 → mål). Midtbanespiller (FIN 5) mod MV 9: uden for 13 + 4 > 16,5 → mål; i feltet 9 < 16,5.
+test('langskud: værdien er min(FIN + 8, 13) – en god afslutter står bedre i feltet, en midtbanespiller får hjælp på afstand', () => {
+  const OUT = { x: 50, y: 34 };
+  assert.equal(goals({ shooterSkills: { finishing: 16 }, gk: 11 }).m.homeGoals, 30, 'i feltet');
+  assert.equal(goals({ shooterSkills: { finishing: 16 }, gk: 11, shooterAt: OUT }).m.homeGoals, 0, 'uden for feltet: loftet 13');
+  assert.equal(goals({ shooterSkills: { finishing: 5 }, gk: 9, shooterAt: OUT }).m.homeGoals, 30, 'FIN 5 + 8 = 13');
+  assert.equal(goals({ shooterSkills: { finishing: 5 }, gk: 9 }).m.homeGoals, 0);
+  assert.equal(goals({ shooterSkills: { finishing: 4.4 }, gk: 9, shooterAt: OUT }).m.homeGoals, 0, 'FIN 4,4 + 8 = 12,4 < 12,5');
+});
+test('øjebliksbillede: ved et solo-mål (langskud) står bolden ved skytten; ved et kontramål imod står dit hold i angrebsform', () => {
+  const g = goals({ shooterSkills: { finishing: 20 }, shooterAt: { x: 50, y: 34 }, script: { 0.3: (n) => n === 0 } });
+  const ev = g.m.events.find((e) => e.type === 'GOAL'), sid = slot(g.H, 9).id;
+  assert.ok(ev?.snapshot && g.m.goalsPool[0].kind === 'LONGSHOT', JSON.stringify(ev?.snapshot));
+  const me = ev.snapshot.pts.find(([id]) => id === sid);
+  assert.deepEqual(ev.snapshot.ball, [me[1], me[2]]);
+  assert.equal(ev.snapshot.scorer, sid);
+  // Kontra imod dit hold (hjem): dit hold mistede bolden i angrebet – CB'en (formation y 73) står fremme (73 − 14 = 59), ikke i blokken (73)
+  const { a, m } = ctr();
+  const ce = m.events.find((e) => e.type === 'GOAL' && e.snapshot);
+  assert.ok(ce && ce.snapshot.attacking === false && ce.snapshot.scorer === null, JSON.stringify(ce?.snapshot));
+  const cb = ce.snapshot.pts.find(([id]) => id === slot(a.H, 2).id);
+  assert.equal(cb[2], 59);
+  assert.ok(ce.snapshot.pts.every(([id]) => a.H.squad.some((p) => p.id === id)), 'kun dit holds spillere');
+});
+// v3.12.1 (QC): kontraens skytte vælges i FORSVARSFORMEN – holdet har lige vundet bolden. ST trukket til (50, 20),
+// CM til (50, 36): i forsvarsform (mellemblok, intet ryk) står ST på pletten (50, 20) → han skyder; i angrebsform
+// (ST −6 → 14, CM −16 → 20) stod CM'en på pletten og ville skyde. Rul 0,5 vælger kumulativt i pladsrækkefølge.
+test('kontra: skytten er den nærmeste i forsvarsformen (ST på pletten), ikke i angrebsformen (CM rykket frem)', () => {
+  const { a, m } = ctr({ tweak: (a) => {
+    a.A.tactics.customCoords = Object.fromEntries([1, 2, 3, 4, 5, 7, 8, 10].map((j) => [j, { x: 50, y: 95 }]));
+    Object.assign(a.A.tactics.customCoords, { 6: { x: 50, y: 36 }, 9: { x: 50, y: 20 } });
+    for (const i of [6, 9]) slot(a.A, i).skills.finishing = 20;
+    slot(a.H, 0).skills.goalkeeping = 1;
+  } });
+  assert.equal(m.awayGoals, 2);
+  assert.equal(rOf(m, 'away', a.A, 9).goals, 2, 'ST scorer');
+  assert.equal(rOf(m, 'away', a.A, 6).goals, 0, 'ikke CM');
 });
 test('måltype: hovedstød og VAR har egen type og tekst', () => {
   const a = arena({ home: { p1: { attackFocus: 'HIGH_CROSSES' } } });
@@ -1121,21 +1173,21 @@ test('friskhed virker også i presset: INT 9 vinder frisk (25,75 > 24,75), taber
   assert.equal(run(80), 30);
 });
 test('friskhed virker i afslutningen – både skytte og målmand', () => {
-  // v3.12 (KEEPER_EDGE 3): skytte FIN 10 mod MV 6 (+4 hver, +3): 14 > 13 → mål; skytte 50 %: 8,75 + 4 < 13 → redning.
-  // MV 7 mod FIN 10: 14 > 14 er falsk → redning; MV 50 %: 5,25 + 7 = 12,25 → mål.
+  // v3.12.1 (KEEPER_EDGE 3,5): skytte FIN 10 mod MV 5,5 (+4 hver, +3,5): 14 > 13 → mål; skytte 50 %: 8,75 + 4 < 13 → redning.
+  // MV 6,5 mod FIN 10: 14 > 14 er falsk → redning; MV 50 %: 5,69 + 7,5 = 13,19 → mål.
   const run = (shFresh, gk, gkFresh) => {
     const { H, A } = arena();
     for (const p of mids(A)) p.skills.intercepting = 1;
-    slot(H, 9).freshness = shFresh; Object.assign(slot(A, 0), { freshness: gkFresh }); slot(A, 0).skills.goalkeeping = gk;
+    onlyShooter(H); slot(H, 9).freshness = shFresh; Object.assign(slot(A, 0), { freshness: gkFresh }); slot(A, 0).skills.goalkeeping = gk;
     for (const b of A.squad.slice(11)) b.skills = SK(1); // udeholdet er en bot – ingen frisk afløser at rotere ind
     const m = simulateMatch(H, A, stubRng({ 0.48: true, 0.3: true }));
     return m.homeGoals;
   };
-  assert.ok(run(100, 6, 100) >= 25); assert.equal(run(50, 6, 100), 0);
-  assert.equal(run(100, 7, 100), 0); assert.ok(run(100, 7, 50) >= 25);
+  assert.ok(run(100, 5.5, 100) >= 25); assert.equal(run(50, 5.5, 100), 0);
+  assert.equal(run(100, 6.5, 100), 0); assert.ok(run(100, 6.5, 50) >= 25);
 });
 test('friskhed virker i luftduellen – både angriber og forsvarer', () => {
-  // Hovedstød (v3.12, trin 1): skytte-aerial·f + 3 + CROSS_EDGE 1 > forsvarer-aerial·f + 3; trin 2 mod MV 0 vindes altid.
+  // Hovedstød (v3.12, trin 1): skytte-aerial·f + 3 + CROSS_EDGE 2 (v3.12.1; før 1) > forsvarer-aerial·f + 3; trin 2 mod MV 0 vindes altid.
   const run = (shAir, shFresh, defFresh) => {
     const a = arena({ home: { p1: { attackFocus: 'HIGH_CROSSES' } } });
     for (const p of mids(a.A)) p.skills.intercepting = 1;
@@ -1145,10 +1197,10 @@ test('friskhed virker i luftduellen – både angriber og forsvarer', () => {
     for (const b of a.A.squad.slice(11)) b.skills = SK(1); // ingen bot-rotation af den trætte forsvarer
     return simulateMatch(a.H, a.A, stubRng({ 0.48: true, 0.3: true, 0.52: true })).events.filter((e) => e.type === 'HEADER_GOAL').length;
   };
-  assert.ok(run(9.5, 100, 100) >= 25);   // 9,5 + 1 > 10
-  assert.equal(run(9.5, 50, 100), 0);    // 8,31 + 1 < 10
-  assert.equal(run(9, 100, 100), 0);     // 9 + 1 > 10 er falsk
-  assert.ok(run(9, 100, 50) >= 25);      // 10 > 7,5
+  assert.ok(run(8.5, 100, 100) >= 25);   // 8,5 + 2 > 10
+  assert.equal(run(8.5, 50, 100), 0);    // 7,44 + 2 < 10
+  assert.equal(run(8, 100, 100), 0);     // 8 + 2 > 10 er falsk
+  assert.ok(run(8, 100, 50) >= 25);      // 10 > 8,75
 });
 
 test('luftduel i feltet tages af en midtstopper, når holdet har en (v3.8) – ellers af den trukne forsvarer', () => {
@@ -1356,7 +1408,7 @@ test('kampen: også en INDSKIFTER løber efter den plads han kommer ind på (ikk
 // =====================================================================================
 // Test Manager, v3.9: huller fundet ved mutation (suiten var grøn med hver af dem fjernet)
 // =====================================================================================
-const CHANCE_KEY = { FEW: 0.26, NORMAL: 0.3, MANY: 0.36 };   // CHANCE_P pr. trin
+const CHANCE_KEY = { FEW: 0.285, NORMAL: 0.3, MANY: 0.36 };   // CHANCE_P pr. trin
 const rOf = (m, side, t, i) => m.ratings[side].find((x) => x.playerId === slot(t, i).id);
 const sumOf = (m, side, f) => m.ratings[side].reduce((s, e) => s + e[f], 0);
 
@@ -1371,7 +1423,7 @@ function ctr({ n = 2, key = 0.032, tweak = null, home = {}, away = {}, form = nu
   return { a, m, summary: m.events.find((e) => e.label === 'Fuldtids-analyse')?.text.match(/🎯 .*?\.(?= ⚔️)/)?.[0] };
 }
 test('kontramål: skytten +1,25 og målmanden −0,3, tæller som skud, på mål og xG, og står i din opsummering som "kontraer imod"', () => {
-  const { a, m, summary } = ctr({ tweak: (a) => { slot(a.A, 9).skills.pace = 14; } });
+  const { a, m, summary } = ctr({ tweak: (a) => { onlyShooter(a.A); slot(a.A, 9).skills.pace = 14; } });   // v3.12.1: skytten er den nærmeste (onlyShooter)
   assert.equal(m.awayGoals, 2); assert.equal(m.homeGoals, 0);
   assert.equal(rOf(m, 'away', a.A, 9).rating, 9.0); assert.equal(rOf(m, 'away', a.A, 9).goals, 2);   // 6,5 + 2·1,25
   assert.equal(rOf(m, 'home', a.H, 0).rating, 5.9);                                                // 6,5 − 2·0,3
@@ -1401,14 +1453,16 @@ test('reddet kontra: målmanden +0,5 pr. redning, redning tælles, hændelsen st
   }
   assert.equal(summary, '🎯 Løb uden bold (Mange): 0 løb, 0 kom fri (0 mål) · kontraer imod i alt: 3 (0 mål).');
 });
-test('kontra-afgørelsen: skyttens FIN + 4 (v3.10; v3.9: +1) mod målmandens MV, begge ·friskhed (strengt større)', () => {
-  const goals9 = (o) => ctr({ tweak: (a) => { Object.assign(slot(a.A, 9).skills, { finishing: o.fin ?? 10 }); slot(a.A, 9).freshness = o.sf ?? 100; slot(a.H, 0).skills.goalkeeping = o.gk; slot(a.H, 0).freshness = o.gf ?? 100; } }).m.awayGoals;
-  assert.equal(goals9({ gk: 14 }), 0);      // 10 + 4 > 14 er falsk (gk 13,9 giver mål)
-  assert.equal(goals9({ gk: 13.9 }), 2);
-  // Skytten træt (71 %: ·0,9275 → 9,275 + 4 = 13,275): 13,2 slås, 13,3 holder. Uden friskhed på skytten: 14 > 13,3 → mål.
-  assert.equal(goals9({ sf: 71, gk: 13.2 }), 2); assert.equal(goals9({ sf: 71, gk: 13.3 }), 0);
-  // Målmanden træt (0 %: ·0,75): 18 → 13,5 < 14 → mål; uden friskhed på målmanden holder 18.
-  assert.equal(goals9({ gk: 18, gf: 0 }), 2); assert.equal(goals9({ gk: 18, gf: 100 }), 0);
+// v3.12.1: COUNTER_FINISH_BONUS 4 → 3 (dokumentets kontra 8–12 %; med 4 var 13,5 mål); skytten står i forsvarsformen.
+test('kontra-afgørelsen: skyttens FIN + 3 (v3.12.1; v3.10: +4; v3.9: +1) mod målmandens MV, begge ·friskhed (strengt større)', () => {
+  const goals9 = (o) => ctr({ tweak: (a) => { onlyShooter(a.A); Object.assign(slot(a.A, 9).skills, { finishing: o.fin ?? 10 }); slot(a.A, 9).freshness = o.sf ?? 100; slot(a.H, 0).skills.goalkeeping = o.gk; slot(a.H, 0).freshness = o.gf ?? 100; } }).m.awayGoals;
+  assert.equal(goals9({ gk: 13 }), 0);      // 10 + 3 > 13 er falsk (gk 12,9 giver mål)
+  assert.equal(goals9({ gk: 12.9 }), 2);
+  assert.equal(goals9({ gk: 13.5 }), 0, 'med +4 ville 13,5 være mål');
+  // Skytten træt (71 %: ·0,9275 → 9,275 + 3 = 12,275): 12,2 slås, 12,3 holder. Uden friskhed på skytten: 13 > 12,3 → mål.
+  assert.equal(goals9({ sf: 71, gk: 12.2 }), 2); assert.equal(goals9({ sf: 71, gk: 12.3 }), 0);
+  // Målmanden træt (0 %: ·0,75): 17 → 12,75 < 13 → mål; uden friskhed på målmanden holder 17.
+  assert.equal(goals9({ gk: 17, gf: 0 }), 2); assert.equal(goals9({ gk: 17, gf: 100 }), 0);
 });
 
 // --- counterChance: ukendte nøgler falder tilbage til Normal / ingen faktor ---
@@ -1449,7 +1503,7 @@ test('Hold på bolden: præcis +2 (gab 2 vinder, gab 3 taber), kun for ÉN opbyg
 });
 
 // --- Chance pr. trin: Få 26 %, Normal 30 %, Mange 36 % ---
-test('chancer pr. tick følger løbs-indstillingen (Få 0,26, Mange 0,36) – og kun den', () => {
+test('chancer pr. tick følger løbs-indstillingen (Få 0,285, Mange 0,36) – og kun den', () => {
   const shotsFor = (runs, keys) => { const a = arena({ home: { p1: { offBallRuns: runs } } }); for (const p of mids(a.A)) { p.skills.passing = 1; p.skills.intercepting = 1; } return simulateMatch(a.H, a.A, stubRng({ 0.48: true, ...keys })).stats.hShots; };
   for (const r of ['FEW', 'NORMAL', 'MANY']) {
     assert.equal(shotsFor(r, { [CHANCE_KEY[r]]: true }), 30, r);
@@ -1526,12 +1580,14 @@ function fx({ rm = {}, def = {}, gk = 1, n = 2, runs = 'NORMAL', rslot = 8, form
 }
 test('løber → aflevering fra kanten: CUTBACK, oplæg til løberen (+0,15 +0,5 pr. mål), mål, observation og tekst hos modtageren', () => {
   const { a, m, runner, goals, summary } = fx({ rm: { passing: 20, finishing: 1 } });
-  const fin = slot(a.H, 9);
+  // v3.12.1: modtageren er den, der står nær straffesparkspletten i øjeblikket (ikke længere altid plads 9)
+  const fin = a.H.squad.find((p) => m.ratings.home.some((e) => e.playerId === p.id && e.goals === 2));
+  assert.ok(fin && fin !== runner);
+  const finE = m.ratings.home.find((e) => e.playerId === fin.id);
   assert.equal(m.homeGoals, 2); assert.deepEqual(m.goalsPool.map((g) => g.kind), ['CUTBACK', 'CUTBACK']);
   assert.equal(rOf(m, 'home', a.H, 8).rating, 7.8);        // 6,5 + 2·(0,15 løb + 0,5 oplæg)
   assert.equal(rOf(m, 'home', a.H, 8).assists, 2); assert.equal(rOf(m, 'home', a.H, 8).goals, 0);
-  assert.equal(rOf(m, 'home', a.H, 9).rating, 9.0);        // 6,5 + 2·1,25 – målscoreren er modtageren, ikke løberen
-  assert.equal(rOf(m, 'home', a.H, 9).goals, 2);
+  assert.equal(finE.rating, 9.0);        // 6,5 + 2·1,25 – målscoreren er modtageren, ikke løberen
   assert.equal(rOf(m, 'away', a.A, 0).rating, 5.9);
   assert.equal(m.goalsPool[0].scorer, tg(fin));
   assert.equal(m.goalsPool[0].spectacle, goalSpectacle('CUTBACK', { passing: 20 }, m.goalsPool[0].min, { next: () => 0.5 }));   // oplæggets PAS (20), ikke modtagerens (10)
@@ -1549,9 +1605,9 @@ test('løber → skud fra kanten: LONGSHOT uden oplæg, +1,4 til løberen selv; 
   assert.equal(g.m.goalsPool[0].scorer, tg(g.runner));
   assert.ok(g.goals[0].text.includes(`✅ ${tg(g.runner)} løber sig fri på kanten og skyder.`), g.goals[0].text);
   assert.equal(g.summary, '🎯 Løb uden bold (Normal): 2 løb, 2 kom fri (2 mål) · kontraer imod i alt: 0 (0 mål).');
-  // Redning (løbsbonus 2, KEEPER_EDGE 3 fra v3.12): FIN 10 + 2 = 12 mod MV 9 + 3 → ikke større → redning; 10,1 → mål
+  // Redning (løbsbonus 2, KEEPER_EDGE 3,5 fra v3.12.1): FIN 10 + 2 = 12 mod MV 8,5 + 3,5 → ikke større → redning; 10,1 → mål
   // (FIN 10: skudvægt 4 mod aflevering 1,5 + dribling 1 – løberen skyder selv)
-  const save = fx({ rm: { finishing: 10, passing: 1, pace: 1, ballControl: 1 }, gk: 9 });
+  const save = fx({ rm: { finishing: 10, passing: 1, pace: 1, ballControl: 1 }, gk: 8.5 });
   assert.equal(save.m.homeGoals, 0);
   assert.equal(rOf(save.m, 'home', save.a.H, 8).rating, 7.0);   // 6,5 + 2·(0,15 + 0,1)
   const gk = rOf(save.m, 'away', save.a.A, 0);
@@ -1560,8 +1616,8 @@ test('løber → skud fra kanten: LONGSHOT uden oplæg, +1,4 til løberen selv; 
   const txt = save.m.events.filter((e) => e.type === 'SAVE').map((e) => e.text);
   assert.equal(txt.length, 2);
   for (const t of txt) assert.match(t, new RegExp(`^🧤 \\[.+\\] Flot redning af #\\d+ .+ på afslutning fra ${tg(save.runner).replace('#', '#')} \\(.+\\)\\. ${tg(save.runner)} løber sig fri på kanten og skyder\\.$`), t);
-  assert.equal(fx({ rm: { finishing: 10.1, passing: 1, pace: 1, ballControl: 1 }, gk: 9 }).m.homeGoals, 2);
-  // Friskhed: løberen træt (0 %: 10 → 7,5 + 2 = 9,5 < 7 + 3 → redning; uden friskhed 12 → mål); målmanden træt (18 → 13,5 + 3 < 15,1 + 2 → mål; uden: 21 → redning)
+  assert.equal(fx({ rm: { finishing: 10.1, passing: 1, pace: 1, ballControl: 1 }, gk: 8.5 }).m.homeGoals, 2);
+  // Friskhed: løberen træt (0 %: 10 → 7,5 + 2 = 9,5 < 7 + 3,5 → redning; uden friskhed 12 → mål); målmanden træt (18 → 13,5 + 3,5 < 15,1 + 2 → mål; uden: 21,5 → redning)
   assert.equal(fx({ rm: { finishing: 10, passing: 1, pace: 1, ballControl: 1 }, gk: 7, tweak: (a) => { a.H.squad.forEach((p) => { p.freshness = 0; }); } }).m.homeGoals, 0);
   assert.equal(fx({ rm: { finishing: 10, passing: 1, pace: 1, ballControl: 1 }, gk: 7 }).m.homeGoals, 2);
   assert.equal(fx({ rm: { finishing: 15.1, passing: 1, pace: 1, ballControl: 1 }, gk: 18, tweak: (a) => { a.A.squad.forEach((p) => { p.freshness = 0; }); } }).m.homeGoals, 2);
@@ -1738,12 +1794,13 @@ test('frispark i skudafstand: 37 % direkte skud (bedste FIN+PAS, MV +4) – elle
   assert.equal(sp({ script: { 0.061: true }, tweak: (a) => { for (const p of a.H.squad) p.aerialPower = 13.7; } }).m.homeGoals, 0);
 });
 test('hjørnespark efter redning (90 %): luftduel (CORNER), tælles som hjørne og afslutning', () => {
-  const g = sp({ script: { 0.3: true, 0.9: true }, gk: 8, tweak: (a) => { slot(a.H, 3).aerialPower = 20; } });
-  // v3.12: afslutningen reddes (10 + 4 < 8 + 4 + 3); hjørnet: duel 20 + 3 > 10 + 3 + 4,5, hovedstød 20 + 4 > 8 + 4 + 1,5
+  // v3.12.1: onlyShooter – ellers kan skytten stå uden for feltet og få langskudsbonussen (+7 → mål, intet hjørne)
+  const g = sp({ script: { 0.3: true, 0.9: true }, gk: 8, tweak: (a) => { onlyShooter(a.H); slot(a.H, 3).aerialPower = 20; } });
+  // afslutningen reddes (10 + 4 < 8 + 4 + 3,5); hjørnet: duel 20 + 3 > 10 + 3 + 3,75, hovedstød 20 + 4 > 8 + 4
   assert.equal(g.m.stats.hCorners, 30);
   assert.ok(g.kinds.length === 30 && g.kinds.every((k) => k === 'CORNER'), g.kinds.join());
   assert.equal(g.m.stats.hShots, 60);
-  assert.equal(sp({ script: { 0.3: true }, gk: 8 }).m.stats.hCorners, 0);
+  assert.equal(sp({ script: { 0.3: true }, gk: 8, tweak: (a) => onlyShooter(a.H) }).m.stats.hCorners, 0);
 });
 test('stille frispark (58 %) tælles på forsvaret uden hændelse; skade-frispark giver ikke gult kort', () => {
   const g = sp({ script: { 0.58: true } });
@@ -1940,12 +1997,13 @@ test('hovedstødsspiller blandt de tre bedste i luften (stopperne går med op): 
   const { a, pool } = spx({ script: { 0.061: once }, wrap: lastPick, tweak: t });
   assert.equal(pool[0].scorer, tg(slot(a.H, 7)));    // top-3 = 20, 19, 18 → sidste = plads 7 (18)
 });
-test('frisparksindlæg: forsvaret får SETPIECE_DEF_EDGE 4,5 (i åbent spil i stedet angriberen CROSS_EDGE 1): 14,4 slår ikke dødbolden men slår åbent indlæg; 14,6 er mål', () => {
+// v3.12.1 (dokumentets dødboldandel 25–30 %): SETPIECE_DEF_EDGE 4,5 → 3,75, CROSS_EDGE 1 → 2. Med 4,5 var 13,8 ikke mål.
+test('frisparksindlæg: forsvaret får SETPIECE_DEF_EDGE 3,75 (i åbent spil i stedet angriberen CROSS_EDGE 2): 13,7 slår ikke dødbolden men slår åbent indlæg; 13,8 er mål', () => {
   const air = (v) => (a) => { for (const p of a.H.squad) p.aerialPower = v; };
-  assert.equal(spx({ script: { 0.061: true }, tweak: air(14.4) }).m.homeGoals, 0);    // 17,4 < 10 + 3 + 4,5
-  assert.equal(spx({ script: { 0.061: true }, tweak: air(14.6) }).m.homeGoals, 30);   // 17,6 > 17,5; hovedstød 18,6 > 10 + 4 + 1,5
-  const open = spx({ script: { 0.3: true, 0.52: true }, home: { p1: { attackFocus: 'HIGH_CROSSES' } }, tweak: air(14.4) });
-  assert.equal(open.m.homeGoals, 30, 'åbent spil: tærskel 9 (CROSS_EDGE 1, ingen dødboldfordel)');
+  assert.equal(spx({ script: { 0.061: true }, tweak: air(13.7) }).m.homeGoals, 0);    // 16,7 < 10 + 3 + 3,75
+  assert.equal(spx({ script: { 0.061: true }, tweak: air(13.8) }).m.homeGoals, 30);   // 16,8 > 16,75; hovedstød 17,8 > 10 + 4
+  const open = spx({ script: { 0.3: true, 0.52: true }, home: { p1: { attackFocus: 'HIGH_CROSSES' } }, tweak: air(13.7) });
+  assert.equal(open.m.homeGoals, 30, 'åbent spil: tærskel 8 (CROSS_EDGE 2, ingen dødboldfordel)');
 });
 test('dødbolde vundet af forsvaret: tekst pr. type, luftsejr +0,4 og aerialWins til forsvareren, ingen dødboldmål', () => {
   const def = (a) => { for (const p of a.A.squad) p.aerialPower = 20; };
@@ -1966,7 +2024,7 @@ test('dødbolde vundet af forsvaret: tekst pr. type, luftsejr +0,4 og aerialWins
 });
 test('hjørnespark-mål i detaljer: hoved +1,35, oplægsgiver (bedste PAS) +0,55, forsvarer −0,35, MV −0,25; bogført som hoved- og dødboldmål, ikke taktisk succes', () => {
   const t = (a) => { slot(a.H, 7).aerialPower = 20; slot(a.H, 6).skills.passing = 15; slot(a.H, 10).skills.finishing = 15; };
-  // v3.12: MV 15 redder skuddet (FIN 15 + 4 < 15 + 4 + 3), men ikke hovedstødet (20 + 4 > 15 + 4 + 1,5)
+  // MV 15 redder skuddet (FIN 15 + 4 < 15 + 4 + 3,5), men ikke hovedstødet (20 + 4 > 15 + 4)
   const { a, m, pool } = spx({ script: { 0.3: shots(2), 0.9: true }, gk: 15, tweak: t });
   assert.equal(m.homeGoals, 2); assert.ok(pool.every((g) => g.kind === 'CORNER'), pool.map((g) => g.kind).join());
   const sh = rOf(m, 'home', a.H, 7), as = rOf(m, 'home', a.H, 6);
@@ -2018,7 +2076,7 @@ test('bogføring pr. måltype: hovedstød i åbent spil er hovedstødsmål men i
   assert.deepEqual(open.pool.map((g) => g.kind), ['HEADER', 'HEADER']);
   assert.deepEqual([e.headerGoals, e.setPieceGoals, e.penaltyGoals], [2, 0, 0]);
   assert.deepEqual(stNums(open.m, 'h', 'HeaderGoals', 'SetPieceGoals', 'AerialWon', 'TacticSuccess'), [2, 0, 2, 2]);
-  const plain = spx({ script: { 0.3: shots(2) }, tweak: (a) => { slot(a.H, 9).skills.finishing = 15; } });
+  const plain = spx({ script: { 0.3: shots(2) }, tweak: (a) => { onlyShooter(a.H); slot(a.H, 9).skills.finishing = 15; } });
   const p = rOf(plain.m, 'home', plain.a.H, 9);
   assert.equal(plain.m.homeGoals, 2); assert.deepEqual([p.headerGoals, p.setPieceGoals, p.penaltyGoals], [0, 0, 0]);
 });
@@ -2051,7 +2109,7 @@ test('fuldtids-analyse: hvert tal står på sin plads (dit hold hjemme), kun for
   // Bolden hos hjemme alle ticks (poss 10 + 3·30 mod 10 → 91 %), opbygningen vinder hver duel (30 af 30; pres 0 af 0),
   // straffe i tick 0–1 (reddet), frispark-indlæg i de næste 4 (tabt luftduel = skud uden på mål), 3 afslutninger der scorer.
   const a = arena();
-  slot(a.H, 9).skills.finishing = 25.5; slot(a.H, 1).skills.finishing = 26; slot(a.H, 1).freshness = 0;   // straffe: FIN 26 · 0,75 + 6,3 = 25,8 < MV 26; skud: 29,5 > 22 + 4 + 3
+  onlyShooter(a.H); slot(a.H, 9).skills.finishing = 26.1; slot(a.H, 1).skills.finishing = 26.2; slot(a.H, 1).freshness = 0;   // straffe: FIN 26,2 · 0,75 + 6,3 = 25,95 < MV 26; skud: 30,1 > 22 + 4 + 3,5
   slot(a.A, 0).skills.goalkeeping = 22;
   for (const p of mids(a.H)) p.skills.passing = 20;
   const m = simulateMatch(a.H, a.A, stubRng({ 0.48: true, 0.011: (n) => n < 2, 0.061: (n) => n < 4, 0.3: (n) => n < 3 }));
@@ -2249,9 +2307,10 @@ test('cutback: kantspilleren (PAC+BAL 20 + 4) mod backen (PAC+POS + 4 − 2): 21
   const back = shut.m.ratings.away.find((e) => e.tacticWins > 0);
   assert.equal(back.tacticWins, 2); assert.equal(back.rating, 7.6);   // 6,5 + 2·0,3 + 0,5 (karakterbonus for clean sheet til LB/RB)
 });
-test('cutback: afslutteren får CUTBACK_FINISH_BONUS 5 – FIN 10 + 4 + 5 mod MV + 4 + 3: MV 11,9 slås, 12 redder', () => {
-  assert.equal(cbRun({ gk: 11.9 }).m.homeGoals, 2);
-  const saved = cbRun({ gk: 12 }).m;
+// v3.12.1: CUTBACK_FINISH_BONUS 6 → 8 og KEEPER_EDGE 2,5 → 3,5 (med de gamle tal reddede 14,4)
+test('cutback: afslutteren får CUTBACK_FINISH_BONUS 8 – FIN 10 + 4 + 8 mod MV + 4 + 3,5: MV 14,4 slås, 14,5 redder', () => {
+  assert.equal(cbRun({ gk: 14.4 }).m.homeGoals, 2);
+  const saved = cbRun({ gk: 14.5 }).m;
   assert.equal(saved.homeGoals, 0); assert.equal(saved.events.filter((e) => e.type === 'SAVE').length, 2); assert.equal(saved.stats.hOnTarget, 2);
 });
 test('modgift mod cutbacks: højt gegenpres lukker kanten (+3), lav blok åbner den (−2)', () => {
@@ -2259,10 +2318,11 @@ test('modgift mod cutbacks: højt gegenpres lukker kanten (+3), lav blok åbner 
   assert.equal(blocked({ defSum: 18.9, press: 'HIGH_GEGENPRESS' }), 0); assert.equal(blocked({ defSum: 19, press: 'HIGH_GEGENPRESS' }), 2);
   assert.equal(blocked({ defSum: 23.9, press: 'LOW_BLOCK' }), 0); assert.equal(blocked({ defSum: 24, press: 'LOW_BLOCK' }), 2);
 });
-test('modgift mod indlæg: lav blok fylder feltet (+1 til CB\'en i åbent spil) – 10 + 1 vinder mod mellemblok, taber mod lav blok', () => {
+// v3.12.1: CROSS_EDGE 2 – angriberne har luft 9 (9 + 2 = 11 > 10, men 11 = 10 + 1 mod lav blok)
+test('modgift mod indlæg: lav blok fylder feltet (+1 til CB\'en i åbent spil) – 9 + 2 vinder mod mellemblok, taber mod lav blok', () => {
   const run = (press) => {
     const a = arena({ home: { p1: { attackFocus: 'HIGH_CROSSES' } }, away: { p2: { pressingHeight: press } } });
-    slot(a.A, 0).skills.goalkeeping = 1;
+    slot(a.A, 0).skills.goalkeeping = 1; for (const p of a.H.squad) p.aerialPower = 9;
     return simulateMatch(a.H, a.A, stubRng({ 0.3: shots(2), 0.52: true })).duelLog[a.H.id];
   };
   assert.deepEqual([run('MID_BLOCK').crossesWon, run('HIGH_GEGENPRESS').crossesWon, run('LOW_BLOCK').crossesWon], [2, 2, 0]);
@@ -2287,8 +2347,6 @@ test('modtageren står nær bolden: skytten er den nærmest feltet – en midtba
     if (custom) a.H.tactics.customCoords = custom;
     return { a, pool: simulateMatch(a.H, a.A, stubRng({ 0.3: shots(2) })).goalsPool };
   };
-  const base = run();
-  assert.equal(base.pool[0].scorer, tg(slot(base.a.H, 9)));
   // Angriberne trukket tilbage og en midtbanespiller lagt ind på feltets kant (50, 20): han tager skuddene
   const moved = run({ 6: { x: 50, y: 20 }, 9: { x: 40, y: 70 }, 10: { x: 60, y: 70 } });
   assert.ok(moved.pool.every((g) => g.scorer === tg(slot(moved.a.H, 6))), moved.pool.map((g) => g.scorer).join());
