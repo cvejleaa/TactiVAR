@@ -53,6 +53,7 @@ try {
   const tab = async (k) => { await g.click(`#tab-${k}`); await g.waitForSelector(`.tabpane.tab-${k}`); };
   check('Fire faner, Trup er åben fra start', (await g.locator('#tabs .tab').count()) === 4 && (await g.textContent('#tabs .tab.active')).includes('Trup'));
   check('Ny liga: dit hold vises med 18 spillere', (await rows()) === 18);
+  check('Ny liga: ingen "Nyt i kampene"-besked (den er til dem, der opdaterer et gammelt gem)', (await g.locator('#notice').count()) === 0);
   check('Holdvælgeren har 8 hold', (await g.locator('#team-select option').count()) === 8);
   const heads = (await g.locator('#matrix thead th').allTextContents()).map((t) => t.replace(/ [▲▼]$/, ''));
   check('Regnearkets kolonner i rækkefølge (Alder står hvor den skal)', JSON.stringify(heads.slice(0, 21)) === JSON.stringify(['Pos/#', 'Spiller', 'Kæde', 'Natur', 'Alder', 'Frisk/🚑', 'Højde', 'Spring', '✈ Luft', 'PAC', 'STA', 'STR', 'BAL', 'PAS', 'FIN', 'POS', 'INT', 'GK', 'Gns', '⭐ Vurd', '🧠 Mod']), heads.join('|'));
@@ -231,12 +232,15 @@ try {
   await g.selectOption('#tactics select[data-field="offBallRuns"]', 'MANY'); await reload();
   check('Løb uden bold: Mange gemmes og overlever F5', (await g.inputValue('#tactics select[data-field="offBallRuns"]')) === 'MANY');
   const help = await g.locator('#tactics .phase-help').allTextContents();
-  check('Hjælpetekst under Fase 1 (pris for Mange, fordel ved Få) og Fase 3 (genpres koster løb)', help.length === 2 && help[0].includes('kontraer imod') && help[0].includes('Få') && help[1].includes('Genpres') && help[1].includes('friskhed'), help.join(' | '));
+  check('Hjælpetekst under Fase 1 (fokus og pasningsstil, pris for Mange, fordel ved Få), Fase 2 (modgiften) og Fase 3 (genpres koster løb)', help.length === 3 && help[0].includes('kontraer imod') && help[0].includes('Få') && help[2].includes('Genpres') && help[2].includes('friskhed'), help.join(' | '));
+  check('Hjælpeteksten forklarer fokus mod pasningsstil (v3.12) og modgiften i Fase 2',
+    help[0].startsWith('Angrebsfokus bestemmer, hvordan chancerne kommer') && help[0].includes('Pasningsstil bestemmer, hvordan bolden kommer frem') && help[0].includes('direkte lange bolde giver også nogle høje bolde')
+    && help[1].includes('lav blok fylder feltet og vinder flere luftdueller mod indlæg, men giver plads til cutbacks') && help[1].includes('højt gegenpres lukker kanten'), help.join(' | '));
   // Test Manager v3.9: hjælpeteksten må ikke love det modsatte af motoren (retning, ikke bare ord)
   check('Hjælpeteksten lover det motoren gør (Få: færre kontraer; Lynkontra: flere; Hold: færre; Genpres dæmper; Fald tilbage gratis)',
     help[0].includes('Mange – flere spillere løber sig fri') && help[0].includes('løber flere km') && help[0].includes('Få – færre løb fremad, færre kontraer imod og mindre slid.')
-    && help[1].includes('Lynkontra giver flere kontraer') && help[1].includes('Hold på bolden giver færre, men styrker jeres næste opbygning')
-    && help[1].includes('Genpres dæmper modstanderens kontraer, men koster løb (friskhed)') && help[1].includes('Fald tilbage koster intet'), help.join(' | '));
+    && help[2].includes('Lynkontra giver flere kontraer') && help[2].includes('Hold på bolden giver færre, men styrker jeres næste opbygning')
+    && help[2].includes('Genpres dæmper modstanderens kontraer, men koster løb (friskhed)') && help[2].includes('Fald tilbage koster intet'), help.join(' | '));
   const runsLabel = await g.locator('#tactics label:has(select[data-field="offBallRuns"])').evaluate((l) => l.firstChild.textContent.trim());
   const runsOpts = await g.locator('#tactics select[data-field="offBallRuns"] option').evaluateAll((os) => os.map((o) => `${o.value}=${o.textContent}`).join(','));
   check('Løb uden bold: etiket og valg (Få/Normal/Mange i den rækkefølge)', runsLabel === 'Løb uden bold' && runsOpts === 'FEW=Få,NORMAL=Normal,MANY=Mange', `${runsLabel} / ${runsOpts}`);
@@ -353,6 +357,7 @@ try {
   check('Karakterark: "fri" for dit hold matcher de gemte løb, modstanderen har ingen kolonne', fri.length >= 11 && JSON.stringify(fri.filter(Boolean).sort()) === JSON.stringify([...friExpect].sort()) /* præcis de spillere med løb – ingen "0/0 fri" til resten; tilfældig liga: ca. hver 5. kamp uden løb, så står alle tomme (unit-testene dækker indholdet) */ && fri.every((t) => t === '' || /^\d+\/\d+ fri$/.test(t)) && (await g.locator('.ratings').nth(1 - own).locator('td.fri').count()) === 0, `${fri.join(',')} / ${friExpect.join(',')}`);
   const runSum = await g.textContent('#match-center');
   check('Fuldtids-analyse med løb uden bold i din kamp', /📊 \[90' FULDTIDS-ANALYSE\] \d+-\d+ til dig\. Du havde \d+% af bolden og \d+ afslutninger \(\d+ på mål\)\. Din opbygning kom igennem \d+ af \d+ gange; dit pres vandt bolden \d+ af \d+ gange\. Dødbolde: \d+ frispark i skudafstand, \d+ hjørnespark, \d+ straffe \(\d+ mål\) · frispark begået \d+, tilkendt \d+\. 🎯 Løb uden bold \(Normal\): \d+ løb, \d+ kom fri \(\d+ mål\) · kontraer imod i alt: \d+ \(\d+ mål\)\./.test(runSum), runSum.match(/🎯[^.]*\./)?.[0] ?? 'mangler');
+  check('Fuldtids-analysen viser dit angreb (fokus · pasningsstil) og dit felt (v3.12)', /⚔️ Angreb \((Centralt|Høje indlæg|Lave cutbacks) · (korte pasninger|balanceret|direkte lange bolde)\): (ingen cutbacks eller høje bolde|(\d+ cutbacks \(\d+ mål, \d+ stoppet ved kanten\))?(, )?(\d+ høje bolde \(\d+ vundne luftdueller, \d+ hovedstødsmål\))?)\. 🛡️ Dit felt: modstanderens cutbacks stoppet \d+ af \d+, luftdueller vundet \d+ af \d+\./.test(runSum), runSum.match(/⚔️[^🛡]*🛡️[^.]*\./)?.[0] ?? 'mangler');
   const gzText = await g.textContent('#gazette');
   check('Avisen: en overskrift pr. kamp og dit holds løber med andel højintenst', (await g.locator('#headlines li').count()) === 4 && /Dit holds løber: #\d+ .+ – \d+\.\d km, \d+ % højintenst/.test(gzText), gzText.slice(0, 200));
   const iconTitles = await g.evaluate(() => [...document.querySelectorAll('.ratings .ricon')].map((e) => [e.textContent, e.title]));
@@ -543,9 +548,15 @@ try {
   await g.evaluate((f) => { for (const k of Object.keys(localStorage)) if (k.startsWith('tactivar_')) localStorage.removeItem(k); localStorage.setItem('tactivar_save', f); }, fixtureV39);
   await reload();
   const v39note = await g.textContent('#notice'); // fanebyt fjerner beskeden
+  check('Nyt i v3.12 vises én gang efter opdateringen (sammen med migreringen)', v39note.includes('"Lave cutbacks" giver rigtige cutbacks') && v39note.includes('Direkte lange bolde'), v39note.slice(-200));
+  // Test Manager v3.12: nyheden skal være GEMT straks – ellers vises den igen efter F5, hvis man ikke har gjort andet (fanebyt gemmer også)
+  await reload();
+  check('Nyt i v3.12 er gemt straks: ikke igen efter F5 uden anden handling', (await g.locator('#notice').count()) === 0);
   await tab('liga');
   const v39secs = await g.locator('#stats details.stats-sec > summary').allTextContents();
   check('Gem fra v3.9: kun kampprogram-beskeden; statistikken tæller fra runde 3 og er tom', v39note.startsWith('Dit spil er opdateret: Nu spilles der efter et fast kampprogram') && !v39note.includes('naturlig position') && v39secs[0] === 'Spillere (fra runde 3)' && (await g.locator('#stats .stat-list[data-key="sGoals"]').textContent()).includes('Ingen endnu') && (await g.locator('#fejlboks').isHidden()), v39secs.join(' | '));
+  await reload();
+  check('…og ikke igen efter næste indlæsning', (await g.locator('#notice').count()) === 0);
   await tab('trup');
 
   // Skema 3 (v3.6 – den version, de fleste kommer fra): beskeden handler om højder og friskhed

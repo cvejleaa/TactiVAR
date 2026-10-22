@@ -90,7 +90,7 @@ spillerobjekt; de skal ligge hos den der observerer.
 - Kampstatistikken i Match Center (v3.10.1: også frispark i skudafstand, hjørnespark, straffe (mål)
   og gule kort) er tal fra én kamp, hvor hver hændelse står i referatet – offentlig for begge hold.
   Kun SÆSONsummer, der følger en skjult indstilling, er private (§8b).
-- Offentligt: navn ("F. Efternavn" på banen), rygnummer, kæde, naturlig position, alder, højde, friskhed, skadesstatus 🚑, stjerner (★☆☆☆☆–★★★★★), holdets startformation. Intet andet om andre holds taktik (brugerens beslutning, afviger bevidst fra v2.5): ingen faser, planer, Hvis-Så-regler eller "typisk stil" – heller ikke i ligatabellen, kamphovedet, det taktiske oplæg eller referatet. Et modstanderholds Hvis-Så-skift vises kun som "omorganiserer sig". Referatet navngiver kun dine egne taktikvalg. (Trin 1 lægger teksterne i motoren med det menneskestyrede hold som seer; trin 2 skal gøre dem seer-afhængige.)
+- Offentligt: navn ("F. Efternavn" på banen), rygnummer, kæde, naturlig position, alder, højde, friskhed, skadesstatus 🚑, stjerner (★☆☆☆☆–★★★★★), holdets startformation. Intet andet om andre holds taktik (brugerens beslutning, afviger bevidst fra v2.5): ingen faser, planer, Hvis-Så-regler eller "typisk stil" – heller ikke i ligatabellen, kamphovedet, det taktiske oplæg eller referatet. Et modstanderholds Hvis-Så-skift vises kun som "omorganiserer sig". Referatet navngiver kun dine egne taktikvalg. Fra v3.12 (brugerens valg) følger chancetypen hvert holds eget angrebsfokus – man kan selv regne ud, at et hold slår mange indlæg eller cutbacks, men ordvalget navngiver aldrig indstillingen. Det gælder også fuldtids-analysens "🛡️ Dit felt: modstanderens cutbacks stoppet X af Y, luftdueller vundet …" – tal fra én kamp, som referatet allerede viser (som "kontraer imod i alt"), en bevidst og accepteret lækage. (Trin 1 lægger teksterne i motoren med det menneskestyrede hold som seer; trin 2 skal gøre dem seer-afhængige.)
 - Kun ejer: 9 evner, spring, luftduel, arketype, løn/værdi, kasse, de præcise fasevalg og Hvis-Så-regler,
   eksakt karakter, mod-kunnen.
 - Ingen: VAR-profil (kun via clues).
@@ -164,17 +164,47 @@ Tick hvert 3. minut (1..90).
 - Frispark 6 % (−0,35): heraf skade 40 % (1–3 kampe, auto-indskiftning fra bænken, intet kort),
   ellers taktisk frispark med gult kort. Fra v3.10 desuden gult kort på 21 % af de "stille" frispark
   (Superligaen ≈ 2 gule pr. hold pr. kamp) – se Dødbolde.
-- Chance 30 % (v3.9: Få 26 %, Normal 30 %, Mange 36 %); xG 0,13–0,35 pr. afslutning. Høje bolde 55 % ved
-  HIGH_CROSSES: `aerial + rnd·6 > forsvarer.aerial + gk·0,4 + rnd·…`.
+- Chance 30 % (v3.9: Få 26 %, Normal 30 %, Mange 36 %); xG 0,13–0,35 pr. afslutning.
+- **Angrebsfokus afgør chancens type (v3.12**, brugeren: "Jeg har sat mit hold til cutbacks, og
+  alligevel er der ikke en eneste reference til cutbacks i referatet … min modstander vinder 11
+  luftdueller"). For ALLE hold (brugerens valg); teksten om en modstander navngiver aldrig
+  indstillingen. `FOCUS_SHARE`: høje indlæg 52 % indlæg, lave cutbacks 38 % cutbacks, ellers giver
+  direkte lange bolde 15 % høje bolde (før tvang DIRECT_LONG 55 % op i luften uanset fokus). Resten:
+  VAR-tjek eller afslutning (løb uden bold / almindeligt skud).
+- **Modtageren står hvor bolden kommer (v3.12**, brugeren: "den spiller der var nærmest hvor bolden
+  blev spillet hen"): spillerne bevæger sig ikke live – hver står på sin (evt. trukne) plads, og
+  modtageren trækkes med vægt exp(−afstand/16)·(10 + evne) (`receiver`): skytten nær feltet (50, 20)
+  efter FIN, hovedstødsspilleren nær feltets midte (50, 16) efter luft, cutbackens afslutter ved
+  straffesparkspletten (50, 28) efter FIN, kantspilleren ude på kanten (12/88, 30) efter PAC+BAL.
+  Målt: angribere scorer ≈ 70 % af målene (v3.11 med tilfældig skytte: 56 %), kant/CAM 12 %,
+  forsvar 11 % (dødbolde), CM 6 % – angriberne står nærmest; bevidst efter brugerens ønske.
+  Dødbolde: en af de tre bedste i luften (de høje går med op).
+- **Luftduellen i to trin (v3.12**; før vandt angriberen ≈ 4 % i åbent spil mod CB + keeperens
+  evne·0,38, og en vundet duel var altid mål): 1) `luft·friskhed + rnd·6 (+1 i åbent spil) >
+  CB.luft·friskhed + rnd·6 + (dødbold 4,5 | lav blok 1)`; 2) `luft·friskhed + rnd·8 > MV·friskhed +
+  rnd·8` – ellers redning (skud på mål). Clearet høj bold → hjørnespark 35 % (efter en
+  redning 90 %). Dit hold får kilden nævnt ("Dit indlæg"/"Din lange bold").
+- **Cutback (v3.12)**: kantspilleren `(PAC+BAL)·friskhed + rnd·8` mod den nærmeste back
+  `(PAC+POS)·friskhed + rnd·8 − 2 + kantpres` (højt gegenpres +3, lav blok −2 – modgiften); lukket
+  kant = ingen afslutning (hjørnespark 35 %), ellers afslutning med +5 og oplæg til kantspilleren.
+  Tekst: "✅ #11 X når baglinjen og lægger den lavt tilbage til #9 Y" for dit hold; for andre neutral
+  ("↩️ … spiller bolden tilbage i feltet" / "🛡️ #2 Z lukker kanten mod …").
+- **Målt v3.12** (`node tools/measure-duels.mjs 100 fokus`): pr. pasningsstil ligger de tre fokus
+  netto inden for ca. 0,15 af hinanden; cutbacks ≈ 1,1 pr. kamp ved lave cutbacks (stoppet 19/30/55 %
+  mod lav blok/mellemblok/højt gegenpres), angriberen vinder ≈ 43 % af de åbne luftdueller (33 % mod
+  lav blok); ligaen 2,82 mål pr. kamp, 23 % hovedstød (åbent spil + dødbolde), 21 % dødbolde (`… 100`);
+  Rundens mål (`… 30 saeson`): cutback 24 %, frispark 22 %, langskud 17 %, dribletur 11 %, hovedstød
+  10 % … – ingen over 30 %; friskheden uændret (startelleven ≈ 85 %).
 - VAR-tjek ved roll < 0,22: `varPulse + vsTrapLong·0,025 + rnd·6 > forsvarer.POS + rnd·…`.
-- Afslutning: `FIN + rnd·8 > GK + rnd·8` (v3.9 havde en målmandsfordel på 5; v3.10 fjerner den –
-  brugeren: "Bliver der scoret for lidt nu" – mod Superliga-niveau).
+- Afslutning: `FIN + rnd·8 > GK + rnd·8 + 3` (v3.9 havde en målmandsfordel på 5; v3.10 fjernede den;
+  v3.12 giver 3 tilbage, fordi skytten nu er den, der står nær feltet – oftest angriberen).
 - **Dødbolde (v3.10**, brugeren: "mål på hovedstød, straffe eller dødbolde. Antallet af frispark"):
   kun til holdet med bolden i en tick uden boldtab. Straffespark 1,1 % pr. tick: holdets bedste FIN,
   `FIN·friskhed + rnd·8 + 2,3 > MV·friskhed + rnd·8`. Frispark i skudafstand 6,1 %: 37 % direkte
   skud (bedste FIN+PAS, MV +4; FREEKICK), ellers indlæg fra bedste PAS til en af de tre bedste i
-  luften – også stopperne (SETPIECE). Hjørnespark 90 % efter en redning eller clearet høj bold (CORNER).
-  Dødbolds-luftduellen er den samme som i åbent spil, med forsvaret +0,5. "Stille" frispark 58 % pr.
+  luften – også stopperne (SETPIECE). Hjørnespark 90 % efter en redning, 35 % efter en clearet høj bold
+  eller lukket kant (CORNER, v3.12). Dødbolds-luftduellen er den samme som i åbent spil, med forsvaret
+  +4,5 (v3.12; før +0,5 og keeper-tillæg). "Stille" frispark 58 % pr.
   tick tælles uden hændelse. Gult kort kun ved det taktiske frispark (skade-frisparkets tekst nævner
   intet kort). Kontramål giver assist til den nævnte oplægsgiver; kontra-afslutningen får +4.
   **Målt** (`node tools/measure-duels.mjs 100`): 2,80 mål pr. kamp (Superligaen ≈ 2,8; v3.9 1,44),
@@ -183,7 +213,10 @@ Tick hvert 3. minut (1..90).
 - **Fuldtids-analyse (v3.10**, brugeren: "Ved pausen får jeg information om hvordan min opbygning har
   klaret sig, men det får jeg ikke af vide ved fuldtid"): kun din kamp – besiddelse, afslutninger,
   opbygning og pres for hele kampen, dødbolde (frispark i skudafstand, hjørne, straffe) og frispark
-  begået/tilkendt, samt løb uden bold og kontraer imod (erstatter v3.9's separate linje).
+  begået/tilkendt, samt løb uden bold og kontraer imod (erstatter v3.9's separate linje). Fra v3.12
+  desuden "⚔️ Angreb (dit fokus · din pasningsstil): N cutbacks (M mål, B stoppet ved kanten), H høje
+  bolde (V vundne luftdueller, K hovedstødsmål)" og "🛡️ Dit felt: modstanderens cutbacks stoppet L af
+  C, luftdueller vundet X af Y" (cutbacks fra løb på kanten tælles med).
 - **Løb uden bold (v3.9**, brugeren: "Alle kan være med til at løbe i position og afhængig af hvor
   man er på banen kan det blive til en dribletur, en aflevering (incl. tværaflevering) eller skud.
   Beslutningen kan også blive påvirket af spillerens evner til skud eller aflevering"). I den
@@ -241,8 +274,9 @@ Tick hvert 3. minut (1..90).
   runden), 🏃 Dit holds løber (kun eget hold – km/topfart er private).
 - **Måltyper (v3.7)**, afgjort ét sted pr. mål og brugt i referat, observation og avis (oplæg/🅰 kun
   for typer med oplægsgiver):
-  LONGSHOT og DRIBBLE (vægtet af FIN / PAC+BAL, intet oplæg), COMBINATION, CUTBACK (kun af DIT
-  holds LOW_CUTBACKS; for andre hold tilfældige 12 % – anti-spionage), HEADER, VAR. Fra v3.9
+  LONGSHOT og DRIBBLE (vægtet af FIN / PAC+BAL, intet oplæg), COMBINATION, CUTBACK (fra v3.12 kun fra
+  en rigtig cutback – hændelsen eller et vundet løb på kanten, der ender i en aflevering – for alle
+  hold; før: DIT holds LOW_CUTBACKS 42 % af almindelige mål, andre tilfældige 12 %), HEADER, VAR. Fra v3.9
   afgør et vundet løb uden bold typen (se §5), og COUNTER kommer kun fra en rigtig kontra. Mindst 3 tekster pr. type (clues.js). Fælles skala 0–20
   (`goalSpectacle`); målt: langskud 36 %, VAR 22 %, dribletur 20 %, kontra 8 % … af
   rundens mål (`node tools/measure-duels.mjs 40 saeson`; efter friskheds-kalibreringen: langskud
@@ -256,6 +290,7 @@ Tick hvert 3. minut (1..90).
   rnd·4), CORNER og SETPIECE (4 + luft·0,35 + rnd·4); HEADER er nu kun åbent spil. Målt (`… 60
   saeson`): langskud 22 %, frispark 20 %, dribletur 19 %, cutback 17 %, hjørnespark 8 %, hovedstød
   4 %, kombination 3 %, kontra 3 %, frisparksindlæg 2 %, VAR 2 % – ingen type over 30 %.
+  **v3.12** (`… 30 saeson`): se målingen i §5; ingen type over 30 % (båndet i balance.test.mjs).
 - **Løbedistance og topfart (v3.7; pr. plads fra v3.8)** pr. karakter: km/90 = basis for den
   PLADS (formationsrolle), spilleren står på – også en indskifter (dokumentets "fysisk
   belastning"): CM/CDM 11,8 · LWB/RWB/LM/RM/LW/RW 11,0 · CAM/CF 10,8 · LB/RB 10,6 · ST 10,0 ·

@@ -101,3 +101,22 @@ test('Rundens mål: bred fordeling – cutback ≥ 8 %, dribletur ≥ 9 %, ingen
   assert.ok((kinds.DRIBBLE ?? 0) >= 0.09, `dribletur ${kinds.DRIBBLE}`);
   for (const [k, v] of Object.entries(kinds)) assert.ok(v <= 0.3, `${k} ${v}`);
 });
+// v3.12 (brugeren: "ikke en eneste reference til cutbacks … min modstander vinder 11 luftdueller").
+// Før (v3.11, målt med samme værktøj): cutback-hændelser 0, åbne luftdueller vundet af angriberen ≈ 4 %,
+// hovedstødsmål (åbent spil) 0,07 pr. kamp ved DIRECT_LONG – hvert bånd nedenfor er rødt mod det.
+// (Hovedstødsandelen af alle mål var 16 % også før – den domineredes af dødbolde – og bevises ikke her.)
+test('angrebsfokus mærkes: cutbacks ≥ 1 pr. kamp, angriberen vinder 35–55 % af de åbne luftdueller, intet fokus dominerer (netto inden for 0,3), og modgiften virker', async () => {
+  const { measureFocus } = await import('../../tools/measure-duels.mjs');
+  const N = 60;
+  const cut = measureFocus({ focus: 'LOW_CUTBACKS' }, N), cross = measureFocus({ focus: 'HIGH_CROSSES' }, N), central = measureFocus({ focus: 'CENTRAL' }, N);
+  assert.ok(cut.cutbacks >= 1, `cutbacks ${cut.cutbacks} (før 0)`);
+  assert.ok(cross.crossWinRate >= 0.35 && cross.crossWinRate <= 0.55, `luftdueller vundet ${cross.crossWinRate} (før ≈ 0,04)`);
+  assert.ok(cross.headerGoals >= 0.15, `hovedstødsmål ${cross.headerGoals} (før ≈ 0,07)`);
+  const nets = [cut.net, cross.net, central.net];
+  assert.ok(Math.max(...nets) - Math.min(...nets) <= 0.3, `netto ${nets.map((x) => x.toFixed(2)).join(' / ')}`);
+  // Modgift: højt gegenpres lukker flere kanter end lav blok; lav blok vinder flere luftdueller
+  const cHigh = measureFocus({ focus: 'LOW_CUTBACKS', oppPress: 'HIGH_GEGENPRESS' }, N), cLow = measureFocus({ focus: 'LOW_CUTBACKS', oppPress: 'LOW_BLOCK' }, N);
+  assert.ok(cHigh.cutbacksBlocked / cHigh.cutbacks > 1.8 * (cLow.cutbacksBlocked / cLow.cutbacks), `lukket ${cHigh.cutbacksBlocked} mod ${cLow.cutbacksBlocked}`);
+  const xLow = measureFocus({ focus: 'HIGH_CROSSES', oppPress: 'LOW_BLOCK' }, N), xMid = measureFocus({ focus: 'HIGH_CROSSES', oppPress: 'MID_BLOCK' }, N);
+  assert.ok(xLow.crossWinRate < xMid.crossWinRate - 0.08, `luftdueller ${xLow.crossWinRate} mod ${xMid.crossWinRate}`);
+});

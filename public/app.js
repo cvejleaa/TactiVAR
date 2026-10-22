@@ -49,8 +49,13 @@ const myIdx = () => game.league.teams.findIndex((t) => !t.isBot);
 const myTeam = () => game.league.teams[myIdx()];
 
 function newGame() {
-  return { league: createLeague(createRng(randomSeed())), notes: {}, ui: { activePresetIndex: 0 } };
+  return { league: createLeague(createRng(randomSeed())), notes: {}, ui: { activePresetIndex: 0, seenVersion: VERSION } };
 }
+
+// Nyt i en version, der ikke ændrer gemme-formatet (vises én gang, ved første indlæsning).
+const NEWS = {
+  '3.12.0': 'Nyt i kampene: Angrebsfokus bestemmer nu, hvordan chancerne kommer – "Lave cutbacks" giver rigtige cutbacks fra baglinjen, og "Direkte lange bolde" tvinger ikke længere chancerne op i luften. Bolden går til den, der står nærmest, hvor den spilles hen (også dine trukne positioner). Dine hovedstødsspillere kan nu vinde luftduellerne. Modgift: lav blok mod indlæg, højt gegenpres mod cutbacks. Se dit angreb og dit felt i fuldtids-analysen.',
+};
 
 // Et migreret spil, hvis gamle fil ikke kunne tages backup af (fuldt lager): den gamle fil må
 // ikke overskrives, før backuppen er lykkedes – hvert gem prøver igen (Release Manager v3.11:
@@ -91,6 +96,10 @@ function start() {
       if (r.backupKey) persist();
       else { pendingRaw = storage.getItem(SAVE_KEY); window.tactivarFejl?.('Dit spil er opdateret, men der kunne ikke tages backup af det gamle format (er browserens lager fuldt?). Eksportér spillet med ⬇ Eksportér som sikkerhed.'); }
     }
+  }
+  if (game.ui.seenVersion !== VERSION) {
+    if (NEWS[VERSION] && r.status === 'ok') view.notice = [view.notice, NEWS[VERSION]].filter(Boolean).join(' ');
+    game.ui.seenVersion = VERSION; persist();
   }
   view.viewTeamIdx = myIdx();
   view.selectedPlayerId = myTeam().squad[3].id;
