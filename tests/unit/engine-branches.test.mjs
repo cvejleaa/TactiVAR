@@ -1101,6 +1101,20 @@ test('øjebliksbillede: ved et solo-mål (langskud) står bolden ved skytten; ve
   assert.equal(cb[2], 59);
   assert.ok(ce.snapshot.pts.every(([id]) => a.H.squad.some((p) => p.id === id)), 'kun dit holds spillere');
 });
+// v3.12.1 (QC): kontraens skytte vælges i FORSVARSFORMEN – holdet har lige vundet bolden. ST trukket til (50, 20),
+// CM til (50, 36): i forsvarsform (mellemblok, intet ryk) står ST på pletten (50, 20) → han skyder; i angrebsform
+// (ST −6 → 14, CM −16 → 20) stod CM'en på pletten og ville skyde. Rul 0,5 vælger kumulativt i pladsrækkefølge.
+test('kontra: skytten er den nærmeste i forsvarsformen (ST på pletten), ikke i angrebsformen (CM rykket frem)', () => {
+  const { a, m } = ctr({ tweak: (a) => {
+    a.A.tactics.customCoords = Object.fromEntries([1, 2, 3, 4, 5, 7, 8, 10].map((j) => [j, { x: 50, y: 95 }]));
+    Object.assign(a.A.tactics.customCoords, { 6: { x: 50, y: 36 }, 9: { x: 50, y: 20 } });
+    for (const i of [6, 9]) slot(a.A, i).skills.finishing = 20;
+    slot(a.H, 0).skills.goalkeeping = 1;
+  } });
+  assert.equal(m.awayGoals, 2);
+  assert.equal(rOf(m, 'away', a.A, 9).goals, 2, 'ST scorer');
+  assert.equal(rOf(m, 'away', a.A, 6).goals, 0, 'ikke CM');
+});
 test('måltype: hovedstød og VAR har egen type og tekst', () => {
   const a = arena({ home: { p1: { attackFocus: 'HIGH_CROSSES' } } });
   for (const p of mids(a.A)) p.skills.intercepting = 1;
