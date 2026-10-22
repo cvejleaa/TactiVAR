@@ -376,7 +376,12 @@ try {
     const before = await g.locator('.ratings').nth(own).locator('.mp-token').evaluateAll((ts) => ts.map((t) => t.style.left + ',' + t.style.top).join('|'));
     await g.locator('#feed .snap-btn').first().click();
     const after = await g.locator('#snap-pitch .mp-token').evaluateAll((ts) => ts.map((t) => t.style.left + ',' + t.style.top).join('|'));
-    check('Klik på 📍: minibanen viser øjebliksbilledet (11 brikker, bolden, flyttet fra startpladserne)', (await g.locator('#snap-pitch .mp-token').count()) === 11 && (await g.locator('#snap-ball').count()) === 1 && after !== before && (await g.locator('#feed .ev.snapped').count()) === 1, after.slice(0, 80));
+    check('Klik på 📍: minibanen viser øjebliksbilledet (11 brikker, bolden, flyttet fra startpladserne)', (await g.locator('#snap-pitch .mp-token').count()) === 11 && (await g.locator('#snap-ball').count()) === 1 && (after !== before || /mål imod/.test(await g.textContent('#snap-title'))) && (await g.locator('#feed .ev.snapped').count()) === 1, after.slice(0, 80));
+    // Test Manager v3.12.1: et mål IMOD mod mellemblok med bolden midt i banen viser præcis startopstillingen (ingen forskydning) – kun dine egne mål SKAL stå anderledes
+    // Test Manager v3.12.1: et nyt valg af kamp (også den aktive) fjerner billedet – ellers hænger et gammelt øjebliksbillede ved
+    await g.locator('#match-cards .matchcard.active').click();
+    check('Valg af kamp fjerner øjebliksbilledet (mc.snap nulstilles)', (await g.locator('#snap-pitch').count()) === 0 && (await g.locator('#feed .ev.snapped').count()) === 0);
+    await g.locator('#feed .snap-btn').first().click();
     await g.click('#snap-back');
     check('↩ Startopstilling går tilbage til minibanen fra kampstart', (await g.locator('#snap-pitch').count()) === 0 && (await g.locator('.ratings').nth(own).locator('.mp-token').count()) === 11);
   }
@@ -583,6 +588,7 @@ try {
   await reload();
   const v39note = await g.textContent('#notice'); // fanebyt fjerner beskeden
   check('Nyt i v3.12 vises én gang efter opdateringen (sammen med migreringen)', v39note.includes('"Lave cutbacks" giver rigtige cutbacks') && v39note.includes('Direkte lange bolde'), v39note.slice(-200));
+  check('Nyhederne står som to sætninger efter hinanden, kun adskilt af ét mellemrum', v39note.includes('i fuldtids-analysen. Spillerne rykker nu med'), v39note.slice(-300));
   check('Hopper man over en version, får man begge nyheder i rækkefølge (3.12.0 før 3.12.1)', v39note.indexOf('"Lave cutbacks"') >= 0 && v39note.indexOf('"Lave cutbacks"') < v39note.indexOf('Spillerne rykker nu med'), v39note.slice(-300));
   // Test Manager v3.12: nyheden skal være GEMT straks – ellers vises den igen efter F5, hvis man ikke har gjort andet (fanebyt gemmer også)
   await reload();
