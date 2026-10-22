@@ -73,6 +73,47 @@ export function measureRuns({ runs = 'NORMAL', lost = 'DROP_BACK', oppWon = null
   }
   return { gf: gf / games, ga: ga / games, net: (gf - ga) / games, cga: cga / games, runs: runsN / games, runsWon: runsWon / games, games };
 }
+// Angrebsfokus (v3.12): hold A med pasningsstil/fokus mod hold B (ligaens bots, evt. med tvunget
+// pres), begge baner. Pr. kamp for A: høje bolde og vundne luftdueller, hovedstødsmål i åbent spil,
+// cutbacks (forsøg/mål/stoppet), mål for/imod – fra kampens private tællere (match.duelLog).
+// Plus ligaens hovedstøds- og cutback-andel af alle mål (alle hold, egne bots).
+export function measureFocus({ pass = 'BALANCED', focus = 'CENTRAL', oppPress = null } = {}, N = ARG_N) {
+  const t = { gf: 0, ga: 0, crosses: 0, crossesWon: 0, headerGoals: 0, cutbacks: 0, cutbackGoals: 0, cutbacksBlocked: 0, games: 0, goals: 0, headerAll: 0, cutbackAll: 0, setPiece: 0 };
+  for (let s = 1; s <= N; s++) {
+    const rng = createRng(s * 15485863);
+    const L = createLeague(rng);
+    for (let i = 0; i < 8; i += 2) for (const swap of [false, true]) {
+      const [A, B] = [L.teams[i], L.teams[i + 1]];
+      Object.assign(A.tactics.phases.phase1_buildUp, { passingStyle: pass, attackFocus: focus });
+      if (oppPress) B.tactics.phases.phase2_defending.pressingHeight = oppPress;
+      const m = swap ? simulateMatch(B, A, rng) : simulateMatch(A, B, rng);
+      const d = m.duelLog[A.id];
+      t.gf += swap ? m.awayGoals : m.homeGoals; t.ga += swap ? m.homeGoals : m.awayGoals; t.games++;
+      for (const k of ['crosses', 'crossesWon', 'headerGoals', 'cutbacks', 'cutbackGoals', 'cutbacksBlocked']) t[k] += d[k];
+      t.goals += m.homeGoals + m.awayGoals;
+      t.headerAll += m.stats.hHeaderGoals + m.stats.aHeaderGoals; t.setPiece += m.stats.hSetPieceGoals + m.stats.aSetPieceGoals;
+      t.cutbackAll += m.goalsPool.filter((g) => g.kind === 'CUTBACK').length;
+    }
+  }
+  const g = t.games;
+  return { gf: t.gf / g, ga: t.ga / g, net: (t.gf - t.ga) / g, crosses: t.crosses / g, crossWinRate: t.crosses ? t.crossesWon / t.crosses : 0, headerGoals: t.headerGoals / g,
+    cutbacks: t.cutbacks / g, cutbackGoals: t.cutbackGoals / g, cutbacksBlocked: t.cutbacksBlocked / g, goalsPerMatch: t.goals / g,
+    headerShare: t.goals ? t.headerAll / t.goals : 0, cutbackShare: t.goals ? t.cutbackAll / t.goals : 0, setPieceShare: t.goals ? t.setPiece / t.goals : 0, games: g };
+}
+if (import.meta.url === `file://${process.argv[1]}` && process.argv[3] === 'fokus') {
+  const f = (x) => x.toFixed(2), pc = (x) => `${Math.round(x * 100)} %`;
+  for (const pass of ['SHORT', 'BALANCED', 'DIRECT_LONG']) for (const focus of ['CENTRAL', 'HIGH_CROSSES', 'LOW_CUTBACKS']) {
+    const r = measureFocus({ pass, focus });
+    console.log(`${pass.padEnd(11)} ${focus.padEnd(12)} netto ${f(r.net)} (for ${f(r.gf)}/imod ${f(r.ga)}) · høje bolde ${f(r.crosses)} (vundet ${pc(r.crossWinRate)}, hovedstødsmål ${f(r.headerGoals)}) · cutbacks ${f(r.cutbacks)} (mål ${f(r.cutbackGoals)}, stoppet ${f(r.cutbacksBlocked)})`);
+  }
+  console.log('Modgift (fokus mod modstanderens pres):');
+  for (const focus of ['HIGH_CROSSES', 'LOW_CUTBACKS', 'CENTRAL']) for (const oppPress of ['LOW_BLOCK', 'MID_BLOCK', 'HIGH_GEGENPRESS']) {
+    const r = measureFocus({ focus, oppPress });
+    console.log(`  ${focus.padEnd(12)} mod ${oppPress.padEnd(15)} netto ${f(r.net)} · vundne luftdueller ${pc(r.crossWinRate)} · cutbacks stoppet ${f(r.cutbacksBlocked)} af ${f(r.cutbacks)}`);
+  }
+  const all = measureFocus({ pass: 'BALANCED', focus: 'CENTRAL' });
+  console.log(`Ligaen (egne bots + A balanceret/centralt): ${f(all.goalsPerMatch)} mål pr. kamp, hovedstød ${pc(all.headerShare)}, cutback ${pc(all.cutbackShare)}, dødbolde ${pc(all.setPieceShare)} af målene`);
+}
 if (import.meta.url === `file://${process.argv[1]}` && process.argv[3] === 'loeb') {
   const f = (x) => x.toFixed(2);
   for (const [label, o] of [['Normal', {}], ['Mange', { runs: 'MANY' }], ['Få', { runs: 'FEW' }],
@@ -88,7 +129,7 @@ const phases = (pass, focus, height) => (t) => {
   Object.assign(t.tactics.phases.phase1_buildUp, { passingStyle: pass, attackFocus: focus });
   Object.assign(t.tactics.phases.phase2_defending, { pressingHeight: height, offsideTrap: 'OFF' });
 };
-if (import.meta.url === `file://${process.argv[1]}` && !['saeson', 'loeb'].includes(process.argv[3])) {
+if (import.meta.url === `file://${process.argv[1]}` && !['saeson', 'loeb', 'fokus'].includes(process.argv[3])) {
   const pct = (x) => `${(x * 100).toFixed(1)} %`;
   const liga = measure();
   console.log(`Ligaens egne taktikker: fase 1 vinder ${pct(liga.rate)} (${liga.n} dueller, ${ARG_N} ligaer × 3 runder); ${liga.goalsPerMatch.toFixed(2)} mål pr. kamp, heraf ${liga.headersPerMatch.toFixed(2)} hovedstød.`);

@@ -6,8 +6,9 @@ import { MAX_RULES } from '../state/actions.js';
 
 const PHASES = [
   ['phase1_buildUp', 'Fase 1 – Opbygning & indlæg', [['passingStyle', 'Pasningsstil'], ['attackFocus', 'Angrebsfokus'], ['offBallRuns', 'Løb uden bold']],
-    'Løb uden bold: Mange – flere spillere løber sig fri (også backs og wingbacks), men holdet står ubalanceret, når bolden tabes, og løber flere km. Få – færre løb fremad, færre kontraer imod og mindre slid.'],
-  ['phase2_defending', 'Fase 2 – Pres, offside & tacklinger', [['pressingHeight', 'Pres'], ['offsideTrap', 'Offside-fælde'], ['tacklingIntensity', 'Tacklinger']]],
+    'Angrebsfokus bestemmer, hvordan chancerne kommer: høje indlæg til den, der står i feltet, lave cutbacks fra baglinjen, eller centralt gennem løb og afslutninger. Pasningsstil bestemmer, hvordan bolden kommer frem (direkte lange bolde giver også nogle høje bolde). Løb uden bold: Mange – flere spillere løber sig fri (også backs og wingbacks), men holdet står ubalanceret, når bolden tabes, og løber flere km. Få – færre løb fremad, færre kontraer imod og mindre slid.'],
+  ['phase2_defending', 'Fase 2 – Pres, offside & tacklinger', [['pressingHeight', 'Pres'], ['offsideTrap', 'Offside-fælde'], ['tacklingIntensity', 'Tacklinger']],
+    'Pres og feltet: lav blok fylder feltet og vinder flere luftdueller mod indlæg, men giver plads til cutbacks; højt gegenpres lukker kanten, før den når baglinjen.'],
   ['phase3_transition', 'Fase 3 – De første 5 sekunder', [['onBallWon', 'Ved erobring'], ['onBallLost', 'Ved boldtab']],
     'Ved erobring: Lynkontra giver flere kontraer, når I vinder bolden; Hold på bolden giver færre, men styrker jeres næste opbygning. Ved boldtab: Genpres dæmper modstanderens kontraer, men koster løb (friskhed); Fald tilbage koster intet.'],
 ];
