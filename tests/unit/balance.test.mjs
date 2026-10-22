@@ -132,3 +132,14 @@ test('målene fordeler sig som i Superligaen: angreb 44–56 %, midtbane 25–38
   band('counter', 0.07, 0.14); band('longshot', 0.06, 0.12); band('setPiece', 0.2, 0.32);
   assert.ok(r.goalsPerMatch >= 2.6 && r.goalsPerMatch <= 3.0, `mål pr. kamp ${r.goalsPerMatch}`);
 });
+// QC v3.12.1 (B1, "efterprøv på dét, den rammer"): langskudsbonussen må ikke gøre det bedre at stå uden
+// for feltet. Med fast +7 (før LONGSHOT_CAP) målt med samme værktøj: 4-4-2 1,36, 4-4-1-1 1,78 (+0,42),
+// ST trukket til y 32 1,64 (+0,28) – begge røde mod grænsen 0,15. Med loftet: +0,06 og ±0,00.
+test('langskud belønner ikke en angriber uden for feltet: 4-4-1-1 og en trukket ST scorer højst 0,15 mere end 4-4-2', async () => {
+  const { measureFormations } = await import('../../tools/measure-duels.mjs');
+  const r = Object.fromEntries(measureFormations(200).map((x) => [x.formation, x]));
+  const base = r['4-4-2'].for;
+  assert.ok(base > 1, `4-4-2 scorer ${base} (data)`);
+  assert.ok(r['4-4-1-1'].for - base <= 0.15, `4-4-1-1 ${r['4-4-1-1'].for} mod 4-4-2 ${base}`);
+  assert.ok(r['4-4-2 + ST trukket til y 32'].for - base <= 0.15, `trukket ST ${r['4-4-2 + ST trukket til y 32'].for} mod ${base}`);
+});

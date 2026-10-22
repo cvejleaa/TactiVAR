@@ -91,7 +91,7 @@ spillerobjekt; de skal ligge hos den der observerer.
   og gule kort) er tal fra én kamp, hvor hver hændelse står i referatet – offentlig for begge hold.
   Kun SÆSONsummer, der følger en skjult indstilling, er private (§8b).
 - Offentligt: navn ("F. Efternavn" på banen), rygnummer, kæde, naturlig position, alder, højde, friskhed, skadesstatus 🚑, stjerner (★☆☆☆☆–★★★★★), holdets startformation. Intet andet om andre holds taktik (brugerens beslutning, afviger bevidst fra v2.5): ingen faser, planer, Hvis-Så-regler eller "typisk stil" – heller ikke i ligatabellen, kamphovedet, det taktiske oplæg eller referatet. Et modstanderholds Hvis-Så-skift vises kun som "omorganiserer sig". Referatet navngiver kun dine egne taktikvalg. Fra v3.12 (brugerens valg) følger chancetypen hvert holds eget angrebsfokus – man kan selv regne ud, at et hold slår mange indlæg eller cutbacks, men ordvalget navngiver aldrig indstillingen. Det gælder også fuldtids-analysens "🛡️ Dit felt: modstanderens cutbacks stoppet X af Y, luftdueller vundet …" – tal fra én kamp, som referatet allerede viser (som "kontraer imod i alt"), en bevidst og accepteret lækage. (Trin 1 lægger teksterne i motoren med det menneskestyrede hold som seer; trin 2 skal gøre dem seer-afhængige.)
-- Øjebliksbilledet ved mål (v3.12.1) gemmer kun DIT holds positioner – de afslører dit pres og dine løb, ikke modstanderens. Ved et modstandermål vises dit forsvar og bolden, aldrig modstanderens spillere eller scorerens plads.
+- Øjebliksbilledet ved mål (v3.12.1) gemmer kun DIT holds positioner – de afslører dit pres og dine løb, ikke modstanderens. Ved et modstandermål vises dit forsvar og bolden, aldrig modstanderens spillere eller scorerens plads. Accepteret: hvem der modtager bolden afhænger af hvert holds levende positioner (pres, løb), så over mange kampe kan man statistisk ane et holds indstilling – på linje med løbe-vægtene fra v3.9.
 - Kun ejer: 9 evner, spring, luftduel, arketype, løn/værdi, kasse, de præcise fasevalg og Hvis-Så-regler,
   eksakt karakter, mod-kunnen.
 - Ingen: VAR-profil (kun via clues).
@@ -155,7 +155,7 @@ Tick hvert 3. minut (1..90).
   (taberens løb uden bold) · taberens "Ved boldtab" (Genpres 0,6 / Fald tilbage 1) · vinderens
   "Ved erobring" (Lynkontra 1,8 / Hold på bolden 0,4) · (1 + 0,05 pr. LB/RB/LWB/RWB-plads ved
   Mange), afrundet til 3 decimaler (`counterChance`). Findes på alle trin – én kontra røber intet.
-  Afslutning: vinderens hurtigste nær målet (`receiver` efter PAC, v3.12.1; før altid angriberen) FIN + rnd·8 + 4 mod MV GK + rnd·8; mål = COUNTER, og oplægsgiveren i
+  Afslutning: vinderens hurtigste nær målet (`receiver` efter PAC i forsvarsformen, v3.12.1; før altid angriberen) FIN + rnd·8 + 3 (v3.10–v3.12: +4) mod MV GK + rnd·8; mål = COUNTER, og oplægsgiveren i
   teksten får assist (v3.10).
   "Hold på bolden" uden kontra giver holdets næste opbygning +2. Genpres koster km ·1,04 for alle
   markspillere (friskhed). Tekster kun for dit hold: Lynkontra + kontra "Din lynkontra sættes
@@ -185,21 +185,36 @@ Tick hvert 3. minut (1..90).
   frem, og en spiller, der har vundet sit løb, står yderligere 12 frem; ingen længere frem end y = 8.
   Uden bolden ligger holdet efter sit pres (lav blok alle 10 tilbage, højt gegenpres midtbane og
   angreb 12 frem). Hele holdet forskydes mod boldsiden (x + (boldX − 50)·0,3). MV står fast.
-  Gemmes ikke (regnes pr. tick). Langskud = skytten står uden for feltet (y ≥ 24) i øjeblikket og
-  får +7 (tid og plads); inde i feltet kombination eller dribletur efter evnerne.
+  Gemmes ikke (regnes pr. tick). Langskud = skytten står uden for feltet (y ≥ 24) i øjeblikket;
+  skuddets værdi er min(FIN + 8, 13) (`longshotBonus`): midtbanen (FIN ≈ 5) får tid og plads, men på
+  afstand er ingen bedre end 13, så en god afslutter står bedre i feltet (QC: med fast +7 scorede en
+  angriber uden for feltet ≈ 90 %). Inde i feltet kombination eller dribletur efter evnerne.
+  Kontraens skytte vælges i forsvarsformen (holdet har lige vundet bolden) efter PAC.
+  Bevidst forskel: løberens zone i teksten ("på kanten/dybt/bag forsvaret", `runZone`) regnes fra
+  pladsen + 20 frem, mens tegningen rykker ham ADVANCE + 12 – brikken kan stå lidt anderledes end ordet.
+  **Målt pr. formation** (`node tools/measure-duels.mjs 400 formation`, hold 0 mod 4-4-2, mål for/imod):
+  4-4-2 1,44/1,22 · 4-4-1-1 1,50/1,22 · 4-3-3 1,52/1,09 · 4-2-3-1 1,12/1,49 · 3-5-2 1,05/1,94 · 4-4-2 med
+  ST trukket til y 32 1,48/1,24 (med fast +7: 4-4-1-1 1,78 og trukket ST 1,64 – båndet i
+  balance.test.mjs). Kendt følge: 4-2-3-1 og 3-5-2 scorer færre end i v3.12.0 (1,27/1,26), fordi
+  spilleren nær målet her ofte er en midtbanespiller med lav afslutning – en sag for en senere version.
 - **Målfordeling (v3.12.1**, dokumentet "Spillerhøjde i Superligaen", afsnit om mål: angreb 45–50 %,
   midtbane 30–35 %, forsvar 15–20 %; åbent spil inkl. langskud 60–65 %, dødbolde 25–30 %, kontra
-  8–12 %, langskud 8–10 %). Målt (`node tools/measure-duels.mjs 150 maal`): 2,91 mål pr. kamp;
-  åbent spil 64 % (heraf langskud 9 %), kontra 10 %, dødbolde 26 %; angreb 51 %, midtbane 29 %,
-  forsvar 20 % (v3.12.0: angreb 75 %, midtbane 15 %, forsvar 10 %, kontra 19 %, langskud 4 %).
+  8–12 %, langskud 8–10 %). Målt (`node tools/measure-duels.mjs 150 maal`): 2,95 mål pr. kamp;
+  åbent spil 62 % (heraf langskud 8 %), kontra 12 %, dødbolde 26 %; angreb 54 %, midtbane 27 %,
+  forsvar 19 % (v3.12.0: angreb 75 %, midtbane 15 %, forsvar 10 %, kontra 19 %, langskud 4 %).
+  Typerne ligger i dokumentets intervaller; kæderne er 3–4 point fra (angreb over, midtbane under) –
+  tæt på, ikke inde i. Kalibreret: KEEPER_EDGE 3,5, CROSS_EDGE 2, SETPIECE_DEF_EDGE 3,75, cutback +8,
+  kontra +3 (v3.10: +4), EDGE_SHARE 0,5, langskud min(FIN + 8, 13).
   Båndet ligger i balance.test.mjs. Brugt fra dokumentet: kæde- og typefordelingen. Ikke brugt:
   enkeltspillernes tal (beskriver Superligaens spillere, ikke spillets).
 - **Øjebliksbillede ved mål (v3.12.1**, brugerens valg "Også på minibanen ved mål"): et mål i åbent
   spil (GOAL, HEADER_GOAL, VAR_GOAL) i en kamp med dit hold gemmer `snapshot` = DIT holds 11
   positioner i øjeblikket (`pts: [[spiller-id, x, y] …]`), bolden og – når I scorer – scorer og
-  oplægsgiver. 📍 ved målet i referatet viser det på minibanen i karakterarket; "↩ Startopstilling"
-  går tilbage. Ved modstanderens mål vises kun dit forsvar og bolden (§3). Ældre runder uden
-  snapshot viser startopstillingen som før.
+  oplægsgiver. Også kontramål (dit hold står da i angrebsform – det mistede bolden fremme). Ved
+  solo-mål (langskud, dribletur) står bolden ved skytten. 📍 ved målet i referatet (efter slutfløjt,
+  forklaret i ikonforklaringen) viser det på minibanen i karakterarket; "↩ Startopstilling" går
+  tilbage. Ingen 📍 på dødbolde (positionerne der er ikke regnet). Ved modstanderens mål vises kun
+  dit forsvar og bolden (§3). Ældre runder uden snapshot viser startopstillingen som før.
 - **Luftduellen i to trin (v3.12**; før vandt angriberen ≈ 4 % i åbent spil mod CB + keeperens
   evne·0,38, og en vundet duel var altid mål): 1) `luft·friskhed + rnd·6 (+2 i åbent spil; v3.12: +1) >
   CB.luft·friskhed + rnd·6 + (dødbold 3,75 (v3.12: 4,5) | lav blok 1)`; 2) `luft·friskhed + rnd·8 > MV·friskhed +
@@ -216,10 +231,14 @@ Tick hvert 3. minut (1..90).
   lav blok); ligaen 2,82 mål pr. kamp, 23 % hovedstød (åbent spil + dødbolde), 21 % dødbolde (`… 100`);
   Rundens mål (`… 30 saeson`): cutback 24 %, frispark 22 %, langskud 17 %, dribletur 11 %, hovedstød
   10 % … – ingen over 30 %; friskheden uændret (startelleven ≈ 85 %).
-  **v3.12.1** (`… 100 fokus`): fokus pr. pasningsstil inden for 0,17 netto; angriberen vinder ≈ 50 %
-  af de åbne luftdueller (41 % mod lav blok); cutbacks stoppet 19/34/53 % mod lav blok/mellemblok/
-  højt gegenpres. Løb (`… 300 loeb`, netto pr. kamp): mod Hold på bolden Mange +0,12, Normal −0,02,
-  Få −0,01; mod Lynkontra Få −0,01, Normal −0,03, Mange −0,13 – ingen indstilling vinder over alt.
+  **v3.12.1** (`… 100 fokus`): fokus pr. pasningsstil inden for 0,19 netto; angriberen vinder ≈ 50 %
+  af de åbne luftdueller (≈ 40 % mod lav blok); cutbacks stoppet ≈ 20/32/54 % mod lav blok/mellemblok/
+  højt gegenpres. Løb (`… 300 loeb`, netto pr. kamp): mod Hold på bolden Mange +0,16, Normal +0,01,
+  Få −0,00; mod Lynkontra Få −0,00, Normal −0,01, Mange −0,04. Få og Normal ligger nu inden for
+  målestøjen (≈ 0,05) af hinanden – Få's fordel er færre kontraer imod (0,03 mod 0,08) og mindre slid.
+  Ligaen 2,85 mål pr. kamp, 26 % dødbolde, hovedstød 22 % (`… 100`). Rundens mål (`… 30 saeson`):
+  frispark 22 %, cutback 22 %, langskud 20 %, dribletur 13 %, hovedstød 12 % … – ingen over 30 %;
+  friskheden uændret (startelleven 85 %).
 - VAR-tjek ved roll < 0,22: `varPulse + vsTrapLong·0,025 + rnd·6 > forsvarer.POS + rnd·…`.
 - Afslutning: `FIN + rnd·8 > GK + rnd·8 + 3,5` (v3.9 havde en målmandsfordel på 5; v3.10 fjernede den;
   v3.12 gav 3 tilbage, v3.12.1 3,5 – kalibreret til målfordelingen ovenfor).
@@ -231,7 +250,7 @@ Tick hvert 3. minut (1..90).
   eller lukket kant (CORNER, v3.12). Dødbolds-luftduellen er den samme som i åbent spil, med forsvaret
   +3,75 (v3.12.1; v3.12 +4,5; før +0,5 og keeper-tillæg). "Stille" frispark 58 % pr.
   tick tælles uden hændelse. Gult kort kun ved det taktiske frispark (skade-frisparkets tekst nævner
-  intet kort). Kontramål giver assist til den nævnte oplægsgiver; kontra-afslutningen får +4.
+  intet kort). Kontramål giver assist til den nævnte oplægsgiver; kontra-afslutningen får +3 (v3.12.1; før +4).
   **Målt** (`node tools/measure-duels.mjs 100`): 2,80 mål pr. kamp (Superligaen ≈ 2,8; v3.9 1,44),
   23 % af målene på dødbolde, 0,27 straffe pr. kamp (77 % scoret), 4,2 hjørnespark, 20,9 frispark,
   2,1 gule kort pr. hold pr. kamp (Superligaen ≈ 2).

@@ -353,13 +353,14 @@ test('duelLog for løb: en aflevering fra kanten tæller som cutback (og som cut
 // ---------- Måleværktøjet (balance.test.mjs bygger sine bånd på det) ----------
 test('measureFocus: netto = for − imod, hovedstødsmål er færre end vundne luftdueller (keeperen redder nogle), cutback-udfaldene er en delmængde af forsøgene', async () => {
   const { measureFocus } = await import('../../tools/measure-duels.mjs');
-  const x = measureFocus({ focus: 'HIGH_CROSSES' }, 2), c = measureFocus({ focus: 'LOW_CUTBACKS', oppPress: 'HIGH_GEGENPRESS' }, 2);
-  assert.equal(x.games, 16);
+  // N = 4 (32 kampe): med 2 lå cutbacks pr. kamp på præcis 1 efter v3.12.1's kalibrering – for lidt data til "> 1".
+  const x = measureFocus({ focus: 'HIGH_CROSSES' }, 4), c = measureFocus({ focus: 'LOW_CUTBACKS', oppPress: 'HIGH_GEGENPRESS' }, 4);
+  assert.equal(x.games, 32);
   assert.ok(Math.abs(x.net - (x.gf - x.ga)) < 1e-9 && Math.abs(x.gf + x.ga - x.goalsPerMatch) < 1e-9, JSON.stringify(x));
-  assert.ok(x.crosses > 1 && x.headerGoals > 0 && x.headerGoals < x.crosses * x.crossWinRate - 1e-9, JSON.stringify(x));
-  assert.ok(c.cutbacks > 1 && c.cutbacksBlocked > 0 && c.cutbackGoals + c.cutbacksBlocked <= c.cutbacks + 1e-9, JSON.stringify(c));
+  assert.ok(x.crosses * x.games > 10 && x.headerGoals > 0 && x.headerGoals < x.crosses * x.crossWinRate - 1e-9, JSON.stringify(x));
+  assert.ok(c.cutbacks * c.games > 10 && c.cutbacksBlocked > 0 && c.cutbackGoals + c.cutbacksBlocked <= c.cutbacks + 1e-9, JSON.stringify(c));
   // Modgiften sættes på B (ikke A): højt gegenpres lukker flere af A's kanter end A's egen lav blok ville
-  const open = measureFocus({ focus: 'LOW_CUTBACKS', oppPress: 'LOW_BLOCK' }, 2);
+  const open = measureFocus({ focus: 'LOW_CUTBACKS', oppPress: 'LOW_BLOCK' }, 4);
   assert.ok(c.cutbacksBlocked / c.cutbacks > open.cutbacksBlocked / open.cutbacks, `${c.cutbacksBlocked / c.cutbacks} mod ${open.cutbacksBlocked / open.cutbacks}`);
 });
 

@@ -98,7 +98,7 @@ function snapPitch(rows, { ev, snap }, onSnap) {
     h('div', { class: 'muted' }, snap.attacking ? 'Spillerne rykker med i kampen: frem når I har bolden, mod boldsiden – og løb uden bold fører flere ind i feltet.' : 'Dit forsvar står efter dit pres og boldsiden.'));
 }
 
-const legend = (isOwn = true) => h('div', { class: 'muted legend', id: 'icon-legend' }, RATING_ICONS.map(([s, t]) => `${s} ${t}`).join(' · ') + ' · HI = andel højintenst løb (over ca. 20 km/t) · "2/3 fri" = løb uden bold: kom fri 2 af 3 gange – begge kun dit hold');
+const legend = (isOwn = true) => h('div', { class: 'muted legend', id: 'icon-legend' }, RATING_ICONS.map(([s, t]) => `${s} ${t}`).join(' · ') + ' · 📍 i referatet = se hvor dit hold stod, da målet faldt (åbent spil og kontra, efter slutfløjt) · HI = andel højintenst løb (over ca. 20 km/t) · "2/3 fri" = løb uden bold: kom fri 2 af 3 gange – begge kun dit hold');
 
 // onOpenMatch(i): åbner referatet af kamp i i runden (Liga: skift til Kamp; Kamp: vis kampen).
 // matches: rundens kampe – bruges til at finde kampen for mål fra før v3.7.1 (uden matchIdx).

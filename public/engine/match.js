@@ -35,7 +35,7 @@ const RUNS_LABEL = { FEW: 'Få', NORMAL: 'Normal', MANY: 'Mange' };
 export const COUNTER_P = { FEW: 0.03, NORMAL: 0.08, MANY: 0.22 };
 export const COUNTER_LOST = { COUNTER_PRESS_5S: 0.6, DROP_BACK: 1 };
 export const COUNTER_WON = { FAST_COUNTER: 1.8, KEEP_POSSESSION: 0.4 };
-export const COUNTER_FINISH_BONUS = 4;   // ubalanceret forsvar (kalibreres sammen med løbene)
+export const COUNTER_FINISH_BONUS = 3;   // ubalanceret forsvar (kalibreres sammen med løbene)
 export const CALM_BUILD_BONUS = 2;       // "Hold på bolden": næste opbygning sidder bedre
 const FB_ROLES = new Set(['LB', 'RB', 'LWB', 'RWB']);
 // Løb uden bold (v3.9, brugeren: "Alle kan være med til at løbe i position og afhængig af hvor
@@ -88,11 +88,14 @@ export const FLANK_BONUS = { LOW_BLOCK: -2, MID_BLOCK: 0, HIGH_GEGENPRESS: 3 }; 
 export const RECEIVE_SPREAD = 16, RECEIVE_BASE = 10;
 // Uden for feltet (y ≥ LONGSHOT_Y i øjeblikket) er et skud et langskud. Den, der får bolden ved
 // feltets kant, har tid og plads (LONGSHOT_BONUS) – det opvejer, at midtbanens afslutning er lavere
-// på evneskalaen; kalibreret til dokumentets 8–10 % langskud.
-export const LONGSHOT_Y = 24, LONGSHOT_BONUS = 7;
+// på evneskalaen; kalibreret til dokumentets 8–10 % langskud. Men på afstand er ingen bedre end
+// LONGSHOT_CAP (QC v3.12.1: med fast +7 scorede en angriber uden for feltet ≈ 90 % – oftere end
+// inde i feltet): skuddets værdi er min(FIN + 7, 12), så en god afslutter står bedre i feltet.
+export const LONGSHOT_Y = 24, LONGSHOT_BONUS = 8, LONGSHOT_CAP = 13;
+export const longshotBonus = (fin) => Math.min(fin + LONGSHOT_BONUS, LONGSHOT_CAP) - fin;
 // En del af de almindelige afslutninger falder til en spiller ved feltets kant (andenbolde, afslag –
 // dokumentet: midtbanen scorer 30–35 %); resten går mod målet.
-export const EDGE_SHARE = 0.45;
+export const EDGE_SHARE = 0.5;
 export const SPOT = { CROSS: { x: 50, y: 16 }, CUTBACK: { x: 50, y: 28 }, GOAL: { x: 50, y: 20 }, EDGE: { x: 50, y: 32 } };
 const FOCUS_LABEL = { CENTRAL: 'Centralt', HIGH_CROSSES: 'Høje indlæg', LOW_CUTBACKS: 'Lave cutbacks' };
 const PASS_LABEL = { SHORT: 'korte pasninger', BALANCED: 'balanceret', DIRECT_LONG: 'direkte lange bolde' };
@@ -238,11 +241,12 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // dit holds positioner gemmes (QC, §3 – modstanderens røber pres og løb): ved dit mål dit angreb,
   // ved et mål imod dit forsvar i øjeblikket. Punkter pr. spiller-id (indskiftere, Hvis-Så-skift).
   // Hænges på den seneste hændelse; spot = hvor bolden kom (holdets egne koordinater).
-  function snapshot(side, scorer, helper, spot = SPOT.GOAL) {
+  // caught = dit hold mistede bolden i angrebet (kontra imod): det står i angrebsform, ikke i sin blok.
+  function snapshot(side, scorer, helper, spot = SPOT.GOAL, caught = false) {
     const mine = [H, A].find(own);
     if (!mine) return;
     const ev = events.at(-1), attacking = side === mine;
-    const pos = attacking ? seen[side.team.id] : livePositions(mine.tactics, { attacking: false, ballX: 100 - (seenX[side.team.id] ?? 50) });
+    const pos = attacking ? seen[side.team.id] : livePositions(mine.tactics, { attacking: caught, ballX: caught ? 50 : 100 - (seenX[side.team.id] ?? 50) });
     if (!pos) return;
     ev.snapshot = {
       attacking, formation: mine.tactics.baseFormation,
@@ -257,7 +261,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
   function counterAttack(win, lose, min, wR, lR) {
     // Kontraens afslutter: den hurtigste nær målet i øjeblikket (v3.12.1, dokumentet "Mål": kontramål
     // fordeles på angreb og midtbane) – ikke altid en angriber.
-    const shooter = receiver(win, SPOT.GOAL, (p) => p.skills.pace, null, { attacking: true, ballX: 50 }), gk = lR.gk;
+    const shooter = receiver(win, SPOT.GOAL, (p) => p.skills.pace, null, { attacking: false, ballX: 50 }), gk = lR.gk;
     duelLog[lose.team.id].countersAgainst++;
     st[k(win, 'Shots')]++;
     st[k(win, 'Xg')] += 0.2 + rng.next() * 0.2;
@@ -279,6 +283,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
       const desc = describeGoal('COUNTER', tag(shooter), tag(helper ?? shooter), min, rng);
       goalsPool.push({ scorer: tag(shooter), teamName: win.team.name, match: `${home.name} - ${away.name}`, min, kind: 'COUNTER', spectacle: goalSpectacle('COUNTER', { pace: shooter.skills.pace }, min, rng), desc });
       addEv(min, 'GOAL', 'HIGHLIGHT', win.isHome, true, `⚽ Kontramål: ${tag(shooter)}`, `⚽ [${win.team.name} • ${hG}-${aG}] MÅÅÅL PÅ KONTRA!${why} ${desc}`);
+      snapshot(win, shooter, helper, SPOT.GOAL, true);
       return true;
     }
     st[k(win, 'OnTarget')]++;
@@ -373,7 +378,9 @@ export function simulateMatch(home, away, rng, opts = {}) {
       const desc = describeGoal(kd, tag(finisher), tag(helper ?? finisher), min, rng);
       goalsPool.push({ scorer: tag(finisher), teamName: att.team.name, match: `${home.name} - ${away.name}`, min, kind: kd, spectacle: goalSpectacle(kd, { finishing: fs.finishing, pace: fs.pace, ballControl: fs.ballControl, passing: (helper ?? finisher).skills.passing }, min, rng), desc });
       addEv(min, 'GOAL', 'HIGHLIGHT', att.isHome, true, `⚽ Mål: ${tag(finisher)}`, `⚽ [${att.team.name} • ${hG}-${aG}] MÅÅÅL! ${lead ? lead + ' ' : ''}${desc}`);
-      snapshot(att, finisher, solo ? null : helper, kd === 'CUTBACK' ? SPOT.CUTBACK : SPOT.GOAL);
+      // Solo-mål (langskud, dribletur): bolden står ved skytten – ikke på en fast plet i feltet (QC).
+      const at = solo && seen[att.team.id]?.[att.starters.indexOf(finisher)];
+      snapshot(att, finisher, solo ? null : helper, at || (kd === 'CUTBACK' ? SPOT.CUTBACK : SPOT.GOAL));
       return true;
     }
     st[k(att, 'OnTarget')]++;
@@ -748,7 +755,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
             const w = { COMBINATION: 4, DRIBBLE: Math.max(0, (sk.pace + sk.ballControl) / 2 - 8) * 0.45 };
             let r = rng.next() * (w.COMBINATION + w.DRIBBLE);
             return Object.keys(w).find((x) => (r -= w[x]) < 0) || 'COMBINATION';
-          }, { bonus: outside ? LONGSHOT_BONUS : 0 });
+          }, { bonus: outside ? longshotBonus(sk.finishing) : 0 });
         }
       }
     }

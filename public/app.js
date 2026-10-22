@@ -57,7 +57,7 @@ function newGame() {
 const newerThan = (a, b) => { const x = String(a ?? '0').split('.').map(Number), y = String(b ?? '0').split('.').map(Number); for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); return false; };
 const NEWS = {
   '3.12.0': 'Nyt i kampene: Angrebsfokus bestemmer nu, hvordan chancerne kommer – "Lave cutbacks" giver rigtige cutbacks fra baglinjen, og "Direkte lange bolde" tvinger ikke længere chancerne op i luften. Bolden går til den, der står nærmest, hvor den spilles hen (også dine trukne positioner). Dine hovedstødsspillere kan nu vinde luftduellerne. Modgift: lav blok mod indlæg, højt gegenpres mod cutbacks. Se dit angreb og dit felt i fuldtids-analysen.',
-  '3.12.1': 'Spillerne rykker nu med i kampen: frem når I har bolden, efter jeres pres når I ikke har, mod boldsiden – og løb uden bold fører flere ind i feltet. Målene fordeler sig som i Superligaen: flere fra midtbanen og forsvaret, langskud fra kanten af feltet. Tryk 📍 ved et mål i referatet for at se, hvor dit hold stod.',
+  '3.12.1': 'Spillerne rykker nu med i kampen: frem når I har bolden og mod boldsiden – og løb uden bold fører flere ind i feltet, så også midtbanen og backs kommer til at score. Målene fordeler sig nu tæt på Superligaens: flere fra midtbanen og forsvaret, langskud fra kanten af feltet, færre kontramål. Efter slutfløjt kan du trykke 📍 ved et mål fra åbent spil eller kontra for at se, hvor dit hold stod.',
 };
 
 // Et migreret spil, hvis gamle fil ikke kunne tages backup af (fuldt lager): den gamle fil må

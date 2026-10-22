@@ -156,7 +156,7 @@ const phases = (pass, focus, height) => (t) => {
   Object.assign(t.tactics.phases.phase1_buildUp, { passingStyle: pass, attackFocus: focus });
   Object.assign(t.tactics.phases.phase2_defending, { pressingHeight: height, offsideTrap: 'OFF' });
 };
-if (import.meta.url === `file://${process.argv[1]}` && !['saeson', 'loeb', 'fokus', 'maal'].includes(process.argv[3])) {
+if (import.meta.url === `file://${process.argv[1]}` && !['saeson', 'loeb', 'fokus', 'maal', 'formation'].includes(process.argv[3])) {
   const pct = (x) => `${(x * 100).toFixed(1)} %`;
   const liga = measure();
   console.log(`Ligaens egne taktikker: fase 1 vinder ${pct(liga.rate)} (${liga.n} dueller, ${ARG_N} ligaer × 3 runder); ${liga.goalsPerMatch.toFixed(2)} mål pr. kamp, heraf ${liga.headersPerMatch.toFixed(2)} hovedstød.`);
@@ -209,4 +209,28 @@ if (import.meta.url === `file://${process.argv[1]}` && process.argv[3] === 'saes
   console.log(`Startelleverens friskhed efter 10 runder: dit hold (roterer ikke her) ${r.freshMe.toFixed(1)} %, bots ${r.freshBots.toFixed(1)} %`);
   console.log(`Mål pr. kamp: runde 1–2 ${r.goalsEarly.toFixed(2)}, runde 9–10 ${r.goalsLate.toFixed(2)}`);
   console.log('Pr. rolle (hele kampe):', ROLE_ORDER.filter((k) => r.km[k] != null).map((k) => `${k} ${r.km[k].toFixed(1)} km / ${r.hi[k].toFixed(1)} % HI`).join(', '));
+}
+
+// v3.12.1 (QC: "efterprøv på dét, den rammer"): mål pr. kamp for hold 0 efter formation – og med en
+// angriber trukket uden for feltet – mod hold 1 på 4-4-2. Langskudsbonussen må ikke belønne en
+// angriber, der står uden for feltet (med fast +7: 4-4-1-1 1,78 og trukket ST 1,64 mod 4-4-2 1,36).
+// Kør: node tools/measure-duels.mjs 400 formation
+export function measureFormations(N) {
+  const out = [];
+  for (const [f, drag] of [['4-4-2'], ['4-2-3-1'], ['4-4-1-1'], ['3-5-2'], ['4-3-3'], ['4-4-2', true]]) {
+    let gf = 0, ga = 0, ls = 0;
+    for (let s = 1; s <= N; s++) {
+      const L = createLeague(createRng(s)), [H, A] = [L.teams[0], L.teams[1]];
+      for (const [t, form] of [[H, f], [A, '4-4-2']]) { t.tactics.baseFormation = form; t.tactics.customCoords = {}; t.tactics.conditionalRules = []; }
+      if (drag) H.tactics.customCoords[9] = { x: 38, y: 32 };   // 4-4-2 plads 9 = ST
+      const m = simulateMatch(H, A, createRng(s * 7 + 1));
+      gf += m.homeGoals; ga += m.awayGoals;
+      ls += m.goalsPool.filter((g) => g.teamName === H.name && g.kind === 'LONGSHOT').length;
+    }
+    out.push({ formation: f + (drag ? ' + ST trukket til y 32' : ''), for: gf / N, against: ga / N, longshots: ls / N });
+  }
+  return out;
+}
+if (import.meta.url === `file://${process.argv[1]}` && process.argv[3] === 'formation') {
+  for (const r of measureFormations(ARG_N)) console.log(r.formation.padEnd(26), 'for', r.for.toFixed(2), 'imod', r.against.toFixed(2), 'langskud', r.longshots.toFixed(2));
 }
