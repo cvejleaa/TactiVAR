@@ -582,6 +582,15 @@ try {
   await g.locator('#matrix tbody tr').first().click();
   check('Gem fra v3.7.0: spillerkortet viser ikke 0 % højintenst, men at tallet kommer', (await g.textContent('#run-stats')).includes('højintenst: kommer efter næste kamp'));
 
+  // v3.12.1: et gem fra den live v3.12.0 (skema 6, runde 3, ingen øjebliksbilleder) – Release Manager
+  const fixtureV3120 = fs.readFileSync(new URL('../fixtures/save-v3.12.0.json', import.meta.url), 'utf8');
+  await g.evaluate((f) => { for (const k of Object.keys(localStorage)) if (k.startsWith('tactivar_')) localStorage.removeItem(k); localStorage.setItem('tactivar_save', f); }, fixtureV3120);
+  await reload();
+  const v3120note = (await g.locator('#notice').count()) ? await g.textContent('#notice') : '';
+  check('Gem fra v3.12.0: kun nyheden for 3.12.1 (ikke 3.12.0 igen), ingen migrering', v3120note.includes('Spillerne rykker nu med') && !v3120note.includes('"Lave cutbacks"') && !v3120note.includes('Dit spil er opdateret'), v3120note.slice(0, 160));
+  await tab('kamp');
+  check('Gem fra v3.12.0: runde 3 i Kamp-fanen uden 📍, startopstillingen på minibanen og ingen fejl', (await g.textContent('#match-center')).includes('runde 3') && (await g.locator('#feed .snap-btn').count()) === 0 && (await g.locator('#snap-pitch').count()) === 0 && (await g.locator('.minipitch').count()) >= 1 && (await g.isHidden('#fejlboks')));
+
   // v3.10: et gem fra v3.9 (runde 2) – kun v3.11's kampprogram-besked, statistikken starter tom fra runde 3
   const fixtureV39 = fs.readFileSync(new URL('../fixtures/save-v3.9.json', import.meta.url), 'utf8');
   await g.evaluate((f) => { for (const k of Object.keys(localStorage)) if (k.startsWith('tactivar_')) localStorage.removeItem(k); localStorage.setItem('tactivar_save', f); }, fixtureV39);
