@@ -98,11 +98,12 @@ test('cutback-mål: bolden på (50,28) (ikke 20), oplægget er kantspilleren, ho
   assert.equal(e.snapshot.scorer, slot(a.H, 9).id); assert.equal(e.snapshot.assist, slot(a.H, 6).id);
   assert.deepEqual(e.snapshot.pts.map(([, x]) => x), [50, 61, 61, 61, 61, 61, 61, 61, 61, 51, 61]);
 });
-test('straffe og kontra giver ingen billede (kun åbent spil: GOAL, HEADER_GOAL, VAR_GOAL)', () => {
+// QC-rettelsen (69dc916): kontramål får også billede – dit hold i angrebsform, når du mister bolden fremme.
+test('straffe giver intet billede; kontramål giver – for dig med scorer, imod dig uden', () => {
   const pen = mine({ spots: { 9: { x: 40, y: 28 } }, script: { 0.011: true, 0.3: false } });
   assert.ok(pen.m.goalsPool.length >= 25 && pen.m.goalsPool.every((g) => g.kind === 'PENALTY'));
   assert.ok(goalEvents(pen.m, 'GOAL').every((e) => e.snapshot === undefined));
-  // Kontra (v3.12.1: afslutteren vælges via receiver, men kontramål er ikke "åbent spil" med billede): både et kontramål FOR og IMOD dig
+  // Kontra: både et kontramål FOR og IMOD dig
   for (const youCounter of [false, true]) {
     const b = arena(); layout(b.H, { 9: { x: 40, y: 28 } }); layout(b.A, { 9: { x: 40, y: 28 } });
     const [att, def] = youCounter ? [b.A, b.H] : [b.H, b.A];
@@ -113,7 +114,7 @@ test('straffe og kontra giver ingen billede (kun åbent spil: GOAL, HEADER_GOAL,
     const cg = goalEvents(cm, 'GOAL').filter((e) => /KONTRA/.test(e.text));
     assert.ok(cg.length >= 20 && cm.goalsPool.every((g) => g.kind === 'COUNTER'), `${cg.length} kontramål, ${cm.goalsPool.map((g) => g.kind).join()}`);
     assert.equal(youCounter ? cm.homeGoals > 20 : cm.awayGoals > 20, true, 'hvem kontrer');
-    assert.ok(cg.every((e) => e.snapshot === undefined), youCounter ? 'dit kontramål' : 'kontramål imod');
+    assert.ok(cg.every((e) => e.snapshot && e.snapshot.attacking === youCounter && (youCounter ? e.snapshot.scorer !== null : e.snapshot.scorer === null) && e.snapshot.pts.every(([id]) => b.H.squad.some((p) => p.id === id))), youCounter ? 'dit kontramål' : 'kontramål imod');
   }
 });
 test('VAR-mål: billedet med dit holds positioner, scorer og oplæg, bolden på (50,20)', () => {
@@ -227,17 +228,17 @@ test('langskud er skytten på levende y ≥ 24 (ST 30 − 6 = 24 → langskud, 2
   assert.ok(goalEvents(lng.m, 'GOAL').every((e) => e.snapshot.assist === null && e.snapshot.scorer === slot(lng.a.H, 9).id));
   assert.ok(goalEvents(comb.m, 'GOAL').every((e) => e.snapshot.assist === slot(comb.a.H, 5).id));
 });
-test('almindelig afslutning: EDGE_SHARE 0,45 vælger feltets kant (50,32) som spot: terning 0,42 → kanten, 0,46 → målet (50,20) – dræber EDGE_SHARE 0,4/0,5 og spot-y', () => {
+test('almindelig afslutning: EDGE_SHARE 0,5 (QC-kalibreringen; før 0,45) vælger feltets kant (50,32) som spot: terning 0,48 → kanten, 0,52 → målet (50,20) – dræber EDGE_SHARE 0,45/0,55 og spot-y', () => {
   // slot 9 står på kanten (levende y 38 − 6 = 32), slot 10 ved målet (26 − 6 = 20); samme evner
   const spots = { 9: { x: 50, y: 38 }, 10: { x: 50, y: 26 } };
   const who = (spots, next) => { const r = mine({ spots, next }); assert.ok(r.m.goalsPool.length >= 25); return [...new Set(r.m.goalsPool.map((g) => g.scorer))]; };
   const tg = (a, i) => `#${slot(a.H, i).shirtNumber} ${slot(a.H, i).shortName}`;
   const a = mine({ spots }).a;
-  assert.deepEqual(who(spots, 0.42), [tg(a, 9)]);
-  assert.deepEqual(who(spots, 0.46), [tg(a, 10)]);
+  assert.deepEqual(who(spots, 0.48), [tg(a, 9)]);
+  assert.deepEqual(who(spots, 0.52), [tg(a, 10)]);
   // Kantens y præcis 32 (ikke 30): slot 9 står 24 væk fra kanten, slot 10 4 væk – men terningen lander på slot 9 med y 32 og på slot 10 med y 30
   const tight = { 9: { x: 50, y: 62 }, 10: { x: 50, y: 34 } };
-  assert.deepEqual(who(tight, 0.42), [tg(a, 9)]);
+  assert.deepEqual(who(tight, 0.45), [tg(a, 9)]);   // 0,45 < EDGE_SHARE 0,5 → kanten; vægtningen ved 0,48 lander på næste plads
 });
 
 test('løber, højre kant (RM, bold 88): løberen står 12 foran sin levende plads (96, 29 − 12 = 17), holdet 11 mod højre, bolden på (50,28), oplægget er løberen – dræber RUN_STEP, ballX-sidebytte, runner-ignoreret', () => {
@@ -276,7 +277,8 @@ test('løb der ender i et skud: løberen står stadig 12 foran (RM trukket til (
   const r = runGoal({ rm: { finishing: 20, passing: 1, pace: 1, ballControl: 1 }, custom: { 8: { x: 50, y: 82 } } });
   assert.deepEqual(r.m.goalsPool.map((g) => g.kind), ['LONGSHOT', 'LONGSHOT']);
   const want = pts(r.a.H, [[50, 90], [15, 50], [38, 59], [62, 59], [85, 50], [15, 29], [38, 32], [62, 32], [50, 54], [38, 14], [62, 14]]);
-  assert.deepEqual(r.evs[0].snapshot, { attacking: true, formation: '4-4-2', pts: want, scorer: slot(r.a.H, 8).id, assist: null, ball: [50, 20] });
+  // Solo-mål: bolden står ved skytten (QC-rettelsen), ikke på (50, 20)
+  assert.deepEqual(r.evs[0].snapshot, { attacking: true, formation: '4-4-2', pts: want, scorer: slot(r.a.H, 8).id, assist: null, ball: [50, 54] });
 });
 function runAgainst(rm) {
   const a = arena({ away: { p1: { attackFocus: 'CENTRAL' } } });
