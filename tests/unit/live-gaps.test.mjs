@@ -132,9 +132,9 @@ test('VAR-mål: billedet med dit holds positioner, scorer og oplæg, bolden på 
   const s = evs[0].snapshot;
   // v3.14.1 (brugeren: VAR på et mål af en midtbanespiller med 5 foran): skytten (her en forsvarer, før vist på sin
   // plads ved y 81) står der, hvor han skød fra (feltkanten, 50,32), og den forreste (#9, før 40,22) – ham VAR tjekker
-  // for offside – står i feltet (50,16). Bolden er ved skytten.
+  // for offside – står, hvor han stod (40,22): han er den forreste. Bolden er ved skytten.
   const scorerSlot = a.H.tactics.lineupSlots.indexOf(s.scorer);
-  const exp = [[50, 90], [50, 75], [50, 81], [50, 81], [50, 75], [50, 79], [50, 79], [50, 79], [50, 79], [50, 16], [50, 89]];
+  const exp = [[50, 90], [50, 75], [50, 81], [50, 81], [50, 75], [50, 79], [50, 79], [50, 79], [50, 79], [40, 22], [50, 89]];   // #9 bliver på 40,22 – han ER den forreste
   exp[scorerSlot] = [50, 32];
   assert.ok(scorerSlot >= 1 && scorerSlot <= 8, `skytten står bagved angriberne (plads ${scorerSlot})`);
   assert.deepEqual(s.pts, pts(a.H, exp));

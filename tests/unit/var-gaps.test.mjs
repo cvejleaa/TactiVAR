@@ -64,7 +64,7 @@ const bySlot = (t, xy) => t.tactics.lineupSlots.map((id, i) => [id, ...xy[i]]);
 const BASE = [[50, 90], [50, 30], [50, 81], [50, 81], [50, 75], [50, 79], [50, 79], [50, 79], [50, 14], [50, 22], [50, 89]];
 const withPts = (changes) => BASE.map((xy, i) => changes[i] ?? xy);
 
-test('billedet: skytten står, hvor han skød fra (kanten 50,32 / målet 50,20); den tjekkede forrest i feltet (50,16); bolden ved skytten', () => {
+test('billedet: skytten står, hvor han skød fra (kanten 50,32 / målet 50,20); den tjekkede står, hvor han stod (forrest, 50,14); bolden ved skytten', () => {
   // Dræber: skudsted altid EDGE / snapshot med SPOT.EDGE i stedet for shotSpot (overlevede: forfatterens test bruger kun rul 0,1 = kanten),
   // moves-skytten på SPOT.EDGE, og 'other' altid sand (så en selv-tjekket skytte flyttes til 50,16).
   for (const [spot, ball] of [[0.1, [50, 32]], [0.9, [50, 20]]]) {
@@ -73,7 +73,7 @@ test('billedet: skytten står, hvor han skød fra (kanten 50,32 / målet 50,20);
     const s = two.evs[0].snapshot;
     assert.equal(s.scorer, two.shooter.id); assert.equal(s.assist, two.assister.id);
     assert.deepEqual(s.ball, ball, `bolden ved skytten (spot ${spot})`);
-    assert.deepEqual(s.pts, bySlot(two.H, withPts({ 1: ball, 8: [50, 16] })), `to foran: skytten på ${ball}, den forreste (slot 8) på 50,16`);
+    assert.deepEqual(s.pts, bySlot(two.H, withPts({ 1: ball })), `to foran: skytten på ${ball}, den forreste (slot 8) bliver på 50,14 (v3.14.1: før flyttet tilbage til 50,16)`);
     // skytten selv forrest: ingen anden flyttes – og skytten flyttes til skudstedet, ikke 50,16
     for (const key of ['front', 'one']) {
       const own = varGame({ spots: SPOTS[key], rolls: { spot } });
