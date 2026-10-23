@@ -79,7 +79,7 @@ export function normalizeLeague(league) {
     if (!Array.isArray(team.tacticPresets) || team.tacticPresets.length < 3) team.tacticPresets = [structuredClone(team.tactics), defaultTactics(starters, profile), defaultTactics(starters, profile)];
     team.tacticPresets = team.tacticPresets.map((t) => fixTactics(t, team.tactics.lineupSlots, profile));
     team.cashBalance ??= 5000000;
-    // Udskiftningsgrænsen (v3.13): gemt før v3.13 → holdets profil (dit hold 75 %); 0 = fra bevares.
+    // Udskiftningsgrænsen (v3.13): gemt før v3.13 → holdets profil (dit hold 70 %); 0 = fra bevares.
     team.subsLimit = clampSubsLimit(team.subsLimit ?? profile.subs);
   });
   return { league, problems };

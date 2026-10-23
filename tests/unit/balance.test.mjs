@@ -145,3 +145,16 @@ test('langskud belønner ikke en angriber uden for feltet: 4-4-1-1 og en trukket
   assert.ok(r['4-4-1-1'].for - base <= 0.15, `4-4-1-1 ${r['4-4-1-1'].for} mod 4-4-2 ${base}`);
   assert.ok(r['4-4-2 + ST trukket til y 32'].for - base <= 0.15, `trukket ST ${r['4-4-2 + ST trukket til y 32'].for} mod ${base}`);
 });
+
+// v3.13 (QC H): kalibreringen af udskiftninger og STA låst i bånd. Før v3.13 (målt med samme værktøj): 0 træthedsskift,
+// ≈ 0,3 skadesskift; STA 6 mod 16 netto-forskel 0,47 (uden friskhed i kampen) – begge røde mod båndene nedenfor.
+test('udskiftninger: 2,2–3,6 skift pr. hold pr. kamp, de fleste efter pausen; STA 16 mod 6 vinder mindst 0,55 mål mere pr. kamp', async () => {
+  const { measureSubs, measureStamina } = await import('../../tools/measure-duels.mjs');
+  const r = measureSubs(10);
+  assert.ok(r.subsPerTeam >= 2.2 && r.subsPerTeam <= 3.6, `skift ${r.subsPerTeam}`);
+  assert.ok(r.why.fatigue >= 1.5, `træthedsskift ${r.why.fatigue} (før 0)`);
+  assert.ok(r.mins['1–45'] <= 0.3, `før pausen ${r.mins['1–45']}`);
+  assert.ok(r.goalsPerMatch >= 2.6 && r.goalsPerMatch <= 3.0, `mål ${r.goalsPerMatch}`);
+  const st = measureStamina(300);
+  assert.ok(st[16].net - st[6].net >= 0.55, `STA-forskel ${(st[16].net - st[6].net).toFixed(2)} (før v3.13 0,47)`);
+});

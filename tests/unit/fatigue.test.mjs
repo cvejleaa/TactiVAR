@@ -86,8 +86,9 @@ test('træthedsskift: under din grænse skiftes han ud i det første tick (også
   assert.equal(s.text, `🔄 [${H.name}] #${cm.shirtNumber} ${cm.shortName} ud (træt, 69 % – under din grænse 70 %) – #${best.shirtNumber} ${best.shortName} ind.`);   // 69,4 rundet ned
   const inE = m.ratings.home.find((e) => e.playerId === best.id), outE = m.ratings.home.find((e) => e.playerId === cm.id);
   assert.deepEqual([outE.minOut, inE.minIn, inE.slot], [21, 21, 6]);
-  // Sparet friskhed: km90 11,8·(0,9 + 0,01)·1 = 10,738; 69 min ikke løbet → 8,23 km · (1,5 − 0,03) = 12,1 → 12
-  assert.equal(m.events.find((e) => e.label === 'Udskiftninger')?.text, `🔋 [${H.name}] Din udskiftede spiller sparede ca. 12 point friskhed til næste runde.`);
+  // Sparet friskhed: km90 11,8·(0,9 + 0,01)·1 = 10,738; 69 min ikke løbet → 8,23 km · (1,5 − 0,03) = 12,1 → 12 i pris;
+  // efter restitutionen (41 % af det manglende) 12 · 0,59 = 7,1 → 7 (QC: før stod 12)
+  assert.equal(m.events.find((e) => e.label === 'Udskiftninger')?.text, `🔋 [${H.name}] Din udskiftede spiller sparede ca. 7 point friskhed til næste runde.`);
 });
 test('grænse Fra (0): ingen træthedsskift; grænsen 65 rammes senere end 70', () => {
   const at = (limit) => { const { H, A } = arena({ homeLimit: limit }); const cm = slot(H, 6); cm.freshness = 75; cm.skills.stamina = 1; return subs(simulateMatch(H, A, stubRng({})))[0]?.min ?? null; };
@@ -119,10 +120,10 @@ test('højst MATCH_RULES.maxSubs (5) skift – alle i samme tick er én pause; d
   assert.ok(why.length >= 1 && why.every((e) => /er under din udskiftningsgrænse \(\d+ % – grænse 80 %\), men (alle 5 udskiftninger er brugt|der er ingen frisk \w+ på bænken)\.$/.test(e.text)), why.map((e) => e.text).join(' | '));
 });
 test('pauserne binder: fire trætte i hver sit tick – 3 pauser bruges, den fjerde får besked om pauserne', () => {
-  // STA 1, tab pr. min: CM 0,278, CB 0,224, ST 0,236. CM 71 → 6'; CB 78 → 39'; CM 87 → 63'; ST 90,5 → 90'. Ved hver
+  // STA 1, tab pr. min: CM 0,278, CB 0,224, ST 0,236. CM 71 → 6'; CB 78 → 39'; CM 87 → 63'; ST 90 → 87' (i 90' skiftes ikke). Ved hver
   // tidligere pause står de næste over grænsen + 5 (ingen samling). Bænken har to i hver kæde. Fjerde gang: pauserne er brugt.
   const { H, A } = arena();
-  [[6, 71], [2, 78], [7, 87], [9, 90.5]].forEach(([i, f]) => { const p = slot(H, i); p.freshness = f; p.skills.stamina = 1; });
+  [[6, 71], [2, 78], [7, 87], [9, 90]].forEach(([i, f]) => { const p = slot(H, i); p.freshness = f; p.skills.stamina = 1; });
   for (const b of bench(H)) b.freshness = 100;
   const m = simulateMatch(H, A, stubRng({}));
   const windows = new Set(subs(m).map((e) => e.min).filter((x) => x !== 45));
@@ -223,4 +224,28 @@ test('en bots Hvis-Så-udskiftning er neutral; gamle regler bliver planskift, "u
   const r = normalizeRule({ condition: 'ANY', margin: 1, newFormation: '4-4-2', newPlan: null, action: 'SUB', subOut: 'a', subIn: 'b' });
   assert.deepEqual([r.condition, r.action, r.subOut, r.subIn], ['ANY', 'SUB', 'a', 'b']);
   assert.equal(normalizeRule({ condition: 'X', action: 'HACK', subOut: 3 }).action, 'SHIFT');
+});
+
+test('beskeder med årsag: reserveret bænkspiller nævnes som Hvis-Så; skade uden indskiftning siger hvorfor; intet træthedsskift i sidste tick', () => {
+  // Reserveret: CM træt i 21', eneste friske MID på bænken står i en regel → beskeden siger det (QC D)
+  const { H, A } = arena();
+  const cm = slot(H, 6); cm.freshness = 75; cm.skills.stamina = 1;
+  const mids = bench(H).filter((p) => p.line === 'MID');
+  mids.forEach((p, i) => { p.freshness = i === 0 ? 100 : 50; });
+  H.tactics.conditionalRules = [subRule(H, 7, mids[0], { minuteTrigger: 85 })];
+  const m = simulateMatch(H, A, stubRng({}));
+  assert.ok(m.events.some((e) => e.label === 'Udskiftning ikke mulig' && e.text.endsWith('men den friske midtbanespiller på bænken er sat til en af dine Hvis-Så-regler.')), m.events.filter((e) => e.label === 'Udskiftning ikke mulig').map((e) => e.text).join(' | '));
+  // Skade efter 5 brugte skift: årsagen står i teksten (QC C)
+  const b = arena({ homeLimit: 80 });
+  for (let i = 1; i <= 10; i++) slot(b.H, i).freshness = 60;
+  for (const p of bench(b.H)) p.freshness = 100;
+  let flip = false;
+  const rng = stubRng({ 0.06: (n) => n === 3, 0.4: true, 0.5: () => (flip = true) });
+  const mi = simulateMatch(b.H, b.A, rng);
+  const lame = mi.events.find((e) => e.label === 'Ingen indskiftning');
+  assert.ok(lame && /Ingen indskiftning mulig \((alle 5 udskiftninger er brugt|der er ingen rask spiller på bænken)\) – holdet spiller videre/.test(lame.text), lame?.text);
+  // Sidste tick: en spiller, der først krydser grænsen i 90', skiftes ikke (QC F)
+  const c = arena();
+  const late = slot(c.H, 6); late.skills.stamina = 1; late.freshness = 70 + 25.0 * 88 / 90;   // krydser lige før 90'
+  assert.ok(subs(simulateMatch(c.H, c.A, stubRng({}))).every((e) => e.min < 90));
 });

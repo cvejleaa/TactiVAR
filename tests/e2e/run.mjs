@@ -641,7 +641,7 @@ try {
   // Advarsel ved ▶ om startere under din udskiftningsgrænse (v3.13: gemt før v3.13 → 70 %; uden grænse: 70 %)
   const setStarterFresh = async (v, limit) => { await g.evaluate(([val, lim]) => { const d = JSON.parse(localStorage.getItem('tactivar_save')); const t = d.league.teams.find((x) => !x.isBot); for (const p of t.squad) p.freshness = 100; t.squad.find((p) => p.id === t.tactics.lineupSlots[6]).freshness = val; if (lim !== undefined) t.subsLimit = lim; localStorage.setItem('tactivar_save', JSON.stringify(d)); }, [v, limit]); await reload(); };
   await setStarterFresh(69);
-  check('Advarsel: én starter under din grænse (70 %) siger, at han skiftes ud i 3. minut', (await g.textContent('#tired-warning')).trim() === '⚠ 1 startere under din grænse (70 %) – skiftes ud i 3. minut', await g.textContent('#tired-warning'));
+  check('Advarsel: én markspiller under din grænse (70 %) – skiftes ud tidligt', (await g.textContent('#tired-warning')).trim() === '⚠ 1 startere under din grænse (70 %) – skiftes ud tidligt', await g.textContent('#tired-warning'));
   await setStarterFresh(70);
   check('Ingen advarsel ved 70 %', (await g.locator('#tired-warning').count()) === 0);
   await setStarterFresh(78, 80);

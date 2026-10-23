@@ -8,7 +8,7 @@ import { masteryVs, counterXpForMatch } from './counter.js';
 import { createSheet, finalizeSheet } from './ratings.js';
 import { describeFinish, describeHeader, describeVarTiming, describeGoal, goalSpectacle } from './clues.js';
 import { MATCH_RULES } from './match-rules.js';
-import { TIRED_PER_POINT, SUBS_LIMIT, matchCost } from './freshness.js';
+import { TIRED_PER_POINT, SUBS_LIMIT, matchCost, REST_SHARE } from './freshness.js';
 
 const PLAN_LETTERS = ['A', 'B', 'C'];
 
@@ -541,7 +541,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // Dit hold får at vide, når grænsen ikke kan følges; en bots grænse og friskhed nævnes aldrig (§3).
   function fatigueSubs(side, min) {
     const limit = side.team.subsLimit || 0;
-    if (!limit) return;
+    if (!limit || min >= 90) return;   // i sidste tick sparer et skift intet og koster indskifteren bænkens +15 (QC)
     const reserved = new Set(side.tactics.conditionalRules.filter((r) => r.action === 'SUB' && !r.used).map((r) => r.subIn));
     const onPitch = () => side.starters.map((p, i) => ({ p, i, f: p && matchFresh(p) })).filter(({ p, i }) => i > 0 && p && !sheet.entries[p.id]?.injured);
     const tired = onPitch().filter((c) => c.f < limit).sort((a, b) => a.f - b.f);
@@ -553,7 +553,11 @@ export function simulateMatch(home, away, rng, opts = {}) {
       if (block) { if (!near) note(c.p, block); return false; }
       const pick = side.benchAvailable().filter((b) => b.line === c.p.line && !reserved.has(b.id) && (b.freshness ?? 100) >= limit + SUBS_LIMIT.near)
         .sort((a, b) => avgSkill(b) * (b.freshness ?? 100) - avgSkill(a) * (a.freshness ?? 100))[0];
-      if (!pick) { if (!near) note(c.p, `der er ingen frisk ${LINE_WORD[c.p.line] ?? 'spiller'} på bænken`); return false; }
+      if (!pick) {
+        const held = side.benchAvailable().some((b) => b.line === c.p.line && reserved.has(b.id) && (b.freshness ?? 100) >= limit + SUBS_LIMIT.near);
+        if (!near) note(c.p, held ? `den friske ${LINE_WORD[c.p.line] ?? 'spiller'} på bænken er sat til en af dine Hvis-Så-regler` : `der er ingen frisk ${LINE_WORD[c.p.line] ?? 'spiller'} på bænken`);
+        return false;
+      }
       const f = Math.floor(c.f);   // rundet NED: 69,6 må ikke stå som "70 % – under din grænse 70 %"
       const text = own(side)
         ? `🔄 [${side.team.name}] ${tag(c.p)} ud (træt, ${f} % – ${near ? 'tages med i samme pause' : `under din grænse ${limit} %`}) – ${tag(pick)} ind.`
@@ -701,7 +705,9 @@ export function simulateMatch(home, away, rng, opts = {}) {
         addEv(min, 'INJURY', 'HIGHLIGHT', victimSide.isHome, true, `🚑 Skade: ${tag(victim)}`, `🚑 [${victimSide.team.name}] ${tag(victim)} bliver skadet efter en tackling fra ${tag(fouler)} (${foulSide.team.name}) og er ude i ${matches} ${matches === 1 ? 'kamp' : 'kampe'}.`);
         if (!substitute(victimSide, slot, min, 'Skadesskift')) {
           sheet.entries[victim.id].minOut = min;
-          addEv(min, 'INFO', 'PLAY', victimSide.isHome, false, 'Ingen indskiftning', `[${victimSide.team.name}] Ingen indskiftning mulig – holdet spiller videre med ${tag(victim)} haltende.`);
+          // Årsagen er offentlig (skift og pauser ses i referatet) – QC v3.13.
+          const why = subBlock(victimSide, min) ?? 'der er ingen rask spiller på bænken';
+          addEv(min, 'INFO', 'PLAY', victimSide.isHome, false, 'Ingen indskiftning', `[${victimSide.team.name}] Ingen indskiftning mulig (${why}) – holdet spiller videre med ${tag(victim)} haltende.`);
         }
       } else {
         // Gult kort kun her – skade-frisparkets tekst nævner intet kort (v3.10).
@@ -844,7 +850,8 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // de udskiftede (ikke skadede) løb færre km – friskheden efter kampen regnes efter km-prisen (freshness.js).
   if (meSide) {
     const off = Object.values(sheet.entries).filter((e) => e.teamId === meSide.team.id && e.minIn <= 1 && e.minOut < 90 && !e.injured);
-    const saved = off.reduce((a, e) => a + matchCost(e.km90 * (90 - e.minOut) / 90, meSide.team.squad.find((p) => p.id === e.playerId)?.skills.stamina ?? 10), 0);
+    // Efter restitutionen (41 % af det, der mangler) er gevinsten 59 % af den sparede pris (QC: ellers stod 12 for 7).
+    const saved = Math.round((1 - REST_SHARE) * off.reduce((a, e) => a + matchCost(e.km90 * (90 - e.minOut) / 90, meSide.team.squad.find((p) => p.id === e.playerId)?.skills.stamina ?? 10), 0));
     if (off.length) addEv(90, 'INFO', 'TACTIC', meSide.isHome, false, 'Udskiftninger', `🔋 [${meSide.team.name}] ${off.length === 1 ? 'Din udskiftede spiller' : `Dine ${off.length} udskiftede spillere`} sparede ca. ${saved} point friskhed til næste runde.`);
   }
   if (meSide) {

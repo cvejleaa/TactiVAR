@@ -117,7 +117,8 @@ function start() {
 const tiredLimit = () => myTeam().subsLimit || 70;
 function tiredStarters() {
   const t = myTeam();
-  return t.squad.filter((p) => t.tactics.lineupSlots.includes(p.id) && p.freshness < tiredLimit()).length;
+  // Målmanden skiftes ikke for træthed – han tælles kun uden grænse (QC v3.13).
+  return t.squad.filter((p) => t.tactics.lineupSlots.slice(t.subsLimit ? 1 : 0).includes(p.id) && p.freshness < tiredLimit()).length;
 }
 
 // Forklaringen på en migrering – både ved indlæsning og ved import af en ældre fil.
@@ -180,9 +181,9 @@ function renderControls() {
     h('button', { id: 'play-round', class: 'primary', disabled: !!mc?.playing, onclick: playNextRound }, `▶ Spil runde ${next.k} af ${game.league.schedule.length} mod ${next.opp.name} (${next.home ? 'hjemme' : 'ude'})`),
     h('button', { id: 'next-opponent', class: 'mini', title: `Scout ${next.opp.name}`, onclick: () => { game.ui.tab = 'trup'; persist(); showTeam(teams.indexOf(next.opp)); } }, `🔍 ${next.opp.name}`),
     tiredStarters() ? h('span', { class: 'tired', id: 'tired-warning', title: myTeam().subsLimit
-      ? `Startere under din udskiftningsgrænse (${myTeam().subsLimit} %) skiftes ud i 3. minut og bruger en skifte-pause. Overvej at rotere i Trup`
+      ? `Markspillere under din udskiftningsgrænse (${myTeam().subsLimit} %) skiftes ud i 3. minut, hvis der er en frisk afløser i samme kæde på bænken – det bruger et skift og en pause. Overvej at rotere i Trup`
       : 'Startere under 70 % friskhed – trætte spillere yder mindre (50 % ≈ 12,5 % svagere). Overvej at rotere i Trup' },
-    myTeam().subsLimit ? `⚠ ${tiredStarters()} startere under din grænse (${myTeam().subsLimit} %) – skiftes ud i 3. minut` : `⚠ ${tiredStarters()} trætte startere`) : null,
+    myTeam().subsLimit ? `⚠ ${tiredStarters()} startere under din grænse (${myTeam().subsLimit} %) – skiftes ud tidligt` : `⚠ ${tiredStarters()} trætte startere`) : null,
     h('span', { class: 'savestatus' + (view.saveError ? ' failed' : ''), id: 'save-status' }, view.saveError ? '⚠ IKKE gemt' : view.savedAt ? `✔ Gemt kl. ${time(view.savedAt)}` : 'Ikke gemt'),
     h('button', { id: 'save-now', onclick: () => { persist(); render(); } }, '💾 Gem nu'),
     h('button', { id: 'export', onclick: exportFile }, '⬇ Eksportér'),

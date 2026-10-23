@@ -199,7 +199,7 @@ Tick hvert 3. minut (1..90).
   spilleren nær målet her ofte er en midtbanespiller med lav afslutning – en sag for en senere version.
 - **Målfordeling (v3.12.1**, dokumentet "Spillerhøjde i Superligaen", afsnit om mål: angreb 45–50 %,
   midtbane 30–35 %, forsvar 15–20 %; åbent spil inkl. langskud 60–65 %, dødbolde 25–30 %, kontra
-  8–12 %, langskud 8–10 %). Målt (`node tools/measure-duels.mjs 150 maal`): 2,95 mål pr. kamp;
+  8–12 %, langskud 8–10 %). Målt (`node tools/measure-duels.mjs 150 maal`): 2,95 mål pr. kamp (v3.13: 3,00);
   åbent spil 62 % (heraf langskud 8 %), kontra 12 %, dødbolde 26 %; angreb 54 %, midtbane 27 %,
   forsvar 19 % (v3.12.0: angreb 75 %, midtbane 15 %, forsvar 10 %, kontra 19 %, langskud 4 %).
   Typerne ligger i dokumentets intervaller; kæderne er 3–4 point fra (angreb over, midtbane under) –
@@ -239,6 +239,8 @@ Tick hvert 3. minut (1..90).
   Ligaen 2,85 mål pr. kamp, 26 % dødbolde, hovedstød 22 % (`… 100`). Rundens mål (`… 30 saeson`):
   frispark 22 %, cutback 22 %, langskud 20 %, dribletur 13 %, hovedstød 12 % … – ingen over 30 %;
   friskheden uændret (startelleven 85 %).
+  **v3.13** (`… 30 saeson`): langskud 27 %, cutback 19 %, frispark 16 %, hovedstød 16 %, dribletur 9 %
+  (v3.12.1: 13 % – trætte spillere og KEEPER_EDGE 3; båndet sænket fra 9 til 8 %).
 - VAR-tjek ved roll < 0,22: `varPulse + vsTrapLong·0,025 + rnd·6 > forsvarer.POS + rnd·…`.
 - Afslutning: `FIN + rnd·8 > GK + rnd·8 + 3` (v3.9 havde en målmandsfordel på 5; v3.10 fjernede den;
   v3.12 gav 3 tilbage, v3.12.1 3,5 – kalibreret til målfordelingen ovenfor; v3.13 3, fordi målmændene
@@ -372,8 +374,10 @@ Tick hvert 3. minut (1..90).
   bold · genpres · (2,2 − 0,08·STA, mindst 0,3) point pr. 90 min (CM STA 6 ≈ 20, STA 10 ≈ 16,5, STA 16
   ≈ 11, målmand ≈ 7,7), og hvert tabt point gør ham 0,6 % svagere oven i friskheden før kampen (20 point
   → 12 %). Friskheden EFTER kampen regnes som før (km-prisen). Målt (`node tools/measure-duels.mjs 30
-  skift`, 600 kampe, alle markspillere STA 6 mod 16, ingen skift): netto 0,25 mod 0,92 mål pr. kamp –
-  forskellen 0,67 (før v3.13: 0,31 mod 0,81 = 0,50; STA tæller også i presset).
+  skift`, 600 kampe, alle markspillere STA 6 mod 16, ingen skift): netto 0,24 mod 0,90 mål pr. kamp –
+  forskellen 0,66 (før v3.13: 0,30 mod 0,77 = 0,47; STA tæller også i presset); i sidste kvarter 0,06 mod
+  0,17 (før 0,04 mod 0,13). Bevidst: et point tabt I kampen koster 0,6 %, et point friskhed fra før kampen
+  0,25 % – "friskhed i kampen" i skiftteksten er derfor ikke helt samme skala som friskheden i Trup.
 - **Udskiftninger (v3.13**; `match-rules.js`, "skal kunne defineres af systemadministrator, men skal som
   udgangspunkt følge FIFA/UEFAs regler for turneringer"): 5 skift i højst 3 pauser (IFAB Law 3);
   flere skift i samme tick er én pause, halvlegen (45') er gratis; skadesskift tæller med. Udeladt:
@@ -386,9 +390,11 @@ Tick hvert 3. minut (1..90).
   udskiftning (spiller ud/ind efter id; første tick fra minuttet); bænkspillere i dine regler bruges
   ikke til træthedsskift; Taktik advarer straks, når en regel ikke passer til opstillingen. Afviger fra
   kilden (§10.1 "energi·0,1 + karakter"): vi vælger efter friskhed i kampen alene – managerens grænse
-  er en friskhedsgrænse. Målt (`… 30 skift`): 2,9 skift pr. hold pr. kamp (træthed 2,5, skade 0,3),
-  ≈ 80 % efter pausen; 2,9 mål pr. kamp; startelleverne ≈ 86 % efter 10 runder. ▶-advarslen følger
-  grænsen.
+  er en friskhedsgrænse. Intet træthedsskift i sidste tick (90'). Målt (`… 30 skift`): 2,8 skift pr. hold
+  pr. kamp (træthed 2,4, skade 0,3), ≈ 80 % efter pausen (de 20 % før er især hold med højt pres og
+  skadesskift); 2,75 mål pr. kamp over en sæson (runde 1, alle friske: 3,00 – `… 150 maal`);
+  startelleverne ≈ 86 % efter 10 runder; "kunne ikke skifte" 0,5 pr. kamp for dit hold. ▶-advarslen
+  følger grænsen (markspillere). Bånd i balance.test.mjs.
 
 ## 7. Mod-kunnen (v2.2b)
 - `counterTactics {vsPress, vsLowBlock, vsTrapLong}`, start
