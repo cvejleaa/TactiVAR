@@ -43,10 +43,19 @@ test('statistik-fanen: fire sektioner, kun spillerne åben, "fra runde N" fra li
   const secs = all(root, (e) => e.tag === 'details');
   assert.deepEqual(secs.map((s) => s.attrs.id), ['stats-players', 'stats-teams', 'stats-flow', 'stats-mine']);
   assert.deepEqual(secs.map((s) => s.attrs.open), ['', undefined, undefined, undefined]);
-  assert.deepEqual(secs.map((s) => s.children[0].textContent), ['Spillere (fra runde 3)', 'Holdtal (fra runde 3)', 'Ligaens forløb (fra runde 3)', 'Dit hold (privat, fra runde 3)']);
+  // v3.14.1 (brugeren: "Statistik skal tælle for sæsonen"): sæsonen står i titlen; runden er sæson-relativ, og kun et gem,
+  // der var midt i sæsonen, da statistikken kom, får "fra runde K" og en linje om de manglende runder.
+  assert.deepEqual(secs.map((s) => s.children[0].textContent), ['Spillere (sæson 1, fra runde 3)', 'Holdtal (sæson 1, fra runde 3)', 'Ligaens forløb (sæson 1, fra runde 3)', 'Dit hold (privat, sæson 1, fra runde 3)']);
+  assert.match(all(root, (e) => e.attrs?.id === 'stats-gap')[0].textContent, /Sæsonens runde 1–2 blev spillet, før statistikken fandtes/);
   delete L.statsFromRound;
   root = render(L, me);
-  assert.equal(all(root, (e) => e.tag === 'summary')[0].textContent, 'Spillere (fra runde 1)');
+  assert.equal(all(root, (e) => e.tag === 'summary')[0].textContent, 'Spillere (sæson 1)');
+  assert.equal(all(root, (e) => e.attrs?.id === 'stats-gap').length, 0, 'hel sæson: ingen linje om manglende runder');
+  // Sæson 2, der startede i global runde 15 med statistik fra start: "sæson 2" – ikke "fra runde 15" (brugerens skærmbillede: "fra runde 18")
+  Object.assign(L, { seasonStartRound: 15, statsFromRound: 15 }); L.leagueMetadata.seasonNumber = 2;
+  assert.equal(all(render(L, me), (e) => e.tag === 'summary')[0].textContent, 'Spillere (sæson 2)');
+  L.statsFromRound = 18;
+  assert.equal(all(render(L, me), (e) => e.tag === 'summary')[0].textContent, 'Spillere (sæson 2, fra runde 4)');
 });
 
 test('spillerlister: titel/nøgle pr. liste, top 5 efter værdi (lighed: flest kampe), kun > 0, eget hold markeret, tom liste siger det', () => {
@@ -147,14 +156,14 @@ test('dit hold (privat): pr.-kamp-tal, sæsonsummer og spillertabellen med snit,
   const p = me.squad[4];
   Object.assign(p, { sGames: 3, ratingSum: 27, ratingGames: 4, minutesSum: 360, distanceSum: 42, hiKmSum: 3, hiDistSum: 12, freeRunsSum: 8, freeRunsWonSum: 3, freshness: 62 });
   const root = render(L, me);
-  assert.equal(byId(root, 'my-team-stats').textContent, 'Fra runde 3, pr. kamp: 12.5 afslutninger (5.0 på mål), xG 1.50, 5.5 hjørnespark, 2.5 frispark i skudafstand. I alt: kontramål 3 for / 2 imod, 9 VAR-tjek.');
+  assert.equal(byId(root, 'my-team-stats').textContent, 'Sæson 1, fra runde 3, pr. kamp: 12.5 afslutninger (5.0 på mål), xG 1.50, 5.5 hjørnespark, 2.5 frispark i skudafstand. I alt: kontramål 3 for / 2 imod, 9 VAR-tjek.');
   const rows = all(byId(root, 'my-players'), (e) => e.tag === 'tr' && e.children[0].tag === 'td');
   assert.equal(rows.length, 18);
   assert.deepEqual(all(byId(root, 'my-players'), (e) => e.tag === 'th').map((t) => t.textContent), ['Spiller', 'Kampe (fra R3)', 'Snit (i alt)', 'km/90 (i alt)', '% HI (i alt)', 'Fri (fra R3)', 'Friskhed']);
   assert.deepEqual(cells(rows[4]), [`#${p.shirtNumber} ${p.shortName}`, '3', '6.8', '10.5', '25 %', '3/8', '62 %']);   // snit 27/4 = 6,75 → 6,8 · 42/360·90 = 10,5 km
   assert.deepEqual(cells(rows[5]).slice(1), [String(me.squad[5].sGames), '–', '–', '–', '–', `${me.squad[5].freshness} %`]);
   assert.ok(!byId(root, 'stats-mine').textContent.includes('99'), 'modstanderens spillere vises ikke');
-  assert.ok(byId(root, 'stats-mine').textContent.endsWith('Kun du ser disse tal – de røber evner og dine taktiske valg. Kampe og frie løb tælles fra runde 3; snit, km og HI gælder alle hans kampe (de nulstilles ikke ved sæsonskifte).'));
+  assert.ok(byId(root, 'stats-mine').textContent.endsWith('Kun du ser disse tal – de røber evner og dine taktiske valg. Kampe og frie løb tælles for sæson 1, fra runde 3; snit, km og HI gælder alle hans kampe (de nulstilles ikke ved sæsonskifte).'));
   assert.ok(byId(root, 'stats-teams').textContent.endsWith('Bold % er snit pr. kamp. Afslutninger, xG, hjørnespark, kontraer og VAR-tjek ses kun for dit eget hold (under "Dit hold") – summeret over sæsonen kunne de røbe et holds taktik.'));
   // Før første runde
   const fresh = world();

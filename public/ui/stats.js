@@ -8,7 +8,12 @@ import { runStats } from '../engine/stats.js';
 import { GOAL_KIND_LABEL } from '../engine/gazette.js';
 
 const TOP = 5;
-const since = (league) => `fra runde ${league.statsFromRound ?? 1}`;
+// Statistikken gælder sæsonen (brugeren v3.14.1: "skal tælle for sæsonen og ikke siden en eller anden runde").
+// Kun et gem, der var midt i en sæson, da statistikken kom (v3.10, sanitize.js), mangler sæsonens første runder –
+// dem er der ingen spillertal for. Runden vises sæson-relativt (som "Spil runde 10 af 14").
+export const statsFromK = (league) => Math.max(1, (league.statsFromRound ?? 1) - (league.seasonStartRound ?? 1) + 1);
+const since = (league) => `sæson ${league.leagueMetadata.seasonNumber}${statsFromK(league) > 1 ? `, fra runde ${statsFromK(league)}` : ''}`;
+const gapNote = (league) => statsFromK(league) > 1 ? h('p', { class: 'muted', id: 'stats-gap' }, `Sæsonens runde 1–${statsFromK(league) - 1} blev spillet, før statistikken fandtes, og kan ikke tælles med. Fra næste sæson tæller hele sæsonen.`) : null;
 // Hvilke sektioner er foldet ud – huskes mellem gen-tegninger (ellers lukkede de ved hvert klik).
 const openSecs = new Set(['stats-players']);
 const section = (id, title, ...body) => h('details', { class: 'stats-sec', id, open: openSecs.has(id),
@@ -79,20 +84,20 @@ function myTeam(league, myTeamId) {
   const n = Math.max(1, s.sMatches);
   return h('div', {},
     h('p', { id: 'my-team-stats' }, s.sMatches
-      ? `Fra runde ${league.statsFromRound ?? 1}, pr. kamp: ${(s.shots / n).toFixed(1)} afslutninger (${(s.onTarget / n).toFixed(1)} på mål), xG ${(s.xg / n).toFixed(2)}, ${(s.corners / n).toFixed(1)} hjørnespark, ${(s.freeKicks / n).toFixed(1)} frispark i skudafstand. I alt: kontramål ${s.counterGoals} for / ${s.counterGoalsAgainst} imod, ${s.varChecks} VAR-tjek.`
+      ? `${since(league)[0].toUpperCase()}${since(league).slice(1)}, pr. kamp: ${(s.shots / n).toFixed(1)} afslutninger (${(s.onTarget / n).toFixed(1)} på mål), xG ${(s.xg / n).toFixed(2)}, ${(s.corners / n).toFixed(1)} hjørnespark, ${(s.freeKicks / n).toFixed(1)} frispark i skudafstand. I alt: kontramål ${s.counterGoals} for / ${s.counterGoalsAgainst} imod, ${s.varChecks} VAR-tjek.`
       : 'Kommer efter første runde.'),
     h('div', { class: 'tablewrap-x' }, h('table', { class: 'standings', id: 'my-players' },
-      h('thead', {}, h('tr', {}, ['Spiller', `Kampe (fra R${league.statsFromRound ?? 1})`, 'Snit (i alt)', 'km/90 (i alt)', '% HI (i alt)', `Fri (fra R${league.statsFromRound ?? 1})`, 'Friskhed'].map((x) => h('th', {}, x)))),
+      h('thead', {}, h('tr', {}, ['Spiller', `Kampe (${statsFromK(league) > 1 ? `fra R${statsFromK(league)}` : 'sæson'})`, 'Snit (i alt)', 'km/90 (i alt)', '% HI (i alt)', `Fri (${statsFromK(league) > 1 ? `fra R${statsFromK(league)}` : 'sæson'})`, 'Friskhed'].map((x) => h('th', {}, x)))),
       h('tbody', {}, team.squad.map((p) => { const r = runStats(p); return h('tr', {},
         h('td', {}, `#${p.shirtNumber} ${p.shortName}`), h('td', {}, p.sGames), h('td', {}, p.ratingGames ? (p.ratingSum / p.ratingGames).toFixed(1) : '–'),
         h('td', {}, r.km90 != null ? r.km90.toFixed(1) : '–'), h('td', {}, r.hiPct != null ? `${r.hiPct} %` : '–'),
         h('td', {}, p.freeRunsSum ? `${p.freeRunsWonSum}/${p.freeRunsSum}` : '–'), h('td', {}, `${p.freshness} %`)); })))),
-    h('p', { class: 'muted' }, `Kun du ser disse tal – de røber evner og dine taktiske valg. Kampe og frie løb tælles fra runde ${league.statsFromRound ?? 1}; snit, km og HI gælder alle hans kampe (de nulstilles ikke ved sæsonskifte).`));
+    h('p', { class: 'muted' }, `Kun du ser disse tal – de røber evner og dine taktiske valg. Kampe og frie løb tælles for ${since(league)}; snit, km og HI gælder alle hans kampe (de nulstilles ikke ved sæsonskifte).`));
 }
 
 export function renderStats({ league, myTeamId }) {
   return h('div', { class: 'panel stats', id: 'stats' }, h('h3', {}, '📊 Statistik'),
-    section('stats-players', `Spillere (${since(league)})`, playerLists(league, myTeamId)),
+    section('stats-players', `Spillere (${since(league)})`, gapNote(league), playerLists(league, myTeamId)),
     section('stats-teams', `Holdtal (${since(league)})`, teamTable(league, myTeamId), h('p', { class: 'muted' }, 'Bold % er snit pr. kamp. Afslutninger, xG, hjørnespark, kontraer og VAR-tjek ses kun for dit eget hold (under "Dit hold") – summeret over sæsonen kunne de røbe et holds taktik.')),
     section('stats-flow', `Ligaens forløb (${since(league)})`, leagueFlow(league)),
     section('stats-mine', `Dit hold (privat, ${since(league)})`, myTeam(league, myTeamId)));

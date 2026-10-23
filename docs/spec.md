@@ -172,6 +172,10 @@ Tick hvert 3. minut (1..90).
   indstillingen. `FOCUS_SHARE`: høje indlæg 52 % indlæg, lave cutbacks 38 % cutbacks, ellers giver
   direkte lange bolde 15 % høje bolde (før tvang DIRECT_LONG 55 % op i luften uanset fokus). Resten:
   VAR-tjek eller afslutning (løb uden bold / almindeligt skud).
+  VAR-tjekket (v3.14.1, brugeren: "VAR på et mål af en midtbanespiller med 5 spillere længere fremme") gælder
+  offside for en af de `VAR_FRONT` = 2 forreste: står skytten bagved, tjekkes hans forreste holdkammerat ("#8 skød, og
+  #9 foran ham stod ikke offside" / "#9 stod offside og var med i situationen"), og øjebliksbilledet viser skytten,
+  hvor han skød fra, og den tjekkede i feltet. Samme træk af tilfældigheder som før (balancen uændret, målt).
 - **Modtageren står hvor bolden kommer (v3.12**, brugeren: "den spiller der var nærmest hvor bolden
   blev spillet hen"): modtageren trækkes med vægt exp(−afstand/16)·(10 + evne) (`receiver`): skytten
   nær feltet (50, 20) eller på feltets kant (50, 32; 45 %) efter FIN, hovedstødsspilleren nær feltets
@@ -450,6 +454,10 @@ lyseblå, 8–11 hvid, 1–7 grå. Filtre Alle/Start-11/Bænk/GK/DEF/MID/ATT. "�
 visning". Sortering på kopi med `origIdx`.
 
 ## 8b. Statistik på Liga-fanen (v3.10)
+Fra v3.14.1 (brugeren: "Statistik skal tælle for sæsonen og ikke siden en eller anden runde") står sæsonen i
+overskrifterne ("Spillere (sæson 2)"); runder vises sæson-relativt. Kun et gem, der var midt i en sæson, da
+statistikken kom, mangler sæsonens første runder (de er ikke gemt) – det siges i én linje, og fra næste sæson tæller
+hele sæsonen.
 Brugeren: "Jeg vil gerne have noget statistik med på liga siden af al mulig slags". Nederst på
 Liga-fanen, fire sammenfoldede sektioner (skjult under afspilning, ligesom avisen). Fra v3.10.1
 (brugeren: "noget rod og ikke til at læse") er hver spillerliste en lille tabel – placering · #nr

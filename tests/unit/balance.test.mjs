@@ -139,7 +139,9 @@ test('målene fordeler sig som i Superligaen: angreb 44–56 %, midtbane 25–38
 // ST trukket til y 32 1,64 (+0,28) – begge røde mod grænsen 0,15. Med loftet: +0,06 og ±0,00.
 test('langskud belønner ikke en angriber uden for feltet: 4-4-1-1 og en trukket ST scorer højst 0,15 mere end 4-4-2', async () => {
   const { measureFormations } = await import('../../tools/measure-duels.mjs');
-  const r = Object.fromEntries(measureFormations(200).map((x) => [x.formation, x]));
+  // 600 kampe (før 200): med 200 er støjen ≈ 0,085 mål – på højde med båndet. v3.14.1 (VAR-tjek af den forreste) gav
+  // med 200 kampe trukket ST +0,16 (rødt på støj), men målt over 1500 kampe: trukket ST −0,035 før og −0,024 efter 4-4-2.
+  const r = Object.fromEntries(measureFormations(600).map((x) => [x.formation, x]));
   const base = r['4-4-2'].for;
   assert.ok(base > 1, `4-4-2 scorer ${base} (data)`);
   assert.ok(r['4-4-1-1'].for - base <= 0.15, `4-4-1-1 ${r['4-4-1-1'].for} mod 4-4-2 ${base}`);

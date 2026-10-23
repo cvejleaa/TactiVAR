@@ -40,6 +40,6 @@ export function renderSchedule({ league, pairs, myTeamId }) {
         h('p', {}, [s.champion ? (s.programmed ? `🏆 Mester: ${s.champion.teamName} (${s.champion.points} point).` : `Førende ved afslutningen: ${s.champion.teamName} (${s.champion.points} point).`) : '', s.myPos ? `Din placering: nr. ${s.myPos}.` : '',
           s.topScorer ? `Topscorer: #${s.topScorer.shirtNumber} ${s.topScorer.shortName} (${s.topScorer.teamName}), ${s.topScorer.goals} mål.` : '',
           s.myBest ? `Din bedste: #${s.myBest.shirtNumber} ${s.myBest.shortName} (${s.myBest.motm}× kampens spiller, ${s.myBest.goals} mål).` : '',
-          s.statsFrom > s.fromRound ? `Spillertallene gælder fra runde ${s.statsFrom}.` : ''].filter(Boolean).join(' ')),
+          s.statsFrom > s.fromRound ? `Spillertallene gælder fra sæsonens runde ${s.statsFrom - s.fromRound + 1}.` : ''].filter(Boolean).join(' ')),
         h('ol', { class: 'past-table' }, s.table.map((r) => h('li', { class: r.teamId === myTeamId ? 'mine' : '' }, `${r.teamName} – ${r.points} p (${r.goalsFor}-${r.goalsAgainst})`)))))) : null);
 }

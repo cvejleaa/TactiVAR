@@ -60,7 +60,7 @@ const GOAL_TEXTS = {
   COMBINATION: [
     (s, a, m) => `Kombinationsfodbold i ${m}. minut: ${a} spillede ${s} fri, og han sluttede sikkert af.`,
     (s, a, m) => `Tre hurtige afleveringer i ${m}. minut, og ${s} kunne score efter oplæg fra ${a}.`,
-    (s, a, m) => `${a} og ${s} spillede væggen i ${m}. minut, og ${s} gjorde det færdigt.`,
+    (s, a, m) => `${a} og ${s} spillede 1-2 i ${m}. minut, og ${s} gjorde det færdigt.`,
   ],
   PENALTY: [
     (s, a, m) => `Straffespark i ${m}. minut: ${a} blev fældet i feltet, og ${s} sendte målmanden den forkerte vej.`,

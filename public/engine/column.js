@@ -77,7 +77,7 @@ export const STYLE_RULES = [
   { key: 'ball', basis: ['poss'], test: (s) => s.poss >= 58,
     say: ['havde bolden det meste af tiden', 'styrede rytmen med bolden', 'lod bolden gå og gik ikke i panik'] },
   { key: 'wait', basis: ['poss', 'goals'], test: (s) => s.poss <= 42 && s.goals >= 1,
-    say: ['havde under halvdelen af bolden og scorede alligevel', 'klarede sig uden meget af bolden', 'scorede med lidt af bolden'] },
+    say: ['havde under halvdelen af bolden og scorede alligevel', 'klarede sig uden meget af bolden', 'scorede, selv om de havde bolden mindst'] },
   { key: 'shots', basis: ['shots'], test: (s) => s.shots >= 12,
     say: ['skød fra alle vinkler', 'pressede mange afslutninger igennem', 'testede målmanden igen og igen'] },
   { key: 'dead', basis: ['setPieceGoals'], test: (s) => s.setPieceGoals >= 1,
