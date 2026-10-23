@@ -64,7 +64,7 @@ const bySlot = (t, xy) => t.tactics.lineupSlots.map((id, i) => [id, ...xy[i]]);
 const BASE = [[50, 90], [50, 30], [50, 81], [50, 81], [50, 75], [50, 79], [50, 79], [50, 79], [50, 14], [50, 22], [50, 89]];
 const withPts = (changes) => BASE.map((xy, i) => changes[i] ?? xy);
 
-test('billedet: skytten står, hvor han skød fra (kanten 50,32 / målet 50,20); den tjekkede forrest i feltet (50,16); bolden ved skytten', () => {
+test('billedet: skytten står, hvor han skød fra (kanten 50,32 / målet 50,20); den tjekkede står, hvor han stod (forrest, 50,14); bolden ved skytten', () => {
   // Dræber: skudsted altid EDGE / snapshot med SPOT.EDGE i stedet for shotSpot (overlevede: forfatterens test bruger kun rul 0,1 = kanten),
   // moves-skytten på SPOT.EDGE, og 'other' altid sand (så en selv-tjekket skytte flyttes til 50,16).
   for (const [spot, ball] of [[0.1, [50, 32]], [0.9, [50, 20]]]) {
@@ -73,7 +73,7 @@ test('billedet: skytten står, hvor han skød fra (kanten 50,32 / målet 50,20);
     const s = two.evs[0].snapshot;
     assert.equal(s.scorer, two.shooter.id); assert.equal(s.assist, two.assister.id);
     assert.deepEqual(s.ball, ball, `bolden ved skytten (spot ${spot})`);
-    assert.deepEqual(s.pts, bySlot(two.H, withPts({ 1: ball, 8: [50, 16] })), `to foran: skytten på ${ball}, den forreste (slot 8) på 50,16`);
+    assert.deepEqual(s.pts, bySlot(two.H, withPts({ 1: ball })), `to foran: skytten på ${ball}, den forreste (slot 8) bliver på 50,14 (v3.14.1: før flyttet tilbage til 50,16)`);
     // skytten selv forrest: ingen anden flyttes – og skytten flyttes til skudstedet, ikke 50,16
     for (const key of ['front', 'one']) {
       const own = varGame({ spots: SPOTS[key], rolls: { spot } });
@@ -187,4 +187,30 @@ test('teksten "spillede 1-2" (kombinationsmål) kan komme fra beskrivelsen – o
     'Tre hurtige afleveringer i 7. minut, og S kunne score efter oplæg fra A.',
     'A og S spillede 1-2 i 7. minut, og S gjorde det færdigt.',
   ]);
+});
+
+// v3.14.2 (brugeren: "siger at M. Møller var foran og ikke offside, men M. Poulsen er længere fremme"): den tjekkede
+// bliver, hvor han stod, og skytten tegnes aldrig foran ham. Her står den forreste (midtbanen) langt tilbage på y 22,
+// så skuddet tæt på mål (y 20) ville tegne skytten foran ham – han står i stedet VAR_BEHIND bag (y 26).
+test('billedet: står den tjekkede forreste trukket tilbage (y 22), tegnes skytten bag ham (y 26), ikke på skudstedet (y 20)', async () => {
+  const { VAR_BEHIND } = await import('../../public/engine/match.js');
+  const deep = { 1: { x: 50, y: 60 }, 8: { x: 50, y: 38 }, 9: { x: 50, y: 40 } };   // back y 40, midtbane y 22, angriber y 34
+  const g = varGame({ spots: deep, rolls: { spot: 0.9 } });
+  const s = g.evs[0].snapshot, y = Object.fromEntries(s.pts.map(([id, , py]) => [id, py]));
+  assert.match(g.evs[0].text, new RegExp(`${tag(g.off)} foran ham`));
+  assert.equal(y[g.off.id], 22, 'den tjekkede står, hvor han stod');
+  assert.equal(y[g.shooter.id], 22 + VAR_BEHIND); assert.equal(VAR_BEHIND, 4);
+  assert.deepEqual(s.ball, [50, 26]);
+});
+
+// Bot-angreb: det gælder også, når botten scorer – billedet af målet imod dig spejles, så bolden står ved
+// 100 - (22 + VAR_BEHIND) = 74, ikke ved skudstedet 100 - 20 = 80. Dræber: offY nulstillet for udeholdet
+// (`* (att === H ? 1 : 0)`) – overlevede alle v3.14.2-tests, som kun prøvede hjemmeholdet.
+test('billedet af et mål imod dig: botten har en tilbagetrukket forreste (y 22) – bolden spejles fra y 26 (74), ikke fra skudstedet y 20 (80)', async () => {
+  const { VAR_BEHIND } = await import('../../public/engine/match.js');
+  const deep = { 1: { x: 50, y: 60 }, 8: { x: 50, y: 38 }, 9: { x: 50, y: 40 } };
+  const g = varGame({ spots: deep, attack: 'A', rolls: { spot: 0.9 }, offPulse: 14, shooterPulse: 8, defPositioning: 1 });
+  assert.equal(g.evs[0].type, 'VAR_GOAL');
+  assert.match(g.evs[0].text, new RegExp(`${tag(g.off)} foran ham`));
+  assert.deepEqual([g.evs[0].snapshot.attacking, g.evs[0].snapshot.scorer, g.evs[0].snapshot.ball], [false, null, [50, 100 - (22 + VAR_BEHIND)]]);
 });

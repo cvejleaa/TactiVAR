@@ -105,6 +105,8 @@ export const longshotBonus = (fin) => Math.min(fin + LONGSHOT_BONUS, LONGSHOT_CA
 export const EDGE_SHARE = 0.5;
 // VAR-offside-tjek (v3.14.1): skytten tjekkes kun selv, når han er blandt de N forreste markspillere – ellers den forreste.
 export const VAR_FRONT = 2;
+// I billedet står en skytte bag den VAR-tjekkede mindst så mange enheder længere tilbage.
+export const VAR_BEHIND = 4;
 export const SPOT = { CROSS: { x: 50, y: 16 }, CUTBACK: { x: 50, y: 28 }, GOAL: { x: 50, y: 20 }, EDGE: { x: 50, y: 32 } };
 const FOCUS_LABEL = { CENTRAL: 'Centralt', HIGH_CROSSES: 'Høje indlæg', LOW_CUTBACKS: 'Lave cutbacks' };
 const PASS_LABEL = { SHORT: 'korte pasninger', BALANCED: 'balanceret', DIRECT_LONG: 'direkte lange bolde' };
@@ -794,8 +796,12 @@ export function simulateMatch(home, away, rng, opts = {}) {
         st[k(att, 'VarChecks')]++;
         const trapBonus = (off.counterTactics?.vsTrapLong ?? 15) * 0.045; // v3.6: samme effekt (≈0,8) på den lavere skala
         const timing = describeVarTiming(off.varProfile.varPulse);
-        // Billedet: skytten der, hvor han skød fra; den offside-tjekkede forrest i feltet.
-        const moves = { [shooter.id]: [shotSpot.x, shotSpot.y], ...(other ? { [off.id]: [SPOT.GOAL.x, SPOT.CROSS.y] } : {}) };
+        // Billedet: skytten der, hvor han skød fra; den offside-tjekkede står, hvor han stod – han ER den forreste
+        // (brugeren v3.14.1: "siger at M. Møller var foran, men M. Poulsen er længere fremme" – han blev før flyttet
+        // tilbage til y 16). Skytten tegnes aldrig foran ham.
+        const offY = seen[att.team.id]?.[att.starters.indexOf(off)]?.y ?? 0;
+        const shotAt = other ? { x: shotSpot.x, y: Math.max(shotSpot.y, offY + VAR_BEHIND) } : shotSpot;
+        const moves = { [shooter.id]: [shotAt.x, shotAt.y] };
         if (off.varProfile.varPulse + trapBonus + rng.next() * 6 > defender.skills.positioning + rng.next() * 6) {
           scored(); homeVarNet += att === H ? 1 : -1;
           sheet.adjust(shooter.id, 1.3); sheet.bump(shooter.id, 'goals'); assist(0.5); sheet.adjust(defender.id, -0.35);
@@ -803,7 +809,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
           goalsPool.push({ scorer: tag(shooter), teamName: att.team.name, match: `${home.name} - ${away.name}`, min, kind: 'VAR', spectacle: goalSpectacle('VAR', {}, min, rng), desc: describeGoal('VAR', tag(shooter), tag(assister), min, rng) });
           const why = other ? `${tag(shooter)} skød, og ${tag(off)} foran ham stod ikke offside – han ${timing}` : `${tag(shooter)} ${timing}`;
           addEv(min, 'VAR_GOAL', 'HIGHLIGHT', att.isHome, true, `📺 VAR: mål godkendt – ${tag(shooter)}`, `📺 [${att.team.name} • ${hG}-${aG}] VAR-KENDELSE: MÅL GODKENDT! ${why}.`, `${att.team.name}: mål godkendt`);
-          snapshot(att, shooter, assister, shotSpot, false, moves);
+          snapshot(att, shooter, assister, shotAt, false, moves);
         } else {
           homeVarNet += att === H ? -1 : 1;
           sheet.adjust(off.id, -0.4); sheet.adjust(defender.id, 0.45); sheet.bump(defender.id, 'tacticWins');

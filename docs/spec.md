@@ -175,7 +175,7 @@ Tick hvert 3. minut (1..90).
   VAR-tjekket (v3.14.1, brugeren: "VAR på et mål af en midtbanespiller med 5 spillere længere fremme") gælder
   offside for en af de `VAR_FRONT` = 2 forreste: står skytten bagved, tjekkes hans forreste holdkammerat ("#8 skød, og
   #9 foran ham stod ikke offside" / "#9 stod offside og var med i situationen"), og øjebliksbilledet viser skytten,
-  hvor han skød fra, og den tjekkede i feltet. Samme træk af tilfældigheder som før (balancen uændret, målt).
+  hvor han skød fra (aldrig foran den tjekkede, `VAR_BEHIND`), og den tjekkede, hvor han stod – forrest (v3.14.2). Samme træk af tilfældigheder som før (balancen uændret, målt).
 - **Modtageren står hvor bolden kommer (v3.12**, brugeren: "den spiller der var nærmest hvor bolden
   blev spillet hen"): modtageren trækkes med vægt exp(−afstand/16)·(10 + evne) (`receiver`): skytten
   nær feltet (50, 20) eller på feltets kant (50, 32; 45 %) efter FIN, hovedstødsspilleren nær feltets

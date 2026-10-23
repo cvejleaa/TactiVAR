@@ -51,3 +51,27 @@ test('"Rundens mål" for et VAR-mål påstår intet om skyttens placering – ha
   assert.equal(new Set(texts).size, 3, texts.join(' | '));
   for (const t of texts) { assert.match(t, /#8 G\. Kristensen/); assert.doesNotMatch(t, /rigtige side|frikendte #8|#8 G\. Kristensen (var|stod)/, t); }
 });
+
+// Brugeren (v3.14.1 live): "siger at M. Møller var foran og ikke offside, men M. Poulsen er længere fremme på banen" –
+// den tjekkede blev flyttet tilbage til y 16 i billedet. Invariant på billedet selv: den, teksten kalder "foran ham",
+// står forrest af alle markspillere, og skytten står bag ham.
+test('billedet ved et VAR-tjek af en holdkammerat: han står forrest i billedet, skytten bag ham (også ved målet, y 20)', async () => {
+  const { VAR_BEHIND } = await import('../../public/engine/match.js');
+  let n = 0;
+  for (let seed = 1; seed <= 80; seed++) {
+    const L = createLeague(createRng(seed)), H = L.teams[0], A = L.teams[1];
+    const m = simulateMatch(H, A, createRng(seed * 11));
+    for (const e of m.events.filter((x) => x.isHome && x.type === 'VAR_GOAL' && x.snapshot && / foran ham /.test(x.text))) {
+      const offTag = e.text.match(/og (#\d+ .+?) foran ham/)[1];
+      const off = H.squad.find((p) => `#${p.shirtNumber} ${p.shortName}` === offTag);
+      const gk = H.squad.find((p) => p.id === H.tactics.lineupSlots[0])?.id;
+      const y = Object.fromEntries(e.snapshot.pts.map(([id, , py]) => [id, py]));
+      const others = e.snapshot.pts.filter(([id]) => id !== off.id && id !== gk);
+      assert.ok(others.every(([, , py]) => py >= y[off.id]), `${offTag} (y ${y[off.id]}) forrest: ${JSON.stringify(others)}`);
+      assert.ok(y[e.snapshot.scorer] >= y[off.id] + VAR_BEHIND, 'skytten står bag ham');
+      assert.deepEqual(e.snapshot.ball, [50, y[e.snapshot.scorer]]);
+      n++;
+    }
+  }
+  assert.ok(n >= 3, `billeder med en tjekket holdkammerat: ${n}`);
+});
