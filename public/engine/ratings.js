@@ -1,4 +1,5 @@
 // Kampkarakterer, stjerner og MotM (docs/spec.md §6).
+import { drainFactor } from './freshness.js';
 export const RATING_MIN = 3.5;
 export const RATING_MAX = 10;
 export const START_RATING = 6.5;
@@ -30,7 +31,7 @@ export function createSheet() {
         minIn, minOut: 90, rating: START_RATING + (rng.next() * 0.3 - 0.15), stars: 0,
         startCounterMastery: oppMastery, gainedCounterXp: 0,
         goals: 0, assists: 0, saves: 0, aerialWins: 0, tacticWins: 0, freeRuns: 0, freeRunsWon: 0, headerGoals: 0, penaltyGoals: 0, setPieceGoals: 0, yellowCard: false, injured: false, isMotM: false,
-        km90: run.km90, topSpeed: run.topSpeed, hiShare: run.hiShare, distanceKm: 0, hiKm: 0,
+        km90: run.km90, drain90: run.drain90, topSpeed: run.topSpeed, hiShare: run.hiShare, distanceKm: 0, hiKm: 0,
       };
       return entries[player.id];
     },
@@ -75,13 +76,15 @@ export function runProfile(player, team, rng, role) {
   const runsF = RUNS_ROLES.has(role) ? ph?.phase1_buildUp?.offBallRuns ?? 'NORMAL' : 'NORMAL';
   const genpres = ph?.phase3_transition?.onBallLost === 'COUNTER_PRESS_5S' && player.line !== 'GK' ? 1.04 : 1;
   const km90 = base.km * (0.9 + sta * 0.01) * press * (RUNS_KM[runsF] ?? 1) * genpres * (0.96 + rng.next() * 0.08);
+  // Tabet af friskhed i kampen pr. 90 min (v3.13, freshness.js): pladsens grund-km · pres/løb – uden STA-leddet på km.
+  const drain90 = base.km * press * (RUNS_KM[runsF] ?? 1) * genpres * drainFactor(sta);
   const topSpeed = Math.round(clamp(25 + pac * 0.45 + (player.line === 'GK' ? -3 : 0) + (rng.next() * 2 - 1), 22, 36) * 10) / 10;
   // Andel højintenst løb (over ca. 20 km/t; v3.7.1, brugeren: "hvor stor en andel af deres løb
   // der er højintense løb"): rolle-basis, fart, pres og friskhed trækker op/ned,
   // ±1 %-point støj, klemt 1–20 %.
   const fresh = Math.max(0, Math.min(100, player.freshness ?? 100));
   const hiShare = Math.round(clamp((base.hi + (pac - 10) * 0.4) * (PRESS_HI[team.tactics?.phases?.phase2_defending?.pressingHeight] ?? 1) * (RUNS_HI[runsF] ?? 1) * (0.8 + 0.2 * fresh / 100) + (rng.next() * 2 - 1), 1, 20) * 10) / 10;
-  return { km90, topSpeed, hiShare };
+  return { km90, topSpeed, hiShare, drain90 };
 }
 const PRESS_HI = { HIGH_GEGENPRESS: 1.15, MID_BLOCK: 1, LOW_BLOCK: 0.9 };
 
@@ -104,7 +107,7 @@ export function finalizeSheet(sheet, homeGoals, awayGoals, rng, xpFor) {
     e.hiKm = Math.round(e.distanceKm * e.hiShare / 100 * 100) / 100;
     // For kort tid til en rigtig spurt eller en meningsfuld HI-andel (støj på få minutter).
     if (e.minOut - e.minIn < 10) { e.topSpeed = null; e.hiShare = null; e.hiKm = null; } // tæller heller ikke i sæsonens HI-andel
-    delete e.km90;
+    delete e.km90; delete e.drain90;
     if (!best || e.rating > best.rating) best = e;
   }
   if (best) best.isMotM = true;

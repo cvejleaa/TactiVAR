@@ -7,7 +7,8 @@ import { viewPlayer, canSeeField, viewRatingEntry } from '../../public/engine/vi
 import { initialCounterTactics, opponentTacticKeys, masteryVs, counterXpForMatch, applyCounterXp, COUNTER_POOL } from '../../public/engine/counter.js';
 import { starsFromRating, createSheet, finalizeSheet } from '../../public/engine/ratings.js';
 import { describeFinish, describeHeader, describeVarTiming, generateScoutingClues } from '../../public/engine/clues.js';
-import { simulateMatch, MAX_SUBS } from '../../public/engine/match.js';
+import { simulateMatch } from '../../public/engine/match.js';
+import { MATCH_RULES } from '../../public/engine/match-rules.js';
 import { playPairs, fixedPairs, commitRound, SCOUTING_PER_PLAYER } from '../../public/engine/season.js';
 import { normalizeLeague } from '../../public/engine/sanitize.js';
 
@@ -218,7 +219,7 @@ test('kampresultat hænger sammen: mål = målhændelser, statistik og karaktera
     assert.equal(goalEvents.filter((e) => !e.isHome).length, m.awayGoals);
     assert.equal(m.ratings.home.reduce((a, r) => a + r.goals, 0), m.homeGoals);
     assert.ok(m.stats.hOnTarget >= m.homeGoals && m.stats.hShots >= m.stats.hOnTarget);
-    assert.ok(m.ratings.home.length >= 11 && m.ratings.home.length <= 11 + MAX_SUBS);
+    assert.ok(m.ratings.home.length >= 11 && m.ratings.home.length <= 11 + MATCH_RULES.maxSubs);
     assert.equal([...m.ratings.home, ...m.ratings.away].filter((r) => r.isMotM).length, 1);
     assert.equal(m.events.at(-1).type, 'END');
     for (const r of [...m.ratings.home, ...m.ratings.away]) assert.ok(r.rating >= 3.5 && r.rating <= 10);
@@ -227,7 +228,7 @@ test('kampresultat hænger sammen: mål = målhændelser, statistik og karaktera
   }
 });
 
-test('skade giver indskiftning fra bænken af samme kæde og maks 3 skift', () => {
+test('skade giver indskiftning fra bænken af samme kæde og højst MATCH_RULES.maxSubs (5) skift', () => {
   let seen = 0;
   for (const { m } of manyMatches(120, 21)) {
     for (const inj of m.injuries) {
@@ -235,20 +236,27 @@ test('skade giver indskiftning fra bænken af samme kæde og maks 3 skift', () =
       if (sub) seen++;
       assert.ok(inj.matches >= 1 && inj.matches <= 3);
     }
-    assert.ok(m.events.filter((e) => e.type === 'SUB' && e.isHome).length <= MAX_SUBS);
+    assert.ok(m.events.filter((e) => e.type === 'SUB' && e.isHome).length <= MATCH_RULES.maxSubs);
   }
   assert.ok(seen > 10, `kun ${seen} skadesskift set – testen har for lidt data`);
 });
 
-test('maks 3 skift pr. hold, og første skift er fra samme kæde', () => {
+// v3.13 (IFAB Law 3, match-rules.js): 5 skift i højst 3 pauser; halvlegen (45') er gratis. Skade i HVERT tick:
+// tre pauser (skadens hold trækkes tilfældigt) + pausen 45' → præcis 4 skift (før v3.13: 3 = den gamle MAX_SUBS; 5 ville betyde, at pauserne ikke binder).
+test('skade i hvert tick: 3 pauser binder (ude 3 skift), halvlegen er gratis (hjemme 4), og første skift er fra samme kæde', () => {
   const L = league(22), base = createRng(3);
-  // Tving frispark og skade i hvert tick, så der er langt flere skader end skift.
-  const rng = { ...base, chance: (p) => (p === 0.06 || p === 0.4 ? true : base.chance(p)) };
+  // Tving frispark og skade i hvert tick, så der er langt flere skader end skift – skiftevis hjemme/ude
+  // (0,5 = skadens hold): tick 45 er det 15. → en hjemmeskade i halvlegen. Hjemme: 3 pauser + 45' = 4; ude: 3.
+  let flip = false;
+  const rng = { ...base, chance: (p) => (p === 0.06 || p === 0.4 ? true : p === 0.5 ? (flip = !flip) : base.chance(p)) };
   const m = simulateMatch(L.teams[0], L.teams[1], rng);
   assert.ok(m.injuries.length > 8);
-  for (const list of [m.ratings.home, m.ratings.away]) {
+  for (const [list, want] of [[m.ratings.home, 4], [m.ratings.away, 3]]) {
     const subs = list.filter((r) => r.role.startsWith('SUB'));
-    assert.equal(subs.length, MAX_SUBS);
+    assert.equal(subs.length, want);
+    const mins = subs.map((r) => r.minIn);
+    assert.equal(new Set(mins.filter((x) => x !== 45)).size, 3, mins.join());
+    assert.equal(mins.includes(45), want === 4, mins.join());
     assert.equal(subs.sort((a, b) => a.minIn - b.minIn)[0].role, `SUB (${subs[0].line})`);
   }
   for (const side of [true, false]) {

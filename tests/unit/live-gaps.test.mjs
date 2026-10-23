@@ -7,8 +7,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRng } from '../../public/engine/rng.js';
 import { createLeague } from '../../public/engine/generator.js';
-import { simulateMatch } from '../../public/engine/match.js';
+import { simulateMatch as simLive } from '../../public/engine/match.js';
 import { livePositions, ADVANCE, RUNS_PUSH, SHAPE, BALL_PULL, FRONT_LIMIT, RUN_STEP } from '../../public/engine/positions.js';
+// v3.13: friskheden falder i kampen (freshness.js). Denne fils tærskler forudsætter fuld friskhed hele
+// kampen, så friskhed i kampen slås fra her – de nye tests i fatigue.test.mjs prøver den slået TIL.
+const simulateMatch = (h, a, r, o = {}) => simLive(h, a, r, { liveEnergy: false, ...o });
 
 // chance(p) afgøres af script[p] (true/false eller (n) => bool med nummeret på kaldet); next() er konstant.
 function stubRng(script = {}, nextValue = 0.5) {
@@ -26,7 +29,7 @@ const prep = (t) => {
     p.skills = SK(10); p.aerialPower = 10; p.counterTactics = { vsPress: 25, vsLowBlock: 25, vsTrapLong: 25 };
     p.varProfile = { cynicism: 10, theatre: 10, varPulse: 10 }; p.injuryMatchesLeft = 0;
   }
-  t.tactics.baseFormation = '4-4-2'; t.tactics.customCoords = {}; t.tactics.conditionalRules = [];
+  t.tactics.baseFormation = '4-4-2'; t.tactics.customCoords = {}; t.tactics.conditionalRules = []; t.subsLimit = 0; /* v3.13: ingen træthedsskift i test-arenaen */
   t.tactics.lineupSlots = t.squad.slice(0, 11).map((p) => p.id);
 };
 function arena({ home = {}, away = {} } = {}) {

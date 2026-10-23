@@ -619,12 +619,17 @@ try {
   const bk = await dl;
   check('Migrering: beskeden har en knap, der henter det gamle spil (skema 3) som fil', bk.suggestedFilename().startsWith('tactivar_backup_') && JSON.parse(fs.readFileSync(await bk.path(), 'utf8')).schemaVersion === 3);
   check('Migrering fra skema 3: beskeden nævner Superliga-højderne og friskheden – ikke puljen eller Hvis-Så', note3.includes('Superliga') && note3.includes('Friskhed') && !note3.includes('100 point') && !note3.includes('Hvis-Så'), note3);
-  // Advarsel ved ▶ om trætte startere (under 70 %)
-  const setStarterFresh = async (v) => { await g.evaluate((val) => { const d = JSON.parse(localStorage.getItem('tactivar_save')); const t = d.league.teams.find((x) => !x.isBot); for (const p of t.squad) p.freshness = 100; t.squad.find((p) => p.id === t.tactics.lineupSlots[6]).freshness = val; localStorage.setItem('tactivar_save', JSON.stringify(d)); }, v); await reload(); };
+  // Advarsel ved ▶ om startere under din udskiftningsgrænse (v3.13: gemt før v3.13 → 70 %; uden grænse: 70 %)
+  const setStarterFresh = async (v, limit) => { await g.evaluate(([val, lim]) => { const d = JSON.parse(localStorage.getItem('tactivar_save')); const t = d.league.teams.find((x) => !x.isBot); for (const p of t.squad) p.freshness = 100; t.squad.find((p) => p.id === t.tactics.lineupSlots[6]).freshness = val; if (lim !== undefined) t.subsLimit = lim; localStorage.setItem('tactivar_save', JSON.stringify(d)); }, [v, limit]); await reload(); };
   await setStarterFresh(69);
-  check('Advarsel: én starter under 70 % giver "⚠ 1 trætte startere"', (await g.textContent('#tired-warning')).trim() === '⚠ 1 trætte startere');
+  check('Advarsel: én starter under din grænse (70 %) siger, at han skiftes ud i 3. minut', (await g.textContent('#tired-warning')).trim() === '⚠ 1 startere under din grænse (70 %) – skiftes ud i 3. minut', await g.textContent('#tired-warning'));
   await setStarterFresh(70);
   check('Ingen advarsel ved 70 %', (await g.locator('#tired-warning').count()) === 0);
+  await setStarterFresh(78, 80);
+  check('Advarslen følger grænsen: 78 % er under en grænse på 80 % (QC: før fast 70)', (await g.textContent('#tired-warning')).includes('under din grænse (80 %)'));
+  await setStarterFresh(69, 0);
+  check('Grænse Fra: advarslen om trætte startere under 70 % som før', (await g.textContent('#tired-warning')).trim() === '⚠ 1 trætte startere');
+  await setStarterFresh(100, 70);
   await g.evaluate(() => { const d = JSON.parse(localStorage.getItem('tactivar_save')); const t = d.league.teams.find((x) => !x.isBot); t.squad.find((p) => !t.tactics.lineupSlots.includes(p.id)).freshness = 10; localStorage.setItem('tactivar_save', JSON.stringify(d)); });
   await reload();
   check('En træt bænkspiller giver ingen advarsel', (await g.locator('#tired-warning').count()) === 0);

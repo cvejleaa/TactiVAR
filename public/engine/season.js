@@ -10,6 +10,7 @@ import { buildGazette } from './gazette.js';
 import { SEASON_ROUNDS, seasonRoundOf } from './schedule.js';
 import { emptyStanding } from './generator.js';
 import { PLAYER_SEASON_DEFAULTS } from './stats.js';
+import { REST_BENCH, afterMatchFreshness } from './freshness.js';
 
 // Næste rundes kampe efter programmet (v3.11) som [hjemmeIdx, udeIdx]. Kampen med et
 // menneskestyret hold står først: avisen, afspilningen og Kamp-fanens første kort bygger på det.
@@ -62,17 +63,6 @@ export const sortStandings = (standings) => standings.slice().sort((a, b) =>
 
 export const SCOUTING_PER_PLAYER = 20;
 
-// Friskhed (v3.7, brugeren: "kun 3 af mine spillere der har under 100% i friskhed"; før
-// −4…9 og straks +8 igen). Kampen koster efter løbet distance – højt pres koster altså mere –
-// og udholdenhed dæmper: km·(1,5 − STA·0,03). Restitution til næste runde: 41 % af det, der
-// mangler op til 100 (v3.10.1, brugeren: "næsten alle mine spillere er langt nede i friskhed" –
-// valgt ≈80 %; før 35 %; ikke brugt: +15 oveni) – jo mere træt, jo hurtigere kommer han sig.
-// Ligevægt for en fast starter f = 100 − 1,44·pris (QC: med fast +5 endte alle på bunden, og
-// rotation blev en fast afgift): CM (pris ≈14) ≈80 %, STA 20 (≈10) ≈86 %, målmand ≈88 %.
-export const REST_SHARE = 0.41, REST_BENCH = 15, FRESH_FLOOR = 50;
-export const matchCost = (km, stamina) => Math.round(km * (1.5 - stamina * 0.03));
-export const restore = (f) => Math.min(100, f + Math.round(REST_SHARE * (100 - f)));
-export const afterMatchFreshness = (fresh, km, stamina, noise = 0) => Math.max(FRESH_FLOOR, restore(fresh - Math.max(0, matchCost(km, stamina) + noise)));
 
 // Bogfører en afviklet runde i ligaen (muterer league) – kaldes før der gemmes.
 // Idempotent: en runde, der allerede er bogført (dobbeltklik, genindlæsning midt i

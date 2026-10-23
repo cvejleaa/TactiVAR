@@ -156,7 +156,7 @@ const phases = (pass, focus, height) => (t) => {
   Object.assign(t.tactics.phases.phase1_buildUp, { passingStyle: pass, attackFocus: focus });
   Object.assign(t.tactics.phases.phase2_defending, { pressingHeight: height, offsideTrap: 'OFF' });
 };
-if (import.meta.url === `file://${process.argv[1]}` && !['saeson', 'loeb', 'fokus', 'maal', 'formation'].includes(process.argv[3])) {
+if (import.meta.url === `file://${process.argv[1]}` && !['saeson', 'loeb', 'fokus', 'maal', 'formation', 'skift'].includes(process.argv[3])) {
   const pct = (x) => `${(x * 100).toFixed(1)} %`;
   const liga = measure();
   console.log(`Ligaens egne taktikker: fase 1 vinder ${pct(liga.rate)} (${liga.n} dueller, ${ARG_N} ligaer × 3 runder); ${liga.goalsPerMatch.toFixed(2)} mål pr. kamp, heraf ${liga.headersPerMatch.toFixed(2)} hovedstød.`);
@@ -233,4 +233,64 @@ export function measureFormations(N) {
 }
 if (import.meta.url === `file://${process.argv[1]}` && process.argv[3] === 'formation') {
   for (const r of measureFormations(ARG_N)) console.log(r.formation.padEnd(26), 'for', r.for.toFixed(2), 'imod', r.against.toFixed(2), 'langskud', r.longshots.toFixed(2));
+}
+
+// v3.13: udskiftninger over en sæson (10 runder med bogføring, så friskheden følger med). Pr. hold pr.
+// kamp: skift i alt og efter årsag, minutfordeling, mål pr. kamp, startelleverens friskhed – og STA's
+// betydning: friskhed i kampen ved 90' for starterne med lav (≤ 8) og høj (≥ 14) STA.
+// Kør: node tools/measure-duels.mjs 30 skift. overrides = { subsLimit } til alle hold (test af grænsen).
+export function measureSubs(N = ARG_N, rounds = 10, overrides = {}) {
+  let games = 0, subs = 0, goals = 0;
+  const why = { fatigue: 0, injury: 0, rule: 0 }, mins = { '1–45': 0, '46–60': 0, '61–75': 0, '76–90': 0 }, blocked = { n: 0 };
+  const fresh = [];
+  for (let s = 1; s <= N; s++) {
+    const rng = createRng(s * 15485863);
+    const L = createLeague(rng);
+    if (overrides.subsLimit != null) for (const t of L.teams) t.subsLimit = overrides.subsLimit;
+    for (let r = 1; r <= rounds; r++) {
+      const res = playPairs(L, fixedPairs(L, 1 + (r % 7)), rng);
+      for (const m of res.matches) {
+        games += 2; goals += m.homeGoals + m.awayGoals;
+        for (const e of m.events) {
+          if (e.type === 'SUB') {
+            subs++;
+            const k = /træt|erstatter/.test(e.text) && !/Skadesskift/.test(e.text) ? (/Hvis-Så/.test(e.text) ? 'rule' : 'fatigue') : /Hvis-Så/.test(e.text) ? 'rule' : 'injury';
+            why[k]++;
+            mins[e.min <= 45 ? '1–45' : e.min <= 60 ? '46–60' : e.min <= 75 ? '61–75' : '76–90']++;
+          }
+          if (e.label === 'Udskiftning ikke mulig') blocked.n++;
+        }
+      }
+      commitRound(L, res, rng);
+    }
+    for (const t of L.teams) { const st = t.squad.filter((p) => t.tactics.lineupSlots.includes(p.id)); fresh.push(st.reduce((a, p) => a + p.freshness, 0) / st.length); }
+  }
+  const mean = (a) => a.reduce((x, y) => x + y, 0) / a.length;
+  return { subsPerTeam: subs / games, why: Object.fromEntries(Object.entries(why).map(([k, v]) => [k, v / games])), mins: Object.fromEntries(Object.entries(mins).map(([k, v]) => [k, subs ? v / subs : 0])), goalsPerMatch: goals / (games / 2), startFresh: mean(fresh), blockedPerMyGame: blocked.n / (N * rounds) };
+}
+// STA's betydning i kampen: samme hold med STA sat lavt (6) eller højt (16) på alle markspillere, mod
+// den samme modstander uden skift (grænse 0): mål for/imod i sidste kvarter (min ≥ 76) og i alt.
+export function measureStamina(N = ARG_N, liveEnergy = true) {
+  const out = {};
+  for (const sta of [6, 16]) {
+    let late = 0, lateAgainst = 0, gf = 0, ga = 0;
+    for (let s = 1; s <= N; s++) {
+      const L = createLeague(createRng(s)), [H, A] = [L.teams[0], L.teams[1]];
+      for (const t of [H, A]) { t.subsLimit = 0; t.tactics.conditionalRules = []; }
+      for (const p of H.squad) if (p.line !== 'GK') p.skills.stamina = sta;
+      for (const p of A.squad) if (p.line !== 'GK') p.skills.stamina = 11;
+      const m = simulateMatch(H, A, createRng(s * 31 + 7), liveEnergy ? {} : { liveEnergy: false });
+      gf += m.homeGoals; ga += m.awayGoals;
+      for (const e of m.events) if (['GOAL', 'HEADER_GOAL', 'VAR_GOAL'].includes(e.type) && e.min >= 76) { if (e.isHome) late++; else lateAgainst++; }
+    }
+    out[sta] = { lateNet: (late - lateAgainst) / N, net: (gf - ga) / N };
+  }
+  return out;
+}
+if (import.meta.url === `file://${process.argv[1]}` && process.argv[3] === 'skift') {
+  const r = measureSubs();
+  console.log(`Skift pr. hold pr. kamp ${r.subsPerTeam.toFixed(2)} (træthed ${r.why.fatigue.toFixed(2)}, skade ${r.why.injury.toFixed(2)}, Hvis-Så ${r.why.rule.toFixed(2)}) · minut: ${Object.entries(r.mins).map(([k, v]) => `${k} ${(v * 100).toFixed(0)} %`).join(', ')}`);
+  console.log(`Mål pr. kamp ${r.goalsPerMatch.toFixed(2)} · startelleverens friskhed efter 10 runder ${r.startFresh.toFixed(1)} % · "kunne ikke skifte" pr. kamp for dit hold ${r.blockedPerMyGame.toFixed(2)}`);
+  const n = Math.max(400, ARG_N * 20), st = measureStamina(n), st0 = measureStamina(n, false);
+  console.log(`STA 6 mod STA 16 (alle markspillere, ingen skift, ${n} kampe): netto i alt ${st[6].net.toFixed(2)} / ${st[16].net.toFixed(2)}, sidste kvarter ${st[6].lateNet.toFixed(2)} / ${st[16].lateNet.toFixed(2)} – uden friskhed i kampen (før v3.13): ${st0[6].net.toFixed(2)} / ${st0[16].net.toFixed(2)}, sidste kvarter ${st0[6].lateNet.toFixed(2)} / ${st0[16].lateNet.toFixed(2)}`);
 }

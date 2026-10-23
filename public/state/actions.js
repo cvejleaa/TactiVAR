@@ -1,6 +1,7 @@
 // Ændringer af eget holds taktik og opstilling – rene funktioner over holdobjektet, så de
 // kan testes uden browser. UI'et kalder dem og gemmer bagefter.
 import { FORMATIONS, clampPos } from '../engine/formations.js';
+import { clampSubsLimit } from '../engine/freshness.js';
 
 const IDENTITY = Array.from({ length: 11 }, (_, i) => i);
 
@@ -46,6 +47,9 @@ export function switchPreset(team, fromIdx, toIdx) {
   team.tactics = next;
   return true;
 }
+
+// Holdets udskiftningsgrænse (v3.13): på holdet, ikke i planen – planskift ændrer den ikke. 0 = fra.
+export const setSubsLimit = (team, v) => { team.subsLimit = clampSubsLimit(v); };
 
 export const MAX_RULES = 5;
 export function addRule(team) {

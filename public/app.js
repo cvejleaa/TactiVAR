@@ -111,10 +111,12 @@ function start() {
   render();
 }
 
-// Startere under 70 % friskhed på dit hold (advarsel ved ▶) – under en fast starters ligevægt (≈75 %).
+// Startere under din udskiftningsgrænse (v3.13, QC: advarslen fulgte før en fast 70 %, også når grænsen
+// var en anden) – de skiftes ud i første tick. Uden grænse: under 70 % (under en fast starters ligevægt).
+const tiredLimit = () => myTeam().subsLimit || 70;
 function tiredStarters() {
   const t = myTeam();
-  return t.squad.filter((p) => t.tactics.lineupSlots.includes(p.id) && p.freshness < 70).length;
+  return t.squad.filter((p) => t.tactics.lineupSlots.includes(p.id) && p.freshness < tiredLimit()).length;
 }
 
 // Forklaringen på en migrering – både ved indlæsning og ved import af en ældre fil.
@@ -176,7 +178,10 @@ function renderControls() {
     // Modstanderen følger programmet (v3.11); navnet ved siden af åbner hans trup til scouting.
     h('button', { id: 'play-round', class: 'primary', disabled: !!mc?.playing, onclick: playNextRound }, `▶ Spil runde ${next.k} af ${game.league.schedule.length} mod ${next.opp.name} (${next.home ? 'hjemme' : 'ude'})`),
     h('button', { id: 'next-opponent', class: 'mini', title: `Scout ${next.opp.name}`, onclick: () => { game.ui.tab = 'trup'; persist(); showTeam(teams.indexOf(next.opp)); } }, `🔍 ${next.opp.name}`),
-    tiredStarters() ? h('span', { class: 'tired', id: 'tired-warning', title: 'Startere under 70 % friskhed – trætte spillere yder mindre (50 % ≈ 12,5 % svagere). Overvej at rotere i Trup' }, `⚠ ${tiredStarters()} trætte startere`) : null,
+    tiredStarters() ? h('span', { class: 'tired', id: 'tired-warning', title: myTeam().subsLimit
+      ? `Startere under din udskiftningsgrænse (${myTeam().subsLimit} %) skiftes ud i 3. minut og bruger en skifte-pause. Overvej at rotere i Trup`
+      : 'Startere under 70 % friskhed – trætte spillere yder mindre (50 % ≈ 12,5 % svagere). Overvej at rotere i Trup' },
+    myTeam().subsLimit ? `⚠ ${tiredStarters()} startere under din grænse (${myTeam().subsLimit} %) – skiftes ud i 3. minut` : `⚠ ${tiredStarters()} trætte startere`) : null,
     h('span', { class: 'savestatus' + (view.saveError ? ' failed' : ''), id: 'save-status' }, view.saveError ? '⚠ IKKE gemt' : view.savedAt ? `✔ Gemt kl. ${time(view.savedAt)}` : 'Ikke gemt'),
     h('button', { id: 'save-now', onclick: () => { persist(); render(); } }, '💾 Gem nu'),
     h('button', { id: 'export', onclick: exportFile }, '⬇ Eksportér'),
@@ -233,6 +238,7 @@ function render() {
     rule: (i, patch) => change(() => act.updateRule(team, i, patch)),
     addRule: () => change(() => act.addRule(team)),
     removeRule: (i) => change(() => act.removeRule(team, i)),
+    subs: (v) => change(() => act.setSubsLimit(team, v)),
   } });
 
   const standings = renderStandings({ league, viewTeamId: team.id, onPick: (id) => showTeam(league.teams.findIndex((t) => t.id === id)) });
