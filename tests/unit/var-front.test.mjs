@@ -44,3 +44,10 @@ test('tekster (brugerens ordvalg): "spillede 1-2", ikke "spillede væggen"; klum
   assert.ok(wait.includes('scorede, selv om de havde bolden mindst'), wait.join(' | '));
   assert.ok(wait.every((t) => !/med lidt af bolden/.test(t)));
 });
+
+test('"Rundens mål" for et VAR-mål påstår intet om skyttens placering – han er ikke nødvendigvis den, VAR tjekkede (QC v3.14.1)', async () => {
+  const { describeGoal } = await import('../../public/engine/clues.js');
+  const texts = [0, 0.4, 0.8].map((v) => describeGoal('VAR', '#8 G. Kristensen', '#7 K. Kristensen', 81, { next: () => v, pick: (a) => a[Math.floor(v * a.length)] }));
+  assert.equal(new Set(texts).size, 3, texts.join(' | '));
+  for (const t of texts) { assert.match(t, /#8 G\. Kristensen/); assert.doesNotMatch(t, /rigtige side|frikendte #8|#8 G\. Kristensen (var|stod)/, t); }
+});

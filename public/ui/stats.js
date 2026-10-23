@@ -70,8 +70,8 @@ function leagueFlow(league) {
   const most = hist.map((r) => r.most).filter(Boolean).sort((a, b) => b.goals - a.goals)[0];
   return h('div', {},
     h('p', { id: 'flow-summary' }, `${goals} mål i ${matches} kampe (${(goals / Math.max(1, matches)).toFixed(2)} pr. kamp) · ${goals ? Math.round(sp / goals * 100) : 0} % på dødbolde.`),
-    h('div', { class: 'round-bars', id: 'round-bars' }, hist.map((r) => h('div', { class: 'round-bar', title: `Runde ${r.round}: ${r.goals} mål` },
-      h('span', { class: 'rb-label' }, `R${r.round}`), h('span', { class: 'rb-fill', style: { width: `${Math.round(r.goals / max * 100)}%` } }), h('span', { class: 'rb-val' }, String(r.goals))))),
+    h('div', { class: 'round-bars', id: 'round-bars' }, hist.map((r, _, __, k = r.round - (league.seasonStartRound ?? 1) + 1) => h('div', { class: 'round-bar', title: `Runde ${k}: ${r.goals} mål` },
+      h('span', { class: 'rb-label' }, `R${k}`), h('span', { class: 'rb-fill', style: { width: `${Math.round(r.goals / max * 100)}%` } }), h('span', { class: 'rb-val' }, String(r.goals))))),
     h('h4', {}, 'Måltyper'),
     h('ul', { id: 'goal-kinds' }, Object.entries(kinds).sort((a, b) => b[1] - a[1]).map(([k, v]) => h('li', {}, `${k === 'HEADER' ? 'Hovedstød (åbent spil)' : GOAL_KIND_LABEL[k] ?? k}: ${v} (${Math.round(v / Math.max(1, goals) * 100)} %)`))),
     biggest ? h('p', {}, `Største sejr: ${biggest.label}`) : null,

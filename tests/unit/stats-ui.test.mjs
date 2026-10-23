@@ -136,7 +136,7 @@ test('ligaens forløb: overskrift, søjler (bredde i forhold til rundens mål), 
   L.seasonStartRound = 4;
   const f2 = render(L, me);
   assert.equal(byId(f2, 'flow-summary').textContent, '6 mål i 4 kampe (1.50 pr. kamp) · 17 % på dødbolde.');
-  assert.deepEqual(all(byId(f2, 'round-bars'), (e) => e.className === 'round-bar').map((b) => b.attrs.title), ['Runde 4: 6 mål']);
+  assert.deepEqual(all(byId(f2, 'round-bars'), (e) => e.className === 'round-bar').map((b) => [b.attrs.title, b.children[0].textContent]), [['Runde 1: 6 mål', 'R1']]);   // sæsonens runde 1 (global runde 4) – v3.14.1
   L.seasonStartRound = 5;
   assert.equal(all(byId(render(L, me), 'stats-flow'), (e) => e.tag === 'p')[0].textContent, 'Kommer efter sæsonens første runde.');
   L.seasonStartRound = 1;

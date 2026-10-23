@@ -88,9 +88,10 @@ const GOAL_TEXTS = {
     (s, a, m) => `Luftherredømme i ${m}. minut: ${s} vandt duellen og headede ind.`,
   ],
   VAR: [
-    (s, a, m) => `Ren VAR-dramatik i ${m}. minut: ${s} var lige akkurat på den rigtige side, og målet stod ved magt.`,
+    // Skytten er ikke nødvendigvis den, VAR tjekkede for offside (v3.14.1) – teksten påstår intet om hans placering.
+    (s, a, m) => `Ren VAR-dramatik i ${m}. minut: linjen holdt, og ${s}s mål stod ved magt.`,
     (s, a, m) => `Nervepirrende minutter i ${m}. minut, før VAR godkendte ${s}s scoring.`,
-    (s, a, m) => `Centimeterafgørelse i ${m}. minut: VAR-linjen frikendte ${s}, og målet tæller.`,
+    (s, a, m) => `Centimeterafgørelse i ${m}. minut: VAR-linjen holdt, og ${s}s mål tæller.`,
   ],
 };
 export const GOAL_KINDS = Object.keys(GOAL_TEXTS);
