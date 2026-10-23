@@ -392,10 +392,12 @@ try {
   const pins = await g.locator('#feed .snap-btn').count();
   check('📍 står ved præcis de mål, der har et gemt øjebliksbillede', pins === snapSaved, `${pins} / ${snapSaved}`);
   if (pins > 0) {
-    const before = await g.locator('.ratings').nth(own).locator('.mp-token').evaluateAll((ts) => ts.map((t) => t.style.left + ',' + t.style.top).join('|'));
     await g.locator('#feed .snap-btn').first().click();
-    const after = await g.locator('#snap-pitch .mp-token').evaluateAll((ts) => ts.map((t) => t.style.left + ',' + t.style.top).join('|'));
-    check('Klik på 📍: minibanen viser øjebliksbilledet (11 brikker, bolden, flyttet fra startpladserne)', (await g.locator('#snap-pitch .mp-token').count()) === 11 && (await g.locator('#snap-ball').count()) === 1 && (after !== before || /mål imod/.test(await g.textContent('#snap-title'))) && (await g.locator('#feed .ev.snapped').count()) === 1, after.slice(0, 80));
+    // Release Manager v3.13: før sammenlignede checken med startopstillingen (≈ 6 % falsk rød, når billedet tilfældigt
+    // lignede). Nu: brikkerne på minibanen er PRÆCIS et gemt øjebliksbillede (spiller-id og koordinater).
+    const shown = (await g.locator('#snap-pitch .mp-token').evaluateAll((ts) => ts.map((t) => `${t.dataset.pid}@${parseFloat(t.style.left)},${parseFloat(t.style.top)}`))).sort().join('|');
+    const saved = await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.lastRound.matches[0].events.filter((e) => e.snapshot).map((e) => e.snapshot.pts.map(([id, x, y]) => `${id}@${x},${y}`).sort().join('|')));
+    check('Klik på 📍: minibanen viser et gemt øjebliksbillede præcist (11 brikker på deres gemte pladser, bolden)', (await g.locator('#snap-pitch .mp-token').count()) === 11 && saved.includes(shown) && (await g.locator('#snap-ball').count()) === 1 && (await g.locator('#feed .ev.snapped').count()) === 1, shown.slice(0, 80));
     // Test Manager v3.12.1: et mål IMOD mod mellemblok med bolden midt i banen viser præcis startopstillingen (ingen forskydning) – kun dine egne mål SKAL stå anderledes
     // Test Manager v3.12.1: et nyt valg af kamp (også den aktive) fjerner billedet – ellers hænger et gammelt øjebliksbillede ved
     await g.locator('#match-cards .matchcard.active').click();
