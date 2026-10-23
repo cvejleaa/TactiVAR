@@ -10,7 +10,8 @@ import { simulateMatch } from '../../public/engine/match.js';
 import { runProfile } from '../../public/engine/ratings.js';
 import { drainFactor, clampSubsLimit, SUBS_LIMIT } from '../../public/engine/freshness.js';
 import { MATCH_RULES } from '../../public/engine/match-rules.js';
-import { normalizeLeague } from '../../public/engine/sanitize.js';
+import { normalizeLeague, normalizeRule } from '../../public/engine/sanitize.js';
+import { filterEvents } from '../../public/ui/matchcenter.js';
 
 // next() konstant, ingen scriptede chancer → ingen skud, frispark eller skader: kun tiden går.
 function stubRng(script = {}, nextValue = 0.5) {
@@ -85,6 +86,8 @@ test('træthedsskift: under din grænse skiftes han ud i det første tick (også
   assert.equal(s.text, `🔄 [${H.name}] #${cm.shirtNumber} ${cm.shortName} ud (træt, 69 % – under din grænse 70 %) – #${best.shirtNumber} ${best.shortName} ind.`);   // 69,4 rundet ned
   const inE = m.ratings.home.find((e) => e.playerId === best.id), outE = m.ratings.home.find((e) => e.playerId === cm.id);
   assert.deepEqual([outE.minOut, inE.minIn, inE.slot], [21, 21, 6]);
+  // Sparet friskhed: km90 11,8·(0,9 + 0,01)·1 = 10,738; 69 min ikke løbet → 8,23 km · (1,5 − 0,03) = 12,1 → 12
+  assert.equal(m.events.find((e) => e.label === 'Udskiftninger')?.text, `🔋 [${H.name}] Din udskiftede spiller sparede ca. 12 point friskhed til næste runde.`);
 });
 test('grænse Fra (0): ingen træthedsskift; grænsen 65 rammes senere end 70', () => {
   const at = (limit) => { const { H, A } = arena({ homeLimit: limit }); const cm = slot(H, 6); cm.freshness = 75; cm.skills.stamina = 1; return subs(simulateMatch(H, A, stubRng({})))[0]?.min ?? null; };
@@ -167,4 +170,57 @@ test('subsLimit: 0 = fra bevares; ukendt → holdets profil (dit hold 70); klemt
 });
 test('spillet sender aldrig liveEnergy: false – kun test-arenaerne gør', () => {
   for (const f of ['season.js', 'match.js']) assert.doesNotMatch(fs.readFileSync(new URL(`../../public/engine/${f}`, import.meta.url), 'utf8').replace(/\/\/.*$/gm, ''), /liveEnergy\s*:\s*false/);
+});
+
+// ---------- Manuelle Hvis-Så-skift (v3.13) ----------
+const subRule = (t, outSlot, inP, o = {}) => ({ ruleId: 9, minuteTrigger: 60, condition: 'ANY', margin: 1, newFormation: '4-4-2', newPlan: null, slotRemapping: [...Array(11).keys()], action: 'SUB', subOut: slot(t, outSlot).id, subIn: inP.id, ...o });
+test('Hvis-Så-udskiftning: "uanset stilling" fra minut 60 → X ud, Y ind i første tick fra minuttet; tæller som skift og står i "Kun taktik"', () => {
+  for (const [minute, want] of [[60, 60], [61, 63]]) {
+    const { H, A } = arena({ homeLimit: 0 });
+    const inP = bench(H).find((p) => p.line === 'MID');
+    H.tactics.conditionalRules = [subRule(H, 6, inP, { minuteTrigger: minute })];
+    const m = simulateMatch(H, A, stubRng({}));
+    const [s] = subs(m);
+    assert.equal(s.min, want);
+    assert.equal(s.text, `🔄 [${H.name} • Hvis-Så] #${slot(H, 6).shirtNumber} ${slot(H, 6).shortName} ud – #${inP.shirtNumber} ${inP.shortName} ind (din Hvis-Så-regel, ${want}. minut).`);
+    assert.equal(m.ratings.home.find((e) => e.playerId === inP.id).slot, 6);
+    assert.ok(filterEvents(m.events, 'tactic').includes(s), 'dit skift står under "Kun taktik"');
+  }
+});
+test('Hvis-Så-udskiftning: betingelsen gælder (bagud ved 0-0 → intet skift), og kan den ikke udføres, får du at vide hvorfor', () => {
+  const { H, A } = arena({ homeLimit: 0 });
+  const inP = bench(H).find((p) => p.line === 'MID');
+  H.tactics.conditionalRules = [subRule(H, 6, inP, { condition: 'TRAILING' })];
+  assert.equal(subs(simulateMatch(H, A, stubRng({}))).length, 0);
+  // Spilleren, der skulle ud, står på bænken (byttet i Trup efter reglen blev lavet)
+  const b = arena({ homeLimit: 0 });
+  const inQ = bench(b.H).find((p) => p.line === 'MID'), other = bench(b.H).find((p) => p.line === 'DEF');
+  b.H.tactics.conditionalRules = [{ ...subRule(b.H, 6, inQ), subOut: other.id }];
+  const m = simulateMatch(b.H, b.A, stubRng({}));
+  assert.equal(subs(m).length, 0);
+  const note = m.events.find((e) => e.label === 'Hvis-Så-skift ikke udført');
+  assert.equal(note?.text, `📋 [${b.H.name} • Hvis-Så] Udskiftningen kunne ikke udføres i 60. minut: #${other.shirtNumber} ${other.shortName} er ikke på banen.`);
+});
+test('en bænkspiller i dine Hvis-Så-regler bruges ikke til træthedsskift – reglen kan stadig udføres bagefter', () => {
+  const { H, A } = arena();
+  const cm = slot(H, 6); cm.freshness = 75; cm.skills.stamina = 1;           // træt i 21'
+  const mids = bench(H).filter((p) => p.line === 'MID');
+  mids.forEach((p, i) => { p.skills = SK(8 + i); p.freshness = 100; });
+  const best = mids.at(-1), other = mids[0];
+  H.tactics.conditionalRules = [subRule(H, 7, best)];                     // den bedste er reserveret til 60'
+  const m = simulateMatch(H, A, stubRng({}));
+  const [first, second] = subs(m);
+  assert.equal(first.min, 21); assert.ok(first.text.includes(`#${other.shirtNumber} ${other.shortName} ind`), first.text);
+  assert.equal(second.min, 60); assert.ok(second.text.includes(`#${best.shirtNumber} ${best.shortName} ind (din Hvis-Så-regel`), second.text);
+});
+test('en bots Hvis-Så-udskiftning er neutral; gamle regler bliver planskift, "uanset stilling" og udskiftning overlever indlæsning', () => {
+  const { H, A } = arena({ homeLimit: 0, homeBot: true });
+  const inP = bench(H).find((p) => p.line === 'MID');
+  H.tactics.conditionalRules = [subRule(H, 6, inP)];
+  const [s] = subs(simulateMatch(H, A, stubRng({})));
+  assert.match(s.text, /^🔄 \[[^•\]]+\] #\d+ .+ erstatter #\d+ .+\.$/);
+  assert.deepEqual(normalizeRule({ condition: 'LEADING', margin: 1, newFormation: '5-4-1', newPlan: null }).action, 'SHIFT');
+  const r = normalizeRule({ condition: 'ANY', margin: 1, newFormation: '4-4-2', newPlan: null, action: 'SUB', subOut: 'a', subIn: 'b' });
+  assert.deepEqual([r.condition, r.action, r.subOut, r.subIn], ['ANY', 'SUB', 'a', 'b']);
+  assert.equal(normalizeRule({ condition: 'X', action: 'HACK', subOut: 3 }).action, 'SHIFT');
 });

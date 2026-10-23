@@ -13,7 +13,7 @@ export const PHASE_OPTIONS = {
   onBallWon: [['FAST_COUNTER', 'Lynkontra'], ['KEEP_POSSESSION', 'Hold på bolden']],
   onBallLost: [['COUNTER_PRESS_5S', 'Genpres i 5 sek.'], ['DROP_BACK', 'Fald tilbage']],
 };
-export const CONDITIONS = [['TRAILING', 'Bagud med mindst'], ['LEADING', 'Foran med mindst'], ['DRAW', 'Uafgjort']];
+export const CONDITIONS = [['TRAILING', 'Bagud med mindst'], ['LEADING', 'Foran med mindst'], ['DRAW', 'Uafgjort'], ['ANY', 'Uanset stilling']];
 export const MARGINS = [1, 2, 3, 4, 5].map((n) => [String(n), `${n} mål`]);
 export const SKILL_LABELS = [
   ['Fysik & luft', [['pace', 'Fart'], ['stamina', 'Udholdenhed'], ['strength', 'Styrke']]],

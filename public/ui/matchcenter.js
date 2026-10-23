@@ -13,7 +13,7 @@ const KEY_TYPES = new Set(['GOAL', 'HEADER_GOAL', 'VAR_GOAL', 'VAR_NO_GOAL', 'IN
 const ICON = { GOAL: '⚽', HEADER_GOAL: '⚽', VAR_GOAL: '📺', VAR_NO_GOAL: '📺', INJURY: '🚑', SUB: '🔄', TRIGGER: '📋', FOUL: '🟨' };
 
 export function filterEvents(events, filter) {
-  if (filter === 'tactic') return events.filter((e) => e.category === 'TACTIC' || e.type === 'TRIGGER');
+  if (filter === 'tactic') return events.filter((e) => e.category === 'TACTIC' || e.type === 'TRIGGER' || e.tactical);   // v3.13: dine træthedsskift og Hvis-Så-skift
   if (filter === 'key') return events.filter((e) => KEY_TYPES.has(e.type));
   return events;
 }

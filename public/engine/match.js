@@ -8,16 +8,17 @@ import { masteryVs, counterXpForMatch } from './counter.js';
 import { createSheet, finalizeSheet } from './ratings.js';
 import { describeFinish, describeHeader, describeVarTiming, describeGoal, goalSpectacle } from './clues.js';
 import { MATCH_RULES } from './match-rules.js';
-import { TIRED_PER_POINT, SUBS_LIMIT } from './freshness.js';
+import { TIRED_PER_POINT, SUBS_LIMIT, matchCost } from './freshness.js';
 
 const PLAN_LETTERS = ['A', 'B', 'C'];
 
-// Hvis-Så-betingelse: "mindst N mål" bagud/foran (N = margin, 1–5), eller uafgjort.
+// Hvis-Så-betingelse: "mindst N mål" bagud/foran (N = margin, 1–5), uafgjort eller uanset stilling.
 export function ruleConditionMet(rule, own, opp) {
   const diff = own - opp, n = Math.max(1, rule.margin || 1);
   if (rule.condition === 'TRAILING') return diff <= -n;
   if (rule.condition === 'LEADING') return diff >= n;
   if (rule.condition === 'DRAW') return diff === 0;
+  if (rule.condition === 'ANY') return true;   // v3.13: "uanset stilling" – fx en planlagt udskiftning
   return false;
 }
 const coordsOf = (tactics) => FORMATIONS[tactics.baseFormation] || FORMATIONS['4-4-2'];
@@ -500,6 +501,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
     side.tactics.conditionalRules.forEach((rule) => {
       if (rule.used || min < rule.minuteTrigger) return;
       if (!ruleConditionMet(rule, own, opp)) return;
+      if (rule.action === 'SUB') { rule.used = true; ruleSub(side, rule, min); return; }
       const from = side.tactics.baseFormation;
       // Skift til en af holdets egne planer: formation, trukne positioner og faser følger
       // med; spillerne beholder deres pladser, og Hvis-Så-reglerne kører videre.
@@ -556,12 +558,29 @@ export function simulateMatch(home, away, rng, opts = {}) {
       const text = own(side)
         ? `🔄 [${side.team.name}] ${tag(c.p)} ud (træt, ${f} % – ${near ? 'tages med i samme pause' : `under din grænse ${limit} %`}) – ${tag(pick)} ind.`
         : `🔄 [${side.team.name}] ${tag(pick)} erstatter ${tag(c.p)}.`;
-      return !!substitute(side, c.i, min, 'Udskiftning', pick, text);
+      const ok = !!substitute(side, c.i, min, 'Udskiftning', pick, text);
+      if (ok && own(side)) events.at(-1).tactical = true;   // dit valg (grænsen) – med i "Kun taktik"
+      return ok;
     };
     let any = false;
     for (const c of tired) any = swap(c, false) || any;
     if (!any) return;
     for (const c of onPitch().filter((x) => x.f >= limit && x.f < limit + SUBS_LIMIT.near).sort((a, b) => a.f - b.f)) swap(c, true);
+  }
+
+  // Manuel udskiftning fra en Hvis-Så-regel (v3.13): spillerne er angivet med id, så de findes, uanset hvilken
+  // plads de står på nu. Kan den ikke udføres, får dit hold at vide hvorfor (en bots regler tier).
+  function ruleSub(side, rule, min) {
+    const slot = side.starters.findIndex((p, i) => i > 0 && p?.id === rule.subOut);
+    const out = side.team.squad.find((p) => p.id === rule.subOut), inP = side.benchAvailable().find((p) => p.id === rule.subIn);
+    const name = (id) => { const p = side.team.squad.find((x) => x.id === id); return p ? tag(p) : 'spilleren'; };
+    const why = slot < 0 ? `${name(rule.subOut)} er ikke på banen` : !inP ? `${name(rule.subIn)} er ikke på bænken (skadet, allerede brugt eller i startopstillingen)` : subBlock(side, min);
+    if (why) {
+      if (own(side)) addEv(min, 'TRIGGER', 'TACTIC', side.isHome, false, 'Hvis-Så-skift ikke udført', `📋 [${side.team.name} • Hvis-Så] Udskiftningen kunne ikke udføres i ${min}. minut: ${why}.`);
+      return;
+    }
+    const text = own(side) ? `🔄 [${side.team.name} • Hvis-Så] ${tag(out)} ud – ${tag(inP)} ind (din Hvis-Så-regel, ${min}. minut).` : `🔄 [${side.team.name}] ${tag(inP)} erstatter ${tag(out)}.`;
+    if (substitute(side, slot, min, 'Hvis-Så', inP, text)) events.at(-1).tactical = own(side);
   }
 
   // Et modstanderholds Hvis-Så-skift kan ses på banen, men ikke læses: ingen regel,
@@ -821,6 +840,13 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // Fuldtids-analyse (v3.10, brugeren: "Ved pausen får jeg information om hvordan min opbygning
   // har klaret sig, men det får jeg ikke af vide ved fuldtid") – kun dit hold, dine valg og tal.
   const meSide = [H, A].find(own);
+  // Hvad udskiftningerne sparede (v3.13, Spilfører: en svagere indskifter skal kunne forstås som et valg):
+  // de udskiftede (ikke skadede) løb færre km – friskheden efter kampen regnes efter km-prisen (freshness.js).
+  if (meSide) {
+    const off = Object.values(sheet.entries).filter((e) => e.teamId === meSide.team.id && e.minIn <= 1 && e.minOut < 90 && !e.injured);
+    const saved = off.reduce((a, e) => a + matchCost(e.km90 * (90 - e.minOut) / 90, meSide.team.squad.find((p) => p.id === e.playerId)?.skills.stamina ?? 10), 0);
+    if (off.length) addEv(90, 'INFO', 'TACTIC', meSide.isHome, false, 'Udskiftninger', `🔋 [${meSide.team.name}] ${off.length === 1 ? 'Din udskiftede spiller' : `Dine ${off.length} udskiftede spillere`} sparede ca. ${saved} point friskhed til næste runde.`);
+  }
   if (meSide) {
     const d = duelLog[meSide.team.id], o = duelLog[other(meSide).team.id], ph = meSide.tactics.phases.phase1_buildUp, runs = ph.offBallRuns ?? 'NORMAL';
     const p = meSide.isHome ? 'h' : 'a', poss = Math.round((st[p + 'Poss'] / (st.hPoss + st.aPoss)) * 100);

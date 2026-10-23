@@ -2,6 +2,7 @@
 // standardværdier, eksisterende data røres ikke. Grundlaget for migreringsreglen i
 // docs/spec.md §9 – en ny version må aldrig slette ligaen.
 import { clampSubsLimit } from './freshness.js';
+import { MAX_RULES } from './match-rules.js';
 import { TEAM_STAT_DEFAULTS, PLAYER_SEASON_DEFAULTS } from './stats.js';
 import { FORMATIONS } from './formations.js';
 import { buildSchedule, isValidSchedule, SEASON_ROUNDS } from './schedule.js';
@@ -13,7 +14,11 @@ const PLAYER_DEFAULTS = { freshness: 100, injuryMatchesLeft: 0, lastRating: 0, r
 // Skema 1 havde LEADING_BY_1 (præcis 1 foran) og TRAILING (bagud) uden antal mål.
 export function normalizeRule(r) {
   if (r.condition === 'LEADING_BY_1') r.condition = 'LEADING';
-  if (!['TRAILING', 'LEADING', 'DRAW'].includes(r.condition)) r.condition = 'TRAILING';
+  if (!['TRAILING', 'LEADING', 'DRAW', 'ANY'].includes(r.condition)) r.condition = 'TRAILING';
+  // v3.13: en regel er enten et skift af plan/formation (SHIFT – alle regler fra før) eller en udskiftning (SUB).
+  r.action = r.action === 'SUB' ? 'SUB' : 'SHIFT';
+  r.subOut = typeof r.subOut === 'string' ? r.subOut : null;
+  r.subIn = typeof r.subIn === 'string' ? r.subIn : null;
   r.margin = Math.max(1, Math.min(5, Math.round(Number(r.margin) || 1)));
   if (!FORMATIONS[r.newFormation]) r.newFormation = '4-4-2';
   r.newPlan = [0, 1, 2].includes(r.newPlan) ? r.newPlan : null;
@@ -33,7 +38,7 @@ function fixTactics(t, starterIds, profile) {
     phase3_transition: { ...def.phases.phase3_transition, ...ph.phase3_transition },
   };
   if (!Array.isArray(t.conditionalRules)) t.conditionalRules = def.conditionalRules;
-  t.conditionalRules = t.conditionalRules.slice(0, 5).map(normalizeRule);
+  t.conditionalRules = t.conditionalRules.slice(0, MAX_RULES).map(normalizeRule);
   return t;
 }
 

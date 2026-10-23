@@ -227,6 +227,24 @@ try {
   check('Byt gemmes straks', (await nameAt(7)) === s8 && (await nameAt(8)) === s7);
   await g.selectOption('#tactics select[data-field="onBallWon"]', 'KEEP_POSSESSION'); await reload();
   check('Fasevalg gemmes straks', (await g.inputValue('#tactics select[data-field="onBallWon"]')) === 'KEEP_POSSESSION');
+  // v3.13: udskiftningsgrænsen (holdets, ikke planens) og en manuel Hvis-Så-udskiftning
+  check('Udskiftninger: feltet står under Hvis-Så med 70 % for et nyt spil og forklarer reglerne (5 skift, 3 pauser)', (await g.inputValue('#subs-limit')) === '70' && (await g.textContent('#subs-help')).includes('højst 5 udskiftninger i højst 3 pauser'));
+  await g.selectOption('#subs-limit', '80'); await reload();
+  check('Udskiftningsgrænsen gemmes straks og overlever F5', (await g.inputValue('#subs-limit')) === '80');
+  await g.click('.presets button:nth-child(1)'); await reload();
+  check('Udskiftningsgrænsen følger holdet, ikke planen (Plan A viser også 80 %)', (await g.inputValue('#subs-limit')) === '80');
+  await g.click('.presets button:nth-child(2)'); await reload();
+  await g.selectOption('#subs-limit', '0'); await reload();
+  await g.click('#add-rule'); await reload();
+  const R = () => g.locator('#rules .rule').last();   // den nye regel (Plan B har sine egne regler)
+  await R().locator('.rule-target').selectOption('sub:'); await reload();
+  check('Hvis-Så-udskiftning: valg af "🔄 Udskiftning" giver vælgere for ud og ind og beder om begge spillere', (await R().locator('.rule-sub-out').count()) === 1 && (await R().locator('.rule-warn').textContent()).includes('vælg begge spillere'));
+  await R().locator('.rule-cond').selectOption('ANY');
+  await R().locator('input[type=number]').fill('3'); await R().locator('input[type=number]').dispatchEvent('change');
+  const outOpt = await R().locator('.rule-sub-out option').nth(6).getAttribute('value');
+  const inOpt = await R().locator('.rule-sub-in option').nth(2).getAttribute('value');
+  await R().locator('.rule-sub-out').selectOption(outOpt); await R().locator('.rule-sub-in').selectOption(inOpt); await reload();
+  check('Hvis-Så-udskiftning: "uanset stilling" skjuler antal mål, spillerne gemmes og der er ingen advarsel', (await R().locator('.rule-margin').count()) === 0 && (await R().locator('.rule-sub-out').inputValue()) === outOpt && (await R().locator('.rule-sub-in').inputValue()) === inOpt && (await R().locator('.rule-warn').count()) === 0);
   // v3.9: løb uden bold i Fase 1 – starter på Normal, gemmes og overlever F5; hjælpeteksten ses
   check('Løb uden bold: findes i Fase 1 og starter på Normal', (await g.inputValue('#tactics fieldset[data-phase="phase1_buildUp"] select[data-field="offBallRuns"]')) === 'NORMAL');
   await g.selectOption('#tactics select[data-field="offBallRuns"]', 'MANY'); await reload();
@@ -277,7 +295,7 @@ try {
   check('Modstander: sortering på FIN afvises med anti-spionage-besked', (await g.textContent('#notice')).includes('Anti-spionage'));
   check('Modstander: spillerkortet skjuler evner og kontrakt', (await g.locator('#player-card .bars').count()) === 0 && (await g.textContent('#player-card')).includes('🔒 ??'));
   await tab('taktik');
-  check('Modstander: faser og Hvis-Så-regler er skjulte', (await g.locator('#tactics fieldset').count()) === 0);
+  check('Modstander: faser, Hvis-Så-regler og udskiftningsgrænse er skjulte', (await g.locator('#tactics fieldset').count()) === 0 && (await g.locator('#subs-limit').count()) === 0 && (await g.textContent('#tactics .lockbox')).includes('udskiftningsgrænse'));
   check('Modstander: ingen bænkrække under banen', (await g.locator('#bench').count()) === 0);
   check('Modstander: kun dit hold kan trækkes på banen', (await g.locator('#pitch .token.draggable').count()) === 0);
   check('Modstander: formationen kan ikke ændres og der er ingen byt-knapper', (await g.isDisabled('#formation')) && (await g.locator('#matrix tbody button').count()) === 0);
@@ -321,6 +339,7 @@ try {
   await g.click('#skip');
   check('Runden har 4 kampe', (await g.locator('#match-cards .matchcard').count()) === 4);
   const mcText = await g.textContent('#match-center');
+  check('Din Hvis-Så-udskiftning (uanset stilling, fra minut 3) står i referatet i 3. minut, og indskifteren står i karakterarket', /🔄 \[.+ • Hvis-Så\] #\d+ .+ ud – #\d+ .+ ind \(din Hvis-Så-regel, 3\. minut\)\./.test(mcText) && /ind på/.test(mcText), (mcText.match(/🔄[^.]*\./) || ['ingen'])[0]);
   // Dit hold kan være hjemme eller ude (programmet) – karakterarkene står hjemme, ude.
   const own = await g.evaluate(() => (JSON.parse(localStorage.getItem('tactivar_save')).league.lastRound.matches[0].ratings.home[0].isUserTeam ? 0 : 1));
   check('Referatet indeholder slutfløjt, statistik og karakterark', mcText.includes('SLUTFLØJT') && (await g.isVisible('#match-stats')) && (await g.locator('.ratings').count()) === 2);

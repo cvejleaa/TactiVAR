@@ -319,7 +319,7 @@ test('normalizeLeague: ugyldigt indhold repareres, gyldige data og standardværd
   t4.tactics.lineupSlots = [...ids.slice(0, 10), 'findes_ikke'];    // ukendt id (og fremmed hold)
   delete t2.tactics; t2.tacticPresets = [t2.tacticPresets[0]];
   L.teams[5].tactics.baseFormation = '9-9-9';
-  L.teams[6].tactics.conditionalRules = Array.from({ length: 8 }, (_, i) => ({ ruleId: i, minuteTrigger: 60, condition: 'DRAW', newFormation: '4-4-2' }));
+  L.teams[6].tactics.conditionalRules = Array.from({ length: 10 }, (_, i) => ({ ruleId: i, minuteTrigger: 60, condition: 'DRAW', newFormation: '4-4-2' }));
   const p = L.teams[1].squad[4]; p.freshness = 70; p.aerialPower = 1;
   L.leagueMetadata.round = 6; L.teams[1].cashBalance = 123;
   const { league: N } = normalizeLeague(L);
@@ -328,7 +328,7 @@ test('normalizeLeague: ugyldigt indhold repareres, gyldige data og standardværd
   assert.equal(N.teams[2].tactics.baseFormation, BOT_PROFILES[2].form); // holdets egen profil, ikke profil 0
   assert.equal(N.teams[2].tacticPresets.length, 3);
   assert.equal(N.teams[5].tactics.baseFormation, BOT_PROFILES[5].form);
-  assert.equal(N.teams[6].tactics.conditionalRules.length, 5);
+  assert.equal(N.teams[6].tactics.conditionalRules.length, 8);   // v3.13: MAX_RULES 8 (før 5)
   assert.equal(p.freshness, 70);
   assert.equal(p.aerialPower, Math.round(Math.max(1, Math.min(20, Math.round((p.heightCm - 166) * 0.7))) * 0.35 + p.jumpingPower * 0.35 + p.skills.strength * 0.15 + p.skills.positioning * 0.15));
   assert.equal(N.leagueMetadata.round, 6); assert.equal(N.teams[1].cashBalance, 123);

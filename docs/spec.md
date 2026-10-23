@@ -90,7 +90,7 @@ spillerobjekt; de skal ligge hos den der observerer.
 - Kampstatistikken i Match Center (v3.10.1: også frispark i skudafstand, hjørnespark, straffe (mål)
   og gule kort) er tal fra én kamp, hvor hver hændelse står i referatet – offentlig for begge hold.
   Kun SÆSONsummer, der følger en skjult indstilling, er private (§8b).
-- Offentligt: navn ("F. Efternavn" på banen), rygnummer, kæde, naturlig position, alder, højde, friskhed, skadesstatus 🚑, stjerner (★☆☆☆☆–★★★★★), holdets startformation. Intet andet om andre holds taktik (brugerens beslutning, afviger bevidst fra v2.5): ingen faser, planer, Hvis-Så-regler eller "typisk stil" – heller ikke i ligatabellen, kamphovedet, det taktiske oplæg eller referatet. Et modstanderholds Hvis-Så-skift vises kun som "omorganiserer sig". Referatet navngiver kun dine egne taktikvalg. Fra v3.12 (brugerens valg) følger chancetypen hvert holds eget angrebsfokus – man kan selv regne ud, at et hold slår mange indlæg eller cutbacks, men ordvalget navngiver aldrig indstillingen. Det gælder også fuldtids-analysens "🛡️ Dit felt: modstanderens cutbacks stoppet X af Y, luftdueller vundet …" – tal fra én kamp, som referatet allerede viser (som "kontraer imod i alt"), en bevidst og accepteret lækage. (Trin 1 lægger teksterne i motoren med det menneskestyrede hold som seer; trin 2 skal gøre dem seer-afhængige.)
+- Offentligt: navn ("F. Efternavn" på banen), rygnummer, kæde, naturlig position, alder, højde, friskhed, skadesstatus 🚑, stjerner (★☆☆☆☆–★★★★★), holdets startformation. Intet andet om andre holds taktik (brugerens beslutning, afviger bevidst fra v2.5): ingen faser, planer, Hvis-Så-regler eller "typisk stil" – heller ikke i ligatabellen, kamphovedet, det taktiske oplæg eller referatet. Et modstanderholds Hvis-Så-skift vises kun som "omorganiserer sig". Referatet navngiver kun dine egne taktikvalg. Fra v3.12 (brugerens valg) følger chancetypen hvert holds eget angrebsfokus – man kan selv regne ud, at et hold slår mange indlæg eller cutbacks, men ordvalget navngiver aldrig indstillingen. Det gælder også fuldtids-analysens "🛡️ Dit felt: modstanderens cutbacks stoppet X af Y, luftdueller vundet …" – tal fra én kamp, som referatet allerede viser (som "kontraer imod i alt"), en bevidst og accepteret lækage. Ligeså (v3.13): minuttet for en bots træthedsskift plus den offentlige friskhed røber lidt om botens løb og STA over mange kampe; teksten nævner aldrig friskhed eller grænse, og botens grænse er skjult (lockboxen i Taktik). (Trin 1 lægger teksterne i motoren med det menneskestyrede hold som seer; trin 2 skal gøre dem seer-afhængige.)
 - Øjebliksbilledet ved mål (v3.12.1) gemmer kun DIT holds positioner – de afslører dit pres og dine løb, ikke modstanderens. Ved et modstandermål vises dit forsvar og bolden, aldrig modstanderens spillere eller scorerens plads. Accepteret: hvem der modtager bolden afhænger af hvert holds levende positioner (pres, løb), så over mange kampe kan man statistisk ane et holds indstilling – på linje med løbe-vægtene fra v3.9.
 - Kun ejer: 9 evner, spring, luftduel, arketype, løn/værdi, kasse, de præcise fasevalg og Hvis-Så-regler,
   eksakt karakter, mod-kunnen.
@@ -120,8 +120,8 @@ spillerobjekt; de skal ligge hos den der observerer.
   LOW_BLOCK/MID_BLOCK/HIGH_GEGENPRESS, offsideTrap OFF/NORMAL/EXTREME_VAR_LINE,
   tacklingIntensity CAUTIOUS/NORMAL/AGGRESSIVE · Fase 3 onBallWon
   FAST_COUNTER/KEEP_POSSESSION, onBallLost COUNTER_PRESS_5S/DROP_BACK.
-- Hvis-Så: maks 5 one-shot. Betingelse "Bagud med mindst N mål", "Foran med
-  mindst N mål" (N = 1–5) eller "Uafgjort" (skema 2; skema 1's "Foran med 1"
+- Hvis-Så: maks 8 one-shot (v3.13; før 5). Betingelse "Bagud med mindst N mål", "Foran med
+  mindst N mål" (N = 1–5), "Uafgjort" eller (v3.13) "Uanset stilling" (skema 2; skema 1's "Foran med 1"
   betød præcis 1 og er migreret til "mindst 1" – brugerens ønske om selv at
   angive antal mål). Mål: en formation (med `slotRemapping`) ELLER en af holdets
   planer A/B/C – så skiftes formation, trukne positioner og faser; spillerne
@@ -203,7 +203,7 @@ Tick hvert 3. minut (1..90).
   åbent spil 62 % (heraf langskud 8 %), kontra 12 %, dødbolde 26 %; angreb 54 %, midtbane 27 %,
   forsvar 19 % (v3.12.0: angreb 75 %, midtbane 15 %, forsvar 10 %, kontra 19 %, langskud 4 %).
   Typerne ligger i dokumentets intervaller; kæderne er 3–4 point fra (angreb over, midtbane under) –
-  tæt på, ikke inde i. Kalibreret: KEEPER_EDGE 3,5, CROSS_EDGE 2, SETPIECE_DEF_EDGE 3,75, cutback +8,
+  tæt på, ikke inde i. Kalibreret: KEEPER_EDGE 3,5 (v3.13: 3), CROSS_EDGE 2, SETPIECE_DEF_EDGE 3,75, cutback +8,
   kontra +3 (v3.10: +4), EDGE_SHARE 0,5, langskud min(FIN + 8, 13).
   Båndet ligger i balance.test.mjs. Brugt fra dokumentet: kæde- og typefordelingen. Ikke brugt:
   enkeltspillernes tal (beskriver Superligaens spillere, ikke spillets).
@@ -240,8 +240,9 @@ Tick hvert 3. minut (1..90).
   frispark 22 %, cutback 22 %, langskud 20 %, dribletur 13 %, hovedstød 12 % … – ingen over 30 %;
   friskheden uændret (startelleven 85 %).
 - VAR-tjek ved roll < 0,22: `varPulse + vsTrapLong·0,025 + rnd·6 > forsvarer.POS + rnd·…`.
-- Afslutning: `FIN + rnd·8 > GK + rnd·8 + 3,5` (v3.9 havde en målmandsfordel på 5; v3.10 fjernede den;
-  v3.12 gav 3 tilbage, v3.12.1 3,5 – kalibreret til målfordelingen ovenfor).
+- Afslutning: `FIN + rnd·8 > GK + rnd·8 + 3` (v3.9 havde en målmandsfordel på 5; v3.10 fjernede den;
+  v3.12 gav 3 tilbage, v3.12.1 3,5 – kalibreret til målfordelingen ovenfor; v3.13 3, fordi målmændene
+  taber mindst friskhed i kampen – ellers faldt målene til ≈ 2,5).
 - **Dødbolde (v3.10**, brugeren: "mål på hovedstød, straffe eller dødbolde. Antallet af frispark"):
   kun til holdet med bolden i en tick uden boldtab. Straffespark 1,1 % pr. tick: holdets bedste FIN,
   `FIN·friskhed + rnd·8 + 2,3 > MV·friskhed + rnd·8`. Frispark i skudafstand 6,1 %: 37 % direkte
@@ -363,7 +364,31 @@ Tick hvert 3. minut (1..90).
   med fast +5 endte alle på 50, og rotation blev en afgift). Virker i kampen: bidrag i duel,
   afslutning (også målmand) og luftduel · (0,75 + 0,25·friskhed/100) – 50 % ≈ 12,5 % svagere.
   Bots hviler en starter under 70 % for en frisk (≥85 %) bænkspiller i samme kæde, højst 2
-  svagere. Målt over 10 runder (`… 30 saeson`): startelleverne ≈85 % i snit (v3.10: ≈81 %).
+  svagere; fra v3.13 under botens udskiftningsgrænse + 10 for en bænkspiller på mindst grænsen + 15.
+  Målt over 10 runder (`… 30 saeson`): startelleverne ≈85 % i snit (v3.10: ≈81 %).
+- **Friskhed i kampen (v3.13**, brugeren: "Friskhed skal ændre sig i løbet af kampen, ellers en stamina
+  ikke så vigtig en evne"; `freshness.js`). Prisen ovenfor ændrer sig næsten ikke med STA (højt STA løber
+  flere km: CM STA 6 ≈ 15, STA 16 ≈ 13). I kampen taber spilleren pladsens grund-km · pres · løb uden
+  bold · genpres · (2,2 − 0,08·STA, mindst 0,3) point pr. 90 min (CM STA 6 ≈ 20, STA 10 ≈ 16,5, STA 16
+  ≈ 11, målmand ≈ 7,7), og hvert tabt point gør ham 0,6 % svagere oven i friskheden før kampen (20 point
+  → 12 %). Friskheden EFTER kampen regnes som før (km-prisen). Målt (`node tools/measure-duels.mjs 30
+  skift`, 600 kampe, alle markspillere STA 6 mod 16, ingen skift): netto 0,25 mod 0,92 mål pr. kamp –
+  forskellen 0,67 (før v3.13: 0,31 mod 0,81 = 0,50; STA tæller også i presset).
+- **Udskiftninger (v3.13**; `match-rules.js`, "skal kunne defineres af systemadministrator, men skal som
+  udgangspunkt følge FIFA/UEFAs regler for turneringer"): 5 skift i højst 3 pauser (IFAB Law 3);
+  flere skift i samme tick er én pause, halvlegen (45') er gratis; skadesskift tæller med. Udeladt:
+  hjernerystelses- og forlængelses-skift. Holdets grænse `team.subsLimit` (Taktik, 50–85 %, 0 = fra;
+  dit hold 70 %, bots 65/70/75 efter profil): i hvilket som helst minut (brugeren: "uanset hvor langt
+  man er kommet i kampen") skiftes alle under grænsen, lavest først, mod den bedste friske
+  (≥ grænsen + 5) i samme kæde; bruges pausen, tages også dem ≤ 5 over grænsen med. Målmanden skiftes
+  kun ved skade. Dit hold får besked, når grænsen ikke kan følges (skift/pauser brugt, ingen frisk på
+  bænken), og efter kampen, hvor meget friskhed de udskiftede sparede. Hvis-Så kan også være en
+  udskiftning (spiller ud/ind efter id; første tick fra minuttet); bænkspillere i dine regler bruges
+  ikke til træthedsskift; Taktik advarer straks, når en regel ikke passer til opstillingen. Afviger fra
+  kilden (§10.1 "energi·0,1 + karakter"): vi vælger efter friskhed i kampen alene – managerens grænse
+  er en friskhedsgrænse. Målt (`… 30 skift`): 2,9 skift pr. hold pr. kamp (træthed 2,5, skade 0,3),
+  ≈ 80 % efter pausen; 2,9 mål pr. kamp; startelleverne ≈ 86 % efter 10 runder. ▶-advarslen følger
+  grænsen.
 
 ## 7. Mod-kunnen (v2.2b)
 - `counterTactics {vsPress, vsLowBlock, vsTrapLong}`, start
@@ -464,8 +489,8 @@ Rækkefølge efter Spilførerens gennemgang: journalisten er den mest gentagne
 klage (v2.0, v2.2, v2.3, v2.5), og MotM-balancen skal før den, ellers bliver
 avisens hovedperson altid målmanden.
 
-1. Taktiske/træthedsbaserede udskiftninger (dårligste efter energi·0,1 +
-   karakter, maks 3 pr. hold INKLUSIVE skadesskift — prosaens "5" er forkert) som `SUB`-hændelse 🔄 på tidslinjen.
+1. ~~Taktiske/træthedsbaserede udskiftninger~~ Med i v3.13 (§5 "Udskiftninger"): 5 skift i 3 pauser efter
+   IFAB (kildens "maks 3" var den gamle regel), valgt efter friskhed i kampen – ikke kildens energi·0,1 + karakter.
 2. MotM-balance: afslutning uden mål 35 % blokeret (forsvarer +0,30), 30 %
    forbi, 35 % redning (+0,22); mål +1,45, oplæg +0,75, taktisk gennembrud
    +0,40; MotM-vægt = karakter + 0,35·mål + 0,20·oplæg + 0,10·dueller − GK-fradrag;

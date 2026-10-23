@@ -133,15 +133,15 @@ test('Plan A/B/C: den aktive gemmes, den valgte hentes, opstillingen følger hol
   assert.equal(act.switchPreset(t, 0, 0), false);
 });
 
-test('Hvis-Så: højst 5 regler; ny regel har gyldig remap', () => {
+test('Hvis-Så: højst 8 regler (v3.13; før 5); ny regel har gyldig remap', () => {
   const t = createLeague(createRng(3)).teams[0];
   while (act.addRule(t));
   assert.equal(t.tactics.conditionalRules.length, act.MAX_RULES);
-  assert.equal(act.MAX_RULES, 5);
+  assert.equal(act.MAX_RULES, 8);
   const r = t.tactics.conditionalRules.at(-1);
   assert.deepEqual(r.slotRemapping, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
-  assert.equal(new Set(t.tactics.conditionalRules.map((x) => x.ruleId)).size, 5);
-  act.removeRule(t, 0); assert.equal(t.tactics.conditionalRules.length, 4);
+  assert.equal(new Set(t.tactics.conditionalRules.map((x) => x.ruleId)).size, 8);
+  act.removeRule(t, 0); assert.equal(t.tactics.conditionalRules.length, 7);
 });
 
 // ---------- Test Managers fund ----------
