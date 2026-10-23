@@ -1858,7 +1858,9 @@ test('statistik: to runder bogføres eksakt – spillertal fra karakterarket, ho
     [2, 14, 8, 2.468, 120, 18, 24, 10, 2, 2, 4, 2, 2, 2, 1, 1]);
   assert.deepEqual([sa.counterGoals, sa.cleanSheets, sa.possSum], [2, 1, 80]);
   assert.equal(L.history.length, 2);
-  assert.deepEqual(L.history[0], { round: 1, matches: 1, goals: 3, setPiece: 2, kinds: { PENALTY: 1, CORNER: 1, LONGSHOT: 1 }, biggest: { diff: 1, label: `${H.name} 2-1 ${A.name}` }, most: { goals: 3, label: `${H.name} 2-1 ${A.name}` }, results: [{ h: H.id, a: A.id, hG: 2, aG: 1 }] });
+  const { facts: f0, ...h0 } = L.history[0];   // v3.14: offentlige tal pr. hold til klummen (fatigue/column-tests)
+  assert.ok(f0 && Object.keys(f0).length >= 2, 'facts pr. hold');
+  assert.deepEqual(h0, { round: 1, matches: 1, goals: 3, setPiece: 2, kinds: { PENALTY: 1, CORNER: 1, LONGSHOT: 1 }, biggest: { diff: 1, label: `${H.name} 2-1 ${A.name}` }, most: { goals: 3, label: `${H.name} 2-1 ${A.name}` }, results: [{ h: H.id, a: A.id, hG: 2, aG: 1 }] });
   assert.equal(L.history[1].biggest, null);
   // Synlighed: andre hold ser ikke tal, der følger en skjult indstilling
   const opp = viewTeamStats(sh, false), own = viewTeamStats(sh, true);
@@ -2221,7 +2223,9 @@ test('statistik: flere kampe pr. runde – største sejr/målrigeste (uafgjort: 
   ]), createRng(1));
   commitRound(L, rnd(2, [mk(T1, T0, 0, 2), mk(T2, T3, 1, 3)]), createRng(1));
   commitRound(L, rnd(3, [mk(T0, T2, 1, 1), mk(T1, T3, 1, 1)]), createRng(1));
-  assert.deepEqual(L.history[0], { round: 1, matches: 2, goals: 7, setPiece: 4, kinds: { PENALTY: 1, CORNER: 1, HEADER: 1, FREEKICK: 1, SETPIECE: 1, LONGSHOT: 2 },
+  const { facts: f0, ...h0 } = L.history[0];   // v3.14: offentlige tal pr. hold til klummen (fatigue/column-tests)
+  assert.ok(f0 && Object.keys(f0).length >= 2, 'facts pr. hold');
+  assert.deepEqual(h0, { round: 1, matches: 2, goals: 7, setPiece: 4, kinds: { PENALTY: 1, CORNER: 1, HEADER: 1, FREEKICK: 1, SETPIECE: 1, LONGSHOT: 2 },
     biggest: { diff: 3, label: `${T0.name} 3-0 ${T1.name}` }, most: { goals: 4, label: `${T2.name} 2-2 ${T3.name}` },
     results: [{ h: T0.id, a: T1.id, hG: 3, aG: 0 }, { h: T2.id, a: T3.id, hG: 2, aG: 2 }] });   // HEADER og LONGSHOT er ikke dødbolde
   assert.deepEqual(L.history[1].biggest, { diff: 2, label: `${T1.name} 0-2 ${T0.name}` }, 'udesejr tæller, og ved lighed står den første');

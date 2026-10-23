@@ -52,3 +52,7 @@ export function viewTeamStats(row, viewerOwnsTeam) {
   if (viewerOwnsTeam) for (const k of TEAM_STATS_OWNER) out[k] = row[k];
   return out;
 }
+
+// Kamprapporten (v3.14, match.ownReports[teamId]): spillet taktik start/slut og duel-tallene bag fuldtids-analysen.
+// Kun holdets ejer – andres rapporter er fraværende i resultatet (klummen og fuldtids-analysen bruger kun seerens).
+export const viewOwnReport = (match, viewerTeamId) => match?.ownReports?.[viewerTeamId] ?? null;

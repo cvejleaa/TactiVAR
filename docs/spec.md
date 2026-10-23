@@ -90,7 +90,7 @@ spillerobjekt; de skal ligge hos den der observerer.
 - Kampstatistikken i Match Center (v3.10.1: også frispark i skudafstand, hjørnespark, straffe (mål)
   og gule kort) er tal fra én kamp, hvor hver hændelse står i referatet – offentlig for begge hold.
   Kun SÆSONsummer, der følger en skjult indstilling, er private (§8b).
-- Offentligt: navn ("F. Efternavn" på banen), rygnummer, kæde, naturlig position, alder, højde, friskhed, skadesstatus 🚑, stjerner (★☆☆☆☆–★★★★★), holdets startformation. Intet andet om andre holds taktik (brugerens beslutning, afviger bevidst fra v2.5): ingen faser, planer, Hvis-Så-regler eller "typisk stil" – heller ikke i ligatabellen, kamphovedet, det taktiske oplæg eller referatet. Et modstanderholds Hvis-Så-skift vises kun som "omorganiserer sig". Referatet navngiver kun dine egne taktikvalg. Fra v3.12 (brugerens valg) følger chancetypen hvert holds eget angrebsfokus – man kan selv regne ud, at et hold slår mange indlæg eller cutbacks, men ordvalget navngiver aldrig indstillingen. Det gælder også fuldtids-analysens "🛡️ Dit felt: modstanderens cutbacks stoppet X af Y, luftdueller vundet …" – tal fra én kamp, som referatet allerede viser (som "kontraer imod i alt"), en bevidst og accepteret lækage. Ligeså (v3.13): minuttet for en bots træthedsskift plus den offentlige friskhed røber lidt om botens løb og STA over mange kampe; teksten nævner aldrig friskhed eller grænse, og botens grænse er skjult (lockboxen i Taktik). (Trin 1 lægger teksterne i motoren med det menneskestyrede hold som seer; trin 2 skal gøre dem seer-afhængige.)
+- Offentligt: navn ("F. Efternavn" på banen), rygnummer, kæde, naturlig position, alder, højde, friskhed, skadesstatus 🚑, stjerner (★☆☆☆☆–★★★★★), holdets startformation. Intet andet om andre holds taktik (brugerens beslutning, afviger bevidst fra v2.5): ingen faser, planer, Hvis-Så-regler eller "typisk stil" (undtagelse fra v3.14, brugerens valg: klummen må gætte på et holds stil ud fra dets seneste OFFENTLIGE kampe – resultat, kamptal fra referatet, måltyper; buddet tager gennemsnittet af skud, hjørner, besiddelse og kontra-/dødbolds-/hovedstødsmål over op til 3 kampe – en accepteret lækage, da hver kamp kan åbnes enkeltvis – men navngiver aldrig en indstilling og påstår intet om pres; klummen ser kun kampene gennem `publicFacts` (column.js), aldrig tekst, labels, private karakterfelter eller andres kamprapport – bevist med en kanarie-test; en bots spillede indstillinger gemmes ikke længere i `endState`) – heller ikke i ligatabellen, kamphovedet, det taktiske oplæg eller referatet. Et modstanderholds Hvis-Så-skift vises kun som "omorganiserer sig". Referatet navngiver kun dine egne taktikvalg. Fra v3.12 (brugerens valg) følger chancetypen hvert holds eget angrebsfokus – man kan selv regne ud, at et hold slår mange indlæg eller cutbacks, men ordvalget navngiver aldrig indstillingen. Det gælder også fuldtids-analysens "🛡️ Dit felt: modstanderens cutbacks stoppet X af Y, luftdueller vundet …" – tal fra én kamp, som referatet allerede viser (som "kontraer imod i alt"), en bevidst og accepteret lækage. Ligeså (v3.13): minuttet for en bots træthedsskift plus den offentlige friskhed røber lidt om botens løb og STA over mange kampe; teksten nævner aldrig friskhed eller grænse, og botens grænse er skjult (lockboxen i Taktik). (Trin 1 lægger teksterne i motoren med det menneskestyrede hold som seer; trin 2 skal gøre dem seer-afhængige.)
 - Øjebliksbilledet ved mål (v3.12.1) gemmer kun DIT holds positioner – de afslører dit pres og dine løb, ikke modstanderens. Ved et modstandermål vises dit forsvar og bolden, aldrig modstanderens spillere eller scorerens plads. Accepteret: hvem der modtager bolden afhænger af hvert holds levende positioner (pres, løb), så over mange kampe kan man statistisk ane et holds indstilling – på linje med løbe-vægtene fra v3.9.
 - Kun ejer: 9 evner, spring, luftduel, arketype, løn/værdi, kasse, de præcise fasevalg og Hvis-Så-regler,
   eksakt karakter, mod-kunnen.
@@ -338,6 +338,22 @@ Tick hvert 3. minut (1..90).
   saeson`): langskud 22 %, frispark 20 %, dribletur 19 %, cutback 17 %, hjørnespark 8 %, hovedstød
   4 %, kombination 3 %, kontra 3 %, frisparksindlæg 2 %, VAR 2 % – ingen type over 30 %.
   **v3.12** (`… 30 saeson`): se målingen i §5; ingen type over 30 % (båndet i balance.test.mjs).
+- **Klummen (v3.14**, brugeren: "avisen er stadig kedelig"; `column.js`): avisen er en klumme, bygget VED VISNING
+  for den, der ser (brugeren: afsnit 1 "skal varieres så det er den indlogget spillers hold det indeholder"):
+  overskrift efter rundens største historie (overraskelse, comeback, sent drama, stime brudt, din store sejr);
+  1) **Din kamp** – resultat, drama og højst 2 sætninger om dine valg med belæg fra din kamprapport (`ownReport`,
+  gemt ved kampen: den spillede taktik og dueltallene – samme objekt som fuldtids-analysen); 2) **De øvrige kampe**
+  – fed overskrift pr. kamp (klik = referatet) og én sætning (comeback, sent mål eller stil-gæt); 3) **Rundens
+  spiller og mål** – begrundet i offentlige handlinger (mål, oplæg, redninger, luftdueller), link til målet;
+  4) **Formen** – overraskelsen, stimer på 3+ og toppen; 5) **Næste runde** – din modstander, hans form og et bud på
+  hans stil ud fra hans seneste 1–3 kampe (gennemsnit, se §3) (offentlige tal i runde-historikken, `facts`), og runden efter følger
+  journalisten op på, om buddet holdt. Ingen tilfældighed (samme runde → samme klumme); varianter rykker videre fra
+  runde til runde; ingen hel sætning mere end 3 gange på en sæson (column.test.mjs). Gamle gem får også en klumme
+  (bygges af de gemte kampe); dit holds løber og sæsonslut står som før.
+  Sandhedsregler (QC v3.14): "sejrsmålet" kun når vinderen scorede sidst fra uafgjort i 80.+ (ikke et
+  reduceringsmål); en årsag til et kontramål imod kun med belæg (mange løb uden bold i din spillede taktik); stil-gættet
+  "indlæg og hjørner" kræver hovedstød i mindst halvdelen af målene eller 7+ hjørner; et ikke-udført Hvis-Så-skift
+  tæller ikke som omorganisering; ved sæsonslut står mesteren, og ingen stime fra den gamle sæson i optakten.
 - **Løbedistance og topfart (v3.7; pr. plads fra v3.8)** pr. karakter: km/90 = basis for den
   PLADS (formationsrolle), spilleren står på – også en indskifter (dokumentets "fysisk
   belastning"): CM/CDM 11,8 · LWB/RWB/LM/RM/LW/RW 11,0 · CAM/CF 10,8 · LB/RB 10,6 · ST 10,0 ·
@@ -501,7 +517,7 @@ avisens hovedperson altid målmanden.
    forbi, 35 % redning (+0,22); mål +1,45, oplæg +0,75, taktisk gennembrud
    +0,40; MotM-vægt = karakter + 0,35·mål + 0,20·oplæg + 0,10·dueller − GK-fradrag;
    GK redning +0,32, efter 3 redninger +0,15, −0,40 pr. mål imod.
-3. Journalist-klumme i 4 afsnit på ligasiden efter hver runde (hovedhistorie,
+3. ~~Journalist-klumme~~ Med i v3.14 (§6 "Klummen"). Oprindelig tekst: Journalist-klumme i 4 afsnit på ligasiden efter hver runde (hovedhistorie,
    de øvrige kampe, rundens spiller/mål med begrundelse). Klummen vurderer
    hvert holds taktik og drysser de samme beskrivende hints som referatet —
    aldrig tal.

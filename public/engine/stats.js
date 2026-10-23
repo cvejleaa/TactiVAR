@@ -2,6 +2,7 @@
 // siden af al mulig slags" – plus "mål på hovedstød, straffe eller dødbolde. Antallet af frispark").
 // Tælles fra league.statsFromRound: ældre runder er ikke gemt og kan ikke genskabes.
 // Hvem der må se hvad, afgøres i visibility.js.
+import { publicFacts, compactFacts } from './column.js';
 
 // Pr. spiller (fladt på spilleren, så sanitize kan give standardværdier felt for felt).
 export const PLAYER_SEASON_FIELDS = ['sGames', 'sMinutes', 'sGoals', 'sAssists', 'sMotm', 'sYellow', 'sCleanSheets', 'sHeaderGoals', 'sPenaltyGoals', 'sSetPieceGoals', 'freeRunsSum', 'freeRunsWonSum'];
@@ -62,7 +63,9 @@ export function roundHistory(round, matches) {
   const setPiece = Object.entries(kinds).filter(([k]) => SET_PIECE.has(k)).reduce((a, [, v]) => a + v, 0);
   // Resultaterne (v3.11) til kampprogrammet: hold-id og score pr. kamp.
   const results = matches.map((m) => ({ h: m.homeId, a: m.awayId, hG: m.homeGoals, aG: m.awayGoals }));
-  return { round, matches: matches.length, goals, setPiece, kinds, biggest, most, results };
+  // Offentlige tal pr. hold (v3.14) – klummens optakt-scouting af næste modstander ud fra hans seneste kampe.
+  const facts = Object.assign({}, ...matches.map((m) => compactFacts(publicFacts(m))));
+  return { round, matches: matches.length, goals, setPiece, kinds, biggest, most, results, facts };
 }
 
 // Sæsonens løb pr. spiller – samme tal på spillerkortet og i "Dit hold" (én formel, så de ikke driver).
