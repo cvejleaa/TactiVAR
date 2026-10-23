@@ -446,7 +446,7 @@ try {
   check('Efter slutfløjt: Liga-fanen viser avisen og ingen afspilningsbesked', (await g.isVisible('#gazette')) && (await g.locator('#booked-league').count()) === 0);
   // v3.10: statistik nederst – fire sektioner, tal = gemte data, andre holds private tal findes ikke
   const secs = await g.locator('#stats details.stats-sec > summary').allTextContents();
-  check('Statistik: fire sektioner med "fra runde 1" (spillere åben, resten sammenfoldet)', secs.length === 4 && secs[0].startsWith('Spillere (fra runde 1)') && secs[3].startsWith('Dit hold (privat, fra runde 1)') && (await g.locator('#stats-players').getAttribute('open')) !== null && (await g.locator('#stats-teams').getAttribute('open')) === null, secs.join(' | '));
+  check('Statistik: fire sektioner for sæsonen (spillere åben, resten sammenfoldet), ingen linje om manglende runder', secs.length === 4 && secs[0] === 'Spillere (sæson 1)' && secs[3] === 'Dit hold (privat, sæson 1)' && (await g.locator('#stats-gap').count()) === 0 && (await g.locator('#stats-players').getAttribute('open')) !== null && (await g.locator('#stats-teams').getAttribute('open')) === null, secs.join(' | '));
   const scorers = await g.locator('#stats .stat-list[data-key="sGoals"] td.st-val').allTextContents();
   const goalsSaved = await g.evaluate(() => { const L = JSON.parse(localStorage.getItem('tactivar_save')).league; return L.teams.flatMap((t) => t.squad.map((p) => p.sGoals)).filter((n) => n > 0).sort((a, b) => b - a).slice(0, 5); });
   check('Statistik: topscorerlisten matcher de gemte sæsonmål', JSON.stringify(scorers.map((t) => Number(t.trim()))) === JSON.stringify(goalsSaved), `${scorers.join(',')} / ${goalsSaved.join(',')}`);
@@ -643,7 +643,7 @@ try {
   check('Nyt i v3.12 er gemt straks: ikke igen efter F5 uden anden handling', (await g.locator('#notice').count()) === 0);
   await tab('liga');
   const v39secs = await g.locator('#stats details.stats-sec > summary').allTextContents();
-  check('Gem fra v3.9: kun kampprogram-beskeden; statistikken tæller fra runde 3 og er tom', v39note.startsWith('Dit spil er opdateret: Nu spilles der efter et fast kampprogram') && !v39note.includes('naturlig position') && v39secs[0] === 'Spillere (fra runde 3)' && (await g.locator('#stats .stat-list[data-key="sGoals"]').textContent()).includes('Ingen endnu') && (await g.locator('#fejlboks').isHidden()), v39secs.join(' | '));
+  check('Gem fra v3.9: kun kampprogram-beskeden; statistikken tæller for den nye sæson og er tom', v39note.startsWith('Dit spil er opdateret: Nu spilles der efter et fast kampprogram') && !v39note.includes('naturlig position') && v39secs[0] === 'Spillere (sæson 2)' && (await g.locator('#stats .stat-list[data-key="sGoals"]').textContent()).includes('Ingen endnu') && (await g.locator('#fejlboks').isHidden()), v39secs.join(' | '));
   await reload();
   check('…og ikke igen efter næste indlæsning', (await g.locator('#notice').count()) === 0);
   await tab('trup');

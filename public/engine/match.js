@@ -103,6 +103,8 @@ export const longshotBonus = (fin) => Math.min(fin + LONGSHOT_BONUS, LONGSHOT_CA
 // En del af de almindelige afslutninger falder til en spiller ved feltets kant (andenbolde, afslag –
 // dokumentet: midtbanen scorer 30–35 %); resten går mod målet.
 export const EDGE_SHARE = 0.5;
+// VAR-offside-tjek (v3.14.1): skytten tjekkes kun selv, når han er blandt de N forreste markspillere – ellers den forreste.
+export const VAR_FRONT = 2;
 export const SPOT = { CROSS: { x: 50, y: 16 }, CUTBACK: { x: 50, y: 28 }, GOAL: { x: 50, y: 20 }, EDGE: { x: 50, y: 32 } };
 const FOCUS_LABEL = { CENTRAL: 'Centralt', HIGH_CROSSES: 'Høje indlæg', LOW_CUTBACKS: 'Lave cutbacks' };
 const PASS_LABEL = { SHORT: 'korte pasninger', BALANCED: 'balanceret', DIRECT_LONG: 'direkte lange bolde' };
@@ -282,6 +284,19 @@ export function simulateMatch(home, away, rng, opts = {}) {
       scorer: attacking ? scorer.id : null, assist: attacking && helper && helper !== scorer ? helper.id : null,
       ball: attacking ? [spot.x, spot.y] : [100 - spot.x, 100 - spot.y],
     };
+  }
+
+  // Er spilleren blandt de VAR_FRONT forreste markspillere i øjeblikket (laveste y = nærmest modstanderens mål)? Uden rng.
+  function frontOf(side) {
+    const pos = seen[side.team.id];
+    if (!pos) return null;
+    return side.starters.map((p, i) => ({ p, i })).filter(({ p, i }) => i > 0 && p).sort((a, b) => pos[a.i].y - pos[b.i].y)[0]?.p ?? null;
+  }
+  function isFront(side, p) {
+    const pos = seen[side.team.id];
+    if (!pos) return true;
+    const i = side.starters.indexOf(p);
+    return side.starters.filter((q, j) => j > 0 && q && pos[j].y < pos[i].y).length < VAR_FRONT;
   }
 
   const fbCount = (side) => coordsOf(side.tactics).filter((c) => FB_ROLES.has(c.r)).length;
@@ -768,25 +783,33 @@ export function simulateMatch(home, away, rng, opts = {}) {
       }
       if (focus === 'LOW_CUTBACKS' && rng.chance(FOCUS_SHARE.LOW_CUTBACKS)) { cutback(att, def, cR, dR, min, shotXg); continue; }
       // Skytten er den, der står nærmest målet (oftest angriberen) – ikke en tilfældig spiller.
-      const shooter = receiver(att, rng.next() < EDGE_SHARE ? SPOT.EDGE : SPOT.GOAL, (p) => p.skills.finishing, null, { attacking: true, ballX: 50 });
+      const shotSpot = rng.next() < EDGE_SHARE ? SPOT.EDGE : SPOT.GOAL;
+      const shooter = receiver(att, shotSpot, (p) => p.skills.finishing, null, { attacking: true, ballX: 50 });
       const scored = () => { if (att === H) hG++; else aG++; st[k(att, 'OnTarget')]++; };
       const assist = (bonus) => { if (assister.id !== shooter.id) { sheet.adjust(assister.id, bonus); sheet.bump(assister.id, 'assists'); } };
+      // VAR-tjekket gælder offside. Står skytten bagved (brugeren v3.14.1: "scoret af en midtbanespiller, og der er 5
+      // spillere længere fremme"), er det hans forreste holdkammerat, der tjekkes for offside – ikke skytten selv.
       if (rng.next() < 0.22) {
+        const off = isFront(att, shooter) ? shooter : frontOf(att) ?? shooter, other = off !== shooter;
         st[k(att, 'VarChecks')]++;
-        const trapBonus = (shooter.counterTactics?.vsTrapLong ?? 15) * 0.045; // v3.6: samme effekt (≈0,8) på den lavere skala
-        const timing = describeVarTiming(shooter.varProfile.varPulse);
-        if (shooter.varProfile.varPulse + trapBonus + rng.next() * 6 > defender.skills.positioning + rng.next() * 6) {
+        const trapBonus = (off.counterTactics?.vsTrapLong ?? 15) * 0.045; // v3.6: samme effekt (≈0,8) på den lavere skala
+        const timing = describeVarTiming(off.varProfile.varPulse);
+        // Billedet: skytten der, hvor han skød fra; den offside-tjekkede forrest i feltet.
+        const moves = { [shooter.id]: [shotSpot.x, shotSpot.y], ...(other ? { [off.id]: [SPOT.GOAL.x, SPOT.CROSS.y] } : {}) };
+        if (off.varProfile.varPulse + trapBonus + rng.next() * 6 > defender.skills.positioning + rng.next() * 6) {
           scored(); homeVarNet += att === H ? 1 : -1;
           sheet.adjust(shooter.id, 1.3); sheet.bump(shooter.id, 'goals'); assist(0.5); sheet.adjust(defender.id, -0.35);
-          observe(shooter, `VAR-tjek (${min}. min mod ${def.team.name}): ${shooter.shortName} ${timing}.`);
+          observe(off, `VAR-tjek (${min}. min mod ${def.team.name}): ${off.shortName} ${timing}.`);
           goalsPool.push({ scorer: tag(shooter), teamName: att.team.name, match: `${home.name} - ${away.name}`, min, kind: 'VAR', spectacle: goalSpectacle('VAR', {}, min, rng), desc: describeGoal('VAR', tag(shooter), tag(assister), min, rng) });
-          addEv(min, 'VAR_GOAL', 'HIGHLIGHT', att.isHome, true, `📺 VAR: mål godkendt – ${tag(shooter)}`, `📺 [${att.team.name} • ${hG}-${aG}] VAR-KENDELSE: MÅL GODKENDT! ${tag(shooter)} ${timing}.`, `${att.team.name}: mål godkendt`);
-          snapshot(att, shooter, assister);
+          const why = other ? `${tag(shooter)} skød, og ${tag(off)} foran ham stod ikke offside – han ${timing}` : `${tag(shooter)} ${timing}`;
+          addEv(min, 'VAR_GOAL', 'HIGHLIGHT', att.isHome, true, `📺 VAR: mål godkendt – ${tag(shooter)}`, `📺 [${att.team.name} • ${hG}-${aG}] VAR-KENDELSE: MÅL GODKENDT! ${why}.`, `${att.team.name}: mål godkendt`);
+          snapshot(att, shooter, assister, shotSpot, false, moves);
         } else {
           homeVarNet += att === H ? -1 : 1;
-          sheet.adjust(shooter.id, -0.4); sheet.adjust(defender.id, 0.45); sheet.bump(defender.id, 'tacticWins');
-          observe(shooter, `VAR-annullering (${min}. min mod ${def.team.name}): ${shooter.shortName} var en anelse for tidligt af sted.`);
-          addEv(min, 'VAR_NO_GOAL', 'HIGHLIGHT', att.isHome, true, `📺 VAR: annulleret – ${tag(shooter)}`, `📺 [${att.team.name}] VAR-KENDELSE: MÅLET ANNULLERES! ${tag(defender)} (${def.team.name}) holdt linjen, og ${tag(shooter)} var offside.`, `${att.team.name}: mål annulleret`);
+          sheet.adjust(off.id, -0.4); sheet.adjust(defender.id, 0.45); sheet.bump(defender.id, 'tacticWins');
+          observe(off, `VAR-annullering (${min}. min mod ${def.team.name}): ${off.shortName} var en anelse for tidligt af sted.`);
+          const why = other ? `${tag(defender)} (${def.team.name}) holdt linjen, og ${tag(off)} stod offside og var med i situationen, da ${tag(shooter)} skød` : `${tag(defender)} (${def.team.name}) holdt linjen, og ${tag(shooter)} var offside`;
+          addEv(min, 'VAR_NO_GOAL', 'HIGHLIGHT', att.isHome, true, `📺 VAR: annulleret – ${tag(off)}`, `📺 [${att.team.name}] VAR-KENDELSE: MÅLET ANNULLERES! ${why}.`, `${att.team.name}: mål annulleret`);
         }
       } else {
         // Løb uden bold (v3.9): en markspiller forsøger at løbe sig fri. Vinder han løbet, træffer

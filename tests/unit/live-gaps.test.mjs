@@ -130,9 +130,17 @@ test('VAR-mål: billedet med dit holds positioner, scorer og oplæg, bolden på 
   const evs = goalEvents(m, 'VAR_GOAL');
   assert.equal(evs.length, 2);
   const s = evs[0].snapshot;
-  assert.deepEqual(s.pts, pts(a.H, [[50, 90], [50, 75], [50, 81], [50, 81], [50, 75], [50, 79], [50, 79], [50, 79], [50, 79], [40, 22], [50, 89]]));
-  assert.deepEqual([s.attacking, s.ball, s.assist], [true, [50, 20], slot(a.H, 5).id]);
+  // v3.14.1 (brugeren: VAR på et mål af en midtbanespiller med 5 foran): skytten (her en forsvarer, før vist på sin
+  // plads ved y 81) står der, hvor han skød fra (feltkanten, 50,32), og den forreste (#9, før 40,22) – ham VAR tjekker
+  // for offside – står i feltet (50,16). Bolden er ved skytten.
+  const scorerSlot = a.H.tactics.lineupSlots.indexOf(s.scorer);
+  const exp = [[50, 90], [50, 75], [50, 81], [50, 81], [50, 75], [50, 79], [50, 79], [50, 79], [50, 79], [50, 16], [50, 89]];
+  exp[scorerSlot] = [50, 32];
+  assert.ok(scorerSlot >= 1 && scorerSlot <= 8, `skytten står bagved angriberne (plads ${scorerSlot})`);
+  assert.deepEqual(s.pts, pts(a.H, exp));
+  assert.deepEqual([s.attacking, s.ball, s.assist], [true, [50, 32], slot(a.H, 5).id]);
   assert.ok(s.scorer && s.scorer !== s.assist);
+  assert.match(evs[0].text, new RegExp(`skød, og #\\d+ ${slot(a.H, 9).shortName} foran ham stod ikke offside`));
 });
 
 // Mål imod: KUN dit eget forsvar gemmes (anti-spionage §3) – modstanderens positioner røber pres og løb

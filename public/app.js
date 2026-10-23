@@ -61,6 +61,7 @@ const NEWS = {
   '3.12.1': 'Spillerne rykker nu med i kampen: frem når I har bolden og mod boldsiden – og løb uden bold fører flere ind i feltet, så også midtbanen og backs kommer til at score. Målene fordeler sig nu tæt på Superligaens: flere fra midtbanen og forsvaret, langskud fra kanten af feltet, færre kontramål. Efter slutfløjt kan du trykke 📍 ved et mål fra åbent spil eller kontra for at se, hvor dit hold stod.',
   '3.13.0': 'Udskiftninger under kampen: friskheden falder nu i løbet af kampen – mest for spillere med lav udholdenhed (STA) – og en træt spiller yder mindre. Under Taktik → "Udskiftninger under kampen" vælger du, hvornår en træt spiller skiftes ud (sat til 70 %; kan slås fra). Der må skiftes 5 gange i 3 pauser som i FIFA/UEFA-turneringer, og dine regler under Taktik kan nu også lave en udskiftning – fx i et bestemt minut uanset stilling.',
   '3.14.0': 'Avisen er blevet en klumme: rundens største historie som overskrift, din kamp med journalistens vurdering af dine valg, de øvrige kampe, rundens spiller og mål, formen i ligaen – og en optakt til din næste kamp med et bud på modstanderens stil ud fra hans seneste kampe. Runden efter følger journalisten op på, om buddet holdt.',
+  '3.14.1': 'Rettelser: VAR tjekker nu offside for den forreste – scorer en spiller længere tilbage, er det hans forreste holdkammerat, der tjekkes, og billedet ved målet viser skytten, hvor han skød fra. Statistikken på Liga-fanen gælder sæsonen.',
 };
 
 // Et migreret spil, hvis gamle fil ikke kunne tages backup af (fuldt lager): den gamle fil må
