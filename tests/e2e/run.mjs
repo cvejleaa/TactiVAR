@@ -623,6 +623,12 @@ try {
   check('Gem fra v3.12.0: runde 3 i Kamp-fanen uden 📍, startopstillingen på minibanen og ingen fejl', (await g.textContent('#match-center')).includes('runde 3') && (await g.locator('#feed .snap-btn').count()) === 0 && (await g.locator('#snap-pitch').count()) === 0 && (await g.locator('.minipitch').count()) >= 1 && (await g.isHidden('#fejlboks')));
   const oldCol = await g.textContent('#gazette');
   check('Gem fra v3.12.0: avisen er en klumme (bygget af de gemte kampe) med "Din kamp" og uden "undefined"', (await g.locator('#gazette #col-mine').count()) === 1 && !/undefined|NaN/.test(oldCol), oldCol.slice(0, 160));
+  // Release Manager v3.14: en fejl i klummen tager ikke Liga-fanen med – den gamle avis vises, og fejlen står i fejlboksen
+  const broken = JSON.parse(fixtureV3120); broken.league.lastRound.matches[0].goalsPool = 5;   // kun klummen læser den ved visning
+  await g.evaluate((f) => { for (const k of Object.keys(localStorage)) if (k.startsWith('tactivar_')) localStorage.removeItem(k); localStorage.setItem('tactivar_save', f); }, JSON.stringify(broken));
+  await reload(); await tab('liga');
+  check('Fejl i klummen: Liga-fanen viser den gamle avis (overskrifter, ingen "Din kamp") og fejlen i fejlboksen', (await g.locator('#gazette #headlines li').count()) >= 1 && (await g.locator('#gazette #col-mine').count()) === 0 && (await g.isVisible('#fejlboks')) && (await g.textContent('#fejlboks')).includes('Klummen kunne ikke bygges'), await g.textContent('#fejlboks'));
+  await g.evaluate(() => { const b = document.getElementById('fejlboks'); b.hidden = true; b.textContent = ''; });
 
   // v3.10: et gem fra v3.9 (runde 2) – kun v3.11's kampprogram-besked, statistikken starter tom fra runde 3
   const fixtureV39 = fs.readFileSync(new URL('../fixtures/save-v3.9.json', import.meta.url), 'utf8');

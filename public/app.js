@@ -88,7 +88,11 @@ function persist() {
 // Den aktive plan holdes lig med live-taktikken, så Hvis-Så-regler til "Plan A" er det, man ser.
 // Klummen for den, der ser (v3.14): bygges ved visning ud fra den sidste runde, sæsonens forløb, tabellen og
 // næste runde i programmet. Efter sæsonslut: den afsluttede sæsons forløb og tabel, og næste runde er en ny sæsons.
+// En fejl i klummen må ikke tage Liga- og Kamp-fanen med: den gamle avis vises, og fejlen står i fejlboksen (Release Manager).
 function columnNow() {
+  try { return buildColumnNow(); } catch (e) { console.error(e); window.tactivarFejl?.(`Klummen kunne ikke bygges – avisen vises i stedet (${e.message}).`); return null; }
+}
+function buildColumnNow() {
   const L = game.league, lr = L.lastRound;
   if (!lr?.matches?.length) return null;
   const end = lr.gazette?.seasonEnd, from = end ? end.fromRound : L.seasonStartRound ?? 1;
