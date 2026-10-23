@@ -79,3 +79,14 @@ test('slutstilling: lige efter sæsonens sidste runde viser tabellen slutstillin
   assert.equal(byId(el2, 'standings-title').textContent, `${L.leagueMetadata.name} – sæson 2, efter 1 af ${L.schedule.length} runder`);
   assert.equal(byId(el2, 'standings-champion'), undefined);
 });
+
+test('slutstilling kun for en rigtig sæson: en arkiveret "sæson uden program" (migreringen fra skema 5) giver den almindelige tabel', async () => {
+  const { endSeason } = await import('../../public/engine/season.js');
+  const rng = createRng(6), L = createLeague(rng);
+  commitRound(L, playRound(L, rng), rng);
+  endSeason(L, L.leagueMetadata.round, false);   // som migreringen: uden program
+  assert.equal(L.seasons.at(-1).programmed, false);
+  const el = renderStandings({ league: L, onPick: () => {}, viewTeamId: null });
+  assert.equal(byId(el, 'standings-title').textContent, `${L.leagueMetadata.name} – sæson 2, efter 0 af ${L.schedule.length} runder`);
+  assert.equal(byId(el, 'standings-champion'), undefined);
+});
