@@ -86,8 +86,9 @@ test('oplægsgiveren markeres ikke, når han selv scorer (helper === scorer) –
 test('hovedstødsmål: bolden på (50,16), bold-siden (88) rykker holdet 11 mod højre, scorer og indlægsgiver – og et dødbolds-hovedstød har intet billede', () => {
   const { a, m } = mine({ spots: { 9: { x: 40, y: 28 } }, home: { p1: { attackFocus: 'HIGH_CROSSES' } }, script: { 0.52: true } });
   const e = goalEvents(m, 'HEADER_GOAL')[0];
-  // x = x + (88 − 50)·0,3 = +11,4 → 50 → 61, 40 → 51; GK står
-  assert.deepEqual(e.snapshot, { attacking: true, formation: '4-4-2', pts: pts(a.H, [[50, 90], [61, 75], [61, 81], [61, 81], [61, 75], [61, 79], [61, 79], [61, 79], [61, 79], [51, 22], [61, 89]]),
+  // x = x + (88 − 50)·0,3 = +11,4 → 50 → 61, 40 → 51; GK står. v3.13 (brugerens eksempel): aktørerne står, hvor
+  // hændelsen var – indlæggeren (plads 5) ude på kanten (88, 14), hovedstødsspilleren (plads 9) i feltet (50, 16).
+  assert.deepEqual(e.snapshot, { attacking: true, formation: '4-4-2', pts: pts(a.H, [[50, 90], [61, 75], [61, 81], [61, 81], [61, 75], [88, 14], [61, 79], [61, 79], [61, 79], [50, 16], [61, 89]]),
     scorer: slot(a.H, 9).id, assist: slot(a.H, 5).id, ball: [50, 16] });
   // Frisparksindlæg (dødbold): header-mål uden billede – kun åbent spil har billede (§3)
   const f = mine({ spots: { 9: { x: 40, y: 28 } }, script: { 0.061: true, 0.37: false }, setup: (b) => { for (const q of b.H.squad) q.aerialPower = 40; } });
@@ -99,7 +100,9 @@ test('cutback-mål: bolden på (50,28) (ikke 20), oplægget er kantspilleren, ho
   const e = goalEvents(m, 'GOAL')[0];
   assert.deepEqual(e.snapshot.ball, [50, 28]);
   assert.equal(e.snapshot.scorer, slot(a.H, 9).id); assert.equal(e.snapshot.assist, slot(a.H, 6).id);
-  assert.deepEqual(e.snapshot.pts.map(([, x]) => x), [50, 61, 61, 61, 61, 61, 61, 61, 61, 51, 61]);
+  // v3.13: kantspilleren (plads 6) ved baglinjen (88, 6), scoreren (plads 9) på pletten (50, 28) – resten i holdets form
+  assert.deepEqual(e.snapshot.pts.map(([, x]) => x), [50, 61, 61, 61, 61, 61, 88, 61, 61, 50, 61]);
+  assert.deepEqual([e.snapshot.pts[6].slice(1), e.snapshot.pts[9].slice(1)], [[88, 6], [50, 28]]);
 });
 // QC-rettelsen (69dc916): kontramål får også billede – dit hold i angrebsform, når du mister bolden fremme.
 test('straffe giver intet billede; kontramål giver – for dig med scorer, imod dig uden', () => {
@@ -308,4 +311,16 @@ test('et hjørnespark-hovedstød efter en reddet afslutning i samme tick giver I
   assert.ok(c.m.goalsPool.length >= 20 && c.m.goalsPool.every((g) => g.kind === 'CORNER'), c.m.goalsPool.map((g) => g.kind).join());
   const hs = goalEvents(c.m, 'HEADER_GOAL');
   assert.ok(hs.length >= 20 && hs.every((e) => e.snapshot === undefined));
+});
+// v3.13 (brugerens eksempel: "#4 J. Petersen når baglinjen og lægger den lavt tilbage" – en CB, der i billedet stod
+// på egen halvdel). Den, der slår cutbacken, skal stå højst RECEIVE_REACH (25) fra kanten. Rul 0,01: cutbacken går
+// til venstre (12, 30), og det vægtede valg lander på den første i rækken – CB'en (plads 2, levende (27, 59), 32 væk)
+// uden rækkevidden. Med den: angriberen trukket ud til venstre (plads 10, levende (9, 34), 5 væk).
+test('cutback: en stopper på egen halvdel kan ikke "nå baglinjen" – kun en spiller inden for rækkevidde af kanten', () => {
+  const { a, m } = mine({ spots: { 2: { x: 38, y: 73 }, 10: { x: 20, y: 40 } }, home: { p1: { attackFocus: 'LOW_CUTBACKS' } }, script: { 0.38: true }, next: 0.01 });
+  const ev = goalEvents(m, 'GOAL');
+  assert.ok(ev.length >= 2, `mål ${ev.length}`);
+  const st = slot(a.H, 10), cb = slot(a.H, 2);
+  assert.ok(ev.every((e) => e.text.includes(`✅ #${st.shirtNumber} ${st.shortName} når baglinjen`)), ev[0].text);
+  assert.ok(ev.every((e) => !e.text.includes(`#${cb.shirtNumber} ${cb.shortName} når baglinjen`)));
 });

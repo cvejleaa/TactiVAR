@@ -88,6 +88,11 @@ export const FLANK_BONUS = { LOW_BLOCK: -2, MID_BLOCK: 0, HIGH_GEGENPRESS: 3 }; 
 // (RECEIVE_BASE + evne), så den nærmeste oftest, men ikke altid, når bolden.
 // Pladserne er i holdets egne koordinater (lille y = fremme ved modstanderens mål).
 export const RECEIVE_SPREAD = 16, RECEIVE_BASE = 10;
+// Rækkevidde (v3.13, brugerens eksempel: en CB på egen halvdel "når baglinjen" og lægger tilbage): den, der
+// slår bolden fra kanten (cutback, indlæg), skal stå højst RECEIVE_REACH derfra – ellers fik de fjerne en hale på
+// ≈ 25 %. Er ingen så tæt, alle. Afsluttere vælges uden grænse (andenbolde falder også til en stopper).
+export const RECEIVE_REACH = 25;
+const BYLINE_Y = 6, CROSS_FROM_Y = 14;   // hvor cutbacken og indlægget slås fra (holdets egne koordinater)
 // Uden for feltet (y ≥ LONGSHOT_Y i øjeblikket) er et skud et langskud. Den, der får bolden ved
 // feltets kant, har tid og plads (LONGSHOT_BONUS) – det opvejer, at midtbanens afslutning er lavere
 // på evneskalaen; kalibreret til dokumentets 8–10 % langskud. Men på afstand er ingen bedre end
@@ -245,10 +250,12 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // Modtageren: spilleren nær det sted, bolden spilles hen (se RECEIVE_SPREAD). exclude = afleveren.
   // ctx = { attacking, ballX } – øjeblikket (positions.js). Positionerne huskes til øjebliksbilledet ved mål.
   let seen = {}, seenX = {};
-  function receiver(side, spot, skill, exclude = null, ctx = { attacking: true, ballX: 50 }) {
+  function receiver(side, spot, skill, exclude = null, ctx = { attacking: true, ballX: 50 }, reach = Infinity) {
     const pos = livePositions(side.tactics, ctx);
     seen[side.team.id] = pos; seenX[side.team.id] = ctx.ballX ?? 50;
-    const cand = side.starters.map((p, i) => ({ p, i })).filter(({ p, i }) => i > 0 && p && p !== exclude);
+    const all = side.starters.map((p, i) => ({ p, i })).filter(({ p, i }) => i > 0 && p && p !== exclude);
+    const near = all.filter(({ i }) => Math.hypot(pos[i].x - spot.x, pos[i].y - spot.y) <= reach);
+    const cand = near.length ? near : all;
     const w = cand.map(({ p, i }) => Math.exp(-Math.hypot(pos[i].x - spot.x, pos[i].y - spot.y) / RECEIVE_SPREAD) * (RECEIVE_BASE + Math.max(0, skill(p))));
     let r = rng.next() * w.reduce((a, b) => a + b, 0);
     return (cand[w.findIndex((x) => (r -= x) < 0)] ?? cand.at(-1)).p;
@@ -258,7 +265,9 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // ved et mål imod dit forsvar i øjeblikket. Punkter pr. spiller-id (indskiftere, Hvis-Så-skift).
   // Hænges på den seneste hændelse; spot = hvor bolden kom (holdets egne koordinater).
   // caught = dit hold mistede bolden i angrebet (kontra imod): det står i angrebsform, ikke i sin blok.
-  function snapshot(side, scorer, helper, spot = SPOT.GOAL, caught = false) {
+  // moves = { spiller-id: [x, y] }: hvor aktørerne var i selve hændelsen (cutbackens oplægsgiver ved baglinjen,
+  // scoreren på pletten) – billedet viser handlingen, ikke kun holdets form (brugerens eksempel v3.13).
+  function snapshot(side, scorer, helper, spot = SPOT.GOAL, caught = false, moves = null) {
     const mine = [H, A].find(own);
     if (!mine) return;
     const ev = events.at(-1), attacking = side === mine;
@@ -266,7 +275,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
     if (!pos) return;
     ev.snapshot = {
       attacking, formation: mine.tactics.baseFormation,
-      pts: mine.starters.map((p, i) => p && [p.id, pos[i].x, pos[i].y]).filter(Boolean),
+      pts: mine.starters.map((p, i) => p && (attacking && moves?.[p.id] ? [p.id, ...moves[p.id]] : [p.id, pos[i].x, pos[i].y])).filter(Boolean),
       scorer: attacking ? scorer.id : null, assist: attacking && helper && helper !== scorer ? helper.id : null,
       ball: attacking ? [spot.x, spot.y] : [100 - spot.x, 100 - spot.y],
     };
@@ -332,7 +341,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // afgør hvilken – ingen ekstra terning. To trin (v3.12): duellen, så hovedstødet mod keeperen.
   // source (åbent spil): 'cross' eller 'long' – kun til teksten for dit eget hold.
   // Returnerer 'goal', 'saved' eller 'cleared'.
-  function aerialDuel(att, def, cR, dR, min, shooter, assister, defender, setPiece = null, source = null) {
+  function aerialDuel(att, def, cR, dR, min, shooter, assister, defender, setPiece = null, source = null, snapMoves = null) {
     const gk = dR.gk;
     const aDef = dR.cbs.length ? (dR.cbs.includes(defender) ? defender : dR.cbs[Math.max(0, dR.defs.indexOf(defender)) % dR.cbs.length]) : defender;
     const kind = setPiece ? SP_KIND[setPiece] : 'HEADER';
@@ -361,7 +370,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
       const how = setPiece ? `MÅÅÅL PÅ ${setPiece.toUpperCase()}! ${tag(assister)} slår ${setPiece}et ind, og ${tag(shooter)} (${shooter.heightCm} cm) header bolden ind – ${prose}.`
         : `MÅÅÅL! ${tag(shooter)} (${shooter.heightCm} cm) header bolden ind – ${prose}.`;
       addEv(min, 'HEADER_GOAL', 'HIGHLIGHT', att.isHome, true, `⚽ Hovedstødsmål: ${tag(shooter)}`, `⚽ [${att.team.name} • ${hG}-${aG}] ${how}`);
-      if (!setPiece) snapshot(att, shooter, assister, SPOT.CROSS);
+      if (!setPiece) snapshot(att, shooter, assister, SPOT.CROSS, false, snapMoves);
       return 'goal';
     }
     st[k(att, 'OnTarget')]++;
@@ -380,7 +389,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // cutbacken ikke blev en tredje kopi). kind kan være en funktion, der afgøres efter skuddet
   // (den almindelige afslutning vælger type efter evnerne). Langskud og dribletur er solo.
   // lead = dit holds egen indledning ("✅ … lægger den tilbage til …"). Returnerer om der blev scoret.
-  function finishAttempt(att, def, cR, dR, min, finisher, helper, kind, { bonus = 0, lead = '', onGoal = null } = {}) {
+  function finishAttempt(att, def, cR, dR, min, finisher, helper, kind, { bonus = 0, lead = '', onGoal = null, snapMoves = null } = {}) {
     const gk = dR.gk, fs = finisher.skills;
     if (fs.finishing * ff(finisher) + rng.next() * 8 + bonus > gk.skills.goalkeeping * ff(gk) + rng.next() * 8 + KEEPER_EDGE) {
       goalFor(att);
@@ -396,7 +405,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
       addEv(min, 'GOAL', 'HIGHLIGHT', att.isHome, true, `⚽ Mål: ${tag(finisher)}`, `⚽ [${att.team.name} • ${hG}-${aG}] MÅÅÅL! ${lead ? lead + ' ' : ''}${desc}`);
       // Solo-mål (langskud, dribletur): bolden står ved skytten – ikke på en fast plet i feltet (QC).
       const at = solo && seen[att.team.id]?.[att.starters.indexOf(finisher)];
-      snapshot(att, finisher, solo ? null : helper, at || (kd === 'CUTBACK' ? SPOT.CUTBACK : SPOT.GOAL));
+      snapshot(att, finisher, solo ? null : helper, at || (kd === 'CUTBACK' ? SPOT.CUTBACK : SPOT.GOAL), false, snapMoves);
       return true;
     }
     st[k(att, 'OnTarget')]++;
@@ -410,7 +419,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // Kaldt med et allerede talt skud (xg) – en lukket kant er ingen afslutning.
   function cutback(att, def, cR, dR, min, xg) {
     const wx = rng.next() < 0.5 ? 12 : 88;
-    const winger = receiver(att, { x: wx, y: 30 }, (p) => p.skills.pace + p.skills.ballControl, null, { attacking: true, ballX: wx });
+    const winger = receiver(att, { x: wx, y: 30 }, (p) => p.skills.pace + p.skills.ballControl, null, { attacking: true, ballX: wx }, RECEIVE_REACH);
     const back = receiver(def, { x: 100 - wx, y: 72 }, (p) => p.skills.pace + p.skills.positioning, null, { attacking: false, ballX: 100 - wx });
     const log = duelLog[att.team.id], ws = winger.skills, bs = back.skills;
     log.cutbacks++;
@@ -429,7 +438,8 @@ export function simulateMatch(home, away, rng, opts = {}) {
     const lead = own(att) ? `✅ ${tag(winger)} når baglinjen og lægger den lavt tilbage til ${tag(finisher)}.` : '';
     if (!lead) addEv(min, 'INFO', 'PLAY', att.isHome, false, 'Mod baglinjen', `↩️ [${att.team.name}] ${tag(winger)} kommer forbi ${tag(back)} og spiller bolden tilbage i feltet.`);
     sheet.adjust(winger.id, 0.15);
-    finishAttempt(att, def, cR, dR, min, finisher, winger, 'CUTBACK', { bonus: CUTBACK_FINISH_BONUS, lead, onGoal: () => { log.cutbackGoals++; } });
+    finishAttempt(att, def, cR, dR, min, finisher, winger, 'CUTBACK', { bonus: CUTBACK_FINISH_BONUS, lead, onGoal: () => { log.cutbackGoals++; },
+      snapMoves: { [winger.id]: [wx, BYLINE_Y], [finisher.id]: [SPOT.CUTBACK.x, SPOT.CUTBACK.y] } });
   }
   function penalty(att, def, cR, dR, min) {
     const taker = best(outfield(cR), (p) => p.skills.finishing), fouled = rng.pick(cR.atts.concat(cR.mids)), fouler = rng.pick(dR.defs), gk = dR.gk;
@@ -746,8 +756,10 @@ export function simulateMatch(home, away, rng, opts = {}) {
         const source = focus === 'HIGH_CROSSES' ? 'cross' : 'long';
         const cx = source === 'cross' ? (rng.next() < 0.5 ? 12 : 88) : 50, ctx = { attacking: true, ballX: cx };
         const target = receiver(att, SPOT.CROSS, (p) => p.aerialPower, null, ctx);
-        const from = source === 'cross' ? receiver(att, { x: cx, y: 30 }, (p) => p.skills.passing, target, ctx) : assister;
-        const res = aerialDuel(att, def, cR, dR, min, target, from, defender, null, source);
+        const from = source === 'cross' ? receiver(att, { x: cx, y: 30 }, (p) => p.skills.passing, target, ctx, RECEIVE_REACH) : assister;
+        // Billedet: indlæggeren ude på kanten, hovedstødsspilleren i feltet (den lange bold slås fra hans plads).
+        const moves = { [target.id]: [SPOT.CROSS.x, SPOT.CROSS.y], ...(source === 'cross' ? { [from.id]: [cx, CROSS_FROM_Y] } : {}) };
+        const res = aerialDuel(att, def, cR, dR, min, target, from, defender, null, source, moves);
         if (res !== 'goal' && rng.chance(res === 'saved' ? CORNER_P : CROSS_CORNER_P)) corner(att, def, cR, dR, min);
         continue;
       }
