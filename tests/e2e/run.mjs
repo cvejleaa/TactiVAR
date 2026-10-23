@@ -708,6 +708,59 @@ try {
   await g.waitForFunction(() => document.getElementById('notice')?.textContent.includes('importeret'));
   check('Import: indlæser filen og lægger det forrige spil i backup', (await backups()).includes(exported) && (await rows()) === 18);
 
+  // v3.14 Test Manager: klummen bygges ved visning (app.js columnNow) – fra Liga-fanen (kampoverskrifterne åbner referatet)
+  // og ved sæsonslut (den afsluttede sæsons tabel og forløb; næste runde er en NY sæsons). Ingen af delene var set af e2e:
+  // en liga spilles i node til runde 13, gemmes og indlæses, og runde 14 spilles i browseren.
+  {
+    const { createRng } = await import('../../public/engine/rng.js');
+    const { createLeague } = await import('../../public/engine/generator.js');
+    const { playRound, commitRound } = await import('../../public/engine/season.js');
+    const { serialize } = await import('../../public/state/storage.js');
+    const { VERSION } = await import('../../public/version.js');
+    const rng = createRng(2024), L = createLeague(rng);
+    for (let r = 0; r < 13; r++) commitRound(L, playRound(L, rng), rng);
+    await g.evaluate((s) => { for (const k of Object.keys(localStorage)) if (k.startsWith('tactivar_')) localStorage.removeItem(k); localStorage.setItem('tactivar_save', s); }, serialize({ league: L, notes: {}, ui: { activePresetIndex: 0, seenVersion: VERSION } }));
+    await reload();
+    await tab('liga');
+    const names = () => g.evaluate(() => { const l = JSON.parse(localStorage.getItem('tactivar_save')).league.lastRound; return l.matches.map((m) => [m.homeName, m.awayName]); });
+    const sbTeams = async () => [await g.locator('#scoreboard strong').first().textContent(), await g.locator('#scoreboard .right strong').textContent()];
+    check('Liga-fanen (runde 13): avisen er klummen med tre øvrige kampe og et afsnit om næste runde', (await g.locator('#gazette #col-title').count()) === 1 && (await g.locator('#gazette #headlines li').count()) === 3 && (await g.locator('#gazette #col-next').count()) === 1);
+    const head0 = await g.locator('#gazette #headlines li').nth(1).textContent(), btnTxt = await g.locator('#gazette #headlines li .col-match').nth(1).textContent();
+    await g.locator('#gazette #headlines li .col-match').nth(1).click();
+    await g.waitForSelector('.tabpane.tab-kamp');
+    const expectedMatch = (await names()).find(([h1, a1]) => btnTxt.includes(h1) && btnTxt.includes(a1));
+    check('Liga-fanen: et klik på en kampoverskrift i klummen åbner DEN kamp i Kamp-fanen', JSON.stringify(await sbTeams()) === JSON.stringify(expectedMatch) && head0.startsWith(btnTxt), `${btnTxt} → ${(await sbTeams()).join(' – ')}`);
+    await g.locator('#gazette #headlines li .col-match').nth(0).click();
+    const btn0 = await g.locator('#gazette #headlines li .col-match').nth(0).textContent();
+    const exp0 = (await names()).find(([h1, a1]) => btn0.includes(h1) && btn0.includes(a1));
+    check('Kamp-fanen: kampoverskrifterne i klummen skifter den viste kamp (indekset følger overskriften)', JSON.stringify(await sbTeams()) === JSON.stringify(exp0), `${btn0} → ${(await sbTeams()).join(' – ')}`);
+    // Runde 14 = sæsonens sidste
+    await tab('trup');
+    await g.click('#play-round');
+    await g.waitForSelector('#skip');
+    await g.click('#skip');
+    await tab('liga');
+    const sv = await g.evaluate(async () => {
+      const { pairRound } = await import('/engine/season.js');
+      const l = JSON.parse(localStorage.getItem('tactivar_save')).league, me = l.teams.find((t) => !t.isBot);
+      const [h, a] = pairRound(l).find(([x, y]) => l.teams[x].id === me.id || l.teams[y].id === me.id), home = l.teams[h].id === me.id;
+      const t = l.lastRound.gazette.seasonEnd.table;
+      return { end: !!l.lastRound.gazette.seasonEnd, round: l.lastRound.round, opp: (home ? l.teams[a] : l.teams[h]).name, home, top: [t[0].teamName, t[0].points, t[1].teamName, t[1].points], myName: me.name };
+    });
+    check('Sæsonslut: runde 14 afslutter sæsonen (forudsætning)', sv.end && sv.round === 14, JSON.stringify(sv));
+    check('Sæsonslut, Liga: sæsonboksen og klummen står sammen', (await g.locator('#gazette #season-end').count()) === 1 && (await g.locator('#gazette #col-title').count()) === 1);
+    const colNext = await g.locator('#gazette #col-next p').allTextContents();
+    const ny = colNext.filter((t) => t.startsWith('Ny sæson: '));   // opfølgningen på sidste gæt ("Før kampen …") står før, og må gerne være der
+    check('Sæsonslut: næste runde er den NYE sæsons runde 1 — "Ny sæson:" sidst, rigtig modstander og retning, intet bud om hans stil', ny.length === 1 && colNext.at(-1) === ny[0] && ny[0].includes(sv.opp) && (sv.home ? ny[0].includes(`${sv.opp} kommer på besøg`) : ny[0].includes(`ude mod ${sv.opp}`)) && !colNext.join(' ').includes('Mit bud') && !colNext.some((t) => t.startsWith('Næste runde')), colNext.join(' | '));
+    const colForm = (await g.locator('#gazette #col-form p').allTextContents()).join(' | ');
+    const [t0, p0, t1, p1] = sv.top;
+    const formOk = (t) => p0 !== 0 && t.includes(`${t0} blev mester med ${p0} point.`) && !/fører med|står lige i toppen/.test(t);   // ved sæsonslut: mesteren, ikke "fører" (QC F9)
+    check('Sæsonslut: formen bygger på den AFSLUTTEDE sæsons tabel og forløb (ikke den nye sæsons nulstillede)', formOk(colForm), `${colForm} | forventet ${t0} ${p0}, ${t1} ${p1}`);
+    await tab('kamp');
+    const kampNext = (await g.locator('#gazette #col-next p').allTextContents()).filter((t) => t.startsWith('Ny sæson: '));
+    check('Sæsonslut, Kamp-fanen: samme klumme (Ny sæson-linjen og tabellen)', kampNext.length === 1 && kampNext[0].includes(sv.opp) && formOk(await g.locator('#gazette #col-form').textContent()), kampNext.join(' | '));
+  }
+
   // Ødelagt gemt spil: aldrig tom side, data bevaret i backup
   await g.evaluate(() => localStorage.setItem('tactivar_save', '{"schemaVersion":1,"league":{"teams":[]}}'));
   await g.reload(); await g.waitForSelector('body[data-klar="ja"]');

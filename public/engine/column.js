@@ -70,7 +70,7 @@ function drama(f) {
 // Stil-gæt for ét hold ud fra offentlige tal (QC B2: om kampen, i datid; aldrig indstillingens navn eller pres).
 // basis = de fakta, gættet bygger på – testet ⊆ PUBLIC_FACT_KEYS.
 export const STYLE_RULES = [
-  { key: 'air', basis: ['headerGoals', 'corners'], test: (s) => (s.headerGoals >= 1 && s.headerGoals * 2 >= s.goals) || s.corners >= 7,   // QC F3: hovedstød mindst halvdelen af målene
+  { key: 'air', basis: ['headerGoals', 'goals', 'corners'], test: (s) => (s.headerGoals >= 1 && s.headerGoals * 2 >= s.goals) || s.corners >= 7,   // QC F3: hovedstød mindst halvdelen af målene
     say: ['fik bolden ind i feltet via indlæg og hjørner', 'fandt vejen via indlæg og hjørner', 'søgte hovedet i feltet'] },
   { key: 'break', basis: ['counterGoals'], test: (s) => s.counterGoals >= 1,
     say: ['slog til i omstillingerne', 'straffede boldtab med hurtige angreb', 'var dødbringende, når bolden blev vundet'] },
