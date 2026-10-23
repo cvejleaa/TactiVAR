@@ -194,3 +194,24 @@ test('F16: et Hvis-Så-skift, der ikke blev udført, tæller ikke som omorganise
   const f = publicFacts(m);
   assert.equal(f.home.reorganised, 0); assert.equal(f.away.reorganised, 1);
 });
+
+// Release Manager v3.14: gem fra den live v3.13.0 (skema 6, runde 3, uden facts/ownReports – lavet med 3.13.0-koden,
+// seed 31300, tre runder). Klummen bygges uden fejl, og næste runde får rapport og facts.
+test('gem fra v3.13.0: klummen bygges uden "undefined", og runden efter har "Din kamp"-vurdering og scouting-tal', async () => {
+  const { parseSave } = await import('../../public/state/storage.js');
+  const raw = fs.readFileSync(new URL('../fixtures/save-v3.13.0.json', import.meta.url), 'utf8');
+  const r = parseSave(raw);
+  assert.ok(r.ok, r.error); assert.ok(!r.migratedFrom, 'ingen migrering');
+  assert.equal(JSON.parse(raw).ui.seenVersion, '3.13.0');
+  const L = r.state.league, me = L.teams.find((t) => !t.isBot);
+  const input = () => ({ matches: L.lastRound.matches, gazette: L.lastRound.gazette, history: L.history.filter((x) => x.round >= L.seasonStartRound && x.round <= L.lastRound.round),
+    table: sortStandings(L.leagueMetadata.standings).map((x) => ({ teamId: x.teamId, teamName: x.teamName, points: x.points })),
+    next: pairRound(L).map(([h, a]) => ({ homeId: L.teams[h].id, homeName: L.teams[h].name, awayId: L.teams[a].id, awayName: L.teams[a].name })), viewerTeamId: me.id, round: L.lastRound.round });
+  assert.ok(!L.lastRound.matches.some((m) => m.ownReports) && !L.history.some((h) => h.facts), 'gemt før v3.14');
+  const old = buildColumn(input());
+  assert.equal(old.sections[0].id, 'col-mine'); assert.doesNotMatch(text(old), /undefined|NaN|null/);
+  const rng = createRng(77); commitRound(L, playRound(L, rng), rng);
+  assert.ok(L.lastRound.matches.find((m) => m.homeId === me.id || m.awayId === me.id).ownReports[me.id], 'ny runde har din rapport');
+  assert.ok(L.history.at(-1).facts?.[me.id], 'ny runde har offentlige tal til scouting');
+  assert.doesNotMatch(text(buildColumn(input())), /undefined|NaN|null/);
+});
