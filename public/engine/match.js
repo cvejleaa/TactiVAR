@@ -99,6 +99,9 @@ const BYLINE_Y = 6, CROSS_FROM_Y = 14;   // hvor cutbacken og indlægget slås f
 // LONGSHOT_CAP (QC v3.12.1: med fast +7 scorede en angriber uden for feltet ≈ 90 % – oftere end
 // inde i feltet): skuddets værdi er min(FIN + 7, 12), så en god afslutter står bedre i feltet.
 export const LONGSHOT_Y = 24, LONGSHOT_BONUS = 8, LONGSHOT_CAP = 13;
+// Et langskud tages fra skudafstand: i billedet står skytten højst på y LONGSHOT_FAR (≈ 35–40 m) – en stopper, der
+// skyder, har båret bolden frem (brugeren v3.14.3: "langskud … fra egen banehalvdel, ikke så sandsynligt").
+export const LONGSHOT_FAR = 38;
 export const longshotBonus = (fin) => Math.min(fin + LONGSHOT_BONUS, LONGSHOT_CAP) - fin;
 // En del af de almindelige afslutninger falder til en spiller ved feltets kant (andenbolde, afslag –
 // dokumentet: midtbanen scorer 30–35 %); resten går mod målet.
@@ -422,10 +425,16 @@ export function simulateMatch(home, away, rng, opts = {}) {
       observe(finisher, `Scoring (${min}. min mod ${def.team.name}): ${finisher.shortName} afsluttede med ${prose}.`);
       const desc = describeGoal(kd, tag(finisher), tag(helper ?? finisher), min, rng);
       goalsPool.push({ scorer: tag(finisher), teamName: att.team.name, match: `${home.name} - ${away.name}`, min, kind: kd, spectacle: goalSpectacle(kd, { finishing: fs.finishing, pace: fs.pace, ballControl: fs.ballControl, passing: (helper ?? finisher).skills.passing }, min, rng), desc });
-      addEv(min, 'GOAL', 'HIGHLIGHT', att.isHome, true, `⚽ Mål: ${tag(finisher)}`, `⚽ [${att.team.name} • ${hG}-${aG}] MÅÅÅL! ${lead ? lead + ' ' : ''}${desc}`);
-      // Solo-mål (langskud, dribletur): bolden står ved skytten – ikke på en fast plet i feltet (QC).
-      const at = solo && seen[att.team.id]?.[att.starters.indexOf(finisher)];
-      snapshot(att, finisher, solo ? null : helper, at || (kd === 'CUTBACK' ? SPOT.CUTBACK : SPOT.GOAL), false, snapMoves);
+      // Med dit holds indledning (lead) fortæller den allerede oplægget – kun en kort slutning, ikke hele beskrivelsen
+      // igen (brugeren v3.14.3: "cutback bliver noteret 2 gange i teksten"). "Rundens mål" bruger den fulde (desc).
+      const end = !lead ? desc : helper && helper.id !== finisher.id && !solo ? `${tag(finisher)} sparkede den ind.` : 'Bolden sad i nettet.';
+      addEv(min, 'GOAL', 'HIGHLIGHT', att.isHome, true, `⚽ Mål: ${tag(finisher)}`, `⚽ [${att.team.name} • ${hG}-${aG}] MÅÅÅL! ${lead ? lead + ' ' : ''}${end}`);
+      // Solo-mål (langskud, dribletur): bolden står ved skytten – ikke på en fast plet i feltet (QC). Et langskud fra
+      // skudafstand: skytten flyttes højst til LONGSHOT_FAR (v3.14.3).
+      const live = solo && seen[att.team.id]?.[att.starters.indexOf(finisher)];
+      const at = live && (kd === 'LONGSHOT' ? { x: live.x, y: Math.min(live.y, LONGSHOT_FAR) } : live);
+      const moves = at && at !== live ? { ...snapMoves, [finisher.id]: [at.x, at.y] } : snapMoves;
+      snapshot(att, finisher, solo ? null : helper, at || (kd === 'CUTBACK' ? SPOT.CUTBACK : SPOT.GOAL), false, moves);
       return true;
     }
     st[k(att, 'OnTarget')]++;

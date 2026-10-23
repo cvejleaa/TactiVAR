@@ -287,12 +287,12 @@ test('almindelig afslutning inde i feltet: dribletur vægtes af PAC og BAL hver 
   assert.deepEqual(kinds({ pace: 8, ballControl: 8 }), ['COMBINATION']);
 });
 
-test('løb der ender i et skud: løberen står stadig 12 foran (RM trukket til (50,82): 82 − 16 − 12 = 54, ikke 66) – billedet bruger løbets øjeblik, ikke skytte-kastet før – dræber "run seen ikke sat/uden runner"', () => {
-  const r = runGoal({ rm: { finishing: 20, passing: 1, pace: 1, ballControl: 1 }, custom: { 8: { x: 50, y: 82 } } });
+test('løb der ender i et skud: løberen står stadig 12 foran (RM trukket til (50,62): 62 − 16 − 12 = 34, ikke 46 → 38 = LONGSHOT_FAR) – billedet bruger løbets øjeblik, ikke skytte-kastet før – dræber "run seen ikke sat/uden runner"', () => {
+  const r = runGoal({ rm: { finishing: 20, passing: 1, pace: 1, ballControl: 1 }, custom: { 8: { x: 50, y: 62 } } });
   assert.deepEqual(r.m.goalsPool.map((g) => g.kind), ['LONGSHOT', 'LONGSHOT']);
-  const want = pts(r.a.H, [[50, 90], [15, 50], [38, 59], [62, 59], [85, 50], [15, 29], [38, 32], [62, 32], [50, 54], [38, 14], [62, 14]]);
+  const want = pts(r.a.H, [[50, 90], [15, 50], [38, 59], [62, 59], [85, 50], [15, 29], [38, 32], [62, 32], [50, 34], [38, 14], [62, 14]]);
   // Solo-mål: bolden står ved skytten (QC-rettelsen), ikke på (50, 20)
-  assert.deepEqual(r.evs[0].snapshot, { attacking: true, formation: '4-4-2', pts: want, scorer: slot(r.a.H, 8).id, assist: null, ball: [50, 54] });
+  assert.deepEqual(r.evs[0].snapshot, { attacking: true, formation: '4-4-2', pts: want, scorer: slot(r.a.H, 8).id, assist: null, ball: [50, 34] });
 });
 function runAgainst(rm) {
   const a = arena({ away: { p1: { attackFocus: 'CENTRAL' } } });

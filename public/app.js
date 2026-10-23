@@ -63,6 +63,7 @@ const NEWS = {
   '3.14.0': 'Avisen er blevet en klumme: rundens største historie som overskrift, din kamp med journalistens vurdering af dine valg, de øvrige kampe, rundens spiller og mål, formen i ligaen – og en optakt til din næste kamp med et bud på modstanderens stil ud fra hans seneste kampe. Runden efter følger journalisten op på, om buddet holdt.',
   '3.14.1': 'Rettelser: VAR tjekker nu offside for den forreste – scorer en spiller længere tilbage, er det hans forreste holdkammerat, der tjekkes, og billedet ved målet viser skytten, hvor han skød fra. Statistikken på Liga-fanen gælder sæsonen.',
   '3.14.2': 'Rettelse: Ved et VAR-tjek står den tjekkede nu, hvor han stod (forrest), i billedet ved målet – ikke flyttet bag en holdkammerat.',
+  '3.14.3': 'Rettelser: Langskud tages fra skudafstand (ikke fra egen banehalvdel) i billedet ved målet, referatet fortæller et oplæg én gang, og efter sæsonens sidste runde viser tabellen slutstillingen og mesteren, til næste sæson går i gang.',
 };
 
 // Et migreret spil, hvis gamle fil ikke kunne tages backup af (fuldt lager): den gamle fil må

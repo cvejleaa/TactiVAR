@@ -1618,8 +1618,11 @@ test('løber → aflevering fra kanten: CUTBACK, oplæg til løberen (+0,15 +0,5
   assert.equal(m.goalsPool[0].spectacle, goalSpectacle('CUTBACK', { passing: 20 }, m.goalsPool[0].min, { next: () => 0.5 }));   // oplæggets PAS (20), ikke modtagerens (10)
   assert.ok(m.observations.some((o) => o.playerId === fin.id) && !m.observations.some((o) => o.playerId === runner.id));
   assert.ok(goals[0].text.includes(`✅ ${tg(runner)} løber sig fri på kanten og lægger den tværs til ${tg(fin)}.`), goals[0].text);
-  const desc = goals[0].text.split(`til ${tg(fin)}. `)[1];                    // målteksten efter løbs-linjen: oplægsgiver = løberen, scorer = modtageren
-  assert.ok(desc && desc.includes(tg(runner)) && desc.includes(tg(fin)), goals[0].text);
+  // v3.14.3 (brugeren: "cutback bliver noteret 2 gange"): efter løbs-linjen kun en kort slutning; den fulde beskrivelse
+  // (oplægsgiver = løberen, scorer = modtageren) står i "Rundens mål" (goalsPool).
+  assert.equal(goals[0].text.split(`til ${tg(fin)}. `)[1], `${tg(fin)} sparkede den ind.`, goals[0].text);
+  const pool = m.goalsPool[0].desc;
+  assert.ok(pool.includes(tg(runner)) && pool.includes(tg(fin)), pool);
   assert.equal(summary, '🎯 Løb uden bold (Normal): 2 løb, 2 kom fri (2 mål) · kontraer imod i alt: 0 (0 mål).');
 });
 test('løber → skud fra kanten: LONGSHOT uden oplæg, +1,4 til løberen selv; pris i rating for en redning', () => {
