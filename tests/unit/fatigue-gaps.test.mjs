@@ -347,7 +347,7 @@ test('sparet friskhed: to udskiftede CM (11,8 km · 87/90 → 11,41 km · (1,5 �
   const m = simulateMatch(H, A, stubRng({}));
   const l = m.events.filter((e) => e.label === 'Udskiftninger');
   assert.equal(l.length, 1);
-  assert.equal(l[0].text, `🔋 [${H.name}] Dine 2 udskiftede spillere sparede ca. 28 point friskhed til næste runde.`);
+  assert.equal(l[0].text, `🔋 [${H.name}] Dine 2 udskiftede spillere sparede ca. 17 point friskhed til næste runde.`);   // QC: efter restitution 28 · 0,59 = 16,5 → 17
   assert.deepEqual([l[0].min, l[0].type, l[0].category, l[0].isHome], [90, 'INFO', 'TACTIC', true]);
   const none = arena({ homeLimit: 0 });
   assert.equal(simulateMatch(none.H, none.A, stubRng({})).events.filter((e) => e.label === 'Udskiftninger').length, 0, 'uden skift: ingen "sparede"-linje');
@@ -362,7 +362,7 @@ test('sparet friskhed: kun dit eget hold får linjen, udebanen lige så, og en s
   const l = m.events.filter((e) => e.label === 'Udskiftninger');
   assert.equal(l.length, 1, 'botten får ingen linje');
   assert.equal(l[0].isHome, false);
-  assert.equal(l[0].text, `🔋 [${A.name}] Din udskiftede spiller sparede ca. 15 point friskhed til næste runde.`);
+  assert.equal(l[0].text, `🔋 [${A.name}] Din udskiftede spiller sparede ca. 9 point friskhed til næste runde.`);   // 15 · 0,59 = 8,9 → 9
 });
 
 // ---------- ff på kaldstederne ----------
@@ -546,5 +546,5 @@ test('en bots Hvis-Så-skift er ikke dit "taktik"-skift; og kun planlagte starte
     { ruleId: 2, minuteTrigger: 6, condition: 'ANY', margin: 1, newFormation: '4-4-2', newPlan: null, slotRemapping: [...Array(11).keys()], action: 'SUB', subOut: b1.id, subIn: b2.id }];
   const mc = simulateMatch(c.H, c.A, stubRng({}));
   assert.equal(subs(mc).length, 2);
-  assert.equal(mc.events.find((e) => e.label === 'Udskiftninger')?.text, `🔋 [${c.H.name}] Din udskiftede spiller sparede ca. 14 point friskhed til næste runde.`);
+  assert.equal(mc.events.find((e) => e.label === 'Udskiftninger')?.text, `🔋 [${c.H.name}] Din udskiftede spiller sparede ca. 8 point friskhed til næste runde.`);   // 14 · 0,59 = 8,3 → 8
 });
