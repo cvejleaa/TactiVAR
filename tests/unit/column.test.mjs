@@ -158,3 +158,39 @@ test('gemt spil fra før v3.14 (uden facts i historikken og uden rapporter): klu
   assert.equal(c.sections[0].id, 'col-mine');
   assert.doesNotMatch(text(c), /undefined|NaN|null/);
 });
+
+// ---------- Sandhedsregler (QC v3.14 F1–F3, F16) – håndlavede kampe, så udfaldet er kendt ----------
+const goalEv = (min, isHome, hG, aG) => ({ type: 'GOAL', category: 'GOAL', min, isHome, hG, aG });
+function hand({ events = [], goalsPool = [], homeGoals, awayGoals, stats = {}, ownReports = {} }) {
+  return { homeId: 'H', awayId: 'A', homeName: 'Hjem', awayName: 'Ude', homeGoals, awayGoals, events, goalsPool, ownReports,
+    stats: { hPoss: 50, aPoss: 50, ...stats }, ratings: { home: [], away: [] }, startFormations: { home: '4-4-2', away: '4-4-2' }, endState: {} };
+}
+const mineText = (m, viewer = 'H') => buildColumn({ matches: [m], viewerTeamId: viewer, round: 3 }).sections[0].paras.join(' ');
+test('F1: et reduceringsmål i 85. minut (2-0 → 2-1) er ikke "sejrsmålet" – et 1-1 → 2-1 i 85. er', () => {
+  const consolation = hand({ homeGoals: 2, awayGoals: 1, events: [goalEv(10, true, 1, 0), goalEv(30, true, 2, 0), goalEv(85, false, 2, 1)] });
+  for (const v of ['H', 'A']) assert.doesNotMatch(mineText(consolation, v), /Sejrsmålet|afgjorde det/, v);
+  const winner = hand({ homeGoals: 2, awayGoals: 1, events: [goalEv(10, true, 1, 0), goalEv(50, false, 1, 1), goalEv(85, true, 2, 1)] });
+  assert.match(mineText(winner, 'H'), /Sejrsmålet kom i 85\. minut/);
+  assert.match(mineText(winner, 'A'), /Hjem afgjorde det i 85\. minut/);
+});
+const rep = (offBallRuns, extra = {}) => ({ H: { side: 'home', build: 0, buildWon: 0, counterGoalsAgainst: 1,
+  start: { formation: '4-4-2', phases: { phase1_buildUp: { passingStyle: 'SHORT', offBallRuns } } },
+  end: { formation: '4-4-2', phases: { phase1_buildUp: { passingStyle: 'SHORT', offBallRuns } } }, ...extra } });
+test('F2: et kontramål imod får kun årsagen "mange spillere fremme" med belæg i din spillede taktik', () => {
+  const base = { homeGoals: 0, awayGoals: 1, events: [goalEv(40, false, 0, 1)], goalsPool: [{ kind: 'COUNTER', min: 40, teamName: 'Ude' }] };
+  const few = mineText(hand({ ...base, ownReports: rep('FEW') }));
+  assert.match(few, /et kontramål imod\./); assert.doesNotMatch(few, /mange spillere fremme/);
+  assert.match(mineText(hand({ ...base, ownReports: rep('MANY') })), /et kontramål imod, da bolden blev tabt med mange spillere fremme\./);
+});
+test('F3: ét hovedstødsmål ud af tre gør ikke holdet til et luft-hold – to ud af tre gør', () => {
+  const air = STYLE_RULES.find((r) => r.key === 'air');
+  assert.equal(air.test({ headerGoals: 1, goals: 3, corners: 2 }), false);
+  assert.equal(air.test({ headerGoals: 2, goals: 3, corners: 2 }), true);
+  assert.equal(air.test({ headerGoals: 0, goals: 0, corners: 7 }), true);
+  assert.ok(air.say.every((t) => !/mest|farligst/.test(t)));
+});
+test('F16: et Hvis-Så-skift, der ikke blev udført, tæller ikke som omorganisering', () => {
+  const m = hand({ homeGoals: 0, awayGoals: 0, events: [{ type: 'TRIGGER', category: 'TACTIC', min: 60, isHome: true, hG: 0, aG: 0 }, { type: 'TRIGGER', category: 'HIGHLIGHT', min: 70, isHome: false, hG: 0, aG: 0 }] });
+  const f = publicFacts(m);
+  assert.equal(f.home.reorganised, 0); assert.equal(f.away.reorganised, 1);
+});

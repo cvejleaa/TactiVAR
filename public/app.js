@@ -279,7 +279,7 @@ function renderNow() {
     trup: () => [header, matrix, h('div', { class: 'tactics-layout lineup-layout' }, h('section', {}, pitch), h('section', {}, card))],
     // Kortet står også i Taktik, så et klik på en brik viser spilleren uden fanebyt.
     taktik: () => [h('div', { class: 'tactics-layout' }, h('section', {}, pitch), h('section', {}, card, tactics))],
-    kamp: () => [shown ? renderMatchCenter({ mc: shown, myTeamId: mine.id, on: mcHandlers, column: shown.round === league.lastRound?.round ? columnNow() : null }) : h('div', { class: 'panel empty', id: 'no-matches' }, 'Ingen kampe spillet endnu. Tryk ▶ Spil runde i topbaren – modstanderen følger kampprogrammet på Liga-fanen.')],
+    kamp: () => [shown ? renderMatchCenter({ mc: shown, myTeamId: mine.id, on: mcHandlers, column: !shown.playing && shown.round === league.lastRound?.round ? columnNow() : null }) : h('div', { class: 'panel empty', id: 'no-matches' }, 'Ingen kampe spillet endnu. Tryk ▶ Spil runde i topbaren – modstanderen følger kampprogrammet på Liga-fanen.')],
     liga: () => [mc?.playing ? h('div', { class: 'notice', id: 'booked-league' }, '📺 Runden spilles i Kamp-fanen – tabellen herunder er allerede opdateret med den.') : null,
       standings,
       // Resultaterne skjules under afspilningen, ligesom avisen (ellers afsløres de).
@@ -363,7 +363,7 @@ const mcHandlers = {
   openGoal: (i, goal) => openGoal(i, goal),
   filter: (f) => { mc ||= lastRoundView(game.league.lastRound); mc.filter = f; renderMc(); },
 };
-const matchCenterEl = () => renderMatchCenter({ mc, myTeamId: myTeam().id, on: mcHandlers, column: mc && game.league.lastRound && mc.round === game.league.lastRound.round ? columnNow() : null });
+const matchCenterEl = () => renderMatchCenter({ mc, myTeamId: myTeam().id, on: mcHandlers, column: mc && !mc.playing && game.league.lastRound && mc.round === game.league.lastRound.round ? columnNow() : null });
 // Under afspilning tegnes kun Match Center om (ikke hele siden).
 function renderMc() { const el = document.getElementById('match-center'); if (el) el.replaceWith(matchCenterEl()); }
 
