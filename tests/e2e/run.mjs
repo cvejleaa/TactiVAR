@@ -227,6 +227,24 @@ try {
   check('Byt gemmes straks', (await nameAt(7)) === s8 && (await nameAt(8)) === s7);
   await g.selectOption('#tactics select[data-field="onBallWon"]', 'KEEP_POSSESSION'); await reload();
   check('Fasevalg gemmes straks', (await g.inputValue('#tactics select[data-field="onBallWon"]')) === 'KEEP_POSSESSION');
+  // v3.13: udskiftningsgrænsen (holdets, ikke planens) og en manuel Hvis-Så-udskiftning
+  check('Udskiftninger: feltet står under Hvis-Så med 70 % for et nyt spil og forklarer reglerne (5 skift, 3 pauser)', (await g.inputValue('#subs-limit')) === '70' && (await g.textContent('#subs-help')).includes('højst 5 udskiftninger i højst 3 pauser'));
+  await g.selectOption('#subs-limit', '80'); await reload();
+  check('Udskiftningsgrænsen gemmes straks og overlever F5', (await g.inputValue('#subs-limit')) === '80');
+  await g.click('.presets button:nth-child(1)'); await reload();
+  check('Udskiftningsgrænsen følger holdet, ikke planen (Plan A viser også 80 %)', (await g.inputValue('#subs-limit')) === '80');
+  await g.click('.presets button:nth-child(2)'); await reload();
+  await g.selectOption('#subs-limit', '0'); await reload();
+  await g.click('#add-rule'); await reload();
+  const R = () => g.locator('#rules .rule').last();   // den nye regel (Plan B har sine egne regler)
+  await R().locator('.rule-target').selectOption('sub:'); await reload();
+  check('Hvis-Så-udskiftning: valg af "🔄 Udskiftning" giver vælgere for ud og ind og beder om begge spillere', (await R().locator('.rule-sub-out').count()) === 1 && (await R().locator('.rule-warn').textContent()).includes('vælg begge spillere'));
+  await R().locator('.rule-cond').selectOption('ANY');
+  await R().locator('input[type=number]').fill('3'); await R().locator('input[type=number]').dispatchEvent('change');
+  const outOpt = await R().locator('.rule-sub-out option').nth(6).getAttribute('value');
+  const inOpt = await R().locator('.rule-sub-in option').nth(2).getAttribute('value');
+  await R().locator('.rule-sub-out').selectOption(outOpt); await R().locator('.rule-sub-in').selectOption(inOpt); await reload();
+  check('Hvis-Så-udskiftning: "uanset stilling" skjuler antal mål, spillerne gemmes og der er ingen advarsel', (await R().locator('.rule-margin').count()) === 0 && (await R().locator('.rule-sub-out').inputValue()) === outOpt && (await R().locator('.rule-sub-in').inputValue()) === inOpt && (await R().locator('.rule-warn').count()) === 0);
   // v3.9: løb uden bold i Fase 1 – starter på Normal, gemmes og overlever F5; hjælpeteksten ses
   check('Løb uden bold: findes i Fase 1 og starter på Normal', (await g.inputValue('#tactics fieldset[data-phase="phase1_buildUp"] select[data-field="offBallRuns"]')) === 'NORMAL');
   await g.selectOption('#tactics select[data-field="offBallRuns"]', 'MANY'); await reload();
@@ -277,7 +295,7 @@ try {
   check('Modstander: sortering på FIN afvises med anti-spionage-besked', (await g.textContent('#notice')).includes('Anti-spionage'));
   check('Modstander: spillerkortet skjuler evner og kontrakt', (await g.locator('#player-card .bars').count()) === 0 && (await g.textContent('#player-card')).includes('🔒 ??'));
   await tab('taktik');
-  check('Modstander: faser og Hvis-Så-regler er skjulte', (await g.locator('#tactics fieldset').count()) === 0);
+  check('Modstander: faser, Hvis-Så-regler og udskiftningsgrænse er skjulte', (await g.locator('#tactics fieldset').count()) === 0 && (await g.locator('#subs-limit').count()) === 0 && (await g.textContent('#tactics .lockbox')).includes('udskiftningsgrænse'));
   check('Modstander: ingen bænkrække under banen', (await g.locator('#bench').count()) === 0);
   check('Modstander: kun dit hold kan trækkes på banen', (await g.locator('#pitch .token.draggable').count()) === 0);
   check('Modstander: formationen kan ikke ændres og der er ingen byt-knapper', (await g.isDisabled('#formation')) && (await g.locator('#matrix tbody button').count()) === 0);
@@ -321,6 +339,7 @@ try {
   await g.click('#skip');
   check('Runden har 4 kampe', (await g.locator('#match-cards .matchcard').count()) === 4);
   const mcText = await g.textContent('#match-center');
+  check('Din Hvis-Så-udskiftning (uanset stilling, fra minut 3) står i referatet i 3. minut, og indskifteren står i karakterarket', /🔄 \[.+ • Hvis-Så\] #\d+ .+ ud – #\d+ .+ ind \(din Hvis-Så-regel, 3\. minut\)\./.test(mcText) && /ind på/.test(mcText), (mcText.match(/🔄[^.]*\./) || ['ingen'])[0]);
   // Dit hold kan være hjemme eller ude (programmet) – karakterarkene står hjemme, ude.
   const own = await g.evaluate(() => (JSON.parse(localStorage.getItem('tactivar_save')).league.lastRound.matches[0].ratings.home[0].isUserTeam ? 0 : 1));
   check('Referatet indeholder slutfløjt, statistik og karakterark', mcText.includes('SLUTFLØJT') && (await g.isVisible('#match-stats')) && (await g.locator('.ratings').count()) === 2);
@@ -373,10 +392,12 @@ try {
   const pins = await g.locator('#feed .snap-btn').count();
   check('📍 står ved præcis de mål, der har et gemt øjebliksbillede', pins === snapSaved, `${pins} / ${snapSaved}`);
   if (pins > 0) {
-    const before = await g.locator('.ratings').nth(own).locator('.mp-token').evaluateAll((ts) => ts.map((t) => t.style.left + ',' + t.style.top).join('|'));
     await g.locator('#feed .snap-btn').first().click();
-    const after = await g.locator('#snap-pitch .mp-token').evaluateAll((ts) => ts.map((t) => t.style.left + ',' + t.style.top).join('|'));
-    check('Klik på 📍: minibanen viser øjebliksbilledet (11 brikker, bolden, flyttet fra startpladserne)', (await g.locator('#snap-pitch .mp-token').count()) === 11 && (await g.locator('#snap-ball').count()) === 1 && (after !== before || /mål imod/.test(await g.textContent('#snap-title'))) && (await g.locator('#feed .ev.snapped').count()) === 1, after.slice(0, 80));
+    // Release Manager v3.13: før sammenlignede checken med startopstillingen (≈ 6 % falsk rød, når billedet tilfældigt
+    // lignede). Nu: brikkerne på minibanen er PRÆCIS et gemt øjebliksbillede (spiller-id og koordinater).
+    const shown = (await g.locator('#snap-pitch .mp-token').evaluateAll((ts) => ts.map((t) => `${t.dataset.pid}@${parseFloat(t.style.left)},${parseFloat(t.style.top)}`))).sort().join('|');
+    const saved = await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.lastRound.matches[0].events.filter((e) => e.snapshot).map((e) => e.snapshot.pts.map(([id, x, y]) => `${id}@${x},${y}`).sort().join('|')));
+    check('Klik på 📍: minibanen viser et gemt øjebliksbillede præcist (11 brikker på deres gemte pladser, bolden)', (await g.locator('#snap-pitch .mp-token').count()) === 11 && saved.includes(shown) && (await g.locator('#snap-ball').count()) === 1 && (await g.locator('#feed .ev.snapped').count()) === 1, shown.slice(0, 80));
     // Test Manager v3.12.1: et mål IMOD mod mellemblok med bolden midt i banen viser præcis startopstillingen (ingen forskydning) – kun dine egne mål SKAL stå anderledes
     // Test Manager v3.12.1: et nyt valg af kamp (også den aktive) fjerner billedet – ellers hænger et gammelt øjebliksbillede ved
     await g.locator('#match-cards .matchcard.active').click();
@@ -588,6 +609,9 @@ try {
   await reload();
   const v3120note = (await g.locator('#notice').count()) ? await g.textContent('#notice') : '';
   check('Gem fra v3.12.0: kun nyheden for 3.12.1 (ikke 3.12.0 igen), ingen migrering', v3120note.includes('Spillerne rykker nu med') && !v3120note.includes('"Lave cutbacks"') && !v3120note.includes('Dit spil er opdateret'), v3120note.slice(0, 160));
+  // Test Manager v3.13: nyheden for 3.13 (udskiftninger) vises efter 3.12.1's, og de gamle hold får deres grænse (dit 70, botternes profil)
+  check('Gem fra v3.12.0: nyheden for 3.13 om udskiftninger kommer efter 3.12.1-nyheden', v3120note.includes('Udskiftninger under kampen: friskheden falder') && v3120note.indexOf('Spillerne rykker nu med') >= 0 && v3120note.indexOf('Spillerne rykker nu med') < v3120note.indexOf('Udskiftninger under kampen: friskheden falder'), v3120note.slice(-200));
+  check('Gem fra v3.12.0: holdene får udskiftningsgrænse efter deres profil (dit hold 70, botterne 75/65/75/70/70/65/75)', JSON.stringify(await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.teams.map((t) => t.subsLimit))) === JSON.stringify([70, 75, 65, 75, 70, 70, 65, 75]));
   await tab('kamp');
   check('Gem fra v3.12.0: runde 3 i Kamp-fanen uden 📍, startopstillingen på minibanen og ingen fejl', (await g.textContent('#match-center')).includes('runde 3') && (await g.locator('#feed .snap-btn').count()) === 0 && (await g.locator('#snap-pitch').count()) === 0 && (await g.locator('.minipitch').count()) >= 1 && (await g.isHidden('#fejlboks')));
 
@@ -619,12 +643,17 @@ try {
   const bk = await dl;
   check('Migrering: beskeden har en knap, der henter det gamle spil (skema 3) som fil', bk.suggestedFilename().startsWith('tactivar_backup_') && JSON.parse(fs.readFileSync(await bk.path(), 'utf8')).schemaVersion === 3);
   check('Migrering fra skema 3: beskeden nævner Superliga-højderne og friskheden – ikke puljen eller Hvis-Så', note3.includes('Superliga') && note3.includes('Friskhed') && !note3.includes('100 point') && !note3.includes('Hvis-Så'), note3);
-  // Advarsel ved ▶ om trætte startere (under 70 %)
-  const setStarterFresh = async (v) => { await g.evaluate((val) => { const d = JSON.parse(localStorage.getItem('tactivar_save')); const t = d.league.teams.find((x) => !x.isBot); for (const p of t.squad) p.freshness = 100; t.squad.find((p) => p.id === t.tactics.lineupSlots[6]).freshness = val; localStorage.setItem('tactivar_save', JSON.stringify(d)); }, v); await reload(); };
+  // Advarsel ved ▶ om startere under din udskiftningsgrænse (v3.13: gemt før v3.13 → 70 %; uden grænse: 70 %)
+  const setStarterFresh = async (v, limit) => { await g.evaluate(([val, lim]) => { const d = JSON.parse(localStorage.getItem('tactivar_save')); const t = d.league.teams.find((x) => !x.isBot); for (const p of t.squad) p.freshness = 100; t.squad.find((p) => p.id === t.tactics.lineupSlots[6]).freshness = val; if (lim !== undefined) t.subsLimit = lim; localStorage.setItem('tactivar_save', JSON.stringify(d)); }, [v, limit]); await reload(); };
   await setStarterFresh(69);
-  check('Advarsel: én starter under 70 % giver "⚠ 1 trætte startere"', (await g.textContent('#tired-warning')).trim() === '⚠ 1 trætte startere');
+  check('Advarsel: én markspiller under din grænse (70 %) – skiftes ud tidligt', (await g.textContent('#tired-warning')).trim() === '⚠ 1 startere under din grænse (70 %) – skiftes ud tidligt', await g.textContent('#tired-warning'));
   await setStarterFresh(70);
   check('Ingen advarsel ved 70 %', (await g.locator('#tired-warning').count()) === 0);
+  await setStarterFresh(78, 80);
+  check('Advarslen følger grænsen: 78 % er under en grænse på 80 % (QC: før fast 70)', (await g.textContent('#tired-warning')).includes('under din grænse (80 %)'));
+  await setStarterFresh(69, 0);
+  check('Grænse Fra: advarslen om trætte startere under 70 % som før', (await g.textContent('#tired-warning')).trim() === '⚠ 1 trætte startere');
+  await setStarterFresh(100, 70);
   await g.evaluate(() => { const d = JSON.parse(localStorage.getItem('tactivar_save')); const t = d.league.teams.find((x) => !x.isBot); t.squad.find((p) => !t.tactics.lineupSlots.includes(p.id)).freshness = 10; localStorage.setItem('tactivar_save', JSON.stringify(d)); });
   await reload();
   check('En træt bænkspiller giver ingen advarsel', (await g.locator('#tired-warning').count()) === 0);

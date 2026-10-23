@@ -7,16 +7,18 @@ import { livePositions } from './positions.js';
 import { masteryVs, counterXpForMatch } from './counter.js';
 import { createSheet, finalizeSheet } from './ratings.js';
 import { describeFinish, describeHeader, describeVarTiming, describeGoal, goalSpectacle } from './clues.js';
+import { MATCH_RULES } from './match-rules.js';
+import { TIRED_PER_POINT, SUBS_LIMIT, matchCost, REST_SHARE } from './freshness.js';
 
-export const MAX_SUBS = 3;
 const PLAN_LETTERS = ['A', 'B', 'C'];
 
-// Hvis-Så-betingelse: "mindst N mål" bagud/foran (N = margin, 1–5), eller uafgjort.
+// Hvis-Så-betingelse: "mindst N mål" bagud/foran (N = margin, 1–5), uafgjort eller uanset stilling.
 export function ruleConditionMet(rule, own, opp) {
   const diff = own - opp, n = Math.max(1, rule.margin || 1);
   if (rule.condition === 'TRAILING') return diff <= -n;
   if (rule.condition === 'LEADING') return diff >= n;
   if (rule.condition === 'DRAW') return diff === 0;
+  if (rule.condition === 'ANY') return true;   // v3.13: "uanset stilling" – fx en planlagt udskiftning
   return false;
 }
 const coordsOf = (tactics) => FORMATIONS[tactics.baseFormation] || FORMATIONS['4-4-2'];
@@ -55,7 +57,7 @@ export const RUN_COVER = { FEW: 5, NORMAL: 0, MANY: 0 };
 export const RUN_FINISH_BONUS = 2;
 // Målmandens fordel på almindelige afslutninger (v3.9): holder ligaens målniveau, efter at
 // løbene og de rigtige kontraer kom til (kalibreret med `node tools/measure-duels.mjs N loeb`).
-export const KEEPER_EDGE = 3.5;
+export const KEEPER_EDGE = 3.0;
 // Dødbolde (v3.10, brugeren: "mål på hovedstød, straffe eller dødbolde. Antallet af frispark").
 // Kun til holdet med bolden i en tick uden boldtab. Pr. tick: straffe 1,1 %, frispark i skudafstand
 // 4,3 % (37 % direkte skud, ellers indlæg); hjørnespark efter redning/clearet luftduel 47 %;
@@ -86,6 +88,11 @@ export const FLANK_BONUS = { LOW_BLOCK: -2, MID_BLOCK: 0, HIGH_GEGENPRESS: 3 }; 
 // (RECEIVE_BASE + evne), så den nærmeste oftest, men ikke altid, når bolden.
 // Pladserne er i holdets egne koordinater (lille y = fremme ved modstanderens mål).
 export const RECEIVE_SPREAD = 16, RECEIVE_BASE = 10;
+// Rækkevidde (v3.13, brugerens eksempel: en CB på egen halvdel "når baglinjen" og lægger tilbage): den, der
+// slår bolden fra kanten (cutback, indlæg), skal stå højst RECEIVE_REACH derfra – ellers fik de fjerne en hale på
+// ≈ 25 %. Er ingen så tæt, alle. Afsluttere vælges uden grænse (andenbolde falder også til en stopper).
+export const RECEIVE_REACH = 25;
+const BYLINE_Y = 6, CROSS_FROM_Y = 14;   // hvor cutbacken og indlægget slås fra (holdets egne koordinater)
 // Uden for feltet (y ≥ LONGSHOT_Y i øjeblikket) er et skud et langskud. Den, der får bolden ved
 // feltets kant, har tid og plads (LONGSHOT_BONUS) – det opvejer, at midtbanens afslutning er lavere
 // på evneskalaen; kalibreret til dokumentets 8–10 % langskud. Men på afstand er ingen bedre end
@@ -132,6 +139,9 @@ const YOUR_PRESS = { LOW_BLOCK: 'din lave blok', MID_BLOCK: 'din mellemblok', HI
 const cap = (t) => t[0].toUpperCase() + t.slice(1);
 const TXT = { SHORT: 'korte pasninger', BALANCED: 'balanceret opbygning', DIRECT_LONG: 'direkte lange bolde', LOW_BLOCK: 'lav blok', MID_BLOCK: 'mellemblok', HIGH_GEGENPRESS: 'højt gegenpress' };
 const isAvailable = (p) => !(p.injuryMatchesLeft > 0);
+// Bots hviler før kampen en starter, der er under grænsen + ROTATE_MARGIN (han ville ellers skiftes ud tidligt).
+export const ROTATE_MARGIN = 10, ROTATE_SKILL = 2;
+const LINE_WORD = { GK: 'målmand', DEF: 'forsvarsspiller', MID: 'midtbanespiller', ATT: 'angriber' };
 // Friskhed virker (v3.7): en træt spiller yder 0,75 + 0,25·friskhed/100 (75 % → 93,75 %,
 // 50 % → 87,5 %) – stærkt nok til, at det betaler sig at hvile en meget træt spiller.
 export const freshFactor = (p) => 0.75 + 0.25 * Math.max(0, Math.min(100, p?.freshness ?? 100)) / 100;
@@ -146,9 +156,12 @@ function prepareSide(team, isHome, notes) {
   const starters = tactics.lineupSlots.map((id) => byId.get(id));
   const used = new Set(starters.filter(Boolean).map((p) => p.id));
   const bench = () => team.squad.filter((p) => !used.has(p.id) && isAvailable(p));
+  // v3.13 (QC): rotationen følger botens udskiftningsgrænse – ellers stillede en bot med grænse 75 en
+  // starter på 72 % og skiftede ham ud i 3. minut. Uden grænse (0) som før: under 70, frisk ≥ 85.
+  const rest = team.subsLimit ? team.subsLimit + ROTATE_MARGIN : 70, freshMin = team.subsLimit ? team.subsLimit + ROTATE_MARGIN + 5 : 85;
   if (team.isBot) starters.forEach((p, slot) => {
-    if (!p || !isAvailable(p) || (p.freshness ?? 100) >= 70) return;
-    const fresh = bench().filter((b) => b.line === p.line && (b.freshness ?? 100) >= 85 && avgSkill(b) >= avgSkill(p) - 2);
+    if (!p || !isAvailable(p) || (p.freshness ?? 100) >= rest) return;
+    const fresh = bench().filter((b) => b.line === p.line && (b.freshness ?? 100) >= freshMin && avgSkill(b) >= avgSkill(p) - ROTATE_SKILL);
     if (!fresh.length) return;
     const sub = fresh.sort((a, b) => avgSkill(b) - avgSkill(a))[0];
     notes.push({ isHome, text: `📋 [${team.name}] ${tag(sub)} starter i stedet for en træt ${tag(p)}.` });
@@ -162,7 +175,7 @@ function prepareSide(team, isHome, notes) {
     if (p) notes.push({ isHome, text: `📋 [${team.name}] ${tag(p)} er skadet og erstattes i startopstillingen af ${tag(sub)}.` });
     starters[slot] = sub; used.add(sub.id);
   });
-  return { team, isHome, tactics, starters, used, subsUsed: 0, benchAvailable: bench };
+  return { team, isHome, tactics, starters, used, subsUsed: 0, windows: 0, lastSubMin: null, benchAvailable: bench };
 }
 
 function rolesOf(side) {
@@ -212,6 +225,14 @@ export function simulateMatch(home, away, rng, opts = {}) {
     events.push({ min, type, category, isHome, plot, label, text, varMsg, hG, aG, stats: { ...st } });
   const observe = (player, text) => observations.push({ playerId: player.id, text });
   // Løbet følger pladsen (v3.8): også en indskifter løber efter den rolle, han kommer ind på.
+  // Friskhed i kampen (v3.13, freshness.js): tabet indtil nu efter arkets drain90 og minutterne på
+  // banen. opts.liveEnergy = false KUN til de deterministiske test-arenaer (deres tærskler forudsætter
+  // fuld friskhed hele kampen) – spillet selv sender aldrig flaget (vagt i tests).
+  const live = opts.liveEnergy !== false;
+  let curMin = 1;
+  const lostAt = (p) => { const e = sheet.entries[p.id]; return live && e?.drain90 ? e.drain90 * Math.max(0, curMin - e.minIn) / 90 : 0; };
+  const matchFresh = (p) => (p.freshness ?? 100) - lostAt(p);
+  const ff = (p) => freshFactor(p) * (1 - TIRED_PER_POINT * lostAt(p));
   const register = (side, p, role, minIn, slot) => sheet.register(p, side.team, side.isHome, role, minIn, rng, masteryVs(p, other(side).team), slot, slot != null ? coordsOf(side.tactics)[slot].r : role);
 
   for (const side of [H, A]) side.starters.forEach((p, i) => p && register(side, p, coordsOf(side.tactics)[i].r, 1, i));
@@ -229,10 +250,12 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // Modtageren: spilleren nær det sted, bolden spilles hen (se RECEIVE_SPREAD). exclude = afleveren.
   // ctx = { attacking, ballX } – øjeblikket (positions.js). Positionerne huskes til øjebliksbilledet ved mål.
   let seen = {}, seenX = {};
-  function receiver(side, spot, skill, exclude = null, ctx = { attacking: true, ballX: 50 }) {
+  function receiver(side, spot, skill, exclude = null, ctx = { attacking: true, ballX: 50 }, reach = Infinity) {
     const pos = livePositions(side.tactics, ctx);
     seen[side.team.id] = pos; seenX[side.team.id] = ctx.ballX ?? 50;
-    const cand = side.starters.map((p, i) => ({ p, i })).filter(({ p, i }) => i > 0 && p && p !== exclude);
+    const all = side.starters.map((p, i) => ({ p, i })).filter(({ p, i }) => i > 0 && p && p !== exclude);
+    const near = all.filter(({ i }) => Math.hypot(pos[i].x - spot.x, pos[i].y - spot.y) <= reach);
+    const cand = near.length ? near : all;
     const w = cand.map(({ p, i }) => Math.exp(-Math.hypot(pos[i].x - spot.x, pos[i].y - spot.y) / RECEIVE_SPREAD) * (RECEIVE_BASE + Math.max(0, skill(p))));
     let r = rng.next() * w.reduce((a, b) => a + b, 0);
     return (cand[w.findIndex((x) => (r -= x) < 0)] ?? cand.at(-1)).p;
@@ -242,7 +265,9 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // ved et mål imod dit forsvar i øjeblikket. Punkter pr. spiller-id (indskiftere, Hvis-Så-skift).
   // Hænges på den seneste hændelse; spot = hvor bolden kom (holdets egne koordinater).
   // caught = dit hold mistede bolden i angrebet (kontra imod): det står i angrebsform, ikke i sin blok.
-  function snapshot(side, scorer, helper, spot = SPOT.GOAL, caught = false) {
+  // moves = { spiller-id: [x, y] }: hvor aktørerne var i selve hændelsen (cutbackens oplægsgiver ved baglinjen,
+  // scoreren på pletten) – billedet viser handlingen, ikke kun holdets form (brugerens eksempel v3.13).
+  function snapshot(side, scorer, helper, spot = SPOT.GOAL, caught = false, moves = null) {
     const mine = [H, A].find(own);
     if (!mine) return;
     const ev = events.at(-1), attacking = side === mine;
@@ -250,7 +275,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
     if (!pos) return;
     ev.snapshot = {
       attacking, formation: mine.tactics.baseFormation,
-      pts: mine.starters.map((p, i) => p && [p.id, pos[i].x, pos[i].y]).filter(Boolean),
+      pts: mine.starters.map((p, i) => p && (attacking && moves?.[p.id] ? [p.id, ...moves[p.id]] : [p.id, pos[i].x, pos[i].y])).filter(Boolean),
       scorer: attacking ? scorer.id : null, assist: attacking && helper && helper !== scorer ? helper.id : null,
       ball: attacking ? [spot.x, spot.y] : [100 - spot.x, 100 - spot.y],
     };
@@ -271,7 +296,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
     const runsOf = (i) => sheet.entries[lose.starters[i].id]?.freeRuns ?? 0;
     const fbSlot = fbSlots.filter((i) => runsOf(i) > 0).sort((x, y) => runsOf(y) - runsOf(x))[0] ?? -1;
     const why = fbSlot > 0 ? ` Din ${coordsOf(lose.tactics)[fbSlot].r} ${tag(lose.starters[fbSlot])} er højt oppe efter sit løb.` : '';
-    if (shooter.skills.finishing * freshFactor(shooter) + rng.next() * 8 + COUNTER_FINISH_BONUS > gk.skills.goalkeeping * freshFactor(gk) + rng.next() * 8) {
+    if (shooter.skills.finishing * ff(shooter) + rng.next() * 8 + COUNTER_FINISH_BONUS > gk.skills.goalkeeping * ff(gk) + rng.next() * 8) {
       if (win === H) hG++; else aG++;
       st[k(win, 'OnTarget')]++;
       duelLog[lose.team.id].counterGoalsAgainst++;
@@ -316,14 +341,14 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // afgør hvilken – ingen ekstra terning. To trin (v3.12): duellen, så hovedstødet mod keeperen.
   // source (åbent spil): 'cross' eller 'long' – kun til teksten for dit eget hold.
   // Returnerer 'goal', 'saved' eller 'cleared'.
-  function aerialDuel(att, def, cR, dR, min, shooter, assister, defender, setPiece = null, source = null) {
+  function aerialDuel(att, def, cR, dR, min, shooter, assister, defender, setPiece = null, source = null, snapMoves = null) {
     const gk = dR.gk;
     const aDef = dR.cbs.length ? (dR.cbs.includes(defender) ? defender : dR.cbs[Math.max(0, dR.defs.indexOf(defender)) % dR.cbs.length]) : defender;
     const kind = setPiece ? SP_KIND[setPiece] : 'HEADER';
     const log = duelLog[att.team.id];
     if (!setPiece) log.crosses++;
     const box = setPiece ? SETPIECE_DEF_EDGE : (BOX_BONUS[def.tactics.phases.phase2_defending.pressingHeight] ?? 0);
-    if (shooter.aerialPower * freshFactor(shooter) + rng.next() * 6 + (setPiece ? 0 : CROSS_EDGE) <= aDef.aerialPower * freshFactor(aDef) + rng.next() * 6 + box) {
+    if (shooter.aerialPower * ff(shooter) + rng.next() * 6 + (setPiece ? 0 : CROSS_EDGE) <= aDef.aerialPower * ff(aDef) + rng.next() * 6 + box) {
       st[k(def, 'AerialWon')]++;
       sheet.adjust(aDef.id, 0.4); sheet.bump(aDef.id, 'aerialWins');
       // Kun dit eget hold får sin kilde nævnt (dit indlæg / din lange bold).
@@ -333,7 +358,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
     }
     st[k(att, 'AerialWon')]++; if (!setPiece) { st[k(att, 'TacticSuccess')]++; log.crossesWon++; }
     sheet.adjust(shooter.id, 0.4); sheet.bump(shooter.id, 'aerialWins');
-    if (shooter.aerialPower * freshFactor(shooter) + rng.next() * 8 > gk.skills.goalkeeping * freshFactor(gk) + rng.next() * 8 + HEADER_GK_EDGE) {
+    if (shooter.aerialPower * ff(shooter) + rng.next() * 8 > gk.skills.goalkeeping * ff(gk) + rng.next() * 8 + HEADER_GK_EDGE) {
       goalFor(att); if (!setPiece) log.headerGoals++;
       sheet.adjust(shooter.id, 0.95); sheet.bump(shooter.id, 'goals');
       if (assister && assister.id !== shooter.id) { sheet.adjust(assister.id, 0.55); sheet.bump(assister.id, 'assists'); }
@@ -345,7 +370,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
       const how = setPiece ? `MÅÅÅL PÅ ${setPiece.toUpperCase()}! ${tag(assister)} slår ${setPiece}et ind, og ${tag(shooter)} (${shooter.heightCm} cm) header bolden ind – ${prose}.`
         : `MÅÅÅL! ${tag(shooter)} (${shooter.heightCm} cm) header bolden ind – ${prose}.`;
       addEv(min, 'HEADER_GOAL', 'HIGHLIGHT', att.isHome, true, `⚽ Hovedstødsmål: ${tag(shooter)}`, `⚽ [${att.team.name} • ${hG}-${aG}] ${how}`);
-      if (!setPiece) snapshot(att, shooter, assister, SPOT.CROSS);
+      if (!setPiece) snapshot(att, shooter, assister, SPOT.CROSS, false, snapMoves);
       return 'goal';
     }
     st[k(att, 'OnTarget')]++;
@@ -364,9 +389,9 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // cutbacken ikke blev en tredje kopi). kind kan være en funktion, der afgøres efter skuddet
   // (den almindelige afslutning vælger type efter evnerne). Langskud og dribletur er solo.
   // lead = dit holds egen indledning ("✅ … lægger den tilbage til …"). Returnerer om der blev scoret.
-  function finishAttempt(att, def, cR, dR, min, finisher, helper, kind, { bonus = 0, lead = '', onGoal = null } = {}) {
+  function finishAttempt(att, def, cR, dR, min, finisher, helper, kind, { bonus = 0, lead = '', onGoal = null, snapMoves = null } = {}) {
     const gk = dR.gk, fs = finisher.skills;
-    if (fs.finishing * freshFactor(finisher) + rng.next() * 8 + bonus > gk.skills.goalkeeping * freshFactor(gk) + rng.next() * 8 + KEEPER_EDGE) {
+    if (fs.finishing * ff(finisher) + rng.next() * 8 + bonus > gk.skills.goalkeeping * ff(gk) + rng.next() * 8 + KEEPER_EDGE) {
       goalFor(att);
       const kd = typeof kind === 'function' ? kind() : kind, solo = kd === 'LONGSHOT' || kd === 'DRIBBLE';
       onGoal?.(kd);
@@ -380,7 +405,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
       addEv(min, 'GOAL', 'HIGHLIGHT', att.isHome, true, `⚽ Mål: ${tag(finisher)}`, `⚽ [${att.team.name} • ${hG}-${aG}] MÅÅÅL! ${lead ? lead + ' ' : ''}${desc}`);
       // Solo-mål (langskud, dribletur): bolden står ved skytten – ikke på en fast plet i feltet (QC).
       const at = solo && seen[att.team.id]?.[att.starters.indexOf(finisher)];
-      snapshot(att, finisher, solo ? null : helper, at || (kd === 'CUTBACK' ? SPOT.CUTBACK : SPOT.GOAL));
+      snapshot(att, finisher, solo ? null : helper, at || (kd === 'CUTBACK' ? SPOT.CUTBACK : SPOT.GOAL), false, snapMoves);
       return true;
     }
     st[k(att, 'OnTarget')]++;
@@ -394,12 +419,12 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // Kaldt med et allerede talt skud (xg) – en lukket kant er ingen afslutning.
   function cutback(att, def, cR, dR, min, xg) {
     const wx = rng.next() < 0.5 ? 12 : 88;
-    const winger = receiver(att, { x: wx, y: 30 }, (p) => p.skills.pace + p.skills.ballControl, null, { attacking: true, ballX: wx });
+    const winger = receiver(att, { x: wx, y: 30 }, (p) => p.skills.pace + p.skills.ballControl, null, { attacking: true, ballX: wx }, RECEIVE_REACH);
     const back = receiver(def, { x: 100 - wx, y: 72 }, (p) => p.skills.pace + p.skills.positioning, null, { attacking: false, ballX: 100 - wx });
     const log = duelLog[att.team.id], ws = winger.skills, bs = back.skills;
     log.cutbacks++;
-    if ((ws.pace + ws.ballControl) * freshFactor(winger) + rng.next() * 8
-      <= (bs.pace + bs.positioning) * freshFactor(back) + rng.next() * 8 + CUTBACK_DEF_EDGE + (FLANK_BONUS[def.tactics.phases.phase2_defending.pressingHeight] ?? 0)) {
+    if ((ws.pace + ws.ballControl) * ff(winger) + rng.next() * 8
+      <= (bs.pace + bs.positioning) * ff(back) + rng.next() * 8 + CUTBACK_DEF_EDGE + (FLANK_BONUS[def.tactics.phases.phase2_defending.pressingHeight] ?? 0)) {
       log.cutbacksBlocked++;
       st[k(att, 'Shots')]--; st[k(att, 'Xg')] -= xg;
       sheet.adjust(back.id, 0.3); sheet.bump(back.id, 'tacticWins');
@@ -413,14 +438,15 @@ export function simulateMatch(home, away, rng, opts = {}) {
     const lead = own(att) ? `✅ ${tag(winger)} når baglinjen og lægger den lavt tilbage til ${tag(finisher)}.` : '';
     if (!lead) addEv(min, 'INFO', 'PLAY', att.isHome, false, 'Mod baglinjen', `↩️ [${att.team.name}] ${tag(winger)} kommer forbi ${tag(back)} og spiller bolden tilbage i feltet.`);
     sheet.adjust(winger.id, 0.15);
-    finishAttempt(att, def, cR, dR, min, finisher, winger, 'CUTBACK', { bonus: CUTBACK_FINISH_BONUS, lead, onGoal: () => { log.cutbackGoals++; } });
+    finishAttempt(att, def, cR, dR, min, finisher, winger, 'CUTBACK', { bonus: CUTBACK_FINISH_BONUS, lead, onGoal: () => { log.cutbackGoals++; },
+      snapMoves: { [winger.id]: [wx, BYLINE_Y], [finisher.id]: [SPOT.CUTBACK.x, SPOT.CUTBACK.y] } });
   }
   function penalty(att, def, cR, dR, min) {
     const taker = best(outfield(cR), (p) => p.skills.finishing), fouled = rng.pick(cR.atts.concat(cR.mids)), fouler = rng.pick(dR.defs), gk = dR.gk;
     st[k(def, 'Fouls')]++; st[k(att, 'Penalties')]++; st[k(att, 'Shots')]++; st[k(att, 'Xg')] += 0.76;
     sheet.adjust(fouler.id, -0.3);
     const why = `${tag(fouled)} fældes i feltet af ${tag(fouler)} (${def.team.name})`;
-    if (taker.skills.finishing * freshFactor(taker) + rng.next() * 8 + PENALTY_BONUS > gk.skills.goalkeeping * freshFactor(gk) + rng.next() * 8) {
+    if (taker.skills.finishing * ff(taker) + rng.next() * 8 + PENALTY_BONUS > gk.skills.goalkeeping * ff(gk) + rng.next() * 8) {
       goalFor(att); st[k(att, 'PenaltyGoals')]++;
       sheet.adjust(taker.id, 1.0); sheet.bump(taker.id, 'goals'); sheet.adjust(gk.id, -0.1);
       bookKind(att, taker, 'PENALTY');
@@ -439,7 +465,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
     if (rng.chance(FK_SHOT_P)) {
       const taker = best(outfield(cR), (p) => p.skills.finishing + p.skills.passing);
       st[k(att, 'Shots')]++; st[k(att, 'Xg')] += 0.07;
-      if (taker.skills.finishing * freshFactor(taker) + rng.next() * 8 > gk.skills.goalkeeping * freshFactor(gk) + rng.next() * 8 + FK_SHOT_EDGE) {
+      if (taker.skills.finishing * ff(taker) + rng.next() * 8 > gk.skills.goalkeeping * ff(gk) + rng.next() * 8 + FK_SHOT_EDGE) {
         goalFor(att);
         sheet.adjust(taker.id, 1.4); sheet.bump(taker.id, 'goals'); sheet.adjust(gk.id, -0.3);
         bookKind(att, taker, 'FREEKICK');
@@ -458,18 +484,25 @@ export function simulateMatch(home, away, rng, opts = {}) {
     aerialDuel(att, def, cR, dR, min, headerTarget(cR, taker), taker, rng.pick(dR.defs), 'frispark');
   }
 
-  // Indskiftning i den kamplokale kopi. Returnerer indskifteren eller null.
-  function substitute(side, slot, min, reason) {
-    if (side.subsUsed >= MAX_SUBS) return null;
+  // Udskiftningsreglerne (match-rules.js): højst maxSubs skift i højst maxWindows pauser; flere skift i
+  // samme tick er én pause, og halvlegen (45') tæller ikke. Årsag, når der IKKE kan skiftes, eller null.
+  const subBlock = (side, min) => side.subsUsed >= MATCH_RULES.maxSubs ? `alle ${MATCH_RULES.maxSubs} udskiftninger er brugt`
+    : (min !== 45 && min !== side.lastSubMin && side.windows >= MATCH_RULES.maxWindows) ? `alle ${MATCH_RULES.maxWindows} skifte-pauser er brugt` : null;
+  // Indskiftning i den kamplokale kopi. Returnerer indskifteren eller null. pick = den valgte
+  // bænkspiller (træthed/Hvis-Så); text = referatets tekst (ellers skadesskiftets).
+  function substitute(side, slot, min, reason, pick = null, text = null) {
+    if (subBlock(side, min)) return null;
     const out = side.starters[slot];
     const bench = side.benchAvailable();
-    const sub = bench.find((b) => b.line === out.line) || bench[0];
+    const sub = pick ?? (bench.find((b) => b.line === out.line) || bench[0]);
     if (!sub) return null;
     side.subsUsed++;
+    if (min !== 45 && min !== side.lastSubMin) side.windows++;
+    side.lastSubMin = min;
     side.starters[slot] = sub; side.used.add(sub.id);
     sheet.entries[out.id].minOut = min;
     register(side, sub, `SUB (${out.line})`, min, slot);
-    addEv(min, 'SUB', 'HIGHLIGHT', side.isHome, true, `🔄 ${tag(sub)} ind for ${tag(out)}`, `🔄 [${side.team.name}] ${reason}: ${tag(sub)} erstatter ${tag(out)}.`);
+    addEv(min, 'SUB', 'HIGHLIGHT', side.isHome, true, `🔄 ${tag(sub)} ind for ${tag(out)}`, text ?? `🔄 [${side.team.name}] ${reason}: ${tag(sub)} erstatter ${tag(out)}.`);
     return sub;
   }
 
@@ -478,6 +511,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
     side.tactics.conditionalRules.forEach((rule) => {
       if (rule.used || min < rule.minuteTrigger) return;
       if (!ruleConditionMet(rule, own, opp)) return;
+      if (rule.action === 'SUB') { rule.used = true; ruleSub(side, rule, min); return; }
       const from = side.tactics.baseFormation;
       // Skift til en af holdets egne planer: formation, trukne positioner og faser følger
       // med; spillerne beholder deres pladser, og Hvis-Så-reglerne kører videre.
@@ -509,6 +543,60 @@ export function simulateMatch(home, away, rng, opts = {}) {
     });
   }
 
+  // Træthedsskift (v3.13, brugeren: grænsen skal gælde "uanset hvor langt man er kommet i kampen. Hvis
+  // alle ens udskiftninger så bliver brugt tidligt på det er det bare ærgeligt"). Alle under holdets
+  // grænse skiftes, lavest friskhed først; bruges pausen, tages også dem med, der højst er NEAR over.
+  // Ind: rask bænkspiller i samme kæde, selv mindst NEAR over grænsen, bedste evnesnit · friskhed –
+  // ikke en, som en af dine Hvis-Så-regler skal bruge. Målmanden skiftes ikke for træthed.
+  // Dit hold får at vide, når grænsen ikke kan følges; en bots grænse og friskhed nævnes aldrig (§3).
+  function fatigueSubs(side, min) {
+    const limit = side.team.subsLimit || 0;
+    if (!limit || min >= 90) return;   // i sidste tick sparer et skift intet og koster indskifteren bænkens +15 (QC)
+    const reserved = new Set(side.tactics.conditionalRules.filter((r) => r.action === 'SUB' && !r.used).map((r) => r.subIn));
+    const onPitch = () => side.starters.map((p, i) => ({ p, i, f: p && matchFresh(p) })).filter(({ p, i }) => i > 0 && p && !sheet.entries[p.id]?.injured);
+    const tired = onPitch().filter((c) => c.f < limit).sort((a, b) => a.f - b.f);
+    if (!tired.length) return;
+    side.noted ||= new Set();
+    const note = (p, why) => { if (!own(side) || side.noted.has(p.id + why)) return; side.noted.add(p.id + why); addEv(min, 'INFO', 'TACTIC', side.isHome, false, 'Udskiftning ikke mulig', `📋 [${side.team.name}] ${tag(p)} er under din udskiftningsgrænse (${Math.floor(matchFresh(p))} % – grænse ${limit} %), men ${why}.`); };
+    const swap = (c, near) => {
+      const block = subBlock(side, min);
+      if (block) { if (!near) note(c.p, block); return false; }
+      const pick = side.benchAvailable().filter((b) => b.line === c.p.line && !reserved.has(b.id) && (b.freshness ?? 100) >= limit + SUBS_LIMIT.near)
+        .sort((a, b) => avgSkill(b) * (b.freshness ?? 100) - avgSkill(a) * (a.freshness ?? 100))[0];
+      if (!pick) {
+        const held = side.benchAvailable().some((b) => b.line === c.p.line && reserved.has(b.id) && (b.freshness ?? 100) >= limit + SUBS_LIMIT.near);
+        if (!near) note(c.p, held ? `den friske ${LINE_WORD[c.p.line] ?? 'spiller'} på bænken er sat til en af dine Hvis-Så-regler` : `der er ingen frisk ${LINE_WORD[c.p.line] ?? 'spiller'} på bænken`);
+        return false;
+      }
+      const f = Math.floor(c.f);   // rundet NED: 69,6 må ikke stå som "70 % – under din grænse 70 %"
+      const text = own(side)
+        ? `🔄 [${side.team.name}] ${tag(c.p)} ud (træt, ${f} % – ${near ? 'tages med i samme pause' : `under din grænse ${limit} %`}) – ${tag(pick)} ind.`
+        : `🔄 [${side.team.name}] ${tag(pick)} erstatter ${tag(c.p)}.`;
+      const ok = !!substitute(side, c.i, min, 'Udskiftning', pick, text);
+      if (ok && own(side)) events.at(-1).tactical = true;   // dit valg (grænsen) – med i "Kun taktik"
+      return ok;
+    };
+    let any = false;
+    for (const c of tired) any = swap(c, false) || any;
+    if (!any) return;
+    for (const c of onPitch().filter((x) => x.f >= limit && x.f < limit + SUBS_LIMIT.near).sort((a, b) => a.f - b.f)) swap(c, true);
+  }
+
+  // Manuel udskiftning fra en Hvis-Så-regel (v3.13): spillerne er angivet med id, så de findes, uanset hvilken
+  // plads de står på nu. Kan den ikke udføres, får dit hold at vide hvorfor (en bots regler tier).
+  function ruleSub(side, rule, min) {
+    const slot = side.starters.findIndex((p, i) => i > 0 && p?.id === rule.subOut);
+    const out = side.team.squad.find((p) => p.id === rule.subOut), inP = side.benchAvailable().find((p) => p.id === rule.subIn);
+    const name = (id) => { const p = side.team.squad.find((x) => x.id === id); return p ? tag(p) : 'spilleren'; };
+    const why = slot < 0 ? `${name(rule.subOut)} er ikke på banen` : !inP ? `${name(rule.subIn)} er ikke på bænken (skadet, allerede brugt eller i startopstillingen)` : subBlock(side, min);
+    if (why) {
+      if (own(side)) addEv(min, 'TRIGGER', 'TACTIC', side.isHome, false, 'Hvis-Så-skift ikke udført', `📋 [${side.team.name} • Hvis-Så] Udskiftningen kunne ikke udføres i ${min}. minut: ${why}.`);
+      return;
+    }
+    const text = own(side) ? `🔄 [${side.team.name} • Hvis-Så] ${tag(out)} ud – ${tag(inP)} ind (din Hvis-Så-regel, ${min}. minut).` : `🔄 [${side.team.name}] ${tag(inP)} erstatter ${tag(out)}.`;
+    if (substitute(side, slot, min, 'Hvis-Så', inP, text)) events.at(-1).tactical = own(side);
+  }
+
   // Et modstanderholds Hvis-Så-skift kan ses på banen, men ikke læses: ingen regel,
   // intet minut-kriterium, ingen ny formation.
   function announceShift(side, min, label, text) {
@@ -517,6 +605,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
   }
 
   for (let min = 3; min <= 90; min += 3) {
+    curMin = min;
     seen = {};   // øjebliksbilledet hører til dette tick
     if (min === 45) {
       const hp = Math.round((st.hPoss / (st.hPoss + st.aPoss)) * 100);
@@ -527,6 +616,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
       addEv(min, 'HALFTIME', 'TACTIC', true, false, 'Pause-analyse', `⏸️ [45' PAUSE-ANALYSE] Stillingen er ${hG}-${aG}. ${home.name} har haft ${hp}% af bolden. ${leader.name} har vundet flest taktiske dueller (${Math.max(st.hTacticSuccess, st.aTacticSuccess)}).${yours}`);
     }
     checkTriggers(H, min); checkTriggers(A, min);
+    fatigueSubs(H, min); fatigueSubs(A, min);
 
     const hR = rolesOf(H), aR = rolesOf(A);
     const hMid = avg(hR.mids, (p) => p.skills.passing + p.skills.ballControl);
@@ -559,9 +649,9 @@ export function simulateMatch(home, away, rng, opts = {}) {
     let ballLost = false;
     if (rng.chance(0.48)) {
       const pmM = masteryVs(playmaker, def.team), prM = masteryVs(presser, att.team);
-      let build = (playmaker.skills.passing + playmaker.skills.ballControl) * freshFactor(playmaker) + pmM * MASTERY_WEIGHT + rng.next() * 7;
+      let build = (playmaker.skills.passing + playmaker.skills.ballControl) * ff(playmaker) + pmM * MASTERY_WEIGHT + rng.next() * 7;
       if (att.calm) { build += CALM_BUILD_BONUS; att.calm = false; } // "Hold på bolden" efter sidste erobring
-      let press = (presser.skills.intercepting + presser.skills.positioning * 0.85 + presser.skills.stamina * 0.35) * freshFactor(presser) + prM * MASTERY_WEIGHT + rng.next() * 7;
+      let press = (presser.skills.intercepting + presser.skills.positioning * 0.85 + presser.skills.stamina * 0.35) * ff(presser) + prM * MASTERY_WEIGHT + rng.next() * 7;
       const pass = attPh.phase1_buildUp.passingStyle, focus = attPh.phase1_buildUp.attackFocus, height = defPh.phase2_defending.pressingHeight;
       if (pass === 'SHORT' && height === 'LOW_BLOCK') build += STYLE_BONUS;
       if (pass === 'DIRECT_LONG' && height === 'HIGH_GEGENPRESS') build += STYLE_BONUS;
@@ -625,7 +715,9 @@ export function simulateMatch(home, away, rng, opts = {}) {
         addEv(min, 'INJURY', 'HIGHLIGHT', victimSide.isHome, true, `🚑 Skade: ${tag(victim)}`, `🚑 [${victimSide.team.name}] ${tag(victim)} bliver skadet efter en tackling fra ${tag(fouler)} (${foulSide.team.name}) og er ude i ${matches} ${matches === 1 ? 'kamp' : 'kampe'}.`);
         if (!substitute(victimSide, slot, min, 'Skadesskift')) {
           sheet.entries[victim.id].minOut = min;
-          addEv(min, 'INFO', 'PLAY', victimSide.isHome, false, 'Ingen indskiftning', `[${victimSide.team.name}] Ingen indskiftning mulig – holdet spiller videre med ${tag(victim)} haltende.`);
+          // Årsagen er offentlig (skift og pauser ses i referatet) – QC v3.13.
+          const why = subBlock(victimSide, min) ?? 'der er ingen rask spiller på bænken';
+          addEv(min, 'INFO', 'PLAY', victimSide.isHome, false, 'Ingen indskiftning', `[${victimSide.team.name}] Ingen indskiftning mulig (${why}) – holdet spiller videre med ${tag(victim)} haltende.`);
         }
       } else {
         // Gult kort kun her – skade-frisparkets tekst nævner intet kort (v3.10).
@@ -664,8 +756,10 @@ export function simulateMatch(home, away, rng, opts = {}) {
         const source = focus === 'HIGH_CROSSES' ? 'cross' : 'long';
         const cx = source === 'cross' ? (rng.next() < 0.5 ? 12 : 88) : 50, ctx = { attacking: true, ballX: cx };
         const target = receiver(att, SPOT.CROSS, (p) => p.aerialPower, null, ctx);
-        const from = source === 'cross' ? receiver(att, { x: cx, y: 30 }, (p) => p.skills.passing, target, ctx) : assister;
-        const res = aerialDuel(att, def, cR, dR, min, target, from, defender, null, source);
+        const from = source === 'cross' ? receiver(att, { x: cx, y: 30 }, (p) => p.skills.passing, target, ctx, RECEIVE_REACH) : assister;
+        // Billedet: indlæggeren ude på kanten, hovedstødsspilleren i feltet (den lange bold slås fra hans plads).
+        const moves = { [target.id]: [SPOT.CROSS.x, SPOT.CROSS.y], ...(source === 'cross' ? { [from.id]: [cx, CROSS_FROM_Y] } : {}) };
+        const res = aerialDuel(att, def, cR, dR, min, target, from, defender, null, source, moves);
         if (res !== 'goal' && rng.chance(res === 'saved' ? CORNER_P : CROSS_CORNER_P)) corner(att, def, cR, dR, min);
         continue;
       }
@@ -703,8 +797,8 @@ export function simulateMatch(home, away, rng, opts = {}) {
         const pick = pool[Math.max(0, wts.findIndex((w) => (rr -= w) < 0))] ?? pool.at(-1);
         const runner = pick.p, rs = runner.skills;
         sheet.bump(runner.id, 'freeRuns'); duelLog[att.team.id].runs++;
-        const runWon = (rs.positioning + rs.pace * 0.5) * freshFactor(runner) + rng.next() * 8 + (RUN_DUEL_BONUS[runs] ?? 0)
-          > (defender.skills.positioning + defender.skills.intercepting * 0.5) * freshFactor(defender) + rng.next() * 8 + (RUN_COVER[defPh.phase1_buildUp.offBallRuns] ?? 0);
+        const runWon = (rs.positioning + rs.pace * 0.5) * ff(runner) + rng.next() * 8 + (RUN_DUEL_BONUS[runs] ?? 0)
+          > (defender.skills.positioning + defender.skills.intercepting * 0.5) * ff(defender) + rng.next() * 8 + (RUN_COVER[defPh.phase1_buildUp.offBallRuns] ?? 0);
         if (runWon) {
           sheet.bump(runner.id, 'freeRunsWon'); duelLog[att.team.id].runsWon++; sheet.adjust(runner.id, 0.15);
           const zone = runZone(slotPosition(att.tactics, pick.i));
@@ -724,8 +818,8 @@ export function simulateMatch(home, away, rng, opts = {}) {
             helper = runner; kind = zone === 'WIDE' ? 'CUTBACK' : 'COMBINATION';
             lead = yourRun && `${yourRun} og ${zone !== 'WIDE' ? 'spiller' : focus === 'LOW_CUTBACKS' ? 'lægger den lavt tilbage til' : 'lægger den tværs til'} ${tag(finisher)}.`;
           } else if (choice === 'DRIBBLE') {
-            const beat = (rs.pace + rs.ballControl) * freshFactor(runner) + rng.next() * 8
-              > (defender.skills.positioning + defender.skills.strength * 0.5) * freshFactor(defender) + rng.next() * 8 + DRIBBLE_DEF_EDGE;
+            const beat = (rs.pace + rs.ballControl) * ff(runner) + rng.next() * 8
+              > (defender.skills.positioning + defender.skills.strength * 0.5) * ff(defender) + rng.next() * 8 + DRIBBLE_DEF_EDGE;
             if (!beat) {
               // Opsnapning: ingen afslutning – og samme kontra-tjek som efter et vundet pres.
               st[k(att, 'Shots')]--; st[k(att, 'Xg')] -= shotXg;
@@ -764,6 +858,14 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // Fuldtids-analyse (v3.10, brugeren: "Ved pausen får jeg information om hvordan min opbygning
   // har klaret sig, men det får jeg ikke af vide ved fuldtid") – kun dit hold, dine valg og tal.
   const meSide = [H, A].find(own);
+  // Hvad udskiftningerne sparede (v3.13, Spilfører: en svagere indskifter skal kunne forstås som et valg):
+  // de udskiftede (ikke skadede) løb færre km – friskheden efter kampen regnes efter km-prisen (freshness.js).
+  if (meSide) {
+    const off = Object.values(sheet.entries).filter((e) => e.teamId === meSide.team.id && e.minIn <= 1 && e.minOut < 90 && !e.injured);
+    // Efter restitutionen (41 % af det, der mangler) er gevinsten 59 % af den sparede pris (QC: ellers stod 12 for 7).
+    const saved = Math.round((1 - REST_SHARE) * off.reduce((a, e) => a + matchCost(e.km90 * (90 - e.minOut) / 90, meSide.team.squad.find((p) => p.id === e.playerId)?.skills.stamina ?? 10), 0));
+    if (off.length) addEv(90, 'INFO', 'TACTIC', meSide.isHome, false, 'Udskiftninger', `🔋 [${meSide.team.name}] ${off.length === 1 ? 'Din udskiftede spiller' : `Dine ${off.length} udskiftede spillere`} sparede ca. ${saved} point friskhed til næste runde.`);
+  }
   if (meSide) {
     const d = duelLog[meSide.team.id], o = duelLog[other(meSide).team.id], ph = meSide.tactics.phases.phase1_buildUp, runs = ph.offBallRuns ?? 'NORMAL';
     const p = meSide.isHome ? 'h' : 'a', poss = Math.round((st[p + 'Poss'] / (st.hPoss + st.aPoss)) * 100);

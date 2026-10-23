@@ -1,6 +1,8 @@
 // Ændringer af eget holds taktik og opstilling – rene funktioner over holdobjektet, så de
 // kan testes uden browser. UI'et kalder dem og gemmer bagefter.
 import { FORMATIONS, clampPos } from '../engine/formations.js';
+import { clampSubsLimit } from '../engine/freshness.js';
+import { MAX_RULES } from '../engine/match-rules.js';
 
 const IDENTITY = Array.from({ length: 11 }, (_, i) => i);
 
@@ -47,11 +49,14 @@ export function switchPreset(team, fromIdx, toIdx) {
   return true;
 }
 
-export const MAX_RULES = 5;
+// Holdets udskiftningsgrænse (v3.13): på holdet, ikke i planen – planskift ændrer den ikke. 0 = fra.
+export const setSubsLimit = (team, v) => { team.subsLimit = clampSubsLimit(v); };
+
+export { MAX_RULES };
 export function addRule(team) {
   const rules = team.tactics.conditionalRules;
   if (rules.length >= MAX_RULES) return false;
-  rules.push({ ruleId: Math.max(0, ...rules.map((r) => r.ruleId)) + 1, minuteTrigger: 75, condition: 'LEADING', margin: 1, newFormation: '5-4-1', newPlan: null, slotRemapping: IDENTITY.slice() });
+  rules.push({ ruleId: Math.max(0, ...rules.map((r) => r.ruleId)) + 1, minuteTrigger: 75, condition: 'LEADING', margin: 1, newFormation: '5-4-1', newPlan: null, slotRemapping: IDENTITY.slice(), action: 'SHIFT', subOut: null, subIn: null });
   return true;
 }
 export const updateRule = (team, i, patch) => Object.assign(team.tactics.conditionalRules[i], patch);
