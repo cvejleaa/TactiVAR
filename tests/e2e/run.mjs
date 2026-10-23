@@ -621,6 +621,8 @@ try {
   check('Gem fra v3.12.0: holdene får udskiftningsgrænse efter deres profil (dit hold 70, botterne 75/65/75/70/70/65/75)', JSON.stringify(await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.teams.map((t) => t.subsLimit))) === JSON.stringify([70, 75, 65, 75, 70, 70, 65, 75]));
   await tab('kamp');
   check('Gem fra v3.12.0: runde 3 i Kamp-fanen uden 📍, startopstillingen på minibanen og ingen fejl', (await g.textContent('#match-center')).includes('runde 3') && (await g.locator('#feed .snap-btn').count()) === 0 && (await g.locator('#snap-pitch').count()) === 0 && (await g.locator('.minipitch').count()) >= 1 && (await g.isHidden('#fejlboks')));
+  const oldCol = await g.textContent('#gazette');
+  check('Gem fra v3.12.0: avisen er en klumme (bygget af de gemte kampe) med "Din kamp" og uden "undefined"', (await g.locator('#gazette #col-mine').count()) === 1 && !/undefined|NaN/.test(oldCol), oldCol.slice(0, 160));
 
   // v3.10: et gem fra v3.9 (runde 2) – kun v3.11's kampprogram-besked, statistikken starter tom fra runde 3
   const fixtureV39 = fs.readFileSync(new URL('../fixtures/save-v3.9.json', import.meta.url), 'utf8');

@@ -185,7 +185,10 @@ export function buildColumn({ matches = [], gazette = null, history = [], table 
   const cold = Object.entries(form).filter(([, s]) => s.lose >= 3).sort((a, b) => b[1].lose - a[1].lose)[0];
   if (hot) formParas.push(pickBy([`${name(hot[0])} har vundet ${hot[1].win} i træk.`, `${hot[1].win} sejre i træk til ${name(hot[0])}.`, `${name(hot[0])} er i flyvende form: ${hot[1].win} sejre i træk.`], round, 'hot', hot[0]));
   if (cold) formParas.push(pickBy([`${name(cold[0])} har tabt ${cold[1].lose} i træk.`, `Krise hos ${name(cold[0])}: ${cold[1].lose} nederlag i træk.`, `${name(cold[0])} kan ikke finde vejen: ${cold[1].lose} nederlag i træk.`], round, 'cold', cold[0]));
-  if (table.length && history.length >= 2) formParas.push(`${table[0].teamName} fører med ${table[0].points} point${table[1] ? `, ${table[0].points - table[1].points} foran ${table[1].teamName}` : ''}.`);
+  if (table.length && history.length >= 2) {
+    const gap = table[1] ? table[0].points - table[1].points : null;
+    formParas.push(gap === 0 ? `${table[0].teamName} og ${table[1].teamName} står lige i toppen med ${table[0].points} point.` : `${table[0].teamName} fører med ${table[0].points} point${gap != null ? `, ${gap} foran ${table[1].teamName}` : ''}.`);
+  }
   if (formParas.length) sections.push({ id: 'col-form', title: 'Formen', paras: formParas });
 
   // 5. Næste runde – seerens modstander set gennem hans seneste offentlige kampe, og opfølgning på sidste gæt.
@@ -195,7 +198,7 @@ export function buildColumn({ matches = [], gazette = null, history = [], table 
     const before = scout(history, opp.id, round - 1);
     if (before?.rule) {
       const held = before.rule.test(opp);
-      preview.push(held ? `Jeg skrev, at ${opp.name} ${pickBy(before.rule.say, round - 1, before.rule.key, 'scout')} – det holdt.` : `Jeg skrev, at ${opp.name} ${pickBy(before.rule.say, round - 1, before.rule.key, 'scout')} – det gjorde de ikke i denne kamp.`);
+      preview.push(held ? `Før kampen skrev jeg, at ${opp.name} ${pickBy(before.rule.say, round - 1, before.rule.key, 'scout')} – det holdt også mod jer.` : `Før kampen skrev jeg, at ${opp.name} ${pickBy(before.rule.say, round - 1, before.rule.key, 'scout')} – det gjorde de ikke mod jer.`);
     }
   }
   const nx = next.find((x) => x.homeId === viewerTeamId || x.awayId === viewerTeamId);
@@ -203,7 +206,7 @@ export function buildColumn({ matches = [], gazette = null, history = [], table 
     const nOpp = nx.homeId === viewerTeamId ? { id: nx.awayId, name: nx.awayName } : { id: nx.homeId, name: nx.homeName };
     const sc = scout(history, nOpp.id);
     preview.push(`${newSeason ? 'Ny sæson: ' : 'Næste runde: '}${nx.homeId === viewerTeamId ? `${nOpp.name} kommer på besøg` : `ude mod ${nOpp.name}`}.${form[nOpp.id]?.win >= 2 ? ` De har vundet ${form[nOpp.id].win} i træk.` : form[nOpp.id]?.lose >= 2 ? ` De har tabt ${form[nOpp.id].lose} i træk.` : ''}`);
-    if (sc?.rule && !newSeason) preview.push(`Mit bud: i ${sc.n === 1 ? 'deres seneste kamp' : `deres seneste ${sc.n} kampe`} ${pickBy(sc.rule.say, round, sc.rule.key, 'scout')}.`);
+    if (sc?.rule && !newSeason) preview.push(`Mit bud: ${nOpp.name} ${pickBy(sc.rule.say, round, sc.rule.key, 'scout')} i ${sc.n === 1 ? 'deres seneste kamp' : `deres seneste ${sc.n} kampe`} – det kan blive kampens tema.`);
   }
   if (preview.length) sections.push({ id: 'col-next', title: 'Næste runde', paras: preview });
 
