@@ -199,7 +199,9 @@ function customDragged(side) {
 
 const avg = (arr, f) => arr.reduce((a, p) => a + f(p), 0) / Math.max(1, arr.length);
 
-const endOf = (s) => ({ formation: s.tactics.baseFormation, starters: s.starters.map((p) => p.id), customCoords: structuredClone(s.tactics.customCoords), phases: structuredClone(s.tactics.phases) });
+// v3.14 (Arkitekt): trukne positioner og faser gemmes KUN for et menneskestyret hold (ejerens egne valg) – før lå
+// en bots fulde indstillinger i det gemte spil, selv om intet viste dem.
+const endOf = (s, full) => ({ formation: s.tactics.baseFormation, starters: s.starters.map((p) => p.id), ...(full ? { customCoords: structuredClone(s.tactics.customCoords), phases: structuredClone(s.tactics.phases) } : {}) });
 
 // Fuldtids-analysens angrebsdel (QC v3.12): kun de dele, dine valg (eller kampen) gav – ellers
 // stod der "0 cutbacks, 0 høje bolde" til et centralt hold. Cutbacks fra løb på kanten tæller med.
@@ -238,6 +240,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
   for (const side of [H, A]) side.starters.forEach((p, i) => p && register(side, p, coordsOf(side.tactics)[i].r, 1, i));
   // Startformationen gemmes, så karakterarket kan vise spillerne på banen.
   const startFormations = { home: H.tactics.baseFormation, away: A.tactics.baseFormation };
+  const startPhases = { home: structuredClone(H.tactics.phases), away: structuredClone(A.tactics.phases) };
   const hAvg = Math.round(avg(H.starters, (p) => masteryVs(p, away)));
   const aAvg = Math.round(avg(A.starters, (p) => masteryVs(p, home)));
 
@@ -866,8 +869,16 @@ export function simulateMatch(home, away, rng, opts = {}) {
     const saved = Math.round((1 - REST_SHARE) * off.reduce((a, e) => a + matchCost(e.km90 * (90 - e.minOut) / 90, meSide.team.squad.find((p) => p.id === e.playerId)?.skills.stamina ?? 10), 0));
     if (off.length) addEv(90, 'INFO', 'TACTIC', meSide.isHome, false, 'Udskiftninger', `🔋 [${meSide.team.name}] ${off.length === 1 ? 'Din udskiftede spiller' : `Dine ${off.length} udskiftede spillere`} sparede ca. ${saved} point friskhed til næste runde.`);
   }
+  // Dit holds egen kamprapport (v3.14, brugerens valg: klummen skal kunne bruge fuldtids-analysens tal): den
+  // spillede taktik (start/slut) og dueltallene pr. menneskestyret side. Ejer-privat (visibility.js
+  // viewOwnReport) – fuldtids-analysen og klummens "din kamp" læser BEGGE herfra, så de aldrig modsiger hinanden.
+  const ownReports = Object.fromEntries([H, A].filter(own).map((s) => {
+    const d = duelLog[s.team.id], o = duelLog[other(s).team.id], side = s.isHome ? 'home' : 'away';
+    return [s.team.id, { side, start: { formation: startFormations[side], phases: startPhases[side] }, end: { formation: s.tactics.baseFormation, phases: structuredClone(s.tactics.phases) },
+      ...d, oppCutbacks: o.cutbacks, oppCutbacksBlocked: o.cutbacksBlocked, oppCrosses: o.crosses, oppCrossesWon: o.crossesWon }];
+  }));
   if (meSide) {
-    const d = duelLog[meSide.team.id], o = duelLog[other(meSide).team.id], ph = meSide.tactics.phases.phase1_buildUp, runs = ph.offBallRuns ?? 'NORMAL';
+    const d = ownReports[meSide.team.id], ph = meSide.tactics.phases.phase1_buildUp, runs = ph.offBallRuns ?? 'NORMAL';
     const p = meSide.isHome ? 'h' : 'a', poss = Math.round((st[p + 'Poss'] / (st.hPoss + st.aPoss)) * 100);
     const [myG, oppG] = meSide.isHome ? [hG, aG] : [aG, hG];
     addEv(90, 'FULLTIME', 'TACTIC', meSide.isHome, false, 'Fuldtids-analyse',
@@ -877,7 +888,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
       // v3.12 (brugeren: "ikke en eneste reference til cutbacks"): dit angreb efter dine valg og
       // dit felt – modstanderens indstilling navngives ikke, kun hvad dit forsvar mødte.
       + ` ⚔️ Angreb (${FOCUS_LABEL[ph.attackFocus] ?? ph.attackFocus} · ${PASS_LABEL[ph.passingStyle] ?? ph.passingStyle}): ${attackLine(d, ph)}.`
-      + ` 🛡️ Dit felt: modstanderens cutbacks stoppet ${o.cutbacksBlocked} af ${o.cutbacks}, luftdueller vundet ${o.crosses - o.crossesWon} af ${o.crosses}.`);
+      + ` 🛡️ Dit felt: modstanderens cutbacks stoppet ${d.oppCutbacksBlocked} af ${d.oppCutbacks}, luftdueller vundet ${d.oppCrosses - d.oppCrossesWon} af ${d.oppCrosses}.`);
   }
   const ratings = finalizeSheet(sheet, hG, aG, rng, counterXpForMatch);
   addEv(90, 'END', 'HIGHLIGHT', true, false, 'Slutfløjt', `🏁 SLUTFLØJT! ${home.name} ${hG} - ${aG} ${away.name}.${ratings.motm ? ` Kampens spiller: #${ratings.motm.shirtNumber} ${ratings.motm.shortName} (${ratings.motm.teamName}).` : ''}`);
@@ -887,7 +898,8 @@ export function simulateMatch(home, away, rng, opts = {}) {
     homeId: home.id, awayId: away.id, homeName: home.name, awayName: away.name,
     homeTacticStr, awayTacticStr, startFormations,
     // Formation og opstilling ved slutfløjt (efter Hvis-Så-skifter og indskiftninger).
-    endState: { home: endOf(H), away: endOf(A) },
+    endState: { home: endOf(H, own(H)), away: endOf(A, own(A)) },
+    ownReports,
     homeGoals: hG, awayGoals: aG, homeVarNet,
     events, stats: st, ratings, goalsPool, injuries, observations,
   };

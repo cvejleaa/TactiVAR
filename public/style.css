@@ -158,3 +158,10 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 
 /* v3.13: advarsel i en Hvis-Så-udskiftning, der ikke passer til opstillingen */
 .rule-warn { color: #fbbf24; }
+
+/* v3.14: journalist-klummen */
+.gazette.column .col-title { font-size: 1.25rem; margin: 0.2rem 0 0.6rem; }
+.gazette.column .col-sec h4 { margin: 0.8rem 0 0.2rem; color: #a78bfa; font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.04em; }
+.gazette.column .col-sec p { margin: 0.25rem 0; }
+.gazette.column .headlines li { margin: 0.2rem 0; }
+.gazette.column .col-box { margin-top: 0.8rem; }

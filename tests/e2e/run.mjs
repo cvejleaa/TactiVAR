@@ -378,7 +378,14 @@ try {
   check('Fuldtids-analyse med løb uden bold i din kamp', /📊 \[90' FULDTIDS-ANALYSE\] \d+-\d+ til dig\. Du havde \d+% af bolden og \d+ afslutninger \(\d+ på mål\)\. Din opbygning kom igennem \d+ af \d+ gange; dit pres vandt bolden \d+ af \d+ gange\. Dødbolde: \d+ frispark i skudafstand, \d+ hjørnespark, \d+ straffe \(\d+ mål\) · frispark begået \d+, tilkendt \d+\. 🎯 Løb uden bold \(Normal\): \d+ løb, \d+ kom fri \(\d+ mål\) · kontraer imod i alt: \d+ \(\d+ mål\)\./.test(runSum), runSum.match(/🎯[^.]*\./)?.[0] ?? 'mangler');
   check('Fuldtids-analysen viser dit angreb (fokus · pasningsstil) og dit felt (v3.12)', /⚔️ Angreb \((Centralt|Høje indlæg|Lave cutbacks) · (korte pasninger|balanceret|direkte lange bolde)\): (ingen cutbacks eller høje bolde|(\d+ cutbacks \(\d+ mål, \d+ stoppet ved kanten\))?(, )?(\d+ høje bolde \(\d+ vundne luftdueller, \d+ hovedstødsmål\))?)\. 🛡️ Dit felt: modstanderens cutbacks stoppet \d+ af \d+, luftdueller vundet \d+ af \d+\./.test(runSum), runSum.match(/⚔️[^🛡]*🛡️[^.]*\./)?.[0] ?? 'mangler');
   const gzText = await g.textContent('#gazette');
-  check('Avisen: en overskrift pr. kamp og dit holds løber med andel højintenst', (await g.locator('#headlines li').count()) === 4 && /Dit holds løber: #\d+ .+ – \d+\.\d km, \d+ % højintenst/.test(gzText), gzText.slice(0, 200));
+  // v3.14: avisen er en klumme – overskrift, "Din kamp", de 3 øvrige kampe (fed overskrift, klik = referatet),
+  // rundens spiller og mål, næste runde; dit holds løber står stadig som boks.
+  const colIds = await g.locator('#gazette .col-sec').evaluateAll((ss) => ss.map((x) => x.id));
+  check('Klummen: overskrift, "Din kamp" først, 3 øvrige kampe, rundens spiller og mål, næste runde – og dit holds løber', (await g.locator('#col-title').count()) === 1 && colIds[0] === 'col-mine' && colIds.includes('col-others') && colIds.includes('col-stars') && colIds.includes('col-next')
+    && (await g.locator('#headlines li').count()) === 3 && /Dit holds løber: #\d+ .+ – \d+\.\d km, \d+ % højintenst/.test(gzText), `${colIds.join(',')} | ${gzText.slice(0, 160)}`);
+  const myMatchTxt = await g.textContent('#col-mine');
+  const myName = await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((t) => !t.isBot).name);
+  check('Klummen, "Din kamp": handler om dit hold (seeren)', myMatchTxt.includes(myName), myMatchTxt.slice(0, 160));
   const iconTitles = await g.evaluate(() => [...document.querySelectorAll('.ratings .ricon')].map((e) => [e.textContent, e.title]));
   check('Ikonerne i karakterarket har mouse-over-tekst', iconTitles.length > 0 && iconTitles.every(([t, ti]) => ti.length > 3 && !ti.includes('undefined')), JSON.stringify(iconTitles.slice(0, 3)));
   const legendTxt = await g.textContent('#icon-legend');

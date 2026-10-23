@@ -12,7 +12,8 @@ import { renderCard } from './ui/card.js';
 import { renderPitch } from './ui/pitch.js';
 import { renderTactics } from './ui/tactics.js';
 import { renderStandings } from './ui/standings.js';
-import { playRound, commitRound, pairRound } from './engine/season.js';
+import { playRound, commitRound, pairRound, sortStandings } from './engine/season.js';
+import { buildColumn } from './engine/column.js';
 import { seasonRoundOf } from './engine/schedule.js';
 import { renderLastRound, renderSchedule } from './ui/rounds.js';
 import { renderMatchCenter, renderGazette } from './ui/matchcenter.js';
@@ -84,6 +85,19 @@ function persist() {
 // Én ændring = ændr, gem, tegn igen. Modstanderhold tilbyder ingen redigering (låste
 // felter, ingen byt-knapper, ingen træk) – det er vagten, og e2e-testen holder øje med den.
 // Den aktive plan holdes lig med live-taktikken, så Hvis-Så-regler til "Plan A" er det, man ser.
+// Klummen for den, der ser (v3.14): bygges ved visning ud fra den sidste runde, sæsonens forløb, tabellen og
+// næste runde i programmet. Efter sæsonslut: den afsluttede sæsons forløb og tabel, og næste runde er en ny sæsons.
+function columnNow() {
+  const L = game.league, lr = L.lastRound;
+  if (!lr?.matches?.length) return null;
+  const end = lr.gazette?.seasonEnd, from = end ? end.fromRound : L.seasonStartRound ?? 1;
+  const history = (L.history || []).filter((r) => r.round >= from && r.round <= lr.round);
+  const table = (end ? end.table : sortStandings(L.leagueMetadata.standings)).map((r) => ({ teamId: r.teamId, teamName: r.teamName, points: r.points }));
+  let next = [];
+  try { next = pairRound(L).map(([hI, aI]) => ({ homeId: L.teams[hI].id, homeName: L.teams[hI].name, awayId: L.teams[aI].id, awayName: L.teams[aI].name })); } catch { next = []; }
+  return buildColumn({ matches: lr.matches, gazette: lr.gazette, history, table, next, viewerTeamId: myTeam().id, round: lr.round, newSeason: !!end });
+}
+
 function change(fn) { fn(); act.syncActivePreset(myTeam(), game.ui.activePresetIndex); persist(); render(); }
 
 function start() {
@@ -264,14 +278,14 @@ function renderNow() {
     trup: () => [header, matrix, h('div', { class: 'tactics-layout lineup-layout' }, h('section', {}, pitch), h('section', {}, card))],
     // Kortet står også i Taktik, så et klik på en brik viser spilleren uden fanebyt.
     taktik: () => [h('div', { class: 'tactics-layout' }, h('section', {}, pitch), h('section', {}, card, tactics))],
-    kamp: () => [shown ? renderMatchCenter({ mc: shown, myTeamId: mine.id, on: mcHandlers }) : h('div', { class: 'panel empty', id: 'no-matches' }, 'Ingen kampe spillet endnu. Tryk ▶ Spil runde i topbaren – modstanderen følger kampprogrammet på Liga-fanen.')],
+    kamp: () => [shown ? renderMatchCenter({ mc: shown, myTeamId: mine.id, on: mcHandlers, column: shown.round === league.lastRound?.round ? columnNow() : null }) : h('div', { class: 'panel empty', id: 'no-matches' }, 'Ingen kampe spillet endnu. Tryk ▶ Spil runde i topbaren – modstanderen følger kampprogrammet på Liga-fanen.')],
     liga: () => [mc?.playing ? h('div', { class: 'notice', id: 'booked-league' }, '📺 Runden spilles i Kamp-fanen – tabellen herunder er allerede opdateret med den.') : null,
       standings,
       // Resultaterne skjules under afspilningen, ligesom avisen (ellers afsløres de).
       league.lastRound && !mc?.playing ? renderLastRound({ round: league.lastRound, myTeamId: mine.id, onOpen: openReport }) : null,
       // Programmet skjules også under afspilningen (det viser den bogførte rundes resultat).
       !mc?.playing ? renderSchedule({ league, pairs: pairRound(league), myTeamId: mine.id }) : null,
-      league.lastRound && !mc?.playing ? renderGazette(league.lastRound.gazette, mine.id, openGoal, league.lastRound.matches) : null,
+      league.lastRound && !mc?.playing ? renderGazette(league.lastRound.gazette, mine.id, openGoal, league.lastRound.matches, columnNow(), openReport) : null,
       // Statistikken skjules også under afspilningen (den er bogført og ville afsløre runden).
       !mc?.playing ? renderStats({ league, myTeamId: mine.id }) : null],
   }[tab]();
@@ -348,7 +362,7 @@ const mcHandlers = {
   openGoal: (i, goal) => openGoal(i, goal),
   filter: (f) => { mc ||= lastRoundView(game.league.lastRound); mc.filter = f; renderMc(); },
 };
-const matchCenterEl = () => renderMatchCenter({ mc, myTeamId: myTeam().id, on: mcHandlers });
+const matchCenterEl = () => renderMatchCenter({ mc, myTeamId: myTeam().id, on: mcHandlers, column: mc && game.league.lastRound && mc.round === game.league.lastRound.round ? columnNow() : null });
 // Under afspilning tegnes kun Match Center om (ikke hele siden).
 function renderMc() { const el = document.getElementById('match-center'); if (el) el.replaceWith(matchCenterEl()); }
 

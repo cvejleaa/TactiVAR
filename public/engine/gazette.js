@@ -1,20 +1,10 @@
 // TactiVAR Avisen efter hver runde (docs/spec.md §6). v3.7 (brugeren: "avisen er stadig
-// kedelig"): overskrift pr. kamp, rundens overraskelse og dit holds løber. Den lange klumme i
-// fire afsnit er spec §10.3 og bygges ovenpå denne.
+// kedelig"): overskrift pr. kamp, rundens overraskelse og dit holds løber. Fra v3.14 skrives avisen
+// som en klumme (column.js) ved visning; denne gemmer rundens byggesten (spiller, mål, overraskelse, løber).
+import { headlineOf, publicFacts } from './column.js';
 
-// Overskrifter: tre varianter pr. udfald, valgt ud fra kampens tal (ingen tilfældighed).
-const HEADLINES = {
-  BIG: [(w, l, s) => `${w} knuser ${l} ${s}`, (w, l, s) => `Opvisning: ${w} sender ${l} hjem med ${s}`, (w, l, s) => `${l} får klø – ${w} vinder ${s}`],
-  WIN: [(w, l, s) => `${w} slår ${l} ${s}`, (w, l, s) => `${w} snupper sejren mod ${l} (${s})`, (w, l, s) => `Tre point til ${w} efter ${s} mod ${l}`],
-  DRAW0: [(h, a) => `Målløst mellem ${h} og ${a}`, (h, a) => `Taktisk skak: ${h} og ${a} deler 0-0`, (h, a) => `Ingen vinder – ${h} og ${a} spiller 0-0`],
-  DRAW: [(h, a, s) => `Point deles: ${h} – ${a} ${s}`, (h, a, s) => `${h} og ${a} skilles ${s}`, (h, a, s) => `Uafgjort ${s} mellem ${h} og ${a}`],
-};
-export function headline(m, round = 0) {
-  const hG = m.homeGoals, aG = m.awayGoals, pick = (list) => list[(hG * 7 + aG * 3 + round) % list.length];
-  if (hG === aG) return hG === 0 ? pick(HEADLINES.DRAW0)(m.homeName, m.awayName) : pick(HEADLINES.DRAW)(m.homeName, m.awayName, `${hG}-${aG}`);
-  const [w, l, s] = hG > aG ? [m.homeName, m.awayName, `${hG}-${aG}`] : [m.awayName, m.homeName, `${aG}-${hG}`];
-  return pick(Math.abs(hG - aG) >= 3 ? HEADLINES.BIG : HEADLINES.WIN)(w, l, s);
-}
+// Overskrifter: tre varianter pr. udfald, valgt ud fra kampens tal (ingen tilfældighed) – ét sted, i klummen.
+export const headline = (m, round = 0) => headlineOf(publicFacts(m), round);
 
 // Hvilken kamp i runden et mål faldt i: matchIdx (fra v3.7.1), ellers kampens navn; −1 = ukendt.
 export const goalMatchIdx = (goal, matches) => (!goal ? -1 : Number.isInteger(goal.matchIdx) ? goal.matchIdx : (matches || []).findIndex((m) => `${m.homeName} - ${m.awayName}` === goal.match));
