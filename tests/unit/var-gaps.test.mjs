@@ -202,3 +202,15 @@ test('billedet: står den tjekkede forreste trukket tilbage (y 22), tegnes skytt
   assert.equal(y[g.shooter.id], 22 + VAR_BEHIND); assert.equal(VAR_BEHIND, 4);
   assert.deepEqual(s.ball, [50, 26]);
 });
+
+// Bot-angreb: det gælder også, når botten scorer – billedet af målet imod dig spejles, så bolden står ved
+// 100 - (22 + VAR_BEHIND) = 74, ikke ved skudstedet 100 - 20 = 80. Dræber: offY nulstillet for udeholdet
+// (`* (att === H ? 1 : 0)`) – overlevede alle v3.14.2-tests, som kun prøvede hjemmeholdet.
+test('billedet af et mål imod dig: botten har en tilbagetrukket forreste (y 22) – bolden spejles fra y 26 (74), ikke fra skudstedet y 20 (80)', async () => {
+  const { VAR_BEHIND } = await import('../../public/engine/match.js');
+  const deep = { 1: { x: 50, y: 60 }, 8: { x: 50, y: 38 }, 9: { x: 50, y: 40 } };
+  const g = varGame({ spots: deep, attack: 'A', rolls: { spot: 0.9 }, offPulse: 14, shooterPulse: 8, defPositioning: 1 });
+  assert.equal(g.evs[0].type, 'VAR_GOAL');
+  assert.match(g.evs[0].text, new RegExp(`${tag(g.off)} foran ham`));
+  assert.deepEqual([g.evs[0].snapshot.attacking, g.evs[0].snapshot.scorer, g.evs[0].snapshot.ball], [false, null, [50, 100 - (22 + VAR_BEHIND)]]);
+});
