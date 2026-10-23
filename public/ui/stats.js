@@ -13,7 +13,7 @@ const TOP = 5;
 // dem er der ingen spillertal for. Runden vises sæson-relativt (som "Spil runde 10 af 14").
 export const statsFromK = (league) => Math.max(1, (league.statsFromRound ?? 1) - (league.seasonStartRound ?? 1) + 1);
 const since = (league) => `sæson ${league.leagueMetadata.seasonNumber}${statsFromK(league) > 1 ? `, fra runde ${statsFromK(league)}` : ''}`;
-const gapNote = (league) => statsFromK(league) > 1 ? h('p', { class: 'muted', id: 'stats-gap' }, `Sæsonens runde 1–${statsFromK(league) - 1} blev spillet, før statistikken fandtes, og kan ikke tælles med. Fra næste sæson tæller hele sæsonen.`) : null;
+const gapNote = (league) => statsFromK(league) > 1 ? h('p', { class: 'muted', id: 'stats-gap' }, `Sæsonens runde ${statsFromK(league) === 2 ? '1' : `1–${statsFromK(league) - 1}`} blev spillet, før statistikken fandtes, og kan ikke tælles med. Fra næste sæson tæller hele sæsonen.`) : null;
 // Hvilke sektioner er foldet ud – huskes mellem gen-tegninger (ellers lukkede de ved hvert klik).
 const openSecs = new Set(['stats-players']);
 const section = (id, title, ...body) => h('details', { class: 'stats-sec', id, open: openSecs.has(id),
