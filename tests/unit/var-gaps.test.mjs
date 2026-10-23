@@ -188,3 +188,17 @@ test('teksten "spillede 1-2" (kombinationsmål) kan komme fra beskrivelsen – o
     'A og S spillede 1-2 i 7. minut, og S gjorde det færdigt.',
   ]);
 });
+
+// v3.14.2 (brugeren: "siger at M. Møller var foran og ikke offside, men M. Poulsen er længere fremme"): den tjekkede
+// bliver, hvor han stod, og skytten tegnes aldrig foran ham. Her står den forreste (midtbanen) langt tilbage på y 22,
+// så skuddet tæt på mål (y 20) ville tegne skytten foran ham – han står i stedet VAR_BEHIND bag (y 26).
+test('billedet: står den tjekkede forreste trukket tilbage (y 22), tegnes skytten bag ham (y 26), ikke på skudstedet (y 20)', async () => {
+  const { VAR_BEHIND } = await import('../../public/engine/match.js');
+  const deep = { 1: { x: 50, y: 60 }, 8: { x: 50, y: 38 }, 9: { x: 50, y: 40 } };   // back y 40, midtbane y 22, angriber y 34
+  const g = varGame({ spots: deep, rolls: { spot: 0.9 } });
+  const s = g.evs[0].snapshot, y = Object.fromEntries(s.pts.map(([id, , py]) => [id, py]));
+  assert.match(g.evs[0].text, new RegExp(`${tag(g.off)} foran ham`));
+  assert.equal(y[g.off.id], 22, 'den tjekkede står, hvor han stod');
+  assert.equal(y[g.shooter.id], 22 + VAR_BEHIND); assert.equal(VAR_BEHIND, 4);
+  assert.deepEqual(s.ball, [50, 26]);
+});

@@ -332,3 +332,4 @@ test('cutback: en stopper på egen halvdel kan ikke "nå baglinjen" – kun en s
   assert.ok(ev.every((e) => e.text.includes(`✅ #${st.shirtNumber} ${st.shortName} når baglinjen`)), ev[0].text);
   assert.ok(ev.every((e) => !e.text.includes(`#${cb.shirtNumber} ${cb.shortName} når baglinjen`)));
 });
+
