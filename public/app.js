@@ -274,7 +274,7 @@ function renderNow() {
     subs: (v) => change(() => act.setSubsLimit(team, v)),
   } });
 
-  const standings = renderStandings({ league, viewTeamId: team.id, onPick: (id) => showTeam(league.teams.findIndex((t) => t.id === id)) });
+  const standings = renderStandings({ league, playing: !!mc?.playing, viewTeamId: team.id, onPick: (id) => showTeam(league.teams.findIndex((t) => t.id === id)) });
 
   // Faner: ét emne ad gangen (brugerens ønske: "et noget rodet layout").
   const tab = TABS.some(([k]) => k === game.ui.tab) ? game.ui.tab : 'trup';

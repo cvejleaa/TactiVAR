@@ -13,6 +13,9 @@ const TOP = 5;
 // dem er der ingen spillertal for. Runden vises sæson-relativt (som "Spil runde 10 af 14").
 export const statsFromK = (league) => Math.max(1, (league.statsFromRound ?? 1) - (league.seasonStartRound ?? 1) + 1);
 const since = (league) => `sæson ${league.leagueMetadata.seasonNumber}${statsFromK(league) > 1 ? `, fra runde ${statsFromK(league)}` : ''}`;
+// Lige efter sæsonslut er den nye sæsons tal tomme – sig hvor den afsluttede sæson står (QC v3.14.3).
+const endNote = (league) => { const last = league.seasons?.at(-1);
+  return last?.programmed && league.leagueMetadata.round + 1 === league.seasonStartRound ? h('p', { class: 'muted', id: 'stats-season-over' }, `Sæson ${last.seasonNumber} er slut – slutstillingen står i tabellen ovenfor, og mester, topscorer og din bedste under "Tidligere sæsoner" i kampprogrammet.`) : null; };
 const gapNote = (league) => statsFromK(league) > 1 ? h('p', { class: 'muted', id: 'stats-gap' }, `Sæsonens runde ${statsFromK(league) === 2 ? '1' : `1–${statsFromK(league) - 1}`} blev spillet, før statistikken fandtes, og kan ikke tælles med. Fra næste sæson tæller hele sæsonen.`) : null;
 // Hvilke sektioner er foldet ud – huskes mellem gen-tegninger (ellers lukkede de ved hvert klik).
 const openSecs = new Set(['stats-players']);
@@ -97,7 +100,7 @@ function myTeam(league, myTeamId) {
 
 export function renderStats({ league, myTeamId }) {
   return h('div', { class: 'panel stats', id: 'stats' }, h('h3', {}, '📊 Statistik'),
-    section('stats-players', `Spillere (${since(league)})`, gapNote(league), playerLists(league, myTeamId)),
+    section('stats-players', `Spillere (${since(league)})`, gapNote(league), endNote(league), playerLists(league, myTeamId)),
     section('stats-teams', `Holdtal (${since(league)})`, teamTable(league, myTeamId), h('p', { class: 'muted' }, 'Bold % er snit pr. kamp. Afslutninger, xG, hjørnespark, kontraer og VAR-tjek ses kun for dit eget hold (under "Dit hold") – summeret over sæsonen kunne de røbe et holds taktik.')),
     section('stats-flow', `Ligaens forløb (${since(league)})`, leagueFlow(league)),
     section('stats-mine', `Dit hold (privat, ${since(league)})`, myTeam(league, myTeamId)));

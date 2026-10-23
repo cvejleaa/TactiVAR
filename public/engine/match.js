@@ -427,7 +427,9 @@ export function simulateMatch(home, away, rng, opts = {}) {
       goalsPool.push({ scorer: tag(finisher), teamName: att.team.name, match: `${home.name} - ${away.name}`, min, kind: kd, spectacle: goalSpectacle(kd, { finishing: fs.finishing, pace: fs.pace, ballControl: fs.ballControl, passing: (helper ?? finisher).skills.passing }, min, rng), desc });
       // Med dit holds indledning (lead) fortæller den allerede oplægget – kun en kort slutning, ikke hele beskrivelsen
       // igen (brugeren v3.14.3: "cutback bliver noteret 2 gange i teksten"). "Rundens mål" bruger den fulde (desc).
-      const end = !lead ? desc : helper && helper.id !== finisher.id && !solo ? `${tag(finisher)} sparkede den ind.` : 'Bolden sad i nettet.';
+      // Slutter indledningen med afslutterens navn ("… lægger den tilbage til #7."), sparker han den ind; ellers (løberen
+      // skød selv – også "løber sig fri og skyder" i en kombination) sad bolden i nettet (QC v3.14.3).
+      const end = !lead ? desc : lead.endsWith(`${tag(finisher)}.`) ? `${tag(finisher)} sparkede den ind.` : 'Bolden sad i nettet.';
       addEv(min, 'GOAL', 'HIGHLIGHT', att.isHome, true, `⚽ Mål: ${tag(finisher)}`, `⚽ [${att.team.name} • ${hG}-${aG}] MÅÅÅL! ${lead ? lead + ' ' : ''}${end}`);
       // Solo-mål (langskud, dribletur): bolden står ved skytten – ikke på en fast plet i feltet (QC). Et langskud fra
       // skudafstand: skytten flyttes højst til LONGSHOT_FAR (v3.14.3).

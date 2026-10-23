@@ -51,16 +51,20 @@ test('langskud: skytten og bolden står i billedet højst på LONGSHOT_FAR (38) 
 });
 
 test('referatet fortæller oplægget én gang: med dit holds løb (✅) slutter målteksten kort – den fulde beskrivelse står i Rundens mål', () => {
-  let n = 0;
+  let n = 0, shot = 0;
   for (const { e, m } of G) {
     if (!e.text.includes('✅')) continue;
     assert.match(e.text, /(#\d+ .+ sparkede den ind|Bolden sad i nettet)\.$/, e.text);
     assert.doesNotMatch(e.text, /Lavt cutback|spillede 1-2|baglinjen.*baglinjen|cutback fra/, e.text);
+    // QC v3.14.3: "sparkede den ind" kun om den, indledningen spillede bolden til – aldrig efter "… og skyder." (løberen selv)
+    const kick = e.text.match(/\. (#\d+ .+) sparkede den ind\.$/);
+    if (kick) assert.ok(e.text.includes(`til ${kick[1]}. `) || e.text.includes(`spiller ${kick[1]}. `), e.text);
+    if (/ og skyder\. /.test(e.text)) { assert.match(e.text, /Bolden sad i nettet\.$/, e.text); shot++; }
     const g = m.goalsPool.find((x) => x.min === e.min && e.text.includes(x.scorer));
     assert.ok(g && g.desc.length > 20 && !e.text.includes(g.desc), 'den fulde beskrivelse er i goalsPool, ikke i referatet');
     n++;
   }
-  assert.ok(n >= 5, `mål med dit holds løb: ${n}`);
+  assert.ok(n >= 5 && shot >= 2, `mål med dit holds løb: ${n}, heraf "og skyder": ${shot}`);
 });
 
 test('slutstilling: lige efter sæsonens sidste runde viser tabellen slutstillingen og mesteren – efter næste runde den nye sæson', () => {
@@ -89,4 +93,17 @@ test('slutstilling kun for en rigtig sæson: en arkiveret "sæson uden program" 
   const el = renderStandings({ league: L, onPick: () => {}, viewTeamId: null });
   assert.equal(byId(el, 'standings-title').textContent, `${L.leagueMetadata.name} – sæson 2, efter 0 af ${L.schedule.length} runder`);
   assert.equal(byId(el, 'standings-champion'), undefined);
+});
+
+test('mesteren røbes ikke, mens sæsonens sidste runde spilles; statistikken siger, hvor den afsluttede sæson står', async () => {
+  const { renderStats } = await import('../../public/ui/stats.js');
+  const rng = createRng(5), L = createLeague(rng);
+  for (let r = 0; r < L.schedule.length; r++) commitRound(L, playRound(L, rng), rng);
+  const playing = renderStandings({ league: L, onPick: () => {}, viewTeamId: null, playing: true });
+  assert.equal(byId(playing, 'standings-champion'), undefined, 'ingen mester under afspilningen');
+  assert.match(byId(playing, 'standings-title').textContent, /slutstilling, sæson 1$/);
+  const st = renderStats({ league: L, myTeamId: L.teams[0].id });
+  assert.match(byId(st, 'stats-season-over').textContent, /^Sæson 1 er slut – slutstillingen står i tabellen ovenfor/);
+  commitRound(L, playRound(L, rng), rng);
+  assert.equal(byId(renderStats({ league: L, myTeamId: L.teams[0].id }), 'stats-season-over'), undefined, 'væk efter første runde i den nye sæson');
 });
