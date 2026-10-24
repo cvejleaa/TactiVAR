@@ -69,9 +69,9 @@ try {
     if (await page.locator('#rp-pitch').count()) {
       const goalBtn = page.locator('#feed .ev.goal .replay-btn, #feed .ev.header_goal .replay-btn').first();
       await ((await goalBtn.count()) ? goalBtn : page.locator('#feed .replay-btn').first()).click().catch(() => {});
-      await page.waitForTimeout(1300); await page.locator('#replay').screenshot({ path: path.join(OUT, `${nn}-afspilning-maal.png`) });
+      await page.waitForTimeout(2400); await page.locator('#replay').screenshot({ path: path.join(OUT, `${nn}-afspilning-maal.png`) });   // øjeblikket er færdigt ved 80 % af 2,6 s (Spilfører)
       lines.push('', `Afspilning (mål/afslutning): ${(await page.textContent('#rp-caption')).trim()}`);
-      await page.click('#rp-prev'); await page.waitForTimeout(1300); await page.locator('#replay').screenshot({ path: path.join(OUT, `${nn}-afspilning-foer.png`) });
+      await page.click('#rp-prev'); await page.waitForTimeout(1000); await page.locator('#replay').screenshot({ path: path.join(OUT, `${nn}-afspilning-foer.png`) });
       lines.push(`Afspilning (trinet før): ${(await page.textContent('#rp-caption')).trim()}`);
       await page.click('#heat-btn').catch(() => {});
       if (await page.locator('#heat-pitch').count()) {

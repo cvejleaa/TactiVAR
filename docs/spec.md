@@ -238,8 +238,8 @@ Tick hvert 3. minut (1..90).
   frem, og en spiller, der har vundet sit løb, står yderligere 12 frem; ingen længere frem end y = 8.
   Uden bolden ligger holdet efter sit pres (lav blok alle 10 tilbage, højt gegenpres midtbane og
   angreb 12 frem). Hele holdet forskydes mod boldsiden (x + (boldX − 50)·0,3). MV står fast.
-  Gemmes ikke (regnes pr. tick). Langskud = skytten står uden for feltet (y ≥ 24) i øjeblikket;
-  skuddets værdi er min(FIN + 8, 13) (`longshotBonus`): midtbanen (FIN ≈ 5) får tid og plads, men på
+  Gemmes ikke (regnes pr. tick). Langskud = skytten står uden for feltet (y ≥ 24; v3.16: y ≥ 30 med koblede linjer) i øjeblikket;
+  skuddets værdi er min(FIN + 8, 13) (`longshotBonus`; v3.15.1: loftet 10): midtbanen (FIN ≈ 5) får tid og plads, men på
   afstand er ingen bedre end 13, så en god afslutter står bedre i feltet (QC: med fast +7 scorede en
   angriber uden for feltet ≈ 90 %). Inde i feltet kombination eller dribletur efter evnerne.
   Kontraens skytte vælges i forsvarsformen (holdet har lige vundet bolden) efter PAC.
@@ -257,7 +257,8 @@ Tick hvert 3. minut (1..90).
   forsvar 19 % (v3.12.0: angreb 75 %, midtbane 15 %, forsvar 10 %, kontra 19 %, langskud 4 %).
   Typerne ligger i dokumentets intervaller; kæderne er 3–4 point fra (angreb over, midtbane under) –
   tæt på, ikke inde i. Kalibreret: KEEPER_EDGE 3,5 (v3.13: 3), CROSS_EDGE 2, SETPIECE_DEF_EDGE 3,75, cutback +8,
-  kontra +3 (v3.10: +4), EDGE_SHARE 0,5, langskud min(FIN + 8, 13).
+  kontra +3 (v3.10: +4), EDGE_SHARE 0,5, langskud min(FIN + 8, 13) (v3.15.1: KEEPER_EDGE 0,3, loft 10; v3.16: kanten
+  efter modstanderens pres – EDGE_BY_PRESS).
   Båndet ligger i balance.test.mjs. Brugt fra dokumentet: kæde- og typefordelingen. Ikke brugt:
   enkeltspillernes tal (beskriver Superligaens spillere, ikke spillets).
 - **Øjebliksbillede ved mål (v3.12.1**, brugerens valg "Også på minibanen ved mål"): et mål i åbent
@@ -286,7 +287,7 @@ Tick hvert 3. minut (1..90).
   Rundens mål (`… 30 saeson`): cutback 24 %, frispark 22 %, langskud 17 %, dribletur 11 %, hovedstød
   10 % … – ingen over 30 %; friskheden uændret (startelleven ≈ 85 %).
   **v3.12.1** (`… 100 fokus`): fokus pr. pasningsstil inden for 0,19 netto; angriberen vinder ≈ 50 %
-  af de åbne luftdueller (≈ 40 % mod lav blok); cutbacks stoppet ≈ 20/32/54 % mod lav blok/mellemblok/
+  af de åbne luftdueller (≈ 40 % mod lav blok); cutbacks stoppet ≈ 20/32/54 % (målt før v3.16 – med koblede linjer lukker også en hjemfalden kant; se `… fokus`) mod lav blok/mellemblok/
   højt gegenpres. Løb (`… 300 loeb`, netto pr. kamp): mod Hold på bolden Mange +0,16, Normal +0,01,
   Få −0,00; mod Lynkontra Få −0,00, Normal −0,01, Mange −0,04. Få og Normal ligger nu inden for
   målestøjen (≈ 0,05) af hinanden – Få's fordel er færre kontraer imod (0,03 mod 0,08) og mindre slid.
@@ -380,6 +381,8 @@ bedre kan kontrollere spil motoren".
     10, højt gegenpres 2; angreb hele vejen, midtbane det halve, forsvar ikke – QC: et hårdt loft gjorde presset ens).
     Ikke ved en kontra: det fangede hold står fremme;
   - kontraens skytte løber COUNTER_RUN 24 mod målet fra sin plads; oplægsgiveren er aldrig skytten;
+  - den almindelige afslutning: kun spillere inden for SHOT_REACH 28 af skudstedet skyder (Spilfører: en stopper skød fra
+    egen halvdel; 18 og 25 vendte målfordelingen og modgift-båndene) – langskud fra skudafstand også ved redning og forbi;
   - langskud = skytten står på y ≥ LONGSHOT_Y 30 (før 24 – angriberne står nu på linjen ≈28), også efter et vundet løb
     (før efter zonen); en kantløber skyder sjældnere selv (DECISION_ZONE.SHOT.WIDE 1 → 0,3);
   - afslutning fra kanten efter modstanderens pres (`EDGE_BY_PRESS`: lav blok 0,75, mellem 0,5, højt 0,35 – Spilfører:
@@ -389,7 +392,9 @@ bedre kan kontrollere spil motoren".
     linjen, VAR-kendelsen siger (kendelsen er stadig lodtrækningen). Afsparksbilledet: begge hold i egen halvdel.
   Målt (`… 150 maal`, `… 1500 var`, 800 kampe pr. pres; før → efter): mål 2,80 → 2,79, langskud 12 → 8 %, angreb 61 →
   62 %, midtbane 24 → 22 %, kontra 13 → 10 %; mål imod lav blok 1,34 → 1,35, langskud imod lav blok 10 → 8 % (gegenpres
-  12 → 7 %). Hjørnespark holdt med MISS_BLOCK_SHARE 0,66.
+  12 → 7 %). Hjørnespark holdt med MISS_BLOCK_SHARE 0,66. Med SHOT_REACH (sidst): mål 2,8 → 2,87, langskud ≈ 6,5 % (under
+  dokumentets 8–10 % – stopperne skød langskud før; bevidst), angreb 65 %, mål imod lav blok 1,38, langskud imod lav blok 7 %
+  mod gegenpres 5 %.
 - **2D-afspilningen** (Kamp-fanen, kun efter slutfløjt – den levende afspilning af referatet er uændret, så intet afsløres
   før tid): taktiktavle med begge hold og bolden, ▶/⏸, ⏮ ⏭ trin, 1×/2×/4×, ⭐ Højdepunkter (kun afslutningerne); 🎬 ved en
   afslutning i referatet springer dertil. Rolige tick 0,7 s, afslutninger 2,6 s med referatets linje som undertekst

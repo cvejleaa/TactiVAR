@@ -212,12 +212,13 @@ test('VAR: mod-kunnen mod VAR-linjen afgør (10 + 23·0,045 = 11,035 > 11; 22·0
   // Forsvareren, der holdt linjen: +0,45 og en taktisk sejr pr. annullering.
   assert.equal(no.ratings.away.find((x) => x.playerId === d.id).tacticWins, 2);
   // Et godkendt mål giver skytten præcis det samme som et mål uden tjek (før: +1,3 for et VAR-mål). Ét skud, så karakteren
-  // ikke rammer loftet 10: rul 0,1 → start 6,38; langskud (solo) +1,4; sejr +0,4; stopperens clean sheet +0,5 = 8,68 → 8,7.
+  // ikke rammer loftet 10: rul 0,1 → start 6,38; langskud (solo) +1,4; sejr +0,4 = 8,18 → 8,2. (v3.16 SHOT_REACH 28: stopperen
+  // står for langt fra skudstedet til at skyde – før scorede han og fik også clean sheet +0,5 = 8,7.)
   const one = varRun(23, { n: 1 }), plain = varRun(23, { n: 1, check: false });
   assert.deepEqual([one.m.stats.hVarChecks, plain.m.stats.hVarChecks, one.m.homeGoals, plain.m.homeGoals], [1, 0, 1, 1]);
   assert.equal(one.shooter.id, plain.shooter.id); assert.equal(one.shooter.id, shooter.id);
   const rt = (x) => x.m.ratings.home.find((e) => e.playerId === x.shooter.id).rating;
-  assert.deepEqual([rt(one), rt(plain)], [8.7, 8.7]);
+  assert.deepEqual([rt(one), rt(plain)], [8.2, 8.2]);
 });
 test('VAR: fortegn på VAR-netto, når udeholdet angriber (godkendt 0, annulleret +1 for hjemmeholdet pr. mål)', () => {
   const ok = varRun(23, { awayAttacks: true }).m, no = varRun(22, { awayAttacks: true }).m;

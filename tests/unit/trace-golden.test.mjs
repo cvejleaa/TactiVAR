@@ -10,7 +10,7 @@ import { createRng } from '../../public/engine/rng.js';
 import { createLeague } from '../../public/engine/generator.js';
 import { simulateMatch } from '../../public/engine/match.js';
 
-const GOLDEN = '4cd932050a0d2430cc4f5b8f8d51133c08e9d6cc23e582671f0c9603408ea020';   // v3.16 koblede linjer (bevidst ændret motor: modtagervalg, langskud, kontra, kant efter pres – før 9ae07870… fra v3.15.1)
+const GOLDEN = 'd67fad2a060dd6d106acae1d063b86e0b8c87f621bdb054dffbe81d597b457d1';   // v3.16 koblede linjer + SHOT_REACH (bevidst ændret motor: modtagervalg, langskud, kontra, kant efter pres – før 9ae07870… fra v3.15.1)
 export function goldenMatches() {
   const out = [];
   for (let s = 1; s <= 20; s++) {

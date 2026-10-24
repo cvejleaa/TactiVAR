@@ -70,10 +70,13 @@ export function replayEl(m, ownSide) {
   function show() {
     const s = r.steps[r.i];
     if (!s) return;
-    // Overgangene følger trinets længde ved alle hastigheder (QC: med faste 1,1 s hang brikkerne bagud ved 2× og 4×):
-    // bolden på 35 %, spillerne glider efter (forsinkelse kun ved 1×).
-    const d = STEP_MS[s.kind] / r.speed, glide = `${Math.round(d * 0.6)}ms ease-in-out ${r.speed === 1 ? Math.round(d * 0.2) : 0}ms`;
-    ball.style.transition = `left ${Math.round(d * 0.35)}ms ease-out, top ${Math.round(d * 0.35)}ms ease-out`;
+    // Overgangene følger trinets længde ved alle hastigheder (QC: med faste 1,1 s hang brikkerne bagud ved 2× og 4×).
+    // Grundbillede: bolden først (35 %), spillerne glider efter. Afslutning: skytten først, så bolden (Spilfører v3.16: bolden
+    // stod i feltet, før der var nogen til at skyde) – alt er fremme ved 80 % af trinet.
+    const d = STEP_MS[s.kind] / r.speed, shot = s.kind === 'moment';
+    const glide = `${Math.round(d * (shot ? 0.45 : 0.6))}ms ease-in-out ${!shot && r.speed === 1 ? Math.round(d * 0.2) : 0}ms`;
+    const bt = shot ? `${Math.round(d * 0.3)}ms ease-out ${Math.round(d * 0.5)}ms` : `${Math.round(d * 0.35)}ms ease-out`;
+    ball.style.transition = `left ${bt}, top ${bt}`;
     const here = new Set();
     for (const side of ['h', 'a']) for (const [id, x, y] of s[side]) {
       const t = token(id, side); here.add(id);

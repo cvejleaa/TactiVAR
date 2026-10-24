@@ -93,6 +93,9 @@ export const RECEIVE_SPREAD = 16, RECEIVE_BASE = 10;
 // slår bolden fra kanten (cutback, indlæg), skal stå højst RECEIVE_REACH derfra – ellers fik de fjerne en hale på
 // ≈ 25 %. Er ingen så tæt, alle. Afsluttere vælges uden grænse (andenbolde falder også til en stopper).
 export const RECEIVE_REACH = 25;
+// Den almindelige afslutning: skytten står højst så langt fra skudstedet (v3.16, Spilfører: en stopper skød fra egen halvdel;
+// 28 udelukker stopperne (≈29 fra kanten), men ikke midtbanen – 18 og 25 vendte målfordelingen og modgift-båndene).
+export const SHOT_REACH = 28;
 const BYLINE_Y = 6, CROSS_FROM_Y = 14;   // hvor cutbacken og indlægget slås fra (holdets egne koordinater)
 // Uden for feltet (y ≥ LONGSHOT_Y i øjeblikket) er et skud et langskud. Den, der får bolden ved
 // feltets kant, har tid og plads (LONGSHOT_BONUS) – det opvejer, at midtbanens afslutning er lavere
@@ -117,6 +120,8 @@ export const EDGE_SHARE = 0.5;
 // Mod en lav blok er feltet lukket: oftere afslutning fra kanten; mod højt pres sjældnere (v3.16, Spilfører: "Lav blok lukker
 // feltet: de skyder udefra"). Kun tærsklen for det samme træk – mellemblok = EDGE_SHARE.
 export const EDGE_BY_PRESS = { LOW_BLOCK: 0.75, MID_BLOCK: EDGE_SHARE, HIGH_GEGENPRESS: 0.35 };
+// Skudstedet for den almindelige afslutning ud fra terningen og forsvarets pres (ét sted – testes direkte).
+export const shotSpotFor = (roll, pressingHeight) => (roll < (EDGE_BY_PRESS[pressingHeight] ?? EDGE_SHARE) ? SPOT.EDGE : SPOT.GOAL);
 // Karakterbonus for en vundet taktisk duel ("styrer midtbanen", pres-erobring). v3.15: 0,35 → 0,2 – den kom ≈10 gange pr.
 // kamp, så en midtbanespiller slog en firemålsscorer til Kampens spiller (Spilførerens sæsongennemgang).
 export const DUEL_BONUS = 0.2;
@@ -277,9 +282,11 @@ export function simulateMatch(home, away, rng, opts = {}) {
     if (PASS_MOMENTS.has(kind)) {
       const c = momentCheck && ownXY(momentCheck.id);
       if (c) mv[momentCheck.id] = [c[0], momentCheck.offside ? line - 1 : line + ONSIDE_GAP];
-    } else if (shooter != null && !shotLong && !b) {
+    } else if (shooter != null && !b) {
       const c = ownXY(shooter);
-      if (c) mv[shooter] = [Math.min(70, Math.max(30, c[0])), Math.min(c[1], SHOT_BOX_Y)];
+      // Langskud: fra skudafstand foran målet – også når det reddes eller går forbi (QC v3.16: kun målet var klemt)
+      if (c) mv[shooter] = shotLong ? [Math.min(LONGSHOT_X[1], Math.max(LONGSHOT_X[0], c[0])), Math.min(LONGSHOT_FAR, Math.max(LONGSHOT_Y, c[1]))]
+        : [Math.min(70, Math.max(30, c[0])), Math.min(c[1], SHOT_BOX_Y)];
     }
     if (b) { const c = ownXY(shooter); if (c && c[1] < b.y) mv[shooter] = [c[0], b.y]; }
     const att = ptsOf(side, atkPos, mv), dpts = ptsOf(def, defPos);
@@ -287,7 +294,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
     const at = shooter != null && att.find((q) => q[0] === shooter);
     const ball = at ? [at[1], at[2]] : common(side, spot.x, spot.y);
     trace.moments.push({ t: curMin / 3, ev: events.length - 1, kind, side: side === H ? 'h' : 'a', ball, h: side === H ? att : dpts, a: side === H ? dpts : att,
-      shooter, ...(extra.scorer ? { scorer: extra.scorer, assist: extra.assist ?? null } : {}) });
+      shooter, ...(shotLong && shooter != null && !PASS_MOMENTS.has(kind) ? { long: true } : {}), ...(extra.scorer ? { scorer: extra.scorer, assist: extra.assist ?? null } : {}) });
   }
   const PASS_MOMENTS = new Set(['VAR_CHECK', 'VAR_NO_GOAL', 'OFFSIDE_FLAG']);
   const SHOT_MOMENTS = new Set(['SAVE', 'MISS', 'OFFSIDE_FLAG', 'VAR_CHECK', 'VAR_NO_GOAL']);
@@ -1089,8 +1096,9 @@ export function simulateMatch(home, away, rng, opts = {}) {
       }
       if (focus === 'LOW_CUTBACKS' && rng.chance(FOCUS_SHARE.LOW_CUTBACKS)) { cutback(att, def, cR, dR, min, shotXg); continue; }
       // Skytten er den, der står nærmest målet (oftest angriberen) – ikke en tilfældig spiller.
-      const shotSpot = rng.next() < (EDGE_BY_PRESS[defPh.phase2_defending.pressingHeight] ?? EDGE_SHARE) ? SPOT.EDGE : SPOT.GOAL;
-      const shooter = receiver(att, shotSpot, (p) => p.skills.finishing, null, { attacking: true, ballX: 50 });
+      const shotSpot = shotSpotFor(rng.next(), defPh.phase2_defending.pressingHeight);
+      // Kun spillere inden for SHOT_REACH af skudstedet afslutter (Spilfører v3.16: en stopper skød fra egen halvdel)
+      const shooter = receiver(att, shotSpot, (p) => p.skills.finishing, null, { attacking: true, ballX: 50 }, SHOT_REACH);
       {
         // Løb uden bold (v3.9): en markspiller forsøger at løbe sig fri. Vinder han løbet, træffer
         // han en beslutning (skud/aflevering/dribletur) efter zone og evner; ellers en almindelig

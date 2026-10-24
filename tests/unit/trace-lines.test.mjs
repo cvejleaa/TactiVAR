@@ -45,6 +45,17 @@ test('afslutteren i feltet: mål (ikke langskud) med scoreren på højst SHOT_BO
   assert.ok(inBox > 200 && longs > 15 && counters > 15, `data: i feltet ${inBox}, langskud ${longs}, kontra ${counters}`);
 });
 
+test('alle afslutningers billeder (også redning og forbi): langskud fra y 30–38 og x 20–80, ellers skytten i feltet (QC v3.16)', () => {
+  let long = 0, box = 0;
+  for (const m of games) for (const mo of m.trace.moments.filter((x) => x.shooter != null && ['SAVE', 'MISS', 'GOAL'].includes(x.kind))) {
+    const p = mo[mo.side].find((q) => q[0] === mo.shooter); if (!p) continue;
+    const [, x, y] = own(mo.side, p), e = m.events[mo.ev];
+    if (mo.long) { long++; assert.ok(y >= 30 && y <= 38 && x >= 20 && x <= 80, `langskud ${mo.kind} (${x},${y})`); }
+    else if (!(m.events[mo.ev - 1]?.type === 'VAR_CHECK' && / foran #/.test(e.text))) { box++; assert.ok(y <= SHOT_BOX_Y, `${mo.kind} (${x},${y})`); }
+  }
+  assert.ok(long > 50 && box > 500, `data: langskud ${long}, i feltet ${box}`);
+});
+
 test('kontraens oplæg: aldrig "#7 X fandt #7 X" – oplægsgiveren er en anden end scoreren', () => {
   let n = 0;
   for (const m of games) for (const g of m.goalsPool.filter((x) => x.kind === 'COUNTER')) { n++; assert.ok(!g.desc.includes(`${g.scorer} fandt ${g.scorer}`), g.desc); }

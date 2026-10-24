@@ -435,7 +435,7 @@ try {
     return null;
   });
   check('Øjebliksbillede, dit mål: 11 brikker, scorer ⚽ og oplæg 🅰 markeret, bolden vist', !!snapT && snapT.a?.n === 11 && snapT.a.scorer === 1 && snapT.a.assist === 1 && snapT.a.ball && snapT.a.pitches === 1 && /mål af #\d+ .+: sådan stod I/.test(snapT.a.title), JSON.stringify(snapT?.a));
-  check('Øjebliksbillede, mål imod: kun dit forsvar (ingen scorer, ingen af modstanderens spillere) – gemt uden modstanderens positioner', !!snapT && snapT.b?.n === 11 && snapT.b.scorer === 0 && !snapT.b.oppName && snapT.b.title.includes('begge hold ses i afspilningen') && snapT.ownOnly, JSON.stringify(snapT?.b));
+  check('Øjebliksbillede, mål imod: kun dit forsvar (ingen scorer, ingen af modstanderens spillere) – gemt uden modstanderens positioner', !!snapT && snapT.b?.n === 11 && snapT.b.scorer === 0 && !snapT.b.oppName && snapT.b.title.includes('sådan stod dit forsvar, da bolden blev spillet') && snapT.ownOnly, JSON.stringify(snapT?.b));
   check('Uden valgt mål: intet øjebliksbillede, men 📍 ved hvert mål med billede', !!snapT && snapT.none.pitches === 0 && snapT.none.pins === snapT.none.want && snapT.none.want >= 2, JSON.stringify(snapT?.none));
   // v3.16: 2D-afspilning og heat map efter slutfløjt (brikker for begge hold, 🎬 springer til hændelsen, ▶ kører, heat map for dit hold)
   if (await g.locator('#replay #rp-pitch').count()) {

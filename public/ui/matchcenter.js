@@ -99,7 +99,7 @@ function snapPitch(rows, { ev, snap }, onSnap) {
   const byId = new Map(rows.map((e) => [e.playerId, e]));
   const who = (id) => byId.get(id);
   const sc = who(snap.scorer);
-  const head = snap.attacking ? `${ev.min}' – mål${sc ? ` af #${sc.shirtNumber} ${sc.shortName}` : ''}: sådan stod I` : `${ev.min}' – mål imod: sådan stod dit forsvar (begge hold ses i afspilningen 🎬)`;
+  const head = snap.attacking ? `${ev.min}' – mål${sc ? ` af #${sc.shirtNumber} ${sc.shortName}` : ''}: sådan stod I, da bolden blev spillet` : `${ev.min}' – mål imod: sådan stod dit forsvar, da bolden blev spillet`;
   return h('div', { class: 'minipitch-wrap', id: 'snap-pitch' }, h('div', { class: 'row' }, h('strong', { id: 'snap-title' }, head),
     h('button', { class: 'mini', id: 'snap-back', onclick: () => onSnap(null) }, '↩ Startopstilling')),
     h('div', { class: 'minipitch' },

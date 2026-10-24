@@ -238,23 +238,18 @@ test('langskud er skytten på koblet y ≥ 30 (ST 36 − 6 = 30 → langskud, 35
 // altid EDGE_SHARE 0,5. Slot 9 står på kanten (38 − 6 = 32), slot 10 længere fremme (30 − 6 = 24; mod mellemblok/gegenpres klemt
 // til linjen 27 + 1 = 28, mod lav blok – linje 17 – står han på 24). Terningen er både tærsklen og modtager-lodtrækningen, så
 // afslutningsevnen (vægt 10 + FIN) er sat pr. pres, så kanten giver slot 9 og målet slot 10 på BEGGE sider af tærsklen.
-test('almindelig afslutning: kanten (50,32) vælges efter forsvarets pres – mellemblok 0,48 → kanten / 0,52 → målet (50,20), lav blok 0,73 / 0,77, gegenpres 0,33 / 0,37 – dræber EDGE_BY_PRESS-værdierne ±0,03, eget pres i stedet for forsvarets, fast EDGE_SHARE og spot-y', () => {
-  const spots = { 9: { x: 50, y: 38 }, 10: { x: 50, y: 30 } };
-  const who = (spots, next, press = 'MID_BLOCK', fin = [10, 10]) => {
-    const r = mine({ spots, next, away: { p2: { pressingHeight: press } }, setup: (b) => { slot(b.H, 9).skills.finishing = fin[0]; slot(b.H, 10).skills.finishing = fin[1]; } });
-    assert.ok(r.m.goalsPool.length >= 25); return [...new Set(r.m.goalsPool.map((g) => g.scorer))];
-  };
-  const tg = (a, i) => `#${slot(a.H, i).shirtNumber} ${slot(a.H, i).shortName}`;
-  const a = mine({ spots }).a;
-  assert.deepEqual(who(spots, 0.48, 'MID_BLOCK', [10, 20]), [tg(a, 9)]);   // 0,48 < 0,5 → kanten
-  assert.deepEqual(who(spots, 0.52, 'MID_BLOCK', [10, 20]), [tg(a, 10)]);  // 0,52 ≥ 0,5 → målet
-  assert.deepEqual(who(spots, 0.73, 'LOW_BLOCK', [25, 10]), [tg(a, 9)]);    // 0,73 < 0,75 (med 0,5 var det målet)
-  assert.deepEqual(who(spots, 0.77, 'LOW_BLOCK', [25, 10]), [tg(a, 10)]);
-  assert.deepEqual(who(spots, 0.33, 'HIGH_GEGENPRESS', [10, 40]), [tg(a, 9)]);   // 0,33 < 0,35
-  assert.deepEqual(who(spots, 0.37, 'HIGH_GEGENPRESS', [10, 40]), [tg(a, 10)]);  // 0,37 ≥ 0,35 (med 0,5 var det kanten)
-  // Kantens y præcis 32 (ikke 30): slot 9 står 24 væk fra kanten, slot 10 4 væk – men terningen lander på slot 9 med y 32 og på slot 10 med y 30
-  const tight = { 9: { x: 50, y: 62 }, 10: { x: 50, y: 34 } };
-  assert.deepEqual(who(tight, 0.45), [tg(a, 9)]);   // 0,45 < EDGE_SHARE 0,5 → kanten; vægtningen ved 0,48 lander på næste plads
+test('almindelig afslutning: kanten (50,32) vælges efter forsvarets pres – mellemblok 0,48 → kanten / 0,52 → målet (50,20), lav blok 0,73 / 0,77, gegenpres 0,33 / 0,37, ukendt pres som mellemblok – dræber EDGE_BY_PRESS-værdierne ±0,03, fast EDGE_SHARE og spot-y', async () => {
+  // v3.16: valget testes direkte (shotSpotFor) – før gennem hvem modtagerlodtrækningen landede på, som flyttede sig med hver
+  // motorændring (SHOT_REACH, koblede linjer). At motoren bruger forsvarets pres, ikke angriberens, bevises nedenfor.
+  const { shotSpotFor, SPOT, EDGE_SHARE } = await import('../../public/engine/match.js');
+  assert.deepEqual([SPOT.EDGE, SPOT.GOAL, EDGE_SHARE], [{ x: 50, y: 32 }, { x: 50, y: 20 }, 0.5]);
+  const y = (r, p) => shotSpotFor(r, p).y;
+  assert.deepEqual([y(0.48, 'MID_BLOCK'), y(0.52, 'MID_BLOCK'), y(0.73, 'LOW_BLOCK'), y(0.77, 'LOW_BLOCK'), y(0.33, 'HIGH_GEGENPRESS'), y(0.37, 'HIGH_GEGENPRESS'), y(0.48, undefined), y(0.52, undefined)],
+    [32, 20, 32, 20, 32, 20, 32, 20]);
+  // Motoren bruger FORSVARETS pres (defPh), ikke angriberens – ét kald (læst i kilden; en lodtrækning kan ikke skelne dem
+  // pålideligt, fordi presset også flytter forsvarets placering).
+  const src = (await import('node:fs')).readFileSync(new URL('../../public/engine/match.js', import.meta.url), 'utf8');
+  assert.equal(src.match(/shotSpotFor\(rng\.next\(\), defPh\.phase2_defending\.pressingHeight\)/g)?.length, 1);
 });
 
 // v3.16 (koblede linjer): angriberne (14) står bag offside-linjen – modstanderens stopper på 73 → 27 + ONSIDE_GAP 1 = 28 –
