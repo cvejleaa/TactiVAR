@@ -275,16 +275,31 @@ test('tillægstidslinjen i referatet: "⏱️ Tillægstid: S min (heraf X for VA
   }
 });
 
-test('tillægstidslinjen: kom der en hændelse i tillægstiden (målet i 90+1), står linjen under DEN – ikke under slutfløjtet', () => {
-  const m = game(27), { end } = halves(m);
-  const goal = m.events.find((e) => e.type === 'GOAL' && e.clock.m === 90 && e.clock.plus === 1);
-  assert.ok(goal && m.events.indexOf(goal) < end, 'data: mål i 90+1 før slutfløjtet');
+const game = (s) => { const L = createLeague(createRng(s)), me = L.teams.find((t) => !t.isBot); return simulateMatch(me, L.teams[(s % 7) + 1], createRng(s * 13)); };
+// Første seed (≥ 1) med et hjemmemål i anden halvlegs tillægstid før slutfløjtet – data, ikke et fast seed (fordelingen i
+// vinduet er en hash, så hvilket seed der rammer, kan ændre sig; testen kræver blot, at der findes et).
+const stoppageGoal = () => {
+  for (let s = 1; s < 400; s++) {
+    const m = game(s), { end } = halves(m);
+    const goal = m.events.find((e, i) => i < end && e.type === 'GOAL' && e.isHome && e.clock.m === 90 && e.clock.plus);
+    const mo = goal && m.trace.moments.find((x) => x.ev === m.events.indexOf(goal) && x.side === 'h');
+    if (mo) return { m, goal, mo, s };
+  }
+  return null;
+};
+const SG = stoppageGoal();
+test('tillægstidslinjen: kom der en hændelse i tillægstiden (et mål i 90+x), står linjen under DEN – ikke under slutfløjtet', () => {
+  assert.ok(SG, 'data: et hjemmemål i 90+x før slutfløjtet');
+  const { m, goal } = SG;
   const el = render(m, m.homeId), feed = byId(el, 'feed')[0].children, row = byId(el, 'stoppage-1')[0];
   const i = feed.indexOf(row);
   assert.equal(row.textContent, `90'⏱️ Tillægstid: ${m.stoppage[1].S} min${m.stoppage[1].var ? ` (heraf ${m.stoppage[1].var} for VAR)` : ''}.`);
-  assert.ok(feed[i - 1].textContent.startsWith("90+1'") && feed[i - 1].textContent.includes(goal.text), 'over linjen: målet');
+  // Linjen står under halvlegens FØRSTE tillægsminut-hændelse (nyeste øverst) – målet eller en hændelse før det
+  const first = m.events.slice(halves(m).ht + 1).find((e) => e.clock.plus);
+  assert.ok(feed[i - 1].textContent.startsWith(evMin(first)) && feed[i - 1].textContent.includes(first.text), 'over linjen: den første i tillægstiden');
   assert.ok(!feed[i - 1].textContent.includes('SLUTFLØJT'));
   assert.ok(!/^\d+\+/.test(feed[i + 1].textContent), 'under linjen: ordinær tid');
+  assert.ok(m.events.indexOf(first) <= m.events.indexOf(goal));
 });
 
 test('tillægstidslinjen under live: ikke før ankeret er vist – derefter med', () => {
@@ -307,15 +322,14 @@ test('scoreboard og tidslinje følger uret: halvlegsstregen på (45+S1)/T, mærk
 });
 
 // ---------- Heat map: prikkens minut og "på banen i X min" ----------
-const game = (s) => { const L = createLeague(createRng(s)), me = L.teams.find((t) => !t.isBot); return simulateMatch(me, L.teams[(s % 7) + 1], createRng(s * 13)); };
-test('heat-prikkens titel er hændelsens minut (90+1\' – ikke tick\'ets 88\' eller t·3 = 90\')', () => {
-  const m = game(27), mo = m.trace.moments.find((x) => x.side === 'h' && m.events[x.ev].clock.plus);
-  assert.ok(mo && mo.t === 30 && evMin(m.events[mo.ev]) === "90+1'", 'data: et mål i 90+1');
-  assert.equal(fmtMin(tickClock(mo.t, m.stoppage)), "88'");
+test('heat-prikkens titel er hændelsens minut (90+x – ikke tick\'ets start eller t·3)', () => {
+  assert.ok(SG && SG.mo.t === 30, 'data: et mål i 90+x i sidste tick');
+  const { m, goal } = SG, tick = fmtMin(tickClock(SG.mo.t, m.stoppage));
+  assert.notEqual(evMin(goal), tick);
   const el = render(m, m.homeId, { heat: { playerId: null } });
   const titles = all(byId(el, 'heat-pitch')[0], (x) => cls(x, 'heat-shot')).map((d) => d.attrs.title);
-  assert.ok(titles.includes("90+1' mål"), titles.join(' | '));
-  assert.ok(!titles.includes("88' mål") && !titles.includes("90' mål"));
+  assert.ok(titles.includes(`${evMin(goal)} mål`), titles.join(' | '));
+  assert.ok(!titles.includes(`${tick} mål`) && !titles.includes("90' mål"));
 });
 
 test('"på banen i X min" i heat-noten følger ind–ud-kolonnen (urets minutter)', () => {

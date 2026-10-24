@@ -56,7 +56,8 @@ function timeline(events, stoppage = null) {
 
 // Spilletid: "90'" for hele kampen, ellers ind–ud.
 // v3.16.4: med referatets ur (span fra clock.js playerSpan) – ellers tick-minutterne som før (gamle gem).
-export const minutes = (e, s = null) => (e.minIn <= 1 && e.minOut === 90 ? "90'" : `${e.minIn <= 1 ? "0'" : s?.in ? fmtMin(s.in) : `${e.minIn}'`}–${e.minOut === 90 ? "90'" : s?.out ? fmtMin(s.out) : `${e.minOut}'`}`);
+// Skiftet ud i sidste tick (minOut 90) viser urets 90+x (TM-hjælper).
+export const minutes = (e, s = null) => (e.minIn <= 1 && e.minOut === 90 && !s?.out ? "90'" : `${e.minIn <= 1 ? "0'" : s?.in ? fmtMin(s.in) : `${e.minIn}'`}–${s?.out ? fmtMin(s.out) : `${e.minOut}'`}`);
 
 // Ikonerne i karakterarket. title giver mouse-over; forklaringen under arket dækker touch.
 export const RATING_ICONS = [['⚽', 'Mål'], ['🅰', 'Oplæg'], ['🧤', 'Redninger'], ['✈', 'Vundne luftdueller'], ['🟨', 'Gult kort'], ['🟥', 'Udvist'], ['🚑', 'Skadet'], ['👑', 'Kampens spiller'], ['🧠', 'Mod-kunnen (erfaring) optjent i kampen']];

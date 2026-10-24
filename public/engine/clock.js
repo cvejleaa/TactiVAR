@@ -14,7 +14,7 @@ const HALF = [{ ticks: 14, from: 1, base: 45 }, { ticks: 16, from: 46, base: 90 
 // kendelse). Rundes op, højst STOPPAGE_MAX; "heraf VAR" er højst totalen (QC C5). Pause-skift (minut 45) tæller ikke.
 export function stoppageFor(evs) {
   const windows = new Set(evs.filter((e) => e.type === 'SUB' && e.min !== 45).map((e) => e.min)).size;
-  const goals = evs.filter((e) => e.type === 'GOAL' || e.type === 'HEADER_GOAL').length;
+  const goals = evs.filter((e) => e.type === 'GOAL' || e.type === 'HEADER_GOAL' || e.type === 'VAR_GOAL').length;
   const cards = evs.filter((e) => (e.type === 'FOUL' && /Gult/.test(e.label ?? '')) || e.type === 'RED' || e.type === 'VAR_RED').length;
   const injuries = evs.filter((e) => e.type === 'INJURY').length;
   const v = evs.filter((e) => e.var).reduce((a, e) => a + 1 + (VAR_REVIEW.has(e.var.verdict) ? 1 : 0), 0);
@@ -28,6 +28,7 @@ function windowOf(h, k, S) {
   const a = from + Math.floor(((k - 1) * len) / n), b = k === n ? HALF[h].base + S : from - 1 + Math.floor((k * len) / n);
   return [a, Math.max(a, b)];
 }
+const hashOf = (str) => { let x = 2166136261; for (const ch of str) x = Math.imul(x ^ ch.charCodeAt(0), 16777619) >>> 0; return x; };
 const asClock = (h, m) => (m > HALF[h].base ? { m: HALF[h].base, plus: m - HALF[h].base } : { m });
 
 // Lægger e.clock på hver hændelse. minClock: Map(hændelsens indeks → tidligste minut). Returnerer [{S, var}, {S, var}].
@@ -47,8 +48,12 @@ export function assignClock(events, minClock = new Map()) {
     let prev = h === 0 ? 1 : 46;
     for (const k of [...groups.keys()].sort((x, y) => x - y)) {
       const idx = groups.get(k), [a, b] = windowOf(h, Math.min(k, HALF[h].ticks), stop[h].S), n = idx.length;
+      // Hver hændelse får sin del af vinduet og et deterministisk sted i den (hash af tick, indeks og type – intet rng): ellers
+      // landede et tick med én hændelse altid på vinduets første minut (TM-hjælper: 1, 4, 7 … ≈150 gange, 43' 6 gange i 1000)
+      const w = b - a + 1;
       idx.forEach((i, j) => {
-        let m = Math.max(prev, a + Math.floor((j * (b - a + 1)) / n), minClock.get(i) ?? 0);
+        const lo = Math.floor((j * w) / n), span = Math.max(1, Math.floor(((j + 1) * w) / n) - lo);
+        let m = Math.max(prev, a + lo + (hashOf(`${k}|${i}|${events[i].type}`) % span), minClock.get(i) ?? 0);
         prev = m;
         events[i].clock = asClock(h, m);
       });
@@ -91,7 +96,9 @@ export function playerSpan(events, entries) {
       if (!e.clock) continue;
       if (e.type === 'SUB' && e.min === r.minIn && e.label?.startsWith(`🔄 ${t} ind for `)) s.in = e.clock;
       if (e.type === 'SUB' && e.min === r.minOut && e.label?.endsWith(` ind for ${t}`)) s.out = e.clock;
-      if (!s.out && (e.type === 'RED' || e.type === 'VAR_RED' || e.type === 'INJURY') && e.min === r.minOut && e.text?.includes(t)) s.out = e.clock;
+      // Rødt kort går forud for skadelinjen (den nævner også tacklingens mand – TM-hjælper)
+      if ((e.type === 'RED' || e.type === 'VAR_RED') && e.min === r.minOut && e.text?.includes(t)) s.out = e.clock;
+      if (!s.out && e.type === 'INJURY' && e.min === r.minOut && e.text?.includes(t)) s.out = e.clock;
     }
     span.set(r.playerId, s);
   }

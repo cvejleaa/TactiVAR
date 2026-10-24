@@ -10,7 +10,7 @@ import { createRng } from '../../public/engine/rng.js';
 import { createLeague } from '../../public/engine/generator.js';
 import { simulateMatch } from '../../public/engine/match.js';
 
-const GOLDEN = '32508c6b2e3e62d920a78e15f07604ed78163283a71f02883cf07cd57ec8bd24';   // v3.16.4: kun ur (clock/stoppage) – noprose uændret (før d46c1314…) · v3.16.3: kun tekst – noprose uændret (tools/fingerprint.mjs; før 7648f4ef… – vary, målets linje, fuldtidsanalysen – og før det 072a48cf… fra v3.16.2) · v3.16.1 sammenpresning i stedet for klemning (bevidst ændret motor: modtagervalget læser positionerne – før d67fad2a… fra v3.16) · v3.16 koblede linjer + SHOT_REACH (bevidst ændret motor: modtagervalg, langskud, kontra, kant efter pres – før 9ae07870… fra v3.15.1)
+const GOLDEN = 'b91c88f512f90dd365b7a23958499796442cd855e62572994df72f459cc3aab0';   // v3.16.4: kun ur (clock/stoppage) – noprose uændret (før d46c1314…) · v3.16.3: kun tekst – noprose uændret (tools/fingerprint.mjs; før 7648f4ef… – vary, målets linje, fuldtidsanalysen – og før det 072a48cf… fra v3.16.2) · v3.16.1 sammenpresning i stedet for klemning (bevidst ændret motor: modtagervalget læser positionerne – før d67fad2a… fra v3.16) · v3.16 koblede linjer + SHOT_REACH (bevidst ændret motor: modtagervalg, langskud, kontra, kant efter pres – før 9ae07870… fra v3.15.1)
 export function goldenMatches() {
   const out = [];
   for (let s = 1; s <= 20; s++) {

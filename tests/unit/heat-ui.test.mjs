@@ -123,11 +123,11 @@ test('holdets heat map: felterne (6×9) med den rigtige placering og styrke (tæ
   const dots = all(byId(el, 'heat-pitch')[0], (x) => cls(x, 'heat-shot'));
   assert.deepEqual(all(byId(el, 'heat-opp')[0], (x) => cls(x, 'heat-shot')).map((d) => [d.className, d.style.left, d.style.top]), [['heat-shot miss', '90%', '90%']]);
   assert.deepEqual(dots.map((d) => [d.className, d.style.left, d.style.top, d.textContent, d.attrs.title]), [
-    ['heat-shot goal', '12%', '30%', '⚽', "4' mål"], ['heat-shot save', '11%', '31%', '●', "5' redning"], ['heat-shot miss', '20%', '20%', '●', "7' forbi/blokeret"],
-    ['heat-shot offside', '20%', '20%', '●', "10' offside (flag)"], ['heat-shot disallowed', '20%', '20%', '●', "11' annulleret af VAR"], ['heat-shot miss', '20%', '20%', '●', "17' forbi/blokeret"]]);
+    ['heat-shot goal', '12%', '30%', '⚽', "4' mål"], ['heat-shot save', '11%', '31%', '●', "5' redning"], ['heat-shot miss', '20%', '20%', '●', "8' forbi/blokeret"],
+    ['heat-shot offside', '20%', '20%', '●', "10' offside (flag)"], ['heat-shot disallowed', '20%', '20%', '●', "12' annulleret af VAR"], ['heat-shot miss', '20%', '20%', '●', "17' forbi/blokeret"]]);
   // v3.16.4: titlen er HÆNDELSENS ur (øjeblikkets ev 1, 2, 3, 4, 5, 7 → 4', 5', 7', 10', 11', 17'), ikke tick'ets start (t 1–7 → 1', 4', 7', 10', 13', 20'
   // med S1 = 8) og ikke t·3 som før (3', 6', 9', 12', 15', 21')
-  assert.deepEqual([1, 2, 3, 4, 5, 7].map((i) => evMin(base.events[i])), ["4'", "5'", "7'", "10'", "11'", "17'"], 'data: kampens ur');
+  assert.deepEqual([1, 2, 3, 4, 5, 7].map((i) => evMin(base.events[i])), ["4'", "5'", "8'", "10'", "12'", "17'"], 'data: kampens ur');
   assert.equal(byId(el, 'heat-note')[0].textContent, 'Angriber opad. Farven: hvor holdet stod i kampens 1 øjebliksbilleder og afslutninger. Prikker: 1 mål, 1 reddet, 2 forbi/blokeret, 1 offside, 1 annulleret. Klik på en spiller i listen.');
   // Knapperne
   const { el: e2, calls } = render(mOf(), base.homeId, { heat: { playerId: null } });
