@@ -46,9 +46,11 @@ function arena({ home = {}, away = {} } = {}) {
   return { L, H, A };
 }
 const slot = (t, i) => t.squad.find((p) => p.id === t.tactics.lineupSlots[i]);
-const FAR = { x: 50, y: 95 };
-// Alle markspillere sættes langt væk; de udvalgte pladser trækkes derhen, man vil have.
-function layout(t, spots) { t.tactics.customCoords = {}; for (let i = 1; i <= 10; i++) t.tactics.customCoords[i] = spots[i] ?? FAR; }
+// Alle markspillere sættes langt væk (y 95); de udvalgte pladser trækkes derhen, man vil have. v3.16.1: hver sin x (14, 22, …, 86 – 8 fra
+// hinanden ≥ MIN_APART 6, også efter boldsidens ±11,4), så de ikke står oven i hinanden og skubbes på tværs (spread) – billedet er så
+// formens egne tal. (Før stod alle ni på (50, 95).)
+const FAR = (i) => ({ x: 14 + 8 * (i - 1), y: 95 });
+function layout(t, spots) { t.tactics.customCoords = {}; for (let i = 1; i <= 10; i++) t.tactics.customCoords[i] = spots[i] ?? FAR(i); }
 const goalEvents = (m, ...types) => m.events.filter((e) => types.includes(e.type));
 const mids = (t) => [5, 6, 7, 8].map((i) => slot(t, i));
 function mine({ spots, home = {}, away = {}, script = {}, next = 0.5, setup = null } = {}) {
@@ -70,10 +72,11 @@ test('dit mål (kombination): billedet har ALLE 11 pladser med de levende koordi
   const evs = goalEvents(m, 'GOAL');
   assert.ok(evs.length >= 25 && evs.every((e) => e.snapshot), 'hvert mål i åbent spil har et billede');
   const snap = evs[0].snapshot, g = (i) => slot(a.H, i).id;
-  // GK uændret (50,90); back 95−20 = 75; CB 95−14 = 81; midtbane 95−16 = 79; ST2 95−6 = 89. ST1 28−6 = 22 står v3.16 (koblede
-  // linjer) ikke foran offside-linjen: modstanderens stopper i mellemblok på y 73 → linje 100 − 73 = 27, + ONSIDE_GAP 1 = 28
-  // (før 22; x 40 uændret ved bold midt)
-  const want = pts(a.H, [[50, 90], [50, 75], [50, 81], [50, 81], [50, 75], [50, 79], [50, 79], [50, 79], [50, 79], [40, 28], [50, 89]]);
+  // GK uændret (50,90); back 95−20 = 75; CB 95−14 = 81; midtbane 95−16 = 79; ST2 95−6 = 89, x fra FAR (14, 22, …, 86). ST1 28−6 = 22
+  // presses v3.16.1 sammen til offside-linjen: modstanderens stopper i mellemblok på y 73 → linje 100 − 73 = 27, + ONSIDE_GAP 1 = 28; de
+  // andre ligger bag 28 + 12 og står. Oven i en modspiller skubbes man 6 på tværs (apartFrom): ST1 (40, 28) fra stopperen (spejlet (38, 27))
+  // → 44; botten (ønsket 100 − 89 + 10 = 21) har angriberne spejlet på (62, 79) og (38, 79): plads 4 (38, 75) → 44, plads 7 (62, 79) → 68
+  const want = pts(a.H, [[50, 90], [14, 75], [22, 81], [30, 81], [44, 75], [46, 79], [54, 79], [68, 79], [70, 79], [44, 28], [86, 89]]);
   assert.deepEqual(snap, { attacking: true, formation: '4-4-2', pts: want, scorer: g(9), assist: g(5), ball: [50, 20] });
   // Billedet hænger på målets egen hændelse (ikke den første i kampen) – alle andre hændelser har intet
   assert.ok(m.events.filter((e) => e.snapshot).every((e) => e.type === 'GOAL') && m.events[0].snapshot === undefined);
@@ -88,10 +91,12 @@ test('oplægsgiveren markeres ikke, når han selv scorer (helper === scorer) –
 test('hovedstødsmål: bolden på (50,16), bold-siden (88) rykker holdet 11 mod højre, scorer og indlægsgiver – og et dødbolds-hovedstød har intet billede', () => {
   const { a, m } = mine({ spots: { 9: { x: 40, y: 28 } }, home: { p1: { attackFocus: 'HIGH_CROSSES' } }, script: { 0.52: true } });
   const e = goalEvents(m, 'HEADER_GOAL')[0];
-  // x = x + (88 − 50)·0,3 = +11,4 → 50 → 61, 40 → 51; GK står. v3.13 (brugerens eksempel): aktørerne står, hvor
-  // hændelsen var – indlæggeren (plads 5) ude på kanten (88, 14), hovedstødsspilleren (plads 9) i feltet (50, 16).
-  assert.deepEqual(e.snapshot, { attacking: true, formation: '4-4-2', pts: pts(a.H, [[50, 90], [61, 75], [61, 81], [61, 81], [61, 75], [88, 14], [61, 79], [61, 79], [61, 79], [50, 16], [61, 89]]),
-    scorer: slot(a.H, 9).id, assist: slot(a.H, 5).id, ball: [50, 16] });
+  // x = x + (88 − 50)·0,3 = +11,4 → 14 → 25, 22 → 33, …, 86 → 97; GK står. Botten (bold 12: −11,4) har angriberne spejlet på (73, 79) og
+  // (49, 79): plads 4 (49, 75) → 55, plads 7 (73, 79) → 79. v3.13 (brugerens eksempel): aktørerne står, hvor hændelsen var – indlæggeren
+  // ude på kanten (88, 14), hovedstødsspilleren (plads 9) i feltet (50, 16). Indlæggeren er plads 6: lodtrækningen (0,5) over vægtene
+  // exp(−afstand/16) til (88, 30) når halvdelen ved plads 6 (65, 79).
+  assert.deepEqual(e.snapshot, { attacking: true, formation: '4-4-2', pts: pts(a.H, [[50, 90], [25, 75], [33, 81], [41, 81], [55, 75], [57, 79], [88, 14], [79, 79], [81, 79], [50, 16], [97, 89]]),
+    scorer: slot(a.H, 9).id, assist: slot(a.H, 6).id, ball: [50, 16] });
   // Frisparksindlæg (dødbold): header-mål uden billede – kun åbent spil har billede (§3)
   const f = mine({ spots: { 9: { x: 40, y: 28 } }, script: { 0.061: true, 0.37: false }, setup: (b) => { for (const q of b.H.squad) q.aerialPower = 40; } });
   const sp = goalEvents(f.m, 'HEADER_GOAL');
@@ -101,10 +106,13 @@ test('cutback-mål: bolden på (50,28) (ikke 20), oplægget er kantspilleren, ho
   const { a, m } = mine({ spots: { 9: { x: 40, y: 28 } }, home: { p1: { attackFocus: 'LOW_CUTBACKS' } }, script: { 0.38: true } });
   const e = goalEvents(m, 'GOAL')[0];
   assert.deepEqual(e.snapshot.ball, [50, 28]);
-  assert.equal(e.snapshot.scorer, slot(a.H, 9).id); assert.equal(e.snapshot.assist, slot(a.H, 6).id);
-  // v3.13: kantspilleren (plads 6) ved baglinjen (88, 6), scoreren (plads 9) på pletten (50, 28) – resten i holdets form
-  assert.deepEqual(e.snapshot.pts.map(([, x]) => x), [50, 61, 61, 61, 61, 61, 88, 61, 61, 50, 61]);
-  assert.deepEqual([e.snapshot.pts[6].slice(1), e.snapshot.pts[9].slice(1)], [[88, 6], [50, 28]]);
+  // kantspilleren er plads 8: ingen inden for rækkevidden, og lodtrækningen (0,5) over vægtene til (88, 30) – nu også angriberen på
+  // (55, 28) – når halvdelen ved plads 8 (81, 79)
+  assert.equal(e.snapshot.scorer, slot(a.H, 9).id); assert.equal(e.snapshot.assist, slot(a.H, 8).id);
+  // v3.13: kantspilleren (plads 8) ved baglinjen (88, 6), scoreren (plads 9) på pletten (50, 28) – resten i holdets form, +11,4 mod boldsiden
+  // (som hovedstødsmålet: plads 4 → 55, plads 7 → 79 væk fra bottens angribere)
+  assert.deepEqual(e.snapshot.pts.map(([, x]) => x), [50, 25, 33, 41, 55, 57, 65, 79, 88, 50, 97]);
+  assert.deepEqual([e.snapshot.pts[8].slice(1), e.snapshot.pts[9].slice(1)], [[88, 6], [50, 28]]);
 });
 // QC-rettelsen (69dc916): kontramål får også billede – dit hold i angrebsform, når du mister bolden fremme.
 test('straffe giver intet billede; kontramål giver – for dig med scorer, imod dig uden', () => {
@@ -139,21 +147,21 @@ function against({ focus = 'CENTRAL', script = {}, press = 'LOW_BLOCK' } = {}) {
   const m = simulateMatch(a.A, a.H, stubRng({ 0.48: true, 0.3: true, ...script }));
   return { a, m, snap: goalEvents(m, 'GOAL', 'HEADER_GOAL', 'VAR_GOAL').find((e) => e.snapshot)?.snapshot };
 }
-// v3.16 (koblede linjer): dit forsvar rykkes som blok efter dit pres – de forreste PRESS_GAP.LOW_BLOCK 20 foran modstanderens
-// dybeste markspiller. Botten (3-5-2, alle andre trukket til y 95) har stopperne på 95 − 14 = 81 → ønsket 100 − 81 + 20 = 39;
-// din forreste (ST 28 + 10 = 38) → skift 1: angrebet ×1 → 39, midtbanen ×0,5 (95,5 → klemt 95), forsvaret ×0 (95).
-test('mål imod (åbent spil): dit forsvar i lav blok (alle +10, ST 28 + 10 = 38, rykket 1 til 39 – 20 foran bottens stoppere på 81), ingen scorer/oplæg, bolden spejlet (50,80), ingen af modstanderens spillere i billedet', () => {
+// v3.16.1 (sammenpresning): dit forsvar presses sammen efter dit pres – de forreste PRESS_GAP.LOW_BLOCK 20 foran modstanderens
+// dybeste markspiller. Botten (3-5-2, alle andre trukket til y 95) har stopperne på 95 − 14 = 81 → ønsket 100 − 81 + 20 = 39 (MIN_DEPTH:
+// 95 − 18 = 77 begrænser ikke); din forreste (ST 28 + 10 = 38) → 39, alle andre (95) ligger bag 39 + 12 og står.
+test('mål imod (åbent spil): dit forsvar i lav blok (alle +10, ST 28 + 10 = 38, presset til 39 – 20 foran bottens stoppere på 81), ingen scorer/oplæg, bolden spejlet (50,80), ingen af modstanderens spillere i billedet', () => {
   const { a, m, snap } = against();
   assert.ok(m.homeGoals >= 25 && snap);
-  // ST: før 38 (livePositions), nu 39 (seen[mine] fra coupledPositions)
-  assert.deepEqual(snap, { attacking: false, formation: '4-4-2', pts: pts(a.H, [[50, 90], [50, 95], [50, 95], [50, 95], [50, 95], [50, 95], [50, 95], [50, 95], [50, 95], [40, 39], [50, 95]]), scorer: null, assist: null, ball: [50, 80] });
+  // ST: før 38 (livePositions), nu 39 (seen[mine] fra coupledPositions); x fra FAR (14, 22, …, 86)
+  assert.deepEqual(snap, { attacking: false, formation: '4-4-2', pts: pts(a.H, [[50, 90], [14, 95], [22, 95], [30, 95], [38, 95], [46, 95], [54, 95], [62, 95], [70, 95], [40, 39], [86, 95]]), scorer: null, assist: null, ball: [50, 80] });
   const enemy = a.A.squad.map((p) => p.id);
   assert.ok(!enemy.some((id) => JSON.stringify(snap).includes(id)), 'modstanderens spiller-id i billedet');
 });
 test('mål imod på et indlæg fra højre (bold 88): dit forsvar forskydes mod den SPEJLEDE boldside (12 → −11,4) og bolden spejles til (50,84)', () => {
   const { a, snap } = against({ focus: 'HIGH_CROSSES', script: { 0.52: true } });
-  // y som i testen ovenfor: ST 38 rykket 1 til 39 (før 38)
-  assert.deepEqual(snap.pts, pts(a.H, [[50, 90], [39, 95], [39, 95], [39, 95], [39, 95], [39, 95], [39, 95], [39, 95], [39, 95], [29, 39], [39, 95]]));
+  // y som i testen ovenfor: ST 38 presset til 39; x − 11,4: 14 → 2,6 → klemt 3, 22 → 11, …, 86 → 75, ST 40 → 29 (mod 88: +11,4 → 25, …, 51)
+  assert.deepEqual(snap.pts, pts(a.H, [[50, 90], [3, 95], [11, 95], [19, 95], [27, 95], [35, 95], [43, 95], [51, 95], [59, 95], [29, 39], [75, 95]]));
   assert.deepEqual([snap.attacking, snap.scorer, snap.assist, snap.ball], [false, null, null, [50, 84]]);
 });
 test('bot mod bot: ingen billeder (der er intet hold at vise) og ingen fejl', () => {
@@ -252,21 +260,24 @@ test('almindelig afslutning: kanten (50,32) vælges efter forsvarets pres – me
   assert.equal(src.match(/shotSpotFor\(rng\.next\(\), defPh\.phase2_defending\.pressingHeight\)/g)?.length, 1);
 });
 
-// v3.16 (koblede linjer): angriberne (14) står bag offside-linjen – modstanderens stopper på 73 → 27 + ONSIDE_GAP 1 = 28 –
-// men løberen er sluppet igennem og står foran den (17). Cutback-lodtrækningen (terning 0,5) lander nu på plads 7 (73, 32),
-// ikke plads 6: angriberen på (49, 28) står ved pletten, men vægtene foran ham i rækken (1–7) når netop halvdelen.
-test('løber, højre kant (RM, bold 88): løberen står 12 foran sin levende plads (96, 29 − 12 = 17) – foran linjen, angriberne bag den (14 → 28) – holdet 11 mod højre, bolden på (50,28), oplægget er løberen – dræber RUN_STEP, ballX-sidebytte, runner-ignoreret, løberen klemt', () => {
+// v3.16.1 (sammenpresning): angriberne (14) presses til offside-linjen – modstanderens stopper på 73 → 27 + ONSIDE_GAP 1 = 28 – og
+// midtbanen bag dem ([14, 40] til [28, 40]: 29 → 35, 32 → 36); løberen er sluppet igennem og står foran linjen (17), uden for
+// sammenpresningen. Oven i en modspiller skubbes man 6 på tværs: ST (49, 28)/(73, 28) fra stopperne (spejlet (49, 27)/(73, 27)) → 55/79,
+// CM (49, 36)/(73, 36) fra bottens CM'er (spejlet y 41) → 55/79, LM (26, 35) fra RB (spejlet (26, 30)) → 32. Cutback-lodtrækningen
+// (terning 0,5) lander på plads 6 (55, 36): vægtene exp(−afstand/16) til (50, 28) for plads 1–6 når netop halvdelen.
+test('løber, højre kant (RM, bold 88): løberen står 12 foran sin levende plads (96, 29 − 12 = 17) – foran linjen, angriberne presset til den (14 → 28) – holdet 11 mod højre, bolden på (50,28), oplægget er løberen – dræber RUN_STEP, ballX-sidebytte, runner-ignoreret, løberen presset med', () => {
   const r = runGoal({ rm: { passing: 20, finishing: 1 } });
   assert.deepEqual(r.m.goalsPool.map((g) => g.kind), ['CUTBACK', 'CUTBACK']);
-  const want = pts(r.a.H, [[50, 90], [26, 50], [49, 59], [73, 59], [96, 50], [26, 29], [49, 32], [73, 32], [96, 17], [49, 28], [73, 28]]);
-  assert.deepEqual(r.evs[0].snapshot, { attacking: true, formation: '4-4-2', pts: want, scorer: slot(r.a.H, 7).id, assist: slot(r.a.H, 8).id, ball: [50, 28] });
+  const want = pts(r.a.H, [[50, 90], [26, 50], [49, 59], [73, 59], [96, 50], [32, 35], [55, 36], [79, 36], [96, 17], [55, 28], [79, 28]]);
+  assert.deepEqual(r.evs[0].snapshot, { attacking: true, formation: '4-4-2', pts: want, scorer: slot(r.a.H, 6).id, assist: slot(r.a.H, 8).id, ball: [50, 28] });
 });
-// v3.16: angriberne 14 → 28 (bag linjen 27 + 1), løberen foran den; lodtrækningen (0,25) lander på plads 7 (51, 32), før plads 6.
-test('løber, venstre kant (LM, bold 12): holdet 11 mod venstre (LB 15 → 4), løberen på (4, 45 − 16 − 12 = 17), angriberne bag linjen (28)', () => {
+// v3.16.1: angriberne 14 → 28 (bag linjen 27 + 1), midtbanen 32/29 → 36/35, løberen foran linjen; skubbet 6 på tværs fra modspillerne
+// (spejlet): ST og CM 27 → 33, 51 → 57, RM (74, 35) fra LB (74, 30) → 80. Lodtrækningen (0,25) lander på plads 6 (33, 36).
+test('løber, venstre kant (LM, bold 12): holdet 11 mod venstre (LB 15 → 4), løberen på (4, 45 − 16 − 12 = 17), angriberne presset til linjen (28)', () => {
   const r = runGoal({ rm: { passing: 20, finishing: 1 }, slotNo: 5, next: 0.25 });
   assert.deepEqual(r.m.goalsPool.map((g) => g.kind), ['CUTBACK', 'CUTBACK']);
-  const want = pts(r.a.H, [[50, 90], [4, 50], [27, 59], [51, 59], [74, 50], [4, 17], [27, 32], [51, 32], [74, 29], [27, 28], [51, 28]]);
-  assert.deepEqual(r.evs[0].snapshot, { attacking: true, formation: '4-4-2', pts: want, scorer: slot(r.a.H, 7).id, assist: slot(r.a.H, 5).id, ball: [50, 28] });
+  const want = pts(r.a.H, [[50, 90], [4, 50], [27, 59], [51, 59], [74, 50], [4, 17], [33, 36], [57, 36], [80, 35], [33, 28], [57, 28]]);
+  assert.deepEqual(r.evs[0].snapshot, { attacking: true, formation: '4-4-2', pts: want, scorer: slot(r.a.H, 6).id, assist: slot(r.a.H, 5).id, ball: [50, 28] });
 });
 
 test('kontra: afslutteren er den FARTIGSTE nær målet (PAC), ikke den bedste afleverer – PAC 20/PAS 1 slår PAC 1/PAS 20 på samme sted – dræber skill → passing', () => {
@@ -288,11 +299,12 @@ test('almindelig afslutning inde i feltet: dribletur vægtes af PAC og BAL hver 
   assert.deepEqual(kinds({ pace: 8, ballControl: 8 }), ['COMBINATION']);
 });
 
-// v3.16: langskud fordi løberen står på 34 ≥ LONGSHOT_Y 30 (før: zonen afgjorde); angriberne bag linjen 14 → 28.
+// v3.16: langskud fordi løberen står på 34 ≥ LONGSHOT_Y 30 (før: zonen afgjorde). v3.16.1: angriberne presset til linjen 14 → 28,
+// midtbanen bag dem 29/32 → 35/36; LM, CM'erne og angriberne skubbet 6 på tværs fra modspillerne (15 → 21, 38 → 44, 62 → 68).
 test('løb der ender i et skud: løberen står stadig 12 foran (RM trukket til (50,62): 62 − 16 − 12 = 34 ≥ 30 → langskud, ikke 46 → 38 = LONGSHOT_FAR) – billedet bruger løbets øjeblik, ikke skytte-kastet før – dræber "run seen ikke sat/uden runner"', () => {
   const r = runGoal({ rm: { finishing: 20, passing: 1, pace: 1, ballControl: 1 }, custom: { 8: { x: 50, y: 62 } } });
   assert.deepEqual(r.m.goalsPool.map((g) => g.kind), ['LONGSHOT', 'LONGSHOT']);
-  const want = pts(r.a.H, [[50, 90], [15, 50], [38, 59], [62, 59], [85, 50], [15, 29], [38, 32], [62, 32], [50, 34], [38, 28], [62, 28]]);
+  const want = pts(r.a.H, [[50, 90], [15, 50], [38, 59], [62, 59], [85, 50], [21, 35], [44, 36], [68, 36], [50, 34], [44, 28], [68, 28]]);
   // Solo-mål: bolden står ved skytten (QC-rettelsen), ikke på (50, 20)
   assert.deepEqual(r.evs[0].snapshot, { attacking: true, formation: '4-4-2', pts: want, scorer: slot(r.a.H, 8).id, assist: null, ball: [50, 34] });
 });
@@ -327,9 +339,9 @@ function runAgainst(rm) {
 test('et løb imod dig på højre kant (bold 88): dit forsvar står forskudt 11 mod venstre (LB 15 → 4) og bolden er spejlet – både når løbet ender i en aflevering (cutback) og i et skud – dræber "run seenX ikke sat"', () => {
   const pass = runAgainst({ passing: 20, finishing: 1 });
   assert.deepEqual(pass.m.goalsPool.map((g) => g.kind), ['CUTBACK', 'CUTBACK']);
-  // v3.16 (koblede linjer, dit pres mellemblok): botten har stopperne på 73 − 14 = 59 → dine forreste skal stå 100 − 59 + PRESS_GAP 10
-  // = 51; dine angribere stod på 20 → skift 31: angreb ×1 20 → 51, midtbane ×0,5 45/48 + 15,5 → 61/64 (før 45/48), forsvaret står.
-  const want = pts(pass.a.H, [[50, 90], [4, 70], [27, 73], [51, 73], [74, 70], [4, 61], [27, 64], [51, 64], [74, 61], [27, 51], [51, 51]]);
+  // v3.16.1 (sammenpresning, dit pres mellemblok): botten har stopperne på 73 − 14 = 59 → dine forreste skal stå 100 − 59 + PRESS_GAP 10
+  // = 51; [20, 63] til [51, 63]: angreb 20 → 51, midtbane 45/48 → 58/59 (klemt v3.16: 61/64), forsvaret (≥ 63) står.
+  const want = pts(pass.a.H, [[50, 90], [4, 70], [27, 73], [51, 73], [74, 70], [4, 58], [27, 59], [51, 59], [74, 58], [27, 51], [51, 51]]);
   assert.deepEqual(pass.snap, { attacking: false, formation: '4-4-2', pts: want, scorer: null, assist: null, ball: [50, 72] });
   // Skud fra kanten: ingen receiver-kald i løbs-grenen – bold-siden kommer kun fra løbets eget kald
   const shot = runAgainst({ finishing: 20, passing: 1, pace: 1, ballControl: 1 });

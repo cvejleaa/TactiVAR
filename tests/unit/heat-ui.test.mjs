@@ -117,8 +117,10 @@ test('holdets heat map: felterne (6×9) med den rigtige placering og styrke (tæ
   assert.equal(at(1, 1).style.opacity, '0.85', 'tætteste felt: 0,15 + 1 · 0,7');
   assert.ok(Number(at(0, 0).style.opacity) < Number(at(2, 0).style.opacity) && Number(at(2, 0).style.opacity) < 0.85);
   assert.equal(all(el, (x) => x.style.left === `${(3 * 100) / 6}%` && x.style.top === `${(8 * 100) / 9}%`).length, 0, 'målmandens felt (række 8, søjle 3) er tomt');
-  // Prikkerne: hA's afslutninger i hold-koordinater; 7 øjeblikke → 6 til hjemmeholdet (udeholdets forbi hører ikke med)
-  const dots = all(el, (x) => cls(x, 'heat-shot'));
+  // Prikkerne: hA's afslutninger i hold-koordinater; 7 øjeblikke → 6 til hjemmeholdet (udeholdets forbi hører ikke med i DIT kort).
+  // v3.16.1: modstanderens zone-kort (heat-opp) har sine egne prikker – udeholdets forbi (90, 90) står dér, ikke i dit kort.
+  const dots = all(byId(el, 'heat-pitch')[0], (x) => cls(x, 'heat-shot'));
+  assert.deepEqual(all(byId(el, 'heat-opp')[0], (x) => cls(x, 'heat-shot')).map((d) => [d.className, d.style.left, d.style.top]), [['heat-shot miss', '90%', '90%']]);
   assert.deepEqual(dots.map((d) => [d.className, d.style.left, d.style.top, d.textContent, d.attrs.title]), [
     ['heat-shot goal', '12%', '30%', '⚽', "3' mål"], ['heat-shot save', '11%', '31%', '●', "6' redning"], ['heat-shot miss', '20%', '20%', '●', "9' forbi/blokeret"],
     ['heat-shot offside', '20%', '20%', '●', "12' offside (flag)"], ['heat-shot disallowed', '20%', '20%', '●', "15' annulleret af VAR"], ['heat-shot miss', '20%', '20%', '●', "21' forbi/blokeret"]]);
@@ -134,7 +136,7 @@ test('en spillers heat map: hans felter og prikker (afslutninger OG oplæg på h
   const cells = all(el, (x) => cls(x, 'heat-cell'));
   // hB: (55,50)→(4,3), (60,60)→(5,3), (60,80)→(7,3) – alle lige stærke
   assert.equal(cells.length, 3); assert.ok(cells.every((x) => x.style.opacity === '0.85'));
-  const dots = all(el, (x) => cls(x, 'heat-shot'));
+  const dots = all(byId(el, 'heat-pitch')[0], (x) => cls(x, 'heat-shot'));   // kun dit kort (modstanderens zone-kort har sine egne)
   assert.deepEqual(dots.map((d) => [d.className, d.style.left, d.style.top, d.textContent, d.attrs.title]), [['heat-shot assist', '60%', '60%', '🅰', "3' oplæg"]]);
   assert.equal(byId(el, 'heat-note')[0].textContent, 'Angriber opad. Farven: hvor han stod i kampens 1 øjebliksbilleder og afslutninger. Prikker: 0 mål, 0 reddet, 0 forbi/blokeret, 1 oplæg.');
   byId(el, 'heat-team')[0].handlers.click(); byId(el, 'heat-back')[0].handlers.click();
@@ -145,7 +147,7 @@ test('en spillers heat map: hans felter og prikker (afslutninger OG oplæg på h
   assert.equal(gc.length, 1); assert.equal(gc[0].style.top, `${(8 * 100) / 9}%`);
   assert.match(byId(g, 'heat-note')[0].textContent, /Prikker: ingen afslutninger\.$/);
   // En spiller uden afslutninger: ingen prikker
-  assert.equal(all(render(mOf(), base.homeId, { heat: { playerId: id(aA) } }).el, (x) => cls(x, 'heat-shot')).length, 0, 'modstanderens spiller findes ikke i dit kort');
+  assert.equal(all(byId(render(mOf(), base.homeId, { heat: { playerId: id(aA) } }).el, 'heat-pitch')[0], (x) => cls(x, 'heat-shot')).length, 0, 'modstanderens spiller findes ikke i dit kort');
 });
 
 test('rækkerne i dit ark: med et heat map åbent kan hver spiller vælges (klik → hans kort; samme spiller igen → holdet), den valgte er markeret; uden kort og i modstanderens ark er rækkerne ikke klikbare', () => {
