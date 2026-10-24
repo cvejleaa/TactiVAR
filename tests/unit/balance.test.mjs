@@ -154,7 +154,11 @@ test('langskud belønner ikke en angriber uden for feltet: 4-4-1-1 og en trukket
 
 // v3.13 (QC H): kalibreringen af udskiftninger og STA låst i bånd. Før v3.13 (målt med samme værktøj): 0 træthedsskift,
 // ≈ 0,3 skadesskift; STA 6 mod 16 netto-forskel 0,47 (uden friskhed i kampen) – begge røde mod båndene nedenfor.
-test('udskiftninger: 2,2–3,6 skift pr. hold pr. kamp, de fleste efter pausen; STA 16 mod 6 vinder mindst 0,55 mål mere pr. kamp', async () => {
+// v3.15.1: grænsen 0,55 → 0,50. Lavere KEEPER_EDGE (3 → 0,3), forbi-udfald og VAR efter målet flytter færre afgørelser
+// over friskhedens kant. Målt med measureStamina(300) og measureStamina(300, false) i tools/measure-duels.mjs:
+// 28efc6d (før v3.15.1) 0,600 med friskhed i kampen / 0,323 uden; nu 0,537 / 0,277 (1500 kampe: 0,652 / 0,411 før,
+// 0,609 / 0,319 nu). 0,50 er rødt mod "uden friskhed i kampen" (0,277) og mod v3.12-tallet 0,47.
+test('udskiftninger: 2,2–3,6 skift pr. hold pr. kamp, de fleste efter pausen; STA 16 mod 6 vinder mindst 0,50 mål mere pr. kamp', async () => {
   const { measureSubs, measureStamina } = await import('../../tools/measure-duels.mjs');
   const r = measureSubs(10);
   assert.ok(r.subsPerTeam >= 2.2 && r.subsPerTeam <= 3.6, `skift ${r.subsPerTeam}`);
@@ -164,7 +168,7 @@ test('udskiftninger: 2,2–3,6 skift pr. hold pr. kamp, de fleste efter pausen; 
   const g = measureSubs(40).goalsPerMatch;
   assert.ok(g >= 2.6 && g <= 3.0, `mål ${g}`);
   const st = measureStamina(300);
-  assert.ok(st[16].net - st[6].net >= 0.55, `STA-forskel ${(st[16].net - st[6].net).toFixed(2)} (før v3.13 0,47)`);
+  assert.ok(st[16].net - st[6].net >= 0.5, `STA-forskel ${(st[16].net - st[6].net).toFixed(2)} (før v3.13 0,47; uden friskhed i kampen nu 0,277)`);
 });
 
 // v3.15 (Spilførerens sæsongennemgang: 0 røde kort, 8 dobbelt-gule på 56 kampe). Superligaen ≈ 0,15 røde og ≈ 4 gule pr. kamp.
