@@ -58,7 +58,7 @@ export function checkTrace(m) {
     if (g?.kind === 'COUNTER' && y > 40) finding.counterFar++;
   }
   // Angriberne i forhold til modstanderens sidste forsvarer i grundbillederne med bolden (fælles koordinater)
-  for (const f of tr.frames.filter((x) => x.poss)) {
+  for (const f of tr.frames.filter((x) => x.poss && !x.lost && !x.run)) {   // en vundet løb/erobring står med vilje forbi linjen
     const att = f[f.poss], def = f[f.poss === 'h' ? 'a' : 'h'], up = f.poss === 'h';
     const front = att.slice(1).reduce((b, q) => (up ? Math.min(b, q[2]) : Math.max(b, q[2])), up ? 100 : 0);
     const last = def.slice(1).reduce((b, q) => (up ? Math.min(b, q[2]) : Math.max(b, q[2])), up ? 100 : 0);

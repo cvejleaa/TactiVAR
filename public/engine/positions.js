@@ -51,14 +51,18 @@ export function livePositions(tactics, { attacking = true, ballX = 50, runner = 
 // nærmere end MIN_APART (fx to trukne pladser), skubbes fra hinanden på tværs.
 // caught: holdet med bolden har lige vundet den (kontra) – det står i forsvarsform, modstanderen i angrebsform.
 // Returnerer { ball, opp, line } – begge i hvert holds egne koordinater (lille y = ved modstanderens mål); line i boldholdets.
-export const ONSIDE_GAP = 1, MIN_APART = 5;
+export const ONSIDE_GAP = 1, MIN_APART = 6;
 export const PRESS_GAP = { LOW_BLOCK: 20, MID_BLOCK: 10, HIGH_GEGENPRESS: 2 };
 // Presser holdets markspillere (pladserne i idx) sammen foran 'to': de, der står inden for SQUEEZE_SPAN af linjen eller foran
 // den, mappes lineært fra [forreste, to + SQUEEZE_SPAN] til [to, to + SQUEEZE_SPAN]; resten står, hvor de stod. Ingen foran
 // 'to', rækkefølgen bevares, og kun de forreste rækker rykker (midtbanen bag angriberne flyttes kun lidt).
-export const SQUEEZE_SPAN = 12;
-function squeeze(pts, idx, to) {
+// Holdet beholder mindst MIN_DEPTH fra forreste til bageste (QC v3.16.1: ellers kunne et højt boldhold presse modstanderens
+// blok sammen til én linje igen).
+export const SQUEEZE_SPAN = 12, MIN_DEPTH = 18;
+// minDepth kun for holdet uden bold: boldholdets forreste må aldrig rykke forbi linjen (offside).
+function squeeze(pts, idx, to, minDepth = 0) {
   if (!idx.length) return;
+  if (minDepth) to = Math.min(to, Math.max(...idx.map((i) => pts[i].y)) - minDepth);
   const front = Math.min(...idx.map((i) => pts[i].y)), edge = to + SQUEEZE_SPAN;
   if (front >= to) return;
   for (const i of idx) {
@@ -77,6 +81,18 @@ function spread(pts, idx) {
     pts[idx[b]] = { x: Math.round(clamp(q.x + dir * dx, 3, 97)), y: q.y };
   }
 }
+// Og ikke oven i en modspiller (QC v3.16.1: angriberen på linjen stod ofte på samme x som stopperen, han står ved): boldholdets
+// spiller skubbes på tværs – kun x, så linjen og offside-billedet er uændrede.
+// Ved sidelinjen skubbes han den anden vej; tre gennemløb, så et skub ikke lander oven i den næste modspiller.
+function apartFrom(pts, idx, other, oidx) {
+  for (let pass = 0; pass < 3; pass++) for (const i of idx) for (const j of oidx) {
+    const p = pts[i], q = { x: 100 - other[j].x, y: 100 - other[j].y };   // modspillerens plads i dette holds koordinater
+    if (Math.hypot(p.x - q.x, p.y - q.y) >= MIN_APART) continue;
+    let x = q.x + (p.x >= q.x ? 1 : -1) * MIN_APART;
+    if (x < 3 || x > 97) x = q.x - (p.x >= q.x ? 1 : -1) * MIN_APART;
+    pts[i] = { x: Math.round(x), y: p.y };
+  }
+}
 // ballOn/oppOn: hvilke pladser er besat (en udvist spillers plads er tom og tæller ikke som linjen) – standard alle.
 export function coupledPositions(ballTactics, oppTactics, { ballX = 50, caught = false, runner = -1, step = RUN_STEP, ballOn = null, oppOn = null } = {}) {
   const ball = livePositions(ballTactics, { attacking: !caught, ballX });
@@ -91,9 +107,10 @@ export function coupledPositions(ballTactics, oppTactics, { ballX = 50, caught =
   if (!caught) {
     const deepest = Math.max(...rest.map((i) => ball[i].y));
     const want = 100 - deepest + (PRESS_GAP[oppTactics.phases?.phase2_defending?.pressingHeight] ?? PRESS_GAP.MID_BLOCK);
-    squeeze(opp, outO, want);
+    squeeze(opp, outO, want, MIN_DEPTH);
   }
   spread(opp, outO);
+  apartFrom(ball, outB, opp, [0, ...outO]);   // også løberen og ved målmanden
   return { ball, opp, line };
 }
 // Afspark (v3.16.1, brugeren: "7 spillere stående på midterlinjen ved start"): holdet i sin forsvarsform, presset sammen
@@ -102,7 +119,7 @@ export const KICKOFF_Y = 53;
 export function kickoffPositions(tactics, on = null) {
   const pts = livePositions(tactics, { attacking: false, ballX: 50 });
   const idx = pts.map((p, i) => i).filter((i) => i > 0 && (!on || on[i]));
-  squeeze(pts, idx, KICKOFF_Y);
+  squeeze(pts, idx, KICKOFF_Y, MIN_DEPTH);
   spread(pts, idx);
   return pts;
 }
