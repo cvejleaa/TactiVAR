@@ -436,6 +436,19 @@ bedre kan kontrollere spil motoren".
   Afspilningens undertekst siger for hvert grundbillede, hvordan duellen gik (har bolden / spiller sig frem til angriberen / erobrer /
   offside).
   Kendt begrænsning: kun seneste runde (en sum over sæsonen er et senere ønske).
+- **Retning og skala i tegningerne (v3.16.3 – én regel for alle visninger)**: DIT HOLD ANGRIBER OPAD, modstanderen nedad.
+  Afspilningen spejles, når du er udehold ("{dit hold} angriber opad"); heat map, 📍 og zone-kort er allerede i holdets
+  egne koordinater. Modstanderens startopstilling under hans zone-kort tegnes nedad som kortet. I kampe uden dit hold
+  angriber hjemmeholdet opad – også i dets zone-kort og startopstilling ("De angriber opad.", mål-mærkerne byttet).
+  Skala (kun tegning, `drawY` i replay.js): y' = 50 + (y − 50)·1,175 klemt til 1–99, så formationernes målmand (y 90/10)
+  står ved mållinjen (≈ 97/3); afspilningens brikker og bold, 📍 og startopstillingen. Skudtrinnets mållinje-punkter
+  (mål, stolpe, over, forbi) er allerede mållinje-koordinater og skaleres ikke; redning og blokering er spillerpladser og
+  skaleres som brikkerne. Heat- og zonefelter er grove og skaleres ikke. 📍 vises kun, hvor 🎬 ikke findes (kampe fra
+  før afspilningen).
+- **Tekster (v3.16.3)**: ingen minutter i referatets tekster (minuttet står ved linjen – ellers modsiger teksten uret);
+  ejefald via `gen` (clues.js); varianter vælges med `pickBy` (hash af minut og aktør – aldrig rng, så ingen kamp ændres);
+  en kamp gentager ikke en måltekst, før typens tekster er brugt (samme rng-træk). Bevis: `tools/fingerprint.mjs` –
+  noprose-hashen er uændret.
 
 ## 6. Karakterer, MotM, avis
 - Start 6,5 (±0,15), klemt 3,5–10,0 – fra v3.15 først til sidst (justeringerne summeres uden loft, så overskud fra mål
