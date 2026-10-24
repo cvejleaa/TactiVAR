@@ -5,11 +5,11 @@
 import { publicFacts, compactFacts } from './column.js';
 
 // Pr. spiller (fladt på spilleren, så sanitize kan give standardværdier felt for felt).
-export const PLAYER_SEASON_FIELDS = ['sGames', 'sMinutes', 'sGoals', 'sAssists', 'sMotm', 'sYellow', 'sCleanSheets', 'sHeaderGoals', 'sPenaltyGoals', 'sSetPieceGoals', 'freeRunsSum', 'freeRunsWonSum'];
+export const PLAYER_SEASON_FIELDS = ['sGames', 'sMinutes', 'sGoals', 'sAssists', 'sMotm', 'sYellow', 'sRed', 'sCleanSheets', 'sHeaderGoals', 'sPenaltyGoals', 'sSetPieceGoals', 'freeRunsSum', 'freeRunsWonSum'];
 export const PLAYER_SEASON_DEFAULTS = Object.fromEntries(PLAYER_SEASON_FIELDS.map((k) => [k, 0]));
 
 // Pr. hold (på tabelrækken). Mål står allerede i tabellen og gentages ikke.
-export const TEAM_STAT_FIELDS = ['sMatches', 'shots', 'onTarget', 'xg', 'possSum', 'fouls', 'foulsWon', 'freeKicks', 'corners', 'penalties', 'penaltyGoals', 'setPieceGoals', 'headerGoals', 'counterGoals', 'counterGoalsAgainst', 'varChecks', 'cleanSheets', 'yellows'];
+export const TEAM_STAT_FIELDS = ['sMatches', 'shots', 'onTarget', 'xg', 'possSum', 'fouls', 'foulsWon', 'freeKicks', 'corners', 'penalties', 'penaltyGoals', 'setPieceGoals', 'headerGoals', 'counterGoals', 'counterGoalsAgainst', 'varChecks', 'cleanSheets', 'yellows', 'reds'];
 export const TEAM_STAT_DEFAULTS = Object.fromEntries(TEAM_STAT_FIELDS.map((k) => [k, 0]));
 
 export const HISTORY_MAX = 60;
@@ -32,7 +32,8 @@ export function bookMatchStats(league, m) {
       s.counterGoals += st[x + 'CounterGoals'] ?? 0; s.counterGoalsAgainst += st[y + 'CounterGoals'] ?? 0;
       s.varChecks += st[x + 'VarChecks'] ?? 0;
       if ((x === 'h' ? m.awayGoals : m.homeGoals) === 0) s.cleanSheets++;
-      s.yellows += sheet.filter((e) => e.yellowCard).length;
+      s.yellows += sheet.reduce((a, e) => a + (e.yellows ?? (e.yellowCard ? 1 : 0)), 0);   // hvert gult kort (v3.15)
+      s.reds += sheet.filter((e) => e.red).length;
     }
     for (const e of sheet) {
       const p = players.get(e.playerId);
@@ -40,7 +41,8 @@ export function bookMatchStats(league, m) {
       p.sGames++; p.sMinutes += Math.max(0, (e.minOut ?? 90) - (e.minIn ?? 1) + (e.minIn <= 1 ? 1 : 0));
       p.sGoals += e.goals ?? 0; p.sAssists += e.assists ?? 0;
       if (e.isMotM) p.sMotm++;
-      if (e.yellowCard) p.sYellow++;
+      p.sYellow += e.yellows ?? (e.yellowCard ? 1 : 0);
+      if (e.red) p.sRed++;
       if (e.cleanSheet) p.sCleanSheets++;
       p.sHeaderGoals += e.headerGoals ?? 0; p.sPenaltyGoals += e.penaltyGoals ?? 0; p.sSetPieceGoals += e.setPieceGoals ?? 0;
       p.freeRunsSum += e.freeRuns ?? 0; p.freeRunsWonSum += e.freeRunsWon ?? 0;

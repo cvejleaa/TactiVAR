@@ -165,6 +165,16 @@ Tick hvert 3. minut (1..90).
 - Frispark 6 % (−0,35): heraf skade 40 % (1–3 kampe, auto-indskiftning fra bænken, intet kort),
   ellers taktisk frispark med gult kort. Fra v3.10 desuden gult kort på 21 % af de "stille" frispark
   (Superligaen ≈ 2 gule pr. hold pr. kamp) – se Dødbolde.
+- **Røde kort (v3.15**, Spilførerens sæsongennemgang: 0 røde og 8 dobbelt-gule på en sæson): andet gule kort giver rødt
+  (en spiller med gult kort holder igen – kun `SECOND_YELLOW_P` = 17 % af hans kortværdige frispark giver kortet);
+  direkte rødt kun ved den grove tackling, der skader en modspiller (`DIRECT_RED_P` = 7 %). Den udviste forlader banen
+  uden indskiftning (pladsen er tom; aldrig under 7 mand), karakter −1, og kan ikke blive Kampens/Rundens spiller.
+  Ti mand: hver spiller svagere i duellerne (`SHORT_PER_MAN` = 4 % pr. manglende mand – gennemsnit og lodtrækning mærker
+  det ellers ikke) og hurtigere træt (`SHORT_DRAIN`). Målt (`measureCards`): ≈ 0,16 røde og ≈ 4,1 gule pr. kamp; ti
+  mand scorer 1,06 og lukker 1,93 ind pr. 90 min (elleve: ≈ 1,4). Ingen karantæne endnu (kommer med trup/økonomi).
+  Kortene gemmes ét sted (karakterarket: `yellows` 0–2, `red`); kamptal, holdtal og sæsonstatistik (`sRed`) regnes derfra.
+- **Træthedsskift spredes (v3.15**, brugerens valg): højst `FATIGUE_SUBS_AT_ONCE` = 3 ad gangen (pausen ved 45' uden loft);
+  grænsen gælder fortsat uanset minut, og dit hold får besked, når en træt spiller må vente.
 - Chance 30 % (v3.9: Få 26 %, Normal 30 %, Mange 36 %; v3.12.1: Få 28,5 %); xG 0,13–0,35 pr. afslutning.
 - **Angrebsfokus afgør chancens type (v3.12**, brugeren: "Jeg har sat mit hold til cutbacks, og
   alligevel er der ikke en eneste reference til cutbacks i referatet … min modstander vinder 11
@@ -308,7 +318,9 @@ Tick hvert 3. minut (1..90).
   ikke efter live-afspilning; motoren skal være deterministisk ved givet seed.
 
 ## 6. Karakterer, MotM, avis
-- Start 6,5 (±0,15), klemt 3,5–10,0. Hovedstødsmål +1,35, VAR-mål +1,30, mål
+- Start 6,5 (±0,15), klemt 3,5–10,0 – fra v3.15 først til sidst (justeringerne summeres uden loft, så overskud fra mål
+  ikke tabes); vundet taktisk duel/pres +0,20 (`DUEL_BONUS`, før +0,35). Kampens og Rundens spiller rangeres ens
+  (`motmOrder`: karakter, så mål·2 + oplæg), og en udvist kan ikke vinde. Hovedstødsmål +1,35, VAR-mål +1,30, mål
   +1,25, oplæg +0,55, redning +0,50 (skytte +0,10), annulleret VAR-mål −0,40
   (forsvarer +0,45), vundet luftduel +0,40, mål imod forsvarer −0,35 / GK
   −0,25, clean sheet +0,50 til GK/CB/LB/RB (karakteren; i statistikken tæller clean sheet

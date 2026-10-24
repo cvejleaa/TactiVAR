@@ -112,7 +112,9 @@ test('angrebsfokus mærkes: cutbacks ≥ 1 pr. kamp, angriberen vinder 35–55 %
   const N = 60;
   const cut = measureFocus({ focus: 'LOW_CUTBACKS' }, N), cross = measureFocus({ focus: 'HIGH_CROSSES' }, N), central = measureFocus({ focus: 'CENTRAL' }, N);
   assert.ok(cut.cutbacks >= 1, `cutbacks ${cut.cutbacks} (før 0)`);
-  assert.ok(cross.crossWinRate >= 0.35 && cross.crossWinRate <= 0.55, `luftdueller vundet ${cross.crossWinRate} (før ≈ 0,04)`);
+  // v3.15: et forsvar med færre mand taber flere luftdueller – målt over 400 kampe 0,545 → 0,555 (her med 60: 0,535 → 0,570);
+  // loftet 0,55 → 0,58. Båndet fanger stadig fejlen, det blev lavet til (≈ 0,04).
+  assert.ok(cross.crossWinRate >= 0.35 && cross.crossWinRate <= 0.58, `luftdueller vundet ${cross.crossWinRate} (før ≈ 0,04)`);
   assert.ok(cross.headerGoals >= 0.15, `hovedstødsmål ${cross.headerGoals} (før ≈ 0,07)`);
   const nets = [cut.net, cross.net, central.net];
   assert.ok(Math.max(...nets) - Math.min(...nets) <= 0.3, `netto ${nets.map((x) => x.toFixed(2)).join(' / ')}`);
@@ -159,4 +161,16 @@ test('udskiftninger: 2,2–3,6 skift pr. hold pr. kamp, de fleste efter pausen; 
   assert.ok(r.goalsPerMatch >= 2.6 && r.goalsPerMatch <= 3.0, `mål ${r.goalsPerMatch}`);
   const st = measureStamina(300);
   assert.ok(st[16].net - st[6].net >= 0.55, `STA-forskel ${(st[16].net - st[6].net).toFixed(2)} (før v3.13 0,47)`);
+});
+
+// v3.15 (Spilførerens sæsongennemgang: 0 røde kort, 8 dobbelt-gule på 56 kampe). Superligaen ≈ 0,15 røde og ≈ 4 gule pr. kamp.
+// Ti mand skal kunne mærkes: før straffen (SHORT_PER_MAN 0) scorede holdet 1,33 og lukkede 1,49 ind pr. 90 min efter
+// udvisningen – båndene nedenfor er røde med de tal. Målt med straffen: 1,06 / 1,93. Med 0,08: 0,57 / 2,78 (også rødt).
+test('kort: 0,10–0,25 røde pr. kamp (før 0), 3–5 gule; ti mand scorer færre og lukker flere ind end med elleve', async () => {
+  const { measureCards } = await import('../../tools/measure-duels.mjs');
+  const r = measureCards(2500);
+  assert.ok(r.redsPerMatch >= 0.10 && r.redsPerMatch <= 0.25 && r.direct > 0 && r.secondYellow > r.direct, JSON.stringify(r));
+  assert.ok(r.yellowsPerMatch >= 3 && r.yellowsPerMatch <= 5, JSON.stringify(r));
+  assert.ok(r.tenMenMatches >= 150, JSON.stringify(r));
+  assert.ok(r.tenMenFor90 <= 1.2 && r.tenMenAgainst90 >= 1.7 && r.tenMenAgainst90 <= 2.4, JSON.stringify(r));
 });

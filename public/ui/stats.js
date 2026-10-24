@@ -47,7 +47,7 @@ function playerLists(league, myTeamId) {
   return h('div', { class: 'stat-grid' },
     list('⚽ Topscorere', 'sGoals'), list('🅰 Flest oplæg', 'sAssists'), list('👑 Kampens spiller', 'sMotm'),
     list('🗣 Hovedstødsmål', 'sHeaderGoals'), list('🎯 Straffemål', 'sPenaltyGoals'), list('🧱 Dødboldmål', 'sSetPieceGoals'),
-    list('🧤 Clean sheets', 'sCleanSheets'), list('🟨 Gule kort', 'sYellow'),
+    list('🧤 Clean sheets', 'sCleanSheets'), list('🟨 Gule kort', 'sYellow'), list('🟥 Røde kort', 'sRed'),
     listTable('⭐ Bedste vurdering (alle kampe)', 'publicStars', starRows, (v) => starsEl(v.publicStars), myTeamId));
 }
 

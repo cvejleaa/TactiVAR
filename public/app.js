@@ -64,6 +64,7 @@ const NEWS = {
   '3.14.1': 'Rettelser: VAR tjekker nu offside for den forreste – scorer en spiller længere tilbage, er det hans forreste holdkammerat, der tjekkes, og billedet ved målet viser skytten, hvor han skød fra. Statistikken på Liga-fanen gælder sæsonen.',
   '3.14.2': 'Rettelse: Ved et VAR-tjek står den tjekkede nu, hvor han stod (forrest), i billedet ved målet – ikke flyttet bag en holdkammerat.',
   '3.14.3': 'Rettelser: Langskud tages fra skudafstand (ikke fra egen banehalvdel) i billedet ved målet, referatet fortæller et oplæg én gang, og efter sæsonens sidste runde viser tabellen slutstillingen og mesteren, til næste sæson går i gang.',
+  '3.15.0': 'Røde kort: andet gule kort giver rødt, og en grov tackling kan give direkte rødt. Den udviste må ikke erstattes – holdet spiller resten af kampen med ti mand og bliver både svagere og hurtigere træt. (Karantæne kommer senere.) Kampens spiller går nu til den, der faktisk afgjorde kampen – mål tæller mere end vundne dueller på midtbanen. Træthedsskift sker højst tre ad gangen (pausen undtaget), så et hold ikke bruger alle sine skift på én gang.',
 };
 
 // Et migreret spil, hvis gamle fil ikke kunne tages backup af (fuldt lager): den gamle fil må

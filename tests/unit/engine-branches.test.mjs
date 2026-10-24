@@ -1935,7 +1935,7 @@ test('kontramål: oplægsgiveren (vinderens første midtbane) får assist og +0,
   const helper = rOf(m, 'away', a.A, 5);
   assert.equal(m.awayGoals, 2);
   assert.equal(helper.assists, 2); assert.equal(sumOf(m, 'away', 'assists'), 2);
-  assert.equal(helper.rating, 8.0);                    // 6,5 + 2·0,35 (vandt presset) + 2·0,4 (oplæg); 0,5 pr. oplæg ville give 8,2
+  assert.equal(helper.rating, 7.7);                    // 6,5 + 2·0,2 (vandt presset, DUEL_BONUS v3.15; før 0,35 → 8,0) + 2·0,4 (oplæg); 0,5 pr. oplæg ville give 7,9
   assert.equal(m.stats.aCounterGoals, 2); assert.equal(m.stats.hCounterGoals, 0);
   // Teksten: oplægsgiveren (ikke skytten) sendte den i dybden. next 0 → første tekstvariant, der nævner ham.
   const t = run(0);
@@ -2249,13 +2249,13 @@ test('synlighed: ti sæsonfelter er offentlige på spillere, løb uden bold kun 
   const { PLAYER_SEASON_FIELDS, TEAM_STAT_FIELDS } = await import('../../public/engine/stats.js');
   const { viewTeamStats } = await import('../../public/engine/visibility.js');
   const p = Object.fromEntries(PLAYER_SEASON_FIELDS.map((k, i) => [k, i + 1]));
-  const pub = ['sGames', 'sMinutes', 'sGoals', 'sAssists', 'sMotm', 'sYellow', 'sCleanSheets', 'sHeaderGoals', 'sPenaltyGoals', 'sSetPieceGoals'], priv = ['freeRunsSum', 'freeRunsWonSum'];
+  const pub = ['sGames', 'sMinutes', 'sGoals', 'sAssists', 'sMotm', 'sYellow', 'sRed', 'sCleanSheets', 'sHeaderGoals', 'sPenaltyGoals', 'sSetPieceGoals'], priv = ['freeRunsSum', 'freeRunsWonSum'];
   assert.deepEqual([...PLAYER_SEASON_FIELDS].sort(), [...pub, ...priv].sort());
   const o = viewPlayer(p, false), w = viewPlayer(p, true);
   for (const k of pub) { assert.equal(o[k], p[k], k); assert.equal(w[k], p[k], k); }
   for (const k of priv) { assert.ok(!(k in o), k); assert.equal(w[k], p[k], k); }
   const row = { teamId: 't', teamName: 'T', ...Object.fromEntries(TEAM_STAT_FIELDS.map((k, i) => [k, i + 1])) };
-  const publicKeys = ['sMatches', 'possSum', 'fouls', 'foulsWon', 'yellows', 'penalties', 'penaltyGoals', 'setPieceGoals', 'headerGoals', 'cleanSheets'];
+  const publicKeys = ['sMatches', 'possSum', 'fouls', 'foulsWon', 'yellows', 'reds', 'penalties', 'penaltyGoals', 'setPieceGoals', 'headerGoals', 'cleanSheets'];
   const opp = viewTeamStats(row, false), own = viewTeamStats(row, true);
   assert.deepEqual(Object.keys(opp).sort(), ['teamId', 'teamName', ...publicKeys].sort());
   assert.equal(opp.teamId, 't'); assert.equal(opp.teamName, 'T');

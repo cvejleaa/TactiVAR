@@ -69,7 +69,7 @@ test('spillerlister: titel/nøgle pr. liste, top 5 efter værdi (lighed: flest k
   const lists = all(root, (e) => e.dataset.key && e.dataset.key !== 'publicStars');
   assert.deepEqual(lists.map((l) => [l.dataset.key, l.children[0].textContent]), [
     ['sGoals', '⚽ Topscorere'], ['sAssists', '🅰 Flest oplæg'], ['sMotm', '👑 Kampens spiller'], ['sHeaderGoals', '🗣 Hovedstødsmål'],
-    ['sPenaltyGoals', '🎯 Straffemål'], ['sSetPieceGoals', '🧱 Dødboldmål'], ['sCleanSheets', '🧤 Clean sheets'], ['sYellow', '🟨 Gule kort']]);
+    ['sPenaltyGoals', '🎯 Straffemål'], ['sSetPieceGoals', '🧱 Dødboldmål'], ['sCleanSheets', '🧤 Clean sheets'], ['sYellow', '🟨 Gule kort'], ['sRed', '🟥 Røde kort']]);
   const top = items(list(root, 'sGoals'));
   // Fire celler: placering · #nr Navn · kort holdnavn · værdi (ingen ombrud – hver ting i sin egen celle)
   const sn = (t) => shortTeam(t.name);

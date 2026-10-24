@@ -7,7 +7,7 @@ import { livePositions } from './positions.js';
 import { masteryVs, counterXpForMatch } from './counter.js';
 import { createSheet, finalizeSheet } from './ratings.js';
 import { describeFinish, describeHeader, describeVarTiming, describeGoal, goalSpectacle } from './clues.js';
-import { MATCH_RULES } from './match-rules.js';
+import { MATCH_RULES, CARD_RULES, FATIGUE_SUBS_AT_ONCE, MIN_PLAYERS } from './match-rules.js';
 import { TIRED_PER_POINT, SUBS_LIMIT, matchCost, REST_SHARE } from './freshness.js';
 
 const PLAN_LETTERS = ['A', 'B', 'C'];
@@ -106,6 +106,9 @@ export const longshotBonus = (fin) => Math.min(fin + LONGSHOT_BONUS, LONGSHOT_CA
 // En del af de almindelige afslutninger falder til en spiller ved feltets kant (andenbolde, afslag –
 // dokumentet: midtbanen scorer 30–35 %); resten går mod målet.
 export const EDGE_SHARE = 0.5;
+// Karakterbonus for en vundet taktisk duel ("styrer midtbanen", pres-erobring). v3.15: 0,35 → 0,2 – den kom ≈10 gange pr.
+// kamp, så en midtbanespiller slog en firemålsscorer til Kampens spiller (Spilførerens sæsongennemgang).
+export const DUEL_BONUS = 0.2;
 // VAR-offside-tjek (v3.14.1): skytten tjekkes kun selv, når han er blandt de N forreste markspillere – ellers den forreste.
 export const VAR_FRONT = 2;
 // I billedet står en skytte bag den VAR-tjekkede mindst så mange enheder længere tilbage.
@@ -189,18 +192,21 @@ function rolesOf(side) {
   const coords = coordsOf(side.tactics);
   const defs = [], mids = [], atts = [], cbs = [];
   side.starters.forEach((p, i) => {
-    if (i === 0) return;
+    if (i === 0 || !p) return;   // en udvist spillers plads er tom (v3.15)
     if (coords[i].r === 'CB') cbs.push(p);
     const line = lineOfRole(coords[i].r);
     (line === 'DEF' ? defs : line === 'MID' ? mids : atts).push(p);
   });
-  const s = side.starters;
-  return { gk: s[0], defs: defs.length ? defs : s.slice(1, 5), mids: mids.length ? mids : s.slice(5, 9), atts: atts.length ? atts : s.slice(9), cbs };
+  // En tom kæde (udvisning, Hvis-Så-ombytning) lånes fra nabokæden – listerne er aldrig tomme og har aldrig en tom plads.
+  const all = side.starters.filter((p, i) => i > 0 && p);
+  const or = (...ls) => ls.find((l) => l.length) ?? all;
+  return { gk: side.starters[0], defs: or(defs, mids, atts), mids: or(mids, defs.concat(atts)), atts: or(atts, mids, defs), cbs };
 }
 
 function customDragged(side) {
   const cc = side.tactics.customCoords || {};
   return Object.keys(cc).map(Number).filter((slot) => slot > 0 && slot < 11)
+    .filter((slot) => side.starters[slot])   // ikke en udvist spillers tomme plads
     .map((slot) => ({ player: side.starters[slot], role: coordsOf(side.tactics)[slot].r, outOfZone: isOutOfZone(side.tactics, slot) }));
 }
 
@@ -208,7 +214,7 @@ const avg = (arr, f) => arr.reduce((a, p) => a + f(p), 0) / Math.max(1, arr.leng
 
 // v3.14 (Arkitekt): trukne positioner og faser gemmes KUN for et menneskestyret hold (ejerens egne valg) – før lå
 // en bots fulde indstillinger i det gemte spil, selv om intet viste dem.
-const endOf = (s, full) => ({ formation: s.tactics.baseFormation, starters: s.starters.map((p) => p.id), ...(full ? { customCoords: structuredClone(s.tactics.customCoords), phases: structuredClone(s.tactics.phases) } : {}) });
+const endOf = (s, full) => ({ formation: s.tactics.baseFormation, starters: s.starters.map((p) => p?.id ?? null), ...(full ? { customCoords: structuredClone(s.tactics.customCoords), phases: structuredClone(s.tactics.phases) } : {}) });
 
 // Fuldtids-analysens angrebsdel (QC v3.12): kun de dele, dine valg (eller kampen) gav – ellers
 // stod der "0 cutbacks, 0 høje bolde" til et centralt hold. Cutbacks fra løb på kanten tæller med.
@@ -225,7 +231,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
   const H = prepareSide(home, true, lineupNotes), A = prepareSide(away, false, lineupNotes);
   const sheet = createSheet();
   const goalsPool = [], injuries = [], observations = [];
-  const st = { hPoss: 10, aPoss: 10, hShots: 0, aShots: 0, hOnTarget: 0, aOnTarget: 0, hXg: 0, aXg: 0, hAerialWon: 0, aAerialWon: 0, hVarChecks: 0, aVarChecks: 0, hTacticSuccess: 0, aTacticSuccess: 0, hFouls: 0, aFouls: 0, hInjuries: 0, aInjuries: 0, hCorners: 0, aCorners: 0, hFreeKicks: 0, aFreeKicks: 0, hPenalties: 0, aPenalties: 0, hPenaltyGoals: 0, aPenaltyGoals: 0, hSetPieceGoals: 0, aSetPieceGoals: 0, hHeaderGoals: 0, aHeaderGoals: 0, hCounterGoals: 0, aCounterGoals: 0, hYellows: 0, aYellows: 0 };
+  const st = { hPoss: 10, aPoss: 10, hShots: 0, aShots: 0, hOnTarget: 0, aOnTarget: 0, hXg: 0, aXg: 0, hAerialWon: 0, aAerialWon: 0, hVarChecks: 0, aVarChecks: 0, hTacticSuccess: 0, aTacticSuccess: 0, hFouls: 0, aFouls: 0, hInjuries: 0, aInjuries: 0, hCorners: 0, aCorners: 0, hFreeKicks: 0, aFreeKicks: 0, hPenalties: 0, aPenalties: 0, hPenaltyGoals: 0, aPenaltyGoals: 0, hSetPieceGoals: 0, aSetPieceGoals: 0, hHeaderGoals: 0, aHeaderGoals: 0, hCounterGoals: 0, aCounterGoals: 0, hYellows: 0, aYellows: 0, hReds: 0, aReds: 0 };
   let hG = 0, aG = 0, homeVarNet = 0;
   const k = (side, name) => (side.isHome ? 'h' : 'a') + name;
   const other = (side) => (side === H ? A : H);
@@ -239,9 +245,13 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // fuld friskhed hele kampen) – spillet selv sender aldrig flaget (vagt i tests).
   const live = opts.liveEnergy !== false;
   let curMin = 1;
-  const lostAt = (p) => { const e = sheet.entries[p.id]; return live && e?.drain90 ? e.drain90 * Math.max(0, curMin - e.minIn) / 90 : 0; };
+  // Med færre mand (v3.15): ekstra tab af friskhed siden udvisningen (side.shortMins = summen af minutter × manglende mand).
+  const sideOf = (p) => (sheet.entries[p.id]?.isHome ? H : A);
+  const shortMinutes = (side) => (side.shortMins ?? 0) + (side.down ? side.down * Math.max(0, curMin - side.downSince) : 0);
+  const lostAt = (p) => { const e = sheet.entries[p.id]; return live && e?.drain90 ? e.drain90 * (Math.max(0, curMin - e.minIn) + CARD_RULES.SHORT_DRAIN * shortMinutes(sideOf(p))) / 90 : 0; };
   const matchFresh = (p) => (p.freshness ?? 100) - lostAt(p);
-  const ff = (p) => freshFactor(p) * (1 - TIRED_PER_POINT * lostAt(p));
+  const shortF = (side) => 1 - CARD_RULES.SHORT_PER_MAN * (side?.down ?? 0);
+  const ff = (p) => freshFactor(p) * (1 - TIRED_PER_POINT * lostAt(p)) * shortF(sideOf(p));
   const register = (side, p, role, minIn, slot) => sheet.register(p, side.team, side.isHome, role, minIn, rng, masteryVs(p, other(side).team), slot, slot != null ? coordsOf(side.tactics)[slot].r : role);
 
   for (const side of [H, A]) side.starters.forEach((p, i) => p && register(side, p, coordsOf(side.tactics)[i].r, 1, i));
@@ -524,6 +534,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
   function substitute(side, slot, min, reason, pick = null, text = null) {
     if (subBlock(side, min)) return null;
     const out = side.starters[slot];
+    if (!out) return null;   // en udvist spillers plads – der må ikke skiftes ind (v3.15)
     const bench = side.benchAvailable();
     const sub = pick ?? (bench.find((b) => b.line === out.line) || bench[0]);
     if (!sub) return null;
@@ -535,6 +546,32 @@ export function simulateMatch(home, away, rng, opts = {}) {
     register(side, sub, `SUB (${out.line})`, min, slot);
     addEv(min, 'SUB', 'HIGHLIGHT', side.isHome, true, `🔄 ${tag(sub)} ind for ${tag(out)}`, text ?? `🔄 [${side.team.name}] ${reason}: ${tag(sub)} erstatter ${tag(out)}.`);
     return sub;
+  }
+
+  // Kort (v3.15): ét sted. Karakterarket gemmer antal gule (0–2) og rødt ('SECOND_YELLOW' | 'DIRECT'); kamptal,
+  // holdtal og sæsonstatistik regnes alle derfra (QC: før talte tre steder forskelligt).
+  const MEN = ['', 'én', 'to', 'tre', 'fire', 'fem', 'seks', 'syv', 'otte', 'ni', 'ti', 'elleve'];
+  function booking(side, p, min, before, after = '') {
+    const e = sheet.entries[p.id];
+    if (!e || e.red) return;
+    if (e.yellows && !rng.chance(CARD_RULES.SECOND_YELLOW_P)) return;   // han holder igen – frisparket, men intet kort
+    e.yellows = (e.yellows ?? 0) + 1; e.yellowCard = true; st[k(side, 'Yellows')]++;
+    if (e.yellows === 1) addEv(min, 'FOUL', 'PLAY', side.isHome, false, 'Gult kort', `🟨 [${side.team.name}] ${before} ${tag(p)}${after}.`);
+    else sendOff(side, p, min, 'SECOND_YELLOW');
+  }
+  function sendOff(side, p, min, kind) {
+    const e = sheet.entries[p.id], slot = side.starters.indexOf(p);
+    if (!e || e.red || slot < 1 || side.starters.filter(Boolean).length <= MIN_PLAYERS) return;
+    e.red = kind; e.minOut = min; st[k(side, 'Reds')]++;
+    sheet.adjust(p.id, -1);
+    // Tiden med færre mand gemmes, før tallet stiger (lostAt regner minutter × manglende mand).
+    if (side.down) side.shortMins = (side.shortMins ?? 0) + side.down * Math.max(0, curMin - side.downSince);
+    side.down = (side.down ?? 0) + 1; side.downSince = curMin;
+    side.starters[slot] = null;
+    const left = side.starters.filter(Boolean).length;
+    const why = kind === 'DIRECT' ? `Direkte rødt kort til ${tag(p)} for den grove tackling` : `Andet gule kort til ${tag(p)}`;
+    observe(p, `Udvist (${min}. min mod ${other(side).team.name}): ${kind === 'DIRECT' ? 'direkte rødt kort' : 'andet gule kort'}.`);
+    addEv(min, 'RED', 'HIGHLIGHT', side.isHome, true, `🟥 Udvist: ${tag(p)}`, `${kind === 'DIRECT' ? '🟥' : '🟨🟥'} [${side.team.name}] ${why} – han er udvist! ${side.team.name} må spille resten af kampen med ${MEN[left] ?? left} mand.`);
   }
 
   function checkTriggers(side, min) {
@@ -607,10 +644,16 @@ export function simulateMatch(home, away, rng, opts = {}) {
       if (ok && own(side)) events.at(-1).tactical = true;   // dit valg (grænsen) – med i "Kun taktik"
       return ok;
     };
-    let any = false;
-    for (const c of tired) any = swap(c, false) || any;
-    if (!any) return;
-    for (const c of onPitch().filter((x) => x.f >= limit && x.f < limit + SUBS_LIMIT.near).sort((a, b) => a.f - b.f)) swap(c, true);
+    // Højst FATIGUE_SUBS_AT_ONCE ad gangen (v3.15, brugerens valg "spred skift") – pausen ved 45' er gratis og uden loft.
+    // De trætteste først; resten venter til næste skift (dit hold får det at vide).
+    const cap = min === 45 ? Infinity : FATIGUE_SUBS_AT_ONCE;
+    let done = 0;
+    for (const c of tired) {
+      if (done >= cap) { note(c.p, `højst ${FATIGUE_SUBS_AT_ONCE} træthedsskift ad gangen – han venter til næste skift`); continue; }
+      if (swap(c, false)) done++;
+    }
+    if (!done) return;
+    for (const c of onPitch().filter((x) => x.f >= limit && x.f < limit + SUBS_LIMIT.near).sort((a, b) => a.f - b.f)) { if (done >= cap) break; if (swap(c, true)) done++; }
   }
 
   // Manuel udskiftning fra en Hvis-Så-regel (v3.13): spillerne er angivet med id, så de findes, uanset hvilken
@@ -619,7 +662,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
     const slot = side.starters.findIndex((p, i) => i > 0 && p?.id === rule.subOut);
     const out = side.team.squad.find((p) => p.id === rule.subOut), inP = side.benchAvailable().find((p) => p.id === rule.subIn);
     const name = (id) => { const p = side.team.squad.find((x) => x.id === id); return p ? tag(p) : 'spilleren'; };
-    const why = slot < 0 ? `${name(rule.subOut)} er ikke på banen` : !inP ? `${name(rule.subIn)} er ikke på bænken (skadet, allerede brugt eller i startopstillingen)` : subBlock(side, min);
+    const why = slot < 0 ? `${name(rule.subOut)} er ${sheet.entries[rule.subOut]?.red ? 'udvist' : 'ikke på banen'}` : !inP ? `${name(rule.subIn)} er ikke på bænken (skadet, allerede brugt eller i startopstillingen)` : subBlock(side, min);
     if (why) {
       if (own(side)) addEv(min, 'TRIGGER', 'TACTIC', side.isHome, false, 'Hvis-Så-skift ikke udført', `📋 [${side.team.name} • Hvis-Så] Udskiftningen kunne ikke udføres i ${min}. minut: ${why}.`);
       return;
@@ -650,8 +693,8 @@ export function simulateMatch(home, away, rng, opts = {}) {
     fatigueSubs(H, min); fatigueSubs(A, min);
 
     const hR = rolesOf(H), aR = rolesOf(A);
-    const hMid = avg(hR.mids, (p) => p.skills.passing + p.skills.ballControl);
-    const aMid = avg(aR.mids, (p) => p.skills.passing + p.skills.ballControl);
+    const hMid = avg(hR.mids, (p) => p.skills.passing + p.skills.ballControl) * shortF(H);
+    const aMid = avg(aR.mids, (p) => p.skills.passing + p.skills.ballControl) * shortF(A);
     const homeHasBall = hMid + hAvg * 0.03 + rng.next() * 8 >= aMid + aAvg * 0.03 + rng.next() * 7.5;
     if (homeHasBall) st.hPoss += 3; else st.aPoss += 3;
     const att = homeHasBall ? H : A, def = homeHasBall ? A : H;
@@ -665,7 +708,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
       const cp = rng.pick(customs);
       if (cp.outOfZone) {
         st[k(def, 'TacticSuccess')]++;
-        sheet.adjust(cp.player.id, -0.45); sheet.adjust(presser.id, 0.35); sheet.bump(presser.id, 'tacticWins');
+        sheet.adjust(cp.player.id, -0.45); sheet.adjust(presser.id, DUEL_BONUS); sheet.bump(presser.id, 'tacticWins');
         addEv(min, 'TACTIC_FAIL', 'TACTIC', def.isHome, false, 'Ude af zone', `⚠️ [TAKTIK FEJLER • CUSTOM POS] ${tag(cp.player)} (${att.team.name}) står for langt fra sin ${cp.role}-zone, og ${tag(presser)} udnytter hullet.`);
         continue;
       }
@@ -692,7 +735,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
       if (build >= press) {
         duelLog[att.team.id].buildWon++;
         st[k(att, 'TacticSuccess')]++;
-        sheet.adjust(playmaker.id, 0.35); sheet.bump(playmaker.id, 'tacticWins');
+        sheet.adjust(playmaker.id, DUEL_BONUS); sheet.bump(playmaker.id, 'tacticWins');
         // Ingen besked afhængig af mod-kunnen mod modstanderen – den ville røbe deres stil.
         const note = ` ${tag(playmaker)} styrer midtbanen.`;
         // Kun dit eget holds valg navngives; modstanderens stil beskrives ikke.
@@ -713,7 +756,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
             : `🛑 [FASE 2 VIRKER • ${def.team.name}] ${tag(striker)} (${att.team.name}) fanges offside.`;
           addEv(min, 'TACTIC_FAIL', 'TACTIC', def.isHome, false, 'Offside-fælde virker', offTxt);
         } else {
-          sheet.adjust(presser.id, 0.35); sheet.adjust(playmaker.id, -0.2); sheet.bump(presser.id, 'tacticWins');
+          sheet.adjust(presser.id, DUEL_BONUS); sheet.adjust(playmaker.id, -0.2); sheet.bump(presser.id, 'tacticWins');
           // Kontra (v3.9): afgøres FØR teksten, så "din lynkontra" kun loves, når den kommer.
           const won = defPh.phase3_transition.onBallWon;
           const goesCounter = rng.chance(counterChance(attPh.phase1_buildUp.offBallRuns, attPh.phase3_transition.onBallLost, won, fbCount(att)));
@@ -733,7 +776,8 @@ export function simulateMatch(home, away, rng, opts = {}) {
     if (rng.chance(0.06)) {
       const victimSide = rng.chance(0.5) ? H : A, foulSide = other(victimSide);
       const fR = foulSide === H ? hR : aR;
-      const slot = rng.int(1, 10);
+      const slots = victimSide.starters.map((p, i) => i).filter((i) => i > 0 && victimSide.starters[i]);
+      const slot = slots[rng.int(0, slots.length - 1)];
       const victim = victimSide.starters[slot], fouler = rng.pick(fR.defs.concat(fR.mids));
       st[k(foulSide, 'Fouls')]++;
       sheet.adjust(fouler.id, -0.35);
@@ -750,10 +794,12 @@ export function simulateMatch(home, away, rng, opts = {}) {
           const why = subBlock(victimSide, min) ?? 'der er ingen rask spiller på bænken';
           addEv(min, 'INFO', 'PLAY', victimSide.isHome, false, 'Ingen indskiftning', `[${victimSide.team.name}] Ingen indskiftning mulig (${why}) – holdet spiller videre med ${tag(victim)} haltende.`);
         }
+        // Den grove tackling kan koste et direkte rødt kort (v3.15) – kun her, så tilfældighederne i resten af kampen
+        // ikke flytter sig (QC). Frisparket er offentligt; kortet afhænger ikke af nogen skjult indstilling.
+        if (rng.chance(CARD_RULES.DIRECT_RED_P)) sendOff(foulSide, fouler, min, 'DIRECT');
       } else {
-        // Gult kort kun her – skade-frisparkets tekst nævner intet kort (v3.10).
-        if (sheet.entries[fouler.id] && !sheet.entries[fouler.id].yellowCard) { sheet.entries[fouler.id].yellowCard = true; st[k(foulSide, 'Yellows')]++; }
-        addEv(min, 'FOUL', 'PLAY', foulSide.isHome, false, 'Frispark', `🟨 [${foulSide.team.name}] Taktisk frispark og gult kort til ${tag(fouler)}.`);
+        // Gult kort kun her – skade-frisparkets tekst nævner intet kort (v3.10). Andet gule giver rødt (v3.15).
+        booking(foulSide, fouler, min, 'Taktisk frispark og gult kort til');
       }
     }
 
@@ -763,10 +809,8 @@ export function simulateMatch(home, away, rng, opts = {}) {
       // Hvert femte giver gult kort (v3.10, QC: ellers ≈0,5 gule pr. hold – Superligaen ≈2).
       if (rng.chance(QUIET_CARD_P)) {
         const dRq = def === H ? hR : aR, fouler = rng.pick(dRq.defs.concat(dRq.mids));
-        if (sheet.entries[fouler.id] && !sheet.entries[fouler.id].yellowCard) {
-          sheet.entries[fouler.id].yellowCard = true; sheet.adjust(fouler.id, -0.2); st[k(def, 'Yellows')]++;
-          addEv(min, 'FOUL', 'PLAY', def.isHome, false, 'Gult kort', `🟨 [${def.team.name}] Gult kort til ${tag(fouler)} for et frispark.`);
-        }
+        sheet.adjust(fouler.id, -0.2);
+        booking(def, fouler, min, 'Gult kort til', ' for et frispark');
       }
     }
     // Dødbolde til holdet med bolden (v3.10): straffe, frispark i skudafstand – ikke efter tabt bold.
@@ -904,7 +948,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // Hvad udskiftningerne sparede (v3.13, Spilfører: en svagere indskifter skal kunne forstås som et valg):
   // de udskiftede (ikke skadede) løb færre km – friskheden efter kampen regnes efter km-prisen (freshness.js).
   if (meSide) {
-    const off = Object.values(sheet.entries).filter((e) => e.teamId === meSide.team.id && e.minIn <= 1 && e.minOut < 90 && !e.injured);
+    const off = Object.values(sheet.entries).filter((e) => e.teamId === meSide.team.id && e.minIn <= 1 && e.minOut < 90 && !e.injured && !e.red);
     // Efter restitutionen (41 % af det, der mangler) er gevinsten 59 % af den sparede pris (QC: ellers stod 12 for 7).
     const saved = Math.round((1 - REST_SHARE) * off.reduce((a, e) => a + matchCost(e.km90 * (90 - e.minOut) / 90, meSide.team.squad.find((p) => p.id === e.playerId)?.skills.stamina ?? 10), 0));
     if (off.length) addEv(90, 'INFO', 'TACTIC', meSide.isHome, false, 'Udskiftninger', `🔋 [${meSide.team.name}] ${off.length === 1 ? 'Din udskiftede spiller' : `Dine ${off.length} udskiftede spillere`} sparede ca. ${saved} point friskhed til næste runde.`);

@@ -215,18 +215,30 @@ test('samlingen: er hovedskiftet umuligt, tages en tæt-på ikke med; lykkes ét
   assert.match(s[0].text, /under din grænse 70 %/); assert.match(s[1].text, /tages med i samme pause/);
   assert.equal(at3(blocked(both)).length, 1, 'B får stadig sin besked; C (tæt på) aldrig');
 });
-test('samlingen: kun 5 skift i alt – de tæt-på tages lavest friskhed først, og de, der ikke nåede med, får ingen besked', () => {
+// v3.15 (brugerens valg "spred skift"): højst 3 træthedsskift ad gangen – de trætteste først; den fjerde venter til
+// næste tick (og får besked), hvor han tages sammen med den mest trætte tæt-på – i alt stadig højst 5.
+test('samlingen: højst 3 ad gangen – de trætteste først, den fjerde venter (med besked) og tages i næste tick sammen med den trætteste tæt-på', () => {
   const { H, A } = arena();
   [[1, 60], [2, 61], [5, 60], [6, 61]].forEach(([i, f]) => { slot(H, i).freshness = f; });
-  slot(H, 8).freshness = 74; slot(H, 10).freshness = 72;     // tæt på; plads 8 står først i rækken, plads 10 er trættest
+  slot(H, 8).freshness = 74; slot(H, 10).freshness = 72;     // tæt på; plads 10 er trættest
   freshBench(H);
   const m = simulateMatch(H, A, stubRng({}));
-  const s = at3(subs(m));
-  assert.equal(s.length, 5);
-  const near5 = s.filter((e) => /tages med/.test(e.text));
-  assert.equal(near5.length, 1);
-  assert.ok(near5[0].text.includes(`${tag(slot(H, 10))} ud (træt, 71 %`), near5[0].text);   // 72 − 0,31 (ST 10 km · 1,4 · 2/90) = 71,7 → "71 %"
-  assert.equal(at3(blocked(m)).length, 0, 'plads 8 (tæt på) nævnes ikke, selv om 5 skift er brugt');
+  const first = at3(subs(m));
+  assert.equal(first.length, 3, first.map((e) => e.text).join(' | '));
+  // De fire trætte (plads 1, 2, 5, 6): tre skiftes (de trætteste efter kampens tab), den fjerde venter
+  const tired = [1, 2, 5, 6].map((i) => slot(H, i)), outOf = (e) => tired.find((p) => e.text.includes(`${tag(p)} ud`));
+  assert.ok(first.every(outOf) && new Set(first.map(outOf)).size === 3, first.map((e) => e.text).join(' | '));
+  const waiting = tired.find((p) => !first.map(outOf).includes(p));
+  const fr = (e) => Number(e.text.match(/træt, (\d+) %/)[1]);
+  assert.ok(first.every((e) => /under din grænse/.test(e.text) && !/tages med/.test(e.text)), 'ingen tæt-på, når loftet er nået');
+  const wait = at3(blocked(m));
+  assert.equal(wait.length, 1);
+  assert.match(wait[0].text, new RegExp(`${tag(waiting)} .*højst 3 træthedsskift ad gangen – han venter til næste skift\\.$`));
+  const next = subs(m).filter((e) => e.min === 6);
+  assert.equal(next.length, 2, next.map((e) => e.text).join(' | '));
+  assert.ok(next[0].text.includes(`${tag(waiting)} ud`) && next[1].text.includes(`${tag(slot(H, 10))} ud`) && /tages med/.test(next[1].text), next.map((e) => e.text).join(' | '));
+  assert.ok(Math.max(...first.map(fr)) <= fr(next[0]), 'de trætteste gik først');
+  assert.equal(subs(m).length, 5);
 });
 test('samlingen: en tæt-på uden frisk indskifter får ingen besked', () => {
   const { H, A } = arena();
