@@ -36,14 +36,20 @@ function game(s = 4) {
 const mcOf = (m, extra = {}) => ({ round: 1, matches: [m], gazette: { goalOfTheRound: null, totalGoals: 0, totalVarChecks: 0 }, viewIdx: 0, filter: 'all', shownCount: Infinity, playing: false, ...extra });
 const on = { skip() {}, view() {}, snapshot() {}, openGoal() {}, filter() {}, heat() {}, replay() {} };
 
-test('trinene: 31 grundbilleder + ét pr. afslutning i tick-orden; højdepunkter = kun afslutningerne; spring rammer hændelsens øjeblik', () => {
+// v3.16.2: efter hvert mål/redning/skud forbi et skudtrin med samme hændelse (VAR-tjek, annulleret mål og flag har intet).
+const SHOT_KINDS = new Set(['GOAL', 'HEADER_GOAL', 'SAVE', 'MISS']);
+test('trinene: 31 grundbilleder + ét pr. afslutning i tick-orden, et skudtrin efter hvert mål/redning/forbi; højdepunkter = kun afslutningerne og deres skudtrin; spring rammer hændelsens øjeblik', () => {
   const { m } = game();
-  const s = replaySteps(m.trace), hl = replaySteps(m.trace, true);
+  const s = replaySteps(m.trace, false, m.events), hl = replaySteps(m.trace, true, m.events);
   assert.equal(s.filter((x) => x.kind === 'frame').length, 31);
   assert.equal(s.filter((x) => x.kind === 'moment').length, m.trace.moments.length);
-  assert.ok(m.trace.moments.length >= 5, 'data: afslutninger');
+  const shots = m.trace.moments.filter((x) => SHOT_KINDS.has(x.kind));
+  assert.ok(m.trace.moments.length >= 5 && shots.length >= 3, 'data: afslutninger');
+  assert.deepEqual(s.filter((x) => x.kind === 'shot').map((x) => x.ev), shots.map((x) => x.ev));
+  assert.ok(s.every((x, i) => x.kind !== 'shot' || (s[i - 1].kind === 'moment' && s[i - 1].ev === x.ev)), 'skudtrinnet lige efter sit øjeblik');
   assert.ok(s.every((x, i) => i === 0 || x.t >= s[i - 1].t), 'tick-orden');
-  assert.deepEqual(hl.map((x) => x.ev), m.trace.moments.map((x) => x.ev));
+  assert.deepEqual(hl.filter((x) => x.kind === 'moment').map((x) => x.ev), m.trace.moments.map((x) => x.ev));
+  assert.deepEqual(hl, s.filter((x) => x.kind !== 'frame'), 'højdepunkter = de samme trin uden grundbillederne');
   const mo = m.trace.moments[2];
   assert.equal(s[stepForEvent(s, m.events, mo.ev)].ev, mo.ev);
   // En hændelse uden øjeblik (fx et gult kort) → grundbilledet i dens tick

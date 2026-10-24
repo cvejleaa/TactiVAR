@@ -262,7 +262,7 @@ test('langskud: skytten tegnes ikke i feltet men på sin plads fra skudafstand (
 // Grundbilledet uden duel (v3.16.1 tickFrame): bolden er hos opspilleren (stub-pick = første midtbanespiller, LM med levende x 15), og holdet
 // trækkes 10,5 mod HANS side (BALL_PULL 0,3 · (15 − 50)) – ikke mod den modsatte (ballX 85). Også efter en chance på højre kant (cutback, seenX 88):
 // tick'ets billede følger opspilleren, ikke den seneste chance.
-test('grundbilledet uden duel: bolden hos opspilleren (LM, x 15), holdet forskudt 10,5 mod venstre (LB 15 → 5, CB 38 → 28) – også efter en chance på højre kant (ikke 88: CB 49) – dræber tickFrame med spejlet ballX, seenX før opspilleren', () => {
+test('grundbilledet uden duel: bolden hos opspilleren (LM, x 15), holdet forskudt 10,5 mod venstre (LB 15 → 5, CB 38 → 28) – også efter en chance på højre kant (ikke 88: CB 49); ens nabobillede → bolden hos LB – dræber tickFrame med spejlet ballX, seenX før opspilleren', () => {
   const a = arena();
   for (const i of [5, 6, 7, 8]) slot(a.A, i).skills.passing = 1;
   for (const i of [1, 2, 3, 4]) Object.assign(slot(a.A, i).skills, { positioning: 1, intercepting: 1, strength: 1 });
@@ -270,15 +270,17 @@ test('grundbilledet uden duel: bolden hos opspilleren (LM, x 15), holdet forskud
   Object.assign(slot(a.H, 8).skills, { passing: 20, finishing: 1 });
   const m = simulateMatch(a.H, a.A, stubRng({ 0.3: (k) => k < 1 }, 0.5));
   assert.equal(m.goalsPool[0].kind, 'CUTBACK');
-  const [, f1, f2] = m.trace.frames;
+  const [, f1, f2, f3] = m.trace.frames;
   // 15 − 10,5 = 4,5 → 5, 38 → 27,5 → 28, 62 → 52, 85 → 75; LM (5, 35), CM (28, 36) og ST (28, 28) står oven i en modspiller og skubbes
   // 6 på tværs fra ham: RB (spejlet (4, 30)) → 10, CM (spejlet (27, 41)) → 33, stopperen (spejlet (27, 27)) → 33
   const want = [50, 5, 28, 52, 75, 10, 33, 57, 80, 33, 57];
-  for (const f of [f1, f2]) {
+  for (const f of [f1, f2, f3]) {
     assert.equal(f.poss, 'h');
-    assert.deepEqual(col(f, 'h', 1), want);
-    assert.deepEqual(f.ball, [10, 35]);   // hos opspilleren (LM), hvor han står i billedet
+    assert.deepEqual(col(f, 'h', 1), want, `t ${f.t}: samme form i hvert tick`);
   }
+  // v3.16.2: t 1 og t 3 bolden hos opspilleren (LM), hvor han står i billedet; t 2 ville være t 1 igen (samme opspiller, ingen duel)
+  // → hos forsvareren nærmest ham, LB (5, 50) (levende x 4,5 mod LM's 4,5 – CB 27,5). t 3 er ikke magen til t 2 → opspilleren igen.
+  assert.deepEqual([f1.ball, f2.ball, f3.ball], [[10, 35], [5, 50], [10, 35]]);
 });
 
 // ---------- momentAt: aktørerne står, hvor HÆNDELSEN var, ikke hvor formen lagde dem ----------

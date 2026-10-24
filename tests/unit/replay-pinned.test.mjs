@@ -2,7 +2,7 @@
 // og tjekkede hovedlinjerne (antal brikker, at et spring viser teksten, stillingen FØR et mål); resten af afspilleren – brikkernes
 // placering/skjul/markering, stillingen i hvert slags trin, ▶/⏸-teksten, trinenes varighed og hastighed, grænserne ved første og
 // sidste trin, genstart, Højdepunkter, spring og oprydning – kunne ændres med grøn suite (~85 af ~100 mutationer overlevede).
-// Tiden er mock.timers (STEP_MS: grundbillede 700 ms, øjeblik 2600 ms, delt med hastigheden).
+// Tiden er mock.timers (STEP_MS: grundbillede 700 ms, øjeblik 2600 ms, skudtrin 1100 ms (v3.16.2), delt med hastigheden).
 import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -57,35 +57,46 @@ const trace = {
 const ev = (min, hG, aG, text, type = 'INFO') => ({ min, hG, aG, text, type });
 const events = [ev(3, 0, 0, 'Kampen i gang'), ev(3, 1, 0, 'MÅL Hjemme', 'GOAL'), ev(6, 1, 0, 'REDNING', 'SAVE'), ev(6, 1, 0, 'GULT KORT', 'FOUL'), ev(6, 1, 0, 'FORBI', 'MISS'), ev(9, 1, 1, 'MÅL Ude', 'GOAL'), ev(90, 1, 1, 'SLUT', 'END')];
 const mk = () => ({ homeName: 'Hjemme', awayName: 'Ude', ratings, events, trace: structuredClone(trace) });
-// Trinene (fuld afspilning): 0 frame t0 · 1 frame t1 · 2 mål ev1 · 3 frame t2 · 4 redning ev2 · 5 forbi ev4 · 6 frame t3 · 7 mål ev5
+// Trinene (fuld afspilning, v3.16.2 med et skudtrin efter hver afslutning): 0 frame t0 · 1 frame t1 · 2 mål ev1 · 3 skud ev1 ·
+// 4 frame t2 · 5 redning ev2 · 6 skud ev2 · 7 forbi ev4 · 8 skud ev4 · 9 frame t3 · 10 mål ev5 · 11 skud ev5.
+// Skuddenes ende (shotEnd): ev1 hjemme mod y 0, skytten x 41 < keeperen 50 → 50 − 5 = 45, y 2 → [45, 2]; ev2 redning → keeperen
+// [50, 90]; ev4 forbi ('FORBI', ingen label), skytten x 50 (ikke < 50) → fjerne side 38, y 100 − 2 → [38, 98]; ev5 ude, x 57 → 55, [55, 98].
 const step = (el) => Number(el.dataset.step);
 const cap = (el) => byId(el, 'rp-caption').textContent;
 const click = (el, id) => byId(el, id).handlers.click();
 const label = (el, id) => byId(el, id).textContent;
 function fresh(ownSide = 'h') { clearReplays(); const m = mk(); return { m, el: replayEl(m, ownSide) }; }
 
-test('trinene: frames i tick-orden, hvert tick efterfulgt af sine afslutninger i referatets rækkefølge; højdepunkter = kun afslutningerne; ingen spor → ingen trin', () => {
-  const s = replaySteps(trace);
-  assert.deepEqual(s.map((x) => `${x.kind}:${x.t}:${x.ev}`), ['frame:0:null', 'frame:1:null', 'moment:1:1', 'frame:2:null', 'moment:2:2', 'moment:2:4', 'frame:3:null', 'moment:3:5']);
-  assert.deepEqual(replaySteps(trace, true).map((x) => `${x.kind}:${x.t}:${x.ev}`), ['moment:1:1', 'moment:2:2', 'moment:2:4', 'moment:3:5']);
+test('trinene: frames i tick-orden, hvert tick efterfulgt af sine afslutninger i referatets rækkefølge, hver med sit skudtrin; højdepunkter = kun afslutningerne og skudtrinnene; ingen spor → ingen trin', () => {
+  const s = replaySteps(trace, false, events);
+  assert.deepEqual(s.map((x) => `${x.kind}:${x.t}:${x.ev}`), ['frame:0:null', 'frame:1:null', 'moment:1:1', 'shot:1:1', 'frame:2:null', 'moment:2:2', 'shot:2:2', 'moment:2:4', 'shot:2:4', 'frame:3:null', 'moment:3:5', 'shot:3:5']);
+  assert.deepEqual(replaySteps(trace, true, events).map((x) => `${x.kind}:${x.t}:${x.ev}`), ['moment:1:1', 'shot:1:1', 'moment:2:2', 'shot:2:2', 'moment:2:4', 'shot:2:4', 'moment:3:5', 'shot:3:5']);
+  assert.deepEqual(replaySteps(trace), s, 'uden referat: samme trin (forbi er forbi)');
+  assert.deepEqual([3, 6, 8, 11].map((i) => s[i].ball), [[45, 2], [50, 90], [38, 98], [55, 98]]);
   assert.deepEqual(replaySteps(null), []); assert.deepEqual(replaySteps(undefined, true), []);
   // Trinet bærer billedet, bolden og aktørerne
   assert.deepEqual(s[2].ball, [41, 22]); assert.deepEqual(s[2].h, trace.moments[0].h); assert.deepEqual(s[2].a, trace.moments[0].a);
   assert.deepEqual([s[2].actor, s[2].assist], ['h3', 'h2']);
-  assert.deepEqual([s[4].actor, s[4].assist], ['a3', null], 'en redning: skytten er aktør, intet oplæg');
-  assert.deepEqual([s[7].actor, s[7].assist], ['a3', null]);
+  assert.deepEqual([s[5].actor, s[5].assist], ['a3', null], 'en redning: skytten er aktør, intet oplæg');
+  assert.deepEqual([s[10].actor, s[10].assist], ['a3', null]);
+  // skudtrinnet er øjeblikket med en anden bold: samme billede, aktører og hændelse
+  const { over, ...shot3 } = s[3];
+  assert.equal(over, false, 'et mål flyver ikke over');
+  assert.deepEqual({ ...shot3, kind: 'moment', ball: s[2].ball }, s[2]);
   assert.deepEqual(s[1].ball, [44, 50]); assert.deepEqual(s[1].h, trace.frames[1].h);
 });
 
 test('stepForEvent: hændelsens eget øjeblik; ellers grundbilledet i dens tick (ikke dets første afslutning); rundes til nærmeste tick; i højdepunkter første afslutning i ticket eller trin 0', () => {
-  const s = replaySteps(trace), hl = replaySteps(trace, true);
-  assert.equal(stepForEvent(s, events, 1), 2); assert.equal(stepForEvent(s, events, 4), 5); assert.equal(stepForEvent(s, events, 5), 7);
-  assert.equal(stepForEvent(s, events, 3), 3, 'gult kort (min 6, tick 2) → grundbilledet t2, ikke redningen');
+  const s = replaySteps(trace, false, events), hl = replaySteps(trace, true, events);
+  // øjeblikket, ikke dets skudtrin (3/8/11)
+  assert.equal(stepForEvent(s, events, 1), 2); assert.equal(stepForEvent(s, events, 4), 7); assert.equal(stepForEvent(s, events, 5), 10);
+  assert.equal(stepForEvent(s, events, 3), 4, 'gult kort (min 6, tick 2) → grundbilledet t2, ikke redningen');
   assert.equal(stepForEvent(s, events, 0), 1, 'min 3 → tick 1');
   assert.equal(stepForEvent(s, events, 6), 0, 'min 90 (tick 30) findes ikke i denne lille kamp → trin 0, ikke −1');
   assert.equal(stepForEvent(s, events, 99), 0, 'ukendt hændelse');
   // Højdepunkter: ingen grundbilleder – første trin i ticket, ellers 0
-  assert.equal(stepForEvent(hl, events, 3), 1, 'gult kort i tick 2 → første afslutning i tick 2');
+  assert.equal(stepForEvent(hl, events, 3), 2, 'gult kort i tick 2 → første afslutning i tick 2 (efter målet og dets skudtrin)');
+  assert.equal(stepForEvent(hl, events, 2), 2); assert.equal(stepForEvent(hl, events, 4), 4);
   assert.equal(stepForEvent(hl, events, 6), 0);
   assert.equal(stepForEvent(hl, events, 0), 0);
   // Afrunding: min 4 → tick 1 (1,33), min 5 → tick 2 (1,67) – ikke gulv/loft
@@ -126,17 +137,21 @@ test('trin frem og tilbage: bolden og brikkerne følger trinet; stillingen i et 
   const { el } = fresh('h');
   // v3.16.1: grundbilledets tekst siger, hvordan duellen gik – t 2 er udeholdets tick, men hjemme erobrer (lost), t 3 slipper
   // hjemmes angriber igennem (run); afsparket (ingen besiddelse) har ingen duel-tekst.
-  const want = ["0' · Hjemme 0-0 Ude", "3' · Hjemme 0-0 Ude · Hjemme har bolden", "3' · Hjemme 1-0 Ude · MÅL Hjemme", "6' · Hjemme 1-0 Ude · Hjemme erobrer bolden", "6' · Hjemme 1-0 Ude · REDNING", "6' · Hjemme 1-0 Ude · FORBI", "9' · Hjemme 1-0 Ude · Hjemme spiller sig frem til angriberen", "9' · Hjemme 1-1 Ude · MÅL Ude"];
-  for (let i = 0; i < 8; i++) { assert.equal(step(el), i); assert.equal(cap(el), want[i], `trin ${i}`); if (i < 7) click(el, 'rp-next'); }
-  click(el, 'rp-next'); assert.equal(step(el), 7, 'ikke forbi sidste trin'); assert.equal(cap(el), want[7]);
-  click(el, 'rp-prev'); assert.equal(step(el), 6); assert.equal(cap(el), want[6]);
-  for (let i = 0; i < 9; i++) click(el, 'rp-prev');
+  // Skudtrinnet (v3.16.2) gentager sit øjebliks linje og stilling.
+  const want = ["0' · Hjemme 0-0 Ude", "3' · Hjemme 0-0 Ude · Hjemme har bolden", "3' · Hjemme 1-0 Ude · MÅL Hjemme", "3' · Hjemme 1-0 Ude · MÅL Hjemme", "6' · Hjemme 1-0 Ude · Hjemme erobrer bolden", "6' · Hjemme 1-0 Ude · REDNING", "6' · Hjemme 1-0 Ude · REDNING", "6' · Hjemme 1-0 Ude · FORBI", "6' · Hjemme 1-0 Ude · FORBI", "9' · Hjemme 1-0 Ude · Hjemme spiller sig frem til angriberen", "9' · Hjemme 1-1 Ude · MÅL Ude", "9' · Hjemme 1-1 Ude · MÅL Ude"];
+  for (let i = 0; i < 12; i++) { assert.equal(step(el), i); assert.equal(cap(el), want[i], `trin ${i}`); if (i < 11) click(el, 'rp-next'); }
+  click(el, 'rp-next'); assert.equal(step(el), 11, 'ikke forbi sidste trin'); assert.equal(cap(el), want[11]);
+  click(el, 'rp-prev'); assert.equal(step(el), 10); assert.equal(cap(el), want[10]);
+  for (let i = 0; i < 12; i++) click(el, 'rp-prev');
   assert.equal(step(el), 0, 'ikke før første trin'); assert.equal(cap(el), want[0]);
   // bolden og brikkerne
   click(el, 'rp-next'); click(el, 'rp-next');   // mål, trin 2
   const ball = byId(el, 'rp-ball');
   assert.deepEqual([ball.style.left, ball.style.top], ['41%', '22%']);
   assert.deepEqual([tok(el, 'h3').style.left, tok(el, 'h3').style.top, tok(el, 'a2').style.left, tok(el, 'a2').style.top], ['41%', '22%', '33%', '39%']);
+  click(el, 'rp-next');   // skudtrinnet: bolden i nettet ved siden af keeperen (45, 2), skytten står, hvor han skød
+  assert.deepEqual([ball.style.left, ball.style.top], ['45%', '2%']);
+  assert.deepEqual([tok(el, 'h3').style.left, tok(el, 'h3').style.top], ['41%', '22%']);
 });
 
 test('markeringer: aktøren og oplægsgiveren markeres i øjeblikket og kun dér; billedtekstens "moment"-klasse følger trinnets slags', () => {
@@ -144,6 +159,8 @@ test('markeringer: aktøren og oplægsgiveren markeres i øjeblikket og kun dér
   const marked = () => tokens(el).filter((x) => !x.hidden && (cls(x, 'actor') || cls(x, 'assist'))).map((x) => `${x.dataset.pid}:${cls(x, 'actor') ? 'actor' : 'assist'}`).sort();
   assert.deepEqual(marked(), []); assert.equal(cls(byId(el, 'rp-caption'), 'moment'), false);
   click(el, 'rp-next'); click(el, 'rp-next');
+  assert.deepEqual(marked(), ['h2:assist', 'h3:actor']); assert.equal(cls(byId(el, 'rp-caption'), 'moment'), true);
+  click(el, 'rp-next');   // skudtrinnet: samme markeringer og 'moment' (kun bolden flytter sig)
   assert.deepEqual(marked(), ['h2:assist', 'h3:actor']); assert.equal(cls(byId(el, 'rp-caption'), 'moment'), true);
   click(el, 'rp-next');   // grundbillede t2
   assert.deepEqual(marked(), [], 'markeringerne fjernes igen'); assert.equal(cls(byId(el, 'rp-caption'), 'moment'), false);
@@ -154,11 +171,12 @@ test('markeringer: aktøren og oplægsgiveren markeres i øjeblikket og kun dér
 test('brikker der ikke er på banen i trinet skjules og vises igen, når de er tilbage; ukendte spillere får "?"', () => {
   const { el } = fresh('h');
   assert.equal(tok(el, 'h3').hidden, false);
-  for (let i = 0; i < 3; i++) click(el, 'rp-next');   // grundbillede t2 uden hjemmespiller 3
+  for (let i = 0; i < 4; i++) click(el, 'rp-next');   // grundbillede t2 (trin 4) uden hjemmespiller 3
+  assert.equal(step(el), 4);
   assert.equal(tok(el, 'h3').hidden, true, 'h3 er ude af billedet');
   assert.equal(tokens(el).filter((x) => !x.hidden).length, 5);
-  for (let i = 0; i < 3; i++) click(el, 'rp-next');   // grundbillede t3: h3 er tilbage
-  assert.equal(step(el), 6); assert.equal(tok(el, 'h3').hidden, false);
+  for (let i = 0; i < 5; i++) click(el, 'rp-next');   // grundbillede t3: h3 er tilbage
+  assert.equal(step(el), 9); assert.equal(tok(el, 'h3').hidden, false);
   // en spiller uden række i karakterarket
   clearReplays();
   const m = mk(); m.trace.frames[0].h.push(['h99', 10, 10]);
@@ -167,11 +185,11 @@ test('brikker der ikke er på banen i trinet skjules og vises igen, når de er t
   assert.equal(unknown.textContent, '?'); assert.ok(!unknown.attrs.title);
 });
 
-test('▶ Afspil: knappen skifter til ⏸ Pause, et grundbillede varer 700 ms og et øjeblik 2600 ms; ⏸ stopper; slutningen stopper og ▶ starter forfra', () => {
+test('▶ Afspil: knappen skifter til ⏸ Pause, et grundbillede varer 700 ms, et øjeblik 2600 ms og et skudtrin 1100 ms; ⏸ stopper; slutningen stopper og ▶ starter forfra', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
     const { el } = fresh('h');
-    assert.deepEqual([STEP_MS.frame, STEP_MS.moment], [700, 2600]);
+    assert.deepEqual([STEP_MS.frame, STEP_MS.moment, STEP_MS.shot], [700, 2600, 1100]);
     assert.equal(label(el, 'rp-play'), '▶ Afspil');
     click(el, 'rp-play');
     assert.equal(label(el, 'rp-play'), '⏸ Pause');
@@ -179,15 +197,17 @@ test('▶ Afspil: knappen skifter til ⏸ Pause, et grundbillede varer 700 ms og
     mock.timers.tick(1); assert.equal(step(el), 1);
     mock.timers.tick(700); assert.equal(step(el), 2, 'grundbillede t1 varer 700 ms');
     mock.timers.tick(2599); assert.equal(step(el), 2, 'et øjeblik varer 2600 ms');
-    mock.timers.tick(1); assert.equal(step(el), 3);
+    mock.timers.tick(1); assert.equal(step(el), 3, 'skudtrinnet');
     // Pause: afspilningen står, og knappen kan starte den igen (spilleren er ikke "sat fast" i spiller-tilstand)
     click(el, 'rp-play'); assert.equal(label(el, 'rp-play'), '▶ Afspil');
     mock.timers.tick(10000); assert.equal(step(el), 3, 'pausen holder');
     click(el, 'rp-play'); assert.equal(label(el, 'rp-play'), '⏸ Pause');
-    mock.timers.tick(700); assert.equal(step(el), 4);
+    mock.timers.tick(1099); assert.equal(step(el), 3, 'et skudtrin varer 1100 ms'); mock.timers.tick(1); assert.equal(step(el), 4);
     // Til slut: sidste trin stopper afspilningen
-    mock.timers.tick(2600); assert.equal(step(el), 5); mock.timers.tick(2600); assert.equal(step(el), 6); mock.timers.tick(700); assert.equal(step(el), 7);
-    mock.timers.tick(2600); assert.equal(step(el), 7, 'bliver på sidste trin');
+    mock.timers.tick(700); assert.equal(step(el), 5); mock.timers.tick(2600); assert.equal(step(el), 6); mock.timers.tick(1100); assert.equal(step(el), 7);
+    mock.timers.tick(2600); assert.equal(step(el), 8); mock.timers.tick(1100); assert.equal(step(el), 9); mock.timers.tick(700); assert.equal(step(el), 10);
+    mock.timers.tick(2600); assert.equal(step(el), 11);
+    mock.timers.tick(1100); assert.equal(step(el), 11, 'bliver på sidste trin');
     assert.equal(label(el, 'rp-play'), '▶ Afspil', 'stoppet ved slutningen');
     // ▶ ved sidste trin starter forfra
     click(el, 'rp-play'); assert.equal(step(el), 0); assert.equal(label(el, 'rp-play'), '⏸ Pause');
@@ -196,7 +216,7 @@ test('▶ Afspil: knappen skifter til ⏸ Pause, et grundbillede varer 700 ms og
   } finally { clearReplays(); mock.timers.reset(); }
 });
 
-test('hastighed: 1× → 2× → 4× → 1× (teksten følger), og trinene varer 700/speed og 2600/speed', () => {
+test('hastighed: 1× → 2× → 4× → 1× (teksten følger), og trinene varer 700/speed, 2600/speed og 1100/speed', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
     assert.deepEqual(SPEEDS, [1, 2, 4]);
@@ -211,8 +231,10 @@ test('hastighed: 1× → 2× → 4× → 1× (teksten følger), og trinene varer
     mock.timers.tick(350); assert.equal(step(el), 2);
     mock.timers.tick(1299); assert.equal(step(el), 2); mock.timers.tick(1); assert.equal(step(el), 3, 'øjeblik ved 2×: 1300 ms');
     click(el, 'rp-speed');   // 4×, midt i afspilningen: gælder fra næste trin
-    mock.timers.tick(350); assert.equal(step(el), 4, 'det igangværende trin (350 ms ved 2×) afsluttes');
-    mock.timers.tick(649); assert.equal(step(el), 4); mock.timers.tick(1); assert.equal(step(el), 5, 'øjeblik ved 4×: 650 ms');
+    mock.timers.tick(549); assert.equal(step(el), 3); mock.timers.tick(1); assert.equal(step(el), 4, 'det igangværende skudtrin (550 ms ved 2×) afsluttes');
+    mock.timers.tick(174); assert.equal(step(el), 4); mock.timers.tick(1); assert.equal(step(el), 5, 'grundbillede ved 4×: 175 ms');
+    mock.timers.tick(649); assert.equal(step(el), 5); mock.timers.tick(1); assert.equal(step(el), 6, 'øjeblik ved 4×: 650 ms');
+    mock.timers.tick(274); assert.equal(step(el), 6); mock.timers.tick(1); assert.equal(step(el), 7, 'skudtrin ved 4×: 275 ms');
     click(el, 'rp-play');
   } finally { clearReplays(); mock.timers.reset(); }
 });
@@ -232,47 +254,56 @@ test('⏮/⏭ under afspilning standser den (og timeren), så trinet ikke løber
   } finally { clearReplays(); mock.timers.reset(); }
 });
 
-test('⭐ Højdepunkter: kun afslutningerne; trinnet bevares (samme hændelse) ved til- og frakobling; stillingen/teksten er afslutningens; knappen markeres; varigheden er øjeblikkets', () => {
+test('⭐ Højdepunkter: kun afslutningerne og deres skudtrin; trinnet bevares (samme hændelse) ved til- og frakobling; stillingen/teksten er afslutningens; knappen markeres; varigheden er øjeblikkets og skudtrinnets', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
     const { el } = fresh('h');
-    click(el, 'rp-next'); click(el, 'rp-next'); click(el, 'rp-next'); click(el, 'rp-next');   // trin 4: redningen (ev 2)
+    for (let i = 0; i < 5; i++) click(el, 'rp-next');   // trin 5: redningen (ev 2)
     assert.equal(cls(byId(el, 'rp-highlights'), 'active'), false);
     click(el, 'rp-highlights');
     assert.equal(cls(byId(el, 'rp-highlights'), 'active'), true);
-    assert.equal(step(el), 1, 'redningen er afslutning nr. 2 af 4'); assert.equal(cap(el), "6' · Hjemme 1-0 Ude · REDNING");
-    click(el, 'rp-next'); click(el, 'rp-next'); click(el, 'rp-next'); assert.equal(step(el), 3, '4 trin i alt'); assert.equal(cap(el), "9' · Hjemme 1-1 Ude · MÅL Ude");
-    click(el, 'rp-prev'); click(el, 'rp-prev'); assert.equal(step(el), 1);
-    click(el, 'rp-highlights');   // tilbage til alle trin – samme hændelse (ev 2 = trin 4)
+    assert.equal(step(el), 2, 'redningen er afslutning nr. 2 af 4 (efter målet og dets skudtrin)'); assert.equal(cap(el), "6' · Hjemme 1-0 Ude · REDNING");
+    for (let i = 0; i < 6; i++) click(el, 'rp-next');
+    assert.equal(step(el), 7, '8 trin i alt (4 afslutninger + 4 skudtrin)'); assert.equal(cap(el), "9' · Hjemme 1-1 Ude · MÅL Ude");
+    for (let i = 0; i < 5; i++) click(el, 'rp-prev');
+    assert.equal(step(el), 2);
+    click(el, 'rp-highlights');   // tilbage til alle trin – samme hændelse (ev 2 = trin 5)
     assert.equal(cls(byId(el, 'rp-highlights'), 'active'), false);
-    assert.equal(step(el), 4); assert.equal(cap(el), "6' · Hjemme 1-0 Ude · REDNING");
+    assert.equal(step(el), 5); assert.equal(cap(el), "6' · Hjemme 1-0 Ude · REDNING");
     // Fra et grundbillede (ingen hændelse) starter højdepunkterne forfra
     click(el, 'rp-prev'); click(el, 'rp-prev');
-    click(el, 'rp-next'); assert.equal(step(el), 3, 'trin 4 → to tilbage = 2 (målet) → ét frem = 3 (grundbilledet t2)');
+    click(el, 'rp-next'); assert.equal(step(el), 4, 'trin 5 → to tilbage = 3 (målets skudtrin) → ét frem = 4 (grundbilledet t2)');
     click(el, 'rp-highlights'); assert.equal(step(el), 0, 'fra et grundbillede → første afslutning');
-    // Afspilning i højdepunkter: kun øjeblikke (2600 ms hver)
+    // Afspilning i højdepunkter: øjeblikket 2600 ms, så skudtrinnet 1100 ms
     click(el, 'rp-play'); mock.timers.tick(2599); assert.equal(step(el), 0); mock.timers.tick(1); assert.equal(step(el), 1);
+    mock.timers.tick(1099); assert.equal(step(el), 1); mock.timers.tick(1); assert.equal(step(el), 2);
     click(el, 'rp-play');
   } finally { clearReplays(); mock.timers.reset(); }
 });
 
-test('🎬-spring (replayJump): går til hændelsens trin, standser afspilningen, slår højdepunkter fra, ruller til afspilleren – og gør intet for en kamp uden afspiller', () => {
+test('🎬-spring (replayJump): går til hændelsens trin, standser afspilningen, slår højdepunkter fra, viser efter 2600 ms skudtrinnet og står dér, ruller til afspilleren – og gør intet for en kamp uden afspiller', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
     const { m, el } = fresh('h');
     click(el, 'rp-highlights'); click(el, 'rp-play');
-    replayJump(m, 4);   // forbi (ev 4) → trin 5 i fuld afspilning
+    replayJump(m, 4);   // forbi (ev 4) → trin 7 i fuld afspilning
     assert.equal(cls(byId(el, 'rp-highlights'), 'active'), false, 'højdepunkter slået fra');
-    assert.equal(step(el), 5); assert.equal(cap(el), "6' · Hjemme 1-0 Ude · FORBI");
+    assert.equal(step(el), 7); assert.equal(cap(el), "6' · Hjemme 1-0 Ude · FORBI");
     assert.equal(label(el, 'rp-play'), '▶ Afspil', 'standset');
+    mock.timers.tick(2599); assert.equal(step(el), 7, 'øjeblikket vises 2600 ms');
+    mock.timers.tick(1); assert.equal(step(el), 8, 'så skudtrinnet'); assert.equal(cap(el), "6' · Hjemme 1-0 Ude · FORBI");
+    assert.equal(label(el, 'rp-play'), '▶ Afspil', 'stadig standset');
+    mock.timers.tick(20000); assert.equal(step(el), 8, 'står på udfaldet');
     click(el, 'rp-highlights');   // højdepunkterne er virkelig slået fra: ét klik slår dem til igen (ikke to)
-    assert.equal(cls(byId(el, 'rp-highlights'), 'active'), true); assert.equal(step(el), 2, 'forbi (ev 4) er afslutning nr. 3 af 4'); click(el, 'rp-highlights');
-    mock.timers.tick(20000); assert.equal(step(el), 5, 'timeren er stoppet');
+    assert.equal(cls(byId(el, 'rp-highlights'), 'active'), true); assert.equal(step(el), 4, 'forbi (ev 4) er afslutning nr. 3 af 4 (trin 4 af 8)'); click(el, 'rp-highlights');
+    assert.equal(step(el), 7);
+    mock.timers.tick(20000); assert.equal(step(el), 7, 'ingen timer tilbage');
     assert.equal(el.scrolled, 1, 'ruller til afspilleren');
-    replayJump(m, 3); assert.equal(step(el), 3, 'gult kort → grundbilledet i dets tick'); assert.equal(el.scrolled, 2);
+    replayJump(m, 3); assert.equal(step(el), 4, 'gult kort → grundbilledet i dets tick'); assert.equal(el.scrolled, 2);
+    mock.timers.tick(20000); assert.equal(step(el), 4, 'intet skudtrin efter et grundbillede');
     // Skal ikke kaste: kamp uden spor, uden kamp, og et spor der aldrig er tegnet
     replayJump({ ...m, trace: undefined }, 1); replayJump(undefined, 1); replayJump({ trace: { frames: [], moments: [] }, events }, 1);
-    assert.equal(step(el), 3);
+    assert.equal(step(el), 4);
   } finally { clearReplays(); mock.timers.reset(); }
 });
 

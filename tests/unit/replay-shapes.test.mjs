@@ -120,3 +120,13 @@ test('gem-vagten (RM v3.16.1): alle 80 kampes spor består isValidTrace – elle
   const { isValidTrace } = await import('../../public/engine/sanitize.js');
   for (const m of matches) assert.equal(isValidTrace(m.trace), true);
 });
+
+// Efter en duel må to billeder gerne være ens (samme opspiller og angriber to gange – underteksten siger udfaldet): 23 par.
+test('ingen ens nabobilleder i tick uden duel (v3.16.2, brugeren: "minut 24 og 27 er ens i 2d") – v3.16.1: 86 af de 109 ens par var uden duel, nu 0', () => {
+  let same = 0;
+  for (const m of matches) {
+    const F = m.trace.frames;
+    for (let i = 2; i < F.length; i++) if (!F[i].lost && !F[i].run && !F[i].offside && JSON.stringify([F[i - 1].h, F[i - 1].a, F[i - 1].ball]) === JSON.stringify([F[i].h, F[i].a, F[i].ball])) same++;
+  }
+  assert.equal(same, 0);
+});
