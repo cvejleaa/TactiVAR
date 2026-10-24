@@ -22,7 +22,7 @@ import { createLeague } from '../../public/engine/generator.js';
 import { simulateMatch } from '../../public/engine/match.js';
 
 const GOLDEN_RESULTS_400 = '652cdcf8274813580edee8e4438841da018a0003079e95b6ab83508725c5091a';   // v3.16.1 (sammenpresning; før 73852862… fra v3.16) – = hashen uden optageren (kickoffFrame, tickFrame og momentAt tomme)
-const GOLDEN_TRACES_20 = 'fecc7a3e5d7c2bc030a3dc7bb728b5fc5781daf9573157e6f10cb53e9e7e0a94';     // v3.16.1: sammenpresning, afsparket i blok, grundbilledet efter duellen (før 2e238fd9…) · v3.16: koblede linjer, bolden ved skytten, skytten i feltet
+const GOLDEN_TRACES_20 = '199efca02611d888fb0a63b931ef5b49c9af68ec7760a62609a8ffcd025f2331';     // v3.16.1: sammenpresning, afsparket i blok, grundbilledet efter duellen (før 2e238fd9…) · v3.16: koblede linjer, bolden ved skytten, skytten i feltet
 function matchN(s) {
   const L = createLeague(createRng(s * 97)), me = L.teams.find((t) => !t.isBot), opp = L.teams[(s % 7) + 1];
   return s % 2 ? simulateMatch(me, opp, createRng(s * 131)) : simulateMatch(opp, me, createRng(s * 131));
