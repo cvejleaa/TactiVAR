@@ -30,12 +30,12 @@ test('mod-kunnen: startelleverens bedste værdi stiger højst 3 pr. runde i snit
 });
 
 // v3.7 (brugeren: "rundens mål er altid VAR-dramatik"): før vandt VAR-mål hver gang.
-test('rundens mål: flere typer vinder, ingen over 50 %, VAR under 40 %; friskheden falder over en sæson', async () => {
+test('rundens mål: flere typer vinder, ingen over 50 %, ingen VAR-mål (v3.15.1); friskheden falder over en sæson', async () => {
   const { measureSeason } = await import('../../tools/measure-duels.mjs');
   const r = measureSeason(8, 6);
   assert.ok(Object.keys(r.kinds).length >= 4, JSON.stringify(r.kinds));
   assert.ok(Object.values(r.kinds).every((v) => v <= 0.5), JSON.stringify(r.kinds));
-  assert.ok((r.kinds.VAR ?? 0) < 0.4, JSON.stringify(r.kinds));
+  assert.equal(r.kinds.VAR, undefined, `v3.15.1: ingen VAR-mål mere – ${JSON.stringify(r.kinds)}`);
   // Før v3.7 lå startelleverne på ≈95–100 % efter flere runder; nu mærkes trætheden
   assert.ok(r.freshMe < 90, String(r.freshMe));
 });
@@ -130,12 +130,16 @@ test('angrebsfokus mærkes: cutbacks ≥ 1 pr. kamp, angriberen vinder 35–55 %
 // bliver scoret"): angreb 45–50 %, midtbane 30–35 %, forsvar 15–20 %; åbent spil 60–65 %, dødbolde
 // 25–30 %, kontra 8–12 %, langskud 8–10 %. Båndene har lidt luft om dokumentets tal; v3.12.0 målt med
 // samme opsætning: angreb 75 %, midtbane 15 %, forsvar 10 %, kontra 19 %, langskud 4 % – rødt overalt.
-test('målene fordeler sig som i Superligaen: angreb 44–56 %, midtbane 25–38 %, forsvar 14–24 %; kontra 7–14 %, langskud 6–12 %, dødbolde 20–32 %', async () => {
+// v3.15.1: VAR-chancetypens mål (21 % af målene, afgjort af en VAR-duel uden afslutning) er væk – målene afgøres af
+// afslutningen, så angriberne scorer flere (Spilfører: "angriberen scorer næsten aldrig i åbent spil"). Målt (150 ligaer,
+// før 28efc6d → nu): angreb 0,534 → 0,612, midtbane 0,278 → 0,245, forsvar 0,188 → 0,143; dokumentets 44–56 / 25–38 /
+// 14–24 % er bevidst forladt (spec §5 "VAR som i virkeligheden") – båndene er røde mod den gamle fordeling.
+test('målene fordeler sig: angreb 56–66 % (før 53 %), midtbane 20–30 %, forsvar 11–17 % (før 19 %); kontra 7–14 %, langskud 6–13 %, dødbolde 18–32 %', async () => {
   const { measureGoalMix } = await import('../../tools/measure-duels.mjs');
   const r = measureGoalMix(150);
   const band = (k, lo, hi) => assert.ok(r[k] >= lo && r[k] <= hi, `${k} ${r[k].toFixed(3)} (bånd ${lo}–${hi})`);
-  band('ATT', 0.44, 0.56); band('MID', 0.25, 0.38); band('DEF', 0.14, 0.24);
-  band('counter', 0.07, 0.14); band('longshot', 0.06, 0.12); band('setPiece', 0.2, 0.32);
+  band('ATT', 0.56, 0.66); band('MID', 0.2, 0.3); band('DEF', 0.11, 0.17);
+  band('counter', 0.07, 0.14); band('longshot', 0.06, 0.13); band('setPiece', 0.18, 0.32);
   assert.ok(r.goalsPerMatch >= 2.6 && r.goalsPerMatch <= 3.0, `mål pr. kamp ${r.goalsPerMatch}`);
 });
 // QC v3.12.1 (B1, "efterprøv på dét, den rammer"): langskudsbonussen må ikke gøre det bedre at stå uden
@@ -189,4 +193,18 @@ test('Kampens spiller: sjældent fra det tabende hold (≤ 8 %, før 15 %), mål
   const { measureMotm } = await import('../../tools/measure-duels.mjs');
   const r = measureMotm(600);
   assert.ok(r.loserShare <= 0.08 && r.gkShare <= 0.28 && r.scorerShare >= 0.55, JSON.stringify(r));
+});
+
+// v3.15.1 – VAR som i virkeligheden (tools/measure-duels.mjs var, 1500 kampe). Før (28efc6d, VAR som chancetype): på mål
+// 0,603, annullerede 0,495 pr. kamp, VAR-tjek 1,09, ingen forbi/straffe-/rødt-VAR. Nu: på mål ≈0,39, annullerede ≈0,16,
+// VAR-tjek ≈0,52, hjørner ≈3,1. Alle bånd er røde mod de gamle tal.
+test('VAR og afslutninger som i Superligaen: på mål 30–45 % (før 60 %), annullerede 0,08–0,25 pr. kamp (før 0,50), alle VAR-slags forekommer', async () => {
+  const { measureVar } = await import('../../tools/measure-duels.mjs');
+  const r = measureVar(1500);
+  const band = (k, lo, hi) => assert.ok(r[k] >= lo && r[k] <= hi, `${k} ${r[k].toFixed(3)} (bånd ${lo}–${hi})`);
+  band('goals', 2.6, 3.0); band('onTargetShare', 0.3, 0.45); band('disallowed', 0.08, 0.25); band('varChecksStat', 0.3, 0.8);
+  band('miss', 2, 5); band('corners', 2.8, 4.5); band('reds', 0.1, 0.25); band('flags', 0.03, 0.15);
+  band('penOverturnedShare', 0.08, 0.35); band('penAwarded', 0.02, 0.1);
+  for (const k of ['goalChecks', 'penChecks', 'redChecks', 'redDown', 'redUp']) assert.ok(r[k] > 0, `${k} ${r[k]}`);
+  assert.equal(r.varGoalOld, 0, 'ingen VAR-chancetype');
 });
