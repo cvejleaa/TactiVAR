@@ -186,3 +186,5 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .heat-shot.save { color: #60a5fa; } .heat-shot.miss { color: #e5e7eb; } .heat-shot.offside, .heat-shot.disallowed { color: #a78bfa; }
 tr.heat-sel td { background: #f9731633; } .ratings tr[title] { cursor: pointer; }
 .minipitch.heat { aspect-ratio: 68 / 100; max-width: 16rem; }
+.minipitch.heat.zones .zone-cell { position: absolute; display: flex; align-items: center; justify-content: center; border: 1px solid #ffffff22; }
+.zone-pc { font-size: .7rem; color: #fff; text-shadow: 0 1px 2px #000; opacity: 1; }

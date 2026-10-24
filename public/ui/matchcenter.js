@@ -8,7 +8,7 @@ import { GOAL_KIND_LABEL, goalMatchIdx } from '../engine/gazette.js';
 import { FORMATIONS } from '../engine/formations.js';
 import { isStarter, placeLabel, lineupSort } from './lineup.js';
 import { replayEl } from './replay.js';
-import { heatGrid, shotsOf, thirds, COLS, ROWS } from '../engine/heatmap.js';
+import { heatGrid, shotsOf, thirds, zones, zoneShots, COLS, ROWS } from '../engine/heatmap.js';
 
 export const REPORT_FILTERS = [['all', 'Alle hændelser'], ['tactic', 'Kun taktik'], ['key', 'Kun nøglemomenter']];
 // VAR_GOAL: kun i gem fra før v3.15.1 (VAR var en chancetype). VAR_CHECK/VAR_PEN/VAR_RED: VAR tjekker et mål, en straffe og
@@ -128,9 +128,17 @@ function heatPitch(rows, heat, gkId) {
     h('div', { class: 'muted', id: 'heat-note' }, `Angriber opad. Farven: hvor ${pid != null ? 'han' : 'holdet'} stod i kampens ${heat.trace.frames.length} øjebliksbilleder og afslutninger${pid != null && e && minutesOn(e) < 90 ? ` (han var på banen i ${minutesOn(e)} min – kortet er mørkest, hvor han stod oftest)` : ''}. Prikker: ${shots.length ? `${n('goal')} mål, ${n('save')} reddet, ${n('miss')} forbi/blokeret${n('offside') ? `, ${n('offside')} offside` : ''}${n('disallowed') ? `, ${n('disallowed')} annulleret` : ''}${n('assist') ? `, ${n('assist')} oplæg` : ''}` : 'ingen afslutninger'}.${pid == null ? ' Klik på en spiller i listen.' : ''}`));
 }
 // Modstanderen groft (brugerens valg): andel af holdets placeringer i hver tredjedel – set fra deres egen banehalvdel.
+// Modstanderen groft (brugerens valg 2026-10-24; v3.16.1 som kort): 3 × 3 zoner set fra din side – han angriber nedad mod dit
+// mål – med procent i hvert felt og hans afslutninger som prikker. Ingen enkeltspillere (heatmap.js zones).
 function thirdsLine(trace, side, gkId) {
-  const t = thirds(trace, side, gkId), pc = (v) => `${Math.round(v * 100)} %`;
-  return h('div', { class: 'muted', id: 'heat-thirds' }, `🔥 Tyngdepunkt (groft): egen tredjedel ${pc(t.defence)} · midten ${pc(t.middle)} · angrebstredjedelen ${pc(t.attack)}`);
+  const t = thirds(trace, side, gkId), z = zones(trace, side, gkId), pc = (v) => `${Math.round(v * 100)} %`;
+  const max = Math.max(...z.flat()) || 1, shots = zoneShots(trace, side);
+  return h('div', { class: 'minipitch-wrap', id: 'heat-opp' },
+    h('div', { class: 'muted', id: 'heat-thirds' }, `🔥 Tyngdepunkt (groft): egen tredjedel ${pc(t.defence)} · midten ${pc(t.middle)} · angrebstredjedelen ${pc(t.attack)}`),
+    h('div', { class: 'minipitch heat zones' },
+      z.flatMap((r, y) => r.map((v, x) => h('div', { class: 'zone-cell', style: { left: `${(x * 100) / 3}%`, top: `${(y * 100) / 3}%`, width: `${100 / 3}%`, height: `${100 / 3}%`, background: `rgba(249, 115, 22, ${(0.1 + (v / max) * 0.75).toFixed(2)})` } }, h('span', { class: 'zone-pc' }, pc(v))))),
+      shots.map((s) => h('div', { class: `heat-shot ${s.outcome}`, style: { left: s.x + '%', top: s.y + '%' }, title: `${s.t * 3}'` }, s.outcome === 'goal' ? '⚽' : '●'))),
+    h('div', { class: 'muted', id: 'heat-opp-note' }, `Set fra din side: de angriber nedad mod dit mål; venstre = din venstre side. Felterne: hvor holdet stod (groft – ingen enkeltspillere). Prikker: deres ${shots.length} afslutninger i åbent spil.`));
 }
 
 const legend = (isOwn = true) => h('div', { class: 'muted legend', id: 'icon-legend' }, RATING_ICONS.map(([s, t]) => `${s} ${t}`).join(' · ') + ' · 🎬 i referatet = vis afslutningen i afspilningen · 📍 i referatet = se hvor dit hold stod, da målet faldt (åbent spil og kontra, efter slutfløjt) · HI = andel højintenst løb (over ca. 20 km/t) · "2/3 fri" = løb uden bold: kom fri 2 af 3 gange – begge kun dit hold');

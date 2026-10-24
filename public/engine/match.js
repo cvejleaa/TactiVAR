@@ -58,7 +58,7 @@ export const RUN_FINISH_BONUS = 2;
 // Målmandens fordel på almindelige afslutninger (v3.9): holder ligaens målniveau, efter at
 // løbene og de rigtige kontraer kom til (kalibreret med `node tools/measure-duels.mjs N loeb`). v3.15.1: 3 → 0,3 – VAR-
 // chancetypens mål (0,59 pr. kamp) skulle erstattes af almindelige afslutninger (`node tools/measure-duels.mjs 1500 var`).
-export const KEEPER_EDGE = 0.3;
+export const KEEPER_EDGE = 0.9;
 // Dødbolde (v3.10, brugeren: "mål på hovedstød, straffe eller dødbolde. Antallet af frispark").
 // Kun til holdet med bolden i en tick uden boldtab. Pr. tick: straffe 1,1 %, frispark i skudafstand
 // 4,3 % (37 % direkte skud, ellers indlæg); hjørnespark efter redning/clearet luftduel 47 %;
@@ -103,7 +103,7 @@ const BYLINE_Y = 6, CROSS_FROM_Y = 14;   // hvor cutbacken og indlægget slås f
 // LONGSHOT_CAP (QC v3.12.1: med fast +7 scorede en angriber uden for feltet ≈ 90 % – oftere end
 // inde i feltet): skuddets værdi er min(FIN + 8, LONGSHOT_CAP), så en god afslutter står bedre i feltet. v3.15.1: loftet
 // 13 → 10 (med KEEPER_EDGE 0,3 blev langskud ellers 19 % af målene).
-export const LONGSHOT_Y = 30, LONGSHOT_BONUS = 8, LONGSHOT_CAP = 10;
+export const LONGSHOT_Y = 30, LONGSHOT_BONUS = 8, LONGSHOT_CAP = 11;
 // Et langskud tages fra skudafstand: i billedet står skytten højst på y LONGSHOT_FAR (≈ 35–40 m) – en stopper, der
 // skyder, har båret bolden frem (brugeren v3.14.3: "langskud … fra egen banehalvdel, ikke så sandsynligt").
 export const LONGSHOT_FAR = 38;
