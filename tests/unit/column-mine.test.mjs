@@ -344,9 +344,9 @@ test('"De øvrige kampe": ved uafgjort ingen "ventede"-regel (wait forklarer en 
     .sections.find((s) => s.id === 'col-others').others[0].note;
   // Data: X har 30 % af bolden og scorer – wait-reglens test er sand for X i begge kampe
   assert.ok(waitRule.test({ poss: 30, goals: 1 }));
-  const win = [0, 1, 2].map(() => other(1, 0));
-  assert.ok(win.every((n) => n.startsWith('X ')) && win[0] !== '', `sejr: X forklares (${win[0]})`);
+  const win = other(1, 0);
+  assert.ok(waitRule.say.some((t) => win === `X ${t}.`), `sejr: X forklares med wait-reglen (${win})`);
   const draw = other(1, 1);
-  assert.ok(!/bolden mindst|ventede/.test(draw), `uafgjort: ingen "ventede/havde bolden mindst" – ${draw}`);
+  assert.ok(!waitRule.say.some((t) => draw.includes(t)), `uafgjort: ingen wait-tekst – ${draw}`);
   assert.equal(draw, '', 'X har ingen anden regel end wait → ingen note');
 });
