@@ -81,3 +81,46 @@ test('Kampens spiller: en firemålsscorer slår midtbanespilleren med mange vund
   const match = { homeGoals: 4, awayGoals: 0, homeName: T.name, awayName: 'X', stats: { hVarChecks: 0, aVarChecks: 0 }, goalsPool: [], ratings: { home: r.home, away: [] }, events: [] };
   assert.equal(buildGazette([match]).playerOfTheRound.playerId, st.id);
 });
+
+test('resultatet og redningerne: sejr +0,4, nederlag −0,4, og redninger over 4 giver kun det halve', () => {
+  const L = createLeague(createRng(3)), [W, Lo] = [L.teams[0], L.teams[1]], rng = createRng(2);
+  const sheet = createSheet(), [gk, st] = [Lo.squad[0], W.squad[9]];
+  sheet.register(gk, Lo, false, 'GK', 1, rng, 0); sheet.register(st, W, true, 'ST', 1, rng, 0);
+  sheet.entries[gk.id].rating = 6.5; sheet.entries[st.id].rating = 6.5;
+  for (let i = 0; i < 8; i++) { sheet.adjust(gk.id, 0.5); sheet.bump(gk.id, 'saves'); }   // 6,5 + 4,0 = 10,5
+  sheet.adjust(gk.id, -0.3);                                                              // ét mål imod
+  sheet.adjust(st.id, 1.25); sheet.bump(st.id, 'goals');                                  // 7,75
+  finalizeSheet(sheet, 1, 0, rng, () => 0);
+  // Målmanden: 10,5 − 0,3 − 0,4 nederlag − 4·0,25 (redning 5–8 halv værdi) = 8,8 (uden halveringen 9,8; uden resultatet 9,2)
+  assert.equal(sheet.entries[gk.id].rating, 8.8);
+  // Målscoreren: 7,75 + 0,4 sejr = 8,15 → 8,2 (uden resultatet 7,8)
+  assert.equal(sheet.entries[st.id].rating, 8.2);
+});
+
+test('et rødt kort stopper spillet: intet sker resten af det minut (den udviste dukker ikke op igen i samme tick)', () => {
+  let n = 0;
+  for (const { m } of M) m.events.forEach((e, i) => {
+    if (e.type !== 'RED') return;
+    n++;
+    assert.ok(m.events.slice(i + 1).every((x) => x.min !== e.min || x.type === 'FULLTIME' || x.type === 'END' || (x.min === 90 && x.type === 'INFO')), `${e.min}': ${m.events.slice(i + 1).filter((x) => x.min === e.min).map((x) => x.text).join(' | ')}`);
+  });
+  assert.ok(n >= 20, `udvisninger: ${n}`);
+});
+
+test('højst 3 træthedsskift ad gangen – også i pausen (Spilfører: botterne skiftede 4–5 i 45. minut; uden loftet i pausen: 5)', async () => {
+  const { playRound, commitRound } = await import('../../public/engine/season.js');
+  let at45 = 0;
+  for (let s = 1; s <= 4; s++) {
+    const rng = createRng(s), L = createLeague(rng);
+    for (let r = 0; r < 14; r++) {
+      const res = playRound(L, rng);
+      for (const m of res.matches) for (const home of [true, false]) {
+        const per = {};
+        for (const e of m.events.filter((x) => x.type === 'SUB' && x.isHome === home && !/Skadesskift|Hvis-Så/.test(x.text))) per[e.min] = (per[e.min] ?? 0) + 1;
+        for (const [min, k] of Object.entries(per)) { assert.ok(k <= 3, `${k} træthedsskift i ${min}. minut`); if (min === '45') at45++; }
+      }
+      commitRound(L, res, rng);
+    }
+  }
+  assert.ok(at45 >= 5, `data: træthedsskift i pausen ${at45}`);
+});

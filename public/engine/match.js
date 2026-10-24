@@ -804,6 +804,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
       }
     }
 
+    if (sentOffThisTick) { sentOffThisTick = false; continue; }   // rødt kort: spillet stopper (se nedenfor)
     // "Stille" frispark – kun talt, ingen hændelse (realistisk antal pr. kamp).
     if (rng.chance(QUIET_FOUL_P)) {
       st[k(def, 'Fouls')]++;

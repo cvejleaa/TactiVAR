@@ -76,7 +76,9 @@ test('løb uden bold: Mange er bedst mod Hold på bolden, Få bedst mod Lynkontr
   const nL = r({ oppWon: 'FAST_COUNTER' }), mL = r({ runs: 'MANY', oppWon: 'FAST_COUNTER' }), fL = r({ runs: 'FEW', oppWon: 'FAST_COUNTER' });
   assert.ok(mH.net > nH.net, `Mange ${mH.net} > Normal ${nH.net} mod Hold på bolden`);
   assert.ok(mL.net < nL.net, `Mange ${mL.net} < Normal ${nL.net} mod Lynkontra`);
-  assert.ok(fL.net >= nL.net, `Få ${fL.net} ≥ Normal ${nL.net} mod Lynkontra`);
+  // Få mod Normal mod Lynkontra er reelt lige (målt over 9600 kampe: 3.14.3 Få 0,007 / Normal 0,000; v3.15 −0,001 / 0,005 –
+  // støjen her er ≈ 0,035). "Få ≥ Normal" målte støj og holdt kun på frø-held; nu: Få er ikke tydeligt dårligere.
+  assert.ok(fL.net >= nL.net - 0.05, `Få ${fL.net} ≥ Normal ${nL.net} − 0,05 mod Lynkontra`);
   // Mange giver flere mål for OG imod; flere løb kommer fri
   assert.ok(mH.gf - nH.gf >= 0.06 && mL.ga - nL.ga >= 0.1, `for +${(mH.gf - nH.gf).toFixed(2)}, imod +${(mL.ga - nL.ga).toFixed(2)}`);
   assert.ok(mH.runsWon > 1.5 * nH.runsWon, `fri ${mH.runsWon} mod ${nH.runsWon}`);
@@ -158,7 +160,9 @@ test('udskiftninger: 2,2–3,6 skift pr. hold pr. kamp, de fleste efter pausen; 
   assert.ok(r.subsPerTeam >= 2.2 && r.subsPerTeam <= 3.6, `skift ${r.subsPerTeam}`);
   assert.ok(r.why.fatigue >= 1.5, `træthedsskift ${r.why.fatigue} (før 0)`);
   assert.ok(r.mins['1–45'] <= 0.3, `før pausen ${r.mins['1–45']}`);
-  assert.ok(r.goalsPerMatch >= 2.6 && r.goalsPerMatch <= 3.0, `mål ${r.goalsPerMatch}`);
+  // Målniveauet over 40 sæsoner (1600 kampe): med 10 lå 3.14.3 selv på 2,600 – præcis på grænsen (40: 3.14.3 2,73, v3.15 2,70).
+  const g = measureSubs(40).goalsPerMatch;
+  assert.ok(g >= 2.6 && g <= 3.0, `mål ${g}`);
   const st = measureStamina(300);
   assert.ok(st[16].net - st[6].net >= 0.55, `STA-forskel ${(st[16].net - st[6].net).toFixed(2)} (før v3.13 0,47)`);
 });
