@@ -61,7 +61,7 @@ test('Hvis-Så-udskiftning af en udvist: beskeden siger "er udvist" (ikke "ikke 
     [`📋 [${H.name} • Hvis-Så] Udskiftningen kunne ikke udføres i 6. minut: ${tag(slot(H, 1))} er udvist.`]);
 });
 
-test('pausen ved 45\' har intet loft: fem trætte, der alle rammer grænsen i 45. minut, skiftes ud i ét tick (ellers ville to vente til 48.)', () => {
+test('også pausen ved 45\' har loft (Spilfører v3.15): fem trætte, der alle rammer grænsen i 45. minut – tre skiftes i pausen, to i 48.', () => {
   const { H, A } = arena();
   const roles = FORMATIONS['4-4-2'].map((c) => c.r);
   // Friskhed så hver spiller først er under 70 % i 45. minut: tab = drain90 · (t − 1)/90 → 41 min er stadig over, 44 min under
@@ -76,13 +76,13 @@ test('pausen ved 45\' har intet loft: fem trætte, der alle rammer grænsen i 45
   }
   for (const b of bench(H)) b.freshness = 100;
   const m = subs(simulateMatch(H, A, stubRng({})));
-  assert.deepEqual(m.map((e) => e.min), [45, 45, 45, 45, 45], m.map((e) => `${e.min} ${e.text}`).join(' | '));
+  assert.deepEqual(m.map((e) => e.min), [45, 45, 45, 48, 48], m.map((e) => `${e.min} ${e.text}`).join(' | '));
 });
 
 test('et hold uden forsvarere tilbage: en straffe imod det tager en midtbanespiller som forsyndet (kæden lånes fra nabokæden – ingen nedbrud)', () => {
   const { H, A } = arena({ homeLimit: 0 });
   // Fire direkte røde i 3., 6., 9. og 12. minut rammer de fire forsvarere i rækkefølge (første forsvarer hver gang); i 15. minut straffe til udeholdet
-  const m = simulateMatch(H, A, stubRng({ 0.06: (n) => n < 4, 0.4: (n) => n < 4, 0.07: true, 0.011: (n) => n === 4 }));
+  const m = simulateMatch(H, A, stubRng({ 0.06: (n) => n < 4, 0.4: (n) => n < 4, 0.07: true, 0.011: (n) => n === 0 }));   // et rødt kort stopper spillet (resten af minuttet), så straffe-kastet kommer først i 15. minut
   const reds = m.events.filter((e) => e.type === 'RED');
   assert.deepEqual(reds.map((e) => e.min), [3, 6, 9, 12]);
   for (let i = 1; i <= 4; i++) assert.ok(reds[i - 1].text.includes(tag(slot(H, i))), reds[i - 1].text);
@@ -160,7 +160,7 @@ function sheetOf(spec) {   // spec: [{ i, role, slot?, raw (karakter før afslut
 test('clean sheet-bonussen lægges til FØR klemmen: en målmand på 9,8 ender på 10,0 (ikke 10,3), en forsvarer på 3,0 på 3,5 (ikke 4,0); uden clean sheet intet', () => {
   const run = (conceded) => {
     const { sheet, ids } = sheetOf([{ i: 0, role: 'GK', slot: 0, raw: 9.8 }, { i: 1, role: 'CB', slot: 2, raw: 3.0 }, { i: 6, role: 'CM', slot: 6, raw: 3.0 }, { i: 7, role: 'CM', slot: 7, raw: 9.8 }]);
-    finalizeSheet(sheet, 1, conceded, createRng(1), () => 0);
+    finalizeSheet(sheet, conceded, conceded, createRng(1), () => 0);   // uafgjort: ingen resultat-bonus (RESULT_BONUS v3.15)
     return ids.map((id) => sheet.entries[id].rating);
   };
   assert.deepEqual(run(0), [RATING_MAX, RATING_MIN, RATING_MIN, 9.8], 'GK 9,8 + 0,5 → 10; CB 3,0 + 0,5 = 3,5 (ikke 3,5 + 0,5); midtbane får ingen bonus og klemmes til 3,5');
