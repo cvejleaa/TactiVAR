@@ -1659,12 +1659,14 @@ test('løber → aflevering/skud efter zone: trukket plads afgør (kant: tværs/
   const deep = fx({ rm: { finishing: 20, passing: 1, pace: 1, ballControl: 1 }, custom: { 8: { x: 50, y: 82 } } });
   assert.deepEqual(deep.m.goalsPool.map((g) => g.kind), ['LONGSHOT', 'LONGSHOT']);
   assert.ok(deep.goals[0].text.includes(`${tg(deep.runner)} løber sig fri dybt i banen og skyder.`), deep.goals[0].text);
+  assert.ok(deep.goals[0].text.endsWith('og skyder. Bolden sad i nettet.') && !deep.goals[0].text.includes('sparkede'), deep.goals[0].text);   // v3.14.3: solo → kort slutning uden sparker
   const midShot = fx({ rm: { finishing: 20, passing: 1, pace: 1, ballControl: 1 }, custom: { 8: { x: 50, y: 60 } } });
   assert.ok(midShot.goals[0].text.includes('løber sig fri mellem kæderne og skyder.'), midShot.goals[0].text);
   // 3-5-2: plads 8 er CAM (50,36 → højt, "bag forsvaret"): et skud bliver COMBINATION med oplæg fra en anden
   const hi = fx({ rm: { finishing: 20, passing: 1, pace: 1, ballControl: 1 }, form: '3-5-2' });
   assert.deepEqual(hi.m.goalsPool.map((g) => g.kind), ['COMBINATION', 'COMBINATION']);
   assert.ok(hi.goals[0].text.includes(`${tg(hi.runner)} løber sig fri bag forsvaret og skyder.`), hi.goals[0].text);
+  assert.ok(hi.goals[0].text.endsWith('og skyder. Bolden sad i nettet.') && !hi.goals[0].text.includes('sparkede'), hi.goals[0].text);   // v3.14.3 (QC): løberen skyder selv – ikke "X skyder. X sparkede den ind."
   assert.equal(sumOf(hi.m, 'home', 'assists'), 2);
   assert.equal(rOf(hi.m, 'home', hi.a.H, 8).assists, 0);
   assert.equal(rOf(hi.m, 'home', hi.a.H, 8).rating, 9.3);          // 6,5 + 2·(0,15 + 1,25) – ikke solo, så ikke 1,4
@@ -1676,6 +1678,7 @@ test('løber → dribletur: vundet er DRIBBLE uden oplæg (+1,4); tabt er en ops
   assert.deepEqual(win.m.goalsPool.map((g) => g.kind), ['DRIBBLE', 'DRIBBLE']);
   assert.equal(rOf(win.m, 'home', win.a.H, 8).rating, 9.6); assert.equal(sumOf(win.m, 'home', 'assists'), 0);
   assert.ok(win.goals[0].text.includes(`${tg(win.runner)} løber sig fri på kanten, dribler #`) && win.goals[0].text.includes('af og afslutter selv.'), win.goals[0].text);
+  assert.ok(win.goals[0].text.endsWith('af og afslutter selv. Bolden sad i nettet.') && !win.goals[0].text.includes('sparkede'), win.goals[0].text);   // v3.14.3: dribletur er solo, selv med en tilfældig "helper" i koden
   // Grænse: løber 24 mod 5 + STR/2 + 3 (strengt større): STR 32 → 24 holder, 31,8 → 23,9 slås
   const drb = (str, o = {}) => fx({ rm: { pace: 12, ballControl: 12, finishing: 1, passing: 1 }, def: { positioning: 5, intercepting: 1, strength: str }, ...o });
   const opps = (r) => r.m.events.filter((e) => e.label === 'Opsnappet').length;

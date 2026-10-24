@@ -9,7 +9,7 @@ class FakeEl extends FakeNode {
   constructor(tag) { super(); this.tag = tag; this.children = []; this.className = ''; this.dataset = {}; this.style = {}; this.attrs = {}; }
   append(...c) { this.children.push(...c); }
   setAttribute(k, v) { this.attrs[k] = v; }
-  addEventListener() {}
+  addEventListener(t, f) { (this.on ||= {})[t] = f; }
   get textContent() { return this.children.map((c) => c.textContent).join(''); }
   set textContent(v) { this.children = [new FakeText(String(v))]; }
 }
@@ -106,4 +106,39 @@ test('mesteren røbes ikke, mens sæsonens sidste runde spilles; statistikken si
   assert.match(byId(st, 'stats-season-over').textContent, /^Sæson 1 er slut – slutstillingen står i tabellen ovenfor/);
   commitRound(L, playRound(L, rng), rng);
   assert.equal(byId(renderStats({ league: L, myTeamId: L.teams[0].id }), 'stats-season-over'), undefined, 'væk efter første runde i den nye sæson');
+});
+
+// TM v3.14.3: slutstillingens indhold – hver kolonne, klasserne og klikket. Tabellen i sæsonarkivet får kunstigt forskellige tal
+// pr. kolonne (data!), så en ombyttet kolonne (V/U, K/T, mål for/imod) ikke kan ligne den rigtige.
+test('slutstilling: hver kolonne (K V U T Mål P) viser sit eget tal, "VAR ±" er –, "mine" kun på dit hold, "viewing" på det viste, klik vælger holdet', () => {
+  const rng = createRng(8), L = createLeague(rng);
+  for (let r = 0; r < L.schedule.length; r++) commitRound(L, playRound(L, rng), rng);
+  const last = L.seasons.at(-1);
+  last.table.forEach((t, i) => Object.assign(t, { played: 30 + i, won: 3 + i, drawn: 50 + i, lost: 70 + i, goalsFor: 100 + i, goalsAgainst: 200 + i, points: 400 + i }));
+  const myId = L.teams.find((t) => !t.isBot).id, viewId = last.table[2].teamId, picked = [];
+  const el = renderStandings({ league: L, onPick: (id) => picked.push(id), viewTeamId: viewId });
+  const trs = all(byId(el, 'standings'), (e) => e.tag === 'tr');
+  assert.deepEqual(trs[0].children.map((c) => c.textContent), ['#', 'Hold', 'K', 'V', 'U', 'T', 'Mål', 'VAR ±', 'P']);
+  const body = trs.slice(1);
+  assert.equal(body.length, last.table.length);
+  body.forEach((tr, i) => {
+    assert.deepEqual(tr.children.map((c) => c.textContent), [String(i + 1), last.table[i].teamName, String(30 + i), String(3 + i), String(50 + i), String(70 + i), `${100 + i}-${200 + i}`, '–', String(400 + i)]);
+    const cls = tr.className.split(' ').filter(Boolean);
+    assert.equal(cls.includes('mine'), last.table[i].teamId === myId, `mine: ${last.table[i].teamName}`);
+    assert.equal(cls.includes('viewing'), last.table[i].teamId === viewId, `viewing: ${last.table[i].teamName}`);
+    tr.on.click(); assert.equal(picked.at(-1), last.table[i].teamId);
+  });
+  assert.equal(body.filter((tr) => tr.className.includes('mine')).length, 1, 'præcis ét hold er dit (resten er bots)');
+});
+
+test('slutstilling efter TO sæsoner viser den SIDSTE sæson (2), ikke den første – og efter 1. runde i sæson 3 den nye tabel', () => {
+  const rng = createRng(9), L = createLeague(rng);
+  for (let s = 0; s < 2; s++) for (let r = 0; r < L.schedule.length; r++) commitRound(L, playRound(L, rng), rng);
+  assert.equal(L.seasons.length, 2);
+  assert.notDeepEqual(L.seasons[0].table.map((t) => t.points), L.seasons[1].table.map((t) => t.points), 'data: de to sæsoner er forskellige');
+  const el = renderStandings({ league: L, onPick: () => {}, viewTeamId: null });
+  assert.equal(byId(el, 'standings-title').textContent, `${L.leagueMetadata.name} – slutstilling, sæson 2`);
+  assert.equal(byId(el, 'standings-champion').textContent, `🏆 Mester: ${L.seasons[1].champion.teamName} (${L.seasons[1].champion.points} point). Sæson 3 starter med næste runde.`);
+  const rows = all(byId(el, 'standings'), (e) => e.tag === 'tr').slice(1).map((tr) => [tr.children[1].textContent, Number(tr.children[8].textContent)]);
+  assert.deepEqual(rows, L.seasons[1].table.map((t) => [t.teamName, t.points]));
 });
