@@ -88,7 +88,8 @@ test('offside-tjekket: den tjekkede får observationen (godkendt: timingen, annu
 });
 
 test('VAR ± (stillingen) tæller kun de kendelser, VAR ændrede: annulleret mål −1, straffe annulleret −1, givet +1, rødt trukket tilbage +1, opgraderet −1 – et godkendt tjek 0 (før +1)', () => {
-  const force = { [VAR_RULES.GOAL_CHECK_P]: true, [VAR_RULES.PEN_CHECK_P]: true, [VAR_RULES.PEN_AWARD_P]: 0.02, [VAR_RULES.RED_CHECK_P]: true, [VAR_RULES.RED_UPGRADE_P]: 0.5 };
+  // Flere frispark (0,06 → 0,12 pr. tick), så også de sjældne nedgraderinger af røde kort forekommer (v3.16: 2 på 200 kampe)
+  const force = { [VAR_RULES.GOAL_CHECK_P]: true, [VAR_RULES.PEN_CHECK_P]: true, [VAR_RULES.PEN_AWARD_P]: 0.02, [VAR_RULES.RED_CHECK_P]: true, [VAR_RULES.RED_UPGRADE_P]: 0.5, 0.06: 0.12 };
   const seen = {};
   for (const { m } of games(200, force)) {
     let net = 0;

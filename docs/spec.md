@@ -273,7 +273,8 @@ Tick hvert 3. minut (1..90).
   CB.luft·friskhed + rnd·6 + (dødbold 3,75 (v3.12: 4,5) | lav blok 1)`; 2) `luft·friskhed + rnd·8 > MV·friskhed +
   rnd·8` – ellers redning (skud på mål). Clearet høj bold → hjørnespark 35 % (efter en
   redning 90 %). Dit hold får kilden nævnt ("Dit indlæg"/"Din lange bold").
-- **Cutback (v3.12)**: kantspilleren `(PAC+BAL)·friskhed + rnd·8` mod den nærmeste back
+- **Cutback (v3.12)**: kantspilleren `(PAC+BAL)·friskhed + rnd·8` mod den nærmeste back (v3.16, koblede linjer: eller kanten, der
+  er faldet med hjem – den, der står nærmest på hans side)
   `(PAC+POS)·friskhed + rnd·8 − 2 + kantpres` (højt gegenpres +3, lav blok −2 – modgiften); lukket
   kant = ingen afslutning (hjørnespark 35 %), ellers afslutning med +8 (v3.12: +5) og oplæg til kantspilleren.
   Tekst: "✅ #11 X når baglinjen og lægger den lavt tilbage til #9 Y" for dit hold; for andre neutral
