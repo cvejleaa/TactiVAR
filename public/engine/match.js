@@ -7,7 +7,7 @@ import { livePositions } from './positions.js';
 import { masteryVs, counterXpForMatch } from './counter.js';
 import { createSheet, finalizeSheet } from './ratings.js';
 import { describeFinish, describeHeader, describeVarTiming, describeGoal, goalSpectacle } from './clues.js';
-import { MATCH_RULES, CARD_RULES, FATIGUE_SUBS_AT_ONCE, MIN_PLAYERS } from './match-rules.js';
+import { MATCH_RULES, CARD_RULES, FATIGUE_SUBS_AT_ONCE, MIN_PLAYERS, VAR_RULES, MISS_P, MISS_BLOCK_SHARE, MISS_CORNER_P } from './match-rules.js';
 import { TIRED_PER_POINT, SUBS_LIMIT, matchCost, REST_SHARE } from './freshness.js';
 
 const PLAN_LETTERS = ['A', 'B', 'C'];
@@ -56,8 +56,9 @@ export const DRIBBLE_DEF_EDGE = 3;   // forsvareren står bedst i en én-mod-én
 export const RUN_COVER = { FEW: 5, NORMAL: 0, MANY: 0 };
 export const RUN_FINISH_BONUS = 2;
 // Målmandens fordel på almindelige afslutninger (v3.9): holder ligaens målniveau, efter at
-// løbene og de rigtige kontraer kom til (kalibreret med `node tools/measure-duels.mjs N loeb`).
-export const KEEPER_EDGE = 3.0;
+// løbene og de rigtige kontraer kom til (kalibreret med `node tools/measure-duels.mjs N loeb`). v3.15.1: 3 → 0,3 – VAR-
+// chancetypens mål (0,59 pr. kamp) skulle erstattes af almindelige afslutninger (`node tools/measure-duels.mjs 1500 var`).
+export const KEEPER_EDGE = 0.3;
 // Dødbolde (v3.10, brugeren: "mål på hovedstød, straffe eller dødbolde. Antallet af frispark").
 // Kun til holdet med bolden i en tick uden boldtab. Pr. tick: straffe 1,1 %, frispark i skudafstand
 // 4,3 % (37 % direkte skud, ellers indlæg); hjørnespark efter redning/clearet luftduel 47 %;
@@ -97,8 +98,9 @@ const BYLINE_Y = 6, CROSS_FROM_Y = 14;   // hvor cutbacken og indlægget slås f
 // feltets kant, har tid og plads (LONGSHOT_BONUS) – det opvejer, at midtbanens afslutning er lavere
 // på evneskalaen; kalibreret til dokumentets 8–10 % langskud. Men på afstand er ingen bedre end
 // LONGSHOT_CAP (QC v3.12.1: med fast +7 scorede en angriber uden for feltet ≈ 90 % – oftere end
-// inde i feltet): skuddets værdi er min(FIN + 7, 12), så en god afslutter står bedre i feltet.
-export const LONGSHOT_Y = 24, LONGSHOT_BONUS = 8, LONGSHOT_CAP = 13;
+// inde i feltet): skuddets værdi er min(FIN + 8, LONGSHOT_CAP), så en god afslutter står bedre i feltet. v3.15.1: loftet
+// 13 → 10 (med KEEPER_EDGE 0,3 blev langskud ellers 19 % af målene).
+export const LONGSHOT_Y = 24, LONGSHOT_BONUS = 8, LONGSHOT_CAP = 10;
 // Et langskud tages fra skudafstand: i billedet står skytten højst på y LONGSHOT_FAR (≈ 35–40 m) – en stopper, der
 // skyder, har båret bolden frem (brugeren v3.14.3: "langskud … fra egen banehalvdel, ikke så sandsynligt").
 export const LONGSHOT_FAR = 38;
@@ -244,7 +246,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // banen. opts.liveEnergy = false KUN til de deterministiske test-arenaer (deres tærskler forudsætter
   // fuld friskhed hele kampen) – spillet selv sender aldrig flaget (vagt i tests).
   const live = opts.liveEnergy !== false;
-  let curMin = 1, sentOffThisTick = false;
+  let curMin = 1, sentOffThisTick = false, varBehind = null;
   // Med færre mand (v3.15): ekstra tab af friskhed siden udvisningen (side.shortMins = summen af minutter × manglende mand).
   const sideOf = (p) => (sheet.entries[p.id]?.isHome ? H : A);
   // Kun minutter, hvor spilleren selv var på banen (QC: en indskifter efter udvisningen arvede ellers hele tabet).
@@ -300,6 +302,11 @@ export function simulateMatch(home, away, rng, opts = {}) {
       scorer: attacking ? scorer.id : null, assist: attacking && helper && helper !== scorer ? helper.id : null,
       ball: attacking ? [spot.x, spot.y] : [100 - spot.x, 100 - spot.y],
     };
+    // VAR tjekkede en holdkammerat foran skytten (v3.15.1): skytten tegnes aldrig foran den tjekkede (brugeren v3.14.2) –
+    // mindst VAR_BEHIND længere tilbage, og bolden ved ham.
+    const pt = attacking && varBehind?.id === scorer.id && ev.snapshot.pts.find((q) => q[0] === scorer.id);
+    if (pt && pt[2] < varBehind.y) { pt[2] = varBehind.y; ev.snapshot.ball = [pt[1], pt[2]]; }
+    varBehind = null;
   }
 
   // Er spilleren blandt de VAR_FRONT forreste markspillere i øjeblikket (laveste y = nærmest modstanderens mål)? Uden rng.
@@ -312,7 +319,70 @@ export function simulateMatch(home, away, rng, opts = {}) {
     const pos = seen[side.team.id];
     if (!pos) return true;
     const i = side.starters.indexOf(p);
+    if (i < 1) return false;   // ikke længere på banen (skiftet ud i samme minut) – den forreste tjekkes
     return side.starters.filter((q, j) => j > 0 && q && pos[j].y < pos[i].y).length < VAR_FRONT;
+  }
+  // Offside-tjekket (VAR ved mål og straffe, linjedommerens flag): den forreste af VAR_FRONT tjekkes – står skytten bagved,
+  // hans forreste holdkammerat (brugeren v3.14.1). Duellen fra før v3.15.1: løbets timing (varPulse) og modkunnen mod
+  // fælden mod forsvarerens placering – en lodtrækning, så én kendelse ikke afslører spillerens trin (QC).
+  function offsideCheck(att, shooter, defender) {
+    const off = isFront(att, shooter) ? shooter : frontOf(att) ?? shooter;
+    const trapBonus = (off.counterTactics?.vsTrapLong ?? 15) * 0.045; // v3.6: samme effekt (≈0,8) på den lavere skala
+    const onside = off.varProfile.varPulse + trapBonus + rng.next() * 6 > defender.skills.positioning + rng.next() * 6;
+    return { off, other: off.id !== shooter.id, onside };
+  }
+  // VAR ved et mål (v3.15.1, Spilfører og QC): kendelsen falder FØR målet bogføres, så et annulleret mål aldrig tæller
+  // (mål, skud på mål, karakterer, statistik, Rundens mål). Brugeren ser spændingen: "📺 Bolden er i nettet – men VAR kigger
+  // på det" med stillingen talt op, så enten målet (med "VAR: målet står") eller annulleringen, hvor stillingen falder
+  // tilbage. Returnerer null (annulleret) eller tillægget til målteksten ('' uden synligt tjek).
+  // VAR ± i stillingen (season.js): kun kendelser, VAR ændrede – et godkendt mål giver 0 (før +1).
+  // noOffside: bolden blev spillet tilbage (cutback) – modtageren kan ikke være offside, så kun frisparket tjekkes (Spilfører).
+  function varGoalCheck(att, def, dR, min, shooter, defender = null, noOffside = false) {
+    varBehind = null;
+    if (!rng.chance(VAR_RULES.GOAL_CHECK_P)) return '';
+    defender ??= rng.pick(dR.defs) ?? dR.gk;
+    st[k(att, 'VarChecks')]++;
+    const foul = rng.chance(VAR_RULES.GOAL_FOUL_SHARE) || noOffside;
+    const o = foul ? { off: shooter, other: false, onside: rng.next() * 30 > shooter.varProfile.cynicism + 4 } : offsideCheck(att, shooter, defender);
+    const what = foul ? `skubbede ${tag(shooter)} ${tag(defender)} i opspillet` : `stod ${tag(o.off)} offside`;
+    if (att === H) hG++; else aG++;
+    addEv(min, 'VAR_CHECK', 'HIGHLIGHT', att.isHome, false, `📺 VAR tjekker målet`, `📺 [${att.team.name} • ${hG}-${aG}] Bolden er i nettet – men VAR kigger på det: ${what}? …`, `${att.team.name}: målet tjekkes …`);
+    events.at(-1).var = { kind: foul ? 'FOUL' : 'OFFSIDE', verdict: o.onside ? 'STANDS' : 'OVERTURNED' };
+    if (att === H) hG--; else aG--;
+    if (!o.onside) {
+      homeVarNet += att === H ? -1 : 1;
+      if (foul) {
+        st[k(att, 'Fouls')]++; sheet.adjust(shooter.id, -0.3);
+        addEv(min, 'VAR_NO_GOAL', 'HIGHLIGHT', att.isHome, true, `📺 VAR: annulleret – ${tag(shooter)}`, `📺 [${att.team.name} • ${hG}-${aG}] VAR-KENDELSE: MÅLET ANNULLERES! Dommeren har set skærmen: ${tag(shooter)} skubbede ${tag(defender)} (${def.team.name}) i opspillet – frispark.`, `${att.team.name}: mål annulleret`);
+        return null;
+      }
+      sheet.adjust(o.off.id, -0.4); sheet.adjust(defender.id, 0.45); sheet.bump(defender.id, 'tacticWins');
+      observe(o.off, `VAR-annullering (${min}. min mod ${def.team.name}): ${o.off.shortName} var en anelse for tidligt af sted.`);
+      const why = o.other ? `${tag(defender)} (${def.team.name}) holdt linjen, og ${tag(o.off)} stod offside og var med i situationen, da ${tag(shooter)} skød` : `${tag(defender)} (${def.team.name}) holdt linjen, og ${tag(shooter)} var offside`;
+      addEv(min, 'VAR_NO_GOAL', 'HIGHLIGHT', att.isHome, true, `📺 VAR: annulleret – ${tag(o.off)}`, `📺 [${att.team.name} • ${hG}-${aG}] VAR-KENDELSE: MÅLET ANNULLERES! ${why}.`, `${att.team.name}: mål annulleret`);
+      return null;
+    }
+    if (foul) return ` 📺 VAR: målet står – ${tag(shooter)} gik til bolden, ikke til manden.`;
+    const timing = describeVarTiming(o.off.varProfile.varPulse);
+    observe(o.off, `VAR-tjek (${min}. min mod ${def.team.name}): ${o.off.shortName} ${timing}.`);
+    if (o.other) varBehind = { id: shooter.id, y: (seen[att.team.id]?.[att.starters.indexOf(o.off)]?.y ?? 0) + VAR_BEHIND };
+    return o.other ? ` 📺 VAR: målet står – ${tag(o.off)} foran ${tag(shooter)} stod ikke offside; han ${timing}.` : ` 📺 VAR: målet står – ${tag(shooter)} ${timing}.`;
+  }
+  // Forbi (v3.15.1): en afslutning, keeperen ikke skal redde. Ét sted for alle afslutninger (åbent spil, kontra, hovedstød,
+  // frispark). Ingen redning, intet skud på mål; en blokeret afslutning kan give hjørnespark (withCorner = false: kalderen giver selv hjørnet).
+  // Returnerer om skuddet gik forbi.
+  const MISS_TXT = ['skyder forbi den lange stolpe', 'sender bolden over mål', 'rammer stolpen', 'skyder en meter forbi', 'får ikke ram på bolden – den triller forbi', 'banker bolden over overliggeren'];
+  function missed(att, def, cR, dR, min, shooter, withCorner = true, how = 'afslutningen') {
+    if (!rng.chance(MISS_P)) return false;
+    if (rng.chance(MISS_BLOCK_SHARE)) {
+      const blocker = rng.pick(dR.defs) ?? dR.gk;
+      sheet.adjust(blocker.id, 0.1);
+      addEv(min, 'MISS', 'PLAY', def.isHome, false, 'Blokeret', `🧱 [${def.team.name}] ${tag(blocker)} kaster sig ind foran ${how} fra ${tag(shooter)} (${att.team.name}).`);
+      if (withCorner && rng.chance(MISS_CORNER_P)) corner(att, def, cR, dR, min);
+      return true;
+    }
+    addEv(min, 'MISS', 'PLAY', att.isHome, false, 'Forbi', `🎯 [${att.team.name}] ${tag(shooter)} ${rng.pick(MISS_TXT)}.`);
+    return true;
   }
 
   const fbCount = (side) => coordsOf(side.tactics).filter((c) => FB_ROLES.has(c.r)).length;
@@ -331,6 +401,8 @@ export function simulateMatch(home, away, rng, opts = {}) {
     const fbSlot = fbSlots.filter((i) => runsOf(i) > 0).sort((x, y) => runsOf(y) - runsOf(x))[0] ?? -1;
     const why = fbSlot > 0 ? ` Din ${coordsOf(lose.tactics)[fbSlot].r} ${tag(lose.starters[fbSlot])} er højt oppe efter sit løb.` : '';
     if (shooter.skills.finishing * ff(shooter) + rng.next() * 8 + COUNTER_FINISH_BONUS > gk.skills.goalkeeping * ff(gk) + rng.next() * 8) {
+      const varOk = varGoalCheck(win, lose, lR, min, shooter);
+      if (varOk === null) return false;
       if (win === H) hG++; else aG++;
       st[k(win, 'OnTarget')]++;
       duelLog[lose.team.id].counterGoalsAgainst++;
@@ -341,10 +413,11 @@ export function simulateMatch(home, away, rng, opts = {}) {
       if (helper && helper.id !== shooter.id) { sheet.adjust(helper.id, 0.4); sheet.bump(helper.id, 'assists'); }
       const desc = describeGoal('COUNTER', tag(shooter), tag(helper ?? shooter), min, rng);
       goalsPool.push({ scorer: tag(shooter), teamName: win.team.name, match: `${home.name} - ${away.name}`, min, kind: 'COUNTER', spectacle: goalSpectacle('COUNTER', { pace: shooter.skills.pace }, min, rng), desc });
-      addEv(min, 'GOAL', 'HIGHLIGHT', win.isHome, true, `⚽ Kontramål: ${tag(shooter)}`, `⚽ [${win.team.name} • ${hG}-${aG}] MÅÅÅL PÅ KONTRA!${why} ${desc}`);
+      addEv(min, 'GOAL', 'HIGHLIGHT', win.isHome, true, `⚽ Kontramål: ${tag(shooter)}`, `⚽ [${win.team.name} • ${hG}-${aG}] MÅÅÅL PÅ KONTRA!${why} ${desc}${varOk}`);
       snapshot(win, shooter, helper, SPOT.GOAL, true);
       return true;
     }
+    if (missed(win, lose, wR, lR, min, shooter, true, 'kontraens afslutning')) return false;
     st[k(win, 'OnTarget')]++;
     sheet.adjust(gk.id, 0.5); sheet.bump(gk.id, 'saves');
     addEv(min, 'SAVE', 'PLAY', lose.isHome, false, 'Kontra reddet', `🧤 [${lose.team.name}] ${win.team.name} kontrer, men ${tag(gk)} redder fra ${tag(shooter)}.${why}`);
@@ -374,7 +447,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // Høje bolde tages af en midtstopper, når holdet har en på banen (v3.8); den trukne forsvarer
   // afgør hvilken – ingen ekstra terning. To trin (v3.12): duellen, så hovedstødet mod keeperen.
   // source (åbent spil): 'cross' eller 'long' – kun til teksten for dit eget hold.
-  // Returnerer 'goal', 'saved' eller 'cleared'.
+  // Returnerer 'goal', 'saved', 'missed', 'disallowed' (VAR) eller 'cleared'.
   function aerialDuel(att, def, cR, dR, min, shooter, assister, defender, setPiece = null, source = null, snapMoves = null) {
     const gk = dR.gk;
     const aDef = dR.cbs.length ? (dR.cbs.includes(defender) ? defender : dR.cbs[Math.max(0, dR.defs.indexOf(defender)) % dR.cbs.length]) : defender;
@@ -393,6 +466,9 @@ export function simulateMatch(home, away, rng, opts = {}) {
     st[k(att, 'AerialWon')]++; if (!setPiece) { st[k(att, 'TacticSuccess')]++; log.crossesWon++; }
     sheet.adjust(shooter.id, 0.4); sheet.bump(shooter.id, 'aerialWins');
     if (shooter.aerialPower * ff(shooter) + rng.next() * 8 > gk.skills.goalkeeping * ff(gk) + rng.next() * 8 + HEADER_GK_EDGE) {
+      // VAR tjekker også hovedstød på dødbolde – dér tjekker det i virkeligheden oftest (QC).
+      const varOk = varGoalCheck(att, def, dR, min, shooter, aDef);
+      if (varOk === null) return 'disallowed';
       goalFor(att); if (!setPiece) log.headerGoals++;
       sheet.adjust(shooter.id, 0.95); sheet.bump(shooter.id, 'goals');
       if (assister && assister.id !== shooter.id) { sheet.adjust(assister.id, 0.55); sheet.bump(assister.id, 'assists'); }
@@ -403,10 +479,11 @@ export function simulateMatch(home, away, rng, opts = {}) {
       goalsPool.push({ scorer: tag(shooter), teamName: att.team.name, match: `${home.name} - ${away.name}`, min, kind, spectacle: goalSpectacle(kind, { aerialPower: shooter.aerialPower }, min, rng), desc: describeGoal(kind, tag(shooter), tag(assister ?? shooter), min, rng) });
       const how = setPiece ? `MÅÅÅL PÅ ${setPiece.toUpperCase()}! ${tag(assister)} slår ${setPiece}et ind, og ${tag(shooter)} (${shooter.heightCm} cm) header bolden ind – ${prose}.`
         : `MÅÅÅL! ${tag(shooter)} (${shooter.heightCm} cm) header bolden ind – ${prose}.`;
-      addEv(min, 'HEADER_GOAL', 'HIGHLIGHT', att.isHome, true, `⚽ Hovedstødsmål: ${tag(shooter)}`, `⚽ [${att.team.name} • ${hG}-${aG}] ${how}`);
+      addEv(min, 'HEADER_GOAL', 'HIGHLIGHT', att.isHome, true, `⚽ Hovedstødsmål: ${tag(shooter)}`, `⚽ [${att.team.name} • ${hG}-${aG}] ${how}${varOk}`);
       if (!setPiece) snapshot(att, shooter, assister, SPOT.CROSS, false, snapMoves);
       return 'goal';
     }
+    if (missed(att, def, cR, dR, min, shooter, false, 'hovedstødet')) return 'missed';
     st[k(att, 'OnTarget')]++;
     sheet.adjust(gk.id, 0.5); sheet.bump(gk.id, 'saves');
     addEv(min, 'SAVE', 'PLAY', def.isHome, false, 'Hovedstød reddet', `🧤 [${def.team.name}] ${tag(gk)} redder hovedstødet fra ${tag(shooter)} (${att.team.name}, ${shooter.heightCm} cm), der vandt luftduellen.`);
@@ -426,6 +503,8 @@ export function simulateMatch(home, away, rng, opts = {}) {
   function finishAttempt(att, def, cR, dR, min, finisher, helper, kind, { bonus = 0, lead = '', onGoal = null, snapMoves = null } = {}) {
     const gk = dR.gk, fs = finisher.skills;
     if (fs.finishing * ff(finisher) + rng.next() * 8 + bonus > gk.skills.goalkeeping * ff(gk) + rng.next() * 8 + KEEPER_EDGE) {
+      const varOk = varGoalCheck(att, def, dR, min, finisher, null, kind === 'CUTBACK');
+      if (varOk === null) return false;
       goalFor(att);
       const kd = typeof kind === 'function' ? kind() : kind, solo = kd === 'LONGSHOT' || kd === 'DRIBBLE';
       onGoal?.(kd);
@@ -441,7 +520,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
       // Slutter indledningen med afslutterens navn ("… lægger den tilbage til #7."), sparker han den ind; ellers (løberen
       // skød selv – også "løber sig fri og skyder" i en kombination) sad bolden i nettet (QC v3.14.3).
       const end = !lead ? desc : lead.endsWith(`${tag(finisher)}.`) ? `${tag(finisher)} sparkede den ind.` : 'Bolden sad i nettet.';
-      addEv(min, 'GOAL', 'HIGHLIGHT', att.isHome, true, `⚽ Mål: ${tag(finisher)}`, `⚽ [${att.team.name} • ${hG}-${aG}] MÅÅÅL! ${lead ? lead + ' ' : ''}${end}`);
+      addEv(min, 'GOAL', 'HIGHLIGHT', att.isHome, true, `⚽ Mål: ${tag(finisher)}`, `⚽ [${att.team.name} • ${hG}-${aG}] MÅÅÅL! ${lead ? lead + ' ' : ''}${end}${varOk}`);
       // Solo-mål (langskud, dribletur): bolden står ved skytten – ikke på en fast plet i feltet (QC). Et langskud fra
       // skudafstand: skytten flyttes højst til LONGSHOT_FAR (v3.14.3).
       const live = solo && seen[att.team.id]?.[att.starters.indexOf(finisher)];
@@ -450,6 +529,17 @@ export function simulateMatch(home, away, rng, opts = {}) {
       snapshot(att, finisher, solo ? null : helper, at || (kd === 'CUTBACK' ? SPOT.CUTBACK : SPOT.GOAL), false, moves);
       return true;
     }
+    // Linjedommerens flag (v3.15.1, Spilfører: offside uden mål er ikke VAR): afslutningen tæller ikke – ingen redning, intet
+    // hjørne. Ikke et VAR-tjek (VarChecks) og intet i VAR ± – kun offside-duellen.
+    if (rng.chance(VAR_RULES.OFFSIDE_FLAG_P)) {
+      const flagDef = rng.pick(dR.defs) ?? gk, o = offsideCheck(att, finisher, flagDef);
+      if (!o.onside) {
+        sheet.adjust(o.off.id, -0.1); sheet.adjust(flagDef.id, 0.2);
+        addEv(min, 'OFFSIDE_FLAG', 'PLAY', def.isHome, false, 'Offside', `🚩 [${def.team.name}] Linjedommeren løfter flaget efter afslutningen fra ${tag(finisher)} – ${o.other ? `${tag(o.off)} (${att.team.name}) stod offside i opspillet` : 'han stod offside'}.`);
+        return false;
+      }
+    }
+    if (missed(att, def, cR, dR, min, finisher)) return false;
     st[k(att, 'OnTarget')]++;
     sheet.adjust(gk.id, 0.5); sheet.bump(gk.id, 'saves'); sheet.adjust(finisher.id, 0.1);
     addEv(min, 'SAVE', 'PLAY', def.isHome, false, 'Redning', `🧤 [${def.team.name}] Flot redning af ${tag(gk)} på afslutning fra ${tag(finisher)} (${att.team.name}).${lead ? ' ' + lead.replace('✅ ', '') : ''}`);
@@ -483,22 +573,52 @@ export function simulateMatch(home, away, rng, opts = {}) {
     finishAttempt(att, def, cR, dR, min, finisher, winger, 'CUTBACK', { bonus: CUTBACK_FINISH_BONUS, lead, onGoal: () => { log.cutbackGoals++; },
       snapMoves: { [winger.id]: [wx, BYLINE_Y], [finisher.id]: [SPOT.CUTBACK.x, SPOT.CUTBACK.y] } });
   }
-  function penalty(att, def, cR, dR, min) {
+  // Straffe-VAR (v3.15.1): byVar = VAR kaldte dommeren ud til et straffespark, han ikke så (PEN_AWARD_P). Ellers tjekkes en
+  // given straffe med PEN_CHECK_P: filmning (den fældedes theatre – lodtrækning) eller offside i opspillet. Kendelsen falder
+  // FØR straffen tælles (frispark, straffe, skud, xG, fælderens karakter – QC: ellers målte straffebåndet forkert).
+  function penalty(att, def, cR, dR, min, byVar = false) {
     const taker = best(outfield(cR), (p) => p.skills.finishing), fouled = rng.pick(cR.atts.concat(cR.mids)), fouler = rng.pick(dR.defs), gk = dR.gk;
+    let varNote = '';
+    if (byVar) {
+      st[k(att, 'VarChecks')]++; homeVarNet += att === H ? 1 : -1;
+      addEv(min, 'VAR_PEN', 'HIGHLIGHT', att.isHome, true, '📺 VAR: straffespark', `📺 [${att.team.name}] Spillet fortsatte, men VAR kalder dommeren ud til skærmen: ${tag(fouled)} blev fældet i feltet af ${tag(fouler)} (${def.team.name}). Efter at have set skærmen dømmer han straffespark!`, `${att.team.name}: straffespark`);
+      events.at(-1).var = { kind: 'PENALTY', verdict: 'AWARDED' };
+      varNote = ' (dømt efter VAR)';
+    } else if (rng.chance(VAR_RULES.PEN_CHECK_P)) {
+      // Spilfører: straffen dømmes FØRST – så tjekker VAR, og kendelsen kan vende den.
+      st[k(att, 'VarChecks')]++;
+      const offside = rng.chance(VAR_RULES.PEN_OFFSIDE_SHARE);
+      // Positionerne i opspillet (TM v3.15.1: uden dem var den tjekkede altid den fældede – "den forreste" gjaldt ikke)
+      if (offside) { seen[att.team.id] = livePositions(att.tactics, { attacking: true, ballX: 50 }); seenX[att.team.id] = 50; }
+      const o = offside ? offsideCheck(att, fouled, fouler) : { onside: rng.next() * 40 > fouled.varProfile.theatre };
+      addEv(min, 'VAR_PEN', 'HIGHLIGHT', att.isHome, false, '📺 VAR tjekker straffen', `📺 [${att.team.name}] Dommeren peger på pletten – ${tag(fouled)} går ned i feltet efter kontakt med ${tag(fouler)} (${def.team.name}). Men VAR tjekker ${offside ? 'for offside i opspillet' : 'om der var kontakt nok'} …`, `${att.team.name}: straffesparket tjekkes …`);
+      events.at(-1).var = { kind: offside ? 'OFFSIDE' : 'DIVE', verdict: o.onside ? 'STANDS' : 'OVERTURNED' };
+      if (!o.onside) {
+        homeVarNet += att === H ? -1 : 1;
+        const text = offside ? `📺 [${att.team.name}] VAR-KENDELSE: STRAFFESPARKET ANNULLERES! ${o.other ? `${tag(o.off)} stod offside i opspillet, før ${tag(fouled)} blev fældet` : `${tag(fouled)} stod offside, før han blev fældet`}.`
+          : `📺 [${att.team.name}] VAR-KENDELSE: Dommeren går ud til skærmen … ingen kontakt. Straffesparket annulleres.`;
+        addEv(min, 'VAR_NO_PEN', 'HIGHLIGHT', att.isHome, true, '📺 VAR: straffe annulleret', text, `${att.team.name}: straffesparket annulleres`);
+        if (offside) { sheet.adjust(o.off.id, -0.2); return; }
+        st[k(att, 'Fouls')]++; sheet.adjust(fouled.id, -0.3);
+        booking(att, fouled, min, 'Gult kort til', ' for filmning', true);
+        return;
+      }
+      varNote = ' 📺 VAR: straffesparket står.';
+    }
     st[k(def, 'Fouls')]++; st[k(att, 'Penalties')]++; st[k(att, 'Shots')]++; st[k(att, 'Xg')] += 0.76;
     sheet.adjust(fouler.id, -0.3);
-    const why = `${tag(fouled)} fældes i feltet af ${tag(fouler)} (${def.team.name})`;
+    const why = `${tag(fouled)} fældes i feltet af ${tag(fouler)} (${def.team.name})`, self = taker.id === fouled.id;
     if (taker.skills.finishing * ff(taker) + rng.next() * 8 + PENALTY_BONUS > gk.skills.goalkeeping * ff(gk) + rng.next() * 8) {
       goalFor(att); st[k(att, 'PenaltyGoals')]++;
       sheet.adjust(taker.id, 1.0); sheet.bump(taker.id, 'goals'); sheet.adjust(gk.id, -0.1);
       bookKind(att, taker, 'PENALTY');
       const desc = describeGoal('PENALTY', tag(taker), tag(fouled), min, rng);
       goalsPool.push({ scorer: tag(taker), teamName: att.team.name, match: `${home.name} - ${away.name}`, min, kind: 'PENALTY', spectacle: goalSpectacle('PENALTY', {}, min, rng), desc });
-      addEv(min, 'GOAL', 'HIGHLIGHT', att.isHome, true, `⚽ Straffespark: ${tag(taker)}`, `⚽ [${att.team.name} • ${hG}-${aG}] STRAFFESPARK – MÅL! ${why}, og ${tag(taker)} sender bolden sikkert i nettet.`);
+      addEv(min, 'GOAL', 'HIGHLIGHT', att.isHome, true, `⚽ Straffespark: ${tag(taker)}`, `⚽ [${att.team.name} • ${hG}-${aG}] STRAFFESPARK – MÅL! ${why}, og ${self ? 'han tager det selv og sender' : `${tag(taker)} sender`} bolden sikkert i nettet.${varNote}`);
     } else {
       st[k(att, 'OnTarget')]++;
       sheet.adjust(gk.id, 0.8); sheet.bump(gk.id, 'saves'); sheet.adjust(taker.id, -0.4);
-      addEv(min, 'SAVE', 'HIGHLIGHT', def.isHome, true, `🧤 Straffe reddet: ${tag(gk)}`, `🧤 [${def.team.name}] STRAFFESPARK REDDET! ${why}, men ${tag(gk)} redder fra ${tag(taker)}.`);
+      addEv(min, 'SAVE', 'HIGHLIGHT', def.isHome, true, `🧤 Straffe reddet: ${tag(gk)}`, `🧤 [${def.team.name}] STRAFFESPARK REDDET! ${why}, men ${tag(gk)} redder fra ${self ? 'ham' : tag(taker)}.${varNote}`);
     }
   }
   function freeKick(att, def, cR, dR, min) {
@@ -514,7 +634,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
         const desc = describeGoal('FREEKICK', tag(taker), tag(taker), min, rng);
         goalsPool.push({ scorer: tag(taker), teamName: att.team.name, match: `${home.name} - ${away.name}`, min, kind: 'FREEKICK', spectacle: goalSpectacle('FREEKICK', { finishing: taker.skills.finishing }, min, rng), desc });
         addEv(min, 'GOAL', 'HIGHLIGHT', att.isHome, true, `⚽ Frisparksmål: ${tag(taker)}`, `⚽ [${att.team.name} • ${hG}-${aG}] FRISPARKSMÅL! Frispark efter ${tag(fouler)}s (${def.team.name}) forseelse – ${desc}`);
-      } else {
+      } else if (!missed(att, def, cR, dR, min, taker, false, 'frisparket')) {
         st[k(att, 'OnTarget')]++;
         sheet.adjust(gk.id, 0.4); sheet.bump(gk.id, 'saves');
         addEv(min, 'SAVE', 'PLAY', def.isHome, false, 'Frispark reddet', `🧤 [${def.team.name}] ${tag(gk)} redder ${tag(taker)}s frispark (${att.team.name}) fra kanten af feltet.`);
@@ -552,17 +672,19 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // Kort (v3.15): ét sted. Karakterarket gemmer antal gule (0–2) og rødt ('SECOND_YELLOW' | 'DIRECT'); kamptal,
   // holdtal og sæsonstatistik regnes alle derfra (QC: før talte tre steder forskelligt).
   const MEN = ['', 'én', 'to', 'tre', 'fire', 'fem', 'seks', 'syv', 'otte', 'ni', 'ti', 'elleve'];
-  function booking(side, p, min, before, after = '') {
+  // force (v3.15.1): kortet er givet efter en VAR-kendelse (filmning, et rødt kort trukket tilbage til gult) – ingen "holder igen".
+  function booking(side, p, min, before, after = '', force = false) {
     const e = sheet.entries[p.id];
     if (!e || e.red) return;
-    if (e.yellows && !rng.chance(CARD_RULES.SECOND_YELLOW_P)) return;   // han holder igen – frisparket, men intet kort
+    if (e.yellows && !force && !rng.chance(CARD_RULES.SECOND_YELLOW_P)) return;   // han holder igen – frisparket, men intet kort
     e.yellows = (e.yellows ?? 0) + 1; e.yellowCard = true; st[k(side, 'Yellows')]++;
     if (e.yellows === 1) addEv(min, 'FOUL', 'PLAY', side.isHome, false, 'Gult kort', `🟨 [${side.team.name}] ${before} ${tag(p)}${after}.`);
     else sendOff(side, p, min, 'SECOND_YELLOW');
   }
+  const canSendOff = (side, p) => { const e = sheet.entries[p.id]; return !!e && !e.red && side.starters.indexOf(p) >= 1 && side.starters.filter(Boolean).length > MIN_PLAYERS; };
   function sendOff(side, p, min, kind) {
+    if (!canSendOff(side, p)) return;
     const e = sheet.entries[p.id], slot = side.starters.indexOf(p);
-    if (!e || e.red || slot < 1 || side.starters.filter(Boolean).length <= MIN_PLAYERS) return;
     e.red = kind; e.minOut = min; st[k(side, 'Reds')]++;
     sheet.adjust(p.id, -1);
     // Tiden med færre mand gemmes, før tallet stiger (lostAt regner minutter × manglende mand).
@@ -680,7 +802,9 @@ export function simulateMatch(home, away, rng, opts = {}) {
   }
 
   for (let min = 3; min <= 90; min += 3) {
-    curMin = min;
+    // Flaget nulstilles ved hvert tick (QC v3.15.1: et kort for filmning i straffen – efter tjekket herunder – lækkede ellers
+    // ind i næste minut og sprang dets dødbolde og chancer over).
+    curMin = min; sentOffThisTick = false; varBehind = null;
     seen = {};   // øjebliksbilledet hører til dette tick
     if (min === 45) {
       const hp = Math.round((st.hPoss / (st.hPoss + st.aPoss)) * 100);
@@ -797,7 +921,30 @@ export function simulateMatch(home, away, rng, opts = {}) {
         }
         // Skade-frisparket giver intet gult kort, men den grove tackling kan koste et direkte rødt kort (v3.15) – kun her, så tilfældighederne i resten af kampen
         // ikke flytter sig (QC). Frisparket er offentligt; kortet afhænger ikke af nogen skjult indstilling.
-        if (rng.chance(CARD_RULES.DIRECT_RED_P)) sendOff(foulSide, fouler, min, 'DIRECT');
+        // Rødt-kort-VAR (v3.15.1, IFAB: kun direkte rødt tjekkes): RED_CHECK_P af de røde kort tjekkes – den kyniske
+        // (cynicism) beholder oftere kortet; ellers trækkes det tilbage til gult. En grov tackling uden kort kan opgraderes
+        // (RED_UPGRADE_P, igen oftere for den kyniske). VAR ± (season.js): tilbagetrukket +1 og opgraderet −1 for det
+        // hold, der begik frisparket.
+        if (rng.chance(CARD_RULES.DIRECT_RED_P)) {
+          // Har han allerede gult, ville et nedgraderet kort alligevel give rødt – så tjekkes kortet ikke (QC v3.15.1).
+          if (canSendOff(foulSide, fouler) && !sheet.entries[fouler.id]?.yellows && rng.chance(VAR_RULES.RED_CHECK_P)) {
+            st[k(foulSide, 'VarChecks')]++;
+            const down = rng.next() * 30 > fouler.varProfile.cynicism + 10;
+            // Spilfører: kortet vises FØRST – så tjekker VAR, og kendelsen kan vende det.
+            addEv(min, 'VAR_RED', 'HIGHLIGHT', foulSide.isHome, false, '📺 VAR tjekker det røde kort', `📺 [${foulSide.team.name}] Dommeren viser ${tag(fouler)} det røde kort for tacklingen – men VAR tjekker situationen …`, `${foulSide.team.name}: det røde kort tjekkes …`);
+            events.at(-1).var = { kind: 'RED', verdict: down ? 'DOWNGRADED' : 'CONFIRMED' };
+            if (down) {
+              homeVarNet += foulSide === H ? 1 : -1;
+              addEv(min, 'VAR_NO_RED', 'HIGHLIGHT', foulSide.isHome, true, '📺 VAR: rødt bliver gult', `📺 [${foulSide.team.name}] VAR-KENDELSE: Dommeren går ud til skærmen … ${tag(fouler)} ramte bolden først. Det røde kort trækkes tilbage – det bliver gult.`, `${foulSide.team.name}: rødt bliver gult`);
+              booking(foulSide, fouler, min, 'Gult kort til', ' efter VAR-tjekket', true);
+            } else sendOff(foulSide, fouler, min, 'DIRECT');
+          } else sendOff(foulSide, fouler, min, 'DIRECT');
+        } else if (canSendOff(foulSide, fouler) && rng.chance(VAR_RULES.RED_UPGRADE_P) && rng.next() * 22 < fouler.varProfile.cynicism) {
+          st[k(foulSide, 'VarChecks')]++; homeVarNet += foulSide === H ? -1 : 1;
+          addEv(min, 'VAR_RED', 'HIGHLIGHT', foulSide.isHome, true, '📺 VAR: opgraderet til rødt', `📺 [${foulSide.team.name}] VAR kalder dommeren ud til skærmen: ${tag(fouler)}s tackling var med knopperne forrest. Efter at have set skærmen giver han rødt kort!`, `${foulSide.team.name}: rødt kort`);
+          events.at(-1).var = { kind: 'RED', verdict: 'UPGRADED' };
+          sendOff(foulSide, fouler, min, 'DIRECT');
+        }
       } else {
         // Gult kort kun her – skade-frisparkets tekst nævner intet kort (v3.10). Andet gule giver rødt (v3.15).
         booking(foulSide, fouler, min, 'Taktisk frispark og gult kort til');
@@ -820,9 +967,10 @@ export function simulateMatch(home, away, rng, opts = {}) {
     if (sentOffThisTick) { sentOffThisTick = false; continue; }
     // Dødbolde til holdet med bolden (v3.10): straffe, frispark i skudafstand – ikke efter tabt bold.
     if (!ballLost && rng.chance(PENALTY_P)) penalty(att, def, att === H ? hR : aR, def === H ? hR : aR, min);
+    else if (!ballLost && rng.chance(VAR_RULES.PEN_AWARD_P)) penalty(att, def, att === H ? hR : aR, def === H ? hR : aR, min, true);
     else if (!ballLost && rng.chance(FREEKICK_P)) freeKick(att, def, att === H ? hR : aR, def === H ? hR : aR, min);
-    // Chance (30 %): angrebsfokus afgør typen (v3.12) – høj bold, cutback – ellers VAR-tjek eller
-    // en afslutning (løb uden bold eller almindeligt skud). Ikke efter tabt bold.
+    // Chance (30 %): angrebsfokus afgør typen (v3.12) – høj bold, cutback – ellers en afslutning (løb uden bold eller
+    // almindeligt skud). Ikke efter tabt bold. VAR er ikke en chancetype (v3.15.1) – det tjekker målet bagefter.
     else if (!ballLost && rng.chance(CHANCE_P[attPh.phase1_buildUp.offBallRuns] ?? CHANCE_P.NORMAL)) {
       const cR = att === H ? hR : aR, dR = def === H ? hR : aR;
       const ph1 = attPh.phase1_buildUp, focus = ph1.attackFocus;
@@ -840,44 +988,14 @@ export function simulateMatch(home, away, rng, opts = {}) {
         // Billedet: indlæggeren ude på kanten, hovedstødsspilleren i feltet (den lange bold slås fra hans plads).
         const moves = { [target.id]: [SPOT.CROSS.x, SPOT.CROSS.y], ...(source === 'cross' ? { [from.id]: [cx, CROSS_FROM_Y] } : {}) };
         const res = aerialDuel(att, def, cR, dR, min, target, from, defender, null, source, moves);
-        if (res !== 'goal' && rng.chance(res === 'saved' ? CORNER_P : CROSS_CORNER_P)) corner(att, def, cR, dR, min);
+        if (res !== 'goal' && res !== 'disallowed' && rng.chance(res === 'saved' ? CORNER_P : CROSS_CORNER_P)) corner(att, def, cR, dR, min);
         continue;
       }
       if (focus === 'LOW_CUTBACKS' && rng.chance(FOCUS_SHARE.LOW_CUTBACKS)) { cutback(att, def, cR, dR, min, shotXg); continue; }
       // Skytten er den, der står nærmest målet (oftest angriberen) – ikke en tilfældig spiller.
       const shotSpot = rng.next() < EDGE_SHARE ? SPOT.EDGE : SPOT.GOAL;
       const shooter = receiver(att, shotSpot, (p) => p.skills.finishing, null, { attacking: true, ballX: 50 });
-      const scored = () => { if (att === H) hG++; else aG++; st[k(att, 'OnTarget')]++; };
-      const assist = (bonus) => { if (assister.id !== shooter.id) { sheet.adjust(assister.id, bonus); sheet.bump(assister.id, 'assists'); } };
-      // VAR-tjekket gælder offside. Står skytten bagved (brugeren v3.14.1: "scoret af en midtbanespiller, og der er 5
-      // spillere længere fremme"), er det hans forreste holdkammerat, der tjekkes for offside – ikke skytten selv.
-      if (rng.next() < 0.22) {
-        const off = isFront(att, shooter) ? shooter : frontOf(att) ?? shooter, other = off !== shooter;
-        st[k(att, 'VarChecks')]++;
-        const trapBonus = (off.counterTactics?.vsTrapLong ?? 15) * 0.045; // v3.6: samme effekt (≈0,8) på den lavere skala
-        const timing = describeVarTiming(off.varProfile.varPulse);
-        // Billedet: skytten der, hvor han skød fra; den offside-tjekkede står, hvor han stod – han ER den forreste
-        // (brugeren v3.14.1: "siger at M. Møller var foran, men M. Poulsen er længere fremme" – han blev før flyttet
-        // tilbage til y 16). Skytten tegnes aldrig foran ham.
-        const offY = seen[att.team.id]?.[att.starters.indexOf(off)]?.y ?? 0;
-        const shotAt = other ? { x: shotSpot.x, y: Math.max(shotSpot.y, offY + VAR_BEHIND) } : shotSpot;
-        const moves = { [shooter.id]: [shotAt.x, shotAt.y] };
-        if (off.varProfile.varPulse + trapBonus + rng.next() * 6 > defender.skills.positioning + rng.next() * 6) {
-          scored(); homeVarNet += att === H ? 1 : -1;
-          sheet.adjust(shooter.id, 1.3); sheet.bump(shooter.id, 'goals'); assist(0.5); sheet.adjust(defender.id, -0.35);
-          observe(off, `VAR-tjek (${min}. min mod ${def.team.name}): ${off.shortName} ${timing}.`);
-          goalsPool.push({ scorer: tag(shooter), teamName: att.team.name, match: `${home.name} - ${away.name}`, min, kind: 'VAR', spectacle: goalSpectacle('VAR', {}, min, rng), desc: describeGoal('VAR', tag(shooter), tag(assister), min, rng) });
-          const why = other ? `${tag(shooter)} skød, og ${tag(off)} foran ham stod ikke offside – han ${timing}` : `${tag(shooter)} ${timing}`;
-          addEv(min, 'VAR_GOAL', 'HIGHLIGHT', att.isHome, true, `📺 VAR: mål godkendt – ${tag(shooter)}`, `📺 [${att.team.name} • ${hG}-${aG}] VAR-KENDELSE: MÅL GODKENDT! ${why}.`, `${att.team.name}: mål godkendt`);
-          snapshot(att, shooter, assister, shotAt, false, moves);
-        } else {
-          homeVarNet += att === H ? -1 : 1;
-          sheet.adjust(off.id, -0.4); sheet.adjust(defender.id, 0.45); sheet.bump(defender.id, 'tacticWins');
-          observe(off, `VAR-annullering (${min}. min mod ${def.team.name}): ${off.shortName} var en anelse for tidligt af sted.`);
-          const why = other ? `${tag(defender)} (${def.team.name}) holdt linjen, og ${tag(off)} stod offside og var med i situationen, da ${tag(shooter)} skød` : `${tag(defender)} (${def.team.name}) holdt linjen, og ${tag(shooter)} var offside`;
-          addEv(min, 'VAR_NO_GOAL', 'HIGHLIGHT', att.isHome, true, `📺 VAR: annulleret – ${tag(off)}`, `📺 [${att.team.name}] VAR-KENDELSE: MÅLET ANNULLERES! ${why}.`, `${att.team.name}: mål annulleret`);
-        }
-      } else {
+      {
         // Løb uden bold (v3.9): en markspiller forsøger at løbe sig fri. Vinder han løbet, træffer
         // han en beslutning (skud/aflevering/dribletur) efter zone og evner; ellers en almindelig
         // afslutning som før. Kun DIT holds løb fortælles – modstanderens "fri" kan ikke tælles op.
@@ -971,7 +1089,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
     const p = meSide.isHome ? 'h' : 'a', poss = Math.round((st[p + 'Poss'] / (st.hPoss + st.aPoss)) * 100);
     const [myG, oppG] = meSide.isHome ? [hG, aG] : [aG, hG];
     addEv(90, 'FULLTIME', 'TACTIC', meSide.isHome, false, 'Fuldtids-analyse',
-      `📊 [90' FULDTIDS-ANALYSE] ${myG}-${oppG} til dig. Du havde ${poss}% af bolden og ${st[p + 'Shots']} afslutninger (${st[p + 'OnTarget']} på mål). Din opbygning kom igennem ${d.buildWon} af ${d.build} gange; dit pres vandt bolden ${d.pressWon} af ${d.press} gange.`
+      `📊 [90' FULDTIDS-ANALYSE] ${myG > oppG ? `Sejr ${myG}-${oppG} til dig` : myG < oppG ? `Nederlag ${myG}-${oppG}` : `Uafgjort ${myG}-${oppG}`}. Du havde ${poss}% af bolden og ${st[p + 'Shots']} afslutninger (${st[p + 'OnTarget']} på mål). Din opbygning kom igennem ${d.buildWon} af ${d.build} gange; dit pres vandt bolden ${d.pressWon} af ${d.press} gange.`
       + ` Dødbolde: ${st[p + 'FreeKicks']} frispark i skudafstand, ${st[p + 'Corners']} hjørnespark, ${st[p + 'Penalties']} straffe (${st[p + 'PenaltyGoals']} mål) · frispark begået ${st[p + 'Fouls']}, tilkendt ${st[(p === 'h' ? 'a' : 'h') + 'Fouls']}.`
       + ` 🎯 Løb uden bold (${RUNS_LABEL[runs]}): ${d.runs} løb, ${d.runsWon} kom fri (${d.runGoals} mål) · kontraer imod i alt: ${d.countersAgainst} (${d.counterGoalsAgainst} mål).`
       // v3.12 (brugeren: "ikke en eneste reference til cutbacks"): dit angreb efter dine valg og

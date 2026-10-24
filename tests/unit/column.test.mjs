@@ -111,7 +111,9 @@ test('"Din kamp" følger seeren: to menneskehold i samme kamp får hvert sit afs
   assert.deepEqual(buildColumn({ ...pa, viewerTeamId: A.id }), ca);
 });
 test('en bots spillede indstillinger gemmes ikke længere i endState (Arkitekt) – dit holds gør', () => {
-  const L = createLeague(createRng(4)), m = simulateMatch(L.teams[0], L.teams[1], createRng(5));
+  // Seed uden Hvis-Så-skift hos botten (v3.15.1: med seed 5 skiftede botten formation, så slutformationen ≠ startformationen)
+  const L = createLeague(createRng(4)), m = simulateMatch(L.teams[0], L.teams[1], createRng(6));
+  assert.ok(!m.events.some((e) => !e.isHome && e.type === 'TRIGGER'), 'data: botten skifter ikke formation');
   assert.ok(m.endState.home.phases && m.endState.home.customCoords, 'dit hold');
   assert.equal(m.endState.away.phases, undefined); assert.equal(m.endState.away.customCoords, undefined);
   assert.equal(m.endState.away.formation, L.teams[1].tactics.baseFormation);

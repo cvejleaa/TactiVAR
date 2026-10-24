@@ -75,9 +75,10 @@ test('drain90: pres, løb uden bold (kun løbsroller), genpres (ikke målmand) o
 
 // ---------- Friskheden i kampen: eksakte minutter (stub-rng, hvert tick et skud) ----------
 // Skytten alene i feltet; skud (0,3) og angreb (0,48) i hvert tick. Uden tab scorer han i alle 30 ticks; med tab holder
-// han op, når FIN·ff + 4 ≤ MV·ff + 7. Målene stopper (monotont) – antal mål = sidste mål / 3. Alle tre konstanter
+// han op, når FIN·ff + 4 ≤ MV·ff + 4 + KEEPER_EDGE 0,3 (v3.15.1; før + 3 mod MV 8,5 → MV 11,3 her, så tabet stadig skiller).
+// Kanten 3 med MV 11,3 giver 0 mål ved alle tre STA – rødt. Målene stopper (monotont) – antal mål = sidste mål / 3. Alle tre konstanter
 // og begge led i ff (friskhed før kampen · tabt i kampen) flytter mindst ét af tallene.
-function shooter({ fin = 12, gk = 8.5, sta, shooterFresh = 100, gkFresh = 100, gkSta = 10 }) {
+function shooter({ fin = 12, gk = 11.3, sta, shooterFresh = 100, gkFresh = 100, gkSta = 10 }) {
   const { H, A } = arena({ homeLimit: 0 });
   H.tactics.customCoords = Object.fromEntries([1, 2, 3, 4, 5, 6, 7, 8, 10].map((j) => [j, { x: 50, y: 95 }]));
   Object.assign(slot(H, 9).skills, { finishing: fin, stamina: sta }); slot(H, 9).freshness = shooterFresh;
@@ -86,15 +87,17 @@ function shooter({ fin = 12, gk = 8.5, sta, shooterFresh = 100, gkFresh = 100, g
   const m = simulateMatch(H, A, stubRng({ 0.48: true, 0.3: true }));
   return { goals: m.homeGoals, last: Math.max(0, ...m.events.filter((e) => e.type === 'GOAL' && e.isHome).map((e) => e.min)) };
 }
-test('friskhed i kampen: sidste mål ved STA 2 / 10 / 18 er 42 / 72 / 90 (14 / 24 / 30 mål) – tab, STA-led og TIRED_PER_POINT pinnet', () => {
+// v3.15.1: MV 8,5 + 3 → 11,3 + 0,3 (målmandens eget tab vejer nu på en større værdi); før 42 / 72 / 90 (14 / 24 / 30 mål).
+test('friskhed i kampen: sidste mål ved STA 2 / 10 / 18 er 39 / 75 / 90 (13 / 25 / 30 mål) – tab, STA-led og TIRED_PER_POINT pinnet', () => {
   const r = [2, 10, 18].map((sta) => shooter({ sta }));
-  assert.deepEqual(r.map((x) => [x.goals, x.last]), [[14, 42], [24, 72], [30, 90]]);
+  assert.deepEqual(r.map((x) => [x.goals, x.last]), [[13, 39], [25, 75], [30, 90]]);
 });
 // Friskheden FØR kampen (freshFactor) og tabet i kampen skal begge med i ff: uden den første er skytten lige så god kl. 90
 // (27 / 16 mål ville være 30), uden den anden holder ingen op. Målmandens friskhed vejer lige så meget som skyttens.
+// v3.15.1 (KEEPER_EDGE 3 → 0,3): MV 8,5 / 7,5 → 11,55 / 10,26 giver de samme tal som før (kanten 3 giver 0 mål).
 test('friskhed før kampen vejer med i ff: skytte 80 % / målmand 70 % → sidste mål 81 (27 mål); skytte 60 % → 48 (16 mål)', () => {
-  const a = shooter({ sta: 10, shooterFresh: 80, gkFresh: 70, fin: 12, gk: 8.5 });
-  const b = shooter({ sta: 10, shooterFresh: 60, gkFresh: 100, fin: 12, gk: 7.5 });
+  const a = shooter({ sta: 10, shooterFresh: 80, gkFresh: 70, fin: 12, gk: 11.55 });
+  const b = shooter({ sta: 10, shooterFresh: 60, gkFresh: 100, fin: 12, gk: 10.26 });
   assert.deepEqual([[a.goals, a.last], [b.goals, b.last]], [[27, 81], [16, 48]]);
 });
 test('arket gemmer hverken km90 eller drain90 efter kampen (de er hjælpetal, ikke data)', () => {
@@ -388,11 +391,12 @@ test('straffe: en træt målmand (STA 0) slipper efterhånden straffer ind – 1
   assert.equal(m.stats.hPenalties, 30);
   assert.equal(m.homeGoals, 16);
 });
-// Skud i hvert tick: FIN 12 + 4 mod MV 9,2 + 7 (MV STA 0, skytte STA 24): den træthed, målmanden ophober, giver mål fra et
-// stykke inde i kampen – 17 af 30. Fanger "ff → freshFactor" på målmanden i afslutningerne (FIN-duellen).
-test('afslutninger: en træt målmand (STA 0) slipper mål ind senere i kampen – 17 af 30 ved MV 9,2', () => {
-  const r = shooter({ sta: 24, gkSta: 0, fin: 12, gk: 9.2 });
-  assert.deepEqual([r.goals, r.last], [17, 90]);
+// Skud i hvert tick: FIN 12 + 4 mod MV 12 + 4 + 0,3 (MV STA 0, skytte STA 24): den træthed, målmanden ophober, giver mål
+// fra et stykke inde i kampen – 16 af 30 (v3.15.1; før MV 9,2 + 7: 17 af 30; kanten 3 med MV 12 giver 0). Uden tab på
+// målmanden: 16 > 16,3 falsk → 0. Fanger "ff → freshFactor" på målmanden i afslutningerne (FIN-duellen).
+test('afslutninger: en træt målmand (STA 0) slipper mål ind senere i kampen – 16 af 30 ved MV 12', () => {
+  const r = shooter({ sta: 24, gkSta: 0, fin: 12, gk: 12 });
+  assert.deepEqual([r.goals, r.last], [16, 90]);
 });
 // Resten af kaldstederne (hovedstød, kontra, indlæg, cutback, løb, dribling, opbygning/pres) er kun bundet af denne vagt:
 // hvert tal i en duel går gennem ff(...), aldrig direkte gennem freshFactor(...) – ellers er tabet i kampen væk dér.

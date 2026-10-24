@@ -149,9 +149,13 @@ test('kampvurdering: hver regels tekst og tærskel (begge sider af grænsen), é
   assert.deepEqual(only(R({ runGoals: 3 })), ['Løbene uden bold gav 3 mål.']);
   // formationsskift: kun når begge formationer kendes og er forskellige; "holdt" kun ved sejr
   const sw = (end, start = '4-4-2') => R({ startFormation: start, endFormation: end });
-  assert.deepEqual(only(sw('3-5-2')), ['Skiftet fra 4-4-2 til 3-5-2 undervejs.']);   // neutralt uanset udfald (QC F4)
-  assert.deepEqual(only(sw('3-5-2'), { hG: 2, aG: 1 }), ['Skiftet fra 4-4-2 til 3-5-2 undervejs.']);
-  assert.deepEqual(only(sw('3-5-2'), { hG: 0, aG: 1 }), ['Skiftet fra 4-4-2 til 3-5-2 undervejs.']);
+  // Neutralt uanset udfald (QC F4) – samme sætning ved sejr og nederlag; fem formuleringer (v3.15.1: med tre gik én igen 4
+  // gange på en sæson), alle med begge formationer og uden vurdering.
+  const SW = /^(Skiftet fra 4-4-2 til 3-5-2 undervejs|I gik fra 4-4-2 til 3-5-2 i løbet af kampen|Formationen blev lagt om fra 4-4-2 til 3-5-2|Undervejs blev 4-4-2 til 3-5-2|Holdet sluttede i 3-5-2 efter at have startet i 4-4-2)\.$/;
+  const t0 = only(sw('3-5-2'));
+  assert.equal(t0.length, 1); assert.match(t0[0], SW);
+  assert.deepEqual(only(sw('3-5-2'), { hG: 2, aG: 1 }), t0);
+  assert.deepEqual(only(sw('3-5-2'), { hG: 0, aG: 1 }), t0);
   assert.deepEqual(only(sw('4-4-2')), [], 'samme formation');
   assert.deepEqual(only(sw(null)), [], 'slutformation mangler');
   assert.deepEqual(only(sw('3-5-2', null)), [], 'startformation mangler');

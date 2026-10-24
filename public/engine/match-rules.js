@@ -26,3 +26,20 @@ export const CARD_RULES = Object.freeze({ DIRECT_RED_P: 0.07, SECOND_YELLOW_P: 0
 export const FATIGUE_SUBS_AT_ONCE = 3;
 // En kamp kræver mindst 7 spillere (IFAB Law 3) – motoren udviser aldrig under det (ingen afbrudt kamp).
 export const MIN_PLAYERS = 7;
+// VAR som i virkeligheden (v3.15.1, brugeren: "VAR skal virke som i virkeligheden … nogle gange tjekker for offside
+// selv om der ikke scores og andre for røde kort, andre igen for om der er straffespark"). VAR er ikke længere en
+// chancetype (før: 22 % af chancerne afgjort af VAR, 0,50 annullerede mål pr. kamp – målt i measure-duels.mjs var):
+// chancen afgøres først, og VAR tjekker bagefter situationen. Alle tal er lodtrækninger (ingen tærskel, der afslører en
+// spillers skjulte trin) og afhænger aldrig af modstanderens indstillinger (§3). Værdierne findes ikke andre steder i
+// motoren og er indbyrdes forskellige, så testenes scriptede rng (chance(p) pr. værdi) kan skelne dem (QC; vagt i
+// var-check.test.mjs).
+//  GOAL_CHECK_P     et mål tjekkes synligt (offside på den forreste – eller frispark i opspillet, GOAL_FOUL_SHARE)
+//  OFFSIDE_FLAG_P   en afslutning, der ikke går ind: linjedommerens flag var oppe (ikke VAR, tæller ikke som VAR-tjek)
+//  PEN_CHECK_P      en straffe tjekkes (filmning – den fældedes theatre – eller offside i opspillet, PEN_OFFSIDE_SHARE)
+//  PEN_AWARD_P      pr. tick: VAR kalder dommeren ud og giver et straffespark, han ikke så
+//  RED_CHECK_P      et direkte rødt kort tjekkes (cynicism: jo mere kynisk, jo oftere står kortet)
+//  RED_UPGRADE_P    en grov tackling, der kun gav frispark, kan opgraderes til rødt
+export const VAR_RULES = Object.freeze({ GOAL_CHECK_P: 0.131, GOAL_FOUL_SHARE: 0.27, OFFSIDE_FLAG_P: 0.043, PEN_CHECK_P: 0.26, PEN_OFFSIDE_SHARE: 0.31, PEN_AWARD_P: 0.0023, RED_CHECK_P: 0.53, RED_UPGRADE_P: 0.041 });
+// Forbi (v3.15.1, Spilfører: 67 % af skuddene gik på mål – Superligaen ≈ 33–35 %): en afslutning, keeperen ikke skal
+// redde, går forbi, over, på stolpen eller blokeres med MISS_P; en blokeret giver hjørnespark med MISS_CORNER_P.
+export const MISS_P = 0.62, MISS_BLOCK_SHARE = 0.6, MISS_CORNER_P = 0.88;

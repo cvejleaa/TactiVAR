@@ -51,8 +51,8 @@ test('tabet i kampen: CM med STA 6 taber ≈ 20 point på 90 min, STA 16 ≈ 11 
 });
 
 // ---------- Friskheden i kampen virker i spillet ----------
-// Skud i hvert tick (0,3), skytten alene i feltet; rul 0,5 → FIN·ff + 4 mod MV·ff + 4 + 3. Uden tab: 16 > 15,5 hele
-// kampen → 30 mål. Med tab bliver skytten svagere minut for minut (STA 2 hurtigere end STA 18), mens målmanden
+// Skud i hvert tick (0,3), skytten alene i feltet; rul 0,5 → FIN·ff + 4 mod MV·ff + 4 + 0,3 (v3.15.1; før + 3 mod MV 8,5).
+// Uden tab: 16 > 15,6 (MV 11,3) hele kampen → 30 mål (kanten 3 giver 0 – rødt). Med tab bliver skytten svagere minut for minut (STA 2 hurtigere end STA 18), mens målmanden
 // taber mindre (grund-km 5,5). Mutationen "ff → freshFactor" eller TIRED_PER_POINT 0 giver 30 og 30 – rødt.
 test('friskheden falder i kampen: en lav-STA skytte scorer færre sene mål end en høj-STA – uden tab scorer begge alle', () => {
   const run = (sta, live = true) => {
@@ -60,12 +60,12 @@ test('friskheden falder i kampen: en lav-STA skytte scorer færre sene mål end 
     H.tactics.customCoords = Object.fromEntries([1, 2, 3, 4, 5, 6, 7, 8, 10].map((j) => [j, { x: 50, y: 95 }]));
     Object.assign(slot(H, 9).skills, { finishing: 12, stamina: sta });
     for (const p of A.squad.slice(5, 9)) p.skills.intercepting = 1;
-    slot(A, 0).skills.goalkeeping = 8.5;
+    slot(A, 0).skills.goalkeeping = 11.3;
     const m = simulateMatch(H, A, stubRng({ 0.48: true, 0.3: true }), live ? {} : { liveEnergy: false });
     return { goals: m.homeGoals, last: Math.max(0, ...m.events.filter((e) => e.type === 'GOAL' && e.isHome).map((e) => e.min)) };
   };
   const off = run(2, false), low = run(2), high = run(18);
-  assert.equal(off.goals, 30, 'uden tab: 12 + 4 > 8,5 + 4 + 3 hele kampen');
+  assert.equal(off.goals, 30, 'uden tab: 12 + 4 > 11,3 + 4 + 0,3 hele kampen');
   assert.ok(low.goals < high.goals && low.goals < off.goals, `STA 2 ${low.goals}, STA 18 ${high.goals}`);
   assert.ok(low.last < high.last, `sidste mål ${low.last}' mod ${high.last}'`);
 });

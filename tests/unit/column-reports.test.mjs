@@ -84,7 +84,9 @@ test('ownReport: rapportens mål-felter passer med kampens mål (hovedstød, kon
     assert.equal(rs[0].side, 'home'); assert.equal(rs[1].side, 'away');
     for (const [i, r] of rs.entries()) {
       const goals = i === 0 ? m.homeGoals : m.awayGoals, against = i === 0 ? m.awayGoals : m.homeGoals;
-      assert.ok(r.runGoals + r.cutbackGoals <= goals + 0, `seed ${seed}: løbs- og cutbackmål (${r.runGoals}+${r.cutbackGoals}) over ${goals} mål`);
+      // En cutback efter et løb tæller i begge (match.js: løbsmål og cutbackmål) – hver for sig højst holdets mål (v3.15.1: før
+      // stod summen her, som kun holdt, fordi seedene aldrig gav et løb til cutback-mål sammen med et andet cutbackmål).
+      assert.ok(r.runGoals <= goals && r.cutbackGoals <= goals, `seed ${seed}: løbsmål ${r.runGoals} / cutbackmål ${r.cutbackGoals} over ${goals} mål`);
       assert.ok(r.counterGoalsAgainst <= against, `seed ${seed}: kontramål imod ${r.counterGoalsAgainst} > ${against} indkasserede`);
       assert.ok(r.buildWon <= r.build && r.pressWon <= r.press && r.crossesWon <= r.crosses && r.cutbacksBlocked <= r.cutbacks);
     }

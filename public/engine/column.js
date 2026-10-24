@@ -104,7 +104,7 @@ function yourVerdict(r, mine, round) {
   if (r.counterGoalsAgainst >= 1) out.push([3, `Det kostede: ${r.counterGoalsAgainst === 1 ? 'et kontramål' : `${r.counterGoalsAgainst} kontramål`} imod${ph.offBallRuns === 'MANY' ? ', da bolden blev tabt med mange spillere fremme' : ''}.`]);   // årsagen kun med belæg (QC F2)
   if (r.press >= 4 && r.pressWon / r.press >= 0.5) out.push([2, `Dit pres vandt bolden ${r.pressWon} af ${r.press} gange.`]);
   if (r.runGoals >= 1) out.push([3, `Løbene uden bold gav ${r.runGoals === 1 ? 'et mål' : `${r.runGoals} mål`}.`]);
-  if (r.start?.formation && r.end?.formation && r.start.formation !== r.end.formation) out.push([2, pickBy([`Skiftet fra ${r.start.formation} til ${r.end.formation} undervejs.`, `I gik fra ${r.start.formation} til ${r.end.formation} i løbet af kampen.`, `Formationen blev lagt om fra ${r.start.formation} til ${r.end.formation}.`], round, 'sw')]);   // neutralt: skiftet alene beviser ikke udfaldet (QC F4)
+  if (r.start?.formation && r.end?.formation && r.start.formation !== r.end.formation) out.push([2, pickBy([`Skiftet fra ${r.start.formation} til ${r.end.formation} undervejs.`, `I gik fra ${r.start.formation} til ${r.end.formation} i løbet af kampen.`, `Formationen blev lagt om fra ${r.start.formation} til ${r.end.formation}.`, `Undervejs blev ${r.start.formation} til ${r.end.formation}.`, `Holdet sluttede i ${r.end.formation} efter at have startet i ${r.start.formation}.`], round, 'sw')]);   // neutralt: skiftet alene beviser ikke udfaldet (QC F4)
   return out.sort((a, b) => b[0] - a[0]).slice(0, 2).map(([, t]) => t);   // højst 2 sætninger om dit hold (Spilfører)
 }
 

@@ -9,8 +9,10 @@ import { FORMATIONS } from '../engine/formations.js';
 import { isStarter, placeLabel, lineupSort } from './lineup.js';
 
 export const REPORT_FILTERS = [['all', 'Alle hændelser'], ['tactic', 'Kun taktik'], ['key', 'Kun nøglemomenter']];
-const KEY_TYPES = new Set(['GOAL', 'HEADER_GOAL', 'VAR_GOAL', 'VAR_NO_GOAL', 'INJURY', 'SUB', 'TRIGGER', 'END', 'HALFTIME', 'FULLTIME']);
-const ICON = { GOAL: '⚽', HEADER_GOAL: '⚽', VAR_GOAL: '📺', VAR_NO_GOAL: '📺', INJURY: '🚑', SUB: '🔄', TRIGGER: '📋', FOUL: '🟨', RED: '🟥' };
+// VAR_GOAL: kun i gem fra før v3.15.1 (VAR var en chancetype). VAR_CHECK/VAR_PEN/VAR_RED: VAR tjekker et mål, en straffe og
+// et rødt kort (v3.15.1); RED er et nøglemoment (QC v3.15.1: manglede i "Kun nøglemomenter").
+const KEY_TYPES = new Set(['GOAL', 'HEADER_GOAL', 'VAR_GOAL', 'VAR_NO_GOAL', 'VAR_CHECK', 'VAR_PEN', 'VAR_NO_PEN', 'VAR_RED', 'VAR_NO_RED', 'RED', 'INJURY', 'SUB', 'TRIGGER', 'END', 'HALFTIME', 'FULLTIME']);
+const ICON = { GOAL: '⚽', HEADER_GOAL: '⚽', VAR_GOAL: '📺', VAR_NO_GOAL: '📺', VAR_CHECK: '📺', VAR_PEN: '📺', VAR_NO_PEN: '📺', VAR_RED: '📺', VAR_NO_RED: '📺', INJURY: '🚑', SUB: '🔄', TRIGGER: '📋', FOUL: '🟨', RED: '🟥', OFFSIDE_FLAG: '🚩' };
 
 export function filterEvents(events, filter) {
   if (filter === 'tactic') return events.filter((e) => e.category === 'TACTIC' || e.type === 'TRIGGER' || e.tactical);   // v3.13: dine træthedsskift og Hvis-Så-skift
