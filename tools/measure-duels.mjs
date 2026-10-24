@@ -156,7 +156,7 @@ const phases = (pass, focus, height) => (t) => {
   Object.assign(t.tactics.phases.phase1_buildUp, { passingStyle: pass, attackFocus: focus });
   Object.assign(t.tactics.phases.phase2_defending, { pressingHeight: height, offsideTrap: 'OFF' });
 };
-if (import.meta.url === `file://${process.argv[1]}` && !['saeson', 'loeb', 'fokus', 'maal', 'formation', 'skift'].includes(process.argv[3])) {
+if (import.meta.url === `file://${process.argv[1]}` && !['saeson', 'loeb', 'fokus', 'maal', 'formation', 'skift', 'var'].includes(process.argv[3])) {
   const pct = (x) => `${(x * 100).toFixed(1)} %`;
   const liga = measure();
   console.log(`Ligaens egne taktikker: fase 1 vinder ${pct(liga.rate)} (${liga.n} dueller, ${ARG_N} ligaer × 3 runder); ${liga.goalsPerMatch.toFixed(2)} mål pr. kamp, heraf ${liga.headersPerMatch.toFixed(2)} hovedstød.`);
@@ -325,4 +325,42 @@ export function measureMotm(N = 600) {
     if (m.homeGoals !== m.awayGoals && (b.isHome ? m.homeGoals < m.awayGoals : m.awayGoals < m.homeGoals)) loser++;
   }
   return { loserShare: loser / n, gkShare: gk / n, scorerShare: scorer / n };
+}
+
+// VAR som i virkeligheden (v3.15.1): skud, på mål, forbi, mål, VAR-tjek pr. slags og kendelser, offsideflag, straffe,
+// røde kort, hjørnespark og målscorernes kæde – pr. kamp. Før v3.15.1 (VAR som chancetype, commit 28efc6d, N=1500):
+// se balance.test.mjs. Kør: node tools/measure-duels.mjs 1500 var
+export function measureVar(N = 1500) {
+  const c = { games: 0, goals: 0, shots: 0, onTarget: 0, miss: 0, corners: 0, penalties: 0, reds: 0, varGoalOld: 0, goalChecks: 0, disallowed: 0, flags: 0, penChecks: 0, penOverturned: 0, penAwarded: 0, redChecks: 0, redDown: 0, redUp: 0, varChecksStat: 0, attGoals: 0, longshots: 0 };
+  for (let s = 1; s <= N; s++) {
+    const L = createLeague(createRng(s));
+    const m = simulateMatch(L.teams[s % 8], L.teams[(s + 3) % 8], createRng(s * 31));
+    const st = m.stats; c.games++;
+    c.goals += m.homeGoals + m.awayGoals; c.shots += st.hShots + st.aShots; c.onTarget += st.hOnTarget + st.aOnTarget;
+    c.corners += st.hCorners + st.aCorners; c.penalties += st.hPenalties + st.aPenalties; c.reds += st.hReds + st.aReds;
+    c.varChecksStat += st.hVarChecks + st.aVarChecks;
+    for (const e of m.events) {
+      const v = e.var;
+      if (e.type === 'MISS') c.miss++;
+      if (e.type === 'VAR_GOAL') c.varGoalOld++;
+      if (e.type === 'VAR_NO_GOAL') c.disallowed++;
+      if (e.type === 'VAR_CHECK') c.goalChecks++;
+      if (e.type === 'OFFSIDE_FLAG') c.flags++;
+      if (e.type === 'VAR_PEN') { c.penChecks++; if (v?.verdict === 'OVERTURNED') c.penOverturned++; if (v?.verdict === 'AWARDED') c.penAwarded++; }
+      if (e.type === 'VAR_RED') { c.redChecks++; if (v?.verdict === 'DOWNGRADED') c.redDown++; if (v?.verdict === 'UPGRADED') c.redUp++; }
+    }
+    const role = new Map([...m.ratings.home, ...m.ratings.away].map((e) => [`#${e.shirtNumber} ${e.shortName}|${e.teamName}`, e.role]));
+    for (const g of m.goalsPool) {
+      let r = role.get(`${g.scorer}|${g.teamName}`) ?? 'ST';
+      if (r.startsWith('SUB (')) r = { DEF: 'CB', MID: 'CM', ATT: 'ST', GK: 'GK' }[r.slice(5, -1)] ?? 'ST';
+      if (lineOfRole(r) === 'ATT') c.attGoals++;
+      if (g.kind === 'LONGSHOT') c.longshots++;
+    }
+  }
+  const per = Object.fromEntries(Object.entries(c).filter(([k]) => k !== 'games').map(([k, v]) => [k, v / c.games]));
+  return { ...per, games: c.games, onTargetShare: c.onTarget / c.shots, attShare: c.attGoals / c.goals, longshotShare: c.longshots / c.goals, penOverturnedShare: c.penOverturned / Math.max(1, c.penChecks) };
+}
+if (import.meta.url === `file://${process.argv[1]}` && process.argv[3] === 'var') {
+  const r = measureVar(ARG_N), f = (x) => x.toFixed(3);
+  console.log(Object.entries(r).map(([k, v]) => `${k} ${Number.isInteger(v) ? v : f(v)}`).join('\n'));
 }

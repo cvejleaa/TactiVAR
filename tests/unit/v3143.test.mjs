@@ -54,12 +54,13 @@ test('referatet fortæller oplægget én gang: med dit holds løb (✅) slutter 
   let n = 0, shot = 0;
   for (const { e, m } of G) {
     if (!e.text.includes('✅')) continue;
-    assert.match(e.text, /(#\d+ .+ sparkede den ind|Bolden sad i nettet)\.$/, e.text);
+    // v3.15.1: et mål, VAR har tjekket, slutter med "📺 VAR: målet står – …" efter slutningen
+    assert.match(e.text, /(#\d+ .+ sparkede den ind|Bolden sad i nettet)\.( 📺 VAR: målet står – .+\.)?$/, e.text);
     assert.doesNotMatch(e.text, /Lavt cutback|spillede 1-2|baglinjen.*baglinjen|cutback fra/, e.text);
     // QC v3.14.3: "sparkede den ind" kun om den, indledningen spillede bolden til – aldrig efter "… og skyder." (løberen selv)
-    const kick = e.text.match(/\. (#\d+ .+) sparkede den ind\.$/);
+    const kick = e.text.replace(/ 📺 VAR: målet står – .+\.$/, '').match(/\. (#\d+ .+) sparkede den ind\.$/);
     if (kick) assert.ok(e.text.includes(`til ${kick[1]}. `) || e.text.includes(`spiller ${kick[1]}. `), e.text);
-    if (/ og skyder\. /.test(e.text)) { assert.match(e.text, /Bolden sad i nettet\.$/, e.text); shot++; }
+    if (/ og skyder\. /.test(e.text)) { assert.match(e.text, /Bolden sad i nettet\.( 📺 VAR: målet står – .+\.)?$/, e.text); shot++; }
     const g = m.goalsPool.find((x) => x.min === e.min && e.text.includes(x.scorer));
     assert.ok(g && g.desc.length > 20 && !e.text.includes(g.desc), 'den fulde beskrivelse er i goalsPool, ikke i referatet');
     n++;

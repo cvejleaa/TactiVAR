@@ -94,7 +94,8 @@ spillerobjekt; de skal ligge hos den der observerer.
 - Øjebliksbilledet ved mål (v3.12.1) gemmer kun DIT holds positioner – de afslører dit pres og dine løb, ikke modstanderens. Ved et modstandermål vises dit forsvar og bolden, aldrig modstanderens spillere eller scorerens plads. Accepteret: hvem der modtager bolden afhænger af hvert holds levende positioner (pres, løb), så over mange kampe kan man statistisk ane et holds indstilling – på linje med løbe-vægtene fra v3.9.
 - Kun ejer: 9 evner, spring, luftduel, arketype, løn/værdi, kasse, de præcise fasevalg og Hvis-Så-regler,
   eksakt karakter, mod-kunnen.
-- Ingen: VAR-profil (kun via clues).
+- Ingen: VAR-profil (kun via clues og VAR-kendelser i referatet – v3.15.1: varPulse, theatre og cynicism afgør VAR's
+  kendelser som lodtrækninger, så én kendelse ikke afslører spillerens trin).
 - Modstandere vises med "🔒 ??"; sortering på skjulte kolonner hos et
   modstanderhold afvises; skift til bot-hold nulstiller sortering.
 - Referat og clues må ALDRIG indeholde en modstanders tal (v1.7-fejlen "FIN: 7").
@@ -181,11 +182,35 @@ Tick hvert 3. minut (1..90).
   luftdueller"). For ALLE hold (brugerens valg); teksten om en modstander navngiver aldrig
   indstillingen. `FOCUS_SHARE`: høje indlæg 52 % indlæg, lave cutbacks 38 % cutbacks, ellers giver
   direkte lange bolde 15 % høje bolde (før tvang DIRECT_LONG 55 % op i luften uanset fokus). Resten:
-  VAR-tjek eller afslutning (løb uden bold / almindeligt skud).
+  en afslutning (løb uden bold / almindeligt skud). VAR er ikke en chancetype (v3.15.1) – se "VAR som i virkeligheden".
   VAR-tjekket (v3.14.1, brugeren: "VAR på et mål af en midtbanespiller med 5 spillere længere fremme") gælder
   offside for en af de `VAR_FRONT` = 2 forreste: står skytten bagved, tjekkes hans forreste holdkammerat ("#8 skød, og
   #9 foran ham stod ikke offside" / "#9 stod offside og var med i situationen"), og øjebliksbilledet viser skytten,
-  hvor han skød fra (aldrig foran den tjekkede, `VAR_BEHIND`), og den tjekkede, hvor han stod – forrest (v3.14.2). Samme træk af tilfældigheder som før (balancen uændret, målt).
+  hvor han skød fra (aldrig foran den tjekkede, `VAR_BEHIND`), og den tjekkede, hvor han stod – forrest (v3.14.2).
+- **VAR som i virkeligheden (v3.15.1**, brugeren: "nogle gange tjekker for offside selv om der ikke scores og andre for
+  røde kort, andre igen for om der er straffespark"; før var VAR en chancetype: 22 % af chancerne, 0,50 annullerede mål og
+  60 % af skuddene på mål). Chancen afgøres først; VAR tjekker situationen bagefter. Tallene i `match-rules.js` (`VAR_RULES`,
+  `MISS_P`) – lodtrækninger, aldrig afhængige af modstanderens indstillinger (§3):
+  - **Mål** (afslutning, kontra, hovedstød – også på dødbold): 13,1 % tjekkes synligt, FØR målet bogføres. Referatet:
+    "📺 Bolden er i nettet – men VAR kigger på det: stod #9 offside? …" med stillingen talt op, så målet ("📺 VAR: målet
+    står – …") eller "MÅLET ANNULLERES!" med stillingen tilbage. Offside (den forreste, som ovenfor; varPulse +
+    vsTrapLong·0,045 mod forsvarerens POS) eller 27 % frispark i opspillet (skyttens cynicism). Et annulleret mål tæller
+    ingen steder (mål, skud på mål, karakter for mål, Rundens mål); den tjekkede −0,40, forsvareren +0,45.
+  - **Straffe**: 27 % tjekkes – filmning (den fældedes theatre; annulleret → gult kort for filmning) eller 30 % offside i
+    opspillet; kendelsen falder før straffen tælles. VAR kalder dommeren ud til et straffespark, han ikke så (0,23 % pr. tick).
+  - **Rødt kort** (kun direkte, IFAB): 53 % tjekkes – den kyniske beholder oftere kortet, ellers bliver det gult; en grov
+    tackling uden kort kan opgraderes (4,1 %, oftere for den kyniske).
+  - **Linjedommerens flag** (ikke VAR, Spilfører): en afslutning, der ikke går ind, kan være offside (4,3 %) – intet skud på
+    mål, intet hjørne, ikke i VAR-tjek.
+  - **Forbi** (Spilfører: 67 % på mål – Superligaen ≈ 33–35 %): et skud, der ikke går ind, går forbi/over/på stolpen eller
+    blokeres med 62 % (blokeret 60 %, heraf hjørne 88 %).
+  - **VAR ±** i stillingen: kun kendelser, VAR ændrede – annulleret mål −1 og annulleret straffe −1 for angriberen,
+    VAR-straffe +1, rødt trukket tilbage +1 og opgraderet −1 for holdet, der begik frisparket; et godkendt tjek 0 (før +1).
+  - Målt (`node tools/measure-duels.mjs 1500 var`; før → efter): mål 2,79 → 2,79, skud på mål 60 % → 39 %, annullerede
+    0,50 → 0,16, VAR-tjek 1,09 → ≈0,5 pr. kamp, hjørnespark 3,8 → 3,1. Kalibreret: KEEPER_EDGE 3 → 0,3 og langskud
+    min(FIN + 8, 13) → min(FIN + 8, 10) (ellers blev langskud 19 % af målene). Angribernes andel 53 % → 61 % (målene
+    afgøres nu af afslutningen, ikke af en VAR-duel uden afslutning – Spilfører: "angriberen scorer næsten aldrig i åbent
+    spil"); over dokumentets 44–56 % – bevidst, til næste sæsongennemgang.
 - **Modtageren står hvor bolden kommer (v3.12**, brugeren: "den spiller der var nærmest hvor bolden
   blev spillet hen"): modtageren trækkes med vægt exp(−afstand/16)·(10 + evne) (`receiver`): skytten
   nær feltet (50, 20) eller på feltets kant (50, 32; 45 %) efter FIN, hovedstødsspilleren nær feltets
@@ -222,7 +247,7 @@ Tick hvert 3. minut (1..90).
   Båndet ligger i balance.test.mjs. Brugt fra dokumentet: kæde- og typefordelingen. Ikke brugt:
   enkeltspillernes tal (beskriver Superligaens spillere, ikke spillets).
 - **Øjebliksbillede ved mål (v3.12.1**, brugerens valg "Også på minibanen ved mål"): et mål i åbent
-  spil (GOAL, HEADER_GOAL, VAR_GOAL) i en kamp med dit hold gemmer `snapshot` = DIT holds 11
+  spil (GOAL, HEADER_GOAL; VAR_GOAL i gem fra før v3.15.1) i en kamp med dit hold gemmer `snapshot` = DIT holds 11
   positioner i øjeblikket (`pts: [[spiller-id, x, y] …]`), bolden og – når I scorer – scorer og
   oplægsgiver. Også kontramål (dit hold står da i angrebsform – det mistede bolden fremme). Ved
   solo-mål (langskud, dribletur) står bolden ved skytten. 📍 ved målet i referatet (efter slutfløjt,
@@ -255,8 +280,8 @@ Tick hvert 3. minut (1..90).
   friskheden uændret (startelleven 85 %).
   **v3.13** (`… 30 saeson`): langskud 27 %, cutback 19 %, frispark 16 %, hovedstød 16 %, dribletur 9 %
   (v3.12.1: 13 % – trætte spillere og KEEPER_EDGE 3; båndet sænket fra 9 til 8 %).
-- VAR-tjek ved roll < 0,22: `varPulse + vsTrapLong·0,025 + rnd·6 > forsvarer.POS + rnd·…`.
-- Afslutning: `FIN + rnd·8 > GK + rnd·8 + 3` (v3.9 havde en målmandsfordel på 5; v3.10 fjernede den;
+- VAR-tjek: se "VAR som i virkeligheden" (v3.15.1; før en chancetype ved roll < 0,22).
+- Afslutning: `FIN + rnd·8 > GK + rnd·8 + 0,3` (v3.15.1: 0,3 – VAR-chancetypens mål skulle erstattes; v3.9 havde en målmandsfordel på 5; v3.10 fjernede den;
   v3.12 gav 3 tilbage, v3.12.1 3,5 – kalibreret til målfordelingen ovenfor; v3.13 3, fordi målmændene
   taber mindst friskhed i kampen – ellers faldt målene til ≈ 2,5).
 - **Dødbolde (v3.10**, brugeren: "mål på hovedstød, straffe eller dødbolde. Antallet af frispark"):
@@ -323,9 +348,9 @@ Tick hvert 3. minut (1..90).
   (`motmOrder`: karakter, så mål·2 + oplæg), og en udvist kan ikke vinde. Resultatet tæller: sejr +0,4, nederlag −0,4
   (`RESULT_BONUS`), og redninger ud over 4 giver kun det halve (Spilfører: en målmand på det tabende hold vandt Kampens og
   Rundens spiller tre runder i træk). Målt (600 kampe): Kampens spiller fra det tabende hold 15 % → 2,5 %, målmand 32 % → 23 %.
-  Målmanden svækkes også af ti mand (forenkling). Hovedstødsmål +1,35, VAR-mål +1,30, mål
-  +1,25, oplæg +0,55, redning +0,50 (skytte +0,10), annulleret VAR-mål −0,40
-  (forsvarer +0,45), vundet luftduel +0,40, mål imod forsvarer −0,35 / GK
+  Målmanden svækkes også af ti mand (forenkling). Hovedstødsmål +1,35, mål
+  +1,25, oplæg +0,55, redning +0,50 (skytte +0,10), forbi 0, annulleret mål for offside −0,40 til den tjekkede
+  (forsvarer +0,45; v3.15.1 – VAR-mål +1,30 fandtes til v3.15.0), annulleret for frispark −0,30, filmning −0,30, vundet luftduel +0,40, mål imod forsvarer −0,35 / GK
   −0,25, clean sheet +0,50 til GK/CB/LB/RB (karakteren; i statistikken tæller clean sheet
   kun for målmanden – §8b).
 - Deltagerliste med minutter (også skadede og indskiftere).
