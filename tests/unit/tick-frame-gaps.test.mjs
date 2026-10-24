@@ -106,11 +106,11 @@ test('afsparket med en tom plads: pladsen tæller ikke som "forreste" – 5-4-1 
   assert.notDeepEqual(withGhostCounted, f.h.slice(1).map((q) => q[2]));
 });
 
-// --- Fund (ikke rettet i koden, derfor todo – de skal blive grønne, når koden følger med) ---
+// --- TM-fund v3.16.1, rettet i koden (KICKOFF_OWN; apartFrom for det fangede hold ved målmanden) ---
 
 // Afsparket: brugeren trækker et holds bagkæde op på y 62 og angriberne til y 20 – alle inden for deres zone (ikke straffet). MIN_DEPTH (18)
 // i kickoffPositions sænker så 'to' fra 53 til 62 − 18 = 44: angriberne står i MODSTANDERENS halvdel ved afspark.
-test('afsparket: et højt trukket hold står stadig i egen halvdel (alle y ≥ 50)', { todo: 'v3.16.1-fund: MIN_DEPTH i kickoffPositions trækker angriberne til y 44 for et hold med bagkæden på 62 – ret: undlad minDepth i kickoffPositions (uden effekt for standardopstillinger) eller klem til ≥ 50' }, () => {
+test('afsparket: et højt trukket hold står stadig i egen halvdel (alle y ≥ 50)', () => {
   const t = { baseFormation: '4-4-2', phases: { phase2_defending: { pressingHeight: 'MID_BLOCK' } },
     customCoords: { 1: { x: 15, y: 62 }, 2: { x: 38, y: 62 }, 3: { x: 62, y: 62 }, 4: { x: 85, y: 62 }, 5: { x: 15, y: 40 }, 6: { x: 38, y: 40 }, 7: { x: 62, y: 40 }, 8: { x: 85, y: 40 }, 9: { x: 40, y: 20 }, 10: { x: 60, y: 20 } } };
   const ys = kickoffPositions(t).slice(1).map((q) => q.y);
@@ -121,7 +121,7 @@ test('afsparket: et højt trukket hold står stadig i egen halvdel (alle y ≥ 5
 // modsatte målmand (løb Normal, afstand 0) eller 2 fra ham (løb Mange: y 8). apartFrom skubber kun BOLDHOLDETS markspillere, og
 // målmanden (plads 0) er ikke blandt dem → en brik oven i en anden. 19 af 2480 billeder (0,77 %) i replay-shapes' 80 kampe (alle
 // 'lost', alle x 50) – lige under dens grænse på 1 %, så båndet ser det ikke.
-test('erobring (caught): modstanderens forreste står ikke oven i boldholdets målmand (afstand ≥ 4)', { todo: 'v3.16.1-fund: lost-billeder med en enlig angriber på x 50 (4-3-3, 3-4-3, 4-2-3-1, 5-4-1, 4-1-4-1, 4-4-1-1) lægger ham på y 8-10 – 0-2 fra målmanden på y 10. Ret: apartFrom(opp, outO, ball, [0]) i coupledPositions når caught' }, () => {
+test('erobring (caught): modstanderens forreste står ikke oven i boldholdets målmand (afstand ≥ 4)', () => {
   for (const f of ['4-3-3', '3-4-3', '4-2-3-1', '5-4-1', '4-1-4-1', '4-4-1-1']) for (const runs of ['NORMAL', 'MANY']) {
     const T = (p) => ({ baseFormation: f, customCoords: {}, phases: { phase1_buildUp: { offBallRuns: runs }, phase2_defending: { pressingHeight: p } } });
     const k = coupledPositions(T('MID_BLOCK'), T('MID_BLOCK'), { ballX: 50, caught: true });

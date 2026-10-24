@@ -396,7 +396,8 @@ bedre kan kontrollere spil motoren".
     SQUEEZE_SPAN 12 af det, mappes lineært ind i [mål, mål + 12]; resten står. Rækkefølgen bevares. Holdet uden bold beholder
     mindst MIN_DEPTH 18 fra forreste til bageste (boldholdet ikke – dets forreste må aldrig forbi linjen);
   - to fra samme hold nærmere end MIN_APART 6 skubbes fra hinanden på tværs; en fra boldholdet (også løberen) nærmere end 6
-    ved en modspiller (også målmanden) træder til siden – kun x, så linjen og offside er uændrede;
+    ved en modspiller (også målmanden) træder til siden – kun x, så linjen og offside er uændrede; ved en erobring træder
+    det fangede holds angriber til siden fra boldholdets målmand (ændrer kun 📍-billederne, ikke kampene);
   - afsparket (`kickoffPositions`): forsvarsformen presset ind i egen halvdel med forreste på KICKOFF_Y 53 (højst KICKOFF_OWN
     51, også hvis dybden ellers ville skubbe ham over midten);
   - grundbilledet pr. tick tages efter duellen (før afslutningerne, ingen nye træk): ingen duel → bolden hos opspilleren,

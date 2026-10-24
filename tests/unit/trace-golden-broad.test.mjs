@@ -21,8 +21,8 @@ import { createRng } from '../../public/engine/rng.js';
 import { createLeague } from '../../public/engine/generator.js';
 import { simulateMatch } from '../../public/engine/match.js';
 
-const GOLDEN_RESULTS_400 = '652cdcf8274813580edee8e4438841da018a0003079e95b6ab83508725c5091a';   // v3.16.1 (sammenpresning; før 73852862… fra v3.16) – = hashen uden optageren (kickoffFrame, tickFrame og momentAt tomme)
-const GOLDEN_TRACES_20 = '199efca02611d888fb0a63b931ef5b49c9af68ec7760a62609a8ffcd025f2331';     // v3.16.1: sammenpresning, afsparket i blok, grundbilledet efter duellen (før 2e238fd9…) · v3.16: koblede linjer, bolden ved skytten, skytten i feltet
+const GOLDEN_RESULTS_400 = 'f096161560c188324aaabf6ce8d3d8d39342438b17aa3c64e21d2fd71bff0012';   // v3.16.1 (sammenpresning; før 73852862… fra v3.16; f09616… efter TM-fundet: kun 📍-billederne ændret – kampene uden snapshot er identiske med 652cdcf8…) – = hashen uden optageren (kickoffFrame, tickFrame og momentAt tomme)
+const GOLDEN_TRACES_20 = 'eaec5550b92c964191820646b5c213661d7eb93fff0f149d70d225d6e836b2a1';     // v3.16.1: sammenpresning, afsparket i blok, grundbilledet efter duellen (før 2e238fd9…) · v3.16: koblede linjer, bolden ved skytten, skytten i feltet
 function matchN(s) {
   const L = createLeague(createRng(s * 97)), me = L.teams.find((t) => !t.isBot), opp = L.teams[(s % 7) + 1];
   return s % 2 ? simulateMatch(me, opp, createRng(s * 131)) : simulateMatch(opp, me, createRng(s * 131));

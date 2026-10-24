@@ -1,6 +1,7 @@
 // v3.16.1 – afspilningen skal ligne fodbold (brugeren efter v3.16.0: "2 spillere stående lige oven i hinanden …
 // modstanderen har 7 spillere stående på midterlinjen ved start … ingen udvikling i starten af kampen … ingen heat map
-// for modstander"). Hvert bånd er rødt mod v3.16.0 (tallene i kommentarerne: v3.16.0 → nu, 80 kampe).
+// for modstander"). Hvert bånd er rødt mod v3.16.0 (tallene i kommentarerne: v3.16.0 → nu, 80 kampe) – undtagen dybde-
+// båndet, der er en vagt for MIN_DEPTH (v3.16.0 havde min 21, nu 20; TM v3.16.1).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRng } from '../../public/engine/rng.js';

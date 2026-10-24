@@ -86,7 +86,7 @@ test('modstanderens afslutninger som prikker: mål ⚽ på (30 %, 85 %) "9\'", r
   const dots = all(card, (x) => cls(x, 'heat-shot'));
   assert.deepEqual(dots.map((d) => [d.className, d.style.left, d.style.top, d.textContent, d.attrs.title]), [
     ['heat-shot goal', '30%', '85%', '⚽', "9'"], ['heat-shot save', '60%', '70%', '●', "12'"]]);
-  assert.equal(byId(card, 'heat-opp-note')[0].textContent, 'Set fra din side: de angriber nedad mod dit mål; venstre = din venstre side. Felterne: hvor holdet stod (groft – ingen enkeltspillere). Prikker: deres 2 afslutninger i åbent spil.');
+  assert.equal(byId(card, 'heat-opp-note')[0].textContent, 'Set fra din side: de angriber nedad mod dit mål; venstre = din venstre side. Felterne: hvor holdet stod (groft – ingen enkeltspillere). Prikker: deres 2 afslutninger i åbent spil og på kontra (⚽ mål, ● reddet, forbi eller offside).');
   // tredjedelslinjen står stadig øverst i kortet: egne y 10, 8, 50, 15, 30 → 0 i egen tredjedel, 1 i midten, 4 i angrebstredjedelen
   assert.equal(byId(card, 'heat-thirds')[0].textContent, '🔥 Tyngdepunkt (groft): egen tredjedel 0 % · midten 20 % · angrebstredjedelen 80 %');
 });
