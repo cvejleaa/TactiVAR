@@ -1286,7 +1286,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
   const ratings = finalizeSheet(sheet, hG, aG, rng, counterXpForMatch);
   addEv(90, 'END', 'HIGHLIGHT', true, false, 'Slutfløjt', `🏁 SLUTFLØJT! ${home.name} ${hG} - ${aG} ${away.name}.${ratings.motm ? ` Kampens spiller: #${ratings.motm.shirtNumber} ${ratings.motm.shortName} (${ratings.motm.teamName}).` : ''}`);
 
-  // Rigtige minutter (v3.16.5): uret lægges på referatet bagefter – kun visning, intet træk (clock.js)
+  // Rigtige minutter (v3.16.4): uret lægges på referatet bagefter – kun visning, intet træk (clock.js)
   const stoppage = assignClock(events, minClock);
   const result = {
     round: opts.round ?? 0,

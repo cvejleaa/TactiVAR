@@ -1,7 +1,7 @@
-// Rigtige minutter (v3.16.5, brugeren: "rigtige minutter (45+2, 90+3)" og "der er også tillægstid for VAR"). Motoren regner
+// Rigtige minutter (v3.16.4, brugeren: "rigtige minutter (45+2, 90+3)" og "der er også tillægstid for VAR"). Motoren regner
 // stadig i tick à 3 minutter (e.min – skift-vinduer, Hvis-Så, friskhed, karakterminutter og sporets t er uændrede); uret er
 // et VISNINGSfelt (e.clock), lagt på bagefter ud fra referatets rækkefølge – intet rng-træk, så ingen kamp ændres.
-//  - Pausen (HALFTIME) er grænsen: alt før den er 1.–45.+S1, alt efter 46.–90.+S2 (QC v3.16.5 C1: pause-tick'ets spil står i
+//  - Pausen (HALFTIME) er grænsen: alt før den er 1.–45.+S1, alt efter 46.–90.+S2 (QC v3.16.4 C1: pause-tick'ets spil står i
 //    referatet EFTER pause-analysen – det er anden halvlegs første minutter). Første halvleg har 14 tick, anden 16.
 //  - Hændelserne i et tick fordeles stigende i tick'ets vindue; det sidste tick i hver halvleg strækkes ind i tillægstiden.
 //  - En Hvis-Så-hændelse står aldrig før reglens minut (minClock – QC C3).

@@ -157,7 +157,7 @@ export function replayEl(m, ownSide) {
     // og teksten siger, hvordan duellen gik (QC v3.16.1: ellers står bolden pludselig hos modspilleren uden forklaring)
     const upto = s.ev ?? lastEventIdx(m.events, s.t * 3 - 1);
     const e = m.events[upto] ?? m.events[0];
-    // Uret (v3.16.5): et øjeblik står på sin hændelses minut, et grundbillede på tick'ets første minut (QC C6 – billedet kommer
+    // Uret (v3.16.4): et øjeblik står på sin hændelses minut, et grundbillede på tick'ets første minut (QC C6 – billedet kommer
     // før tick'ets afslutninger, så dets minut må ikke ligge efter deres)
     caption.textContent = `${s.kind === 'moment' ? evMin(e) : fmtMin(tickClock(s.t, m.stoppage))} · ${m.homeName} ${e.hG}-${e.aG} ${m.awayName}${s.kind === 'moment' ? ' · ' + e.text : duelText(s, m)}`;
     flag(caption, 'moment', s.kind === 'moment');

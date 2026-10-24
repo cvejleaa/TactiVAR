@@ -57,10 +57,11 @@ function drama(f) {
   const g = f.events.filter((e) => GOAL_TYPES.has(e.type));
   const last = g.at(-1), diff = f.home.goals - f.away.goals;
   // Sent sejrsmål: vinderen scorede sidst, i 80.+, til 1 måls forskel – altså fra uafgjort (QC F1: ikke et reduceringsmål).
-  const late = last && last.min >= 80 && Math.abs(diff) === 1 && last.isHome === (diff > 0) && last.hG - last.aG === diff ? (diff > 0 ? f.home : f.away) : null;
+  // Sent = 80. minut eller senere på uret, når det findes (QC v3.16.4: ellers "sent drama … i 79. minut")
+  const late = last && (last.clock ? last.clock.m + (last.clock.plus ?? 0) : last.min) >= 80 && Math.abs(diff) === 1 && last.isHome === (diff > 0) && last.hG - last.aG === diff ? (diff > 0 ? f.home : f.away) : null;
   const behind = (h) => g.some((e) => (h ? e.hG - e.aG : e.aG - e.hG) <= -1);
   const comeback = diff > 0 && behind(true) ? f.home : diff < 0 && behind(false) ? f.away : null;
-  return { late, comeback, lateMin: last?.min, lateAt: inMinute(last?.clock ?? { m: last?.min }) };   // lateAt: "i 87. minut" / "i tillægstiden" (v3.16.5)
+  return { late, comeback, lateMin: last?.min, lateAt: inMinute(last?.clock ?? { m: last?.min }) };   // lateAt: "i 87. minut" / "i tillægstiden" (v3.16.4)
 }
 
 // Stil-gæt for ét hold ud fra offentlige tal (QC B2: om kampen, i datid; aldrig indstillingens navn eller pres).
