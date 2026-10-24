@@ -68,6 +68,7 @@ test('Kampens spiller: en firemålsscorer slår midtbanespilleren med mange vund
   for (let i = 0; i < 4; i++) { sheet.adjust(st.id, 1.25); sheet.bump(st.id, 'goals'); }   // 6,5 + 5 = 11,5 → 10,0
   for (let i = 0; i < 12; i++) sheet.adjust(mid.id, 0.2);                                   // 6,5 + 2,4 = 8,9
   sheet.adjust(red.id, 6); sheet.entries[red.id].red = 'DIRECT';                             // 10,0 – men udvist
+  for (let i = 0; i < 5; i++) sheet.bump(red.id, 'goals');                                   // og flere mål: uden vagten vandt han
   const r = finalizeSheet(sheet, 4, 0, rng, () => 0);
   assert.equal(r.motm.playerId, st.id, 'firemålsscoreren');
   assert.equal(sheet.entries[st.id].rating, 10);
