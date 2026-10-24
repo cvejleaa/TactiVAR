@@ -387,3 +387,21 @@ test('assignClock uden pause gør intet og giver null', () => {
   assert.equal(assignClock(evs), null);
   assert.ok(evs.every((e) => !('clock' in e)));
 });
+
+test('gem-vagt (RM v3.16.4): et ødelagt ur eller en ødelagt tillægstid slettes ved indlæsning – Kamp-fanen falder tilbage til tick-minutterne', async () => {
+  const { isValidClock, isValidStoppage } = await import('../../public/engine/sanitize.js');
+  assert.equal(isValidClock({ m: 45, plus: 3 }), true); assert.equal(isValidClock({ m: 7 }), true);
+  for (const bad of [null, {}, { m: 91 }, { m: 3.5 }, { m: 45, plus: 9 }, { m: -1 }, { m: '7' }]) assert.equal(isValidClock(bad), false, JSON.stringify(bad));
+  assert.equal(isValidStoppage([{ S: 3, var: 1 }, { S: 8, var: 8 }]), true);
+  for (const bad of [[{}, null], [{ S: 3, var: 4 }, { S: 2, var: 0 }], [{ S: 9, var: 0 }, { S: 2, var: 0 }], [{ S: 3, var: 0 }], 'x']) assert.equal(isValidStoppage(bad), false, JSON.stringify(bad));
+  const { serialize, parseSave } = await import('../../public/state/storage.js');
+  const { playRound, commitRound } = await import('../../public/engine/season.js');
+  const rng = createRng(4), L = createLeague(rng);
+  commitRound(L, playRound(L, rng), rng);
+  const m0 = L.lastRound.matches[0];
+  m0.stoppage = [{}, null]; m0.events[3].clock = { m: 'x' };
+  const back = parseSave(serialize({ league: L })), st = back.state ?? back, m = st.league.lastRound.matches[0];
+  assert.equal(m.stoppage, undefined); assert.equal(m.events[3].clock, undefined);
+  assert.ok(m.events[4].clock && isValidClock(m.events[4].clock), 'de gode ure står');
+  assert.equal(evMin(m.events[3]), `${m.events[3].min}'`);
+});
