@@ -19,7 +19,7 @@ globalThis.document = { createElement: (t) => new FakeEl(t), createTextNode: (t)
 const { createRng } = await import('../../public/engine/rng.js');
 const { createLeague } = await import('../../public/engine/generator.js');
 const { simulateMatch, LONGSHOT_FAR } = await import('../../public/engine/match.js');
-const { playRound, commitRound } = await import('../../public/engine/season.js');
+const { playRound, commitRound, championText } = await import('../../public/engine/season.js');
 const { renderStandings } = await import('../../public/ui/standings.js');
 const all = (el, pred, out = []) => { if (el instanceof FakeEl) { if (pred(el)) out.push(el); el.children.forEach((c) => all(c, pred, out)); } return out; };
 const byId = (el, id) => all(el, (e) => e.attrs.id === id)[0];
@@ -76,7 +76,7 @@ test('slutstilling: lige efter sæsonens sidste runde viser tabellen slutstillin
   assert.ok(last.table.some((t) => t.points > 0), 'data: point i slutstillingen');
   const el = renderStandings({ league: L, onPick: () => {}, viewTeamId: null });
   assert.equal(byId(el, 'standings-title').textContent, `${L.leagueMetadata.name} – slutstilling, sæson 1`);
-  assert.equal(byId(el, 'standings-champion').textContent, `🏆 Mester: ${last.champion.teamName} (${last.champion.points} point). Sæson 2 starter med næste runde.`);
+  assert.equal(byId(el, 'standings-champion').textContent, `🏆 ${championText(last.champion, last.myPos)}. Sæson 2 starter med næste runde.`);
   const rows = all(byId(el, 'standings'), (e) => e.tag === 'tr').slice(1).map((tr) => [tr.children[1].textContent, Number(tr.children[8].textContent)]);
   assert.deepEqual(rows, last.table.map((t) => [t.teamName, t.points]));
   commitRound(L, playRound(L, rng), rng);
@@ -104,18 +104,22 @@ test('mesteren røbes ikke, mens sæsonens sidste runde spilles; statistikken si
   assert.equal(byId(playing, 'standings-champion'), undefined, 'ingen mester under afspilningen');
   assert.match(byId(playing, 'standings-title').textContent, /slutstilling, sæson 1$/);
   const st = renderStats({ league: L, myTeamId: L.teams[0].id });
-  assert.match(byId(st, 'stats-season-over').textContent, /^Sæson 1 er slut – slutstillingen står i tabellen ovenfor/);
+  // v3.16.3: en sæson afsluttet med den nye kode viser sine egne tal (mærket); "slut"-noten er til gamle arkiver (season-end.test.mjs)
+  assert.match(byId(st, 'stats-season-ended').textContent, /^Sæson 1 – afsluttet\./);
+  assert.equal(byId(st, 'stats-season-over'), undefined);
   commitRound(L, playRound(L, rng), rng);
-  assert.equal(byId(renderStats({ league: L, myTeamId: L.teams[0].id }), 'stats-season-over'), undefined, 'væk efter første runde i den nye sæson');
+  const st2 = renderStats({ league: L, myTeamId: L.teams[0].id });
+  assert.equal(byId(st2, 'stats-season-ended'), undefined, 'væk efter første runde i den nye sæson');
+  assert.equal(byId(st2, 'stats-season-over'), undefined);
 });
 
 // TM v3.14.3: slutstillingens indhold – hver kolonne, klasserne og klikket. Tabellen i sæsonarkivet får kunstigt forskellige tal
 // pr. kolonne (data!), så en ombyttet kolonne (V/U, K/T, mål for/imod) ikke kan ligne den rigtige.
-test('slutstilling: hver kolonne (K V U T Mål P) viser sit eget tal, "VAR ±" er –, "mine" kun på dit hold, "viewing" på det viste, klik vælger holdet', () => {
+test('slutstilling: hver kolonne (K V U T Mål P) viser sit eget tal, "VAR ±" med fortegn (v3.16.3), "mine" kun på dit hold, "viewing" på det viste, klik vælger holdet', () => {
   const rng = createRng(8), L = createLeague(rng);
   for (let r = 0; r < L.schedule.length; r++) commitRound(L, playRound(L, rng), rng);
   const last = L.seasons.at(-1);
-  last.table.forEach((t, i) => Object.assign(t, { played: 30 + i, won: 3 + i, drawn: 50 + i, lost: 70 + i, goalsFor: 100 + i, goalsAgainst: 200 + i, points: 400 + i }));
+  last.table.forEach((t, i) => Object.assign(t, { played: 30 + i, won: 3 + i, drawn: 50 + i, lost: 70 + i, goalsFor: 100 + i, goalsAgainst: 200 + i, points: 400 + i, varNet: i - 3 }));
   const myId = L.teams.find((t) => !t.isBot).id, viewId = last.table[2].teamId, picked = [];
   const el = renderStandings({ league: L, onPick: (id) => picked.push(id), viewTeamId: viewId });
   const trs = all(byId(el, 'standings'), (e) => e.tag === 'tr');
@@ -123,7 +127,7 @@ test('slutstilling: hver kolonne (K V U T Mål P) viser sit eget tal, "VAR ±" e
   const body = trs.slice(1);
   assert.equal(body.length, last.table.length);
   body.forEach((tr, i) => {
-    assert.deepEqual(tr.children.map((c) => c.textContent), [String(i + 1), last.table[i].teamName, String(30 + i), String(3 + i), String(50 + i), String(70 + i), `${100 + i}-${200 + i}`, '–', String(400 + i)]);
+    assert.deepEqual(tr.children.map((c) => c.textContent), [String(i + 1), last.table[i].teamName, String(30 + i), String(3 + i), String(50 + i), String(70 + i), `${100 + i}-${200 + i}`, i - 3 > 0 ? `+${i - 3}` : String(i - 3), String(400 + i)]);
     const cls = tr.className.split(' ').filter(Boolean);
     assert.equal(cls.includes('mine'), last.table[i].teamId === myId, `mine: ${last.table[i].teamName}`);
     assert.equal(cls.includes('viewing'), last.table[i].teamId === viewId, `viewing: ${last.table[i].teamName}`);
@@ -139,7 +143,7 @@ test('slutstilling efter TO sæsoner viser den SIDSTE sæson (2), ikke den førs
   assert.notDeepEqual(L.seasons[0].table.map((t) => t.points), L.seasons[1].table.map((t) => t.points), 'data: de to sæsoner er forskellige');
   const el = renderStandings({ league: L, onPick: () => {}, viewTeamId: null });
   assert.equal(byId(el, 'standings-title').textContent, `${L.leagueMetadata.name} – slutstilling, sæson 2`);
-  assert.equal(byId(el, 'standings-champion').textContent, `🏆 Mester: ${L.seasons[1].champion.teamName} (${L.seasons[1].champion.points} point). Sæson 3 starter med næste runde.`);
+  assert.equal(byId(el, 'standings-champion').textContent, `🏆 ${championText(L.seasons[1].champion, L.seasons[1].myPos)}. Sæson 3 starter med næste runde.`);
   const rows = all(byId(el, 'standings'), (e) => e.tag === 'tr').slice(1).map((tr) => [tr.children[1].textContent, Number(tr.children[8].textContent)]);
   assert.deepEqual(rows, L.seasons[1].table.map((t) => [t.teamName, t.points]));
 });

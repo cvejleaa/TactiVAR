@@ -810,7 +810,7 @@ try {
     check('Sæsonslut: næste runde er den NYE sæsons runde 1 — "Ny sæson:" sidst, rigtig modstander og retning, intet bud om hans stil', ny.length === 1 && colNext.at(-1) === ny[0] && ny[0].includes(sv.opp) && (sv.home ? ny[0].includes(`${sv.opp} kommer på besøg`) : ny[0].includes(`ude mod ${sv.opp}`)) && !colNext.join(' ').includes('Mit bud') && !colNext.some((t) => t.startsWith('Næste runde')), colNext.join(' | '));
     // v3.14.3 (brugeren: "man kan ikke længere se slutstillingen"): tabellen viser slutstillingen og mesteren
     const stTitle = await g.textContent('#standings-title'), champ = (await g.locator('#standings-champion').count()) ? await g.textContent('#standings-champion') : '';
-    check('Sæsonslut, Liga: tabellen er slutstillingen for den afsluttede sæson, med mesteren', /slutstilling, sæson \d+$/.test(stTitle) && champ.startsWith('🏆 Mester: ') && champ.includes(`${sv.top[0]} (${sv.top[1]} point)`) && champ.endsWith('starter med næste runde.'), `${stTitle} | ${champ}`);
+    check('Sæsonslut, Liga: tabellen er slutstillingen for den afsluttede sæson, med mesteren', /slutstilling, sæson \d+$/.test(stTitle) && champ.startsWith(`🏆 ${sv.top[0]} er mester `) && champ.includes(` ${sv.top[1]} point`) && champ.endsWith('starter med næste runde.'), `${stTitle} | ${champ}`);
     const colForm = (await g.locator('#gazette #col-form p').allTextContents()).join(' | ');
     const [t0, p0, t1, p1] = sv.top;
     const formOk = (t) => p0 !== 0 && t.includes(`${t0} blev mester med ${p0} point.`) && !/fører med|står lige i toppen/.test(t);   // ved sæsonslut: mesteren, ikke "fører" (QC F9)

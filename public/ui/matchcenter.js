@@ -5,6 +5,7 @@ import { h } from './dom.js';
 import { starsEl } from './labels.js';
 import { viewRatingEntry } from '../engine/visibility.js';
 import { GOAL_KIND_LABEL, goalMatchIdx } from '../engine/gazette.js';
+import { championText } from '../engine/season.js';
 import { FORMATIONS } from '../engine/formations.js';
 import { isStarter, placeLabel, lineupSort } from './lineup.js';
 import { replayEl, drawY } from './replay.js';
@@ -163,7 +164,7 @@ export function renderGazette(g, myTeamId, onOpenMatch = null, matches = null, c
   return h('div', { class: 'panel gazette', id: 'gazette' }, h('h3', {}, '📰 TactiVAR Avisen'),
     // Sæsonslut (v3.11): mesteren og din placering står øverst.
     g.seasonEnd ? h('p', { id: 'season-end', class: 'season-end' }, h('strong', {}, `🏆 Sæson ${g.seasonEnd.seasonNumber} er slut: `),
-      [g.seasonEnd.champion ? `${g.seasonEnd.champion.teamName} er mester med ${g.seasonEnd.champion.points} point.` : '', g.seasonEnd.myPos ? `Du sluttede nr. ${g.seasonEnd.myPos}.` : '',
+      [g.seasonEnd.champion ? `${championText(g.seasonEnd.champion, g.seasonEnd.myPos)}.` : '', g.seasonEnd.myPos ? `Du sluttede nr. ${g.seasonEnd.myPos}.` : '',
         g.seasonEnd.topScorer ? `Topscorer: #${g.seasonEnd.topScorer.shirtNumber} ${g.seasonEnd.topScorer.shortName} (${g.seasonEnd.topScorer.teamName}), ${g.seasonEnd.topScorer.goals} mål.` : '',
         'En ny sæson starter med nulstillet tabel – se Tidligere sæsoner på Liga-fanen.'].filter(Boolean).join(' ')) : null,
     h('p', {}, `Runden bød på ${g.totalGoals} ${g.totalGoals === 1 ? 'scoring' : 'scoringer'} og ${g.totalVarChecks} VAR-tjek på tværs af de 4 stadions. ${g.myResult}`),
@@ -189,7 +190,7 @@ function renderColumn(g, myTeamId, onOpenMatch, matches, col, onOpenReport) {
   return h('div', { class: 'panel gazette column', id: 'gazette' }, h('h3', {}, '📰 TactiVAR Avisen'),
     h('h2', { class: 'col-title', id: 'col-title' }, col.title),
     g.seasonEnd ? h('p', { id: 'season-end', class: 'season-end' }, h('strong', {}, `🏆 Sæson ${g.seasonEnd.seasonNumber} er slut: `),
-      [g.seasonEnd.champion ? `${g.seasonEnd.champion.teamName} er mester med ${g.seasonEnd.champion.points} point.` : '', g.seasonEnd.myPos ? `Du sluttede nr. ${g.seasonEnd.myPos}.` : '',
+      [g.seasonEnd.champion ? `${championText(g.seasonEnd.champion, g.seasonEnd.myPos)}.` : '', g.seasonEnd.myPos ? `Du sluttede nr. ${g.seasonEnd.myPos}.` : '',
         g.seasonEnd.topScorer ? `Topscorer: #${g.seasonEnd.topScorer.shirtNumber} ${g.seasonEnd.topScorer.shortName} (${g.seasonEnd.topScorer.teamName}), ${g.seasonEnd.topScorer.goals} mål.` : '',
         'En ny sæson starter med nulstillet tabel – se Tidligere sæsoner på Liga-fanen.'].filter(Boolean).join(' ')) : null,
     h('p', { class: 'muted' }, `Runden bød på ${g.totalGoals} ${g.totalGoals === 1 ? 'scoring' : 'scoringer'} og ${g.totalVarChecks} VAR-tjek på tværs af de ${matches?.length ?? 4} stadions.`),

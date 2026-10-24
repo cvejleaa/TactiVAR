@@ -22,7 +22,7 @@ begrundelse).
 | Runde | 4 kampe pr. runde, alle simuleres med fuld motor | med |
 | Stilling | sejr 3, uafgjort 1; sortering point → målforskel; kolonner K/V/U/T/Mål/VAR(±)/Point; klik på hold = scout | med |
 | Kampprogram | 14 runder Berger-program hjemme/ude (`public/engine/schedule.js`, v3.11): alle møder alle én gang hjemme og én gang ude, runde 8–14 er runde 1–7 spejlet, højst 2 hjemme/ude i træk. Holdrækkefølgen blandes pr. liga (seedet af spillerne, ikke ligaens rng). Ingen modstandervælger; din kamp står først i runden. Ingen hjemmebanefordel – hjemme/ude er kun, hvor kampen spilles | med |
-| Sæson | Efter sæsonens runde 14 arkiveres tabel, mester, din placering, topscorer og din bedste (flest kåringer, så mål) i `league.seasons`; tabel og sæsonstatistik nulstilles, `seasonNumber` +1, `seasonStartRound`/`statsFromRound` = næste runde. Spillere, friskhed og ligaens forløb bevares. Aldring kommer med træningen | med (v3.11) |
+| Sæson | Efter sæsonens runde 14 arkiveres tabel, mester, din placering, topscorer og din bedste (flest kåringer, så mål) i `league.seasons`; tabel og sæsonstatistik nulstilles, `seasonNumber` +1, `seasonStartRound`/`statsFromRound` = næste runde. Spillere, friskhed og ligaens forløb bevares. Aldring kommer med træningen. Mesterregel og den seneste sæsons fulde tal: §8 "Sæsonslut og mester" (v3.16.3) | med (v3.11) |
 | Kalender | 3 kampe/uge tir/tor/søn, fredag træning+økonomi, sæson = 5 uger, fodboldår = 2 sæsoner, +1 år alder pr. fodboldår | udskudt |
 | Klubkasse | 5.000.000 kr. | med (vises; ingen økonomi endnu) |
 
@@ -608,6 +608,20 @@ runde, indtil første runde i den nye sæson er spillet, viser Liga-fanens tabel
 (fra `league.seasons`); derefter ligger den under "Tidligere sæsoner". Langskud (v3.14.3): i billedet står skytten højst
 på `LONGSHOT_FAR` = 38 (skudafstand). Med dit holds løb (✅) slutter målteksten kort; den fulde beskrivelse er Rundens mål.
 
+Sæsonslut og mester (v3.16.3): "lige efter sæsonslut" afgøres ét sted, `seasonJustEnded(league)` i season.js (tabellen og
+statistikken bruger den). I det vindue har slutstillingen VAR ± (et arkiv fra før v3.16.3: "–", én celle-helper `varCell`
+i standings.js), og Liga-statistikken viser den afsluttede sæsons tal gennem de samme visninger (`viewPlayer`/
+`viewTeamStats`, §3), mærket "sæson N – afsluttet", til den nye sæsons runde 1 er spillet. Kun den SENESTE sæson har de
+fulde tal: dens tabelrækker har `varNet` og `TEAM_STAT_FIELDS`, spillernes sæsontal ligger i `league.lastSeasonStats`
+(`{ seasonNumber, players: { id: { felter ≠ 0 } } }`, overskrives ved næste sæsonslut), og ved hvert sæsonslut skæres
+de ældre sæsoners rækker ned til de faste felter – så gemmet ikke vokser. Kan arkivet ikke vises, vises den nye sæsons
+tal med den gamle note og en synlig besked (`#stats-season-failed`). **Mesterreglen** = `sortStandings`: point →
+målforskel → scorede mål → tabellens rækkefølge. `champion` har `goalDiff`, `goalsFor` og `runnerUp` {teamName, points,
+goalDiff, goalsFor}, og `championText(c, myPos)` siger, hvad der afgjorde det: "X er mester med 32 point" / "X er mester
+på målforskel – I endte begge på 29 point" ("I" kun når seeren er nr. 2; ellers "X og Y endte begge") / "… på flest
+scorede mål – … og målforskel +8". Ét sted for teksten: avisen (begge udgaver), slutstillingen, Tidligere sæsoner og
+klummen. Et arkiv uden de nye felter får point-teksten.
+
 ## 8b. Statistik på Liga-fanen (v3.10)
 Fra v3.14.1 (brugeren: "Statistik skal tælle for sæsonen og ikke siden en eller anden runde") står sæsonen i
 overskrifterne ("Spillere (sæson 2)"); runder vises sæson-relativt. Kun et gem, der var midt i en sæson, da
@@ -649,7 +663,10 @@ referaterne).
   arkiveres som "Sæson 1 (uden program)", sæson 2 starter med program og nulstillet
   sæsonstatistik; programmet bygges deterministisk af holdenes rækkefølge) – fixtures
   `tests/fixtures/save-schema1.json` … `save-schema5.json`, `save-v3.9.json`, `save-v3.10.1.json`
-  (gemt af den live v3.10.1).
+  (gemt af den live v3.10.1). Nye valgfrie felter uden skema-bump får også et fixture fra forrige
+  version: `save-v3.16.2.json` (v3.16.2-koden, ny liga + 14 runder = lige efter sæsonslut, uden
+  `varNet`/holdtal i arkivet, `champion.runnerUp` og `lastSeasonStats`; indlæses i
+  `tests/unit/season-end.test.mjs`).
 - Eksport/import af hele spillet som JSON-fil (backup og flytning mellem
   browsere/domæner).
 - Gamle data fra vejleaa.dk kan ikke flyttes (localStorage er bundet til

@@ -80,7 +80,7 @@ test('pairRound: dit hold først, og de øvrige kampe i programmets rækkefølge
   }
 });
 
-test('endSeason: arkivet har den rigtige tabel, mester, din placering, topscorer og din bedste – med kendte, forskellige tal', () => {
+test('endSeason: arkivet har den rigtige tabel, mester, din placering, topscorer og din bedste – med kendte, forskellige tal', async () => {
   const L = createLeague(createRng(5));
   const me = L.teams.find((t) => !t.isBot), bots = L.teams.filter((t) => t.isBot);
   const md = L.leagueMetadata;
@@ -103,11 +103,18 @@ test('endSeason: arkivet har den rigtige tabel, mester, din placering, topscorer
   // Forløbet: kun runde 15–28 tæller (mål = rundenummer, 4 kampe pr. runde)
   L.history = [14, ...Array.from({ length: 14 }, (_, i) => 15 + i), 29].map((round) => ({ round, goals: round, matches: 4, kinds: {} }));
   delete L.seasons; // endSeason skal selv oprette arkivet
+  // v3.16.3: den seneste sæsons tabelrække har VAR ± og holdtallene – med data, så en ombytning/udeladelse ses
+  const myRow = md.standings.find((r) => r.teamId === me.id);
+  Object.assign(myRow, { varNet: -3, shots: 41, cleanSheets: 6, reds: 2 });
   const s = endSeason(L, 28, true);
   const who = (t, q, goals, motm) => ({ playerId: q.id, teamId: t.id, teamName: t.name, shirtNumber: q.shirtNumber, shortName: q.shortName, goals, motm });
   assert.deepEqual(s.table.map((r) => r.teamId), sorted.map((t) => t.id), 'sorteret efter point, målforskel, mål for');
-  assert.deepEqual(s.table[0], { teamId: me.id, teamName: me.name, played: 14, won: 1, drawn: 2, lost: 3, goalsFor: 10, goalsAgainst: 9, points: 40 });
-  assert.deepEqual(s.champion, { teamId: me.id, teamName: me.name, points: 40 });
+  const { TEAM_STAT_FIELDS } = await import('../../public/engine/stats.js');
+  assert.deepEqual(s.table[0], { teamId: me.id, teamName: me.name, played: 14, won: 1, drawn: 2, lost: 3, goalsFor: 10, goalsAgainst: 9, points: 40,
+    varNet: -3, ...Object.fromEntries(TEAM_STAT_FIELDS.map((k) => [k, myRow[k]])) });
+  assert.deepEqual([s.table[0].shots, s.table[0].cleanSheets, s.table[0].reds], [41, 6, 2]);
+  // Mesteren med det, der afgør (point → målforskel → mål for) – og nr. 2 (bots[4]: 30 point, +1, 10 mål)
+  assert.deepEqual(s.champion, { teamId: me.id, teamName: me.name, points: 40, goalDiff: 1, goalsFor: 10, runnerUp: { teamName: bots[4].name, points: 30, goalDiff: 1, goalsFor: 10 } });
   assert.equal(s.myPos, 1);
   assert.deepEqual(s.topScorer, who(bots[2], p(bots[2], 4), 9, 0));
   assert.deepEqual(s.myBest, who(me, p(me, 2), 6, 2));
