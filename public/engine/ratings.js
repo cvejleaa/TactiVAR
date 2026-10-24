@@ -3,6 +3,7 @@ import { drainFactor } from './freshness.js';
 export const RATING_MIN = 3.5;
 export const RATING_MAX = 10;
 export const START_RATING = 6.5;
+export const RESULT_BONUS = 0.4, SAVES_FULL = 4;
 export const STAR_LIMITS = [8.35, 7.25, 6.15, 5.15]; // ≥ grænse giver 5, 4, 3, 2 stjerner; ellers 1
 const CLEAN_SHEET_ROLES = new Set(['GK', 'CB', 'LB', 'RB']);
 
@@ -30,14 +31,16 @@ export function createSheet() {
         teamId: team.id, teamName: team.name, isUserTeam: !team.isBot, isHome, role, line: player.line, slot,
         minIn, minOut: 90, rating: START_RATING + (rng.next() * 0.3 - 0.15), stars: 0,
         startCounterMastery: oppMastery, gainedCounterXp: 0,
-        goals: 0, assists: 0, saves: 0, aerialWins: 0, tacticWins: 0, freeRuns: 0, freeRunsWon: 0, headerGoals: 0, penaltyGoals: 0, setPieceGoals: 0, yellowCard: false, injured: false, isMotM: false,
+        goals: 0, assists: 0, saves: 0, aerialWins: 0, tacticWins: 0, freeRuns: 0, freeRunsWon: 0, headerGoals: 0, penaltyGoals: 0, setPieceGoals: 0, yellowCard: false, yellows: 0, red: null, injured: false, isMotM: false,
         km90: run.km90, drain90: run.drain90, topSpeed: run.topSpeed, hiShare: run.hiShare, distanceKm: 0, hiKm: 0,
       };
       return entries[player.id];
     },
+    // Summeres UDEN loft i kampen og klemmes først i finalizeSheet (v3.15, Spilfører: før tabte en firemålsscorer
+    // overskuddet ved loftet 10 og blev overhalet af en midtbanespiller).
     adjust(playerId, delta) {
       const e = entries[playerId];
-      if (e) e.rating = clamp(e.rating + delta, RATING_MIN, RATING_MAX);
+      if (e) e.rating += delta;
     },
     bump(playerId, field, n = 1) {
       const e = entries[playerId];
@@ -89,12 +92,21 @@ export function runProfile(player, team, rng, role) {
 const PRESS_HI = { HIGH_GEGENPRESS: 1.15, MID_BLOCK: 1, LOW_BLOCK: 0.9 };
 
 // Afslutter karakterarket: clean sheet, afrunding, stjerner, XP-grundlag og MotM.
+// Kampens og Rundens spiller rangeres ens (v3.15, QC): karakter, så mål·2 + oplæg. En udvist kan ikke vinde.
+export const motmOrder = (a, b) => (b.rating - a.rating) || ((b.goals ?? 0) * 2 + (b.assists ?? 0) - (a.goals ?? 0) * 2 - (a.assists ?? 0));
+
 export function finalizeSheet(sheet, homeGoals, awayGoals, rng, xpFor) {
   const all = Object.values(sheet.entries);
   let best = null;
   for (const e of all) {
     const conceded = e.isHome ? awayGoals : homeGoals;
-    if (conceded === 0 && CLEAN_SHEET_ROLES.has(e.role)) e.rating = clamp(e.rating + 0.5, RATING_MIN, RATING_MAX);
+    if (conceded === 0 && CLEAN_SHEET_ROLES.has(e.role)) e.rating += 0.5;
+    // Resultatet tæller (v3.15, Spilfører: en målmand på det tabende hold blev Kampens og Rundens spiller tre runder i træk):
+    // sejr +RESULT_BONUS, nederlag −RESULT_BONUS; og en redning ud over de første SAVES_FULL giver kun det halve.
+    const scored = e.isHome ? homeGoals : awayGoals;
+    e.rating += scored > conceded ? RESULT_BONUS : scored < conceded ? -RESULT_BONUS : 0;
+    if ((e.saves ?? 0) > SAVES_FULL) e.rating -= 0.25 * (e.saves - SAVES_FULL);
+    e.rating = clamp(e.rating, RATING_MIN, RATING_MAX);
     // Clean sheet i statistikken: kun målmanden (v3.11, brugeren: "Det er kun målmanden der får
     // Clean sheet" – før også forsvaret), 0 mål imod og mindst 59 spilleminutter (minOut − minIn;
     // en starter har 89). Plads 0 er målet, så en målmand skiftet ind ved skade tæller også.
@@ -108,7 +120,7 @@ export function finalizeSheet(sheet, homeGoals, awayGoals, rng, xpFor) {
     // For kort tid til en rigtig spurt eller en meningsfuld HI-andel (støj på få minutter).
     if (e.minOut - e.minIn < 10) { e.topSpeed = null; e.hiShare = null; e.hiKm = null; } // tæller heller ikke i sæsonens HI-andel
     delete e.km90; delete e.drain90;
-    if (!best || e.rating > best.rating) best = e;
+    if (!e.red && (!best || motmOrder(e, best) < 0)) best = e;
   }
   if (best) best.isMotM = true;
   return { home: all.filter((e) => e.isHome), away: all.filter((e) => !e.isHome), motm: best };

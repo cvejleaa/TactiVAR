@@ -47,7 +47,7 @@ function playerLists(league, myTeamId) {
   return h('div', { class: 'stat-grid' },
     list('⚽ Topscorere', 'sGoals'), list('🅰 Flest oplæg', 'sAssists'), list('👑 Kampens spiller', 'sMotm'),
     list('🗣 Hovedstødsmål', 'sHeaderGoals'), list('🎯 Straffemål', 'sPenaltyGoals'), list('🧱 Dødboldmål', 'sSetPieceGoals'),
-    list('🧤 Clean sheets', 'sCleanSheets'), list('🟨 Gule kort', 'sYellow'),
+    list('🧤 Clean sheets', 'sCleanSheets'), list('🟨 Gule kort', 'sYellow'), list('🟥 Røde kort', 'sRed'),
     listTable('⭐ Bedste vurdering (alle kampe)', 'publicStars', starRows, (v) => starsEl(v.publicStars), myTeamId));
 }
 
@@ -55,9 +55,9 @@ function teamTable(league, myTeamId) {
   const rows = league.leagueMetadata.standings.map((s) => viewTeamStats(s, s.teamId === myTeamId));
   const per = (r, k) => (r.sMatches ? (r[k] / r.sMatches) : 0);
   return h('div', { class: 'tablewrap-x' }, h('table', { class: 'standings', id: 'team-stats' },
-    h('thead', {}, h('tr', {}, ['Hold', 'Bold %', 'Frispark begået', 'Frispark tilkendt', '🟨', 'Straffe for (scoret)', 'Dødboldmål', 'Hovedstødsmål', 'Clean sheets'].map((x) => h('th', {}, x)))),
+    h('thead', {}, h('tr', {}, ['Hold', 'Bold %', 'Frispark begået', 'Frispark tilkendt', '🟨', '🟥', 'Straffe for (scoret)', 'Dødboldmål', 'Hovedstødsmål', 'Clean sheets'].map((x) => h('th', {}, x)))),
     h('tbody', {}, rows.map((r) => h('tr', { class: r.teamId === myTeamId ? 'mine' : '' },
-      h('td', {}, r.teamName), h('td', {}, r.sMatches ? Math.round(per(r, 'possSum')) : '–'), h('td', {}, r.fouls), h('td', {}, r.foulsWon), h('td', {}, r.yellows),
+      h('td', {}, r.teamName), h('td', {}, r.sMatches ? Math.round(per(r, 'possSum')) : '–'), h('td', {}, r.fouls), h('td', {}, r.foulsWon), h('td', {}, r.yellows), h('td', {}, r.reds ?? 0),
       h('td', {}, `${r.penalties} (${r.penaltyGoals})`), h('td', {}, r.setPieceGoals), h('td', {}, r.headerGoals), h('td', {}, r.cleanSheets))))));
 }
 

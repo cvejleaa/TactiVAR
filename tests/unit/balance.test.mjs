@@ -76,7 +76,9 @@ test('løb uden bold: Mange er bedst mod Hold på bolden, Få bedst mod Lynkontr
   const nL = r({ oppWon: 'FAST_COUNTER' }), mL = r({ runs: 'MANY', oppWon: 'FAST_COUNTER' }), fL = r({ runs: 'FEW', oppWon: 'FAST_COUNTER' });
   assert.ok(mH.net > nH.net, `Mange ${mH.net} > Normal ${nH.net} mod Hold på bolden`);
   assert.ok(mL.net < nL.net, `Mange ${mL.net} < Normal ${nL.net} mod Lynkontra`);
-  assert.ok(fL.net >= nL.net, `Få ${fL.net} ≥ Normal ${nL.net} mod Lynkontra`);
+  // Få mod Normal mod Lynkontra er reelt lige (målt over 9600 kampe: 3.14.3 Få 0,007 / Normal 0,000; v3.15 −0,001 / 0,005 –
+  // støjen her er ≈ 0,035). "Få ≥ Normal" målte støj og holdt kun på frø-held; nu: Få er ikke tydeligt dårligere.
+  assert.ok(fL.net >= nL.net - 0.05, `Få ${fL.net} ≥ Normal ${nL.net} − 0,05 mod Lynkontra`);
   // Mange giver flere mål for OG imod; flere løb kommer fri
   assert.ok(mH.gf - nH.gf >= 0.06 && mL.ga - nL.ga >= 0.1, `for +${(mH.gf - nH.gf).toFixed(2)}, imod +${(mL.ga - nL.ga).toFixed(2)}`);
   assert.ok(mH.runsWon > 1.5 * nH.runsWon, `fri ${mH.runsWon} mod ${nH.runsWon}`);
@@ -112,7 +114,9 @@ test('angrebsfokus mærkes: cutbacks ≥ 1 pr. kamp, angriberen vinder 35–55 %
   const N = 60;
   const cut = measureFocus({ focus: 'LOW_CUTBACKS' }, N), cross = measureFocus({ focus: 'HIGH_CROSSES' }, N), central = measureFocus({ focus: 'CENTRAL' }, N);
   assert.ok(cut.cutbacks >= 1, `cutbacks ${cut.cutbacks} (før 0)`);
-  assert.ok(cross.crossWinRate >= 0.35 && cross.crossWinRate <= 0.55, `luftdueller vundet ${cross.crossWinRate} (før ≈ 0,04)`);
+  // v3.15: et forsvar med færre mand taber flere luftdueller – målt over 400 kampe 0,545 → 0,555 (her med 60: 0,535 → 0,570);
+  // loftet 0,55 → 0,58. Båndet fanger stadig fejlen, det blev lavet til (≈ 0,04).
+  assert.ok(cross.crossWinRate >= 0.35 && cross.crossWinRate <= 0.58, `luftdueller vundet ${cross.crossWinRate} (før ≈ 0,04)`);
   assert.ok(cross.headerGoals >= 0.15, `hovedstødsmål ${cross.headerGoals} (før ≈ 0,07)`);
   const nets = [cut.net, cross.net, central.net];
   assert.ok(Math.max(...nets) - Math.min(...nets) <= 0.3, `netto ${nets.map((x) => x.toFixed(2)).join(' / ')}`);
@@ -156,7 +160,29 @@ test('udskiftninger: 2,2–3,6 skift pr. hold pr. kamp, de fleste efter pausen; 
   assert.ok(r.subsPerTeam >= 2.2 && r.subsPerTeam <= 3.6, `skift ${r.subsPerTeam}`);
   assert.ok(r.why.fatigue >= 1.5, `træthedsskift ${r.why.fatigue} (før 0)`);
   assert.ok(r.mins['1–45'] <= 0.3, `før pausen ${r.mins['1–45']}`);
-  assert.ok(r.goalsPerMatch >= 2.6 && r.goalsPerMatch <= 3.0, `mål ${r.goalsPerMatch}`);
+  // Målniveauet over 40 sæsoner (1600 kampe): med 10 lå 3.14.3 selv på 2,600 – præcis på grænsen (40: 3.14.3 2,73, v3.15 2,70).
+  const g = measureSubs(40).goalsPerMatch;
+  assert.ok(g >= 2.6 && g <= 3.0, `mål ${g}`);
   const st = measureStamina(300);
   assert.ok(st[16].net - st[6].net >= 0.55, `STA-forskel ${(st[16].net - st[6].net).toFixed(2)} (før v3.13 0,47)`);
+});
+
+// v3.15 (Spilførerens sæsongennemgang: 0 røde kort, 8 dobbelt-gule på 56 kampe). Superligaen ≈ 0,15 røde og ≈ 4 gule pr. kamp.
+// Ti mand skal kunne mærkes: før straffen (SHORT_PER_MAN 0) scorede holdet 1,33 og lukkede 1,49 ind pr. 90 min efter
+// udvisningen – båndene nedenfor er røde med de tal. Målt med straffen: 1,06 / 1,93. Med 0,08: 0,57 / 2,78 (også rødt).
+test('kort: 0,10–0,25 røde pr. kamp (før 0), 3–5 gule; ti mand scorer færre og lukker flere ind end med elleve', async () => {
+  const { measureCards } = await import('../../tools/measure-duels.mjs');
+  const r = measureCards(2500);
+  assert.ok(r.redsPerMatch >= 0.10 && r.redsPerMatch <= 0.25 && r.direct > 0 && r.secondYellow > r.direct, JSON.stringify(r));
+  assert.ok(r.yellowsPerMatch >= 3 && r.yellowsPerMatch <= 5, JSON.stringify(r));
+  assert.ok(r.tenMenMatches >= 150, JSON.stringify(r));
+  assert.ok(r.tenMenFor90 <= 1.2 && r.tenMenAgainst90 >= 1.7 && r.tenMenAgainst90 <= 2.4, JSON.stringify(r));
+});
+
+// v3.15 (Spilfører: målmanden på det tabende hold blev Kampens og Rundens spiller tre runder i træk). Før (3.14.3, samme
+// måling): tabende hold 15 %, målmand 32 %, målscorer 48 %. Med RESULT_BONUS og halv værdi for redninger over 4: 2,5 / 23 / 64 %.
+test('Kampens spiller: sjældent fra det tabende hold (≤ 8 %, før 15 %), målmand ≤ 28 % (før 32 %), oftest en målscorer (≥ 55 %)', async () => {
+  const { measureMotm } = await import('../../tools/measure-duels.mjs');
+  const r = measureMotm(600);
+  assert.ok(r.loserShare <= 0.08 && r.gkShare <= 0.28 && r.scorerShare >= 0.55, JSON.stringify(r));
 });

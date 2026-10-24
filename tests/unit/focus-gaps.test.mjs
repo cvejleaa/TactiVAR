@@ -383,7 +383,7 @@ test('almindelig afslutning: skytten er også første midtbane (oplægsgiveren) 
   const r = plainShot({ spots: { 5: { x: 50, y: 10 } }, setup: (a) => { Object.assign(slot(a.H, 5).skills, { finishing: 10 }); slot(a.H, 9).skills.finishing = 0; } });
   assert.deepEqual(r.m.goalsPool.map((g) => [g.kind, g.scorer]), [['COMBINATION', tg(slot(r.a.H, 5))], ['COMBINATION', tg(slot(r.a.H, 5))]]);
   assert.equal(r.m.ratings.home.reduce((s, e) => s + e.assists, 0), 0);
-  assert.equal(r.m.ratings.home.find((e) => e.playerId === slot(r.a.H, 5).id).rating, 9);
+  assert.equal(r.m.ratings.home.find((e) => e.playerId === slot(r.a.H, 5).id).rating, 9.4);   // + 0,4 sejr (v3.15)
 });
 test('almindelig afslutning: målmanden er aldrig modtager, selv om han er trukket helt frem og har den bedste afslutning', () => {
   const r = plainShot({ spots: { 9: { x: 50, y: 10 } }, setup: (a) => { slot(a.H, 0).skills.finishing = 40; a.H.tactics.customCoords[0] = { x: 50, y: 10 }; } });

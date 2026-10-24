@@ -263,7 +263,7 @@ test('"De øvrige kampe": seerens egen kamp er ikke med, hver kamp har sit indek
   assert.deepEqual([by[0].note, by[10].note, by[1].note], ['Comeback til U0.', 'U10 kom bagfra og vandt.', 'Afgjort i 83. minut.']);
   assert.deepEqual(c.sections.map((x) => x.title), ['Din kamp', 'De øvrige kampe'], 'afsnitstitlerne');
   // Bogstavelig pind: noten for kamp 3 i runde 5 (nøglen rule.key + indeks indgår i valget)
-  assert.equal(by[3].note, 'U3 havde bolden det meste af tiden.');
+  assert.equal(by[3].note, 'U3 lod modstanderen løbe efter bolden.');
   // En runde uden andre kampe har ingen "De øvrige kampe"
   assert.deepEqual(buildColumn(inp({ matches: [M({ hG: 1, aG: 0 })] })).sections.map((s) => s.id), ['col-mine']);
 });

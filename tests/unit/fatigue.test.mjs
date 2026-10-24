@@ -108,16 +108,18 @@ test('målmanden skiftes ikke for træthed – heller ikke under grænsen fra st
 // ---------- Pauser og antal (match-rules.js) ----------
 // Alle ti markspillere under grænsen fra start; bænken har 6 friske markspillere: 5 skift i 3. minut = én pause,
 // resten får en besked om hvorfor.
-test('højst MATCH_RULES.maxSubs (5) skift – alle i samme tick er én pause; dit hold får at vide, hvorfor resten ikke skiftes', () => {
+test('højst MATCH_RULES.maxSubs (5) skift – højst 3 ad gangen (v3.15); dit hold får at vide, hvorfor resten ikke skiftes', () => {
   const { H, A } = arena({ homeLimit: 80 });
   for (let i = 1; i <= 10; i++) slot(H, i).freshness = 60;
   for (const b of bench(H)) b.freshness = 100;
   const m = simulateMatch(H, A, stubRng({}));
   const s = subs(m);
   assert.equal(s.length, MATCH_RULES.maxSubs);
-  assert.ok(s.every((e) => e.min === 3));
+  // v3.15: højst 3 ad gangen – 3 i 3. minut, de 2 sidste i næste tick (to pauser)
+  assert.deepEqual(s.map((e) => e.min), [3, 3, 3, 6, 6]);
   const why = m.events.filter((e) => e.label === 'Udskiftning ikke mulig' && e.isHome);
-  assert.ok(why.length >= 1 && why.every((e) => /er under din udskiftningsgrænse \(\d+ % – grænse 80 %\), men (alle 5 udskiftninger er brugt|der er ingen frisk \w+ på bænken)\.$/.test(e.text)), why.map((e) => e.text).join(' | '));
+  assert.ok(why.some((e) => /højst 3 træthedsskift ad gangen – han venter til næste skift\.$/.test(e.text)), 'besked om loftet');
+  assert.ok(why.length >= 1 && why.every((e) => /er under din udskiftningsgrænse \(\d+ % – grænse 80 %\), men (alle 5 udskiftninger er brugt|der er ingen frisk \w+ på bænken|højst 3 træthedsskift ad gangen – han venter til næste skift)\.$/.test(e.text)), why.map((e) => e.text).join(' | '));
 });
 test('pauserne binder: fire trætte i hver sit tick – 3 pauser bruges, den fjerde får besked om pauserne', () => {
   // STA 1, tab pr. min: CM 0,278, CB 0,224, ST 0,236. CM 71 → 6'; CB 78 → 39'; CM 87 → 63'; ST 90 → 87' (i 90' skiftes ikke). Ved hver

@@ -158,7 +158,7 @@ test('karakterer: godkendt giver skytten +1,3 og forsvareren −0,35 pr. mål; a
   // Dræber: annul-adjust (off.id → shooter.id), goal-defender −0,35, annul-defender +0,45. Alle har start 6,5 (rul 0,5); clean sheet +0,5 til dit holds forsvar.
   // Dit hold angriber: skytten er back (clean sheet), den tjekkede en midtbanespiller.
   const ok = varGame({ spots: SPOTS.two, offPulse: 14, shooterPulse: 8, defPositioning: 1 });
-  assert.deepEqual([ok.shooter, ok.off, ok.assister, ok.defender].map((p) => ok.rating(p).rating), [9.6, 6.5, 7.5, 5.8], 'back: 6,5+2·1,3+0,5 · tjekket: uændret · oplæg: +2·0,5 · forsvarer: 6,5−2·0,35');
+  assert.deepEqual([ok.shooter, ok.off, ok.assister, ok.defender].map((p) => ok.rating(p).rating), [10, 6.9, 7.9, 5.4], 'back: 6,5+2·1,3+0,5 · tjekket: uændret · oplæg: +2·0,5 · forsvarer: 6,5−2·0,35 – vinderne +0,4, taberen −0,4 (v3.15)');
   assert.deepEqual([ok.shooter, ok.off].map((p) => ok.rating(p).goals), [2, 0]);
   const no = varGame({ spots: SPOTS.two, offPulse: 0, shooterPulse: 20 });
   assert.deepEqual([no.shooter, no.off, no.assister, no.defender].map((p) => no.rating(p).rating), [7.0, 5.7, 6.5, 7.9], 'back: 6,5+0,5 uændret · tjekket: 6,5−2·0,4 · oplæg: uændret · forsvarer: 6,5+2·0,45+0,5');

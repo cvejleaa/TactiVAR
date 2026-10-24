@@ -2,6 +2,7 @@
 // kedelig"): overskrift pr. kamp, rundens overraskelse og dit holds løber. Fra v3.14 skrives avisen
 // som en klumme (column.js) ved visning; denne gemmer rundens byggesten (spiller, mål, overraskelse, løber).
 import { headlineOf, publicFacts } from './column.js';
+import { motmOrder } from './ratings.js';
 
 // Overskrifter: tre varianter pr. udfald, valgt ud fra kampens tal (ingen tilfældighed) – ét sted, i klummen.
 export const headline = (m, round = 0) => headlineOf(publicFacts(m), round);
@@ -21,7 +22,7 @@ export function buildGazette(matches, { positions = null, round = 0 } = {}) {
     players.push(...m.ratings.home, ...m.ratings.away);
     goals.push(...m.goalsPool);
   }
-  players.sort((a, b) => b.rating - a.rating || (b.goals * 2 + b.assists) - (a.goals * 2 + a.assists));
+  players.sort(motmOrder);   // samme rangering som Kampens spiller (ratings.js, v3.15); en udvist kan ikke blive Rundens spiller
   goals.sort((a, b) => b.spectacle - a.spectacle);
   // Din kamp står først (pairRound); fra v3.11 kan du også være udehold.
   const my = matches[0];
@@ -50,7 +51,7 @@ export function buildGazette(matches, { positions = null, round = 0 } = {}) {
   const myRunner = mine ? { playerId: mine.playerId, teamId: mine.teamId, shirtNumber: mine.shirtNumber, shortName: mine.shortName, distanceKm: mine.distanceKm, topSpeed: mine.topSpeed, hiShare: mine.hiShare } : null;
 
   return {
-    totalGoals, totalVarChecks, playerOfTheRound: players[0] || null, goalOfTheRound: goals[0] || null, defensiveAction: defensive, myResult,
+    totalGoals, totalVarChecks, playerOfTheRound: players.find((p) => !p.red) || null, goalOfTheRound: goals[0] || null, defensiveAction: defensive, myResult,
     headlines: matches.map((m) => headline(m, round)), upset, myRunner,
   };
 }

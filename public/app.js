@@ -64,6 +64,7 @@ const NEWS = {
   '3.14.1': 'Rettelser: VAR tjekker nu offside for den forreste – scorer en spiller længere tilbage, er det hans forreste holdkammerat, der tjekkes, og billedet ved målet viser skytten, hvor han skød fra. Statistikken på Liga-fanen gælder sæsonen.',
   '3.14.2': 'Rettelse: Ved et VAR-tjek står den tjekkede nu, hvor han stod (forrest), i billedet ved målet – ikke flyttet bag en holdkammerat.',
   '3.14.3': 'Rettelser: Langskud tages fra skudafstand (ikke fra egen banehalvdel) i billedet ved målet, referatet fortæller et oplæg én gang, og efter sæsonens sidste runde viser tabellen slutstillingen og mesteren, til næste sæson går i gang.',
+  '3.15.0': 'Røde kort: andet gule kort giver rødt, og en grov tackling kan give direkte rødt. Den udviste må ikke erstattes – holdet spiller resten af kampen med ti mand og bliver både svagere og hurtigere træt. (Karantæne kommer senere.) Kampens spiller: mål tæller nu fuldt ud, vundne dueller på midtbanen mindre, og resultatet tæller med – en målmand på det tabende hold vinder sjældent. Træthedsskift sker højst tre ad gangen (også i pausen), så et hold ikke bruger alle sine skift på én gang.',
 };
 
 // Et migreret spil, hvis gamle fil ikke kunne tages backup af (fuldt lager): den gamle fil må
@@ -203,7 +204,7 @@ function renderControls() {
     h('button', { id: 'play-round', class: 'primary', disabled: !!mc?.playing, onclick: playNextRound }, `▶ Spil runde ${next.k} af ${game.league.schedule.length} mod ${next.opp.name} (${next.home ? 'hjemme' : 'ude'})`),
     h('button', { id: 'next-opponent', class: 'mini', title: `Scout ${next.opp.name}`, onclick: () => { game.ui.tab = 'trup'; persist(); showTeam(teams.indexOf(next.opp)); } }, `🔍 ${next.opp.name}`),
     tiredStarters() ? h('span', { class: 'tired', id: 'tired-warning', title: myTeam().subsLimit
-      ? `Markspillere under din udskiftningsgrænse (${myTeam().subsLimit} %) skiftes ud i 3. minut, hvis der er en frisk afløser i samme kæde på bænken – det bruger et skift og en pause. Overvej at rotere i Trup`
+      ? `Markspillere under din udskiftningsgrænse (${myTeam().subsLimit} %) skiftes ud fra 3. minut (højst 3 ad gangen), hvis der er en frisk afløser i samme kæde på bænken – det bruger et skift og en pause. Overvej at rotere i Trup`
       : 'Startere under 70 % friskhed – trætte spillere yder mindre (50 % ≈ 12,5 % svagere). Overvej at rotere i Trup' },
     myTeam().subsLimit ? `⚠ ${tiredStarters()} startere under din grænse (${myTeam().subsLimit} %) – skiftes ud tidligt` : `⚠ ${tiredStarters()} trætte startere`) : null,
     h('span', { class: 'savestatus' + (view.saveError ? ' failed' : ''), id: 'save-status' }, view.saveError ? '⚠ IKKE gemt' : view.savedAt ? `✔ Gemt kl. ${time(view.savedAt)}` : 'Ikke gemt'),

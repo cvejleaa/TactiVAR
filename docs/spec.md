@@ -162,9 +162,19 @@ Tick hvert 3. minut (1..90).
   straks i gang", uden "… løber ind i et organiseret forsvar"; Hold + kontra "Dit hold ser hullet
   og går direkte", uden "Dit hold falder til ro på bolden"; taber du på Mange: "Din RWB … er højt
   oppe efter sit løb". Modstanderens indstilling nævnes aldrig.
-- Frispark 6 % (−0,35): heraf skade 40 % (1–3 kampe, auto-indskiftning fra bænken, intet kort),
+- Frispark 6 % (−0,35): heraf skade 40 % (1–3 kampe, auto-indskiftning fra bænken, intet gult kort – men 7 % direkte rødt, v3.15),
   ellers taktisk frispark med gult kort. Fra v3.10 desuden gult kort på 21 % af de "stille" frispark
   (Superligaen ≈ 2 gule pr. hold pr. kamp) – se Dødbolde.
+- **Røde kort (v3.15**, Spilførerens sæsongennemgang: 0 røde og 8 dobbelt-gule på en sæson): andet gule kort giver rødt
+  (en spiller med gult kort holder igen – kun `SECOND_YELLOW_P` = 17 % af hans kortværdige frispark giver kortet);
+  direkte rødt kun ved den grove tackling, der skader en modspiller (`DIRECT_RED_P` = 7 %). Den udviste forlader banen
+  uden indskiftning (pladsen er tom; aldrig under 7 mand), karakter −1, og kan ikke blive Kampens/Rundens spiller.
+  Ti mand: hver spiller svagere i duellerne (`SHORT_PER_MAN` = 4 % pr. manglende mand – gennemsnit og lodtrækning mærker
+  det ellers ikke) og hurtigere træt (`SHORT_DRAIN`). Målt (`measureCards`): ≈ 0,16 røde og ≈ 4,1 gule pr. kamp; ti
+  mand scorer 1,06 og lukker 1,93 ind pr. 90 min (elleve: ≈ 1,4). Ingen karantæne endnu (kommer med trup/økonomi).
+  Kortene gemmes ét sted (karakterarket: `yellows` 0–2, `red`); kamptal, holdtal og sæsonstatistik (`sRed`) regnes derfra.
+- **Træthedsskift spredes (v3.15**, brugerens valg): højst `FATIGUE_SUBS_AT_ONCE` = 3 ad gangen (også i pausen; flere trætte bruger flere pauser);
+  grænsen gælder fortsat uanset minut, og dit hold får besked, når en træt spiller må vente.
 - Chance 30 % (v3.9: Få 26 %, Normal 30 %, Mange 36 %; v3.12.1: Få 28,5 %); xG 0,13–0,35 pr. afslutning.
 - **Angrebsfokus afgør chancens type (v3.12**, brugeren: "Jeg har sat mit hold til cutbacks, og
   alligevel er der ikke en eneste reference til cutbacks i referatet … min modstander vinder 11
@@ -308,7 +318,12 @@ Tick hvert 3. minut (1..90).
   ikke efter live-afspilning; motoren skal være deterministisk ved givet seed.
 
 ## 6. Karakterer, MotM, avis
-- Start 6,5 (±0,15), klemt 3,5–10,0. Hovedstødsmål +1,35, VAR-mål +1,30, mål
+- Start 6,5 (±0,15), klemt 3,5–10,0 – fra v3.15 først til sidst (justeringerne summeres uden loft, så overskud fra mål
+  ikke tabes); vundet taktisk duel/pres +0,20 (`DUEL_BONUS`, før +0,35). Kampens og Rundens spiller rangeres ens
+  (`motmOrder`: karakter, så mål·2 + oplæg), og en udvist kan ikke vinde. Resultatet tæller: sejr +0,4, nederlag −0,4
+  (`RESULT_BONUS`), og redninger ud over 4 giver kun det halve (Spilfører: en målmand på det tabende hold vandt Kampens og
+  Rundens spiller tre runder i træk). Målt (600 kampe): Kampens spiller fra det tabende hold 15 % → 2,5 %, målmand 32 % → 23 %.
+  Målmanden svækkes også af ti mand (forenkling). Hovedstødsmål +1,35, VAR-mål +1,30, mål
   +1,25, oplæg +0,55, redning +0,50 (skytte +0,10), annulleret VAR-mål −0,40
   (forsvarer +0,45), vundet luftduel +0,40, mål imod forsvarer −0,35 / GK
   −0,25, clean sheet +0,50 til GK/CB/LB/RB (karakteren; i statistikken tæller clean sheet
@@ -403,7 +418,7 @@ Tick hvert 3. minut (1..90).
   flere skift i samme tick er én pause, halvlegen (45') er gratis; skadesskift tæller med. Udeladt:
   hjernerystelses- og forlængelses-skift. Holdets grænse `team.subsLimit` (Taktik, 50–85 %, 0 = fra;
   dit hold 70 %, bots 65/70/75 efter profil): i hvilket som helst minut (brugeren: "uanset hvor langt
-  man er kommet i kampen") skiftes alle under grænsen, lavest først, mod den bedste friske
+  man er kommet i kampen") skiftes de under grænsen – fra v3.15 højst 3 ad gangen, også i pausen –, lavest først, mod den bedste friske
   (≥ grænsen + 5) i samme kæde; bruges pausen, tages også dem ≤ 5 over grænsen med. Målmanden skiftes
   kun ved skade. Dit hold får besked, når grænsen ikke kan følges (skift/pauser brugt, ingen frisk på
   bænken), og efter kampen, hvor meget friskhed de udskiftede sparede. Hvis-Så kan også være en

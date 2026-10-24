@@ -10,7 +10,7 @@ import { isStarter, placeLabel, lineupSort } from './lineup.js';
 
 export const REPORT_FILTERS = [['all', 'Alle hændelser'], ['tactic', 'Kun taktik'], ['key', 'Kun nøglemomenter']];
 const KEY_TYPES = new Set(['GOAL', 'HEADER_GOAL', 'VAR_GOAL', 'VAR_NO_GOAL', 'INJURY', 'SUB', 'TRIGGER', 'END', 'HALFTIME', 'FULLTIME']);
-const ICON = { GOAL: '⚽', HEADER_GOAL: '⚽', VAR_GOAL: '📺', VAR_NO_GOAL: '📺', INJURY: '🚑', SUB: '🔄', TRIGGER: '📋', FOUL: '🟨' };
+const ICON = { GOAL: '⚽', HEADER_GOAL: '⚽', VAR_GOAL: '📺', VAR_NO_GOAL: '📺', INJURY: '🚑', SUB: '🔄', TRIGGER: '📋', FOUL: '🟨', RED: '🟥' };
 
 export function filterEvents(events, filter) {
   if (filter === 'tactic') return events.filter((e) => e.category === 'TACTIC' || e.type === 'TRIGGER' || e.tactical);   // v3.13: dine træthedsskift og Hvis-Så-skift
@@ -35,6 +35,7 @@ function statsRows(m, st) {
     ['Hjørnespark', st.hCorners ?? '–', st.aCorners ?? '–'],
     ['Straffe (mål)', st.hPenalties != null ? `${st.hPenalties} (${st.hPenaltyGoals})` : '–', st.aPenalties != null ? `${st.aPenalties} (${st.aPenaltyGoals})` : '–'],
     ['Gule kort', st.hYellows ?? '–', st.aYellows ?? '–'],
+    ['Røde kort', st.hReds ?? '–', st.aReds ?? '–'],   // v3.15; gamle kampe uden tallet viser –
   ];
   return h('table', { class: 'mstats', id: 'match-stats' }, h('thead', {}, h('tr', {}, h('th', {}, m.homeName), h('th', {}, ''), h('th', {}, m.awayName))),
     h('tbody', {}, rows.map(([l, a, b]) => h('tr', {}, h('td', {}, String(a)), h('th', {}, l), h('td', {}, String(b))))));
@@ -49,7 +50,7 @@ function timeline(events) {
 export const minutes = (e) => (e.minIn <= 1 && e.minOut === 90 ? "90'" : `${e.minIn <= 1 ? 0 : e.minIn}'–${e.minOut}'`);
 
 // Ikonerne i karakterarket. title giver mouse-over; forklaringen under arket dækker touch.
-export const RATING_ICONS = [['⚽', 'Mål'], ['🅰', 'Oplæg'], ['🧤', 'Redninger'], ['✈', 'Vundne luftdueller'], ['🟨', 'Gult kort'], ['🚑', 'Skadet'], ['👑', 'Kampens spiller'], ['🧠', 'Mod-kunnen (erfaring) optjent i kampen']];
+export const RATING_ICONS = [['⚽', 'Mål'], ['🅰', 'Oplæg'], ['🧤', 'Redninger'], ['✈', 'Vundne luftdueller'], ['🟨', 'Gult kort'], ['🟥', 'Udvist'], ['🚑', 'Skadet'], ['👑', 'Kampens spiller'], ['🧠', 'Mod-kunnen (erfaring) optjent i kampen']];
 const TIP = Object.fromEntries(RATING_ICONS);
 // Mål og oplæg gentages (⚽⚽); redninger og luftdueller står som tal (🧤4).
 const REPEAT = new Set(['⚽', '🅰']);
@@ -63,7 +64,7 @@ function ratingsTable(list, isOwn, title, formation, snap = null, onSnap = null)
     h('table', {}, h('tbody', {}, rows.map((e) => h('tr', { class: e.isMotM ? 'motm' : '' },
       h('td', {}, `#${e.shirtNumber} ${e.shortName}`, h('span', { class: 'place' }, ` · ${e.place}`)), h('td', { class: 'muted' }, minutes(e)),
       h('td', { class: 'icons' }, e.goals ? icon('⚽', e.goals) : null, e.assists ? icon('🅰', e.assists) : null, e.saves ? icon('🧤', e.saves) : null, e.aerialWins ? icon('✈', e.aerialWins) : null,
-        e.yellowCard ? icon('🟨') : null, e.injured ? icon('🚑') : null, e.isMotM ? icon('👑') : null),
+        e.yellowCard ? icon('🟨') : null, e.red ? icon('🟥') : null, e.injured ? icon('🚑') : null, e.isMotM ? icon('👑') : null),
       h('td', { class: 'rating' }, isOwn ? e.rating.toFixed(1) : starsEl(e.stars)),
       isOwn ? h('td', { class: 'run', title: 'Løbet distance · andel højintenst løb (over ca. 20 km/t) · topfart – kun dit hold (det røber udholdenhed og fart)' }, e.distanceKm > 0 ? `${e.distanceKm.toFixed(1)} km${e.hiShare != null ? ` · ${Math.round(e.hiShare)} % HI` : ''}${e.topSpeed ? ` · ${e.topSpeed.toFixed(1)} km/t` : ''}` : '–') : null,
       isOwn ? h('td', { class: 'fri', title: 'Løb uden bold: kom fri / forsøg – kun dit hold (det røber positionering og fart)' }, e.freeRuns ? `${e.freeRunsWon ?? 0}/${e.freeRuns} fri` : '') : null,

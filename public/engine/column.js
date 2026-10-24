@@ -71,19 +71,19 @@ function drama(f) {
 // basis = de fakta, gættet bygger på – testet ⊆ PUBLIC_FACT_KEYS.
 export const STYLE_RULES = [
   { key: 'air', basis: ['headerGoals', 'goals', 'corners'], test: (s) => (s.headerGoals >= 1 && s.headerGoals * 2 >= s.goals) || s.corners >= 7,   // QC F3: hovedstød mindst halvdelen af målene
-    say: ['fik bolden ind i feltet via indlæg og hjørner', 'fandt vejen via indlæg og hjørner', 'søgte hovedet i feltet'] },
+    say: ['fik bolden ind i feltet via indlæg og hjørner', 'fandt vejen via indlæg og hjørner', 'søgte hovedet i feltet', 'bombarderede feltet med høje bolde', 'var farlige i luften'] },
   { key: 'break', basis: ['counterGoals'], test: (s) => s.counterGoals >= 1,
-    say: ['slog til i omstillingerne', 'straffede boldtab med hurtige angreb', 'var dødbringende, når bolden blev vundet'] },
+    say: ['slog til i omstillingerne', 'straffede boldtab med hurtige angreb', 'var dødbringende, når bolden blev vundet', 'gik hurtigt fremad efter erobringer', 'udnyttede den åbne bane bag forsvaret'] },
   { key: 'ball', basis: ['poss'], test: (s) => s.poss >= 58,
-    say: ['havde bolden det meste af tiden', 'styrede rytmen med bolden', 'lod bolden gå og gik ikke i panik'] },
+    say: ['havde bolden det meste af tiden', 'styrede rytmen med bolden', 'spillede roligt bolden rundt', 'satte sig på kampen med bolden', 'lod modstanderen løbe efter bolden'] },
   { key: 'wait', basis: ['poss', 'goals'], test: (s) => s.poss <= 42 && s.goals >= 1,
-    say: ['havde under halvdelen af bolden og scorede alligevel', 'klarede sig uden meget af bolden', 'scorede, selv om de havde bolden mindst'] },
+    say: ['havde under halvdelen af bolden og scorede alligevel', 'klarede sig uden meget af bolden', 'scorede, selv om de havde bolden mindst', 'fik meget ud af lidt', 'var effektive på få muligheder'] },
   { key: 'shots', basis: ['shots'], test: (s) => s.shots >= 12,
-    say: ['skød fra alle vinkler', 'pressede mange afslutninger igennem', 'testede målmanden igen og igen'] },
+    say: ['skød fra alle vinkler', 'pressede mange afslutninger igennem', 'testede målmanden igen og igen', 'havde skudstøvlerne på', 'afsluttede, hver gang muligheden bød sig'] },
   { key: 'dead', basis: ['setPieceGoals'], test: (s) => s.setPieceGoals >= 1,
-    say: ['fik dødboldene til at tælle', 'var skarpe på de faste situationer', 'slog til på dødbolde'] },
+    say: ['fik dødboldene til at tælle', 'var skarpe på de faste situationer', 'slog til på dødbolde', 'var farlige, når bolden lå stille', 'høstede på standardsituationerne'] },
   { key: 'switch', basis: ['reorganised'], test: (s) => s.reorganised >= 1,
-    say: ['skiftede om undervejs', 'omorganiserede sig i løbet af kampen', 'ændrede ansigt midt i kampen'] },
+    say: ['skiftede om undervejs', 'omorganiserede sig i løbet af kampen', 'ændrede ansigt midt i kampen', 'lagde om i løbet af kampen', 'fandt en ny opstilling undervejs'] },
 ];
 export const styleGuess = (s) => STYLE_RULES.filter((r) => r.test(s));
 const say = (rule, round, key) => pickBy(rule.say, round, rule.key, key);
@@ -104,7 +104,7 @@ function yourVerdict(r, mine, round) {
   if (r.counterGoalsAgainst >= 1) out.push([3, `Det kostede: ${r.counterGoalsAgainst === 1 ? 'et kontramål' : `${r.counterGoalsAgainst} kontramål`} imod${ph.offBallRuns === 'MANY' ? ', da bolden blev tabt med mange spillere fremme' : ''}.`]);   // årsagen kun med belæg (QC F2)
   if (r.press >= 4 && r.pressWon / r.press >= 0.5) out.push([2, `Dit pres vandt bolden ${r.pressWon} af ${r.press} gange.`]);
   if (r.runGoals >= 1) out.push([3, `Løbene uden bold gav ${r.runGoals === 1 ? 'et mål' : `${r.runGoals} mål`}.`]);
-  if (r.start?.formation && r.end?.formation && r.start.formation !== r.end.formation) out.push([2, `Skiftet fra ${r.start.formation} til ${r.end.formation} undervejs.`]);   // neutralt: skiftet alene beviser ikke udfaldet (QC F4)
+  if (r.start?.formation && r.end?.formation && r.start.formation !== r.end.formation) out.push([2, pickBy([`Skiftet fra ${r.start.formation} til ${r.end.formation} undervejs.`, `I gik fra ${r.start.formation} til ${r.end.formation} i løbet af kampen.`, `Formationen blev lagt om fra ${r.start.formation} til ${r.end.formation}.`], round, 'sw')]);   // neutralt: skiftet alene beviser ikke udfaldet (QC F4)
   return out.sort((a, b) => b[0] - a[0]).slice(0, 2).map(([, t]) => t);   // højst 2 sætninger om dit hold (Spilfører)
 }
 

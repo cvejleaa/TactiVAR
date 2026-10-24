@@ -69,7 +69,7 @@ test('spillerlister: titel/nøgle pr. liste, top 5 efter værdi (lighed: flest k
   const lists = all(root, (e) => e.dataset.key && e.dataset.key !== 'publicStars');
   assert.deepEqual(lists.map((l) => [l.dataset.key, l.children[0].textContent]), [
     ['sGoals', '⚽ Topscorere'], ['sAssists', '🅰 Flest oplæg'], ['sMotm', '👑 Kampens spiller'], ['sHeaderGoals', '🗣 Hovedstødsmål'],
-    ['sPenaltyGoals', '🎯 Straffemål'], ['sSetPieceGoals', '🧱 Dødboldmål'], ['sCleanSheets', '🧤 Clean sheets'], ['sYellow', '🟨 Gule kort']]);
+    ['sPenaltyGoals', '🎯 Straffemål'], ['sSetPieceGoals', '🧱 Dødboldmål'], ['sCleanSheets', '🧤 Clean sheets'], ['sYellow', '🟨 Gule kort'], ['sRed', '🟥 Røde kort']]);
   const top = items(list(root, 'sGoals'));
   // Fire celler: placering · #nr Navn · kort holdnavn · værdi (ingen ombrud – hver ting i sin egen celle)
   const sn = (t) => shortTeam(t.name);
@@ -106,14 +106,14 @@ test('holdtal: ni kolonner uden taktik-afslørende tal, alle hold, bold % = snit
   Object.assign(row(other), { sMatches: 3, possSum: 150, fouls: 12, foulsWon: 13, yellows: 1, penalties: 2, penaltyGoals: 1, setPieceGoals: 3, cleanSheets: 1, shots: 55, counterGoals: 44 });
   const root = render(L, me);
   const tbl = byId(root, 'team-stats');
-  assert.deepEqual(all(tbl, (e) => e.tag === 'th').map((t) => t.textContent), ['Hold', 'Bold %', 'Frispark begået', 'Frispark tilkendt', '🟨', 'Straffe for (scoret)', 'Dødboldmål', 'Hovedstødsmål', 'Clean sheets']);
+  assert.deepEqual(all(tbl, (e) => e.tag === 'th').map((t) => t.textContent), ['Hold', 'Bold %', 'Frispark begået', 'Frispark tilkendt', '🟨', '🟥', 'Straffe for (scoret)', 'Dødboldmål', 'Hovedstødsmål', 'Clean sheets']);
   const rows = all(tbl, (e) => e.tag === 'tr' && e.children[0].tag === 'td');
   assert.equal(rows.length, 8);
   const mineRow = rows.find((r) => r.className === 'mine'), otherRow = rows.find((r) => r.children[0].textContent === other.name);
   assert.equal(mineRow.children[0].textContent, me.name); assert.equal(rows.filter((r) => r.className === 'mine').length, 1);
-  assert.deepEqual(cells(mineRow), [me.name, '53', '31', '27', '6', '5 (4)', '7', '0', '2']);          // 210/4 = 52,5 → 53
-  assert.deepEqual(cells(otherRow), [other.name, '50', '12', '13', '1', '2 (1)', '3', '0', '1']);
-  assert.deepEqual(cells(rows.find((r) => r.children[0].textContent === third.name)), [third.name, '–', '0', '0', '0', '0 (0)', '0', '0', '0']);   // ingen kampe: ingen bold-%
+  assert.deepEqual(cells(mineRow), [me.name, '53', '31', '27', '6', '0', '5 (4)', '7', '0', '2']);          // 210/4 = 52,5 → 53
+  assert.deepEqual(cells(otherRow), [other.name, '50', '12', '13', '1', '0', '2 (1)', '3', '0', '1']);
+  assert.deepEqual(cells(rows.find((r) => r.children[0].textContent === third.name)), [third.name, '–', '0', '0', '0', '0', '0 (0)', '0', '0', '0']);   // ingen kampe: ingen bold-%
   const text = tbl.textContent;
   for (const hidden of ['99', '88', '77', '66', '55', '44']) assert.ok(!text.includes(hidden), `${hidden} er et privat holdtal`);
 });
