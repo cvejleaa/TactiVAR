@@ -98,7 +98,7 @@ test('første billede: hold og bold på deres pladser (x → left, y → top), k
   assert.equal(el.id, 'replay');
   assert.equal(step(el), 0);
   assert.equal(cap(el), "0' · Hjemme 0-0 Ude");
-  assert.match(el.children[0].textContent, /^🎬 Afspilning – taktiktavle ud fra 4 øjebliksbilleder \(hvert 3\. minut\) og afslutningerne\. Hjemme angriber opad\.$/);
+  assert.match(el.children[0].textContent, /^🎬 Afspilning – taktiktavle ud fra 4 øjebliksbilleder \(hvert 3\. minut\) og afslutningerne i åbent spil \(dødbolde – straffe, frispark, hjørnespark – har intet billede\)\. Hjemme angriber opad\.$/);
   const ball = byId(el, 'rp-ball');
   assert.deepEqual([ball.style.left, ball.style.top], ['50%', '50%']);
   assert.equal(tokens(el).length, 6);

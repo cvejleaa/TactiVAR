@@ -3,12 +3,17 @@
 // 1) BREDT: 20 kampe er for få til en optager, der kun ændrer én kamp ud af ~300. Mutationen "optageren skriver seen[holdet] i
 //    baseFrame" (skriver i den tilstand øjebliksbilledet læser) ændrede KUN resultatet i 1 af 300 kampe (seed 260 her: et
 //    øjebliksbillede hænges på det forkerte referat-event) og overlevede derfor den lille hash. Her: 400 kampe, hash af hele
-//    resultatet UDEN sporet. Værdien er regnet på main (2bc2d4f), FØR sporet fandtes – altså beviset for, at optagelsen ikke
-//    flytter én eneste kamp. (Ændres motoren bevidst, opdateres værdien her og i trace-golden – commit-teksten siger hvorfor.)
+//    resultatet UDEN sporet. Værdien var først regnet på main (2bc2d4f, v3.15.1), FØR sporet fandtes. Den motor findes ikke
+//    mere: v3.16 ændrede kampene BEVIDST (koblede linjer – coupledPositions, SHOT_REACH 28, LONGSHOT_Y 30, EDGE_BY_PRESS,
+//    COUNTER_RUN, MISS_BLOCK_SHARE 0,66; spec §5 "Koblede linjer"). Værdien er derfor regnet igen på v3.16-motoren – og
+//    efterprøvet uden optageren: med baseFrame og momentAt gjort tomme (return først) giver de 400 kampe præcis samme hash.
+//    Formålet er det samme: optageren må ikke flytte én eneste kamp (mutationerne "optageren skriver i seen" og "optageren
+//    trækker på rng" gør den rød). Ændres motoren bevidst igen, regnes værdien om – og efterprøves igen uden optageren
+//    (her og i trace-golden – commit-teksten siger hvorfor).
 // 2) SPORET SELV: hash af de 20 kampes spor. Sporet er fuldt bestemt af motoren og seedet; en ændring af koordinatsystem,
 //    spejling, afrunding, hvilket billede et øjeblik tegnes med, skytter, tidspunkter og hvilke afslutninger der får et billede
 //    skal være BEVIDST. Hashen forklarer ikke HVORFOR den fejler – det gør trace-oracle.test.mjs, som bindes mod
-//    livePositions, øjebliksbilledet og referatet; hashen er sikkerhedsnettet mod det, orakel-testene ikke tænker på.
+//    coupledPositions, øjebliksbilledet og referatet; hashen er sikkerhedsnettet mod det, orakel-testene ikke tænker på.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -16,8 +21,8 @@ import { createRng } from '../../public/engine/rng.js';
 import { createLeague } from '../../public/engine/generator.js';
 import { simulateMatch } from '../../public/engine/match.js';
 
-const GOLDEN_RESULTS_400 = '4377384b0998169a542f6a2c32e77f6407263e7b4448c87be868c21c8aecb6c3';   // v3.15.1 (main 2bc2d4f) – regnet uden sporet
-const GOLDEN_TRACES_20 = '9735f95a428bdaf145cece822d5002e33865468e913c0514194678cfcbc08664';     // v3.16.0
+const GOLDEN_RESULTS_400 = '7385286247476d7d9f3f84080d6d261f3729a1faf8f44c400cb9fc542434a0bc';   // v3.16 (koblede linjer) – = hashen uden optageren
+const GOLDEN_TRACES_20 = '2e238fd9e0e057fb290057f2c6323d6a3ca0a63bb146f23d13f66e300b49dfb5';     // v3.16: koblede linjer, bolden ved skytten, skytten i feltet
 function matchN(s) {
   const L = createLeague(createRng(s * 97)), me = L.teams.find((t) => !t.isBot), opp = L.teams[(s % 7) + 1];
   return s % 2 ? simulateMatch(me, opp, createRng(s * 131)) : simulateMatch(opp, me, createRng(s * 131));
@@ -33,7 +38,7 @@ const FP = (() => {
   return { results: h.digest('hex'), traces: h20.digest('hex') };
 })();
 
-test('bredt fingeraftryk: 400 seedede kampe er uændrede af optagelsen (hash af hele resultatet uden sporet = værdien fra før v3.16)', () => {
+test('bredt fingeraftryk: 400 seedede kampe er uændrede af optagelsen (hash af hele resultatet uden sporet = værdien uden optageren, v3.16-motoren)', () => {
   assert.equal(FP.results, GOLDEN_RESULTS_400);
 });
 test('sporets fingeraftryk: de 20 første kampes spor er uændrede (bevidst ændring af sporet? opdatér GOLDEN_TRACES_20 og sig hvorfor)', () => {
