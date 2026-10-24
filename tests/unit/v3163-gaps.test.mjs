@@ -276,12 +276,15 @@ test('direkte frisparksmål: kampens brugte måltekster gælder også frisparken
 // ---------- røde kort i klummen: variantvalget pr. runde og hold (bogstaveligt) ----------
 // Forfatterens test samler runde 0 og 1 i en sorteret liste og kan derfor ikke se, hvilken variant der hører til hvilken runde
 // – eller at modstanderens linje vælges på HANS id (ikke dit). Hold h1/a1: runde 0 giver dit "Med 10 mand …" og hans "Ude fik …".
-test('røde kort i klummen: variant pr. runde — dit holds linje vælges på dit id, modstanderens på hans (bogstaveligt, runde 0–3)', () => {
-  const m = (hR, aR) => ({ homeId: 'h1', awayId: 'a1', homeName: 'Hjem', awayName: 'Ude', homeGoals: 1, awayGoals: 1, events: [], goalsPool: [], stats: { hPoss: 50, aPoss: 50, hReds: hR, aReds: aR } });
-  const lines = (round) => buildColumn({ matches: [m(1, 1)], gazette: null, history: [], table: [], next: [], viewerTeamId: 'h1', round }).sections[0].paras.slice(1);
-  const mine = ['Med 10 mand efter udvisningen blev det op ad bakke.', 'Et rødt kort kostede: Hjem måtte spille med 10 mand.'];
-  const his = ['Ude fik rødt kort og spillede med 10 mand.', 'Ude mistede en mand på rødt kort.'];
-  assert.deepEqual([0, 1, 2, 3].map(lines), [[mine[0], his[0]], [mine[1], his[1]], [mine[0], his[0]], [mine[1], his[1]]]);
+test('røde kort i klummen: dit holds nederlagslinje vælges pr. runde på DIT id; uafgjort og modstanderens linje er faste (bogstaveligt, runde 0–3)', () => {
+  const m = (hG, aG) => ({ homeId: 'h1', awayId: 'a1', homeName: 'Hjem', awayName: 'Ude', homeGoals: hG, awayGoals: aG, events: [], goalsPool: [], stats: { hPoss: 50, aPoss: 50, hReds: 1, aReds: 1 } });
+  const reds = (round, hG, aG) => buildColumn({ matches: [m(hG, aG)], gazette: null, history: [], table: [], next: [], viewerTeamId: 'h1', round }).sections[0].paras.filter((t) => /rødt kort|med 10 mand|udvisningen/.test(t));
+  const loss = ['Et rødt kort kostede: Hjem måtte spille med 10 mand.', 'Med 10 mand efter udvisningen blev det op ad bakke.'];
+  const pick = (round) => pickBy(loss, round, 'red', 'h1');
+  assert.deepEqual([0, 1, 2, 3].map((r) => reds(r, 0, 1)), [0, 1, 2, 3].map((r) => [pick(r), 'Ude fik rødt kort undervejs.']));
+  assert.ok(new Set([0, 1, 2, 3].map(pick)).size === 2, 'begge nederlagsvarianter forekommer');
+  assert.deepEqual(reds(0, 1, 1), ['Hjem holdt point med 10 mand efter udvisningen.', 'Ude fik rødt kort undervejs.']);
+  assert.deepEqual(reds(0, 2, 1), ['Et rødt kort til trods: Hjem vandt med 10 mand.', 'Ude fik rødt kort undervejs.']);
 });
 
 // ---------- banens skala ----------
