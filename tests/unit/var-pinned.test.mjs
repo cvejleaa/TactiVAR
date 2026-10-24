@@ -76,7 +76,7 @@ test('annulleret mål (offside): den tjekkede −0,4 og forsvareren +0,45 pr. m�
   assert.deepEqual([no.m.homeGoals, no.m.stats.hShots, no.m.stats.hOnTarget, no.m.stats.hVarChecks, no.m.homeVarNet], [0, 2, 0, 2, -2]);
   assert.equal(evs(no.m, 'SAVE').length, 0, 'et annulleret mål er ingen redning');
   // Observationen går til den tjekkede (ikke til skytten eller forsvareren)
-  assert.ok(no.m.observations.some((o) => o.playerId === off.id && /^VAR-annullering \(\d+\. min mod .+\): .+ var en anelse for tidligt af sted\.$/.test(o.text)));
+  assert.ok(no.m.observations.some((o) => o.playerId === off.id && /^VAR-annullering \(mod .+\): .+ var en anelse for tidligt af sted\.$/.test(o.text)));
   assert.ok(!no.m.observations.some((o) => o.playerId === no.d.id && /VAR/.test(o.text)));
 });
 test('annulleret mål (frispark i opspillet): skytten −0,3 pr. mål og angriberens frispark tælles – forsvareren får hverken karakter eller sejr', () => {
@@ -447,7 +447,7 @@ test('VAR tjekker en holdkammerat foran skytten: godkendt → timingen er den TJ
   assert.match(g.text, /📺 VAR: målet står – #\d+ .+ foran #6 A\. Hansen stod ikke offside; han timede sit løb med iskold præcision\.$/);
   const off = find(r.a, g.text.match(/målet står – (#\d+ .+?) foran/)[1]);
   assert.ok(off === slot(r.a.H, 9) || off === slot(r.a.H, 10));
-  assert.ok(r.m.observations.some((o) => o.playerId === off.id && o.text === `VAR-tjek (3. min mod ${r.a.A.name}): ${off.shortName} timede sit løb med iskold præcision.`), 'observationen går til den tjekkede');
+  assert.ok(r.m.observations.some((o) => o.playerId === off.id && o.text === `VAR-tjek (mod ${r.a.A.name}): ${off.shortName} timede sit løb med iskold præcision.`), 'observationen går til den tjekkede');   // v3.16.3: uden minut
   assert.ok(!r.m.observations.some((o) => o.playerId === r.shooter.id && /^VAR-/.test(o.text)), 'skytten får ingen VAR-observation');
   // omvendt: den tjekkede er slap (5), skytten iskold (30) → afgørelsen følger den tjekkede
   const w = behindRun(ONE_CHECK, { offPulse: 5, shooterPulse: 30, trap: 22 });

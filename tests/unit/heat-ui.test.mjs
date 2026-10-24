@@ -208,8 +208,30 @@ test('modstanderens zone-kort (v3.16.1, QC): "Dit mål" og "din side" KUN i kamp
   const mine = render(mOf(), base.homeId).el;
   assert.deepEqual(goals(mine), ['Deres mål', 'Dit mål']);
   assert.equal(notes(mine).length, 1); assert.match(notes(mine)[0], /^Set fra din side: de angriber nedad mod dit mål/);
+  // v3.16.3 (én retningsregel som afspilningen): i en kamp uden dit hold angriber hjemmeholdet OPAD (kortet vendt, målmærkerne
+  // byttet: deres mål nederst) og udeholdet nedad
   const other = render(mOf(), 'ingen-af-dem').el;
-  assert.deepEqual(goals(other), ['Deres mål', 'Modstanderens mål', 'Deres mål', 'Modstanderens mål']);
+  assert.deepEqual(goals(other), ['Modstanderens mål', 'Deres mål', 'Deres mål', 'Modstanderens mål']);
   assert.equal(notes(other).length, 2);
-  for (const t of notes(other)) { assert.match(t, /^De angriber nedad\./); assert.doesNotMatch(t, /din|dit/i); }
+  assert.match(notes(other)[0], /^De angriber opad\./); assert.match(notes(other)[1], /^De angriber nedad\./);
+  for (const t of notes(other)) assert.doesNotMatch(t, /din|dit/i);
+  // Du er ude: hjemmeholdet er modstanderen og angriber nedad mod dit mål
+  const away = render(mOf(), base.awayId).el;
+  assert.deepEqual(goals(away), ['Deres mål', 'Dit mål']); assert.match(notes(away)[0], /^Set fra din side: de angriber nedad mod dit mål/);
+});
+
+// v3.16.3 (QC: kortene i samme ark vendte modsat): startopstillingen under modstanderens zone-kort vender som kortet – nedad
+// (spejlet: x → 100 − x, y → 100 − y) – og dit hold opad; i en kamp uden dit hold hjemme opad, ude nedad. Tallene i hånden:
+// GK (50, 90): opad 90 → 97, nedad 10 → 3; LB (15, 70): opad (15, 73,5), nedad (85, 30 → 26,5).
+test('startopstillingen (miniPitch) vender som zone-kortet: modstanderen nedad, dit hold opad; neutral kamp hjemme opad, ude nedad', () => {
+  const pos = (table, r) => { const t = all(table, (x) => cls(x, 'mp-token')).find((x) => x.attrs.title?.startsWith(`${r} – `)); return t && [t.style.left, t.style.top]; };
+  const UP = { GK: ['50%', '97%'], LB: ['15%', '73.5%'] }, DOWN = { GK: ['50%', '3%'], LB: ['85%', '26.5%'] };
+  assert.deepEqual([base.startFormations.home, base.startFormations.away], ['4-4-2', '4-4-2'], 'data: begge i 4-4-2');
+  for (const [viewer, home, away] of [[base.homeId, UP, DOWN], [base.awayId, DOWN, UP], ['ingen-af-dem', UP, DOWN]]) {
+    const t = tables(render(mOf(), viewer).el);
+    for (const r of ['GK', 'LB']) {
+      assert.deepEqual(pos(t[0], r), home[r], `${viewer} hjemme ${r}`);
+      assert.deepEqual(pos(t[1], r), away[r], `${viewer} ude ${r}`);
+    }
+  }
 });

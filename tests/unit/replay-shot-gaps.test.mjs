@@ -92,24 +92,26 @@ const mk = () => ({ homeName: 'Hjemme', awayName: 'Ude', ratings, events, trace:
   { t: 1, ev: 1, shooter: 'h9', ...mo('h', 'MISS', [50, 20], AWAY) }, { t: 1, ev: 2, shooter: 'h9', ...mo('h', 'MISS', [40, 22], AWAY) }] } });
 // Trinene (fuld): 0 frame t1 · 1 blokeret · 2 skud → (60, 30) · 3 stolpe · 4 skud → (44, 1) · 5 frame t2.  Højdepunkter: 0 · 1 skud · 2 · 3 skud
 const fresh = () => { clearReplays(); const m = mk(); return { m, el: replayEl(m, 'h') }; };
+// v3.16.3: blokeringens ende er blokerens plads (endPlayer) og tegnes som brikkerne: (60, 30) → top 50 − 20·1,175 = 26,5;
+// stolpen (44, 3) er et mållinje-punkt og skaleres ikke. Brikkerne: (40, 22) → 17,1; (50, 50) → 50.
 
 test('ledningen: blokeringen er den NAVNGIVNE (a3, ikke nærmeste a2) og stolpen på stolpen – i grundafspilningen, efter ⭐ og efter 🎬 – dræber tabt idOf/referat i replayEl, ⭐-knappen og r.jump', () => {
   let { m, el } = fresh();
   for (let i = 0; i < 2; i++) click(el, 'rp-next');
-  assert.deepEqual(ballAt(el), ['60%', '30%'], 'start: idOf');
+  assert.deepEqual(ballAt(el), ['60%', '26.5%'], 'start: idOf');
   for (let i = 0; i < 2; i++) click(el, 'rp-next');
   assert.deepEqual(ballAt(el), ['44%', '3%'], 'start: referatet (stolpen)');
   // ⭐ fra første trin: højdepunkterne er byggede igen, med referat og idOf
   ({ m, el } = fresh()); click(el, 'rp-highlights');
   click(el, 'rp-next'); assert.equal(step(el), 1, 'højdepunkter: 0 blokeringen, 1 dens skudtrin');
-  assert.deepEqual(ballAt(el), ['60%', '30%'], '⭐: idOf'); click(el, 'rp-next'); click(el, 'rp-next');
+  assert.deepEqual(ballAt(el), ['60%', '26.5%'], '⭐: idOf'); click(el, 'rp-next'); click(el, 'rp-next');
   assert.deepEqual(ballAt(el), ['44%', '3%'], '⭐: referatet');
   // 🎬 mens ⭐ er til: højdepunkterne slås fra og fuld afspilning bygges igen – med referat og idOf
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
     ({ m, el } = fresh()); click(el, 'rp-highlights');
     replayJump(m, 1); assert.equal(step(el), 1, 'fuld afspilning igen'); mock.timers.tick(2600);
-    assert.equal(step(el), 2); assert.deepEqual(ballAt(el), ['60%', '30%'], '🎬: idOf');
+    assert.equal(step(el), 2); assert.deepEqual(ballAt(el), ['60%', '26.5%'], '🎬: idOf');
     replayJump(m, 2); mock.timers.tick(2600);
     assert.equal(step(el), 4); assert.deepEqual(ballAt(el), ['44%', '3%'], '🎬: referatet');
   } finally { clearReplays(); mock.timers.reset(); }
@@ -133,7 +135,7 @@ test('⏮ fra grundbilledet lander på skudtrinnet med øjeblikkets brikker (sky
   assert.deepEqual([tok(el, 'h9').style.left, tok(el, 'h9').style.top], ['50%', '50%']);
   click(el, 'rp-prev'); assert.equal(step(el), 4);
   assert.deepEqual(ballAt(el), ['44%', '3%']);
-  assert.deepEqual([tok(el, 'h9').style.left, tok(el, 'h9').style.top], ['40%', '22%'], 'skytten, hvor han skød');
+  assert.deepEqual([tok(el, 'h9').style.left, tok(el, 'h9').style.top], ['40%', '17.1%'], 'skytten, hvor han skød');
   assert.ok(cls(tok(el, 'h9'), 'actor'));
   assert.ok(cls(byId(el, 'rp-caption'), 'moment'), 'billedteksten er øjeblikkets (ikke grundbilledets)');
 });

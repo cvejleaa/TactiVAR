@@ -46,7 +46,7 @@ test('VAR-tjekket nævner kun en af de forreste som offside-mand – og en skytt
 test('tekster (brugerens ordvalg): "spillede 1-2", ikke "spillede væggen"; klummen siger "havde bolden mindst", ikke "med lidt af bolden"', async () => {
   const fs = await import('node:fs');
   const clues = fs.readFileSync(new URL('../../public/engine/clues.js', import.meta.url), 'utf8');
-  assert.match(clues, /spillede 1-2 i \$\{m\}\. minut/); assert.doesNotMatch(clues, /væggen/);
+  assert.match(clues, /\$\{a\} og \$\{s\} spillede 1-2, og/);   // v3.16.3: uden minut assert.doesNotMatch(clues, /væggen/);
   const { STYLE_RULES } = await import('../../public/engine/column.js');
   const wait = STYLE_RULES.find((r) => r.key === 'wait').say;
   assert.ok(wait.includes('scorede, selv om de havde bolden mindst'), wait.join(' | '));

@@ -80,8 +80,12 @@ test('trinene: frames i tick-orden, hvert tick efterfulgt af sine afslutninger i
   assert.deepEqual([s[5].actor, s[5].assist], ['a3', null], 'en redning: skytten er aktør, intet oplæg');
   assert.deepEqual([s[10].actor, s[10].assist], ['a3', null]);
   // skudtrinnet er øjeblikket med en anden bold: samme billede, aktører og hændelse
-  const { over, ...shot3 } = s[3];
+  const { over, endPlayer, ...shot3 } = s[3];
   assert.equal(over, false, 'et mål flyver ikke over');
+  // endPlayer (v3.16.3): skuddets ende er en spillers plads (redningen: keeperen h1 på (50, 90)) – tegnes som brikkerne;
+  // mållinje-punkterne (45, 2), (38, 98), (55, 98) er ingen spillers plads
+  assert.deepEqual([3, 6, 8, 11].map((i) => s[i].endPlayer), [false, true, false, false]);
+  assert.equal(endPlayer, false);
   assert.deepEqual({ ...shot3, kind: 'moment', ball: s[2].ball }, s[2]);
   assert.deepEqual(s[1].ball, [44, 50]); assert.deepEqual(s[1].h, trace.frames[1].h);
 });
@@ -114,8 +118,10 @@ test('første billede: hold og bold på deres pladser (x → left, y → top), k
   assert.deepEqual([ball.style.left, ball.style.top], ['50%', '50%']);
   assert.equal(tokens(el).length, 6);
   const t = tok(el, 'h2'), u = tok(el, 'a3');
-  assert.deepEqual([t.style.left, t.style.top, t.textContent], ['30%', '60%', '2']);
-  assert.deepEqual([u.style.left, u.style.top, u.textContent], ['68%', '61%', '13']);
+  // v3.16.3: y tegnes med banens skala 1,175 om 50 (målmanden ved mållinjen): 60 → 61,75 → 61.8; 61 → 62,925 → 62.9 (x uændret)
+  assert.deepEqual([t.style.left, t.style.top, t.textContent], ['30%', '61.8%', '2']);
+  assert.deepEqual([u.style.left, u.style.top, u.textContent], ['68%', '62.9%', '13']);
+  assert.deepEqual([tok(el, 'h1').style.top, tok(el, 'a1').style.top], ['97%', '3%'], 'målmændene (90/10) ved mållinjen (97/3), ikke 10 % ude');
   assert.equal(t.attrs.title, '#2 B. Back (Hjemme)'); assert.equal(u.attrs.title, '#13 Z. Spids (Ude)');
   assert.ok(tokens(el).every((x) => !x.hidden));
   // antallet i overskriften er billederne (ikke afslutningerne): 2 billeder og 1 afslutning
@@ -147,11 +153,12 @@ test('trin frem og tilbage: bolden og brikkerne følger trinet; stillingen i et 
   // bolden og brikkerne
   click(el, 'rp-next'); click(el, 'rp-next');   // mål, trin 2
   const ball = byId(el, 'rp-ball');
-  assert.deepEqual([ball.style.left, ball.style.top], ['41%', '22%']);
-  assert.deepEqual([tok(el, 'h3').style.left, tok(el, 'h3').style.top, tok(el, 'a2').style.left, tok(el, 'a2').style.top], ['41%', '22%', '33%', '39%']);
-  click(el, 'rp-next');   // skudtrinnet: bolden i nettet ved siden af keeperen (45, 2), skytten står, hvor han skød
+  // skala (v3.16.3): 22 → 50 − 28·1,175 = 17,1; 39 → 50 − 11·1,175 = 37,075 → 37.1
+  assert.deepEqual([ball.style.left, ball.style.top], ['41%', '17.1%']);
+  assert.deepEqual([tok(el, 'h3').style.left, tok(el, 'h3').style.top, tok(el, 'a2').style.left, tok(el, 'a2').style.top], ['41%', '17.1%', '33%', '37.1%']);
+  click(el, 'rp-next');   // skudtrinnet: bolden i nettet ved siden af keeperen (45, 2) – et mållinje-punkt skaleres ikke; skytten står, hvor han skød
   assert.deepEqual([ball.style.left, ball.style.top], ['45%', '2%']);
-  assert.deepEqual([tok(el, 'h3').style.left, tok(el, 'h3').style.top], ['41%', '22%']);
+  assert.deepEqual([tok(el, 'h3').style.left, tok(el, 'h3').style.top], ['41%', '17.1%']);
 });
 
 test('markeringer: aktøren og oplægsgiveren markeres i øjeblikket og kun dér; billedtekstens "moment"-klasse følger trinnets slags', () => {
@@ -347,4 +354,43 @@ test('duellens tekst (v3.16.1): alle fire udfald for begge hold – erobringen n
   assert.equal(duelText({ poss: 'h', duel: 'offside' }, m), ' · Hjemme: fanget offside');
   assert.equal(duelText({ poss: 'a', duel: 'run' }, m), ' · Ude spiller sig frem til angriberen');
   assert.equal(duelText({ poss: null, duel: null }, m), '');
+});
+
+// ---------- v3.16.3: dit hold angriber altid opad (spejling for udeholds-seeren) og redningens bold ----------
+// Forventningerne er regnet i hånden (ikke med drawY): spejlet (x, y) → (100 − x, 100 − y), derefter y-skala 50 + (y − 50)·1,175.
+test('udeholds-seer: brikker og bold spejles (x → 100 − x, y → 100 − y) og teksten siger "Ude angriber opad"; hjemme-seer og neutral er uspejlede', () => {
+  const at = (el, pid) => [tok(el, pid).style.left, tok(el, pid).style.top];
+  const head = (el) => el.children[0].textContent;
+  const a = fresh('a').el;
+  assert.match(head(a), / Ude angriber opad\.$/);
+  // a3 (68, 61) → (32, 39) → top 50 − 11·1,175 = 37,075 → 37.1; h1 (50, 90) → (50, 10) → 3; a1 (50, 10) → (50, 90) → 97
+  assert.deepEqual(at(a, 'a3'), ['32%', '37.1%']);
+  assert.deepEqual([at(a, 'h1'), at(a, 'a1')], [['50%', '3%'], ['50%', '97%']], 'udeholdets keeper nederst, dit mål');
+  for (const side of ['h', null]) {
+    const e = fresh(side).el;
+    assert.match(head(e), / Hjemme angriber opad\.$/, String(side));
+    assert.deepEqual(at(e, 'a3'), ['68%', '62.9%'], `${side}: 61 → 62,925 → 62.9, ingen spejling`);
+    assert.deepEqual([at(e, 'h1'), at(e, 'a1')], [['50%', '97%'], ['50%', '3%']], String(side));
+  }
+  // Bolden i et øjeblik spejles og skaleres: målet ev1 ved (41, 22) → (59, 78) → 50 + 28·1,175 = 82,9
+  click(a, 'rp-next'); click(a, 'rp-next');
+  assert.deepEqual([byId(a, 'rp-ball').style.left, byId(a, 'rp-ball').style.top], ['59%', '82.9%']);
+  assert.deepEqual(at(a, 'h3'), ['59%', '82.9%'], 'skytten under bolden');
+  // skudtrinnet: mållinje-punktet (45, 2) spejles, men skaleres ikke → (55, 98)
+  click(a, 'rp-next');
+  assert.deepEqual([byId(a, 'rp-ball').style.left, byId(a, 'rp-ball').style.top], ['55%', '98%']);
+});
+test('redningens bold = målmandens TEGNEDE plads (endPlayer skaleres som brikkerne) – også spejlet; et skud forbi ved mållinjen skaleres ikke', () => {
+  for (const [side, top] of [['h', '97%'], ['a', '3%']]) {
+    const { el } = fresh(side);
+    for (let i = 0; i < 6; i++) click(el, 'rp-next');
+    assert.equal(step(el), 6, 'skudtrinnet efter redningen (ev2)');
+    const ball = byId(el, 'rp-ball'), gk = tok(el, 'h1');
+    // keeperen h1 står på (50, 90): hjemme-seer 90 → 97; ude-seer 100 − 90 = 10 → 3 (ikke 90/10 – det var 7 % ved siden af ham)
+    assert.deepEqual([ball.style.left, ball.style.top], ['50%', top], side);
+    assert.deepEqual([gk.style.left, gk.style.top], ['50%', top], `${side}: bolden hos målmanden`);
+    click(el, 'rp-next'); click(el, 'rp-next');   // skudtrinnet efter forbi (ev4): (38, 98) – mållinjen, ikke skaleret
+    assert.equal(step(el), 8);
+    assert.deepEqual([ball.style.left, ball.style.top], side === 'h' ? ['38%', '98%'] : ['62%', '2%'], `${side}: forbi`);
+  }
 });

@@ -75,16 +75,27 @@ test('frispark i opspillet: den samme spiller nævnes i tjekket og i kendelsen, 
 });
 
 test('offside-tjekket: den tjekkede får observationen (godkendt: timingen, annulleret: "for tidligt af sted")', () => {
-  let n = 0;
-  for (const { m, H, A } of GOAL_CHECKS) for (const e of m.events.filter((x) => x.type === 'VAR_CHECK' && x.var.kind === 'OFFSIDE')) {
-    const name = e.text.match(/stod (#\d+ .+?) offside\?/)[1];
-    const p = [...H.squad, ...A.squad].find((x) => `#${x.shirtNumber} ${x.shortName}` === name);
-    const o = m.observations.filter((x) => x.playerId === p.id && new RegExp(`^VAR-(tjek|annullering) \\(${e.min}\\. min`).test(x.text));
-    assert.ok(o.length >= 1, `${name}: ${e.text}`);
-    if (e.var.verdict === 'OVERTURNED') assert.ok(o.some((x) => /for tidligt af sted/.test(x.text)));
-    n++;
+  // v3.16.3: observationen har intet minut længere ("VAR-tjek (mod X)") – i stedet tælles pr. kamp og spiller: præcis én
+  // "VAR-tjek (mod modstanderen)" pr. godkendt tjek og én "VAR-annullering (mod modstanderen)" pr. annulleret.
+  let n = 0, nOver = 0;
+  for (const { m, H, A } of GOAL_CHECKS) {
+    const want = new Map();
+    for (const e of m.events.filter((x) => x.type === 'VAR_CHECK' && x.var.kind === 'OFFSIDE')) {
+      const name = e.text.match(/stod (#\d+ .+?) offside\?/)[1];
+      const p = [...H.squad, ...A.squad].find((x) => `#${x.shirtNumber} ${x.shortName}` === name);
+      const opp = H.squad.includes(p) ? A.name : H.name;
+      const w = want.get(p) ?? { opp, ok: 0, over: 0 };
+      if (e.var.verdict === 'OVERTURNED') { w.over++; nOver++; } else w.ok++;
+      want.set(p, w); n++;
+    }
+    for (const [p, w] of want) {
+      const o = m.observations.filter((x) => x.playerId === p.id && /^VAR-/.test(x.text));
+      assert.equal(o.filter((x) => x.text.startsWith(`VAR-tjek (mod ${w.opp}): ${p.shortName} `)).length, w.ok, `${p.shortName}: godkendte`);
+      assert.equal(o.filter((x) => x.text === `VAR-annullering (mod ${w.opp}): ${p.shortName} var en anelse for tidligt af sted.`).length, w.over, `${p.shortName}: annullerede`);
+      assert.ok(o.every((x) => !/\d+\. min/.test(x.text)), 'intet minut i observationen');
+    }
   }
-  assert.ok(n >= 40, `data: ${n}`);
+  assert.ok(n >= 40 && nOver >= 3, `data: ${n} tjek, ${nOver} annulleret`);
 });
 
 test('VAR ± (stillingen) tæller kun de kendelser, VAR ændrede: annulleret mål −1, straffe annulleret −1, givet +1, rødt trukket tilbage +1, opgraderet −1 – et godkendt tjek 0 (før +1)', () => {

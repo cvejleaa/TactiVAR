@@ -269,7 +269,7 @@ test('⏮ baglæns ind i et skudtrin (QC v3.16.2): brikkerne står som i øjebli
   assert.deepEqual([h9.style.left, h9.style.top, cls(h9, 'actor')], ['50%', '50%', false]);
   click(el, 'rp-prev');   // trin 4: stolpeskuddets skudtrin
   assert.equal(step(el), 4);
-  assert.deepEqual([h9.style.left, h9.style.top, cls(h9, 'actor')], ['40%', '22%', true]);
+  assert.deepEqual([h9.style.left, h9.style.top, cls(h9, 'actor')], ['40%', '17.1%', true]);   // v3.16.3-skala: 22 → 50 − 28·1,175 = 17,1
   clearReplays();
 });
 

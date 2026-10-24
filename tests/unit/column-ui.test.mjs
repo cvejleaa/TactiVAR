@@ -44,6 +44,9 @@ test('uden klumme får gamle visninger den gamle avis (ingen col-title), og uden
   const old = renderGazette(G(), 'h1', null, MATCHES);
   assert.equal(byId(old, 'col-title'), undefined);
   assert.ok(byId(old, 'headlines') && txt(byId(old, 'headlines')).includes('Gammel overskrift'));
+  // v3.16.3: også den gamle avis viser modstanderens rundens spiller som "rundens bedste karakter" (ingen stjerner, intet tal)
+  assert.equal(txt(byId(old, 'player-of-round')), '🏆 Rundens spiller: #9 Hansen (Ude) – rundens bedste karakter');
+  assert.equal(txt(byId(renderGazette(G(), 'a1', null, MATCHES), 'player-of-round')), '🏆 Rundens spiller: #9 Hansen (Ude) – karakter 8.4');
   assert.equal(renderGazette(null, 'h1', null, MATCHES, COL), null, 'ingen gazette → intet, også selv om en klumme er givet');
   assert.equal(renderGazette(null, 'h1'), null);
 });
@@ -79,14 +82,15 @@ test('klummen: overskrift, afsnit med id og titel i rækkefølge, tomme sætning
   assert.match(txt(renderGazette(G(), 'h1', null, null, COL)), /de 4 stadions/);
 });
 
-test('klummen, afsnit 3: modstanderens spiller kun med stjerner (aldrig karakteren), din egen med karakter; begrundelsen og målets link', () => {
+// v3.16.3 (Spilfører: "4 stjerner" til rundens bedste lød middelmådigt): modstanderens spiller får "rundens bedste karakter" i stedet for stjerner – stadig aldrig tallet
+test('klummen, afsnit 3: modstanderens spiller med "rundens bedste karakter" (aldrig tallet, ingen stjerner), din egen med karakter; begrundelsen og målets link', () => {
   const opp = renderGazette(G(), 'h1', () => {}, MATCHES, COL);
   const p = byId(opp, 'player-of-round');
-  assert.equal(txt(p), '🏆 Rundens spiller: #9 Hansen (Ude) – ★★★★☆ • Begrundelse: 2 mål.');
-  assert.doesNotMatch(txt(opp), /8\.4|karakter/, 'modstanderens karakter røbes ikke');
+  assert.equal(txt(p), '🏆 Rundens spiller: #9 Hansen (Ude) – rundens bedste karakter • Begrundelse: 2 mål.');
+  assert.doesNotMatch(txt(opp), /8\.4|karakter \d|★/, 'modstanderens karakter røbes ikke (og ingen stjerner)');
   const own = renderGazette(G(), 'a1', () => {}, MATCHES, COL);
   assert.equal(txt(byId(own, 'player-of-round')), '🏆 Rundens spiller: #9 Hansen (Ude) – karakter 8.4 • Begrundelse: 2 mål.');
-  assert.equal(txt(byId(renderGazette(G(), 'h1', null, MATCHES, { ...COL, sections: [{ ...COL.sections[2], player: { playerId: 'p1', teamId: 'a1', why: '' } }] }), 'player-of-round')), '🏆 Rundens spiller: #9 Hansen (Ude) – ★★★★☆', 'uden begrundelse ingen •');
+  assert.equal(txt(byId(renderGazette(G(), 'h1', null, MATCHES, { ...COL, sections: [{ ...COL.sections[2], player: { playerId: 'p1', teamId: 'a1', why: '' } }] }), 'player-of-round')), '🏆 Rundens spiller: #9 Hansen (Ude) – rundens bedste karakter', 'uden begrundelse ingen •');
   // Rundens mål: type, beskrivelse og link til kampen (matchIdx), som åbner (indeks, mål)
   const opened = [];
   const g = G();

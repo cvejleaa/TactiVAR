@@ -50,6 +50,11 @@ function played({ youAttack }) {
 }
 const draw = (m, me, mc, on = {}) => renderMatchCenter({ mc: { round: 1, matches: [m], gazette: null, viewIdx: 0, filter: 'all', shownCount: 0, playing: false, snap: null, ...mc }, myTeamId: me.id, on: { snapshot: () => {}, view: () => {}, filter: () => {}, skip: () => {}, ...on } });
 const goalIdx = (m) => m.events.findIndex((e) => e.snapshot);
+// v3.16.3: y tegnes med banens skala (målmanden ved mållinjen) – regnet her uafhængigt af replay.js: 50 + (y − 50)·1,175,
+// én decimal, mellem 1 og 99. Faste punkter: 90 → 97, 10 → 3, 28 → 24,15 → 24.2, 72 → 75,85 → 75.9.
+const scaleY = (y) => Math.max(1, Math.min(99, Math.round((50 + (y - 50) * 1.175) * 10) / 10));
+// En kamp fra før afspilningen (intet spor): her er 📍 den eneste vej til billedet
+const old = (m) => { const { trace, ...rest } = m; return rest; };
 
 test('dit mål: 11 brikker på (x%, y%) fra billedet, scorer ⚽ og oplæg 🅰 mærket på de rigtige spillere, bolden på (50 %, 28 %), overskriften nævner scorer og minut', () => {
   const { m, me } = played({ youAttack: true });
@@ -60,8 +65,11 @@ test('dit mål: 11 brikker på (x%, y%) fra billedet, scorer ⚽ og oplæg 🅰 
   assert.equal(pitches.length, 1, 'præcis ét billede');
   const toks = all(pitches[0], (e) => cls(e, 'mp-token'));
   assert.equal(toks.length, 11);
-  // Hver brik står på billedets koordinater (x → left, y → top)
-  assert.deepEqual(toks.map((t) => [t.dataset.pid, t.style.left, t.style.top]), snap.pts.map(([id, x, y]) => [id, x + '%', y + '%']));
+  // Hver brik står på billedets koordinater (x → left, y → top, y i banens skala)
+  assert.deepEqual(toks.map((t) => [t.dataset.pid, t.style.left, t.style.top]), snap.pts.map(([id, x, y]) => [id, x + '%', scaleY(y) + '%']));
+  const gk = snap.pts.find(([, , y]) => y === 90);
+  assert.ok(gk, 'data: målmanden på y 90');
+  assert.equal(toks.find((t) => t.dataset.pid === gk[0]).style.top, '97%', 'målmanden ved mållinjen (90 → 97), ikke 10 % ude');
   const sc = toks.filter((t) => cls(t, 'scorer')), as = toks.filter((t) => cls(t, 'assist'));
   assert.equal(sc.length, 1); assert.equal(as.length, 1);
   assert.equal(sc[0].dataset.pid, snap.scorer); assert.equal(as[0].dataset.pid, snap.assist);
@@ -70,7 +78,7 @@ test('dit mål: 11 brikker på (x%, y%) fra billedet, scorer ⚽ og oplæg 🅰 
   // De øvrige har trøjenummer (#N) – ikke ⚽/🅰
   assert.ok(toks.filter((t) => !cls(t, 'scorer') && !cls(t, 'assist')).every((t) => /^#\d+$/.test(t.children[0].textContent)));
   const ball = byId(pitches[0], 'snap-ball')[0];
-  assert.deepEqual([ball.style.left, ball.style.top], ['50%', '28%']);
+  assert.deepEqual([ball.style.left, ball.style.top], ['50%', '24.2%']);   // (50, 28): 50 − 22·1,175 = 24,15 → 24.2
   const title = byId(pitches[0], 'snap-title')[0].textContent;
   assert.match(title, new RegExp(`^${m.events[i].min}' – mål af #\\d+ .+: sådan stod I, da bolden blev spillet$`));
   // Billedet ligger i DIT holds karakterark (hjemmeholdet er dig her); modstanderen viser stadig startopstillingen
@@ -93,18 +101,20 @@ test('mål imod: ingen scorer/oplæg-mærker, bolden spejlet på (50 %, 72 %), o
   const toks = all(pitch, (e) => cls(e, 'mp-token'));
   assert.equal(toks.length, 11);
   assert.equal(toks.filter((t) => cls(t, 'scorer') || cls(t, 'assist')).length, 0);
-  assert.deepEqual(toks.map((t) => [t.dataset.pid, t.style.left, t.style.top]), snap.pts.map(([id, x, y]) => [id, x + '%', y + '%']));
+  assert.deepEqual(toks.map((t) => [t.dataset.pid, t.style.left, t.style.top]), snap.pts.map(([id, x, y]) => [id, x + '%', scaleY(y) + '%']));
   const ball = byId(pitch, 'snap-ball')[0];
   assert.deepEqual(snap.ball, [50, 72]);   // cutback-stedet (50,28) set fra modstanderens side
-  assert.deepEqual([ball.style.left, ball.style.top], ['50%', '72%']);
+  assert.deepEqual([ball.style.left, ball.style.top], ['50%', '75.9%']);   // 50 + 22·1,175 = 75,85 → 75.9
   assert.equal(byId(pitch, 'snap-title')[0].textContent, `${m.events[i].min}' – mål imod: sådan stod dit forsvar, da bolden blev spillet`);
   assert.deepEqual(all(pitch, (e) => cls(e, 'muted')).map((e) => e.textContent), ['Dit forsvar står efter dit pres og boldsiden.']);
   // Du er udeholdet: billedet står i udeholdets karakterark
   const ratings = all(root, (e) => cls(e, 'ratings'));
   assert.equal(all(ratings[1], (e) => e.attrs.id === 'snap-pitch').length, 1); assert.equal(all(ratings[0], (e) => e.attrs.id === 'snap-pitch').length, 0);
 });
-test('uden valgt mål, eller et valgt indeks uden billede: ingen bane med billede (men 📍 ved hvert mål med billede)', () => {
-  const { m, me } = played({ youAttack: true });
+// v3.16.3: 📍 vises kun, hvor afspilningen ikke har afslutningen (gamle kampe uden spor) – her en kamp uden spor
+test('uden valgt mål, eller et valgt indeks uden billede: ingen bane med billede (men 📍 ved hvert mål med billede i en kamp uden spor)', () => {
+  const { m: played1, me } = played({ youAttack: true });
+  const m = old(played1);
   const want = m.events.filter((e) => e.snapshot).length;
   assert.ok(want >= 25, 'testen har data');
   for (const snap of [null, 0, undefined]) {
@@ -114,8 +124,9 @@ test('uden valgt mål, eller et valgt indeks uden billede: ingen bane med billed
     assert.equal(all(root, (e) => cls(e, 'snap-btn')).length, want);
   }
 });
-test('📍 findes ikke under afspilning; i et filtreret referat peger den på hændelsens plads i HELE kampen (ikke i den filtrerede liste)', () => {
-  const { m, me } = played({ youAttack: true });
+test('📍 findes ikke under afspilning; i et filtreret referat peger den på hændelsens plads i HELE kampen (ikke i den filtrerede liste) – kamp uden spor', () => {
+  const { m: played1, me } = played({ youAttack: true });
+  const m = old(played1);
   const playing = draw(m, me, { playing: true, shownCount: m.events.length });
   assert.equal(all(playing, (e) => cls(e, 'snap-btn')).length, 0, 'ingen 📍 før slutfløjt');
   for (const filter of ['all', 'key', 'tactic']) {
@@ -133,4 +144,28 @@ test('📍 findes ikke under afspilning; i et filtreret referat peger den på h�
   const got2 = []; const r2 = draw(m, me, { filter: 'key' }, { snapshot: (i) => got2.push(i) });
   all(r2, (e) => cls(e, 'snap-btn'))[0].handlers.click();
   assert.equal(got2[0], m.events.map((e, i) => (e.snapshot ? i : -1)).filter((i) => i >= 0).at(-1));
+});
+
+// v3.16.3 (QC: to knapper, én handling): 📍 forsvinder på linjer med 🎬 – men står på kampe uden spor og på et mål, hvis
+// afslutning sporet ikke har. Genkendt på tilstedeværelse: 🎬 tælles også, så en fjernet 🎬 ikke giver grøn suite.
+test('📍 kun uden 🎬: en kamp med spor har 🎬 og ingen 📍 på målene; uden spor 📍 ved hvert mål; et mål uden øjeblik i sporet får 📍', () => {
+  const { m, me } = played({ youAttack: true });
+  const goals = m.events.map((e, i) => (e.snapshot ? i : -1)).filter((i) => i >= 0);
+  assert.ok(goals.length >= 25 && goals.every((i) => m.trace.moments.some((x) => x.ev === i)), 'data: hvert mål med billede har et øjeblik i sporet');
+  const btns = (root, c) => all(root, (e) => cls(e, c)).length;
+  const withTrace = draw(m, me, {});
+  assert.equal(btns(withTrace, 'snap-btn'), 0, 'ingen 📍, hvor 🎬 står');
+  assert.ok(btns(withTrace, 'replay-btn') >= goals.length, '🎬 ved målene');
+  const noTrace = draw(old(m), me, {});
+  assert.deepEqual([btns(noTrace, 'snap-btn'), btns(noTrace, 'replay-btn')], [goals.length, 0], 'gammel kamp: 📍 ved hvert mål, ingen 🎬');
+  // Ét mål mangler i sporet: netop det får 📍 (og ikke 🎬), de andre 🎬
+  const missing = goals[0];
+  const partial = { ...m, trace: { ...m.trace, moments: m.trace.moments.filter((x) => x.ev !== missing) } };
+  const got = [];
+  const root = draw(partial, me, {}, { snapshot: (i) => got.push(i) });
+  for (const p of all(root, (e) => cls(e, 'snap-btn'))) p.handlers.click();
+  assert.deepEqual(got, [missing]);
+  // Under afspilning ingen af dem
+  const playing = draw(old(m), me, { playing: true, shownCount: m.events.length });
+  assert.equal(btns(playing, 'snap-btn') + btns(playing, 'replay-btn'), 0);
 });
