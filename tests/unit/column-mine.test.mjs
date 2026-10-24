@@ -256,7 +256,7 @@ test('"De øvrige kampe": seerens egen kamp er ikke med, hver kamp har sit indek
   for (const x of others) assert.equal(x.head, headlineOf(publicFacts(matches[x.idx], x.idx), 5), `overskrift ${x.idx}`);
   assert.notEqual(by[3].head, headlineOf(publicFacts(matches[3], 3), 0), 'runden indgår i overskriften (runde 5 ≠ 0 for denne kamp)');
   assert.deepEqual(variants((r) => sec(buildColumn(inp({ matches, round: r })), 'col-others').others[0].note), ['U0 kom bagfra og vandt.', 'U0 vendte kampen.', 'Comeback til U0.'].sort());
-  assert.deepEqual(variants((r) => sec(buildColumn(inp({ matches, round: r })), 'col-others').others[1].note), ['Afgjort i 83. minut.', 'H1 slog til sent – 83. minut.', 'Sejrsmålet faldt i 83. minut.'].sort());
+  assert.deepEqual(variants((r) => sec(buildColumn(inp({ matches, round: r })), 'col-others').others[1].note), ['Afgjort i 83. minut.', 'H1 slog til sent – i 83. minut.', 'Sejrsmålet faldt i 83. minut.'].sort());
   const say = (rule, name, idx) => `${name} ${pickBy(STYLE_RULES.find((r) => r.key === rule).say, 5, rule, idx)}.`;
   assert.equal(by[3].note, say('ball', 'U3', 3), 'udesejr: vinderen (ude) beskrives');
   assert.equal(by[4].note, say('ball', 'H4', 4), 'uafgjort: hjemmeholdet beskrives');

@@ -29,6 +29,8 @@ const lock = (obj, allowed) => {
 };
 // hReds/aReds (v3.16.3): røde kort er offentlige (referatet) og står nu i klummen ("Din kamp") og i PUBLIC_FACT_KEYS
 const STATS_OK = ['hPoss', 'aPoss', 'hShots', 'aShots', 'hOnTarget', 'aOnTarget', 'hCorners', 'aCorners', 'hAerialWon', 'aAerialWon', 'hYellows', 'aYellows', 'hReds', 'aReds'];
+// Hændelsernes felter, klummen må læse. clock (v3.16.4): referatets ur – offentligt (står ved hver linje) – til "i 87. minut"/"i tillægstiden"
+const EVENT_OK = ['type', 'category', 'min', 'clock', 'isHome', 'hG', 'aG'];
 function poisoned(input) {
   const p = structuredClone(input);
   // structuredClone bevarer delte referencer (rundens mål ER en post i goalsPool, rundens spiller en karakterlinje): tag kopier FØR noget forgiftes
@@ -37,7 +39,7 @@ function poisoned(input) {
     const owner = m.homeId === p.viewerTeamId ? 'home' : m.awayId === p.viewerTeamId ? 'away' : null;
     lock(m, ['homeId', 'awayId', 'homeName', 'awayName', 'homeGoals', 'awayGoals', 'events', 'goalsPool', 'ratings', 'stats', 'startFormations', 'endState', 'ownReports']);
     lock(m.stats, STATS_OK);
-    for (const e of m.events) lock(e, ['type', 'category', 'min', 'isHome', 'hG', 'aG']);   // category: kun udførte Hvis-Så-skift tæller (QC F16)
+    for (const e of m.events) { lock(e, EVENT_OK); lock(e.clock, ['m', 'plus']); }   // category: kun udførte Hvis-Så-skift tæller (QC F16); clock: uret (v3.16.4)
     for (const g of m.goalsPool) lock(g, ['kind', 'min', 'scorer', 'teamName']);
     lock(m.ratings, ['home', 'away']);
     for (const side of ['home', 'away']) for (const e of m.ratings[side]) lock(e, RATING_PUBLIC);
@@ -75,5 +77,16 @@ test("kanarie: klummen læser hReds/aReds (v3.16.3) – uden dem på listen kast
   const only = (drop) => { const p = structuredClone(input); for (const m of p.matches) lock(m.stats, STATS_OK.filter((k) => !drop.includes(k))); return p; };
   assert.throws(() => buildColumn(only(['hReds', 'aReds'])), /KANARIE: [ha]Reds/);
   assert.throws(() => buildColumn(only(['hYellows', 'aYellows'])), /KANARIE: [ha]Yellows/);
+  assert.doesNotThrow(() => buildColumn(only([])));
+});
+
+// v3.16.4: 'clock' er tilladt POSITIVT – klummen læser den virkelig (lateAt), og listen uden clock kaster; med clock, men uden
+// isHome, kaster den stadig (kanarien er ikke blevet blind). Mutation: lad publicFacts udelade clock → første assert bliver rød.
+test('kanarie: klummen læser hændelsernes clock (v3.16.4) – uden clock på listen kaster den; med clock, men uden isHome, kaster den også', () => {
+  const input = season(11, 1)[0];
+  assert.ok(input.matches.every((m) => m.events.every((e) => e.clock && typeof e.clock.m === 'number')), 'data: hver hændelse har et ur');
+  const only = (drop) => { const p = structuredClone(input); for (const m of p.matches) for (const e of m.events) lock(e, EVENT_OK.filter((k) => !drop.includes(k))); return p; };
+  assert.throws(() => buildColumn(only(['clock'])), /KANARIE: clock/);
+  assert.throws(() => buildColumn(only(['isHome'])), /KANARIE: isHome/);
   assert.doesNotThrow(() => buildColumn(only([])));
 });
