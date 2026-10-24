@@ -301,7 +301,11 @@ test('Hvis-Så: reglen udløses én gang, for begge hold, og skifter formation',
   assert.ok(trig.every((e) => e.min === 3));
   assert.match(trig.find((e) => e.isHome).text, /til 5-4-1/, 'dit eget skift beskrives');
   const opp = trig.find((e) => !e.isHome).text;
-  assert.match(opp, /omorganiserer sig/); assert.doesNotMatch(opp, /5-4-1|Hvis-Så|minut/, 'modstanderens regel kan ikke læses');
+  // v3.16.3: tre varianter (pickBy på minut og hold – intet rng-træk) – teksten er netop én af dem, ligesom etiketten
+  assert.ok(['🔁 [' + L.teams[1].name + '] Holdet omorganiserer sig på banen.', '🔁 [' + L.teams[1].name + '] Holdet skifter form – spillerne får nye pladser.', '🔁 [' + L.teams[1].name + '] Træneren flytter rundt på holdet.'].includes(opp), opp);
+  assert.ok([' omorganiserer sig', ' skifter form', ' flytter rundt'].map((v) => L.teams[1].name + v).includes(trig.find((e) => !e.isHome).label), trig.find((e) => !e.isHome).label);
+  assert.doesNotMatch(opp, /5-4-1|4-4-2|Hvis-Så|minut|\b3\b/, 'modstanderens regel kan ikke læses');
+  assert.doesNotMatch(trig.find((e) => e.isHome).text, /minut/, 'v3.16.3: minuttet står ved linjen, ikke i teksten');
   assert.equal(m.endState.home.formation, '5-4-1');
   assert.equal(m.endState.away.formation, '5-4-1');
   assert.match(m.homeTacticStr, /^4-4-2/, 'kamphovedet viser startformationen');

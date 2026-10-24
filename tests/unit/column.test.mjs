@@ -148,8 +148,8 @@ test('optakt-scouting og opfølgning: næste modstander gættes ud fra hans sene
   let bud = 0, follow = 0;
   for (const { input } of season(41, 14)) {
     const t = (buildColumn(input).sections.find((s) => s.id === 'col-next')?.paras ?? []).join(' ');
-    if (/Mit bud: .+ i deres seneste/.test(t)) bud++;
-    if (/Før kampen skrev jeg, at .+ – det (holdt|gjorde de ikke)/.test(t)) follow++;
+    if (/Mit bud: .+ ud fra deres seneste/.test(t)) bud++;   // v3.16.3: "ud fra" (før "i deres seneste")
+    if (/Før kampen skrev jeg, at .+ – (det holdt|det gjorde de ikke|de scorede igen, men havde mere af bolden)/.test(t)) follow++;
   }
   assert.ok(bud >= 5 && follow >= 3, `bud ${bud}, opfølgning ${follow}`);
 });

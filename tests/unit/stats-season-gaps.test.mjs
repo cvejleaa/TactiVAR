@@ -103,7 +103,7 @@ test('tidligere sæsoner: sæsonens runde regnes fra sæsonens start (sæson fra
   L.seasonStartRound = 63; L.leagueMetadata.round = 62; L.leagueMetadata.seasonNumber = 6;
   const past = byId(renderSchedule({ league: L, pairs: pairRound(L), myTeamId: me.id }), 'past-seasons');
   const ps = all(past, (e) => e.tag === 'p').map((x) => x.textContent), hs = all(past, (e) => e.tag === 'h4').map((x) => x.textContent);
-  const champ = `🏆 Mester: ${me.name} (30 point). Din placering: nr. 1.`;
+  const champ = `🏆 ${me.name} er mester med 30 point. Din placering: nr. 1.`;
   assert.deepEqual(hs.map((h) => h.slice(0, 7)), ['Sæson 5', 'Sæson 4', 'Sæson 3', 'Sæson 2', 'Sæson 1']);
   assert.deepEqual(ps, [champ, champ, `${champ} Spillertallene gælder fra sæsonens runde 2.`, `${champ} Spillertallene gælder fra sæsonens runde 4.`, champ]);
 });

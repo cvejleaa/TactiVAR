@@ -74,7 +74,7 @@ test('kampprogrammet: tidligere sæsoner med mester, din placering, topscorer og
   const heads = all(past, (e) => e.tag === 'h4').map((x) => x.textContent);
   assert.deepEqual(heads, ['Sæson 2 – runde 7–20', 'Sæson 1 (uden program) – runde 1–6']);
   const ps = all(past, (e) => e.tag === 'p').map((x) => x.textContent);
-  assert.equal(ps[0], `🏆 Mester: ${me.name} (30 point). Din placering: nr. 1.`);
+  assert.equal(ps[0], `🏆 ${me.name} er mester med 30 point. Din placering: nr. 1.`);
   assert.equal(ps[1], `Førende ved afslutningen: ${bot.name} (12 point). Din placering: nr. 2. Topscorer: #9 A. Topp (${bot.name}), 7 mål. Din bedste: #10 B. Bedst (3× kampens spiller, 2 mål). Spillertallene gælder fra sæsonens runde 4.`);
   const lis = all(past, (e) => e.tag === 'li');
   assert.deepEqual(lis.slice(2).map((l) => [l.textContent, l.className]), [[`${bot.name} – 12 p (13-3)`, ''], [`${me.name} – 9 p (10-3)`, 'mine']]);

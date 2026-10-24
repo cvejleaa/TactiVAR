@@ -7,6 +7,11 @@
 // (v3.16.2): efter et mål, en redning eller et skud forbi går bolden derhen, referatet siger – tegnet ud fra udfaldet, ikke motoren.
 import { h } from './dom.js';
 
+// Banens skala i tegningen (v3.16.3, Spilfører: målmanden stod 10 % ude, forsvarerne aldrig i eget felt): formationernes
+// y 90/10 (målmanden) tegnes ved mållinjen (≈97/3) – kun visningen; motoren og sporet er uændrede. Symmetrisk om 50, så
+// samme skala gælder begge hold.
+export const DRAW_K = 1.175;
+export const drawY = (y) => Math.max(1, Math.min(99, Math.round((50 + (y - 50) * DRAW_K) * 10) / 10));
 export const STEP_MS = { frame: 700, moment: 2600, shot: 1100 };
 export const SPEEDS = [1, 2, 4];
 
@@ -21,7 +26,8 @@ export function replaySteps(trace, highlights = false, events = null, idOf = nul
       const step = { kind: 'moment', t: m.t, h: m.h, a: m.a, ball: m.ball, ev: m.ev, actor: m.scorer ?? m.shooter, assist: m.assist ?? null };
       steps.push(step);
       const end = shotEnd(m, events?.[m.ev], idOf);
-      if (end) steps.push({ ...step, kind: 'shot', ball: end, over: shotOver(m, events?.[m.ev]) });
+      // endPlayer: endepunktet er en spillers plads (redning, blokering) og tegnes som brikkerne; ellers et mållinje-punkt
+      if (end) steps.push({ ...step, kind: 'shot', ball: end, over: shotOver(m, events?.[m.ev]), endPlayer: [...m.h, ...m.a].some((q) => q[1] === end[0] && q[2] === end[1]) });
     }
   }
   return steps;
@@ -79,6 +85,9 @@ export function replayEl(m, ownSide) {
   if (cache.has(m.trace)) return cache.get(m.trace).el;
   const who = new Map([...m.ratings.home, ...m.ratings.away].map((e) => [e.playerId, e]));
   const byTag = new Map([...who.values()].map((e) => [`#${e.shirtNumber} ${e.shortName}`, e.playerId])), idOf = (t) => byTag.get(t);
+  // Dit hold angriber altid opad (v3.16.3, Spilfører – én regel for alle visninger): er du udehold, spejles tavlen. I kampe
+  // uden dit hold angriber hjemmeholdet opad (sporets egne koordinater).
+  const flip = ownSide === 'a', vx = (x) => (flip ? 100 - x : x), vy = (y) => drawY(flip ? 100 - y : y), vLine = (y) => (flip ? 100 - y : y);
   const r = { i: 0, playing: false, speed: 1, highlights: false, timer: null, steps: replaySteps(m.trace, false, m.events, idOf), tokens: new Map() };
   const pitch = h('div', { class: 'rp-pitch', id: 'rp-pitch' }, h('div', { class: 'rp-half' }), h('div', { class: 'rp-box top' }), h('div', { class: 'rp-box bottom' }), h('div', { class: 'rp-goal top' }), h('div', { class: 'rp-goal bottom' }));
   const ball = h('div', { class: 'rp-ball', id: 'rp-ball' }, '●');
@@ -93,7 +102,7 @@ export function replayEl(m, ownSide) {
     if (r.playing) r.timer = setTimeout(tick, STEP_MS[r.steps[r.i].kind] / r.speed); } }, '⭐ Højdepunkter');
   const el = h('div', { class: 'replay', id: 'replay' },
     h('div', { class: 'row' }, h('strong', {}, '🎬 Afspilning'),
-      h('span', { class: 'muted' }, ` – taktiktavle ud fra ${m.trace.frames.length} øjebliksbilleder (hvert 3. minut) og afslutningerne i åbent spil (dødbolde – straffe, frispark, hjørnespark – har intet billede). ${m.homeName} angriber opad.`)),
+      h('span', { class: 'muted' }, ` – taktiktavle ud fra ${m.trace.frames.length} øjebliksbilleder (hvert 3. minut) og afslutningerne i åbent spil (dødbolde – straffe, frispark, hjørnespark – har intet billede). ${flip ? m.awayName : m.homeName} angriber opad.`)),
     pitch, caption,
     h('div', { class: 'rp-controls' },
       h('button', { class: 'mini', id: 'rp-prev', title: 'Et trin tilbage', onclick: () => { pause(); r.i = Math.max(0, r.i - 1); show(); } }, '⏮'),
@@ -112,7 +121,7 @@ export function replayEl(m, ownSide) {
     const here = new Set();
     for (const side of ['h', 'a']) for (const [id, x, y] of s[side]) {
       const t = token(id, side); here.add(id);
-      t.style.transition = transition; t.style.left = x + '%'; t.style.top = y + '%'; t.hidden = false;
+      t.style.transition = transition; t.style.left = vx(x) + '%'; t.style.top = vy(y) + '%'; t.hidden = false;
       flag(t, 'actor', id === s.actor); flag(t, 'assist', id === s.assist);
     }
     for (const [id, t] of r.tokens) if (!here.has(id)) t.hidden = true;
@@ -126,7 +135,7 @@ export function replayEl(m, ownSide) {
     if (s.kind === 'shot') {   // kun bolden flytter sig – fra skytten derhen, skuddet endte
       const d = STEP_MS.shot / r.speed, bt = `${Math.round(d * 0.6)}ms ease-in`;
       ball.style.transition = `left ${bt}, top ${bt}, transform ${bt}, opacity ${bt}`;
-      ball.style.left = s.ball[0] + '%'; ball.style.top = s.ball[1] + '%'; flag(ball, 'over', !!s.over);
+      ball.style.left = vx(s.ball[0]) + '%'; ball.style.top = (s.endPlayer ? vy(s.ball[1]) : vLine(s.ball[1])) + '%'; flag(ball, 'over', !!s.over);
       // Brikkerne står som i øjeblikket – også når man kommer baglæns fra et senere trin (QC v3.16.2: ellers gik bolden ved ⏮
       // hen til en tom plads); fremad flytter de sig ikke, for pladserne er de samme.
       place(s, 'none');
@@ -141,7 +150,7 @@ export function replayEl(m, ownSide) {
     const bt = shot ? `${Math.round(d * 0.3)}ms ease-out ${Math.round(d * 0.5)}ms` : `${Math.round(d * 0.35)}ms ease-out`;
     ball.style.transition = `left ${bt}, top ${bt}`; flag(ball, 'over', false);
     place(s, `left ${glide}, top ${glide}`);
-    ball.style.left = s.ball[0] + '%'; ball.style.top = s.ball[1] + '%';
+    ball.style.left = vx(s.ball[0]) + '%'; ball.style.top = vy(s.ball[1]) + '%';
     // Stillingen og teksten: den seneste hændelse til og med trinet (et øjeblik viser sin egen linje)
     // Et grundbillede er tick'ets duel, før afslutningerne (v3.16.1) – stillingen er den fra før (aldrig et mål for tidligt),
     // og teksten siger, hvordan duellen gik (QC v3.16.1: ellers står bolden pludselig hos modspilleren uden forklaring)

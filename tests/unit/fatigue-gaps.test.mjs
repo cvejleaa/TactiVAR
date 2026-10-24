@@ -288,22 +288,24 @@ test('Hvis-Så-udskiftning: fejlmeddelelserne – ude af banen går først, dere
     return { H, m: () => simulateMatch(H, A, stubRng({})) };
   };
   const msg = (m) => m.events.filter((e) => e.label === 'Hvis-Så-skift ikke udført').map((e) => e.text);
+  const mins = (m) => m.events.filter((e) => e.label === 'Hvis-Så-skift ikke udført').map((e) => e.min);   // v3.16.3: minuttet står ved linjen, ikke i teksten
   // Indskifteren er skadet
   let c = build(({ b1, r }) => { b1.injuryMatchesLeft = 2; return [r()]; });
   let m = c.m();
   assert.equal(subs(m).length, 0);
-  assert.deepEqual(msg(m), [`📋 [${c.H.name} • Hvis-Så] Udskiftningen kunne ikke udføres i 6. minut: ${tag(bench(c.H).find((p) => p.injuryMatchesLeft))} er ikke på bænken (skadet, allerede brugt eller i startopstillingen).`]);
+  assert.deepEqual(mins(m), [6]);
+  assert.deepEqual(msg(m), [`📋 [${c.H.name} • Hvis-Så] Udskiftningen kunne ikke udføres: ${tag(bench(c.H).find((p) => p.injuryMatchesLeft))} er ikke på bænken (skadet, allerede brugt eller i startopstillingen).`]);
   // Begge spillere forkerte: "ikke på banen" går først og nævner UD-spilleren
   c = build(({ b1, b2, r, H }) => { b1.injuryMatchesLeft = 2; return [r({ subOut: bench(H).find((p) => p.line === 'DEF').id })]; });
   m = c.m();
-  assert.deepEqual(msg(m), [`📋 [${c.H.name} • Hvis-Så] Udskiftningen kunne ikke udføres i 6. minut: ${tag(bench(c.H).find((p) => p.line === 'DEF'))} er ikke på banen.`]);
+  assert.deepEqual(msg(m), [`📋 [${c.H.name} • Hvis-Så] Udskiftningen kunne ikke udføres: ${tag(bench(c.H).find((p) => p.line === 'DEF'))} er ikke på banen.`]);
   // Reglen skifter målmanden (plads 0)? UD-spilleren er målmanden: kan ikke
   c = build(({ r, H }) => [r({ subOut: slot(H, 0).id })]);
   m = c.m();
   assert.equal(subs(m).length, 0); assert.equal(msg(m).length, 1);
   assert.ok(msg(m)[0].includes('er ikke på banen'), msg(m)[0]);
   // En regel, der ikke kan udføres, ændrer ikke formationen (SUB falder ikke igennem til planskiftet 5-4-1)
-  assert.equal(m.events.filter((e) => /skifter holdet fra/.test(e.text)).length, 0);
+  assert.equal(m.events.filter((e) => /Holdet skifter fra/.test(e.text)).length, 0);   // v3.16.3-ordlyden ("Holdet skifter fra …")
 });
 test('Hvis-Så-udskiftning: en vellykket regel bruges kun én gang og skifter ikke formation (fx 5-4-1)', () => {
   const { H, A } = arena({ homeLimit: 0 });
@@ -312,7 +314,7 @@ test('Hvis-Så-udskiftning: en vellykket regel bruges kun én gang og skifter ik
   const m = simulateMatch(H, A, stubRng({}));
   assert.equal(subs(m).length, 1);
   assert.equal(m.events.filter((e) => e.label === 'Hvis-Så-skift ikke udført').length, 0, 'ingen fejl-besked et tick senere');
-  assert.equal(m.events.filter((e) => /skifter holdet fra/.test(e.text)).length, 0, 'ingen formationsskift');
+  assert.equal(m.events.filter((e) => /Holdet skifter fra/.test(e.text)).length, 0, 'ingen formationsskift');   // v3.16.3-ordlyden
   assert.equal(m.endState?.tactics?.baseFormation ?? '4-4-2', '4-4-2');
 });
 
@@ -323,23 +325,25 @@ function ruleRun(minutes, { limit = 0 } = {}) {
   const outs = [1, 2, 3, 4, 5, 6];
   H.tactics.conditionalRules = minutes.map((min, i) => ({ ruleId: i + 1, minuteTrigger: min, condition: 'ANY', margin: 1, newFormation: '4-4-2', newPlan: null, slotRemapping: [...Array(11).keys()], action: 'SUB', subOut: slot(H, outs[i]).id, subIn: pool[i].id }));
   const m = simulateMatch(H, A, stubRng({}));
-  return { H, m, mins: subs(m).map((e) => e.min), notes: m.events.filter((e) => e.label === 'Hvis-Så-skift ikke udført').map((e) => e.text) };
+  // notes: [minut, tekst] – minuttet står ved linjen, ikke i teksten (v3.16.3)
+  return { H, m, mins: subs(m).map((e) => e.min), notes: m.events.filter((e) => e.label === 'Hvis-Så-skift ikke udført').map((e) => [e.min, e.text]) };
 }
 test('pauser: to skift i samme tick er én pause – 3-3-6-9-9 giver fem skift i tre pauser; det sjette får "alle 5 udskiftninger er brugt"', () => {
   const r = ruleRun([3, 3, 6, 9, 9, 12]);
   assert.deepEqual(r.mins, [3, 3, 6, 9, 9]);
-  assert.deepEqual(r.notes, [`📋 [${r.H.name} • Hvis-Så] Udskiftningen kunne ikke udføres i 12. minut: alle 5 udskiftninger er brugt.`]);
+  assert.deepEqual(r.notes, [[12, `📋 [${r.H.name} • Hvis-Så] Udskiftningen kunne ikke udføres: alle 5 udskiftninger er brugt.`]]);
 });
 test('pauser: den fjerde pause afvises med "alle 3 skifte-pauser er brugt" (skift 4 af 5)', () => {
   const r = ruleRun([3, 6, 9, 12]);
   assert.deepEqual(r.mins, [3, 6, 9]);
-  assert.deepEqual(r.notes, [`📋 [${r.H.name} • Hvis-Så] Udskiftningen kunne ikke udføres i 12. minut: alle 3 skifte-pauser er brugt.`]);
+  assert.deepEqual(r.notes, [[12, `📋 [${r.H.name} • Hvis-Så] Udskiftningen kunne ikke udføres: alle 3 skifte-pauser er brugt.`]]);
 });
 test('pauser: halvlegen (45) er gratis og tæller ikke som en af de tre – 45-48-51-54 udføres, 57 afvises', () => {
   const r = ruleRun([45, 48, 51, 54, 57]);
   assert.deepEqual(r.mins, [45, 48, 51, 54]);
   assert.equal(r.notes.length, 1);
-  assert.match(r.notes[0], /57\. minut: alle 3 skifte-pauser er brugt\.$/);
+  assert.equal(r.notes[0][0], 57);
+  assert.match(r.notes[0][1], /udføres: alle 3 skifte-pauser er brugt\.$/);
 });
 test('Hvis-Så-skiftet kører før træthedsskiftet i samme tick: reglens indskifter er til rådighed, og reglen mister ikke sin udgående spiller', () => {
   const { H, A } = arena({ homeLimit: 70 });
@@ -350,7 +354,8 @@ test('Hvis-Så-skiftet kører før træthedsskiftet i samme tick: reglens indski
   H.tactics.conditionalRules = [{ ruleId: 9, minuteTrigger: 3, condition: 'ANY', margin: 1, newFormation: '4-4-2', newPlan: null, slotRemapping: [...Array(11).keys()], action: 'SUB', subOut: cm.id, subIn: b2.id }];
   const m = simulateMatch(H, A, stubRng({}));
   const [first] = subs(m);
-  assert.equal(first.text, `🔄 [${H.name} • Hvis-Så] ${tag(cm)} ud – ${tag(b2)} ind (din Hvis-Så-regel, 3. minut).`);
+  assert.equal(first.text, `🔄 [${H.name} • Hvis-Så] ${tag(cm)} ud – ${tag(b2)} ind (din Hvis-Så-regel).`);
+  assert.equal(first.min, 3);   // v3.16.3: minuttet ved linjen, ikke i teksten
   assert.equal(m.events.filter((e) => e.label === 'Hvis-Så-skift ikke udført').length, 0);
 });
 
@@ -412,7 +417,7 @@ test('en Hvis-Så-regel med ukendt spiller siger "spilleren er ikke på banen" (
   const { H, A } = arena({ homeLimit: 0 });
   H.tactics.conditionalRules = [{ ruleId: 1, minuteTrigger: 6, condition: 'ANY', margin: 1, newFormation: '4-4-2', newPlan: null, slotRemapping: [...Array(11).keys()], action: 'SUB', subOut: 'findes_ikke', subIn: bench(H)[1].id }];
   const m = simulateMatch(H, A, stubRng({}));
-  assert.deepEqual(m.events.filter((e) => e.label === 'Hvis-Så-skift ikke udført').map((e) => e.text), [`📋 [${H.name} • Hvis-Så] Udskiftningen kunne ikke udføres i 6. minut: spilleren er ikke på banen.`]);
+  assert.deepEqual(m.events.filter((e) => e.label === 'Hvis-Så-skift ikke udført').map((e) => [e.min, e.text]), [[6, `📋 [${H.name} • Hvis-Så] Udskiftningen kunne ikke udføres: spilleren er ikke på banen.`]]);   // v3.16.3: minuttet ved linjen
 });
 test('reservation: en brugt regel (der mislykkedes) og en regel, der kun er et planskift, holder ingen bænkspiller tilbage', () => {
   const run = (rule) => {

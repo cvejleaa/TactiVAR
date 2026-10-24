@@ -187,6 +187,14 @@ try {
   await g.click('#pitch .token[data-slot="4"]'); await tab('trup'); await tab('taktik'); await g.click('#pitch .token[data-slot="5"]');
   check('Et påbegyndt byt afbrydes af fanebyt (intet byt uden varsel)', (await nameAt(4)) === n4 && (await nameAt(5)) === n5);
   await g.click('#pitch .token[data-slot="5"]'); // klik igen = fravælg
+  // Test Manager v3.16.3: ejefald i notebeskeden (app.js gen) – et navn på -s får apostrof ("T. Jens' plads", ikke "T. Jenss"/"T. Jens's");
+  // spilleren omdøbes i det gemte spil (tilfældige navne ender sjældent på -s), siden genindlæses
+  await g.evaluate(() => { const d = JSON.parse(localStorage.getItem('tactivar_save')), t = d.league.teams.find((x) => !x.isBot); t.squad.find((p) => p.id === t.tactics.lineupSlots[6]).shortName = 'T. Jens'; localStorage.setItem('tactivar_save', JSON.stringify(d)); });
+  await g.reload(); await g.waitForSelector('body[data-klar="ja"]'); await tab('taktik');
+  await g.click('#pitch .token[data-slot="6"]');
+  const swapNote = await g.textContent('#notice');
+  check('Et påbegyndt byt nævner spilleren med rigtigt ejefald: "T. Jens\' plads"', swapNote.includes("for at bytte T. Jens' plads."), swapNote);
+  await g.click('#pitch .token[data-slot="6"]'); // fravælg igen
   // Indskiftning fra bænken under banen – uden at forlade Taktik
   await g.locator('#bench .bench-p').first().click(); await g.locator('#bench .bench-p').first().click();
   check('Bænken: klik igen på samme bænkspiller fravælger', (await g.locator('#bench .bench-p.active').count()) === 0 && (await g.locator('#notice').count()) === 0);
@@ -339,7 +347,8 @@ try {
   await g.click('#skip');
   check('Runden har 4 kampe', (await g.locator('#match-cards .matchcard').count()) === 4);
   const mcText = await g.textContent('#match-center');
-  check('Din Hvis-Så-udskiftning (uanset stilling, fra minut 3) står i referatet i 3. minut, og indskifteren står i karakterarket', /🔄 \[.+ • Hvis-Så\] #\d+ .+ ud – #\d+ .+ ind \(din Hvis-Så-regel, 3\. minut\)\./.test(mcText) && /ind på/.test(mcText), (mcText.match(/🔄[^.]*\./) || ['ingen'])[0]);
+  // v3.16.3: minuttet står ved linjen ("3'"), ikke i teksten
+  check('Din Hvis-Så-udskiftning (uanset stilling, fra minut 3) står i referatet i 3. minut, og indskifteren står i karakterarket', /(?<!\d)3'🔄 \[.+ • Hvis-Så\] #\d+ .+ ud – #\d+ .+ ind \(din Hvis-Så-regel\)\./.test(mcText) && /ind på/.test(mcText), (mcText.match(/🔄[^.]*\./) || ['ingen'])[0]);
   // Dit hold kan være hjemme eller ude (programmet) – karakterarkene står hjemme, ude.
   const own = await g.evaluate(() => (JSON.parse(localStorage.getItem('tactivar_save')).league.lastRound.matches[0].ratings.home[0].isUserTeam ? 0 : 1));
   check('Referatet indeholder slutfløjt, statistik og karakterark', mcText.includes('SLUTFLØJT') && (await g.isVisible('#match-stats')) && (await g.locator('.ratings').count()) === 2);
@@ -375,8 +384,8 @@ try {
   const friExpect = await g.evaluate(() => { const m = JSON.parse(localStorage.getItem('tactivar_save')).league.lastRound.matches[0]; const own = [m.ratings.home, m.ratings.away].find((l) => l[0].isUserTeam); return own.filter((e) => e.freeRuns > 0).map((e) => `${e.freeRunsWon}/${e.freeRuns} fri`); });
   check('Karakterark: "fri" for dit hold matcher de gemte løb, modstanderen har ingen kolonne', fri.length >= 11 && JSON.stringify(fri.filter(Boolean).sort()) === JSON.stringify([...friExpect].sort()) /* præcis de spillere med løb – ingen "0/0 fri" til resten; tilfældig liga: ca. hver 5. kamp uden løb, så står alle tomme (unit-testene dækker indholdet) */ && fri.every((t) => t === '' || /^\d+\/\d+ fri$/.test(t)) && (await g.locator('.ratings').nth(1 - own).locator('td.fri').count()) === 0, `${fri.join(',')} / ${friExpect.join(',')}`);
   const runSum = await g.textContent('#match-center');
-  check('Fuldtids-analyse med løb uden bold i din kamp', /📊 \[90' FULDTIDS-ANALYSE\] (Sejr \d+-\d+ til dig|Nederlag \d+-\d+|Uafgjort \d+-\d+)\. Du havde \d+% af bolden og \d+ afslutninger \(\d+ på mål\)\. Din opbygning kom igennem \d+ af \d+ gange; dit pres vandt bolden \d+ af \d+ gange\. Dødbolde: \d+ frispark i skudafstand, \d+ hjørnespark, \d+ straffe \(\d+ mål\) · frispark begået \d+, tilkendt \d+\. 🎯 Løb uden bold \(Normal\): \d+ løb, \d+ kom fri \(\d+ mål\) · kontraer imod i alt: \d+ \(\d+ mål\)\./.test(runSum), runSum.match(/🎯[^.]*\./)?.[0] ?? 'mangler');
-  check('Fuldtids-analysen viser dit angreb (fokus · pasningsstil) og dit felt (v3.12)', /⚔️ Angreb \((Centralt|Høje indlæg|Lave cutbacks) · (korte pasninger|balanceret|direkte lange bolde)\): (ingen cutbacks eller høje bolde|(\d+ cutbacks \(\d+ mål, \d+ stoppet ved kanten\))?(, )?(\d+ høje bolde \(\d+ vundne luftdueller, \d+ hovedstødsmål\))?)\. 🛡️ Dit felt: modstanderens cutbacks stoppet \d+ af \d+, luftdueller vundet \d+ af \d+\./.test(runSum), runSum.match(/⚔️[^🛡]*🛡️[^.]*\./)?.[0] ?? 'mangler');
+  check('Fuldtids-analyse med løb uden bold i din kamp', /📊 \[FULDTIDS-ANALYSE\] (Sejr \d+-\d+ til dig|Nederlag \d+-\d+|Uafgjort \d+-\d+)\. Du havde \d+% af bolden og \d+ afslutninger \(\d+ på mål\)\. Din opbygning kom igennem \d+ af \d+ gange; dit pres vandt bolden \d+ af \d+ gange\. Dødbolde: \d+ frispark i skudafstand, \d+ hjørnespark, \d+ straffe \(\d+ mål\) · frispark begået \d+, tilkendt \d+\. 🎯 Løb uden bold \(Normal\): \d+ løb, \d+ kom fri \(\d+ mål\) · kontraer imod i alt: \d+ \(\d+ mål\)\./.test(runSum), runSum.match(/🎯[^.]*\./)?.[0] ?? 'mangler');
+  check('Fuldtids-analysen viser dit angreb (fokus · pasningsstil) og dit felt (v3.12)', /⚔️ Angreb \((Centralt|Høje indlæg|Lave cutbacks) · (korte pasninger|balanceret|direkte lange bolde)\): (ingen cutbacks eller høje bolde|(\d+ cutbacks \(\d+ mål, \d+ stoppet ved kanten\))?(, )?(\d+ høje bolde \(\d+ vundne luftdueller i åbent spil, \d+ hovedstødsmål\))?)\. 🛡️ Dit felt: modstanderens cutbacks stoppet \d+ af \d+ · luftdueller i åbent spil vundet \d+ af \d+\./.test(runSum), runSum.match(/⚔️[^🛡]*🛡️[^.]*\./)?.[0] ?? 'mangler');
   const gzText = await g.textContent('#gazette');
   // v3.14: avisen er en klumme – overskrift, "Din kamp", de 3 øvrige kampe (fed overskrift, klik = referatet),
   // rundens spiller og mål, næste runde; dit holds løber står stadig som boks.
@@ -393,28 +402,12 @@ try {
   check('Forklaring af "fri" og HI (rigtig vej rundt: 2/3 = kom fri 2 af 3 gange)', legendTxt.includes('"2/3 fri" = løb uden bold: kom fri 2 af 3 gange') && legendTxt.includes('HI = andel højintenst løb') && legendTxt.endsWith('begge kun dit hold'), legendTxt);
   const por = await g.textContent('#player-of-round');
   const porIsMine = (await g.locator('.ratings').nth(own).textContent()).includes(por.match(/#\d+ [^ ]+ [^ (]+/)[0]);
-  check('Avisen kårer rundens spiller – med karakter kun hvis det er din spiller, ellers stjerner', porIsMine ? /karakter \d+\.\d/.test(por) : (/[★☆]{5}/.test(por) && !/karakter/.test(por)), por);
-  // v3.12.1: 📍 ved mål i åbent spil viser dit holds positioner i øjeblikket på minibanen
-  const snapSaved = await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.lastRound.matches[0].events.filter((e) => e.snapshot).length);
-  const pins = await g.locator('#feed .snap-btn').count();
-  check('📍 står ved præcis de mål, der har et gemt øjebliksbillede', pins === snapSaved, `${pins} / ${snapSaved}`);
-  if (pins > 0) {
-    await g.locator('#feed .snap-btn').first().click();
-    // Release Manager v3.13: før sammenlignede checken med startopstillingen (≈ 6 % falsk rød, når billedet tilfældigt
-    // lignede). Nu: brikkerne på minibanen er PRÆCIS et gemt øjebliksbillede (spiller-id og koordinater).
-    const shown = (await g.locator('#snap-pitch .mp-token').evaluateAll((ts) => ts.map((t) => `${t.dataset.pid}@${parseFloat(t.style.left)},${parseFloat(t.style.top)}`))).sort().join('|');
-    const saved = await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.lastRound.matches[0].events.filter((e) => e.snapshot).map((e) => e.snapshot.pts.map(([id, x, y]) => `${id}@${x},${y}`).sort().join('|')));
-    // v3.15: efter et rødt kort har billedet 10 (eller færre) brikker – antallet skal passe med det gemte billede (saved.includes)
-    const nTok = await g.locator('#snap-pitch .mp-token').count();
-    check('Klik på 📍: minibanen viser et gemt øjebliksbillede præcist (7–11 brikker på deres gemte pladser, bolden)', nTok >= 7 && nTok <= 11 && nTok === shown.split('|').length && saved.includes(shown) && (await g.locator('#snap-ball').count()) === 1 && (await g.locator('#feed .ev.snapped').count()) === 1, shown.slice(0, 80));
-    // Test Manager v3.12.1: et mål IMOD mod mellemblok med bolden midt i banen viser præcis startopstillingen (ingen forskydning) – kun dine egne mål SKAL stå anderledes
-    // Test Manager v3.12.1: et nyt valg af kamp (også den aktive) fjerner billedet – ellers hænger et gammelt øjebliksbillede ved
-    await g.locator('#match-cards .matchcard.active').click();
-    check('Valg af kamp fjerner øjebliksbilledet (mc.snap nulstilles)', (await g.locator('#snap-pitch').count()) === 0 && (await g.locator('#feed .ev.snapped').count()) === 0);
-    await g.locator('#feed .snap-btn').first().click();
-    await g.click('#snap-back');
-    check('↩ Startopstilling går tilbage til minibanen fra kampstart', (await g.locator('#snap-pitch').count()) === 0 && (await g.locator('.ratings').nth(own).locator('.mp-token').count()) === 11);
-  }
+  check('Avisen kårer rundens spiller – med karakter kun hvis det er din spiller, ellers "rundens bedste karakter" (v3.16.3, ingen stjerner)', porIsMine ? /karakter \d+\.\d/.test(por) : (por.includes('rundens bedste karakter') && !/[★☆]/.test(por) && !/karakter \d/.test(por)), por);
+  // v3.16.3: 📍 kun hvor afspilningen ikke har afslutningen (QC: ellers to knapper, én handling) – i en ny kamp har hvert mål med
+  // billede en 🎬, så 📍 står kun ved et mål med billede UDEN øjeblik i sporet. 📍-flowet køres længere nede på et gem uden spor.
+  const pinWant = await g.evaluate(() => { const m = JSON.parse(localStorage.getItem('tactivar_save')).league.lastRound.matches[0]; const mo = new Set((m.trace?.moments ?? []).map((x) => x.ev)); return { snaps: m.events.filter((e) => e.snapshot).length, noFilm: m.events.filter((e, i) => e.snapshot && !mo.has(i)).length, trace: !!m.trace }; });
+  const pinsLive = await g.locator('#feed .snap-btn').count();
+  check('📍 står kun ved mål med gemt øjebliksbillede uden 🎬 (kamp med spor)', pinWant.trace && pinsLive === pinWant.noFilm, `${pinsLive} / ${pinWant.noFilm} (billeder i alt ${pinWant.snaps})`);
   // Med faste data: dit mål (scorer og oplæg markeret) og et mål imod (kun dit forsvar) – uafhængigt af tilfældighed
   const snapT = await g.evaluate(async () => {
     const { renderMatchCenter } = await import('/ui/matchcenter.js');
@@ -430,13 +423,14 @@ try {
       const ownIds = new Set(me.squad.map((p) => p.id)), oppNames = opp.squad.map((p) => p.shortName);
       const read = (el) => { const sp = el.querySelector('#snap-pitch'); return sp && { title: sp.querySelector('#snap-title').textContent, n: sp.querySelectorAll('.mp-token').length, scorer: sp.querySelectorAll('.mp-token.scorer').length, assist: sp.querySelectorAll('.mp-token.assist').length, ball: !!sp.querySelector('#snap-ball'), pitches: el.querySelectorAll('#snap-pitch').length, oppName: oppNames.some((n) => sp.textContent.includes(n)), pins: el.querySelectorAll('.snap-btn').length }; };
       const ev = m.events[theirI].snapshot;
-      return { a: read(draw(mineI)), b: read(draw(theirI)), none: (() => { const el = draw(null); return { pitches: el.querySelectorAll('#snap-pitch').length, pins: el.querySelectorAll('.snap-btn').length, want: m.events.filter((e) => e.snapshot).length }; })(), ownOnly: ev.pts.every(([id]) => ownIds.has(id)) && ev.scorer === null && ev.pts.length === 11 };
+      return { a: read(draw(mineI)), b: read(draw(theirI)), none: (() => { const el = draw(null); const { trace, ...old } = m; const elOld = renderMatchCenter({ mc: { round: 1, matches: [old], gazette: null, viewIdx: 0, filter: 'all', shownCount: 0, playing: false, snap: null }, myTeamId: me.id, on: { snapshot: () => {}, view: () => {}, filter: () => {}, skip: () => {} } }); return { pitches: el.querySelectorAll('#snap-pitch').length, pins: el.querySelectorAll('.snap-btn').length, films: el.querySelectorAll('.replay-btn').length, pinsOld: elOld.querySelectorAll('.snap-btn').length, want: m.events.filter((e) => e.snapshot).length }; })(), ownOnly: ev.pts.every(([id]) => ownIds.has(id)) && ev.scorer === null && ev.pts.length === 11 };
     }
     return null;
   });
   check('Øjebliksbillede, dit mål: 11 brikker, scorer ⚽ og oplæg 🅰 markeret, bolden vist', !!snapT && snapT.a?.n === 11 && snapT.a.scorer === 1 && snapT.a.assist === 1 && snapT.a.ball && snapT.a.pitches === 1 && /mål af #\d+ .+: sådan stod I/.test(snapT.a.title), JSON.stringify(snapT?.a));
   check('Øjebliksbillede, mål imod: kun dit forsvar (ingen scorer, ingen af modstanderens spillere) – gemt uden modstanderens positioner', !!snapT && snapT.b?.n === 11 && snapT.b.scorer === 0 && !snapT.b.oppName && snapT.b.title.includes('sådan stod dit forsvar, da bolden blev spillet') && snapT.ownOnly, JSON.stringify(snapT?.b));
-  check('Uden valgt mål: intet øjebliksbillede, men 📍 ved hvert mål med billede', !!snapT && snapT.none.pitches === 0 && snapT.none.pins === snapT.none.want && snapT.none.want >= 2, JSON.stringify(snapT?.none));
+  // v3.16.3: med spor 🎬 i stedet for 📍; uden spor (gammelt gem) 📍 ved hvert mål med billede
+  check('Uden valgt mål: intet øjebliksbillede; med spor 🎬 og ingen 📍, uden spor 📍 ved hvert mål med billede', !!snapT && snapT.none.pitches === 0 && snapT.none.pins === 0 && snapT.none.films >= snapT.none.want && snapT.none.pinsOld === snapT.none.want && snapT.none.want >= 2, JSON.stringify(snapT?.none));
   // v3.16: 2D-afspilning og heat map efter slutfløjt (brikker for begge hold, 🎬 springer til hændelsen, ▶ kører, heat map for dit hold)
   if (await g.locator('#replay #rp-pitch').count()) {
     const rp0 = await g.evaluate(() => ({ tokens: [...document.querySelectorAll('#rp-pitch .rp-token')].filter((t) => !t.hidden).length, home: document.querySelectorAll('#rp-pitch .rp-token.home').length, away: document.querySelectorAll('#rp-pitch .rp-token.away').length, own: document.querySelectorAll('#rp-pitch .rp-token.own').length, films: document.querySelectorAll('#feed .replay-btn').length, moments: (() => { const lr = JSON.parse(localStorage.getItem('tactivar_save')).league.lastRound; const idx = [...document.querySelectorAll('#match-cards .matchcard')].findIndex((c) => c.classList.contains('active')); return lr.matches[Math.max(0, idx)].trace?.moments.length ?? -1; })() }));
@@ -476,6 +470,35 @@ try {
         afterPin.snap === 1 && afterPin.heat === 0 && afterHeat.snap === 0 && afterHeat.heat === 1 && afterBack.snap === 0 && afterBack.heat === 0, JSON.stringify([afterPin, afterHeat, afterBack]));
     } else await g.click('#heat-back');
   } else check('Afspilning findes efter en spillet runde', false, (await g.locator('#replay').textContent().catch(() => 'intet #replay')) + ' | mc ' + (await g.locator('#match-center').count()));
+  // v3.16.3: 📍 i et gem fra før afspilningen (v3.12.1–v3.15: øjebliksbilleder, intet spor) – sporet fjernes fra det gemte spil,
+  // siden genindlæses, og 📍-flowet køres i den rigtige app; bagefter lægges det oprindelige gem tilbage.
+  const savedWithTrace = await g.evaluate(() => localStorage.getItem('tactivar_save'));
+  await g.evaluate(() => { const d = JSON.parse(localStorage.getItem('tactivar_save')); for (const m of d.league.lastRound.matches) delete m.trace; localStorage.setItem('tactivar_save', JSON.stringify(d)); });
+  await reload(); await tab('kamp');
+  // v3.12.1: 📍 ved mål i åbent spil viser dit holds positioner i øjeblikket på minibanen
+  const snapSaved = await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.lastRound.matches[0].events.filter((e) => e.snapshot).length);
+  const pins = await g.locator('#feed .snap-btn').count();
+  check('Gem uden spor: 📍 står ved præcis de mål, der har et gemt øjebliksbillede – og ingen 🎬', pins === snapSaved && (await g.locator('#feed .replay-btn').count()) === 0, `${pins} / ${snapSaved}`);
+  if (pins > 0) {
+    await g.locator('#feed .snap-btn').first().click();
+    // Release Manager v3.13: før sammenlignede checken med startopstillingen (≈ 6 % falsk rød, når billedet tilfældigt
+    // lignede). Nu: brikkerne på minibanen er PRÆCIS et gemt øjebliksbillede (spiller-id og koordinater).
+    const shown = (await g.locator('#snap-pitch .mp-token').evaluateAll((ts) => ts.map((t) => `${t.dataset.pid}@${parseFloat(t.style.left)},${parseFloat(t.style.top)}`))).sort().join('|');
+    const saved = await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.lastRound.matches[0].events.filter((e) => e.snapshot).map((e) => e.snapshot.pts.map(([id, x, y]) => `${id}@${x},${Math.max(1, Math.min(99, Math.round((50 + (y - 50) * 1.175) * 10) / 10))}`).sort().join('|')));   // v3.16.3: y i banens skala (50 + (y − 50)·1,175), regnet her
+    // v3.15: efter et rødt kort har billedet 10 (eller færre) brikker – antallet skal passe med det gemte billede (saved.includes)
+    const nTok = await g.locator('#snap-pitch .mp-token').count();
+    check('Klik på 📍: minibanen viser et gemt øjebliksbillede præcist (7–11 brikker på deres gemte pladser, bolden)', nTok >= 7 && nTok <= 11 && nTok === shown.split('|').length && saved.includes(shown) && (await g.locator('#snap-ball').count()) === 1 && (await g.locator('#feed .ev.snapped').count()) === 1, shown.slice(0, 80));
+    // Test Manager v3.12.1: et mål IMOD mod mellemblok med bolden midt i banen viser præcis startopstillingen (ingen forskydning) – kun dine egne mål SKAL stå anderledes
+    // Test Manager v3.12.1: et nyt valg af kamp (også den aktive) fjerner billedet – ellers hænger et gammelt øjebliksbillede ved
+    await g.locator('#match-cards .matchcard.active').click();
+    check('Valg af kamp fjerner øjebliksbilledet (mc.snap nulstilles)', (await g.locator('#snap-pitch').count()) === 0 && (await g.locator('#feed .ev.snapped').count()) === 0);
+    await g.locator('#feed .snap-btn').first().click();
+    await g.click('#snap-back');
+    check('↩ Startopstilling går tilbage til minibanen fra kampstart', (await g.locator('#snap-pitch').count()) === 0 && (await g.locator('.ratings').nth(own).locator('.mp-token').count()) === 11);
+  }
+  await g.evaluate((f) => localStorage.setItem('tactivar_save', f), savedWithTrace);
+  await reload(); await tab('kamp');
+  check('Gemmet med spor er tilbage: afspilningen findes igen', (await g.locator('#replay #rp-pitch').count()) === 1);
   const allEvents = await g.locator('#feed .ev').count();
   await g.click('#match-center .toolbar button:nth-child(3)');
   check('Filteret "Kun nøglemomenter" viser færre hændelser', (await g.locator('#feed .ev').count()) < allEvents);
@@ -586,7 +609,7 @@ try {
     return { mine, theirs };
   });
   check('Avisen: din spiller vises med karakter', gaz.mine.includes('karakter 8.7') && gaz.mine.includes('2 mål'), gaz.mine);
-  check('Avisen: modstanderens spiller kun med stjerner – aldrig karakteren', gaz.theirs.includes('★★★★★') && !gaz.theirs.includes('8.7') && !gaz.theirs.includes('karakter'), gaz.theirs);
+  check('Avisen: modstanderens spiller som "rundens bedste karakter" (v3.16.3) – aldrig tallet, ingen stjerner', gaz.theirs.includes('– rundens bedste karakter') && !gaz.theirs.includes('8.7') && !/[★☆]/.test(gaz.theirs) && !/karakter \d/.test(gaz.theirs), gaz.theirs);
 
   // Mislykkes backuppen ved "Ny liga" (fuldt lager), står det gamle spil urørt – også efter næste gem
   await g.selectOption('#team-select', '0');
@@ -795,14 +818,28 @@ try {
     check('Sæsonslut: næste runde er den NYE sæsons runde 1 — "Ny sæson:" sidst, rigtig modstander og retning, intet bud om hans stil', ny.length === 1 && colNext.at(-1) === ny[0] && ny[0].includes(sv.opp) && (sv.home ? ny[0].includes(`${sv.opp} kommer på besøg`) : ny[0].includes(`ude mod ${sv.opp}`)) && !colNext.join(' ').includes('Mit bud') && !colNext.some((t) => t.startsWith('Næste runde')), colNext.join(' | '));
     // v3.14.3 (brugeren: "man kan ikke længere se slutstillingen"): tabellen viser slutstillingen og mesteren
     const stTitle = await g.textContent('#standings-title'), champ = (await g.locator('#standings-champion').count()) ? await g.textContent('#standings-champion') : '';
-    check('Sæsonslut, Liga: tabellen er slutstillingen for den afsluttede sæson, med mesteren', /slutstilling, sæson \d+$/.test(stTitle) && champ.startsWith('🏆 Mester: ') && champ.includes(`${sv.top[0]} (${sv.top[1]} point)`) && champ.endsWith('starter med næste runde.'), `${stTitle} | ${champ}`);
+    check('Sæsonslut, Liga: tabellen er slutstillingen for den afsluttede sæson, med mesteren', /slutstilling, sæson \d+$/.test(stTitle) && champ.startsWith(`🏆 ${sv.top[0]} er mester `) && champ.includes(` ${sv.top[1]} point`) && champ.endsWith('starter med næste runde.'), `${stTitle} | ${champ}`);
     const colForm = (await g.locator('#gazette #col-form p').allTextContents()).join(' | ');
     const [t0, p0, t1, p1] = sv.top;
-    const formOk = (t) => p0 !== 0 && t.includes(`${t0} blev mester med ${p0} point.`) && !/fører med|står lige i toppen/.test(t);   // ved sæsonslut: mesteren, ikke "fører" (QC F9)
+    const formOk = (t) => p0 !== 0 && t.includes(`${t0} er mester `) && t.includes(`${p0} point`)   /* v3.16.3: championText */ && !/fører med|står lige i toppen/.test(t);   // ved sæsonslut: mesteren, ikke "fører" (QC F9)
     check('Sæsonslut: formen bygger på den AFSLUTTEDE sæsons tabel og forløb (ikke den nye sæsons nulstillede)', formOk(colForm), `${colForm} | forventet ${t0} ${p0}, ${t1} ${p1}`);
     await tab('kamp');
     const kampNext = (await g.locator('#gazette #col-next p').allTextContents()).filter((t) => t.startsWith('Ny sæson: '));
     check('Sæsonslut, Kamp-fanen: samme klumme (Ny sæson-linjen og tabellen)', kampNext.length === 1 && kampNext[0].includes(sv.opp) && formOk(await g.locator('#gazette #col-form').textContent()), kampNext.join(' | '));
+    // Test Manager v3.16.3: mesterteksten følger den regel, der afgjorde det — på ALLE tre steder (klummen får champion fra app.js).
+    // Et tilfældigt forløb afgøres sjældent på målforskel, så mesteren i det gemte spil sættes til en målforskels-afgørelse (samme point).
+    const tie = await g.evaluate(() => {
+      const d = JSON.parse(localStorage.getItem('tactivar_save')), se = d.league.lastRound.gazette.seasonEnd, c = se.champion, t = se.table;
+      const mk = (r, gd, gf) => ({ teamName: r.teamName, points: c.points, goalDiff: gd, goalsFor: gf });
+      const champion = { ...c, ...mk(t[0], 7, 22), runnerUp: mk(t[1], 4, 30) };
+      se.champion = champion; d.league.seasons.at(-1).champion = champion;
+      localStorage.setItem('tactivar_save', JSON.stringify(d));
+      return { first: t[0].teamName, second: t[1].teamName, points: c.points, myPos: se.myPos };
+    });
+    await g.reload(); await g.waitForSelector('body[data-klar="ja"]'); await tab('liga');
+    const tieTxt = `${tie.first} er mester på målforskel – ${tie.myPos === 2 ? 'I' : `${tie.first} og ${tie.second}`} endte begge på ${tie.points} point`;
+    const tieCol = await g.textContent('#gazette #col-form'), tieBox = await g.textContent('#gazette #season-end'), tieTable = (await g.locator('#standings-champion').count()) ? await g.textContent('#standings-champion') : '';
+    check('Sæsonslut: afgjort på målforskel står der i klummen, avisens sæsonboks og slutstillingen (ens tekst alle tre steder)', tieCol.includes(`${tieTxt}.`) && tieBox.includes(`${tieTxt}.`) && tieTable.includes(`${tieTxt}.`), `${tieCol} | ${tieBox} | ${tieTable}`);
   }
 
   // Ødelagt gemt spil: aldrig tom side, data bevaret i backup

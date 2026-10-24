@@ -10,7 +10,8 @@ Kør før en udgivelse, der ændrer kampmotoren, referaterne, klummen eller Liga
 1. Spil sæsonen (lokal side, nuværende branch; `BASE_URL=https://tactivar.web.app` for den live):
    `node tools/season-walkthrough.mjs <scratchpad>/saeson` – 14 runder som en bruger (▶ Spil runde, ⏭).
    Mappen får pr. runde `NN-runde.md` (alle fire kampes referater kronologisk, kamptal, Liga-fanens tekst),
-   `NN-kamp.png`, `NN-kamp-mal-billede.png` (første 📍), `NN-liga.png`, sæsonslut-billeder og `fejl.txt`.
+   `NN-kamp.png`, `NN-kamp-mal-billede.png` (første 📍 – kun i kampe uden afspilning, fra v3.16.3 normalt ingen; målet ses i
+   `NN-afspilning-maal.png`), `NN-liga.png`, sæsonslut-billeder og `fejl.txt`.
    Fra v3.16 også: alle faner ved sæsonslut, pr. runde afspilningen (`NN-afspilning-maal.png`, `NN-afspilning-foer.png`),
    heat map (`NN-heat-hold.png`, `NN-heat-spiller.png`), sporets øjeblikke i `NN-runde.md` ("· spor …": skyttens og boldens
    plads pr. afslutning) og kontrolværktøjets rapport for alle kampe i `spor.md` (tools/trace-invariants.mjs).

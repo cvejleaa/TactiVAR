@@ -19,7 +19,7 @@ globalThis.document = { createElement: (t) => new FakeEl(t), createTextNode: (t)
 const { createRng } = await import('../../public/engine/rng.js');
 const { createLeague } = await import('../../public/engine/generator.js');
 const { simulateMatch, LONGSHOT_FAR } = await import('../../public/engine/match.js');
-const { playRound, commitRound } = await import('../../public/engine/season.js');
+const { playRound, commitRound, championText } = await import('../../public/engine/season.js');
 const { renderStandings } = await import('../../public/ui/standings.js');
 const all = (el, pred, out = []) => { if (el instanceof FakeEl) { if (pred(el)) out.push(el); el.children.forEach((c) => all(c, pred, out)); } return out; };
 const byId = (el, id) => all(el, (e) => e.attrs.id === id)[0];
@@ -50,22 +50,44 @@ test('langskud: skytten og bolden står i billedet højst på LONGSHOT_FAR (38) 
   assert.ok(n >= 5, `langskudsmål med billede: ${n}`);
 });
 
-test('referatet fortæller oplægget én gang: med dit holds løb (✅) slutter målteksten kort – den fulde beskrivelse står i Rundens mål', () => {
-  let n = 0, shot = 0;
+// v3.16.3 (Spilfører): målets linje genfortæller løbet UDEN ✅ ("MÅÅÅL! ✅ …") og uden afslutterens navn to gange i træk
+// ("… lægger den tværs til #7 X. #7 X sparkede den ind." → "Han sparkede den ind."). "Rundens mål" (goalsPool.desc) fortæller
+// samme hændelse som linjen. Dit holds løb genkendes positivt på indledningen ("løber sig fri" / "når baglinjen" lige efter MÅÅÅL!).
+const LEAD = /^⚽ \[[^\]]+\] MÅÅÅL! (#\d+ .+? (løber sig fri|når baglinjen) .+)$/;
+const noVar = (t) => t.replace(/ 📺 VAR: målet står – .+\.$/, '');
+test('referatet fortæller oplægget én gang: med dit holds løb slutter målteksten kort – uden ✅, uden dobbelt navn, og Rundens mål er samme fortælling', () => {
+  let n = 0, shot = 0, kicked = 0;
   for (const { e, m } of G) {
-    if (!e.text.includes('✅')) continue;
+    const lead = noVar(e.text).match(LEAD);
+    if (!lead) continue;
+    assert.doesNotMatch(e.text, /✅/, e.text);
     // v3.15.1: et mål, VAR har tjekket, slutter med "📺 VAR: målet står – …" efter slutningen
-    assert.match(e.text, /(#\d+ .+ sparkede den ind|Bolden sad i nettet)\.( 📺 VAR: målet står – .+\.)?$/, e.text);
-    assert.doesNotMatch(e.text, /Lavt cutback|spillede 1-2|baglinjen.*baglinjen|cutback fra/, e.text);
-    // QC v3.14.3: "sparkede den ind" kun om den, indledningen spillede bolden til – aldrig efter "… og skyder." (løberen selv)
-    const kick = e.text.replace(/ 📺 VAR: målet står – .+\.$/, '').match(/\. (#\d+ .+) sparkede den ind\.$/);
-    if (kick) assert.ok(e.text.includes(`til ${kick[1]}. `) || e.text.includes(`spiller ${kick[1]}. `), e.text);
-    if (/ og skyder\. /.test(e.text)) { assert.match(e.text, /Bolden sad i nettet\.( 📺 VAR: målet står – .+\.)?$/, e.text); shot++; }
+    assert.match(e.text, /(Han sparkede den ind|Bolden sad i nettet)\.( 📺 VAR: målet står – .+\.)?$/, e.text);
+    assert.doesNotMatch(e.text, /Lavt cutback|spillede 1-2|baglinjen.*baglinjen|cutback fra|(?<!Han) sparkede den ind/, e.text);
     const g = m.goalsPool.find((x) => x.min === e.min && e.text.includes(x.scorer));
-    assert.ok(g && g.desc.length > 20 && !e.text.includes(g.desc), 'den fulde beskrivelse er i goalsPool, ikke i referatet');
+    assert.ok(g, e.text);
+    // "Han sparkede den ind" kun om den, indledningen spillede bolden til – aldrig efter "… og skyder." (løberen selv); navnet én gang
+    if (/ Han sparkede den ind\.$/.test(noVar(e.text))) {
+      assert.ok(noVar(e.text).endsWith(`til ${g.scorer}. Han sparkede den ind.`) || noVar(e.text).endsWith(`spiller ${g.scorer}. Han sparkede den ind.`), e.text);
+      assert.equal(e.text.split(g.scorer).length - 1, e.text.includes('VAR: målet står') ? e.text.split(g.scorer).length - 1 : 1, `${g.scorer} én gang: ${e.text}`);
+      kicked++;
+    }
+    if (/ og skyder\. /.test(e.text)) { assert.match(e.text, /Bolden sad i nettet\.( 📺 VAR: målet står – .+\.)?$/, e.text); shot++; }
+    // Rundens mål = linjens fortælling (før: describeGoal's fulde beskrivelse – en anden historie end referatet)
+    assert.equal(g.desc, lead[1], 'goalsPool.desc er linjens tekst efter "MÅÅÅL! " (uden VAR-tillægget)');
     n++;
   }
-  assert.ok(n >= 5 && shot >= 2, `mål med dit holds løb: ${n}, heraf "og skyder": ${shot}`);
+  assert.ok(n >= 5 && shot >= 2 && kicked >= 2, `mål med dit holds løb: ${n}, heraf "og skyder": ${shot}, "Han sparkede den ind": ${kicked}`);
+  // Mål uden dit holds løb: Rundens mål er stadig linjens tekst (describeGoal), og ingen "Han sparkede"
+  let plain = 0;
+  for (const { e, m } of G) {
+    if (noVar(e.text).match(LEAD) || !/^⚽ \[[^\]]+\] MÅÅÅL! /.test(e.text)) continue;
+    const g = m.goalsPool.find((x) => x.min === e.min && e.text.includes(x.scorer));
+    if (!g) continue;
+    assert.equal(noVar(e.text).replace(/^⚽ \[[^\]]+\] MÅÅÅL! /, ''), g.desc, e.text); assert.doesNotMatch(e.text, /Han sparkede/);
+    plain++;
+  }
+  assert.ok(plain >= 20, `data: ${plain} almindelige mål`);
 });
 
 test('slutstilling: lige efter sæsonens sidste runde viser tabellen slutstillingen og mesteren – efter næste runde den nye sæson', () => {
@@ -76,7 +98,7 @@ test('slutstilling: lige efter sæsonens sidste runde viser tabellen slutstillin
   assert.ok(last.table.some((t) => t.points > 0), 'data: point i slutstillingen');
   const el = renderStandings({ league: L, onPick: () => {}, viewTeamId: null });
   assert.equal(byId(el, 'standings-title').textContent, `${L.leagueMetadata.name} – slutstilling, sæson 1`);
-  assert.equal(byId(el, 'standings-champion').textContent, `🏆 Mester: ${last.champion.teamName} (${last.champion.points} point). Sæson 2 starter med næste runde.`);
+  assert.equal(byId(el, 'standings-champion').textContent, `🏆 ${championText(last.champion, last.myPos)}. Sæson 2 starter med næste runde.`);
   const rows = all(byId(el, 'standings'), (e) => e.tag === 'tr').slice(1).map((tr) => [tr.children[1].textContent, Number(tr.children[8].textContent)]);
   assert.deepEqual(rows, last.table.map((t) => [t.teamName, t.points]));
   commitRound(L, playRound(L, rng), rng);
@@ -104,18 +126,22 @@ test('mesteren røbes ikke, mens sæsonens sidste runde spilles; statistikken si
   assert.equal(byId(playing, 'standings-champion'), undefined, 'ingen mester under afspilningen');
   assert.match(byId(playing, 'standings-title').textContent, /slutstilling, sæson 1$/);
   const st = renderStats({ league: L, myTeamId: L.teams[0].id });
-  assert.match(byId(st, 'stats-season-over').textContent, /^Sæson 1 er slut – slutstillingen står i tabellen ovenfor/);
+  // v3.16.3: en sæson afsluttet med den nye kode viser sine egne tal (mærket); "slut"-noten er til gamle arkiver (season-end.test.mjs)
+  assert.match(byId(st, 'stats-season-ended').textContent, /^Sæson 1 – afsluttet\./);
+  assert.equal(byId(st, 'stats-season-over'), undefined);
   commitRound(L, playRound(L, rng), rng);
-  assert.equal(byId(renderStats({ league: L, myTeamId: L.teams[0].id }), 'stats-season-over'), undefined, 'væk efter første runde i den nye sæson');
+  const st2 = renderStats({ league: L, myTeamId: L.teams[0].id });
+  assert.equal(byId(st2, 'stats-season-ended'), undefined, 'væk efter første runde i den nye sæson');
+  assert.equal(byId(st2, 'stats-season-over'), undefined);
 });
 
 // TM v3.14.3: slutstillingens indhold – hver kolonne, klasserne og klikket. Tabellen i sæsonarkivet får kunstigt forskellige tal
 // pr. kolonne (data!), så en ombyttet kolonne (V/U, K/T, mål for/imod) ikke kan ligne den rigtige.
-test('slutstilling: hver kolonne (K V U T Mål P) viser sit eget tal, "VAR ±" er –, "mine" kun på dit hold, "viewing" på det viste, klik vælger holdet', () => {
+test('slutstilling: hver kolonne (K V U T Mål P) viser sit eget tal, "VAR ±" med fortegn (v3.16.3), "mine" kun på dit hold, "viewing" på det viste, klik vælger holdet', () => {
   const rng = createRng(8), L = createLeague(rng);
   for (let r = 0; r < L.schedule.length; r++) commitRound(L, playRound(L, rng), rng);
   const last = L.seasons.at(-1);
-  last.table.forEach((t, i) => Object.assign(t, { played: 30 + i, won: 3 + i, drawn: 50 + i, lost: 70 + i, goalsFor: 100 + i, goalsAgainst: 200 + i, points: 400 + i }));
+  last.table.forEach((t, i) => Object.assign(t, { played: 30 + i, won: 3 + i, drawn: 50 + i, lost: 70 + i, goalsFor: 100 + i, goalsAgainst: 200 + i, points: 400 + i, varNet: i - 3 }));
   const myId = L.teams.find((t) => !t.isBot).id, viewId = last.table[2].teamId, picked = [];
   const el = renderStandings({ league: L, onPick: (id) => picked.push(id), viewTeamId: viewId });
   const trs = all(byId(el, 'standings'), (e) => e.tag === 'tr');
@@ -123,7 +149,7 @@ test('slutstilling: hver kolonne (K V U T Mål P) viser sit eget tal, "VAR ±" e
   const body = trs.slice(1);
   assert.equal(body.length, last.table.length);
   body.forEach((tr, i) => {
-    assert.deepEqual(tr.children.map((c) => c.textContent), [String(i + 1), last.table[i].teamName, String(30 + i), String(3 + i), String(50 + i), String(70 + i), `${100 + i}-${200 + i}`, '–', String(400 + i)]);
+    assert.deepEqual(tr.children.map((c) => c.textContent), [String(i + 1), last.table[i].teamName, String(30 + i), String(3 + i), String(50 + i), String(70 + i), `${100 + i}-${200 + i}`, i - 3 > 0 ? `+${i - 3}` : String(i - 3), String(400 + i)]);
     const cls = tr.className.split(' ').filter(Boolean);
     assert.equal(cls.includes('mine'), last.table[i].teamId === myId, `mine: ${last.table[i].teamName}`);
     assert.equal(cls.includes('viewing'), last.table[i].teamId === viewId, `viewing: ${last.table[i].teamName}`);
@@ -139,7 +165,7 @@ test('slutstilling efter TO sæsoner viser den SIDSTE sæson (2), ikke den førs
   assert.notDeepEqual(L.seasons[0].table.map((t) => t.points), L.seasons[1].table.map((t) => t.points), 'data: de to sæsoner er forskellige');
   const el = renderStandings({ league: L, onPick: () => {}, viewTeamId: null });
   assert.equal(byId(el, 'standings-title').textContent, `${L.leagueMetadata.name} – slutstilling, sæson 2`);
-  assert.equal(byId(el, 'standings-champion').textContent, `🏆 Mester: ${L.seasons[1].champion.teamName} (${L.seasons[1].champion.points} point). Sæson 3 starter med næste runde.`);
+  assert.equal(byId(el, 'standings-champion').textContent, `🏆 ${championText(L.seasons[1].champion, L.seasons[1].myPos)}. Sæson 3 starter med næste runde.`);
   const rows = all(byId(el, 'standings'), (e) => e.tag === 'tr').slice(1).map((tr) => [tr.children[1].textContent, Number(tr.children[8].textContent)]);
   assert.deepEqual(rows, L.seasons[1].table.map((t) => [t.teamName, t.points]));
 });

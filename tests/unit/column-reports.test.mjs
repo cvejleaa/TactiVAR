@@ -69,7 +69,8 @@ test('ownReport: modstander-tallene er modstanderens egne (cutbacks og høje bol
     // Fuldtids-analysen (for den ene menneskeside) bruger rapportens modstander-tal
     const ft = m.events.find((e) => e.type === 'FULLTIME');
     const ownerRep = ft.isHome ? a : b;
-    assert.ok(ft.text.includes(`modstanderens cutbacks stoppet ${ownerRep.oppCutbacksBlocked} af ${ownerRep.oppCutbacks}, luftdueller vundet ${ownerRep.oppCrosses - ownerRep.oppCrossesWon} af ${ownerRep.oppCrosses}.`), `${ft.text.slice(-120)} | ${JSON.stringify(ownerRep)}`);
+    // v3.16.3-ordlyden: "cutbacks stoppet M af N · luftdueller i åbent spil vundet …"
+    assert.ok(ft.text.includes(`Dit felt: modstanderens cutbacks stoppet ${ownerRep.oppCutbacksBlocked} af ${ownerRep.oppCutbacks} · luftdueller i åbent spil vundet ${ownerRep.oppCrosses - ownerRep.oppCrossesWon} af ${ownerRep.oppCrosses}.`), `${ft.text.slice(-120)} | ${JSON.stringify(ownerRep)}`);
     assert.ok(ft.text.includes(`Din opbygning kom igennem ${ownerRep.buildWon} af ${ownerRep.build} gange; dit pres vandt bolden ${ownerRep.pressWon} af ${ownerRep.press} gange.`));
     if (ownerRep.oppCutbacks !== ownerRep.cutbacks || ownerRep.oppCrosses !== ownerRep.crosses) nText++;
   }

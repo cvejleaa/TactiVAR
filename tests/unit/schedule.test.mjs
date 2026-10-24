@@ -89,7 +89,8 @@ test('sæsonslut efter runde 14: tabel og sæsonstatistik arkiveres og nulstille
   assert.equal(s1.table.reduce((a, r) => a + r.goalsFor, 0), s1.goals, 'mål i tabellen = mål i forløbet');
   assert.equal(s1.matches, 56);
   for (let i = 1; i < 8; i++) assert.ok(s1.table[i - 1].points >= s1.table[i].points, 'sorteret');
-  assert.deepEqual(s1.champion, { teamId: s1.table[0].teamId, teamName: s1.table[0].teamName, points: s1.table[0].points });
+  const dec = (r) => ({ teamName: r.teamName, points: r.points, goalDiff: r.goalsFor - r.goalsAgainst, goalsFor: r.goalsFor });
+  assert.deepEqual(s1.champion, { teamId: s1.table[0].teamId, ...dec(s1.table[0]), runnerUp: dec(s1.table[1]) });
   assert.equal(res.gazette.seasonEnd, s1, 'avisen har mesteren');
   assert.ok(s1.topScorer && s1.topScorer.goals > 0);
   assert.ok(s1.myPos >= 1 && s1.myPos <= 8);

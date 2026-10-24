@@ -4,7 +4,8 @@
 import { h } from './dom.js';
 import { starsEl } from './labels.js';
 import { viewPlayer, viewTeamStats } from '../engine/visibility.js';
-import { runStats } from '../engine/stats.js';
+import { runStats, PLAYER_SEASON_DEFAULTS, TEAM_STAT_FIELDS } from '../engine/stats.js';
+import { seasonJustEnded } from '../engine/season.js';
 import { GOAL_KIND_LABEL } from '../engine/gazette.js';
 
 const TOP = 5;
@@ -12,10 +13,24 @@ const TOP = 5;
 // Kun et gem, der var midt i en sæson, da statistikken kom (v3.10, sanitize.js), mangler sæsonens første runder –
 // dem er der ingen spillertal for. Runden vises sæson-relativt (som "Spil runde 10 af 14").
 export const statsFromK = (league) => Math.max(1, (league.statsFromRound ?? 1) - (league.seasonStartRound ?? 1) + 1);
-const since = (league) => `sæson ${league.leagueMetadata.seasonNumber}${statsFromK(league) > 1 ? `, fra runde ${statsFromK(league)}` : ''}`;
-// Lige efter sæsonslut er den nye sæsons tal tomme – sig hvor den afsluttede sæson står (QC v3.14.3).
-const endNote = (league) => { const last = league.seasons?.at(-1);
-  return last?.programmed && league.leagueMetadata.round + 1 === league.seasonStartRound ? h('p', { class: 'muted', id: 'stats-season-over' }, `Sæson ${last.seasonNumber} er slut – slutstillingen står i tabellen ovenfor, og mester, topscorer og din bedste under "Tidligere sæsoner" i kampprogrammet.`) : null; };
+const since = (league) => `sæson ${league.leagueMetadata.seasonNumber}${league.endedSeason ? ' – afsluttet' : ''}${statsFromK(league) > 1 ? `, fra runde ${statsFromK(league)}` : ''}`;
+// Lige efter sæsonslut (v3.16.3): den afsluttede sæsons tal, til den nye sæsons runde 1 er spillet. Det er de SAMME
+// visninger (viewPlayer/viewTeamStats, §3) på en kopi af ligaen, hvor tabellen er sæsonarkivets og spillernes
+// sæsontal er league.lastSeasonStats. null = intet at vise (ingen sæson lige afsluttet, eller et arkiv fra før v3.16.3).
+export function endedSeasonView(league) {
+  const last = seasonJustEnded(league), saved = league.lastSeasonStats;
+  if (!last || saved?.seasonNumber !== last.seasonNumber || !saved.players || typeof saved.players !== 'object') return null;
+  if (!last.table.every((r) => TEAM_STAT_FIELDS.every((k) => Number.isFinite(r[k])))) return null;
+  return { ...league, endedSeason: last,
+    leagueMetadata: { ...league.leagueMetadata, seasonNumber: last.seasonNumber, standings: last.table },
+    seasonStartRound: last.fromRound, statsFromRound: last.statsFrom ?? last.fromRound,
+    teams: league.teams.map((t) => ({ ...t, squad: t.squad.map((p) => ({ ...p, ...PLAYER_SEASON_DEFAULTS, ...saved.players[p.id] })) })) };
+}
+// Lige efter sæsonslut uden den afsluttede sæsons tal (arkiv fra før v3.16.3) er den nye sæsons tal tomme –
+// sig hvor den afsluttede sæson står (QC v3.14.3).
+const endNote = (league) => { const last = seasonJustEnded(league);
+  return last ? h('p', { class: 'muted', id: 'stats-season-over' }, `Sæson ${last.seasonNumber} er slut – slutstillingen står i tabellen ovenfor, og mester, topscorer og din bedste under "Tidligere sæsoner" i kampprogrammet.`) : null; };
+const endedNote = (view) => h('p', { class: 'muted', id: 'stats-season-ended' }, `Sæson ${view.endedSeason.seasonNumber} – afsluttet. Tallene herunder er den afsluttede sæsons; den nye sæsons statistik starter, når dens første runde er spillet.`);
 const gapNote = (league) => statsFromK(league) > 1 ? h('p', { class: 'muted', id: 'stats-gap' }, `Sæsonens runde ${statsFromK(league) === 2 ? '1' : `1–${statsFromK(league) - 1}`} blev spillet, før statistikken fandtes, og kan ikke tælles med. Fra næste sæson tæller hele sæsonen.`) : null;
 // Hvilke sektioner er foldet ud – huskes mellem gen-tegninger (ellers lukkede de ved hvert klik).
 const openSecs = new Set(['stats-players']);
@@ -99,8 +114,16 @@ function myTeam(league, myTeamId) {
 }
 
 export function renderStats({ league, myTeamId }) {
+  let view = null, failed = null;
+  try { view = endedSeasonView(league); if (view) return statsPanel(view, myTeamId, endedNote(view)); }
+  catch (e) { failed = e; console.warn('Den afsluttede sæsons statistik kunne ikke vises', e); }
+  // Ingen afsluttet sæson at vise – eller den kunne ikke vises: den nye sæsons tal (et gammelt arkiv vælter ikke fanen).
+  return statsPanel(league, myTeamId, failed ? h('p', { class: 'muted', id: 'stats-season-failed' }, `Den afsluttede sæsons tal kunne ikke vises (${failed.message}).`) : null, endNote(league));
+}
+
+function statsPanel(league, myTeamId, ...notes) {
   return h('div', { class: 'panel stats', id: 'stats' }, h('h3', {}, '📊 Statistik'),
-    section('stats-players', `Spillere (${since(league)})`, gapNote(league), endNote(league), playerLists(league, myTeamId)),
+    section('stats-players', `Spillere (${since(league)})`, gapNote(league), ...notes, playerLists(league, myTeamId)),
     section('stats-teams', `Holdtal (${since(league)})`, teamTable(league, myTeamId), h('p', { class: 'muted' }, 'Bold % er snit pr. kamp. Afslutninger, xG, hjørnespark, kontraer og VAR-tjek ses kun for dit eget hold (under "Dit hold") – summeret over sæsonen kunne de røbe et holds taktik.')),
     section('stats-flow', `Ligaens forløb (${since(league)})`, leagueFlow(league)),
     section('stats-mine', `Dit hold (privat, ${since(league)})`, myTeam(league, myTeamId)));

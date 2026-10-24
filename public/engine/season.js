@@ -9,7 +9,7 @@ import { applyCounterXp } from './counter.js';
 import { buildGazette } from './gazette.js';
 import { SEASON_ROUNDS, seasonRoundOf } from './schedule.js';
 import { emptyStanding } from './generator.js';
-import { PLAYER_SEASON_DEFAULTS } from './stats.js';
+import { PLAYER_SEASON_DEFAULTS, PLAYER_SEASON_FIELDS, TEAM_STAT_FIELDS } from './stats.js';
 import { REST_BENCH, afterMatchFreshness } from './freshness.js';
 
 // Næste rundes kampe efter programmet (v3.11) som [hjemmeIdx, udeIdx]. Kampen med et
@@ -130,7 +130,10 @@ export function commitRound(league, result, rng) {
 // sæsonen før kampprogrammet (migreringen fra skema 5).
 export function endSeason(league, toRound, programmed) {
   const md = league.leagueMetadata;
-  const table = sortStandings(md.standings).map(({ teamId, teamName, played, won, drawn, lost, goalsFor, goalsAgainst, points }) => ({ teamId, teamName, played, won, drawn, lost, goalsFor, goalsAgainst, points }));
+  // Den seneste sæsons tabel har også VAR ± og holdtallene (Liga-statistikken viser dem, til næste sæsons runde 1 er
+  // spillet); ældre sæsoner skæres ned til de faste felter, så gemmet ikke vokser med hver sæson.
+  for (const s of league.seasons || []) if (s.table) s.table = s.table.map(baseRow);
+  const table = sortStandings(md.standings).map((s) => ({ ...baseRow(s), varNet: s.varNet ?? 0, ...Object.fromEntries(TEAM_STAT_FIELDS.map((k) => [k, s[k] ?? 0])) }));
   const teamOf = new Map(league.teams.flatMap((t) => t.squad.map((p) => [p.id, t])));
   const all = league.teams.flatMap((t) => t.squad);
   const who = (p) => (p ? { playerId: p.id, teamId: teamOf.get(p.id).id, teamName: teamOf.get(p.id).name, shirtNumber: p.shirtNumber, shortName: p.shortName, goals: p.sGoals, motm: p.sMotm } : null);
@@ -139,7 +142,7 @@ export function endSeason(league, toRound, programmed) {
   const hist = (league.history || []).filter((r) => r.round >= league.seasonStartRound && r.round <= toRound);
   const summary = {
     seasonNumber: md.seasonNumber, fromRound: league.seasonStartRound, toRound, programmed, statsFrom: league.statsFromRound ?? league.seasonStartRound,
-    table, champion: table[0] ? { teamId: table[0].teamId, teamName: table[0].teamName, points: table[0].points } : null,
+    table, champion: table[0] ? { ...decider(table[0]), teamId: table[0].teamId, runnerUp: table[1] ? decider(table[1]) : null } : null,
     myPos: mine ? table.findIndex((s) => s.teamId === mine.id) + 1 : null,
     topScorer: who(all.filter((p) => p.sGoals > 0).sort(byGoals)[0]),
     // Dit holds bedste: flest kåringer som kampens spiller, så mål.
@@ -147,10 +150,36 @@ export function endSeason(league, toRound, programmed) {
     goals: hist.reduce((a, r) => a + r.goals, 0), matches: hist.reduce((a, r) => a + r.matches, 0),
   };
   (league.seasons ||= []).push(summary);
+  // Spillernes sæsontal for netop denne sæson (kun den seneste – overskrives ved næste sæsonslut). Kun felter ≠ 0.
+  league.lastSeasonStats = { seasonNumber: md.seasonNumber, players: Object.fromEntries(all.map((p) => [p.id, Object.fromEntries(PLAYER_SEASON_FIELDS.filter((k) => p[k]).map((k) => [k, p[k]]))]).filter(([, v]) => Object.keys(v).length)) };
   md.standings = league.teams.map(emptyStanding);
   for (const t of league.teams) for (const p of t.squad) Object.assign(p, PLAYER_SEASON_DEFAULTS);
   md.seasonNumber = (md.seasonNumber || 1) + 1;
   league.statsFromRound = toRound + 1;
   league.seasonStartRound = toRound + 1;
   return summary;
+}
+
+const baseRow = ({ teamId, teamName, played, won, drawn, lost, goalsFor, goalsAgainst, points }) => ({ teamId, teamName, played, won, drawn, lost, goalsFor, goalsAgainst, points });
+// Det, sortStandings afgør på: point → målforskel → scorede mål.
+const decider = (s) => ({ teamName: s.teamName, points: s.points, goalDiff: s.goalsFor - s.goalsAgainst, goalsFor: s.goalsFor });
+
+// Lige efter sæsonslut (ingen runde spillet i den nye sæson): den afsluttede sæsons arkiv – ellers null.
+// En "sæson uden program" (migreringen fra skema 5) er ikke en rigtig sæson og tæller ikke.
+export function seasonJustEnded(league) {
+  const last = league.seasons?.at(-1);
+  return last?.programmed && last.table?.length && league.leagueMetadata.round + 1 === league.seasonStartRound ? last : null;
+}
+
+// Mesterteksten siger, hvad der afgjorde det (samme rækkefølge som sortStandings). myPos = seerens placering:
+// er seeren nr. 2, hedder det "I endte begge". Et arkiv fra før v3.16.3 (uden målforskel/nr. 2) får point-teksten.
+// Uden afsluttende punktum – kalderen sætter det.
+const signed = (n) => (n > 0 ? `+${n}` : String(n));
+export function championText(c, myPos = null) {
+  const base = `${c.teamName} er mester med ${c.points} point`, r = c.runnerUp;
+  if (!r || c.goalDiff == null || r.goalDiff == null || r.points !== c.points) return base;
+  const both = myPos === 2 ? 'I endte begge' : `${c.teamName} og ${r.teamName} endte begge`;
+  if (r.goalDiff !== c.goalDiff) return `${c.teamName} er mester på målforskel – ${both} på ${c.points} point`;
+  if (r.goalsFor !== c.goalsFor) return `${c.teamName} er mester på flest scorede mål – ${both} på ${c.points} point og målforskel ${signed(c.goalDiff)}`;
+  return `${c.teamName} er mester – ${both} på ${c.points} point, målforskel ${signed(c.goalDiff)} og ${c.goalsFor} scorede mål`;
 }

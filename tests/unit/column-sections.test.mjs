@@ -128,7 +128,9 @@ test('afsnit 5: næste modstander (hjemme/ude, seriens tilføjelse fra 2 i træk
 test('afsnit 5: optakt-scouting – modstanderens seneste 3 offentlige kampe, gennemsnit pr. kamp, første regel i tabellen, ental/flertal, ikke i en ny sæson', () => {
   const bud = (rows, o = {}) => (next({ next: [NX('h1', 'o2')], history: H('o2', rows), ...o }) ?? [])[1];
   const say = (rule, round = 5) => pickBy(RULE(rule).say, round, rule, 'scout');
-  const text = (rule, n, round = 5) => `Mit bud: Opp2 ${say(rule, round)} i ${n === 1 ? 'deres seneste kamp' : `deres seneste ${n} kampe`} – det kan blive kampens tema.`;
+  // v3.16.3 (Spilfører): "… havde bolden det meste af tiden i deres seneste 3 kampe" læstes som en påstand om kampene – nu "ud fra"
+  const text = (rule, n, round = 5) => `Mit bud: Opp2 ${say(rule, round)} ud fra ${n === 1 ? 'deres seneste kamp' : `deres seneste ${n} kampe`} – det kan blive kampens tema.`;
+  assert.doesNotMatch(bud([{ poss: 60 }, { poss: 60 }]), / i deres seneste/, 'ikke "i deres seneste"');
   // Gennemsnittet af de TRE seneste (ikke de fire, ikke de to, ikke kun den sidste, ikke summen): 75, 60, 40 → 58,3 ≥ 58 = "ball"
   assert.equal(bud([{ poss: 0 }, { poss: 75 }, { poss: 60 }, { poss: 40 }]), text('ball', 3));
   assert.equal(bud([{ poss: 99 }, { poss: 60 }, { poss: 40 }]), text('ball', 3), '3 kampe: 99 er med');
@@ -201,6 +203,21 @@ test('afsnit 5: opfølgning – "Før kampen skrev jeg …" bruger historikken F
   const rowsH = H('h1', [{ poss: 60 }, { poss: 60 }, { poss: 60 }, { poss: 60 }, { poss: 60 }]);
   const t = (sec(buildColumn(inp({ matches: [mAway], viewerTeamId: 'a1', history: rowsH, round: 5 })), 'col-next')?.paras ?? [])[0];
   assert.equal(t, `Før kampen skrev jeg, at Hjem ${say('ball', 4)} – det holdt også mod jer.`);
+});
+// v3.16.3 (Spilfører): "wait" er to-delt (lidt af bolden OG scorede). Holdt den ikke, men de scorede, er det besiddelsen, der
+// ikke holdt – og det siges. Kun for "wait": en anden regel, der ikke holdt, får "det gjorde de ikke", også når de scorede.
+test('afsnit 5: opfølgning på spådommens to dele ("wait") – scorede de, men havde mere af bolden: "de scorede igen, men havde mere af bolden mod jer"', () => {
+  const fu = (rows, hG, aG, played) => (sec(buildColumn(inp({ matches: [M({ hG, aG, stats: played })], history: H('a1', rows), round: 5 })), 'col-next')?.paras ?? []).find((t) => t.startsWith('Før kampen')) ?? null;
+  const W = Array.from({ length: 5 }, () => ({ poss: 40, goals: 1 }));
+  const s = pickBy(RULE('wait').say, 4, 'wait', 'scout'), pre = `Før kampen skrev jeg, at Ude ${s} – `;
+  assert.equal(fu(W, 0, 1, { hPoss: 60, aPoss: 40 }), `${pre}det holdt også mod jer.`, 'begge dele holdt (40 %, 1 mål)');
+  assert.equal(fu(W, 1, 1, { hPoss: 40, aPoss: 60 }), `${pre}de scorede igen, men havde mere af bolden mod jer.`, '60 % og 1 mål: besiddelsen holdt ikke');
+  assert.equal(fu(W, 0, 2, { hPoss: 40, aPoss: 60 }), `${pre}de scorede igen, men havde mere af bolden mod jer.`, '2 mål tæller også');
+  assert.equal(fu(W, 1, 0, { hPoss: 70, aPoss: 30 }), `${pre}det gjorde de ikke mod jer.`, '30 %, men ingen mål: "scorede igen" ville være forkert');
+  assert.equal(fu(W, 1, 0, { hPoss: 40, aPoss: 60 }), `${pre}det gjorde de ikke mod jer.`, 'hverken lidt bold eller mål');
+  // En anden regel ("ball"), der ikke holdt, mens de scorede: ingen "scorede igen"
+  const B = Array.from({ length: 5 }, () => ({ poss: 60 }));
+  assert.equal(fu(B, 1, 1, { hPoss: 70, aPoss: 30 }), `Før kampen skrev jeg, at Ude ${pickBy(RULE('ball').say, 4, 'ball', 'scout')} – det gjorde de ikke mod jer.`);
 });
 
 test('gem fra v3.10.1 (historik UDEN results og facts): klummen bygges af det migrerede gem uden fejl, og formen/optakten har intet at bygge på', () => {

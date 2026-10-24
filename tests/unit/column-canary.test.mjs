@@ -27,7 +27,8 @@ const lock = (obj, allowed) => {
   if (!obj || typeof obj !== 'object') return;
   for (const k of Object.keys(obj)) if (!allowed.includes(k)) { trips++; Object.defineProperty(obj, k, { get() { throw new Error(`KANARIE: ${k}`); }, enumerable: true, configurable: true }); }
 };
-const STATS_OK = ['hPoss', 'aPoss', 'hShots', 'aShots', 'hOnTarget', 'aOnTarget', 'hCorners', 'aCorners', 'hAerialWon', 'aAerialWon', 'hYellows', 'aYellows'];
+// hReds/aReds (v3.16.3): røde kort er offentlige (referatet) og står nu i klummen ("Din kamp") og i PUBLIC_FACT_KEYS
+const STATS_OK = ['hPoss', 'aPoss', 'hShots', 'aShots', 'hOnTarget', 'aOnTarget', 'hCorners', 'aCorners', 'hAerialWon', 'aAerialWon', 'hYellows', 'aYellows', 'hReds', 'aReds'];
 function poisoned(input) {
   const p = structuredClone(input);
   // structuredClone bevarer delte referencer (rundens mål ER en post i goalsPool, rundens spiller en karakterlinje): tag kopier FØR noget forgiftes
@@ -64,4 +65,15 @@ test('kanarie med tilladelsesliste: klummen læser kun de offentlige tal – int
     n++;
   }
   assert.ok(n === 14 && trips > 5000, `forgiftede felter ${trips}`);
+});
+
+// v3.16.3: 'reds' er den ENESTE nye nøgle – tilladelseslisten uden hReds/aReds trips (klummen læser dem virkelig), og
+// listen med dem, men uden fx hYellows, trips stadig (kanarien er ikke blevet blind). Mutation: fjern reds i publicFacts →
+// første assert bliver rød (intet trips).
+test("kanarie: klummen læser hReds/aReds (v3.16.3) – uden dem på listen kaster den; med dem, men uden hYellows, kaster den også", () => {
+  const input = season(11, 1)[0];
+  const only = (drop) => { const p = structuredClone(input); for (const m of p.matches) lock(m.stats, STATS_OK.filter((k) => !drop.includes(k))); return p; };
+  assert.throws(() => buildColumn(only(['hReds', 'aReds'])), /KANARIE: [ha]Reds/);
+  assert.throws(() => buildColumn(only(['hYellows', 'aYellows'])), /KANARIE: [ha]Yellows/);
+  assert.doesNotThrow(() => buildColumn(only([])));
 });

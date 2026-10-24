@@ -100,7 +100,8 @@ test('et reddet hovedstød giver hjørne med CORNER_P 0,9 (ikke 0,35); en cleare
 test('luftduel-tekster: dit hold nævner kilden (Dit indlæg / Din lange bold), en bot gør det aldrig; reddet hovedstød og clearing står på forsvarets side', () => {
   const clr = (o) => aer({ shAir: 8, ...o }).m.events.filter((e) => e.label === 'Luftduel i feltet');
   const cross = clr({}), long = clr({ focus: 'CENTRAL', pass: 'DIRECT_LONG' });
-  assert.ok(cross.length === 2 && cross.every((e) => /^✈️ \[.+ forsvar\] Dit indlæg: #\d+ .+ \(\d+ cm\) stiger højest og clearer foran #\d+ /.test(e.text) && e.isHome === false), cross[0]?.text);
+  // v3.16.3: fire varianter af clearingen (pickBy på minut og forsvarer), og skytten nævnes med sit hold
+  assert.ok(cross.length === 2 && cross.every((e) => /^✈️ \[.+ forsvar\] Dit indlæg: #\d+ .+ \(\d+ cm\) (stiger højest og clearer|vinder duellen og header væk|kommer først og rydder|hamrer bolden ud af feltet) foran #\d+ \S+ \S+ \(Bibamus United\)\.$/.test(e.text) && e.isHome === false), cross[0]?.text);
   assert.ok(long.length === 2 && long.every((e) => /^✈️ \[.+ forsvar\] Din lange bold: #\d+ /.test(e.text) && e.isHome === false), long[0]?.text);
   for (const o of [{ homeBot: true }, { homeBot: true, focus: 'CENTRAL', pass: 'DIRECT_LONG' }]) {
     const b = clr({ ...o });
@@ -289,7 +290,7 @@ test('cutback-afslutteren står nær (50,28) og er ikke kantspilleren selv; PAS 
     layout(a.H, { 8: { x: 85, y: 45 }, 9: { x: 50, y: 34 }, 10: { x: 50, y: 14 } });
   });
   assert.equal(near.m.homeGoals, 2);
-  for (const t of text(near)) assert.ok(t.includes(`✅ ${tg(slot(near.a.H, 8))} når baglinjen og lægger den lavt tilbage til ${tg(slot(near.a.H, 9))}.`), t);
+  for (const t of text(near)) assert.ok(t.includes(`MÅÅÅL! ${tg(slot(near.a.H, 8))} når baglinjen og lægger den lavt tilbage til ${tg(slot(near.a.H, 9))}.`) && !t.includes('✅'), t);   // v3.16.3: uden ✅
   // Kantspilleren er bedst til afslutning og står på cutbackstedet – men er ekskluderet; plads 9 tager den.
   // v3.16.1: plads 9 står ved siden af (40, 28), ikke oven i ham – to på samme plet skubbes fra hinanden (spread), og så kom plads 9
   // (64, 32) inden for kantens rækkevidde (25 fra (88, 30)) og blev selv kantspiller. Nu: RM (61, 28) og ST (55, 32 – skubbet fra
@@ -298,7 +299,7 @@ test('cutback-afslutteren står nær (50,28) og er ikke kantspilleren selv; PAS 
     Object.assign(slot(a.H, 8).skills, { pace: 50, ballControl: 50, finishing: 20 }); Object.assign(slot(a.H, 9).skills, { finishing: 10 });
     layout(a.H, { 8: { x: 50, y: 28 }, 9: { x: 40, y: 28 } });
   });
-  for (const t of text(self)) assert.ok(t.includes(`✅ ${tg(slot(self.a.H, 8))} når baglinjen og lægger den lavt tilbage til ${tg(slot(self.a.H, 9))}.`), t);
+  for (const t of text(self)) assert.ok(t.includes(`MÅÅÅL! ${tg(slot(self.a.H, 8))} når baglinjen og lægger den lavt tilbage til ${tg(slot(self.a.H, 9))}.`), t);
   // Evne: FIN, ikke PAS (samme afstand; P: FIN 6/PAS 14, Q: FIN 14/PAS 6). v3.16.1: to på samme plet skubbes fra hinanden (spread), og så
   // afgjorde afstanden – derfor spejlet om pletten: x 36 / 42 + 11,4 (boldsiden) = 47 / 53, y 40 − 6 = 34 (RM rå 29 bag linjen 28: ingen
   // sammenpresning), begge 6,7 fra (50, 28), 7 fra stopperne (y 27) og bottens midtbane (y 41) – ingen skubbes.
@@ -329,11 +330,11 @@ test('fuldtids-analysen: dit angreb (forsøg/mål/stoppet, høje bolde/vundne/ho
   const me = mixedMatch({ meIsAttacker: true });
   assert.deepEqual([me.m.duelLog[me.m.homeId].crosses, me.m.duelLog[me.m.homeId].crossesWon, me.m.duelLog[me.m.homeId].headerGoals], [3, 2, 1]);
   assert.deepEqual([me.m.duelLog[me.m.homeId].cutbacks, me.m.duelLog[me.m.homeId].cutbackGoals, me.m.duelLog[me.m.homeId].cutbacksBlocked], [4, 2, 1]);
-  assert.ok(me.ft.text.endsWith(' ⚔️ Angreb (Lave cutbacks · direkte lange bolde): 4 cutbacks (2 mål, 1 stoppet ved kanten), 3 høje bolde (2 vundne luftdueller, 1 hovedstødsmål). 🛡️ Dit felt: modstanderens cutbacks stoppet 0 af 0, luftdueller vundet 0 af 0.'), me.ft.text);
+  assert.ok(me.ft.text.endsWith(' ⚔️ Angreb (Lave cutbacks · direkte lange bolde): 4 cutbacks (2 mål, 1 stoppet ved kanten), 3 høje bolde (2 vundne luftdueller i åbent spil, 1 hovedstødsmål). 🛡️ Dit felt: modstanderens cutbacks stoppet 0 af 0 · luftdueller i åbent spil vundet 0 af 0.'), me.ft.text);
   // Samme kamp set fra forsvarets side: en bot angriber dig. Du har ikke selv noget angreb (Centralt · balanceret).
   const def = mixedMatch({ meIsAttacker: false });
   assert.equal(def.ft.isHome, false);
-  assert.ok(def.ft.text.endsWith(' ⚔️ Angreb (Centralt · balanceret): ingen cutbacks eller høje bolde. 🛡️ Dit felt: modstanderens cutbacks stoppet 1 af 4, luftdueller vundet 1 af 3.'), def.ft.text);
+  assert.ok(def.ft.text.endsWith(' ⚔️ Angreb (Centralt · balanceret): ingen cutbacks eller høje bolde. 🛡️ Dit felt: modstanderens cutbacks stoppet 1 af 4 · luftdueller i åbent spil vundet 1 af 3.'), def.ft.text);
 });
 test('fuldtids-analysen nævner alle ni kombinationer af fokus og pasningsstil med de rigtige danske navne', () => {
   const F = { CENTRAL: 'Centralt', HIGH_CROSSES: 'Høje indlæg', LOW_CUTBACKS: 'Lave cutbacks' };

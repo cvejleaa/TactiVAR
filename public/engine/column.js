@@ -10,22 +10,18 @@
 // de offentlige tal – aldrig en indstilling ved navn, aldrig noget om pres (intet offentligt tal måler pres).
 // Ingen tilfældighed: varianter vælges ud fra runden og kampens tal (samme runde → samme klumme).
 import { RATING_PRIVATE_FIELDS, viewOwnReport } from './visibility.js';
+import { pickBy, gen } from './clues.js';
+import { championText } from './season.js';
 
 // De felter på en karakterlinje, klummen må læse (ingen af RATING_PRIVATE_FIELDS – testet).
 export const RATING_PUBLIC = ['playerId', 'shirtNumber', 'shortName', 'teamId', 'teamName', 'goals', 'assists', 'saves', 'aerialWins', 'stars', 'isMotM'];
 if (RATING_PUBLIC.some((k) => RATING_PRIVATE_FIELDS.includes(k))) throw new Error('RATING_PUBLIC indeholder et privat felt');
 
-// Variant: hash af nøglerne + runden – samme runde giver samme valg, og næste runde rykker én videre, så den
-// samme skabelon ikke kommer to runder i træk (QC N4).
-export function pickBy(list, round, ...keys) {
-  let h = 7;
-  for (const k of keys) for (const ch of String(k)) h = (Math.imul(h, 31) + ch.charCodeAt(0)) >>> 0;
-  return list[(h + (round | 0)) % list.length];
-}
+export { pickBy } from './clues.js';   // bor i clues.js (v3.16.3 – også referatets varianter)
 
 const GOAL_TYPES = new Set(['GOAL', 'HEADER_GOAL', 'VAR_GOAL']);
 // De offentlige fakta pr. hold i en kamp – den lukkede liste, stil-gættene må bygge på (QC B2: positiv assertion).
-export const PUBLIC_FACT_KEYS = ['poss', 'shots', 'onTarget', 'corners', 'aerialWon', 'counterGoals', 'setPieceGoals', 'headerGoals', 'yellows', 'reorganised', 'goals', 'against'];
+export const PUBLIC_FACT_KEYS = ['poss', 'shots', 'onTarget', 'corners', 'aerialWon', 'counterGoals', 'setPieceGoals', 'headerGoals', 'yellows', 'reds', 'reorganised', 'goals', 'against'];
 const SET_PIECE = new Set(['PENALTY', 'FREEKICK', 'CORNER', 'SETPIECE']);
 
 // Eneste indgang til en kamp. Alt andet i klummen læser kun det, denne returnerer.
@@ -40,7 +36,7 @@ export function publicFacts(m, idx = 0) {
       id: h ? m.homeId : m.awayId, name, goals: h ? m.homeGoals : m.awayGoals, against: h ? m.awayGoals : m.homeGoals,
       formation: m.startFormations?.[h ? 'home' : 'away'] ?? null, endFormation: m.endState?.[h ? 'home' : 'away']?.formation ?? null,
       poss: Math.round(((st[p + 'Poss'] ?? 0) / possSum) * 100), shots: st[p + 'Shots'] ?? 0, onTarget: st[p + 'OnTarget'] ?? 0,
-      corners: st[p + 'Corners'] ?? 0, aerialWon: st[p + 'AerialWon'] ?? 0, yellows: st[p + 'Yellows'] ?? 0,
+      corners: st[p + 'Corners'] ?? 0, aerialWon: st[p + 'AerialWon'] ?? 0, yellows: st[p + 'Yellows'] ?? 0, reds: st[p + 'Reds'] ?? 0,
       counterGoals: mine.filter((g) => g.kind === 'COUNTER').length, setPieceGoals: mine.filter((g) => SET_PIECE.has(g.kind)).length,
       headerGoals: mine.filter((g) => g.kind === 'HEADER').length,   // kun åbent spil (QC: HeaderGoals tæller dødbolde med)
       reorganised: events.filter((e) => e.type === 'TRIGGER' && e.isHome === h).length,
@@ -54,7 +50,6 @@ export function publicFacts(m, idx = 0) {
 // Til runde-historikken (scouting af næste modstander): kun de offentlige tal pr. hold.
 export const compactFacts = (f) => Object.fromEntries([f.home, f.away].map((s) => [s.id, Object.fromEntries(PUBLIC_FACT_KEYS.map((k) => [k, s[k]]))]));
 
-const gen = (n) => (/[sxz]$/i.test(n) ? `${n}'` : `${n}s`);   // ejefald: "Aarhus'" (QC F8)
 
 // Kampens drama ud fra stillingen efter hvert mål (offentligt i referatet).
 function drama(f) {
@@ -131,7 +126,7 @@ function scout(history, teamId, uptoRound = Infinity) {
 // Klummen for én seer. input: { matches, gazette, history (sæsonens runder, inkl. den spillede), table (sorteret
 // [{teamId, teamName, points}]), next ([{homeId, homeName, awayId, awayName}] – næste runde efter programmet),
 // viewerTeamId, round (ligarunde), seasonRound, newSeason }.
-export function buildColumn({ matches = [], gazette = null, history = [], table = [], next = [], viewerTeamId = null, round = 0, newSeason = false }) {
+export function buildColumn({ matches = [], gazette = null, history = [], table = [], next = [], viewerTeamId = null, round = 0, newSeason = false, champion = null }) {
   const facts = matches.map((m, i) => publicFacts(m, i));
   const vi = facts.findIndex((f) => f.home.id === viewerTeamId || f.away.id === viewerTeamId);
   const vf = vi >= 0 ? facts[vi] : null;
@@ -145,13 +140,20 @@ export function buildColumn({ matches = [], gazette = null, history = [], table 
   if (vf) {
     const d = drama(vf), res = me.goals > me.against ? 'W' : me.goals < me.against ? 'L' : 'D', score = `${me.goals}-${me.against}`, rev = `${me.against}-${me.goals}`;   // vinderens mål først (QC F7)
     const open = { W: [`Sejr til ${me.name}: ${score} over ${opp.name}.`, `${me.name} tog de tre point mod ${opp.name} (${score}).`, `${score} – ${me.name} slog ${opp.name}.`],
-      L: [`Nederlag til ${me.name}: ${rev} mod ${opp.name}.`, `${opp.name} var for stærke for ${me.name} – ${rev}.`, `${me.name} tabte ${rev} til ${opp.name}.`],
+      L: [`${opp.name} slog ${me.name} ${rev}.`, `${opp.name} var for stærke for ${me.name} – ${rev}.`, `${me.name} tabte ${rev} til ${opp.name}.`],
       D: [`${me.name} og ${opp.name} delte point efter ${score}.`, `Uafgjort ${score} mellem ${me.name} og ${opp.name}.`, `Et point hver: ${me.name} – ${opp.name} ${score}.`] }[res];
     const paras = [pickBy(open, round, 'open', me.id)];
     if (d.comeback === me) paras.push('I kom bagfra – det siger noget om moralen.');
     else if (d.late === me) paras.push(`Sejrsmålet kom i ${d.lateMin}. minut.`);
     else if (d.late === opp) paras.push(`Det gjorde ondt: ${opp.name} afgjorde det i ${d.lateMin}. minut.`);
     paras.push(...yourVerdict(report, me, round));
+    // Efter dommen over dit hold (Spilfører v3.16.3: "… mistede en mand på rødt kort. Det kostede: et kontramål imod." læstes som årsag)
+    // Røde kort (v3.16.3, Spilfører: klummen nævnte aldrig en udvisning) – offentlige fakta (referatet), begge hold
+    // Varianten følger resultatet (QC v3.16.3: "kostede" lovede en årsag til et nederlag, også efter en sejr)
+    const down = `${me.reds > 1 ? `${me.reds} røde kort` : 'Et rødt kort'}`, men = 11 - me.reds;
+    if (me.reds) paras.push(res === 'W' ? `${down} til trods: ${me.name} vandt med ${men} mand.` : res === 'L' ? pickBy([`${down} kostede: ${me.name} måtte spille med ${men} mand.`, `Med ${men} mand efter ${me.reds > 1 ? 'udvisningerne' : 'udvisningen'} blev det op ad bakke.`], round, 'red', me.id) : `${me.name} holdt point med ${men} mand efter ${me.reds > 1 ? 'udvisningerne' : 'udvisningen'}.`);
+    // Modstanderens kort uden påstand om, hvor længe de var færre (kortets minut er ikke en offentlig fakta her – Spilfører)
+    if (opp.reds) paras.push(`${opp.name} ${opp.reds > 1 ? `fik ${opp.reds} røde kort` : 'fik rødt kort'} undervejs.`);
     sections.push({ id: 'col-mine', title: 'Din kamp', paras });
     if (res === 'W' && me.goals - me.against >= 3) stories.push([55, `${me.name} kørte over ${opp.name}`]);
     if (d.comeback === me) stories.push([65, `${me.name} kom tilbage mod ${opp.name}`]);
@@ -165,7 +167,8 @@ export function buildColumn({ matches = [], gazette = null, history = [], table 
     if (d.comeback) note = pickBy([`${d.comeback.name} kom bagfra og vandt.`, `${d.comeback.name} vendte kampen.`, `Comeback til ${d.comeback.name}.`], round, 'cb', f.idx);
     else if (d.late) note = pickBy([`Afgjort i ${d.lateMin}. minut.`, `${d.late.name} slog til sent – ${d.lateMin}. minut.`, `Sejrsmålet faldt i ${d.lateMin}. minut.`], round, 'late', f.idx);
     else {
-      const who = w ?? f.home, g = styleGuess(who)[0];
+      // Ved uafgjort ingen "ventede/havde bolden mindst"-forklaring (Spilfører v3.16: den forklarer en sejr, ikke et point)
+      const who = w ?? f.home, g = styleGuess(who).filter((r) => w || r.key !== 'wait')[0];
       note = g ? `${who.name} ${say(g, round, f.idx)}.` : '';
     }
     if (d.comeback) stories.push([70, `${d.comeback.name} vendte kampen`]);
@@ -192,7 +195,9 @@ export function buildColumn({ matches = [], gazette = null, history = [], table 
   if (cold) formParas.push(pickBy([`${name(cold[0])} har tabt ${cold[1].lose} i træk.`, `Krise hos ${name(cold[0])}: ${cold[1].lose} nederlag i træk.`, `${name(cold[0])} kan ikke finde vejen: ${cold[1].lose} nederlag i træk.`], round, 'cold', cold[0]));
   if (table.length && history.length >= 2) {
     const gap = table[1] ? table[0].points - table[1].points : null;
-    formParas.push(newSeason ? `${table[0].teamName} blev mester med ${table[0].points} point.` : gap === 0 ? `${table[0].teamName} og ${table[1].teamName} står lige i toppen med ${table[0].points} point.` : `${table[0].teamName} fører med ${table[0].points} point${gap != null ? `, ${gap} foran ${table[1].teamName}` : ''}.`);
+    // Mesteren med den regel, der afgjorde (v3.16.3 – championText i season.js, samme tekst som slutstillingen)
+    const myPos = table.findIndex((t) => t.teamId === viewerTeamId) + 1 || null;
+    formParas.push(newSeason ? `${championText(champion ?? { teamName: table[0].teamName, points: table[0].points }, myPos)}.` : gap === 0 ? `${table[0].teamName} og ${table[1].teamName} står lige i toppen med ${table[0].points} point.` : `${table[0].teamName} fører med ${table[0].points} point${gap != null ? `, ${gap} foran ${table[1].teamName}` : ''}.`);
   }
   if (formParas.length) sections.push({ id: 'col-form', title: 'Formen', paras: formParas });
 
@@ -203,7 +208,7 @@ export function buildColumn({ matches = [], gazette = null, history = [], table 
     const before = scout(history, opp.id, round - 1);
     if (before?.rule) {
       const held = before.rule.test(opp);
-      preview.push(held ? `Før kampen skrev jeg, at ${opp.name} ${pickBy(before.rule.say, round - 1, before.rule.key, 'scout')} – det holdt også mod jer.` : `Før kampen skrev jeg, at ${opp.name} ${pickBy(before.rule.say, round - 1, before.rule.key, 'scout')} – det gjorde de ikke mod jer.`);
+      preview.push(held ? `Før kampen skrev jeg, at ${opp.name} ${pickBy(before.rule.say, round - 1, before.rule.key, 'scout')} – det holdt også mod jer.` : `Før kampen skrev jeg, at ${opp.name} ${pickBy(before.rule.say, round - 1, before.rule.key, 'scout')} – ${before.rule.key === 'wait' && opp.goals >= 1 ? 'de scorede igen, men havde mere af bolden mod jer' : 'det gjorde de ikke mod jer'}.`);   // to-delt regel: sig, hvilken del der ikke holdt (Spilfører v3.16.3)
     }
   }
   const nx = next.find((x) => x.homeId === viewerTeamId || x.awayId === viewerTeamId);
@@ -211,7 +216,7 @@ export function buildColumn({ matches = [], gazette = null, history = [], table 
     const nOpp = nx.homeId === viewerTeamId ? { id: nx.awayId, name: nx.awayName } : { id: nx.homeId, name: nx.homeName };
     const sc = scout(history, nOpp.id);
     preview.push(`${newSeason ? 'Ny sæson: ' : 'Næste runde: '}${nx.homeId === viewerTeamId ? `${nOpp.name} kommer på besøg` : `ude mod ${nOpp.name}`}.${newSeason ? '' : form[nOpp.id]?.win >= 2 ? ` De har vundet ${form[nOpp.id].win} i træk.` : form[nOpp.id]?.lose >= 2 ? ` De har tabt ${form[nOpp.id].lose} i træk.` : ''}`);
-    if (sc?.rule && !newSeason) preview.push(`Mit bud: ${nOpp.name} ${pickBy(sc.rule.say, round, sc.rule.key, 'scout')} i ${sc.n === 1 ? 'deres seneste kamp' : `deres seneste ${sc.n} kampe`} – det kan blive kampens tema.`);
+    if (sc?.rule && !newSeason) preview.push(`Mit bud: ${nOpp.name} ${pickBy(sc.rule.say, round, sc.rule.key, 'scout')} ud fra ${sc.n === 1 ? 'deres seneste kamp' : `deres seneste ${sc.n} kampe`} – det kan blive kampens tema.`);
   }
   if (preview.length) sections.push({ id: 'col-next', title: 'Næste runde', paras: preview });
 

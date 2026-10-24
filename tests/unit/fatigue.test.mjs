@@ -185,7 +185,7 @@ test('Hvis-Så-udskiftning: "uanset stilling" fra minut 60 → X ud, Y ind i fø
     const m = simulateMatch(H, A, stubRng({}));
     const [s] = subs(m);
     assert.equal(s.min, want);
-    assert.equal(s.text, `🔄 [${H.name} • Hvis-Så] #${slot(H, 6).shirtNumber} ${slot(H, 6).shortName} ud – #${inP.shirtNumber} ${inP.shortName} ind (din Hvis-Så-regel, ${want}. minut).`);
+    assert.equal(s.text, `🔄 [${H.name} • Hvis-Så] #${slot(H, 6).shirtNumber} ${slot(H, 6).shortName} ud – #${inP.shirtNumber} ${inP.shortName} ind (din Hvis-Så-regel).`);   // v3.16.3: minuttet står ved linjen (s.min ovenfor), ikke i teksten
     assert.equal(m.ratings.home.find((e) => e.playerId === inP.id).slot, 6);
     assert.ok(filterEvents(m.events, 'tactic').includes(s), 'dit skift står under "Kun taktik"');
   }
@@ -202,7 +202,8 @@ test('Hvis-Så-udskiftning: betingelsen gælder (bagud ved 0-0 → intet skift),
   const m = simulateMatch(b.H, b.A, stubRng({}));
   assert.equal(subs(m).length, 0);
   const note = m.events.find((e) => e.label === 'Hvis-Så-skift ikke udført');
-  assert.equal(note?.text, `📋 [${b.H.name} • Hvis-Så] Udskiftningen kunne ikke udføres i 60. minut: #${other.shirtNumber} ${other.shortName} er ikke på banen.`);
+  // v3.16.3: minuttet står ved linjen (note.min), ikke i teksten
+  assert.deepEqual([note?.min, note?.text], [60, `📋 [${b.H.name} • Hvis-Så] Udskiftningen kunne ikke udføres: #${other.shirtNumber} ${other.shortName} er ikke på banen.`]);
 });
 test('en bænkspiller i dine Hvis-Så-regler bruges ikke til træthedsskift – reglen kan stadig udføres bagefter', () => {
   const { H, A } = arena();

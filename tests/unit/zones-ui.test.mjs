@@ -90,3 +90,32 @@ test('modstanderens afslutninger som prikker: mål ⚽ på (30 %, 85 %) "9\'", r
   // tredjedelslinjen står stadig øverst i kortet: egne y 10, 8, 50, 15, 30 → 0 i egen tredjedel, 1 i midten, 4 i angrebstredjedelen
   assert.equal(byId(card, 'heat-thirds')[0].textContent, '🔥 Tyngdepunkt (groft): egen tredjedel 0 % · midten 20 % · angrebstredjedelen 80 %');
 });
+
+// v3.16.3: i en kamp uden dit hold angriber hjemmeholdet OPAD (som i afspilningen) – hans zone-kort vendes (rækker og søjler),
+// prikkerne spejles (x → 100 − x, y → 100 − y) og målmærkerne byttes; udeholdets kort er uændret (nedad). Skævt spor, så en
+// vending ikke kan se ud som ingen: hjemme hA (80, 90), hB (80, 50) og hA's skud (30, 15) – nedad-kortet (som når du er ude,
+// x → 100 − x, y → 100 − y) har dem i (søjle, række) (0, 0), (0, 1) og (2, 2); opad (fælles koordinater) i (2, 2), (2, 1) og
+// (0, 0) – 33 % hver. Skuddet står opad på (30 %, 15 %) og nedad på (70 %, 85 %).
+test('neutral kamp: hjemmeholdets zone-kort vendt opad (felter, prikker, mærker, "De angriber opad"), udeholdets nedad som før', () => {
+  const skew = () => ({ v: 1,
+    frames: [{ t: 1, poss: 'h', ball: [50, 50], h: [P(hGk, 50, 90), P(hA, 80, 90), P(hB, 80, 50)], a: trace().frames[0].a }],
+    moments: [...trace().moments, { t: 5, ev: 3, kind: 'MISS', side: 'h', ball: [30, 15], h: [P(hA, 30, 15)], a: [], shooter: hA.playerId }] });
+  const view = (myTeamId) => { clearReplays(); return renderMatchCenter({ mc: { round: 1, matches: [{ ...base, trace: skew() }], gazette: { goalOfTheRound: null, totalGoals: 0, totalVarChecks: 0 }, viewIdx: 0, filter: 'all', shownCount: Infinity, playing: false }, myTeamId, on: { skip() {}, view() {}, snapshot() {}, openGoal() {}, filter() {}, heat() {}, replay() {} } }); };
+  const homeCard = (el) => byId(ratingTables(el)[0], 'heat-opp')[0];
+  const nonzero = (card) => cellsOf(card).filter((x) => x[5] !== '0 %');
+  const dots = (card) => all(card, (x) => cls(x, 'heat-shot')).map((d) => [d.style.left, d.style.top]);
+  const marks = (card) => all(card, (x) => cls(x, 'zone-goal')).map((x) => x.textContent);
+  const down = homeCard(view(base.awayId));
+  assert.deepEqual(nonzero(down), [cell(0, 0, '0.85', '33 %'), cell(0, 1, '0.85', '33 %'), cell(2, 2, '0.85', '33 %')]);
+  const up = homeCard(view('ingen-af-dem'));
+  // Opad er nedad-kortet roteret 180° (felt (søjle, række) → (2 − søjle, 2 − række)), i rækkefølge række for række
+  assert.deepEqual(nonzero(up), [cell(0, 0, '0.85', '33 %'), cell(2, 1, '0.85', '33 %'), cell(2, 2, '0.85', '33 %')]);
+  assert.deepEqual(dots(down), [['70%', '85%']]); assert.deepEqual(dots(up), [['30%', '15%']]);
+  assert.deepEqual(marks(down), ['Deres mål', 'Dit mål']); assert.deepEqual(marks(up), ['Modstanderens mål', 'Deres mål']);
+  assert.match(byId(up, 'heat-opp-note')[0].textContent, /^De angriber opad\. /);
+  // Udeholdets kort i den neutrale kamp er det samme som når du er hjemme (nedad, uændret) – kun mærket/teksten er neutral
+  const awayNeutral = byId(ratingTables(view('ingen-af-dem'))[1], 'heat-opp')[0], awayVsMe = byId(ratingTables(view(base.homeId))[1], 'heat-opp')[0];
+  assert.deepEqual(cellsOf(awayNeutral), cellsOf(awayVsMe)); assert.deepEqual(dots(awayNeutral), dots(awayVsMe));
+  assert.deepEqual(marks(awayNeutral), ['Deres mål', 'Modstanderens mål']);
+  assert.match(byId(awayNeutral, 'heat-opp-note')[0].textContent, /^De angriber nedad\. /);
+});

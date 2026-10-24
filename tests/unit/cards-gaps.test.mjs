@@ -57,8 +57,9 @@ test('Hvis-Så-udskiftning af en udvist: beskeden siger "er udvist" (ikke "ikke 
   H.tactics.conditionalRules = [{ ruleId: 1, minuteTrigger: 6, condition: 'ANY', margin: 1, newFormation: '4-4-2', newPlan: null, slotRemapping: [...Array(11).keys()], action: 'SUB', subOut: slot(H, 1).id, subIn: inP.id }];
   const m = simulateMatch(H, A, stubRng(RED_AT_3));
   assert.equal(subs(m).length, 0, 'ingen indskiftning for den udviste');
-  assert.deepEqual(m.events.filter((e) => e.label === 'Hvis-Så-skift ikke udført').map((e) => e.text),
-    [`📋 [${H.name} • Hvis-Så] Udskiftningen kunne ikke udføres i 6. minut: ${tag(slot(H, 1))} er udvist.`]);
+  // v3.16.3: minuttet står ved linjen (e.min), ikke i teksten
+  assert.deepEqual(m.events.filter((e) => e.label === 'Hvis-Så-skift ikke udført').map((e) => [e.min, e.text]),
+    [[6, `📋 [${H.name} • Hvis-Så] Udskiftningen kunne ikke udføres: ${tag(slot(H, 1))} er udvist.`]]);
 });
 
 test('også pausen ved 45\' har loft (Spilfører v3.15): fem trætte, der alle rammer grænsen i 45. minut – tre skiftes i pausen, to i 48.', () => {
