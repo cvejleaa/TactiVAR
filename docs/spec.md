@@ -362,7 +362,7 @@ Tick hvert 3. minut (1..90).
 Brugeren: "et heat map for kampen, både for holdet, men også for den enkelte spiller … en 2d simulering af kampen … så vi
 bedre kan kontrollere spil motoren".
 - **Sporet** `m.trace = { v: 1, frames, moments }` (match.js "Kampens spor"): 31 grundbilleder (t 0 = afspark, t = tick =
-  minut/3) efter boldbesiddelsen og tick'ets skift – `{ t, poss, ball, h: [[id, x, y]…], a }` – og et øjeblik pr. afslutning
+  minut/3) efter tick'ets duel – `{ t, poss, ball, h: [[id, x, y]…], a, lost?, run?, offside? }` – og et øjeblik pr. afslutning
   i åbent spil og kontra (mål, redning, forbi/blokeret, linjedommerens flag, VAR-tjek, annulleret mål) med skytte, scorer og
   oplæg. Dødbolde (straffe, frispark, hjørne) har bevidst intet billede. Ét koordinatsystem: hjemmeholdet angriber mod y 0,
   udeholdet spejles; heltal. Kun aflæsning – intet rng-træk, ingen skrivning i `seen`/`seenX` (fingeraftryk af 20 kampe,
@@ -390,6 +390,22 @@ bedre kan kontrollere spil motoren".
   - ét billede pr. øjeblik (QC): positionerne er afleveringens øjeblik; i afslutningens billede står skytten i feltet
     (y ≤ SHOT_BOX_Y 12, x 30–70; langskud y 30–38, x 20–80), og i et offside-billede står den tjekkede på den side af
     linjen, VAR-kendelsen siger (kendelsen er stadig lodtrækningen). Afsparksbilledet: begge hold i egen halvdel.
+- **Formationerne i billedet (v3.16.1**, brugeren: "2 spillere stående lige oven i hinanden … 7 spillere på midterlinjen ved
+  start … ingen udvikling i starten af kampen … ingen heat map for modstander"):
+  - sammenpresning i stedet for klemning (`squeeze`): de, der står foran målet for linjen/presset eller inden for
+    SQUEEZE_SPAN 12 af det, mappes lineært ind i [mål, mål + 12]; resten står. Rækkefølgen bevares. Holdet uden bold beholder
+    mindst MIN_DEPTH 18 fra forreste til bageste (boldholdet ikke – dets forreste må aldrig forbi linjen);
+  - to fra samme hold nærmere end MIN_APART 6 skubbes fra hinanden på tværs; en fra boldholdet (også løberen) nærmere end 6
+    ved en modspiller (også målmanden) træder til siden – kun x, så linjen og offside er uændrede;
+  - afsparket (`kickoffPositions`): forsvarsformen presset ind i egen halvdel med forreste på KICKOFF_Y 53;
+  - grundbilledet pr. tick tages efter duellen (før afslutningerne, ingen nye træk): ingen duel → bolden hos opspilleren,
+    holdene forskudt efter hans side; opbygning vundet → angriberen et løb frem med bolden (`run`); pres vundet → det
+    erobrende hold i sin kontraform, bolden hos presseren (`lost`; også "ude af zone"); offside-fælde → angriberen foran
+    linjen (`offside`). `poss` er tick'ets besiddelse; spillerne er dem på banen ved tick'ets start;
+  - motoren måler som v3.16.0 (150 sæsoner: 2,90 mål, langskud 7 %, angreb 66 %); bånd og billedregler i
+    tests/unit/replay-shapes.test.mjs (hvert rødt mod v3.16.0);
+  - modstanderens grove kort: 3 × 3 felter set fra din side (`zones`, procent pr. felt, målmanden ude) med hans afslutninger
+    (`zoneShots`).
   Målt (`… 150 maal`, `… 1500 var`, 800 kampe pr. pres; før → efter): mål 2,80 → 2,79, langskud 12 → 8 %, angreb 61 →
   62 %, midtbane 24 → 22 %, kontra 13 → 10 %; mål imod lav blok 1,34 → 1,35, langskud imod lav blok 10 → 8 % (gegenpres
   12 → 7 %). Hjørnespark holdt med MISS_BLOCK_SHARE 0,66. Med SHOT_REACH (sidst): mål 2,8 → 2,87, langskud ≈ 6,5 % (under

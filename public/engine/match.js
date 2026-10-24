@@ -3,7 +3,7 @@
 // Rettet ift. v2.5b: auto-indskiftning sker i en kamplokal kopi (ændrede før lineupSlots
 // permanent), og Hvis-Så-reglerne kører for begge hold og skifter reelt formation.
 import { FORMATIONS, lineOfRole, isOutOfZone, slotPosition } from './formations.js';
-import { livePositions, coupledPositions, kickoffPositions, ONSIDE_GAP, RUN_STEP } from './positions.js';
+import { livePositions, coupledPositions, kickoffPositions, apartFrom, ONSIDE_GAP } from './positions.js';
 import { masteryVs, counterXpForMatch } from './counter.js';
 import { createSheet, finalizeSheet } from './ratings.js';
 import { describeFinish, describeHeader, describeVarTiming, describeGoal, goalSpectacle } from './clues.js';
@@ -311,8 +311,9 @@ export function simulateMatch(home, away, rng, opts = {}) {
   //  - ingen duel: bolden hos opspilleren, og holdene forskudt efter hans side af banen;
   //  - opbygningen vinder: angriberen er sluppet et løb frem, bolden hos ham – run: true;
   //  - presset vinder: forsvaret har erobret bolden (caught-formen), bolden hos presseren – lost: true;
-  //  - offside-fælden: angriberen står foran linjen, bolden hos ham – lost: true.
+  //  - offside-fælden: angriberen står foran linjen, bolden hos ham – offside: true.
   // poss er tick'ets besiddelse. Spillerne er dem på banen ved tick'ets start (et rødt kort i tick'et står efter billedet).
+  const OFFSIDE_DRAW = 3;
   function tickFrame(t, att) {
     const def = other(att), st0 = new Map([[H, H.starters.slice()], [A, A.starters.slice()]]);
     let done = false;
@@ -328,12 +329,17 @@ export function simulateMatch(home, away, rng, opts = {}) {
         at = k.ball[slot(def, presser)];
       } else {
         const runner = outcome === 'build' || outcome === 'trap' ? slot(att, striker) : -1;
-        k = coupledPositions(att.tactics, def.tactics, { ballX, runner, step: outcome === 'trap' ? RUN_STEP + ONSIDE_GAP + 2 : RUN_STEP, ballOn: on(att), oppOn: on(def) });
+        k = coupledPositions(att.tactics, def.tactics, { ballX, runner, ballOn: on(att), oppOn: on(def) });
+        // Offside: angriberen lige foran linjen (OFFSIDE_DRAW), ikke et helt løb frem – han blev fanget, ikke sluppet igennem
+        if (outcome === 'trap' && runner > 0) {
+          k.ball[runner] = { x: k.ball[runner].x, y: k.line - OFFSIDE_DRAW };
+          apartFrom(k.ball, [runner], k.opp, k.opp.map((q, i) => i).filter((i) => on(def)[i]));   // ved siden af forsvareren, ikke oven i ham
+        }
         at = k.ball[runner > 0 ? runner : pm];
       }
       const ball = at ? common(ballSide, at.x, at.y) : common(att, ballX, 50);
       const shape = (s) => (s === ballSide ? k.ball : k.opp);
-      trace.frames.push({ t, poss: att === H ? 'h' : 'a', ...(outcome === 'press' || outcome === 'trap' ? { lost: true } : {}), ...(outcome === 'build' ? { run: true } : {}), ball, h: ptsOf(H, shape(H), null, st0.get(H)), a: ptsOf(A, shape(A), null, st0.get(A)) });
+      trace.frames.push({ t, poss: att === H ? 'h' : 'a', ...(outcome === 'press' ? { lost: true } : {}), ...(outcome === 'build' ? { run: true } : {}), ...(outcome === 'trap' ? { offside: true } : {}), ball, h: ptsOf(H, shape(H), null, st0.get(H)), a: ptsOf(A, shape(A), null, st0.get(A)) });
     };
   }
   const observe = (player, text) => observations.push({ playerId: player.id, text });

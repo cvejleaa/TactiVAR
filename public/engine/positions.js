@@ -84,7 +84,7 @@ function spread(pts, idx) {
 // Og ikke oven i en modspiller (QC v3.16.1: angriberen på linjen stod ofte på samme x som stopperen, han står ved): boldholdets
 // spiller skubbes på tværs – kun x, så linjen og offside-billedet er uændrede.
 // Ved sidelinjen skubbes han den anden vej; tre gennemløb, så et skub ikke lander oven i den næste modspiller.
-function apartFrom(pts, idx, other, oidx) {
+export function apartFrom(pts, idx, other, oidx) {
   for (let pass = 0; pass < 3; pass++) for (const i of idx) for (const j of oidx) {
     const p = pts[i], q = { x: 100 - other[j].x, y: 100 - other[j].y };   // modspillerens plads i dette holds koordinater
     if (Math.hypot(p.x - q.x, p.y - q.y) >= MIN_APART) continue;
