@@ -404,7 +404,9 @@ try {
     // lignede). Nu: brikkerne på minibanen er PRÆCIS et gemt øjebliksbillede (spiller-id og koordinater).
     const shown = (await g.locator('#snap-pitch .mp-token').evaluateAll((ts) => ts.map((t) => `${t.dataset.pid}@${parseFloat(t.style.left)},${parseFloat(t.style.top)}`))).sort().join('|');
     const saved = await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.lastRound.matches[0].events.filter((e) => e.snapshot).map((e) => e.snapshot.pts.map(([id, x, y]) => `${id}@${x},${y}`).sort().join('|')));
-    check('Klik på 📍: minibanen viser et gemt øjebliksbillede præcist (11 brikker på deres gemte pladser, bolden)', (await g.locator('#snap-pitch .mp-token').count()) === 11 && saved.includes(shown) && (await g.locator('#snap-ball').count()) === 1 && (await g.locator('#feed .ev.snapped').count()) === 1, shown.slice(0, 80));
+    // v3.15: efter et rødt kort har billedet 10 (eller færre) brikker – antallet skal passe med det gemte billede (saved.includes)
+    const nTok = await g.locator('#snap-pitch .mp-token').count();
+    check('Klik på 📍: minibanen viser et gemt øjebliksbillede præcist (7–11 brikker på deres gemte pladser, bolden)', nTok >= 7 && nTok <= 11 && nTok === shown.split('|').length && saved.includes(shown) && (await g.locator('#snap-ball').count()) === 1 && (await g.locator('#feed .ev.snapped').count()) === 1, shown.slice(0, 80));
     // Test Manager v3.12.1: et mål IMOD mod mellemblok med bolden midt i banen viser præcis startopstillingen (ingen forskydning) – kun dine egne mål SKAL stå anderledes
     // Test Manager v3.12.1: et nyt valg af kamp (også den aktive) fjerner billedet – ellers hænger et gammelt øjebliksbillede ved
     await g.locator('#match-cards .matchcard.active').click();
