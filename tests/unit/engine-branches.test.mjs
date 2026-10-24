@@ -904,7 +904,8 @@ test('løb: kanten med god pasning løber sig fri og lægger den tværs → CUTB
   assert.equal(r.rmE.freeRuns, 30); assert.equal(r.rmE.freeRunsWon, 30); assert.equal(r.rmE.assists, 30); assert.equal(r.rmE.goals, 0);
   const sc = r.m.ratings.home.find((e) => e.goals === 30);   // modtageren står nær straffesparkspletten (v3.12.1)
   assert.ok(sc && sc.playerId !== slot(r.a.H, 8).id);
-  assert.match(r.goals[0], /✅ #\d+ .+ løber sig fri på kanten og lægger den tværs til #\d+/);
+  // v3.16.3 (Spilfører: "MÅÅÅL! ✅ …"): målets linje genfortæller løbet uden ✅
+  assert.match(r.goals[0], /MÅÅÅL! #\d+ .+ løber sig fri på kanten og lægger den tværs til #\d+/); assert.doesNotMatch(r.goals[0], /✅/);
 });
 // v3.16: skuddets type efter løberens plads (LONGSHOT_Y 30), ikke zonen – RM sluppet igennem står på 48 − 16 − 12 = 20 i feltet:
 // kombination med oplæg fra den første anden midtbanespiller (LM, plads 5). Før: langskud uden oplæg. Skudvægt (FIN 20 − 6)·0,3 = 4,2
@@ -1666,12 +1667,14 @@ test('løber → aflevering fra kanten: CUTBACK, oplæg til løberen (+0,15 +0,5
   assert.equal(m.goalsPool[0].scorer, tg(fin));
   assert.equal(m.goalsPool[0].spectacle, goalSpectacle('CUTBACK', { passing: 20 }, m.goalsPool[0].min, { next: () => 0.5 }));   // oplæggets PAS (20), ikke modtagerens (10)
   assert.ok(m.observations.some((o) => o.playerId === fin.id) && !m.observations.some((o) => o.playerId === runner.id));
-  assert.ok(goals[0].text.includes(`✅ ${tg(runner)} løber sig fri på kanten og lægger den tværs til ${tg(fin)}.`), goals[0].text);
-  // v3.14.3 (brugeren: "cutback bliver noteret 2 gange"): efter løbs-linjen kun en kort slutning; den fulde beskrivelse
-  // (oplægsgiver = løberen, scorer = modtageren) står i "Rundens mål" (goalsPool).
-  assert.equal(goals[0].text.split(`til ${tg(fin)}. `)[1], `${tg(fin)} sparkede den ind.`, goals[0].text);
+  // v3.16.3 (Spilfører): uden løbets ✅ i målets linje, og "Han sparkede den ind." – ikke modtagerens navn to gange i træk
+  assert.ok(goals[0].text.includes(`MÅÅÅL! ${tg(runner)} løber sig fri på kanten og lægger den tværs til ${tg(fin)}.`) && !goals[0].text.includes('✅'), goals[0].text);
+  // v3.14.3 (brugeren: "cutback bliver noteret 2 gange"): efter løbs-linjen kun en kort slutning
+  assert.equal(goals[0].text.split(`til ${tg(fin)}. `)[1], 'Han sparkede den ind.', goals[0].text);
+  assert.equal(goals[0].text.split(tg(fin)).length, 2, 'modtagerens navn én gang');
+  // "Rundens mål" (goalsPool) fortæller samme hændelse som linjen (v3.16.3 – før describeGoal's fulde beskrivelse)
   const pool = m.goalsPool[0].desc;
-  assert.ok(pool.includes(tg(runner)) && pool.includes(tg(fin)), pool);
+  assert.equal(pool, `${tg(runner)} løber sig fri på kanten og lægger den tværs til ${tg(fin)}. Han sparkede den ind.`, pool);
   assert.equal(summary, '🎯 Løb uden bold (Normal): 2 løb, 2 kom fri (2 mål) · kontraer imod i alt: 0 (0 mål).');
 });
 // v3.16: langskud efter løberens plads, ikke zonen – RM trukket til (85, 58) står sluppet igennem på 58 − 16 − 12 = 30 ≥ LONGSHOT_Y 30
@@ -1687,7 +1690,7 @@ test('løber → skud fra kanten: LONGSHOT uden oplæg, når han står uden for 
   assert.equal(rOf(g.m, 'home', g.a.H, 8).rating, 10);     // 6,5 + 2·(0,15 + 1,4) + 0,4 sejr (v3.15) = 10,0
   assert.equal(sumOf(g.m, 'home', 'assists'), 0);
   assert.equal(g.m.goalsPool[0].scorer, tg(g.runner));
-  assert.ok(g.goals[0].text.includes(`✅ ${tg(g.runner)} løber sig fri på kanten og skyder.`), g.goals[0].text);
+  assert.ok(g.goals[0].text.includes(`MÅÅÅL! ${tg(g.runner)} løber sig fri på kanten og skyder.`) && !g.goals[0].text.includes('✅'), g.goals[0].text);   // v3.16.3: uden ✅
   assert.equal(g.summary, '🎯 Løb uden bold (Normal): 2 løb, 2 kom fri (2 mål) · kontraer imod i alt: 0 (0 mål).');
   // Redning (løbsbonus 2, KEEPER_EDGE 0,3 fra v3.15.1): FIN 15 + 2 = 17 mod MV 16,75 + 0,3 = 17,05 → redning; 15,1 + 2 = 17,1 → mål
   // (med kanten 3 også redning). v3.16: før FIN 10 mod MV 11,75 – FIN 10 afleverer nu fra kanten (skudvægt 1,2 mod 2,5).
@@ -2109,9 +2112,10 @@ test('dødbolde vundet af forsvaret: tekst pr. type, luftsejr +0,4 og aerialWins
   assert.equal(fk.m.homeGoals, 0); assert.equal(fk.m.stats.aAerialWon, 2); assert.equal(fk.m.stats.hAerialWon, 0);
   assert.equal(cb.rating, 7.8); assert.equal(cb.aerialWins, 2);                // 6,5 + 2·0,4 + clean sheet 0,5
   const evs = fk.m.events.filter((x) => x.label === 'Luftduel i feltet');
-  // v3.16.3: fire varianter (pickBy på tick og forsvarer – intet rng-træk), og skytten med sit hold: "foran #X (Hold)"
+  // v3.16.3: fire varianter (vary: pickBy på forsvarerens n'te clearing i kampen – intet rng-træk; to i træk er forskellige),
+  // og skytten med sit hold: "foran #X (Hold)"
   const CLEAR = ['stiger højest og clearer', 'vinder duellen og header væk', 'kommer først og rydder', 'hamrer bolden ud af feltet'];
-  assert.equal(evs.length, 2); assert.ok(evs.every((x) => x.text === `✈️ [${fk.a.A.name} forsvar] Frisparksindlæg: ${tg(slot(fk.a.A, 2))} (${slot(fk.a.A, 2).heightCm} cm) ${pickBy(CLEAR, x.min / 3, slot(fk.a.A, 2).id)} foran ${x.text.match(/foran (#\d+ \S+ \S+) /)[1]} (${fk.a.H.name}).`), evs[0].text);
+  assert.equal(evs.length, 2); assert.ok(evs.every((x, i) => x.text === `✈️ [${fk.a.A.name} forsvar] Frisparksindlæg: ${tg(slot(fk.a.A, 2))} (${slot(fk.a.A, 2).heightCm} cm) ${pickBy(CLEAR, i, 'clear', slot(fk.a.A, 2).id)} foran ${x.text.match(/foran (#\d+ \S+ \S+) /)[1]} (${fk.a.H.name}).`), evs[0].text);
   assert.doesNotMatch(evs[0].text, /Hjørnespark|Stærk luftduel/);
   const co = spx({ script: { 0.3: shots(2), 0.9: true }, gk: 20, tweak: def });
   const ce = co.m.events.filter((x) => x.label === 'Luftduel i feltet');
@@ -2224,7 +2228,7 @@ test('fuldtids-analyse: hvert tal står på sin plads (dit hold hjemme), kun for
   assert.deepEqual(stNums(m, 'h', 'Penalties', 'PenaltyGoals', 'FreeKicks', 'Corners'), [2, 0, 4, 0]);
   const poss = Math.round(st.hPoss / (st.hPoss + st.aPoss) * 100);
   assert.equal(poss, 91);
-  assert.equal(ft[0].text, `📊 [90' FULDTIDS-ANALYSE] Sejr ${m.homeGoals}-${m.awayGoals} til dig. Du havde 91% af bolden og ${st.hShots} afslutninger (${st.hOnTarget} på mål). Din opbygning kom igennem 30 af 30 gange; dit pres vandt bolden 0 af 0 gange.`
+  assert.equal(ft[0].text, `📊 [FULDTIDS-ANALYSE] Sejr ${m.homeGoals}-${m.awayGoals} til dig. Du havde 91% af bolden og ${st.hShots} afslutninger (${st.hOnTarget} på mål). Din opbygning kom igennem 30 af 30 gange; dit pres vandt bolden 0 af 0 gange.`
     + ` Dødbolde: 4 frispark i skudafstand, 0 hjørnespark, 2 straffe (0 mål) · frispark begået ${st.hFouls}, tilkendt ${st.aFouls}.`
     + ft[0].text.slice(ft[0].text.indexOf(' 🎯 Løb uden bold (Normal): ')));
   assert.match(ft[0].text, / 🎯 Løb uden bold \(Normal\): \d+ løb, \d+ kom fri \(\d+ mål\) · kontraer imod i alt: 0 \(0 mål\)\. ⚔️ Angreb \(Centralt · balanceret\): ingen cutbacks eller høje bolde\. 🛡️ /);
@@ -2401,7 +2405,7 @@ test('cutback: kantspilleren (PAC+BAL 20 + 4) mod backen (PAC+POS + 4 − 2): 21
   const won = cbRun({ defSum: 21.9 }), shut = cbRun({ defSum: 22 });
   assert.deepEqual([won.d.cutbacks, won.d.cutbacksBlocked, won.d.cutbackGoals, won.m.homeGoals], [2, 0, 2, 2]);
   assert.deepEqual(won.m.goalsPool.map((g) => g.kind), ['CUTBACK', 'CUTBACK']);
-  assert.ok(won.m.events.filter((e) => e.type === 'GOAL').every((e) => /✅ #\d+ .+ når baglinjen og lægger den lavt tilbage til #\d+ /.test(e.text)));
+  assert.ok(won.m.events.filter((e) => e.type === 'GOAL').every((e) => /MÅÅÅL! #\d+ .+ når baglinjen og lægger den lavt tilbage til #\d+ /.test(e.text) && !e.text.includes('✅')));   // v3.16.3: uden ✅
   // Kantspilleren får oplægget (+0,15 + 0,5 pr. mål); scoreren +1,25
   const wE = won.m.ratings.home.find((e) => e.assists > 0), sE = won.m.ratings.home.find((e) => e.goals > 0);
   assert.equal(wE.assists, 2); assert.equal(wE.rating, 8.2); assert.equal(sE.rating, 9.4);   // + 0,4 sejr (v3.15)

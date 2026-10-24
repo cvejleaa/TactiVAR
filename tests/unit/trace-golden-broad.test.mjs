@@ -21,7 +21,7 @@ import { createRng } from '../../public/engine/rng.js';
 import { createLeague } from '../../public/engine/generator.js';
 import { simulateMatch } from '../../public/engine/match.js';
 
-const GOLDEN_RESULTS_400 = '046ccd247d85c084d00fd83545f866a9530e88de70da99268770f15fb7028590';   // v3.16.3: kun tekst – noprose uændret (tools/fingerprint.mjs; før f0961615…) · v3.16.1 (sammenpresning; før 73852862… fra v3.16; f09616… efter TM-fundet: kun 📍-billederne ændret – kampene uden snapshot er identiske med 652cdcf8…) – = hashen uden optageren (kickoffFrame, tickFrame og momentAt tomme)
+const GOLDEN_RESULTS_400 = '53c152af925e250aa9ff37e05cbb35053c3f288d5d94a1476187940223b6839a';   // v3.16.3: kun tekst – noprose uændret (tools/fingerprint.mjs: full = denne, noprose e45a5498…; før 046ccd24… – vary, målets linje, fuldtidsanalysen – og før det f0961615… fra v3.16.2) · v3.16.1 (sammenpresning; før 73852862… fra v3.16; f09616… efter TM-fundet: kun 📍-billederne ændret – kampene uden snapshot er identiske med 652cdcf8…) – = hashen uden optageren (kickoffFrame, tickFrame og momentAt tomme)
 const GOLDEN_TRACES_20 = 'c59e0b2ce56af30e59bf896ca6fd2406e87d25feb14b3fedd9c605332d69fb16';     // v3.16.1: sammenpresning, afsparket i blok, grundbilledet efter duellen (før 2e238fd9…) · v3.16: koblede linjer, bolden ved skytten, skytten i feltet
 function matchN(s) {
   const L = createLeague(createRng(s * 97)), me = L.teams.find((t) => !t.isBot), opp = L.teams[(s % 7) + 1];

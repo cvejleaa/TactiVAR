@@ -364,7 +364,7 @@ test('cutback: en stopper på egen halvdel kan ikke "nå baglinjen" – kun en s
   const ev = goalEvents(m, 'GOAL');
   assert.ok(ev.length >= 2, `mål ${ev.length}`);
   const st = slot(a.H, 10), cb = slot(a.H, 2);
-  assert.ok(ev.every((e) => e.text.includes(`✅ #${st.shirtNumber} ${st.shortName} når baglinjen`)), ev[0].text);
+  assert.ok(ev.every((e) => e.text.includes(`MÅÅÅL! #${st.shirtNumber} ${st.shortName} når baglinjen`)), ev[0].text);
   assert.ok(ev.every((e) => !e.text.includes(`#${cb.shirtNumber} ${cb.shortName} når baglinjen`)));
 });
 

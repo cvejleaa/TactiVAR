@@ -321,22 +321,47 @@ test('overskriften: sejrsserie brudt (≥ 3 sejre før kampen, ikke sejr nu) er 
 
 // ---------- Røde kort i "Din kamp" (v3.16.3, Spilfører: klummen nævnte aldrig en udvisning) ----------
 // Offentlige fakta (hReds/aReds – referatet viser udvisningen). Begge hold, dit først; ingen linje uden rødt kort.
-test('"Din kamp": røde kort for begge hold – dit hold (1 eller 2) og modstanderen (1 eller 2) med antal mand; seerens side vender; ingen linje uden rødt', () => {
-  const reds = (hR, aR, viewer = 'h1', round = 5) => buildColumn(inp({ matches: [M({ hG: 1, aG: 1, stats: { hPoss: 50, aPoss: 50, hReds: hR, aReds: aR } })], viewerTeamId: viewer, round }))
+// Dit holds linje følger resultatet (QC v3.16.3: "kostede" lovede en årsag, også efter en sejr): sejr "til trods", nederlag
+// en af to varianter (pickBy på runden), uafgjort "holdt point". Modstanderens linje: kun "fik rødt kort undervejs" – ingen
+// påstand om, hvor længe de spillede med færre (før: "Ude fik rødt kort og spillede med 10 mand.").
+test('"Din kamp": røde kort for begge hold – dit holds linje efter resultatet (sejr/nederlag/uafgjort, 1 eller 2 kort), modstanderens "fik rødt kort undervejs"; seerens side vender; ingen linje uden rødt', () => {
+  const reds = (hR, aR, { viewer = 'h1', round = 5, hG = 1, aG = 1 } = {}) => buildColumn(inp({ matches: [M({ hG, aG, stats: { hPoss: 50, aPoss: 50, hReds: hR, aReds: aR } })], viewerTeamId: viewer, round }))
     .sections[0].paras.slice(1).filter((t) => /rødt|røde|udvis/.test(t));
-  const both = (hR, aR, viewer) => [0, 1].map((r) => reds(hR, aR, viewer, r)).map((x) => x.join(' | ')).sort();
+  const both = (hR, aR, o) => [0, 1].map((round) => reds(hR, aR, { ...o, round })).map((x) => x.join(' | ')).sort();
   assert.deepEqual(reds(0, 0), [], 'ingen røde kort → ingen linje');
-  assert.deepEqual(both(1, 0), ['Et rødt kort kostede: Hjem måtte spille med 10 mand.', 'Med 10 mand efter udvisningen blev det op ad bakke.'].sort());
-  assert.deepEqual(both(2, 0), ['2 røde kort kostede: Hjem måtte spille med 9 mand.', 'Med 9 mand efter udvisningerne blev det op ad bakke.'].sort());
-  assert.deepEqual(both(0, 1), ['Ude fik rødt kort og spillede med 10 mand.', 'Ude mistede en mand på rødt kort.'].sort());
-  assert.deepEqual(both(0, 2), ['Ude fik 2 røde kort og spillede med 9 mand.', 'Ude mistede 2 mand på rødt kort.'].sort());
-  // Seeren er udeholdet: aReds er "dine", hReds modstanderens
-  assert.deepEqual(both(0, 1, 'a1'), ['Et rødt kort kostede: Ude måtte spille med 10 mand.', 'Med 10 mand efter udvisningen blev det op ad bakke.'].sort());
-  assert.deepEqual(both(1, 0, 'a1'), ['Hjem fik rødt kort og spillede med 10 mand.', 'Hjem mistede en mand på rødt kort.'].sort());
+  assert.deepEqual(reds(0, 0, { hG: 2, aG: 0 }), []); assert.deepEqual(reds(0, 0, { hG: 0, aG: 2 }), []);
+  // Sejr: "til trods" – samme tekst i alle runder
+  assert.deepEqual(both(1, 0, { hG: 2, aG: 1 }), ['Et rødt kort til trods: Hjem vandt med 10 mand.', 'Et rødt kort til trods: Hjem vandt med 10 mand.']);
+  assert.deepEqual(reds(2, 0, { hG: 2, aG: 1 }), ['2 røde kort til trods: Hjem vandt med 9 mand.']);
+  // Nederlag: de to varianter (runde 0 og 1 vælger hver sin)
+  assert.deepEqual(both(1, 0, { hG: 0, aG: 1 }), ['Et rødt kort kostede: Hjem måtte spille med 10 mand.', 'Med 10 mand efter udvisningen blev det op ad bakke.'].sort());
+  assert.deepEqual(both(2, 0, { hG: 0, aG: 1 }), ['2 røde kort kostede: Hjem måtte spille med 9 mand.', 'Med 9 mand efter udvisningerne blev det op ad bakke.'].sort());
+  // Uafgjort: "holdt point" – ingen "kostede" og ingen "op ad bakke"
+  assert.deepEqual(both(1, 0), ['Hjem holdt point med 10 mand efter udvisningen.', 'Hjem holdt point med 10 mand efter udvisningen.']);
+  assert.deepEqual(reds(2, 0), ['Hjem holdt point med 9 mand efter udvisningerne.']);
+  for (const [hG, aG] of [[2, 1], [1, 1]]) for (const r of [0, 1, 2, 3]) assert.doesNotMatch(reds(1, 0, { hG, aG, round: r }).join(' '), /kostede|op ad bakke/, `${hG}-${aG}: ingen nederlagstekst`);
+  // Modstanderen: ental/flertal, uanset resultat – aldrig "spillede med" eller "mistede"
+  for (const [hG, aG] of [[1, 1], [2, 1], [0, 1]]) {
+    assert.deepEqual(both(0, 1, { hG, aG }), ['Ude fik rødt kort undervejs.', 'Ude fik rødt kort undervejs.']);
+    assert.deepEqual(reds(0, 2, { hG, aG }), ['Ude fik 2 røde kort undervejs.']);
+  }
+  // Seeren er udeholdet: aReds er "dine", hReds modstanderens (ude vinder 2-1 → "til trods"; ude taber 1-0 → "kostede"/"op ad bakke")
+  assert.deepEqual(reds(0, 1, { viewer: 'a1', hG: 1, aG: 2 }), ['Et rødt kort til trods: Ude vandt med 10 mand.']);
+  assert.deepEqual(both(0, 1, { viewer: 'a1', hG: 1, aG: 0 }), ['Et rødt kort kostede: Ude måtte spille med 10 mand.', 'Med 10 mand efter udvisningen blev det op ad bakke.'].sort());
+  assert.deepEqual(reds(1, 0, { viewer: 'a1' }), ['Hjem fik rødt kort undervejs.']);
   // Begge hold: to linjer, dit hold først
-  const two = reds(1, 1);
-  assert.equal(two.length, 2);
-  assert.match(two[0], /Hjem måtte|Med 10 mand efter udvisningen/); assert.match(two[1], /^Ude (fik|mistede)/);
+  assert.deepEqual(reds(1, 1), ['Hjem holdt point med 10 mand efter udvisningen.', 'Ude fik rødt kort undervejs.']);
+});
+test('"Din kamp": de røde kort står EFTER dommen over dit hold (Spilfører v3.16.3: "… mistede en mand på rødt kort. Det kostede: et kontramål imod." læstes som årsag)', () => {
+  const paras = (hR, aR) => buildColumn(inp({ matches: [M({ hG: 0, aG: 1, stats: { hPoss: 50, aPoss: 50, hReds: hR, aReds: aR }, ownReports: { h1: R({ counterGoalsAgainst: 1 }) } })], round: 5 })).sections[0].paras;
+  const p = paras(1, 1);
+  const iv = p.findIndex((t) => t.startsWith('Det kostede: et kontramål imod'));
+  const im = p.findIndex((t) => /Hjem måtte spille med 10 mand|Med 10 mand efter udvisningen/.test(t)), io = p.indexOf('Ude fik rødt kort undervejs.');
+  assert.ok(iv > 0 && im > 0 && io > 0, `data: dom, dit kort og modstanderens kort står alle (${JSON.stringify(p)})`);
+  assert.ok(iv < im && im < io, `rækkefølge: dom (${iv}) < dit kort (${im}) < modstanderens (${io})`);
+  assert.equal(io, p.length - 1, 'modstanderens kort er afsnittets sidste linje');
+  // Uden kort står dommen alene – samme dom
+  assert.equal(paras(0, 0).at(-1), p[iv]);
 });
 test('"De øvrige kampe": ved uafgjort ingen "ventede"-regel (wait forklarer en sejr) – en sejr med samme tal får den', () => {
   const waitRule = STYLE_RULES.find((r) => r.key === 'wait');

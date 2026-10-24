@@ -198,7 +198,7 @@ test('fuldtids-analysen nævner resultatet rigtigt: sejr "til dig", nederlag og 
     if (!ft) continue;
     const [my, opp] = ft.isHome ? [m.homeGoals, m.awayGoals] : [m.awayGoals, m.homeGoals];
     const want = my > opp ? `Sejr ${my}-${opp} til dig.` : my < opp ? `Nederlag ${my}-${opp}.` : `Uafgjort ${my}-${opp}.`;
-    assert.ok(ft.text.startsWith(`📊 [90' FULDTIDS-ANALYSE] ${want} `), ft.text.slice(0, 60));
+    assert.ok(ft.text.startsWith(`📊 [FULDTIDS-ANALYSE] ${want} `), ft.text.slice(0, 60));
     seen[want.split(' ')[0]]++;
   }
   assert.ok(seen.Sejr >= 3 && seen.Nederlag >= 3 && seen.Uafgjort >= 2, JSON.stringify(seen));

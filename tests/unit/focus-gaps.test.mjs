@@ -290,7 +290,7 @@ test('cutback-afslutteren står nær (50,28) og er ikke kantspilleren selv; PAS 
     layout(a.H, { 8: { x: 85, y: 45 }, 9: { x: 50, y: 34 }, 10: { x: 50, y: 14 } });
   });
   assert.equal(near.m.homeGoals, 2);
-  for (const t of text(near)) assert.ok(t.includes(`✅ ${tg(slot(near.a.H, 8))} når baglinjen og lægger den lavt tilbage til ${tg(slot(near.a.H, 9))}.`), t);
+  for (const t of text(near)) assert.ok(t.includes(`MÅÅÅL! ${tg(slot(near.a.H, 8))} når baglinjen og lægger den lavt tilbage til ${tg(slot(near.a.H, 9))}.`) && !t.includes('✅'), t);   // v3.16.3: uden ✅
   // Kantspilleren er bedst til afslutning og står på cutbackstedet – men er ekskluderet; plads 9 tager den.
   // v3.16.1: plads 9 står ved siden af (40, 28), ikke oven i ham – to på samme plet skubbes fra hinanden (spread), og så kom plads 9
   // (64, 32) inden for kantens rækkevidde (25 fra (88, 30)) og blev selv kantspiller. Nu: RM (61, 28) og ST (55, 32 – skubbet fra
@@ -299,7 +299,7 @@ test('cutback-afslutteren står nær (50,28) og er ikke kantspilleren selv; PAS 
     Object.assign(slot(a.H, 8).skills, { pace: 50, ballControl: 50, finishing: 20 }); Object.assign(slot(a.H, 9).skills, { finishing: 10 });
     layout(a.H, { 8: { x: 50, y: 28 }, 9: { x: 40, y: 28 } });
   });
-  for (const t of text(self)) assert.ok(t.includes(`✅ ${tg(slot(self.a.H, 8))} når baglinjen og lægger den lavt tilbage til ${tg(slot(self.a.H, 9))}.`), t);
+  for (const t of text(self)) assert.ok(t.includes(`MÅÅÅL! ${tg(slot(self.a.H, 8))} når baglinjen og lægger den lavt tilbage til ${tg(slot(self.a.H, 9))}.`), t);
   // Evne: FIN, ikke PAS (samme afstand; P: FIN 6/PAS 14, Q: FIN 14/PAS 6). v3.16.1: to på samme plet skubbes fra hinanden (spread), og så
   // afgjorde afstanden – derfor spejlet om pletten: x 36 / 42 + 11,4 (boldsiden) = 47 / 53, y 40 − 6 = 34 (RM rå 29 bag linjen 28: ingen
   // sammenpresning), begge 6,7 fra (50, 28), 7 fra stopperne (y 27) og bottens midtbane (y 41) – ingen skubbes.

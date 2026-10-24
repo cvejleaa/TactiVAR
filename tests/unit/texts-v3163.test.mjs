@@ -62,13 +62,15 @@ const TMPL = Object.fromEntries(GOAL_KINDS.map((k) => [k, [0, 1, 2].map((j) => {
   return new RegExp(`^${t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/SSS'|SSSs|SSS|AAA'|AAAs|AAA/g, '.+?')}$`);
 })]));
 const variantOf = (g) => TMPL[g.kind].findIndex((r) => r.test(g.desc));
+const LEAD_DESC = /^#\d+ .+? (løber sig fri|når baglinjen) /;
 // Alle måltyper får kampens brugte tekster – også hovedstødsmålene (HEADER, CORNER, SETPIECE; rettet efter TM-hjælperens fund).
 const WITH_USED = new Set(['LONGSHOT', 'DRIBBLE', 'COUNTER', 'CUTBACK', 'COMBINATION', 'PENALTY', 'FREEKICK', 'HEADER', 'CORNER', 'SETPIECE']);
 test('ingen gentaget måltekst i en kamp, før typens tre er brugt (Spilfører: "missil fra langt ude" i 8 af 13 langskud) – 200 kampe', () => {
   let groups = 0, multi = 0;
   for (const m of M200) {
     const per = {};
-    for (const g of m.goalsPool) if (WITH_USED.has(g.kind)) (per[g.kind] ??= []).push(variantOf(g));
+    // Dit holds løb (v3.16.3): Rundens mål er linjens egen fortælling, ikke describeGoal – genkendt positivt på indledningen
+    for (const g of m.goalsPool) if (WITH_USED.has(g.kind) && !LEAD_DESC.test(g.desc)) (per[g.kind] ??= []).push(variantOf(g));
     for (const [kind, js] of Object.entries(per)) {
       assert.ok(js.every((j) => j >= 0), `${kind}: hver beskrivelse er en af typens tekster`);
       const first = js.slice(0, 3);
@@ -78,37 +80,48 @@ test('ingen gentaget måltekst i en kamp, før typens tre er brugt (Spilfører: 
   }
   assert.ok(groups > 300 && multi > 60, `data: ${groups} typer i kampe, ${multi} med mindst to mål af samme type`);
 });
-test('hovedstødsmålene (HEADER/CORNER/SETPIECE) får også kampens brugte tekster (fund, rettet) – describeGoal kaldes uden goalTexts i luftduel-grenen', () => {
+test('hovedstødsmålene (HEADER/CORNER/SETPIECE) får også kampens brugte tekster (fund, rettet: describeGoal blev kaldt uden goalTexts i luftduel-grenen)', () => {
+  let multi = 0;
   for (const m of M200) {
     const per = {};
-    for (const g of m.goalsPool) if (!WITH_USED.has(g.kind)) (per[g.kind] ??= []).push(variantOf(g));
-    for (const [kind, js] of Object.entries(per)) { const first = js.slice(0, 3); assert.equal(new Set(first).size, first.length, `${kind}: ${js.join(',')}`); }
+    // Før stod her !WITH_USED – tom, efter at hovedstødsmålene kom med (grøn uden data). Nu: netop de tre typer, med datavagt.
+    for (const g of m.goalsPool) if (['HEADER', 'CORNER', 'SETPIECE'].includes(g.kind)) (per[g.kind] ??= []).push(variantOf(g));
+    for (const [kind, js] of Object.entries(per)) {
+      assert.ok(js.every((j) => j >= 0), kind); const first = js.slice(0, 3); assert.equal(new Set(first).size, first.length, `${kind}: ${js.join(',')}`);
+      if (js.length >= 2) multi++;
+    }
   }
+  assert.ok(multi >= 4, `data: ${multi} kampe med mindst to hovedstødsmål af samme type`);   // 5
 });
 
-// ---------- Varianter uden rng: pickBy(liste, tick = minut / 3, id) ----------
-// Hver familie: alle varianter forekommer over mange kampe, og hver forekomst er netop pickBy(listen, minuttet, id'et) – samme
-// (minut, id) giver altså samme tekst. id'et findes ud fra tag'et i hændelsens holds karakterark (hjemme/ude efter isHome).
+// ---------- Varianter uden rng: vary = pickBy(liste, n, familie, aktør) – n = aktørens n'te brug i kampen ----------
+// v3.16.3 (Spilfører: "styrer midtbanen" tre gange for samme spiller i én kamp – pickBy på tick'et ramte samme variant hvert
+// 4. tick): hver (familie, aktør) går én variant videre, hver gang den bruges i kampen. Reglen: aktørens n'te forekomst (0, 1, …)
+// i en kamp er pickBy(listen, n, familie, id) – så samme aktør får aldrig samme variant to gange i træk, og alle varianter
+// bruges, før en gentages. id'et findes ud fra tag'et i hændelsens holds karakterark (hjemme/ude efter isHome).
 const MID = ['styrer midtbanen', 'finder den frie mand', 'spiller sig ud af presset', 'vender op og sætter spillet i gang'];
 const CLEAR = ['stiger højest og clearer', 'vinder duellen og header væk', 'kommer først og rydder', 'hamrer bolden ud af feltet'];
 const REORG_LABEL = ['omorganiserer sig', 'skifter form', 'flytter rundt'];
 const REORG_TEXT = ['Holdet omorganiserer sig på banen.', 'Holdet skifter form – spillerne får nye pladser.', 'Træneren flytter rundt på holdet.'];
 const LYN = ['Din lynkontra løber ind i et organiseret forsvar.', 'Modstanderen når hjem, før lynkontraen kommer i gang.', 'Lynkontraen bremses – de er hurtigt tilbage i position.'];
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+// Pr. familie: én post pr. forekomst med kampens nr. (mi), aktørens id og n = hvor mange gange aktøren har haft familien før i kampen.
 function families(ms) {
   const out = { mid: [], clear: [], reorg: [], lyn: [] };
-  for (const m of ms) {
+  ms.forEach((m, mi) => {
     const idOf = (home, t) => (home ? m.ratings.home : m.ratings.away).find((e) => tag(e) === t)?.playerId;
+    const seen = new Map();
+    const push = (fam, x) => { const k = `${fam}|${x.id}`, n = seen.get(k) ?? 0; seen.set(k, n + 1); out[fam].push({ ...x, mi, n }); };
     for (const e of m.events) {
       const mid = e.type === 'TACTIC_WIN' && e.text.match(new RegExp(`(#\\d+ \\S+(?: \\S+)*?) (${MID.map(esc).join('|')})\\.$`));
-      if (mid) out.mid.push({ min: e.min, id: idOf(e.isHome, mid[1]), v: mid[2] });
+      if (mid) push('mid', { min: e.min, id: idOf(e.isHome, mid[1]), v: mid[2] });
       const cl = e.label === 'Luftduel i feltet' && e.text.match(new RegExp(`\\] [^:]+: (#\\d+ .+?) \\(\\d+ cm\\) (${CLEAR.map(esc).join('|')}) foran #\\d+ .+ \\((.+)\\)\\.$`));
-      if (cl) out.clear.push({ min: e.min, id: idOf(e.isHome, cl[1]), v: cl[2], team: cl[3], att: e.isHome ? m.awayName : m.homeName });
-      if (e.type === 'TRIGGER' && e.text.startsWith('🔁')) out.reorg.push({ min: e.min, id: e.isHome ? m.homeId : m.awayId, label: e.label.replace(`${e.isHome ? m.homeName : m.awayName} `, ''), v: e.text.replace(/^🔁 \[.+?\] /, '') });
+      if (cl) push('clear', { min: e.min, id: idOf(e.isHome, cl[1]), v: cl[2], team: cl[3], att: e.isHome ? m.awayName : m.homeName });
+      if (e.type === 'TRIGGER' && e.text.startsWith('🔁')) push('reorg', { min: e.min, id: e.isHome ? m.homeId : m.awayId, label: e.label.replace(`${e.isHome ? m.homeName : m.awayName} `, ''), v: e.text.replace(/^🔁 \[.+?\] /, '') });
       const ly = e.label === 'Fase 2 pres virker' && e.text.match(new RegExp(`: (#\\d+ .+?) erobrer bolden .* (${LYN.map(esc).join('|')})$`));
-      if (ly) out.lyn.push({ min: e.min, id: idOf(e.isHome, ly[1]), v: ly[2] });
+      if (ly) push('lyn', { min: e.min, id: idOf(e.isHome, ly[1]), v: ly[2] });
     }
-  }
+  });
   return out;
 }
 function season(seed, rounds) {
@@ -118,39 +131,61 @@ function season(seed, rounds) {
 }
 const SEASON = [...season(21, 14), ...season(22, 14)];
 const F = families([...M200, ...SEASON]);
-
-test('variant "styrer midtbanen" (4): alle fire forekommer, og hver er pickBy(listen, tick'et, playmakerens id)', () => {
-  assert.ok(F.mid.length > 2000 && F.mid.every((x) => x.id), `data: ${F.mid.length}`);
-  assert.deepEqual([...new Set(F.mid.map((x) => x.v))].sort(), [...MID].sort());
-  for (const x of F.mid) assert.equal(x.v, pickBy(MID, x.min / 3, x.id), JSON.stringify(x));
+// Forekomsterne grupperet pr. (kamp, aktør) i kampens rækkefølge
+const runs = (fam) => { const g = new Map(); for (const x of fam) { const k = `${x.mi}|${x.id}`; (g.get(k) ?? g.set(k, []).get(k)).push(x); } return [...g.values()]; };
+// Fælles for alle fire familier: (1) n'te forekomst = pickBy(liste, n, familie, id); (2) aldrig samme variant to gange i træk for
+// samme aktør i en kamp; (3) de første min(antal, listens længde) forekomster er alle forskellige; (4) alle varianter forekommer.
+function varyRule(fam, list, key, { min, minRepeat, minFull }) {
+  assert.ok(fam.length > min && fam.every((x) => x.id), `data: ${fam.length} forekomster`);
+  for (const x of fam) assert.equal(x.v, pickBy(list, x.n, key, x.id), JSON.stringify(x));
+  const g = runs(fam), rep = g.filter((r) => r.length >= 2), full = g.filter((r) => r.length >= list.length);
+  assert.ok(rep.length > minRepeat && full.length > minFull, `data: ${rep.length} aktører med mindst 2 i en kamp, ${full.length} med mindst ${list.length}`);
+  for (const r of rep) {
+    for (let i = 1; i < r.length; i++) assert.notEqual(r[i].v, r[i - 1].v, `samme variant to gange i træk: ${JSON.stringify(r.map((x) => [x.min, x.v]))}`);
+    const first = r.slice(0, list.length).map((x) => x.v);
+    assert.equal(new Set(first).size, first.length, `alle varianter før en gentagelse: ${first.join(' | ')}`);
+  }
+  assert.deepEqual([...new Set(fam.map((x) => x.v))].sort(), [...list].sort(), 'alle varianter forekommer');
+  return { rep: rep.length, full: full.length };
+}
+test('variant "styrer midtbanen" (4): vary – playmakerens n\'te gang i kampen er pickBy(listen, n, "mid", id); aldrig samme to gange i træk; alle fire før en gentagelse', () => {
+  varyRule(F.mid, MID, 'mid', { min: 2000, minRepeat: 300, minFull: 50 });   // 2369 forekomster, 616 aktører med ≥ 2 i en kamp, 96 med ≥ 4
 });
-test('variant "stiger højest og clearer" (4): alle fire forekommer, hver er pickBy(listen, tick'et, forsvarerens id), og skytten står med SIT hold', () => {
-  assert.ok(F.clear.length > 200 && F.clear.every((x) => x.id), `data: ${F.clear.length}`);
-  assert.deepEqual([...new Set(F.clear.map((x) => x.v))].sort(), [...CLEAR].sort());
-  for (const x of F.clear) { assert.equal(x.v, pickBy(CLEAR, x.min / 3, x.id), JSON.stringify(x)); assert.equal(x.team, x.att, 'foran #X (angriberens hold)'); }
+test('variant "stiger højest og clearer" (4): vary pr. forsvarer ("clear") – og skytten står med SIT hold', () => {
+  varyRule(F.clear, CLEAR, 'clear', { min: 1000, minRepeat: 200, minFull: 20 });   // 1171, 289, 30
+  for (const x of F.clear) assert.equal(x.team, x.att, 'foran #X (angriberens hold)');
 });
-test('variant "omorganiserer sig" (3): etiket og tekst er samme variant (pickBy på minut og hold-id), alle tre forekommer – og stadig hverken regel, formation eller minut', () => {
-  assert.ok(F.reorg.length > 100, `data: ${F.reorg.length}`);
-  assert.deepEqual([...new Set(F.reorg.map((x) => x.v))].sort(), [...REORG_TEXT].sort());
-  for (const x of F.reorg) {
-    assert.equal(x.v, pickBy(REORG_TEXT, x.min / 3, x.id)); assert.equal(x.label, pickBy(REORG_LABEL, x.min / 3, x.id));
+// I de seedede kampe omorganiserer et hold sig højst én gang pr. kamp (0 hold med to) – gentagelsen bevises derfor på kampe,
+// hvor bot-holdet har fem Hvis-Så-formationsskift (ANY, minut 10-50), som hjemme- og som udehold.
+const REORG5 = Array.from({ length: 12 }, (_, i) => {
+  const L = createLeague(createRng(500 + i)), me = L.teams.find((t) => !t.isBot), bot = L.teams.find((t) => t.isBot);
+  bot.tactics.conditionalRules = ['4-3-3', '4-4-2', '4-2-3-1', '4-3-3', '4-4-2'].map((f, j) => ({ condition: 'ANY', minuteTrigger: 10 * (j + 1), action: 'FORMATION', newFormation: f }));
+  return i % 2 ? simulateMatch(me, bot, createRng(900 + i)) : simulateMatch(bot, me, createRng(900 + i));
+});
+test('variant "omorganiserer sig" (3): vary pr. hold ("reorg"); etiket og tekst er samme variant (etiketten flytter ikke tælleren) – og stadig hverken regel, formation eller minut', () => {
+  varyRule(F.reorg, REORG_TEXT, 'reorg', { min: 100, minRepeat: -1, minFull: -1 });   // 178 forekomster, ingen gentagelse i en kamp
+  const R5 = families(REORG5).reorg;
+  assert.ok(R5.length >= 50, `data: ${R5.length} omorganiseringer i ${REORG5.length} kampe`);
+  varyRule(R5, REORG_TEXT, 'reorg', { min: 49, minRepeat: 10, minFull: 10 });   // 60, 12 hold med 5 hver
+  for (const x of [...F.reorg, ...R5]) {
+    assert.equal(x.label, pickBy(REORG_LABEL, x.n, 'reorg', x.id), JSON.stringify(x));
     assert.equal(REORG_LABEL.indexOf(x.label), REORG_TEXT.indexOf(x.v), 'etiket og tekst følges ad');
   }
 });
-test('variant "Din lynkontra løber ind i …" (3): alle tre forekommer, hver er pickBy(listen, tick'et, presserens id)', () => {
-  assert.ok(F.lyn.length > 100 && F.lyn.every((x) => x.id), `data: ${F.lyn.length}`);
-  assert.deepEqual([...new Set(F.lyn.map((x) => x.v))].sort(), [...LYN].sort());
-  for (const x of F.lyn) assert.equal(x.v, pickBy(LYN, x.min / 3, x.id), JSON.stringify(x));
+test('variant "Din lynkontra løber ind i …" (3): vary pr. presser ("lyn")', () => {
+  varyRule(F.lyn, LYN, 'lyn', { min: 300, minRepeat: 40, minFull: 4 });   // 328, 50, 6
 });
-// FUND (rettet): alle kampens minutter er tick-minutter (deleligt med 3), så pickBy på minuttet gav med tre varianter altid samme
-// variant pr. hold/presser. Nu vælges der på tick'et (min / 3) – vogtes her.
-test('et hold/en presser får mindst to forskellige af de tre varianter over en sæson (minuttet er altid deleligt med 3)', () => {
-  for (const fam of [F.reorg, F.lyn]) {
-    const per = new Map();
-    for (const x of fam) per.set(x.id, (per.get(x.id) ?? new Set()).add(x.v));
-    const many = [...per.values()].filter((s) => s.size > 0);
-    assert.ok([...per.entries()].filter(([, s]) => s.size === 1).length < many.length / 2, `${[...per.values()].map((s) => s.size).join(',')}`);
+// Tælleren er pr. KAMP: samme aktør starter forfra i næste kamp (n = 0) – en tæller på tværs af kampene (eller pr. tick) ville
+// give en anden første variant. Og pr. AKTØR: to playmakere i samme kamp har hver sin tæller.
+test('vary: tælleren starter forfra i hver kamp og er pr. aktør – hver aktørs første forekomst i en kamp er pickBy(listen, 0, familie, id)', () => {
+  let firsts = 0, multi = 0;
+  for (const [fam, list, key] of [[F.mid, MID, 'mid'], [F.clear, CLEAR, 'clear'], [F.reorg, REORG_TEXT, 'reorg'], [F.lyn, LYN, 'lyn']]) {
+    for (const r of runs(fam)) { assert.equal(r[0].v, pickBy(list, 0, key, r[0].id)); firsts++; }
+    const perMatch = new Map();
+    for (const x of fam) (perMatch.get(x.mi) ?? perMatch.set(x.mi, new Set()).get(x.mi)).add(x.id);
+    multi += [...perMatch.values()].filter((s) => s.size >= 2).length;
   }
+  assert.ok(firsts > 1000 && multi > 100, `data: ${firsts} første forekomster, ${multi} kampe med flere aktører i samme familie`);
 });
 
 // ---------- Ingen minutter i teksterne ----------

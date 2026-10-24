@@ -50,22 +50,44 @@ test('langskud: skytten og bolden står i billedet højst på LONGSHOT_FAR (38) 
   assert.ok(n >= 5, `langskudsmål med billede: ${n}`);
 });
 
-test('referatet fortæller oplægget én gang: med dit holds løb (✅) slutter målteksten kort – den fulde beskrivelse står i Rundens mål', () => {
-  let n = 0, shot = 0;
+// v3.16.3 (Spilfører): målets linje genfortæller løbet UDEN ✅ ("MÅÅÅL! ✅ …") og uden afslutterens navn to gange i træk
+// ("… lægger den tværs til #7 X. #7 X sparkede den ind." → "Han sparkede den ind."). "Rundens mål" (goalsPool.desc) fortæller
+// samme hændelse som linjen. Dit holds løb genkendes positivt på indledningen ("løber sig fri" / "når baglinjen" lige efter MÅÅÅL!).
+const LEAD = /^⚽ \[[^\]]+\] MÅÅÅL! (#\d+ .+? (løber sig fri|når baglinjen) .+)$/;
+const noVar = (t) => t.replace(/ 📺 VAR: målet står – .+\.$/, '');
+test('referatet fortæller oplægget én gang: med dit holds løb slutter målteksten kort – uden ✅, uden dobbelt navn, og Rundens mål er samme fortælling', () => {
+  let n = 0, shot = 0, kicked = 0;
   for (const { e, m } of G) {
-    if (!e.text.includes('✅')) continue;
+    const lead = noVar(e.text).match(LEAD);
+    if (!lead) continue;
+    assert.doesNotMatch(e.text, /✅/, e.text);
     // v3.15.1: et mål, VAR har tjekket, slutter med "📺 VAR: målet står – …" efter slutningen
-    assert.match(e.text, /(#\d+ .+ sparkede den ind|Bolden sad i nettet)\.( 📺 VAR: målet står – .+\.)?$/, e.text);
-    assert.doesNotMatch(e.text, /Lavt cutback|spillede 1-2|baglinjen.*baglinjen|cutback fra/, e.text);
-    // QC v3.14.3: "sparkede den ind" kun om den, indledningen spillede bolden til – aldrig efter "… og skyder." (løberen selv)
-    const kick = e.text.replace(/ 📺 VAR: målet står – .+\.$/, '').match(/\. (#\d+ .+) sparkede den ind\.$/);
-    if (kick) assert.ok(e.text.includes(`til ${kick[1]}. `) || e.text.includes(`spiller ${kick[1]}. `), e.text);
-    if (/ og skyder\. /.test(e.text)) { assert.match(e.text, /Bolden sad i nettet\.( 📺 VAR: målet står – .+\.)?$/, e.text); shot++; }
+    assert.match(e.text, /(Han sparkede den ind|Bolden sad i nettet)\.( 📺 VAR: målet står – .+\.)?$/, e.text);
+    assert.doesNotMatch(e.text, /Lavt cutback|spillede 1-2|baglinjen.*baglinjen|cutback fra|(?<!Han) sparkede den ind/, e.text);
     const g = m.goalsPool.find((x) => x.min === e.min && e.text.includes(x.scorer));
-    assert.ok(g && g.desc.length > 20 && !e.text.includes(g.desc), 'den fulde beskrivelse er i goalsPool, ikke i referatet');
+    assert.ok(g, e.text);
+    // "Han sparkede den ind" kun om den, indledningen spillede bolden til – aldrig efter "… og skyder." (løberen selv); navnet én gang
+    if (/ Han sparkede den ind\.$/.test(noVar(e.text))) {
+      assert.ok(noVar(e.text).endsWith(`til ${g.scorer}. Han sparkede den ind.`) || noVar(e.text).endsWith(`spiller ${g.scorer}. Han sparkede den ind.`), e.text);
+      assert.equal(e.text.split(g.scorer).length - 1, e.text.includes('VAR: målet står') ? e.text.split(g.scorer).length - 1 : 1, `${g.scorer} én gang: ${e.text}`);
+      kicked++;
+    }
+    if (/ og skyder\. /.test(e.text)) { assert.match(e.text, /Bolden sad i nettet\.( 📺 VAR: målet står – .+\.)?$/, e.text); shot++; }
+    // Rundens mål = linjens fortælling (før: describeGoal's fulde beskrivelse – en anden historie end referatet)
+    assert.equal(g.desc, lead[1], 'goalsPool.desc er linjens tekst efter "MÅÅÅL! " (uden VAR-tillægget)');
     n++;
   }
-  assert.ok(n >= 5 && shot >= 2, `mål med dit holds løb: ${n}, heraf "og skyder": ${shot}`);
+  assert.ok(n >= 5 && shot >= 2 && kicked >= 2, `mål med dit holds løb: ${n}, heraf "og skyder": ${shot}, "Han sparkede den ind": ${kicked}`);
+  // Mål uden dit holds løb: Rundens mål er stadig linjens tekst (describeGoal), og ingen "Han sparkede"
+  let plain = 0;
+  for (const { e, m } of G) {
+    if (noVar(e.text).match(LEAD) || !/^⚽ \[[^\]]+\] MÅÅÅL! /.test(e.text)) continue;
+    const g = m.goalsPool.find((x) => x.min === e.min && e.text.includes(x.scorer));
+    if (!g) continue;
+    assert.equal(noVar(e.text).replace(/^⚽ \[[^\]]+\] MÅÅÅL! /, ''), g.desc, e.text); assert.doesNotMatch(e.text, /Han sparkede/);
+    plain++;
+  }
+  assert.ok(plain >= 20, `data: ${plain} almindelige mål`);
 });
 
 test('slutstilling: lige efter sæsonens sidste runde viser tabellen slutstillingen og mesteren – efter næste runde den nye sæson', () => {

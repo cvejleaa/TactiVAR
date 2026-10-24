@@ -1032,8 +1032,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
         st[k(att, 'TacticSuccess')]++;
         sheet.adjust(playmaker.id, DUEL_BONUS); sheet.bump(playmaker.id, 'tacticWins');
         // Ingen besked afhængig af mod-kunnen mod modstanderen – den ville røbe deres stil.
-        // Varianter uden rng (v3.16.3, Spilfører: "styrer midtbanen" ×420 pr. sæson) – pickBy på tick (min / 3: minuttet er altid
-        // deleligt med 3, så en liste på 3 gav ellers altid samme variant – TM-hjælper) og spiller
+        // Varianter uden rng (v3.16.3, Spilfører: "styrer midtbanen" ×420 pr. sæson) – vary: næste variant for samme spiller i kampen
         const note = ' ' + vary([`${tag(playmaker)} styrer midtbanen.`, `${tag(playmaker)} finder den frie mand.`, `${tag(playmaker)} spiller sig ud af presset.`, `${tag(playmaker)} vender op og sætter spillet i gang.`], 'mid', playmaker.id);
         // Kun dit eget holds valg navngives; modstanderens stil beskrives ikke.
         // Teksten er den samme, uanset om en stilbonus afgjorde duellen (ellers røbede ordvalget modstanderens stil).
