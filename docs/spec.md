@@ -453,6 +453,11 @@ Standard: start-slot 0–10, bænk 100+rygnr. Heatmap 15–20 smaragd, 12–14
 lyseblå, 8–11 hvid, 1–7 grå. Filtre Alle/Start-11/Bænk/GK/DEF/MID/ATT. "⤢ Bred
 visning". Sortering på kopi med `origIdx`.
 
+Slutstilling (v3.14.3, brugeren: "man kan derfor ikke længere se slutstillingen for sæsonen"): efter sæsonens sidste
+runde, indtil første runde i den nye sæson er spillet, viser Liga-fanens tabel "slutstilling, sæson N" med mesteren
+(fra `league.seasons`); derefter ligger den under "Tidligere sæsoner". Langskud (v3.14.3): i billedet står skytten højst
+på `LONGSHOT_FAR` = 38 (skudafstand). Med dit holds løb (✅) slutter målteksten kort; den fulde beskrivelse er Rundens mål.
+
 ## 8b. Statistik på Liga-fanen (v3.10)
 Fra v3.14.1 (brugeren: "Statistik skal tælle for sæsonen og ikke siden en eller anden runde") står sæsonen i
 overskrifterne ("Spillere (sæson 2)"); runder vises sæson-relativt. Kun et gem, der var midt i en sæson, da

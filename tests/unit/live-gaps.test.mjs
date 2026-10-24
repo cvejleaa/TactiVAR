@@ -287,12 +287,31 @@ test('almindelig afslutning inde i feltet: dribletur vægtes af PAC og BAL hver 
   assert.deepEqual(kinds({ pace: 8, ballControl: 8 }), ['COMBINATION']);
 });
 
-test('løb der ender i et skud: løberen står stadig 12 foran (RM trukket til (50,82): 82 − 16 − 12 = 54, ikke 66) – billedet bruger løbets øjeblik, ikke skytte-kastet før – dræber "run seen ikke sat/uden runner"', () => {
-  const r = runGoal({ rm: { finishing: 20, passing: 1, pace: 1, ballControl: 1 }, custom: { 8: { x: 50, y: 82 } } });
+test('løb der ender i et skud: løberen står stadig 12 foran (RM trukket til (50,62): 62 − 16 − 12 = 34, ikke 46 → 38 = LONGSHOT_FAR) – billedet bruger løbets øjeblik, ikke skytte-kastet før – dræber "run seen ikke sat/uden runner"', () => {
+  const r = runGoal({ rm: { finishing: 20, passing: 1, pace: 1, ballControl: 1 }, custom: { 8: { x: 50, y: 62 } } });
   assert.deepEqual(r.m.goalsPool.map((g) => g.kind), ['LONGSHOT', 'LONGSHOT']);
-  const want = pts(r.a.H, [[50, 90], [15, 50], [38, 59], [62, 59], [85, 50], [15, 29], [38, 32], [62, 32], [50, 54], [38, 14], [62, 14]]);
+  const want = pts(r.a.H, [[50, 90], [15, 50], [38, 59], [62, 59], [85, 50], [15, 29], [38, 32], [62, 32], [50, 34], [38, 14], [62, 14]]);
   // Solo-mål: bolden står ved skytten (QC-rettelsen), ikke på (50, 20)
-  assert.deepEqual(r.evs[0].snapshot, { attacking: true, formation: '4-4-2', pts: want, scorer: slot(r.a.H, 8).id, assist: null, ball: [50, 54] });
+  assert.deepEqual(r.evs[0].snapshot, { attacking: true, formation: '4-4-2', pts: want, scorer: slot(r.a.H, 8).id, assist: null, ball: [50, 34] });
+});
+// TM v3.14.3: langskuddets cap (LONGSHOT_FAR = 38) med x bevaret og de andre spillere urørt. Den gamle test ovenfor
+// står på 34 (< 38), så den beviser ikke selve loftet – her er løberen trukket så langt tilbage, at loftet er det, der virker.
+test('langskud fra egen banehalvdel: løberen står i billedet højst på y 38 med sin egen x (30, ikke 50) – de andre spillere og grænsen (live 37 → 37, 38 → 38, 39 → 38) – dræber x-konstant, min→max, FAR 37/39', () => {
+  const at = (y) => { const r = runGoal({ rm: { finishing: 20, passing: 1, pace: 1, ballControl: 1 }, custom: { 8: { x: 30, y } } }); assert.deepEqual(r.m.goalsPool.map((g) => g.kind), ['LONGSHOT', 'LONGSHOT']); const s = r.evs[0].snapshot; return { s, me: s.pts.find(([id]) => id === s.scorer), id: s.scorer }; };
+  const base = at(60);                    // live 60 − 28 = 32: under loftet, uberørt – giver løberens egen x (ikke 50)
+  assert.notEqual(base.me[1], 50); assert.equal(base.me[2], 32);
+  for (const [y, want] of [[65, 37], [66, 38], [67, 38], [90, 38]]) {   // live y = y − 28
+    const r = at(y);
+    assert.deepEqual(r.me, [base.id, base.me[1], want], `spot y ${y}`);
+    assert.deepEqual(r.s.ball, [base.me[1], want]);
+    assert.deepEqual(r.s.pts.filter(([id]) => id !== r.id), base.s.pts.filter(([id]) => id !== base.id), 'de andre spillere flyttes ikke');
+  }
+});
+test('dribletur efter et løb flyttes IKKE af langskudsloftet: løber fra y 82 står på 54 (> 38) i billedet', () => {
+  const r = runGoal({ rm: { pace: 20, ballControl: 20, finishing: 10, passing: 1 }, custom: { 8: { x: 30, y: 82 } } });
+  assert.deepEqual(r.m.goalsPool.map((g) => g.kind), ['DRIBBLE', 'DRIBBLE']);
+  const s = r.evs[0].snapshot, me = s.pts.find(([id]) => id === s.scorer);
+  assert.equal(me[2], 54); assert.deepEqual(s.ball, [me[1], 54]);
 });
 function runAgainst(rm) {
   const a = arena({ away: { p1: { attackFocus: 'CENTRAL' } } });
