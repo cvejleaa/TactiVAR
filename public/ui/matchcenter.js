@@ -163,7 +163,7 @@ export function renderGazette(g, myTeamId, onOpenMatch = null, matches = null, c
         g.seasonEnd.topScorer ? `Topscorer: #${g.seasonEnd.topScorer.shirtNumber} ${g.seasonEnd.topScorer.shortName} (${g.seasonEnd.topScorer.teamName}), ${g.seasonEnd.topScorer.goals} mål.` : '',
         'En ny sæson starter med nulstillet tabel – se Tidligere sæsoner på Liga-fanen.'].filter(Boolean).join(' ')) : null,
     h('p', {}, `Runden bød på ${g.totalGoals} ${g.totalGoals === 1 ? 'scoring' : 'scoringer'} og ${g.totalVarChecks} VAR-tjek på tværs af de 4 stadions. ${g.myResult}`),
-    pr ? h('p', { id: 'player-of-round' }, h('strong', { title: 'Bedste karakter i runden' }, '🏆 Rundens spiller: '), `#${pr.shirtNumber} ${pr.shortName} (${pr.teamName}) – `, 'rating' in pr ? `karakter ${pr.rating.toFixed(1)}` : starsEl(pr.stars), feats ? ` • ${feats}` : '') : null,
+    pr ? h('p', { id: 'player-of-round' }, h('strong', { title: 'Bedste karakter i runden' }, '🏆 Rundens spiller: '), `#${pr.shirtNumber} ${pr.shortName} (${pr.teamName}) – `, 'rating' in pr ? `karakter ${pr.rating.toFixed(1)}` : 'rundens bedste karakter', feats ? ` • ${feats}` : '') : null,
     g.headlines?.length ? h('ul', { class: 'headlines', id: 'headlines' }, g.headlines.map((x) => h('li', {}, x))) : null,
     g.goalOfTheRound ? h('p', { id: 'goal-of-round' }, h('strong', {}, '🚀 Rundens mål'), GOAL_KIND_LABEL[g.goalOfTheRound.kind] ? ` (${GOAL_KIND_LABEL[g.goalOfTheRound.kind]})` : '', h('strong', {}, ': '), g.goalOfTheRound.desc,
       // Hvilken kamp – som link til referatet, når runden ved det (fra v3.7.1).
@@ -193,7 +193,7 @@ function renderColumn(g, myTeamId, onOpenMatch, matches, col, onOpenReport) {
       if (s.id === 'col-others') return sec(s, h('ul', { class: 'headlines', id: 'headlines' }, s.others.map((o) => h('li', {},
         onOpenReport ? h('button', { class: 'linklike col-match', title: 'Åbn referatet', onclick: () => onOpenReport(o.idx) }, h('strong', {}, o.head)) : h('strong', {}, o.head), o.note ? ` – ${o.note}` : ''))));
       if (s.id === 'col-stars') return sec(s,
-        pr ? h('p', { id: 'player-of-round' }, h('strong', { title: 'Bedste karakter i runden' }, '🏆 Rundens spiller: '), `#${pr.shirtNumber} ${pr.shortName} (${pr.teamName}) – `, 'rating' in pr ? `karakter ${pr.rating.toFixed(1)}` : starsEl(pr.stars), s.player?.why ? ` • ${s.player.why}` : '') : null,
+        pr ? h('p', { id: 'player-of-round' }, h('strong', { title: 'Bedste karakter i runden' }, '🏆 Rundens spiller: '), `#${pr.shirtNumber} ${pr.shortName} (${pr.teamName}) – `, 'rating' in pr ? `karakter ${pr.rating.toFixed(1)}` : 'rundens bedste karakter', s.player?.why ? ` • ${s.player.why}` : '') : null,
         goal ? h('p', { id: 'goal-of-round' }, h('strong', {}, '🚀 Rundens mål'), GOAL_KIND_LABEL[goal.kind] ? ` (${GOAL_KIND_LABEL[goal.kind]})` : '', h('strong', {}, ': '), goal.desc,
           goal.match ? ' ' : null,
           goal.match ? (onOpenMatch && goalIdx >= 0

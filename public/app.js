@@ -14,6 +14,7 @@ import { renderTactics } from './ui/tactics.js';
 import { renderStandings } from './ui/standings.js';
 import { playRound, commitRound, pairRound, sortStandings } from './engine/season.js';
 import { buildColumn } from './engine/column.js';
+import { gen } from './engine/clues.js';
 import { seasonRoundOf } from './engine/schedule.js';
 import { renderLastRound, renderSchedule } from './ui/rounds.js';
 import { renderMatchCenter, renderGazette } from './ui/matchcenter.js';
@@ -263,7 +264,7 @@ function renderNow() {
 
   const pitch = h('div', { class: 'panel' }, h('h3', {}, `Taktiktavle – ${team.tactics.baseFormation}`),
     renderPitch({ team, isOwn, ui: view,
-      onSelect: (p, own) => { view.selectedPlayerId = p.id; view.pitchSwapId = own ? (view.pitchSwapId === p.id ? null : p.id) : null; view.notice = view.pitchSwapId ? `🔁 Klik på en anden brik for at bytte ${p.shortName}s plads.` : ''; render(); },
+      onSelect: (p, own) => { view.selectedPlayerId = p.id; view.pitchSwapId = own ? (view.pitchSwapId === p.id ? null : p.id) : null; view.notice = view.pitchSwapId ? `🔁 Klik på en anden brik for at bytte ${gen(p.shortName)} plads.` : ''; render(); },
       onTokenSwap: (a, b) => { clearSwap(); view.notice = ''; change(() => act.swapPlayers(team, a, b)); },
       onMove: (slot, pos) => { clearSwap(); change(() => act.moveSlot(team, slot, pos)); } }),
     isOwn ? renderBench(team) : null,

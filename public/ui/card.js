@@ -37,7 +37,7 @@ export function renderCard({ player: p, team, isOwn, scouting, note, onNote }) {
   }
 
   return h('div', { class: 'panel card', id: 'player-card' }, head, body,
-    h('div', { class: 'varbox' }, h('strong', {}, 'VAR-profil: '), 'Kynisme ?? · Teater ?? · VAR-Puls ?? – afsløres gennem kampe'),
+    h('div', { class: 'varbox' }, h('strong', {}, 'VAR-profil: '), 'Kynisme ?? · Teater ?? · VAR-Puls ?? – tallene er skjulte; spillerens VAR-kendelser og scouting-indtrykkene herunder giver fingerpeg'),
     h('div', { class: 'scouting' }, h('h4', {}, '🕵️ Scouting-indtryk'), (scouting?.length ? scouting.slice(0, 8) : ['Ingen indtryk endnu.']).map((s) => h('div', { class: 'clue' }, s))),
     h('label', { class: 'notes' }, h('h4', {}, '📝 Dine private noter'),
       h('textarea', { id: 'note-input', rows: 3, placeholder: 'Skriv hvad du har bemærket …', value: note || '', oninput: (e) => onNote(e.target.value) })));

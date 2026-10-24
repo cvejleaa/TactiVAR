@@ -1,3 +1,13 @@
+// Ejefald (flyttet fra column.js v3.16.3 – "Roverss"/"Tacticianss" i referatet): "Aarhus'", "Kjærs".
+export const gen = (n) => (/[sxz]$/i.test(n) ? `${n}'` : `${n}s`);
+// Variant: hash af nøglerne + runden/minuttet – samme nøgler giver samme valg (intet rng-træk, så ingen kamp ændres),
+// næste runde/minut rykker én videre, så den samme skabelon ikke kommer to gange i træk (QC N4, flyttet fra column.js).
+export function pickBy(list, round, ...keys) {
+  let h = 7;
+  for (const k of keys) for (const ch of String(k)) h = (Math.imul(h, 31) + ch.charCodeAt(0)) >>> 0;
+  return list[(h + (round | 0)) % list.length];
+}
+
 // Scouting-clues og beskrivende prosa. Reglen er absolut: skjulte og private evner beskrives
 // med ORD, aldrig tal (v1.6-fejlen "FIN: 7" – docs/spec.md §2–3). Offentlige data (højde,
 // rygnummer, minut) må gerne stå.
@@ -38,66 +48,72 @@ export function describeVarTiming(varPulse) {
 // Hver type har mindst tre tekster, så avisen ikke gentager sig efter to runder.
 const GOAL_TEXTS = {
   LONGSHOT: [
-    (s, a, m) => `Et brag af et langskud i ${m}. minut: ${s} fik bolden 25 meter fra mål og hamrede den op i det lange hjørne.`,
-    (s, a, m) => `${s} prøvede lykken fra distancen i ${m}. minut – og bolden dalede ind under overliggeren.`,
-    (s, a, m) => `Ingen så det komme: ${s} tog et træk og sendte et missil afsted fra langt ude i ${m}. minut.`,
+    (s, a) => `Et brag af et langskud: ${s} fik bolden et godt stykke uden for feltet og hamrede den op i det lange hjørne.`,
+    (s, a) => `${s} prøvede lykken fra distancen – og bolden dalede ind under overliggeren.`,
+    (s, a) => `Ingen så det komme: ${s} tog et træk og sendte et missil afsted fra langt ude.`,
   ],
   DRIBBLE: [
-    (s, a, m) => `En dribletur for historiebøgerne i ${m}. minut: ${s} snoede sig forbi tre mand og satte bolden roligt ind.`,
-    (s, a, m) => `${s} tog sagen i egen hånd i ${m}. minut, driblede sig forbi sin mand og afsluttede selv.`,
-    (s, a, m) => `Ren individuel klasse i ${m}. minut: ${s} vendte forsvareren rundt på en tallerken og scorede.`,
+    (s, a) => `En dribletur for historiebøgerne: ${s} snoede sig forbi tre mand og satte bolden roligt ind.`,
+    (s, a) => `${s} tog sagen i egen hånd, driblede sig forbi sin mand og afsluttede selv.`,
+    (s, a) => `Ren individuel klasse: ${s} vendte forsvareren rundt på en tallerken og scorede.`,
   ],
   COUNTER: [
-    (s, a, m) => `Kontra i ${m}. minut: bolden blev erobret, ${a} sendte den i dybden, og ${s} løb fra alle og scorede.`,
-    (s, a, m) => `Fra eget felt til mål på ti sekunder i ${m}. minut – ${a} satte ${s} i gang, og han sluttede kontraen af.`,
-    (s, a, m) => `Omstilling i topklasse i ${m}. minut: ${a} fandt ${s}, der kom løbende og trillede den ind.`,
+    (s, a) => `Kontra: bolden blev erobret, ${a} sendte den i dybden, og ${s} løb fra alle og scorede.`,
+    (s, a) => `Fra eget felt til mål på ti sekunder – ${a} satte ${s} i gang, og han sluttede kontraen af.`,
+    (s, a) => `Omstilling i topklasse: ${a} fandt ${s}, der kom løbende og trillede den ind.`,
   ],
   CUTBACK: [
-    (s, a, m) => `Lavt cutback i ${m}. minut: ${a} nåede baglinjen og lagde den tilbage til ${s}, der sparkede den ind.`,
-    (s, a, m) => `${a} trak bolden tilbage fra baglinjen i ${m}. minut, og ${s} var på pletten.`,
-    (s, a, m) => `Indøvet variant i ${m}. minut: cutback fra ${a}, førstegangsafslutning fra ${s}.`,
+    (s, a) => `Lavt cutback: ${a} nåede baglinjen og lagde den tilbage til ${s}, der sparkede den ind.`,
+    (s, a) => `${a} trak bolden tilbage fra baglinjen, og ${s} var på pletten.`,
+    (s, a) => `Indøvet variant: cutback fra ${a}, førstegangsafslutning fra ${s}.`,
   ],
   COMBINATION: [
-    (s, a, m) => `Kombinationsfodbold i ${m}. minut: ${a} spillede ${s} fri, og han sluttede sikkert af.`,
-    (s, a, m) => `Tre hurtige afleveringer i ${m}. minut, og ${s} kunne score efter oplæg fra ${a}.`,
-    (s, a, m) => `${a} og ${s} spillede 1-2 i ${m}. minut, og ${s} gjorde det færdigt.`,
+    (s, a) => `Kombinationsfodbold: ${a} spillede ${s} fri, og han sluttede sikkert af.`,
+    (s, a) => `Tre hurtige afleveringer, og ${s} kunne score efter oplæg fra ${a}.`,
+    (s, a) => `${a} og ${s} spillede 1-2, og ${s} gjorde det færdigt.`,
   ],
   PENALTY: [
-    (s, a, m) => `Straffespark i ${m}. minut: ${a} blev fældet i feltet, og ${s} sendte målmanden den forkerte vej.`,
-    (s, a, m) => `${s} var iskold fra pletten i ${m}. minut, efter at ${a} var blevet lagt ned i feltet.`,
-    (s, a, m) => `Kold, rolig, mål: ${s} scorede på straffespark i ${m}. minut.`,
+    (s, a) => `Straffespark: ${a} blev fældet i feltet, og ${s} sendte målmanden den forkerte vej.`,
+    (s, a) => `${s} var iskold fra pletten, efter at ${a} var blevet lagt ned i feltet.`,
+    (s, a) => `Kold, rolig, mål: ${s} scorede på straffespark.`,
   ],
   FREEKICK: [
-    (s, a, m) => `Et frispark for vitrineskabet i ${m}. minut: ${s} krøllede bolden over muren og op i hjørnet.`,
-    (s, a, m) => `${s} sendte et frispark ind under overliggeren i ${m}. minut – målmanden nåede kun at se efter den.`,
-    (s, a, m) => `Direkte frispark i ${m}. minut: ${s} fandt det lange hjørne fra 22 meter.`,
+    (s, a) => `Et frispark for vitrineskabet: ${s} krøllede bolden over muren og op i hjørnet.`,
+    (s, a) => `${s} sendte et frispark ind under overliggeren – målmanden nåede kun at se efter den.`,
+    (s, a) => `Direkte frispark: ${s} fandt det lange hjørne fra 22 meter.`,
   ],
   CORNER: [
-    (s, a, m) => `Hjørnespark i ${m}. minut: ${a} slog bolden ind, og ${s} stangede den i mål.`,
-    (s, a, m) => `${s} vandt luftduellen på ${a}s hjørnespark i ${m}. minut og headede ind.`,
-    (s, a, m) => `Dødboldsstyrke i ${m}. minut: hjørnespark fra ${a}, hovedstød fra ${s}.`,
+    (s, a) => `Hjørnespark: ${a} slog bolden ind, og ${s} stangede den i mål.`,
+    (s, a) => `${s} vandt luftduellen på ${gen(a)} hjørnespark og headede ind.`,
+    (s, a) => `Dødboldsstyrke: hjørnespark fra ${a}, hovedstød fra ${s}.`,
   ],
   SETPIECE: [
-    (s, a, m) => `Frisparksindlæg i ${m}. minut: ${a} lagde bolden ind, og ${s} headede den i mål.`,
-    (s, a, m) => `${s} kom først på ${a}s frispark i ${m}. minut og nikkede ind.`,
-    (s, a, m) => `Indøvet dødbold i ${m}. minut: frispark fra ${a}, hovedstød fra ${s}.`,
+    (s, a) => `Frisparksindlæg: ${a} lagde bolden ind, og ${s} headede den i mål.`,
+    (s, a) => `${s} kom først på ${gen(a)} frispark og nikkede ind.`,
+    (s, a) => `Indøvet dødbold: frispark fra ${a}, hovedstød fra ${s}.`,
   ],
   HEADER: [
-    (s, a, m) => `Et hovedstødsmål i ${m}. minut: efter et indlæg fra ${a} rejste ${s} sig over alle.`,
-    (s, a, m) => `${s} stangede ${a}s indlæg ind i ${m}. minut.`,
-    (s, a, m) => `Luftherredømme i ${m}. minut: ${s} vandt duellen og headede ind.`,
+    (s, a) => `Et hovedstødsmål: efter et indlæg fra ${a} rejste ${s} sig over alle.`,
+    (s, a) => `${s} stangede ${gen(a)} indlæg ind.`,
+    (s, a) => `Luftherredømme: ${s} vandt duellen og headede ind.`,
   ],
   VAR: [
     // Skytten er ikke nødvendigvis den, VAR tjekkede for offside (v3.14.1) – teksten påstår intet om hans placering.
-    (s, a, m) => `Ren VAR-dramatik i ${m}. minut: linjen holdt, og ${s}s mål stod ved magt.`,
-    (s, a, m) => `Nervepirrende minutter i ${m}. minut, før VAR godkendte ${s}s scoring.`,
-    (s, a, m) => `Centimeterafgørelse i ${m}. minut: VAR-linjen holdt, og ${s}s mål tæller.`,
+    (s, a) => `Ren VAR-dramatik: linjen holdt, og ${gen(s)} mål stod ved magt.`,
+    (s, a) => `Nervepirrende minutter, før VAR godkendte ${gen(s)} scoring.`,
+    (s, a) => `Centimeterafgørelse: VAR-linjen holdt, og ${gen(s)} mål tæller.`,
   ],
 };
 export const GOAL_KINDS = Object.keys(GOAL_TEXTS);
-export function describeGoal(kind, scorer, assister, min, rng) {
+// used (v3.16.3, Spilfører: "missil fra langt ude" i 8 af 13 langskudsmål): en kamps brugte tekster – samme rng-træk som
+// før (ingen kamp ændres), men er teksten brugt i kampen, tages den næste ubrugte. Minuttet står ikke i teksten (det står
+// ved linjen – QC v3.16.3: en indlejret minut-angivelse modsiger urets minut).
+export function describeGoal(kind, scorer, assister, min, rng, used = null) {
   const list = GOAL_TEXTS[kind] || GOAL_TEXTS.COMBINATION;
-  return list[Math.min(list.length - 1, Math.floor(rng.next() * list.length))](scorer, assister, min);
+  let i = Math.min(list.length - 1, Math.floor(rng.next() * list.length));
+  const key = (j) => `${kind}:${j}`;
+  if (used) { for (let k = 0; k < list.length && used.has(key(i)); k++) i = (i + 1) % list.length; used.add(key(i)); }
+  return list[i](scorer, assister);
 }
 
 // Én fælles skala 0–20 for "Rundens mål": typen giver grundværdien, spilleren og minuttet
