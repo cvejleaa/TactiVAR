@@ -146,10 +146,14 @@ export function buildColumn({ matches = [], gazette = null, history = [], table 
     if (d.comeback === me) paras.push('I kom bagfra – det siger noget om moralen.');
     else if (d.late === me) paras.push(`Sejrsmålet kom i ${d.lateMin}. minut.`);
     else if (d.late === opp) paras.push(`Det gjorde ondt: ${opp.name} afgjorde det i ${d.lateMin}. minut.`);
-    // Røde kort (v3.16.3, Spilfører: klummen nævnte aldrig en udvisning) – offentlige fakta (referatet), begge hold
-    if (me.reds) paras.push(pickBy([`${me.reds > 1 ? `${me.reds} røde kort` : 'Et rødt kort'} kostede: ${me.name} måtte spille med ${11 - me.reds} mand.`, `Med ${11 - me.reds} mand efter ${me.reds > 1 ? 'udvisningerne' : 'udvisningen'} blev det op ad bakke.`], round, 'red', me.id));
-    if (opp.reds) paras.push(pickBy([`${opp.name} fik ${opp.reds > 1 ? `${opp.reds} røde kort` : 'rødt kort'} og spillede med ${11 - opp.reds} mand.`, `${opp.name} mistede ${opp.reds > 1 ? `${opp.reds} mand` : 'en mand'} på rødt kort.`], round, 'red', opp.id));
     paras.push(...yourVerdict(report, me, round));
+    // Efter dommen over dit hold (Spilfører v3.16.3: "… mistede en mand på rødt kort. Det kostede: et kontramål imod." læstes som årsag)
+    // Røde kort (v3.16.3, Spilfører: klummen nævnte aldrig en udvisning) – offentlige fakta (referatet), begge hold
+    // Varianten følger resultatet (QC v3.16.3: "kostede" lovede en årsag til et nederlag, også efter en sejr)
+    const down = `${me.reds > 1 ? `${me.reds} røde kort` : 'Et rødt kort'}`, men = 11 - me.reds;
+    if (me.reds) paras.push(res === 'W' ? `${down} til trods: ${me.name} vandt med ${men} mand.` : res === 'L' ? pickBy([`${down} kostede: ${me.name} måtte spille med ${men} mand.`, `Med ${men} mand efter ${me.reds > 1 ? 'udvisningerne' : 'udvisningen'} blev det op ad bakke.`], round, 'red', me.id) : `${me.name} holdt point med ${men} mand efter ${me.reds > 1 ? 'udvisningerne' : 'udvisningen'}.`);
+    // Modstanderens kort uden påstand om, hvor længe de var færre (kortets minut er ikke en offentlig fakta her – Spilfører)
+    if (opp.reds) paras.push(`${opp.name} ${opp.reds > 1 ? `fik ${opp.reds} røde kort` : 'fik rødt kort'} undervejs.`);
     sections.push({ id: 'col-mine', title: 'Din kamp', paras });
     if (res === 'W' && me.goals - me.against >= 3) stories.push([55, `${me.name} kørte over ${opp.name}`]);
     if (d.comeback === me) stories.push([65, `${me.name} kom tilbage mod ${opp.name}`]);
@@ -204,7 +208,7 @@ export function buildColumn({ matches = [], gazette = null, history = [], table 
     const before = scout(history, opp.id, round - 1);
     if (before?.rule) {
       const held = before.rule.test(opp);
-      preview.push(held ? `Før kampen skrev jeg, at ${opp.name} ${pickBy(before.rule.say, round - 1, before.rule.key, 'scout')} – det holdt også mod jer.` : `Før kampen skrev jeg, at ${opp.name} ${pickBy(before.rule.say, round - 1, before.rule.key, 'scout')} – det gjorde de ikke mod jer.`);
+      preview.push(held ? `Før kampen skrev jeg, at ${opp.name} ${pickBy(before.rule.say, round - 1, before.rule.key, 'scout')} – det holdt også mod jer.` : `Før kampen skrev jeg, at ${opp.name} ${pickBy(before.rule.say, round - 1, before.rule.key, 'scout')} – ${before.rule.key === 'wait' && opp.goals >= 1 ? 'de scorede igen, men havde mere af bolden mod jer' : 'det gjorde de ikke mod jer'}.`);   // to-delt regel: sig, hvilken del der ikke holdt (Spilfører v3.16.3)
     }
   }
   const nx = next.find((x) => x.homeId === viewerTeamId || x.awayId === viewerTeamId);
@@ -212,7 +216,7 @@ export function buildColumn({ matches = [], gazette = null, history = [], table 
     const nOpp = nx.homeId === viewerTeamId ? { id: nx.awayId, name: nx.awayName } : { id: nx.homeId, name: nx.homeName };
     const sc = scout(history, nOpp.id);
     preview.push(`${newSeason ? 'Ny sæson: ' : 'Næste runde: '}${nx.homeId === viewerTeamId ? `${nOpp.name} kommer på besøg` : `ude mod ${nOpp.name}`}.${newSeason ? '' : form[nOpp.id]?.win >= 2 ? ` De har vundet ${form[nOpp.id].win} i træk.` : form[nOpp.id]?.lose >= 2 ? ` De har tabt ${form[nOpp.id].lose} i træk.` : ''}`);
-    if (sc?.rule && !newSeason) preview.push(`Mit bud: ${nOpp.name} ${pickBy(sc.rule.say, round, sc.rule.key, 'scout')} i ${sc.n === 1 ? 'deres seneste kamp' : `deres seneste ${sc.n} kampe`} – det kan blive kampens tema.`);
+    if (sc?.rule && !newSeason) preview.push(`Mit bud: ${nOpp.name} ${pickBy(sc.rule.say, round, sc.rule.key, 'scout')} ud fra ${sc.n === 1 ? 'deres seneste kamp' : `deres seneste ${sc.n} kampe`} – det kan blive kampens tema.`);
   }
   if (preview.length) sections.push({ id: 'col-next', title: 'Næste runde', paras: preview });
 

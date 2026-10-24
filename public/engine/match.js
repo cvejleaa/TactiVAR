@@ -252,6 +252,15 @@ export function simulateMatch(home, away, rng, opts = {}) {
   const k = (side, name) => (side.isHome ? 'h' : 'a') + name;
   const other = (side) => (side === H ? A : H);
 
+  // Varianter pr. kamp (v3.16.3, Spilfører: "styrer midtbanen" tre gange for samme spiller i én kamp – pickBy på tick'et ramte
+  // samme variant hvert 4. tick): hver (familie, aktør) går videre til næste variant, hver gang den bruges. Intet rng-træk.
+  // advance = false: samme variant som næste kald (etiket og tekst i samme linje).
+  const varyCount = new Map();
+  const vary = (list, fam, id, advance = true) => {
+    const k = `${fam}|${id}`, c = varyCount.get(k) ?? 0;
+    if (advance) varyCount.set(k, c + 1);
+    return pickBy(list, c, fam, id);
+  };
   const goalTexts = new Set();   // kampens brugte måltekster (describeGoal – ingen gentagelse i en kamp)
   const addEv = (min, type, category, isHome, plot, label, text, varMsg) => {
     events.push({ min, type, category, isHome, plot, label, text, varMsg, hG, aG, stats: { ...st } });
@@ -607,7 +616,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
       sheet.adjust(aDef.id, 0.4); sheet.bump(aDef.id, 'aerialWins');
       // Kun dit eget hold får sin kilde nævnt (dit indlæg / din lange bold).
       const what = setPiece ? (setPiece === 'hjørnespark' ? 'Hjørnespark' : 'Frisparksindlæg') : own(att) ? (source === 'long' ? 'Din lange bold' : 'Dit indlæg') : 'Stærk luftduel';
-      addEv(min, 'INFO', 'PLAY', def.isHome, false, 'Luftduel i feltet', `✈️ [${def.team.name} forsvar] ${what}: ${tag(aDef)} (${aDef.heightCm} cm) ${pickBy(['stiger højest og clearer', 'vinder duellen og header væk', 'kommer først og rydder', 'hamrer bolden ud af feltet'], min / 3, aDef.id)} foran ${tag(shooter)} (${att.team.name}).`);
+      addEv(min, 'INFO', 'PLAY', def.isHome, false, 'Luftduel i feltet', `✈️ [${def.team.name} forsvar] ${what}: ${tag(aDef)} (${aDef.heightCm} cm) ${vary(['stiger højest og clearer', 'vinder duellen og header væk', 'kommer først og rydder', 'hamrer bolden ud af feltet'], 'clear', aDef.id)} foran ${tag(shooter)} (${att.team.name}).`);
       return 'cleared';
     }
     st[k(att, 'AerialWon')]++; if (!setPiece) { st[k(att, 'TacticSuccess')]++; log.crossesWon++; }
@@ -664,13 +673,15 @@ export function simulateMatch(home, away, rng, opts = {}) {
       const prose = describeFinish(fs.finishing);
       observe(finisher, `Scoring (mod ${def.team.name}): ${finisher.shortName} afsluttede med ${prose}.`);
       const desc = describeGoal(kd, tag(finisher), tag(helper ?? finisher), min, rng, goalTexts);
-      goalsPool.push({ scorer: tag(finisher), teamName: att.team.name, match: `${home.name} - ${away.name}`, min, kind: kd, spectacle: goalSpectacle(kd, { finishing: fs.finishing, pace: fs.pace, ballControl: fs.ballControl, passing: (helper ?? finisher).skills.passing }, min, rng), desc });
       // Med dit holds indledning (lead) fortæller den allerede oplægget – kun en kort slutning, ikke hele beskrivelsen
       // igen (brugeren v3.14.3: "cutback bliver noteret 2 gange i teksten"). "Rundens mål" bruger den fulde (desc).
       // Slutter indledningen med afslutterens navn ("… lægger den tilbage til #7."), sparker han den ind; ellers (løberen
       // skød selv – også "løber sig fri og skyder" i en kombination) sad bolden i nettet (QC v3.14.3).
-      const end = !lead ? desc : lead.endsWith(`${tag(finisher)}.`) ? `${tag(finisher)} sparkede den ind.` : 'Bolden sad i nettet.';
-      addEv(min, 'GOAL', 'HIGHLIGHT', att.isHome, true, `⚽ Mål: ${tag(finisher)}`, `⚽ [${att.team.name} • ${hG}-${aG}] MÅÅÅL! ${lead ? lead + ' ' : ''}${end}${varOk}`);
+      const end = !lead ? desc : lead.endsWith(`${tag(finisher)}.`) ? 'Han sparkede den ind.' : 'Bolden sad i nettet.';
+      // I selve målets linje uden løbets ✅ (Spilfører v3.16.3: "MÅÅÅL! ✅ …"); Rundens mål genfortæller samme hændelse
+      const told = lead ? `${lead.replace(/^✅ /, '')} ${end}` : desc;
+      goalsPool.push({ scorer: tag(finisher), teamName: att.team.name, match: `${home.name} - ${away.name}`, min, kind: kd, spectacle: goalSpectacle(kd, { finishing: fs.finishing, pace: fs.pace, ballControl: fs.ballControl, passing: (helper ?? finisher).skills.passing }, min, rng), desc: told });
+      addEv(min, 'GOAL', 'HIGHLIGHT', att.isHome, true, `⚽ Mål: ${tag(finisher)}`, `⚽ [${att.team.name} • ${hG}-${aG}] MÅÅÅL! ${told}${varOk}`);
       // Solo-mål (langskud, dribletur): bolden står ved skytten – ikke på en fast plet i feltet (QC). Et langskud fra
       // skudafstand: skytten flyttes højst til LONGSHOT_FAR (v3.14.3).
       const live = solo && seen[att.team.id]?.[att.starters.indexOf(finisher)];
@@ -952,7 +963,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
   function announceShift(side, min, label, text) {
     if (own(side)) addEv(min, 'TRIGGER', 'HIGHLIGHT', side.isHome, true, label, text);
     // Varianter uden rng (v3.16.3, Spilfører: "omorganiserer sig" i 49 af 56 kampe) – stadig uden regel og ny formation (§3)
-    else addEv(min, 'TRIGGER', 'HIGHLIGHT', side.isHome, true, `${side.team.name} ${pickBy(['omorganiserer sig', 'skifter form', 'flytter rundt'], min / 3, side.team.id)}`, `🔁 [${side.team.name}] ${pickBy(['Holdet omorganiserer sig på banen.', 'Holdet skifter form – spillerne får nye pladser.', 'Træneren flytter rundt på holdet.'], min / 3, side.team.id)}`);
+    else addEv(min, 'TRIGGER', 'HIGHLIGHT', side.isHome, true, `${side.team.name} ${vary(['omorganiserer sig', 'skifter form', 'flytter rundt'], 'reorg', side.team.id, false)}`, `🔁 [${side.team.name}] ${vary(['Holdet omorganiserer sig på banen.', 'Holdet skifter form – spillerne får nye pladser.', 'Træneren flytter rundt på holdet.'], 'reorg', side.team.id)}`);
   }
 
   kickoffFrame();
@@ -1023,7 +1034,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
         // Ingen besked afhængig af mod-kunnen mod modstanderen – den ville røbe deres stil.
         // Varianter uden rng (v3.16.3, Spilfører: "styrer midtbanen" ×420 pr. sæson) – pickBy på tick (min / 3: minuttet er altid
         // deleligt med 3, så en liste på 3 gav ellers altid samme variant – TM-hjælper) og spiller
-        const note = ' ' + pickBy([`${tag(playmaker)} styrer midtbanen.`, `${tag(playmaker)} finder den frie mand.`, `${tag(playmaker)} spiller sig ud af presset.`, `${tag(playmaker)} vender op og sætter spillet i gang.`], min / 3, playmaker.id);
+        const note = ' ' + vary([`${tag(playmaker)} styrer midtbanen.`, `${tag(playmaker)} finder den frie mand.`, `${tag(playmaker)} spiller sig ud af presset.`, `${tag(playmaker)} vender op og sætter spillet i gang.`], 'mid', playmaker.id);
         // Kun dit eget holds valg navngives; modstanderens stil beskrives ikke.
         // Teksten er den samme, uanset om en stilbonus afgjorde duellen (ellers røbede ordvalget modstanderens stil).
         const text = own(att) ? `✅ [DIN OPBYGNING VIRKER] ${YOUR_PASS[pass]} bryder igennem ${gen(def.team.name)} pres.${note}`
@@ -1049,7 +1060,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
           const won = defPh.phase3_transition.onBallWon;
           const goesCounter = rng.chance(counterChance(attPh.phase1_buildUp.offBallRuns, attPh.phase3_transition.onBallLost, won, fbCount(att)));
           if (!goesCounter && won === 'KEEP_POSSESSION') def.calm = true;
-          const counter = !own(def) ? '' : won === 'FAST_COUNTER' ? (goesCounter ? ' Din lynkontra sættes straks i gang.' : ' ' + pickBy(['Din lynkontra løber ind i et organiseret forsvar.', 'Modstanderen når hjem, før lynkontraen kommer i gang.', 'Lynkontraen bremses – de er hurtigt tilbage i position.'], min / 3, presser.id))
+          const counter = !own(def) ? '' : won === 'FAST_COUNTER' ? (goesCounter ? ' Din lynkontra sættes straks i gang.' : ' ' + vary(['Din lynkontra løber ind i et organiseret forsvar.', 'Modstanderen når hjem, før lynkontraen kommer i gang.', 'Lynkontraen bremses – de er hurtigt tilbage i position.'], 'lyn', presser.id))
             : (goesCounter ? ' Dit hold ser hullet og går direkte.' : ' Dit hold falder til ro på bolden.');
           const text = own(def) ? `✅ [DIT PRES VIRKER] ${cap(YOUR_PRESS[height])} lukker af: ${tag(presser)} erobrer bolden fra ${tag(playmaker)} (${att.team.name}).${counter}`
             : own(att) ? `❌ [DIN OPBYGNING STOPPES] ${YOUR_PASS[pass]} kommer ikke igennem: ${tag(presser)} (${def.team.name}) erobrer bolden fra ${tag(playmaker)} (${att.team.name}).`
@@ -1259,7 +1270,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
     const p = meSide.isHome ? 'h' : 'a', poss = Math.round((st[p + 'Poss'] / (st.hPoss + st.aPoss)) * 100);
     const [myG, oppG] = meSide.isHome ? [hG, aG] : [aG, hG];
     addEv(90, 'FULLTIME', 'TACTIC', meSide.isHome, false, 'Fuldtids-analyse',
-      `📊 [90' FULDTIDS-ANALYSE] ${myG > oppG ? `Sejr ${myG}-${oppG} til dig` : myG < oppG ? `Nederlag ${myG}-${oppG}` : `Uafgjort ${myG}-${oppG}`}. Du havde ${poss}% af bolden og ${st[p + 'Shots']} afslutninger (${st[p + 'OnTarget']} på mål). Din opbygning kom igennem ${d.buildWon} af ${d.build} gange; dit pres vandt bolden ${d.pressWon} af ${d.press} gange.`
+      `📊 [FULDTIDS-ANALYSE] ${myG > oppG ? `Sejr ${myG}-${oppG} til dig` : myG < oppG ? `Nederlag ${myG}-${oppG}` : `Uafgjort ${myG}-${oppG}`}. Du havde ${poss}% af bolden og ${st[p + 'Shots']} afslutninger (${st[p + 'OnTarget']} på mål). Din opbygning kom igennem ${d.buildWon} af ${d.build} gange; dit pres vandt bolden ${d.pressWon} af ${d.press} gange.`
       + ` Dødbolde: ${st[p + 'FreeKicks']} frispark i skudafstand, ${st[p + 'Corners']} hjørnespark, ${st[p + 'Penalties']} straffe (${st[p + 'PenaltyGoals']} mål) · frispark begået ${st[p + 'Fouls']}, tilkendt ${st[(p === 'h' ? 'a' : 'h') + 'Fouls']}.`
       + ` 🎯 Løb uden bold (${RUNS_LABEL[runs]}): ${d.runs} løb, ${d.runsWon} kom fri (${d.runGoals} mål) · kontraer imod i alt: ${d.countersAgainst} (${d.counterGoalsAgainst} mål).`
       // v3.12 (brugeren: "ikke en eneste reference til cutbacks"): dit angreb efter dine valg og
