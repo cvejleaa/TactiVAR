@@ -446,7 +446,9 @@ bedre kan kontrollere spil motoren".
   skaleres som brikkerne. Heat- og zonefelter er grove og skaleres ikke. 📍 vises kun, hvor 🎬 ikke findes (kampe fra
   før afspilningen).
 - **Tekster (v3.16.3)**: ingen minutter i referatets tekster (minuttet står ved linjen – ellers modsiger teksten uret);
-  ejefald via `gen` (clues.js); varianter vælges med `pickBy` (hash af minut og aktør – aldrig rng, så ingen kamp ændres);
+  ejefald via `gen` (clues.js); varianter vælges med `vary` i match.js (pickBy på en tæller pr. familie og aktør i kampen –
+  samme aktør får aldrig samme variant to gange i træk; aldrig rng, så ingen kamp ændres); dit holds løb fortælles uden ✅ i
+  målets linje, og Rundens mål genfortæller samme hændelse;
   en kamp gentager ikke en måltekst, før typens tekster er brugt (samme rng-træk). Bevis: `tools/fingerprint.mjs` –
   noprose-hashen er uændret.
 
