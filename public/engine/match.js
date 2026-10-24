@@ -3,7 +3,7 @@
 // Rettet ift. v2.5b: auto-indskiftning sker i en kamplokal kopi (ændrede før lineupSlots
 // permanent), og Hvis-Så-reglerne kører for begge hold og skifter reelt formation.
 import { FORMATIONS, lineOfRole, isOutOfZone, slotPosition } from './formations.js';
-import { livePositions, coupledPositions, kickoffPositions, apartFrom, ONSIDE_GAP } from './positions.js';
+import { livePositions, coupledPositions, kickoffPositions, apartFrom, ONSIDE_GAP, MIN_APART } from './positions.js';
 import { masteryVs, counterXpForMatch } from './counter.js';
 import { createSheet, finalizeSheet } from './ratings.js';
 import { describeFinish, describeHeader, describeVarTiming, describeGoal, goalSpectacle } from './clues.js';
@@ -289,6 +289,9 @@ export function simulateMatch(home, away, rng, opts = {}) {
         : [Math.min(70, Math.max(30, c[0])), Math.min(c[1], SHOT_BOX_Y)];
     }
     if (b) { const c = ownXY(shooter); if (c && c[1] < b.y) mv[shooter] = [c[0], b.y]; }
+    // Skytten står ikke oven i målmanden (Spilfører v3.16.1: hovedstødsmålene lå alle på keeperen) – et skridt til siden
+    const s0 = shooter != null && ownXY(shooter), gk = def.starters[0] && [100 - defPos[0].x, 100 - defPos[0].y];
+    if (s0 && gk && Math.hypot(s0[0] - gk[0], s0[1] - gk[1]) < MIN_APART) mv[shooter] = [gk[0] + (s0[0] < gk[0] ? -1 : 1) * MIN_APART, s0[1]];
     const att = ptsOf(side, atkPos, mv), dpts = ptsOf(def, defPos);
     // Bolden ved skytten (Spilfører v3.16: bolden stod på en fast plet, mens skytten stod ved hjørneflaget). 📍 er uændret.
     const at = shooter != null && att.find((q) => q[0] === shooter);
@@ -309,7 +312,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // Grundbilledet pr. tick (v3.16.1, brugeren: "ingen udvikling i starten af kampen"; QC B1): tick'ets opbygning FØR
   // afslutningerne, men tegnet ud fra duellens udfald, som allerede er trukket (ingen nye træk – ingen kamp ændres):
   //  - ingen duel: bolden hos opspilleren, og holdene forskudt efter hans side af banen;
-  //  - opbygningen vinder: angriberen er sluppet et løb frem, bolden hos ham – run: true;
+  //  - opbygningen vinder: bolden spillet frem til angriberen på linjen – run: true;
   //  - presset vinder: forsvaret har erobret bolden (caught-formen), bolden hos presseren – lost: true;
   //  - offside-fælden: angriberen står foran linjen, bolden hos ham – offside: true.
   // poss er tick'ets besiddelse. Spillerne er dem på banen ved tick'ets start (et rødt kort i tick'et står efter billedet).
@@ -328,14 +331,16 @@ export function simulateMatch(home, away, rng, opts = {}) {
         k = coupledPositions(def.tactics, att.tactics, { ballX: 100 - ballX, caught: true, ballOn: on(def), oppOn: on(att) });
         at = k.ball[slot(def, presser)];
       } else {
-        const runner = outcome === 'build' || outcome === 'trap' ? slot(att, striker) : -1;
+        // Opbygningen vundet: bolden spillet frem til angriberen på linjen – ikke et løb alene mod målmanden (Spilfører
+        // v3.16.1: løberen var ofte en anden end tick'ets skytte og stod ved keeperen, også når der slet ikke kom en afslutning)
+        const runner = outcome === 'trap' ? slot(att, striker) : -1;
         k = coupledPositions(att.tactics, def.tactics, { ballX, runner, ballOn: on(att), oppOn: on(def) });
         // Offside: angriberen lige foran linjen (OFFSIDE_DRAW), ikke et helt løb frem – han blev fanget, ikke sluppet igennem
         if (outcome === 'trap' && runner > 0) {
           k.ball[runner] = { x: k.ball[runner].x, y: k.line - OFFSIDE_DRAW };
           apartFrom(k.ball, [runner], k.opp, k.opp.map((q, i) => i).filter((i) => on(def)[i]));   // ved siden af forsvareren, ikke oven i ham
         }
-        at = k.ball[runner > 0 ? runner : pm];
+        at = k.ball[runner > 0 ? runner : outcome === 'build' ? slot(att, striker) : pm];
       }
       const ball = at ? common(ballSide, at.x, at.y) : common(att, ballX, 50);
       const shape = (s) => (s === ballSide ? k.ball : k.opp);

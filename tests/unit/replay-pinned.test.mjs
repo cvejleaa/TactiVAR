@@ -122,11 +122,11 @@ test('dit hold markeres: hjemme → hjemmebrikkerne har "own", ude → udebrikke
   }
 });
 
-test('trin frem og tilbage: bolden og brikkerne følger trinet; stillingen i et grundbillede er FØR tickets hændelser og teksten siger duellens udfald (har bolden / erobrer – det ANDET hold / slipper igennem), et øjeblik viser sin egen linje; grænserne holder', () => {
+test('trin frem og tilbage: bolden og brikkerne følger trinet; stillingen i et grundbillede er FØR tickets hændelser og teksten siger duellens udfald (har bolden / erobrer – det ANDET hold / spiller sig frem), et øjeblik viser sin egen linje; grænserne holder', () => {
   const { el } = fresh('h');
   // v3.16.1: grundbilledets tekst siger, hvordan duellen gik – t 2 er udeholdets tick, men hjemme erobrer (lost), t 3 slipper
   // hjemmes angriber igennem (run); afsparket (ingen besiddelse) har ingen duel-tekst.
-  const want = ["0' · Hjemme 0-0 Ude", "3' · Hjemme 0-0 Ude · Hjemme har bolden", "3' · Hjemme 1-0 Ude · MÅL Hjemme", "6' · Hjemme 1-0 Ude · Hjemme erobrer bolden", "6' · Hjemme 1-0 Ude · REDNING", "6' · Hjemme 1-0 Ude · FORBI", "9' · Hjemme 1-0 Ude · Hjemme: en angriber slipper igennem", "9' · Hjemme 1-1 Ude · MÅL Ude"];
+  const want = ["0' · Hjemme 0-0 Ude", "3' · Hjemme 0-0 Ude · Hjemme har bolden", "3' · Hjemme 1-0 Ude · MÅL Hjemme", "6' · Hjemme 1-0 Ude · Hjemme erobrer bolden", "6' · Hjemme 1-0 Ude · REDNING", "6' · Hjemme 1-0 Ude · FORBI", "9' · Hjemme 1-0 Ude · Hjemme spiller sig frem til angriberen", "9' · Hjemme 1-1 Ude · MÅL Ude"];
   for (let i = 0; i < 8; i++) { assert.equal(step(el), i); assert.equal(cap(el), want[i], `trin ${i}`); if (i < 7) click(el, 'rp-next'); }
   click(el, 'rp-next'); assert.equal(step(el), 7, 'ikke forbi sidste trin'); assert.equal(cap(el), want[7]);
   click(el, 'rp-prev'); assert.equal(step(el), 6); assert.equal(cap(el), want[6]);
@@ -314,6 +314,6 @@ test('duellens tekst (v3.16.1): alle fire udfald for begge hold – erobringen n
   assert.equal(duelText({ poss: 'a', duel: 'lost' }, m), ' · Hjemme erobrer bolden');
   assert.equal(duelText({ poss: 'h', duel: 'lost' }, m), ' · Ude erobrer bolden');
   assert.equal(duelText({ poss: 'h', duel: 'offside' }, m), ' · Hjemme: fanget offside');
-  assert.equal(duelText({ poss: 'a', duel: 'run' }, m), ' · Ude: en angriber slipper igennem');
+  assert.equal(duelText({ poss: 'a', duel: 'run' }, m), ' · Ude spiller sig frem til angriberen');
   assert.equal(duelText({ poss: null, duel: null }, m), '');
 });

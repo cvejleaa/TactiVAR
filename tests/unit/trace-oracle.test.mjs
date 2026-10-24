@@ -34,7 +34,7 @@ const DATA = bots(80);   // 80 seedede kampe mellem to botter (deles af testene 
 // Ellers holdenes placering i forhold til modstanderen – coupledPositions(boldholdet, modstanderen, bolden som sidebelastning) – og
 // bolden HOS en spiller, efter duellens udfald (flaget på billedet):
 //  - intet flag (ingen duel / opbygningen uden løb): ballX = opspillerens levende x (en markspiller hos holdet med bolden), bolden hos ham;
-//  - run (opbygningen vandt): som ovenfor, men angriberen (runner) er sluppet RUN_STEP frem, bolden hos ham;
+//  - run (opbygningen vandt): som ovenfor, men bolden hos angriberen, hvor han står (på linjen – intet løb frem, Spilfører v3.16.1);
 //  - lost (presset vandt): forsvaret har bolden i caught-formen (ballX spejlet), bolden hos presseren (en af dets markspillere);
 //  - offside (fælden): som run, men angriberen tegnes lige foran linjen (line − 3) – han springes over her (skubbet på tværs).
 // Oraklet prøver alle pladser som opspiller/løber/presser og kræver, at præcis billedet og bolden passer. (Før v3.16.1: bolden på
@@ -48,7 +48,7 @@ function frameKind(T, f) {
     const bx = xOf(T[att], pm);
     if (!f.run && !f.lost && !f.offside && fits(coupled(T, att, { ballX: bx }), att, pm)) return 'none';
     for (let r = 1; r < 11; r++) {
-      if (f.run && fits(coupled(T, att, { ballX: bx, runner: r }), att, r)) return 'run';
+      if (f.run && fits(coupled(T, att, { ballX: bx }), att, r)) return 'run';   // v3.16.1 (Spilfører): bolden frem til angriberen på linjen, intet løb
       if (f.offside) {
         const exp = coupled(T, att, { ballX: bx, runner: r }), id = f[att][r]?.[0];
         // den fangede står lige foran linjen (y i egne koordinater line − 3) – x skubbet væk fra forsvareren, så kun y tjekkes
@@ -228,6 +228,9 @@ test('sporets øjeblik for et mål = øjebliksbilledet (📍) for alle andre end
         if (sn.attacking && id === sn.scorer && !behind) {
           [cx, cy] = conv(clampShot([x, y], mo.long));
           if (!near(cx, conv([x, y])[0]) || !near(cy, conv([x, y])[1])) n.moved++;
+          // … og et skridt til siden fra modstanderens målmand, hvis han ellers stod nærmere end MIN_APART 6 (Spilfører v3.16.1)
+          const gk = mo[mo.side === 'h' ? 'a' : 'h'][0];
+          if (gk && Math.hypot(cx - gk[1], cy - gk[2]) < 6) { cx = gk[1] + (cx < gk[1] ? -1 : cx > gk[1] ? 1 : mo.side === 'h' ? 1 : -1) * 6; n.keeper = (n.keeper ?? 0) + 1; }
         }
         assert.ok(q && near(q[1], cx) && near(q[2], cy), `${tag}: ${id}${id === sn.scorer ? ' (skytten)' : ''} er ${JSON.stringify(q)}, forventet ${[cx, cy]}`);
       }

@@ -284,7 +284,7 @@ test('grundbilledet uden duel: bolden hos opspilleren (LM, x 15), holdet forskud
 // ---------- momentAt: aktørerne står, hvor HÆNDELSEN var, ikke hvor formen lagde dem ----------
 const momentOf = (m, kind) => m.trace.moments.find((mo) => mo.kind === kind);
 const at = (mo, side, id) => mo[side].find((q) => q[0] === id).slice(1);
-test('cutback-mål: afslutteren tegnes ved straffesparkspletten (50, 12 – ikke ved sit eget x 35) og oplægsgiveren ved baglinjen (88, 6) – dræber ownXY uden moves, snapMoves ikke videregivet', () => {
+test('cutback-mål: afslutteren tegnes ved straffesparkspletten (50, 12 – ikke ved sit eget x 35), et skridt til siden for målmanden på (50, 10) → (56, 12) og oplægsgiveren ved baglinjen (88, 6) – dræber ownXY uden moves, snapMoves ikke videregivet', () => {
   const a = arena(); a.H.tactics.phases.phase1_buildUp.attackFocus = 'LOW_CUTBACKS';
   for (const p of a.H.squad) Object.assign(p.skills, { pace: 0, ballControl: 0, finishing: 1 });
   Object.assign(slot(a.H, 8).skills, { pace: 20, ballControl: 20 });   // kantspilleren (højre kant ved terning 0,5)
@@ -297,9 +297,9 @@ test('cutback-mål: afslutteren tegnes ved straffesparkspletten (50, 12 – ikke
   assert.equal(m.goalsPool[0].kind, 'CUTBACK');
   const mo = momentOf(m, 'GOAL');
   assert.equal(mo.scorer, slot(a.H, 10).id); assert.equal(mo.assist, slot(a.H, 8).id);
-  assert.deepEqual(at(mo, 'h', slot(a.H, 10).id), [50, 12]);
+  assert.deepEqual(at(mo, 'h', slot(a.H, 10).id), [56, 12]);   // v3.16.1: ikke oven i keeperen (50, 10)
   assert.deepEqual(at(mo, 'h', slot(a.H, 8).id), [88, 6]);
-  assert.deepEqual(mo.ball, [50, 12]);
+  assert.deepEqual(mo.ball, [56, 12]);   // bolden ved skytten
 });
 
 test('motstanderens hold i øjeblikket er blokken, rykket efter boldholdets dybeste (ikke formens egen opstilling): A (4-4-2, mellemblok) mod H med alle andre på 95 – ønsket 100 − 89 + 10 = 21: angrebet 20 → 21, midtbanen urørt – dræber dpts fra livePositions', () => {

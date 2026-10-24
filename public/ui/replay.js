@@ -108,7 +108,7 @@ export function replayEl(m, ownSide) {
   show();
   return el;
 }
-const DUEL_TEXT = { ball: (a) => `${a} har bolden`, run: (a) => `${a}: en angriber slipper igennem`, lost: (a, d) => `${d} erobrer bolden`, offside: (a) => `${a}: fanget offside` };
+const DUEL_TEXT = { ball: (a) => `${a} har bolden`, run: (a) => `${a} spiller sig frem til angriberen`, lost: (a, d) => `${d} erobrer bolden`, offside: (a) => `${a}: fanget offside` };
 export const duelText = (s, m) => {
   if (!s.duel) return '';
   const [a, d] = s.poss === 'h' ? [m.homeName, m.awayName] : [m.awayName, m.homeName];

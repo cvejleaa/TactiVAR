@@ -401,7 +401,7 @@ bedre kan kontrollere spil motoren".
   - afsparket (`kickoffPositions`): forsvarsformen presset ind i egen halvdel med forreste på KICKOFF_Y 53 (højst KICKOFF_OWN
     51, også hvis dybden ellers ville skubbe ham over midten);
   - grundbilledet pr. tick tages efter duellen (før afslutningerne, ingen nye træk): ingen duel → bolden hos opspilleren,
-    holdene forskudt efter hans side; opbygning vundet → angriberen et løb frem med bolden (`run`); pres vundet → det
+    holdene forskudt efter hans side; opbygning vundet → bolden spillet frem til angriberen på linjen (`run`; v3.16.1 Spilfører: ikke et løb alene mod keeperen); pres vundet → det
     erobrende hold i sin kontraform, bolden hos presseren (`lost`; også "ude af zone"); offside-fælde → angriberen foran
     linjen (`offside`). `poss` er tick'ets besiddelse; spillerne er dem på banen ved tick'ets start;
   - motoren måler som v3.16.0 (150 sæsoner: 2,90 mål, langskud 7 %, angreb 66 %); bånd og billedregler i
@@ -422,7 +422,7 @@ bedre kan kontrollere spil motoren".
   øjeblikke, og et klik på en spiller hans – med hans afslutninger efter udfald (⚽ mål, reddet, forbi, offside, annulleret,
   🅰 oplæg; Spilfører: positionerne alene er "der hvor du satte ham"). Modstanderen: "Tyngdepunkt (groft)" i tredjedele og (v3.16.1) et 3 × 3 zone-kort
   med "Deres mål" øverst og "Dit mål" nederst (i rundens andre kampe "Modstanderens mål", uden "din side").
-  Afspilningens undertekst siger for hvert grundbillede, hvordan duellen gik (har bolden / slipper igennem / erobrer /
+  Afspilningens undertekst siger for hvert grundbillede, hvordan duellen gik (har bolden / spiller sig frem til angriberen / erobrer /
   offside).
   Kendt begrænsning: kun seneste runde (en sum over sæsonen er et senere ønske).
 

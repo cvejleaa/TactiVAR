@@ -71,9 +71,9 @@ test('grundbilledet følger duellen: bolden står ved en spiller – modstandere
     const other = f.poss === 'h' ? 'a' : 'h', holder = f.lost ? other : f.poss;
     assert.ok(f[holder].some((q) => q[1] === f.ball[0] && q[2] === f.ball[1]), `t ${f.t} ${f.lost ? 'lost' : f.run ? 'run' : 'none'}`);
     if (f.lost) lost++; else if (f.run) run++; else if (f.offside) off++; else none++;
-    if (f.run || f.offside) {   // løberen er holdets forreste
+    if (f.offside) {   // den offside-fangede står forrest (run: bolden hos en angriber, hvor han står – en 4-4-1-1's 10'er kan stå bag)
       const me = f[f.poss].find((q) => q[1] === f.ball[0] && q[2] === f.ball[1]), up = f.poss === 'h';
-      assert.ok(f[f.poss].slice(1).every((q) => (up ? q[2] >= me[2] : q[2] <= me[2])), `t ${f.t}: løberen er ikke forrest`);
+      assert.ok(f[f.poss].slice(1).every((q) => (up ? q[2] >= me[2] : q[2] <= me[2])), `t ${f.t}: den offside-fangede er ikke forrest`);
     }
   }
   assert.ok(lost > 100 && run > 100 && none > 100 && off > 20, `${lost}/${run}/${none}/${off}`);   // alle slags findes i data
