@@ -47,12 +47,12 @@ export function replayEl(m, ownSide) {
   const caption = h('div', { class: 'rp-caption', id: 'rp-caption' });
   const playBtn = h('button', { class: 'mini', id: 'rp-play', onclick: () => (r.playing ? pause() : play()) }, '▶ Afspil');
   const speedBtn = h('button', { class: 'mini', id: 'rp-speed', title: 'Hastighed', onclick: () => { r.speed = SPEEDS[(SPEEDS.indexOf(r.speed) + 1) % SPEEDS.length]; speedBtn.textContent = `${r.speed}×`; } }, '1×');
-  const hlBtn = h('button', { class: 'mini', id: 'rp-highlights', title: 'Kun afslutningerne (mål, redninger, forbi, VAR)', onclick: () => {
+  const hlBtn = h('button', { class: 'mini', id: 'rp-highlights', title: 'Kun afslutningerne i åbent spil og på kontra (mål, redninger, forbi, VAR) – ikke straffe, frispark og hjørnespark', onclick: () => {
     const ev = r.steps[r.i]?.ev; r.highlights = !r.highlights; r.steps = replaySteps(m.trace, r.highlights);
     r.i = ev != null ? Math.max(0, r.steps.findIndex((s) => s.ev === ev)) : 0; flag(hlBtn, 'active', r.highlights); show(); } }, '⭐ Højdepunkter');
   const el = h('div', { class: 'replay', id: 'replay' },
     h('div', { class: 'row' }, h('strong', {}, '🎬 Afspilning'),
-      h('span', { class: 'muted' }, ` – taktiktavle ud fra ${m.trace.frames.length} øjebliksbilleder (hvert 3. minut) og afslutningerne. ${m.homeName} angriber opad.`)),
+      h('span', { class: 'muted' }, ` – taktiktavle ud fra ${m.trace.frames.length} øjebliksbilleder (hvert 3. minut) og afslutningerne i åbent spil (dødbolde – straffe, frispark, hjørnespark – har intet billede). ${m.homeName} angriber opad.`)),
     pitch, caption,
     h('div', { class: 'rp-controls' },
       h('button', { class: 'mini', id: 'rp-prev', title: 'Et trin tilbage', onclick: () => { pause(); r.i = Math.max(0, r.i - 1); show(); } }, '⏮'),
@@ -70,10 +70,14 @@ export function replayEl(m, ownSide) {
   function show() {
     const s = r.steps[r.i];
     if (!s) return;
+    // Overgangene følger trinets længde ved alle hastigheder (QC: med faste 1,1 s hang brikkerne bagud ved 2× og 4×):
+    // bolden på 35 %, spillerne glider efter (forsinkelse kun ved 1×).
+    const d = STEP_MS[s.kind] / r.speed, glide = `${Math.round(d * 0.6)}ms ease-in-out ${r.speed === 1 ? Math.round(d * 0.2) : 0}ms`;
+    ball.style.transition = `left ${Math.round(d * 0.35)}ms ease-out, top ${Math.round(d * 0.35)}ms ease-out`;
     const here = new Set();
     for (const side of ['h', 'a']) for (const [id, x, y] of s[side]) {
       const t = token(id, side); here.add(id);
-      t.style.left = x + '%'; t.style.top = y + '%'; t.hidden = false;
+      t.style.transition = `left ${glide}, top ${glide}`; t.style.left = x + '%'; t.style.top = y + '%'; t.hidden = false;
       flag(t, 'actor', id === s.actor); flag(t, 'assist', id === s.assist);
     }
     for (const [id, t] of r.tokens) if (!here.has(id)) t.hidden = true;

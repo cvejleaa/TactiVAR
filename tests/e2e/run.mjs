@@ -451,6 +451,12 @@ try {
     await g.click('#rp-play'); await g.waitForTimeout(1600); await g.click('#rp-play');
     const s2 = await g.getAttribute('#replay', 'data-step');
     check('Afspilning: ⏭ og ▶ flytter frem', Number(s1) === Number(s0) + 1 && Number(s2) > Number(s1), `${s0} → ${s1} → ${s2}`);
+    // QC v3.16: synlighed målt som tegnet (computed style), ikke .hidden – en udskiftet/udvist må aldrig stå på tavlen. Gå til
+    // sidste trin (flest skift er sket) og tæl de viste brikker pr. hold.
+    await g.evaluate(() => { const n = document.querySelector('#rp-next'); for (let i = 0; i < 400; i++) n.click(); });
+    const vis = await g.evaluate(() => ['home', 'away'].map((c) => [...document.querySelectorAll(`#rp-pitch .rp-token.${c}`)].filter((t) => getComputedStyle(t).display !== 'none').length));
+    const totalTok = await g.evaluate(() => document.querySelectorAll('#rp-pitch .rp-token').length);
+    check('Afspilning: højst 11 viste brikker pr. hold i sidste trin (udskiftede skjult – målt som tegnet)', vis.every((n) => n >= 7 && n <= 11) && (totalTok <= 22 || vis[0] + vis[1] < totalTok), `${vis} af ${totalTok} brikker`);
     await g.click('#heat-btn'); await g.waitForSelector('#heat-pitch');
     const heat = await g.evaluate(() => ({ cells: document.querySelectorAll('#heat-pitch .heat-cell').length, title: document.querySelector('#heat-title').textContent, thirds: document.querySelector('#heat-thirds')?.textContent ?? '' }));
     check('Heat map: dit hold som felter, modstanderen kun groft i tredjedele', heat.cells >= 6 && /Holdet/.test(heat.title) && /Tyngdepunkt \(groft\)/.test(heat.thirds), JSON.stringify(heat));

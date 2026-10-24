@@ -112,6 +112,7 @@ function snapPitch(rows, { ev, snap }, onSnap) {
 }
 
 // Heat map (v3.16): tætheden af hvor holdet/spilleren stod (grundbilleder og afslutninger) og hans afslutninger efter udfald.
+const minutesOn = (e) => Math.max(0, (e.minOut ?? 90) - (e.minIn <= 1 ? 0 : e.minIn));
 const OUT_LABEL = { goal: 'mål', save: 'redning', miss: 'forbi/blokeret', offside: 'offside (flag)', disallowed: 'annulleret af VAR', assist: 'oplæg' };
 function heatPitch(rows, heat, gkId) {
   const pid = heat.mine.playerId, e = rows.find((x) => x.playerId === pid);
@@ -124,7 +125,7 @@ function heatPitch(rows, heat, gkId) {
     h('div', { class: 'minipitch heat' },
       grid.flatMap((r, y) => r.map((v, x) => v > 0 ? h('div', { class: 'heat-cell', style: { left: `${(x * 100) / COLS}%`, top: `${(y * 100) / ROWS}%`, width: `${100 / COLS}%`, height: `${100 / ROWS}%`, opacity: String(0.15 + v * 0.7) } }) : null)),
       shots.map((s) => h('div', { class: `heat-shot ${s.outcome}`, style: { left: s.x + '%', top: s.y + '%' }, title: `${s.t * 3}' ${OUT_LABEL[s.outcome]}` }, s.outcome === 'goal' ? '⚽' : s.outcome === 'assist' ? '🅰' : '●'))),
-    h('div', { class: 'muted', id: 'heat-note' }, `Angriber opad. Farven: hvor ${pid != null ? 'han' : 'holdet'} stod i kampens ${heat.trace.frames.length} øjebliksbilleder og afslutninger. Prikker: ${shots.length ? `${n('goal')} mål, ${n('save')} reddet, ${n('miss')} forbi/blokeret${n('offside') ? `, ${n('offside')} offside` : ''}${n('disallowed') ? `, ${n('disallowed')} annulleret` : ''}${n('assist') ? `, ${n('assist')} oplæg` : ''}` : 'ingen afslutninger'}.${pid == null ? ' Klik på en spiller i listen.' : ''}`));
+    h('div', { class: 'muted', id: 'heat-note' }, `Angriber opad. Farven: hvor ${pid != null ? 'han' : 'holdet'} stod i kampens ${heat.trace.frames.length} øjebliksbilleder og afslutninger${pid != null && e && minutesOn(e) < 90 ? ` (han var på banen i ${minutesOn(e)} min – kortet er mørkest, hvor han stod oftest)` : ''}. Prikker: ${shots.length ? `${n('goal')} mål, ${n('save')} reddet, ${n('miss')} forbi/blokeret${n('offside') ? `, ${n('offside')} offside` : ''}${n('disallowed') ? `, ${n('disallowed')} annulleret` : ''}${n('assist') ? `, ${n('assist')} oplæg` : ''}` : 'ingen afslutninger'}.${pid == null ? ' Klik på en spiller i listen.' : ''}`));
 }
 // Modstanderen groft (brugerens valg): andel af holdets placeringer i hver tredjedel – set fra deres egen banehalvdel.
 function thirdsLine(trace, side, gkId) {
