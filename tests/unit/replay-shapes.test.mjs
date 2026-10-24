@@ -120,3 +120,12 @@ test('gem-vagten (RM v3.16.1): alle 80 kampes spor består isValidTrace – elle
   const { isValidTrace } = await import('../../public/engine/sanitize.js');
   for (const m of matches) assert.equal(isValidTrace(m.trace), true);
 });
+
+test('ingen ens nabobilleder (v3.16.2, brugeren: "minut 24 og 27 er ens i 2d"): to grundbilleder i træk er aldrig helt ens – v3.16.1: 109 af 2320 i de 80 kampe, nu 0', () => {
+  let same = 0;
+  for (const m of matches) {
+    const F = m.trace.frames;
+    for (let i = 2; i < F.length; i++) if (JSON.stringify([F[i - 1].h, F[i - 1].a, F[i - 1].ball]) === JSON.stringify([F[i].h, F[i].a, F[i].ball])) same++;
+  }
+  assert.equal(same, 0);
+});

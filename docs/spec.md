@@ -406,6 +406,12 @@ bedre kan kontrollere spil motoren".
     linjen (`offside`). `poss` er tick'ets besiddelse; spillerne er dem på banen ved tick'ets start;
   - motoren måler som v3.16.0 (150 sæsoner: 2,90 mål, langskud 7 %, angreb 66 %); bånd og billedregler i
     tests/unit/replay-shapes.test.mjs (hvert rødt mod v3.16.0);
+  - v3.16.2 (brugeren: "minut 24 og 27 er ens i 2d"): uden duel står bolden i ulige tick hos holdets forsvarer nærmest
+    opspilleren (holdet spiller den rundt bagfra), i lige tick hos opspilleren; ville billedet være identisk med forrige,
+    tegnes det med bolden spejlet på tværs (100 − x), og er det stadig ens (midten), ude på en kant (20/80). Ingen træk –
+    kampene er uændrede. Afspilningen (replay.js `shotEnd`, brugeren: "Man ser aldrig bolden nærme sig målmanden"): efter
+    hvert mål, redning og forbi et trin (1,1 s), hvor kun bolden flytter sig – i nettet ved siden af målmanden, ind til
+    ham, eller uden for stolpen. VAR-tjek, annulleret mål og flag har intet sådant trin;
   - modstanderens grove kort: 3 × 3 felter set fra din side (`zones`, procent pr. felt, målmanden ude) med hans afslutninger
     (`zoneShots`).
   Målt (`… 150 maal`, `… 1500 var`, 800 kampe pr. pres; før → efter): mål 2,80 → 2,79, langskud 12 → 8 %, angreb 61 →
