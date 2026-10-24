@@ -444,11 +444,15 @@ try {
     const filmText = await g.locator('#feed .replay-btn').first().evaluate((b) => b.parentElement.textContent);
     await g.locator('#feed .replay-btn').first().click();
     const cap = await g.textContent('#rp-caption');
-    check('Afspilning: 🎬 springer til hændelsen – undertekst = referatets linje', filmText.replace(/^\d+'/, '').includes(cap.split(' · ').slice(2).join(' · ').slice(0, 30)), `${cap} | ${filmText}`);
+    // Test Manager v3.16: den gamle check var tom, hvis springet ikke skete (et grundbillede har ingen tekst-del: ''.includes('') er sandt)
+    const capParts = cap.split(' · '), jumpedStep = Number(await g.getAttribute('#replay', 'data-step'));
+    check('Afspilning: 🎬 springer til hændelsen – undertekst = referatets linje', capParts.length >= 3 && jumpedStep > 0 && filmText.replace(/^\d+'/, '').includes(capParts.slice(2).join(' · ').slice(0, 30)), `${cap} | ${filmText} | trin ${jumpedStep}`);
     await g.locator('#feed .replay-btn').last().click();   // den tidligste afslutning – så er der trin efter den
     const s0 = await g.getAttribute('#replay', 'data-step');
     await g.click('#rp-next'); const s1 = await g.getAttribute('#replay', 'data-step');
-    await g.click('#rp-play'); await g.waitForTimeout(1600); await g.click('#rp-play');
+    // Test Manager v3.16: 1600 ms var for kort – et øjeblik (afslutning) varer 2600 ms, og trinnet efter den tidligste afslutning kan selv være
+    // en afslutning (to skud i samme tick) → ingen bevægelse og falsk rød ("2 → 3 → 3"). 2800 ms rummer altid mindst ét trin.
+    await g.click('#rp-play'); await g.waitForTimeout(2800); await g.click('#rp-play');
     const s2 = await g.getAttribute('#replay', 'data-step');
     check('Afspilning: ⏭ og ▶ flytter frem', Number(s1) === Number(s0) + 1 && Number(s2) > Number(s1), `${s0} → ${s1} → ${s2}`);
     // QC v3.16: synlighed målt som tegnet (computed style), ikke .hidden – en udskiftet/udvist må aldrig stå på tavlen. Gå til
@@ -460,7 +464,17 @@ try {
     await g.click('#heat-btn'); await g.waitForSelector('#heat-pitch');
     const heat = await g.evaluate(() => ({ cells: document.querySelectorAll('#heat-pitch .heat-cell').length, title: document.querySelector('#heat-title').textContent, thirds: document.querySelector('#heat-thirds')?.textContent ?? '' }));
     check('Heat map: dit hold som felter, modstanderen kun groft i tredjedele', heat.cells >= 6 && /Holdet/.test(heat.title) && /Tyngdepunkt \(groft\)/.test(heat.thirds), JSON.stringify(heat));
-    await g.click('#heat-back');
+    // Test Manager v3.16: heat map og 📍 udelukker hinanden (app.js heat/snapshot-handlerne nulstiller hinandens valg) – ellers
+    // åbner ↩ det GAMLE øjebliksbillede, eller 📍 gør intet, mens heat map'et står. Kun hvis dit hold har et mål i åbent spil at klikke på.
+    if (await g.locator('#feed .snap-btn').count()) {
+      const view = async () => ({ snap: await g.locator('#snap-pitch').count(), heat: await g.locator('#heat-pitch').count() });
+      await g.locator('#feed .snap-btn').first().click(); const afterPin = await view();
+      await g.click('#heat-btn'); const afterHeat = await view();
+      if (await g.locator('#heat-back').count()) await g.click('#heat-back');   // (uden knappen er heat map'et allerede lukket – checken melder det)
+      const afterBack = await view();
+      check('Heat map og 📍 udelukker hinanden: 📍 lukker heat map, heat map lukker 📍, og ↩ giver startopstillingen (ikke det gamle billede)',
+        afterPin.snap === 1 && afterPin.heat === 0 && afterHeat.snap === 0 && afterHeat.heat === 1 && afterBack.snap === 0 && afterBack.heat === 0, JSON.stringify([afterPin, afterHeat, afterBack]));
+    } else await g.click('#heat-back');
   } else check('Afspilning findes efter en spillet runde', false, (await g.locator('#replay').textContent().catch(() => 'intet #replay')) + ' | mc ' + (await g.locator('#match-center').count()));
   const allEvents = await g.locator('#feed .ev').count();
   await g.click('#match-center .toolbar button:nth-child(3)');
