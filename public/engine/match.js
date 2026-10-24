@@ -244,11 +244,12 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // banen. opts.liveEnergy = false KUN til de deterministiske test-arenaer (deres tærskler forudsætter
   // fuld friskhed hele kampen) – spillet selv sender aldrig flaget (vagt i tests).
   const live = opts.liveEnergy !== false;
-  let curMin = 1;
+  let curMin = 1, sentOffThisTick = false;
   // Med færre mand (v3.15): ekstra tab af friskhed siden udvisningen (side.shortMins = summen af minutter × manglende mand).
   const sideOf = (p) => (sheet.entries[p.id]?.isHome ? H : A);
-  const shortMinutes = (side) => (side.shortMins ?? 0) + (side.down ? side.down * Math.max(0, curMin - side.downSince) : 0);
-  const lostAt = (p) => { const e = sheet.entries[p.id]; return live && e?.drain90 ? e.drain90 * (Math.max(0, curMin - e.minIn) + CARD_RULES.SHORT_DRAIN * shortMinutes(sideOf(p))) / 90 : 0; };
+  // Kun minutter, hvor spilleren selv var på banen (QC: en indskifter efter udvisningen arvede ellers hele tabet).
+  const shortMinutes = (side, minIn) => (minIn <= (side.firstDown ?? Infinity) ? side.shortMins ?? 0 : 0) + (side.down ? side.down * Math.max(0, curMin - Math.max(side.downSince, minIn)) : 0);
+  const lostAt = (p) => { const e = sheet.entries[p.id]; return live && e?.drain90 ? e.drain90 * (Math.max(0, curMin - e.minIn) + CARD_RULES.SHORT_DRAIN * shortMinutes(sideOf(p), e.minIn)) / 90 : 0; };
   const matchFresh = (p) => (p.freshness ?? 100) - lostAt(p);
   const shortF = (side) => 1 - CARD_RULES.SHORT_PER_MAN * (side?.down ?? 0);
   const ff = (p) => freshFactor(p) * (1 - TIRED_PER_POINT * lostAt(p)) * shortF(sideOf(p));
@@ -566,8 +567,8 @@ export function simulateMatch(home, away, rng, opts = {}) {
     sheet.adjust(p.id, -1);
     // Tiden med færre mand gemmes, før tallet stiger (lostAt regner minutter × manglende mand).
     if (side.down) side.shortMins = (side.shortMins ?? 0) + side.down * Math.max(0, curMin - side.downSince);
-    side.down = (side.down ?? 0) + 1; side.downSince = curMin;
-    side.starters[slot] = null;
+    side.down = (side.down ?? 0) + 1; side.downSince = curMin; side.firstDown ??= curMin;
+    side.starters[slot] = null; sentOffThisTick = true;
     const left = side.starters.filter(Boolean).length;
     const why = kind === 'DIRECT' ? `Direkte rødt kort til ${tag(p)} for den grove tackling` : `Andet gule kort til ${tag(p)}`;
     observe(p, `Udvist (${min}. min mod ${other(side).team.name}): ${kind === 'DIRECT' ? 'direkte rødt kort' : 'andet gule kort'}.`);
@@ -644,9 +645,9 @@ export function simulateMatch(home, away, rng, opts = {}) {
       if (ok && own(side)) events.at(-1).tactical = true;   // dit valg (grænsen) – med i "Kun taktik"
       return ok;
     };
-    // Højst FATIGUE_SUBS_AT_ONCE ad gangen (v3.15, brugerens valg "spred skift") – pausen ved 45' er gratis og uden loft.
-    // De trætteste først; resten venter til næste skift (dit hold får det at vide).
-    const cap = min === 45 ? Infinity : FATIGUE_SUBS_AT_ONCE;
+    // Højst FATIGUE_SUBS_AT_ONCE ad gangen (v3.15, brugerens valg "spred skift") – også i pausen (Spilfører: ellers skiftede
+    // botterne stadig 4–5 i 45'). De trætteste først; resten venter til næste skift (dit hold får det at vide).
+    const cap = FATIGUE_SUBS_AT_ONCE;
     let done = 0;
     for (const c of tired) {
       if (done >= cap) { note(c.p, `højst ${FATIGUE_SUBS_AT_ONCE} træthedsskift ad gangen – han venter til næste skift`); continue; }
@@ -792,9 +793,9 @@ export function simulateMatch(home, away, rng, opts = {}) {
           sheet.entries[victim.id].minOut = min;
           // Årsagen er offentlig (skift og pauser ses i referatet) – QC v3.13.
           const why = subBlock(victimSide, min) ?? 'der er ingen rask spiller på bænken';
-          addEv(min, 'INFO', 'PLAY', victimSide.isHome, false, 'Ingen indskiftning', `[${victimSide.team.name}] Ingen indskiftning mulig (${why}) – holdet spiller videre med ${tag(victim)} haltende.`);
+          addEv(min, 'INFO', 'PLAY', victimSide.isHome, false, 'Ingen indskiftning', `🚑 [${victimSide.team.name}] Ingen indskiftning mulig (${why}) – holdet spiller videre med ${tag(victim)} haltende.`);
         }
-        // Den grove tackling kan koste et direkte rødt kort (v3.15) – kun her, så tilfældighederne i resten af kampen
+        // Skade-frisparket giver intet gult kort, men den grove tackling kan koste et direkte rødt kort (v3.15) – kun her, så tilfældighederne i resten af kampen
         // ikke flytter sig (QC). Frisparket er offentligt; kortet afhænger ikke af nogen skjult indstilling.
         if (rng.chance(CARD_RULES.DIRECT_RED_P)) sendOff(foulSide, fouler, min, 'DIRECT');
       } else {
@@ -813,6 +814,9 @@ export function simulateMatch(home, away, rng, opts = {}) {
         booking(def, fouler, min, 'Gult kort til', ' for et frispark');
       }
     }
+    // Et rødt kort stopper spillet (v3.15, QC): resten af minuttet springes over, så den udviste ikke dukker op igen i
+    // samme tick fra de lister (hR/aR), der blev lavet før udvisningen. Næste tick bygger dem uden ham.
+    if (sentOffThisTick) { sentOffThisTick = false; continue; }
     // Dødbolde til holdet med bolden (v3.10): straffe, frispark i skudafstand – ikke efter tabt bold.
     if (!ballLost && rng.chance(PENALTY_P)) penalty(att, def, att === H ? hR : aR, def === H ? hR : aR, min);
     else if (!ballLost && rng.chance(FREEKICK_P)) freeKick(att, def, att === H ? hR : aR, def === H ? hR : aR, min);
@@ -951,7 +955,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
     const off = Object.values(sheet.entries).filter((e) => e.teamId === meSide.team.id && e.minIn <= 1 && e.minOut < 90 && !e.injured && !e.red);
     // Efter restitutionen (41 % af det, der mangler) er gevinsten 59 % af den sparede pris (QC: ellers stod 12 for 7).
     const saved = Math.round((1 - REST_SHARE) * off.reduce((a, e) => a + matchCost(e.km90 * (90 - e.minOut) / 90, meSide.team.squad.find((p) => p.id === e.playerId)?.skills.stamina ?? 10), 0));
-    if (off.length) addEv(90, 'INFO', 'TACTIC', meSide.isHome, false, 'Udskiftninger', `🔋 [${meSide.team.name}] ${off.length === 1 ? 'Din udskiftede spiller' : `Dine ${off.length} udskiftede spillere`} sparede ca. ${saved} point friskhed til næste runde.`);
+    if (off.length && saved >= 1) addEv(90, 'INFO', 'TACTIC', meSide.isHome, false, 'Udskiftninger', `🔋 [${meSide.team.name}] ${off.length === 1 ? 'Din udskiftede spiller' : `Dine ${off.length} udskiftede spillere`} sparede ca. ${saved} point friskhed til næste runde.`);
   }
   // Dit holds egen kamprapport (v3.14, brugerens valg: klummen skal kunne bruge fuldtids-analysens tal): den
   // spillede taktik (start/slut) og dueltallene pr. menneskestyret side. Ejer-privat (visibility.js

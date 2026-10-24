@@ -174,3 +174,11 @@ test('kort: 0,10–0,25 røde pr. kamp (før 0), 3–5 gule; ti mand scorer fær
   assert.ok(r.tenMenMatches >= 150, JSON.stringify(r));
   assert.ok(r.tenMenFor90 <= 1.2 && r.tenMenAgainst90 >= 1.7 && r.tenMenAgainst90 <= 2.4, JSON.stringify(r));
 });
+
+// v3.15 (Spilfører: målmanden på det tabende hold blev Kampens og Rundens spiller tre runder i træk). Før (3.14.3, samme
+// måling): tabende hold 15 %, målmand 32 %, målscorer 48 %. Med RESULT_BONUS og halv værdi for redninger over 4: 2,5 / 23 / 64 %.
+test('Kampens spiller: sjældent fra det tabende hold (≤ 8 %, før 15 %), målmand ≤ 28 % (før 32 %), oftest en målscorer (≥ 55 %)', async () => {
+  const { measureMotm } = await import('../../tools/measure-duels.mjs');
+  const r = measureMotm(600);
+  assert.ok(r.loserShare <= 0.08 && r.gkShare <= 0.28 && r.scorerShare >= 0.55, JSON.stringify(r));
+});

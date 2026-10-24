@@ -312,3 +312,17 @@ export function measureCards(N = 2500) {
   }
   return { redsPerMatch: reds / n, secondYellow: second / n, direct: direct / n, yellowsPerMatch: yellows / n, tenMenMatches: ten, tenMenFor90: own / ten, tenMenAgainst90: opp / ten };
 }
+
+// Kampens spiller (v3.15): fra hvilket hold og hvilken rolle – Spilføreren: målmanden på det tabende hold vandt for tit.
+export function measureMotm(N = 600) {
+  let n = 0, loser = 0, gk = 0, scorer = 0;
+  for (let s = 1; s <= N; s++) {
+    const L = createLeague(createRng(s));
+    const m = simulateMatch(L.teams[s % 8], L.teams[(s + 3) % 8], createRng(s * 31));
+    const b = [...m.ratings.home, ...m.ratings.away].find((e) => e.isMotM);
+    if (!b) continue;
+    n++; if (b.role === 'GK') gk++; if (b.goals > 0) scorer++;
+    if (m.homeGoals !== m.awayGoals && (b.isHome ? m.homeGoals < m.awayGoals : m.awayGoals < m.homeGoals)) loser++;
+  }
+  return { loserShare: loser / n, gkShare: gk / n, scorerShare: scorer / n };
+}

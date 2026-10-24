@@ -3,6 +3,7 @@ import { drainFactor } from './freshness.js';
 export const RATING_MIN = 3.5;
 export const RATING_MAX = 10;
 export const START_RATING = 6.5;
+export const RESULT_BONUS = 0.4, SAVES_FULL = 4;
 export const STAR_LIMITS = [8.35, 7.25, 6.15, 5.15]; // ≥ grænse giver 5, 4, 3, 2 stjerner; ellers 1
 const CLEAN_SHEET_ROLES = new Set(['GK', 'CB', 'LB', 'RB']);
 
@@ -100,6 +101,11 @@ export function finalizeSheet(sheet, homeGoals, awayGoals, rng, xpFor) {
   for (const e of all) {
     const conceded = e.isHome ? awayGoals : homeGoals;
     if (conceded === 0 && CLEAN_SHEET_ROLES.has(e.role)) e.rating += 0.5;
+    // Resultatet tæller (v3.15, Spilfører: en målmand på det tabende hold blev Kampens og Rundens spiller tre runder i træk):
+    // sejr +RESULT_BONUS, nederlag −RESULT_BONUS; og en redning ud over de første SAVES_FULL giver kun det halve.
+    const scored = e.isHome ? homeGoals : awayGoals;
+    e.rating += scored > conceded ? RESULT_BONUS : scored < conceded ? -RESULT_BONUS : 0;
+    if ((e.saves ?? 0) > SAVES_FULL) e.rating -= 0.25 * (e.saves - SAVES_FULL);
     e.rating = clamp(e.rating, RATING_MIN, RATING_MAX);
     // Clean sheet i statistikken: kun målmanden (v3.11, brugeren: "Det er kun målmanden der får
     // Clean sheet" – før også forsvaret), 0 mål imod og mindst 59 spilleminutter (minOut − minIn;

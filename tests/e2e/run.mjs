@@ -452,7 +452,7 @@ try {
   check('Statistik: topscorerlisten matcher de gemte sæsonmål', JSON.stringify(scorers.map((t) => Number(t.trim()))) === JSON.stringify(goalsSaved), `${scorers.join(',')} / ${goalsSaved.join(',')}`);
   await g.click('#stats-teams > summary');
   const teamHead = await g.locator('#team-stats thead th').allTextContents();
-  check('Holdtal: ingen kolonner, der kan røbe taktik (skud/xG/kontra/hjørne/VAR)', teamHead.length === 9 && !teamHead.some((t) => /skud|xg|kontra|hjørne|var-/i.test(t)) && (await g.locator('#team-stats tbody tr').count()) === 8, teamHead.join('|'));
+  check('Holdtal: ingen kolonner, der kan røbe taktik (skud/xG/kontra/hjørne/VAR)', teamHead.length === 10 && teamHead.includes('🟥') && !teamHead.some((t) => /skud|xg|kontra|hjørne|var-/i.test(t)) && (await g.locator('#team-stats tbody tr').count()) === 8, teamHead.join('|'));
   await g.click('#stats-mine > summary');
   check('Dit hold: afslutninger, xG og frie løb står kun her', (await g.textContent('#my-team-stats')).includes('xG') && (await g.locator('#my-players tbody tr').count()) === 18);
   await g.click('#stats-flow > summary');

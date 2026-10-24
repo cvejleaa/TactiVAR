@@ -22,7 +22,7 @@ export const MAX_RULES = 8;
 // udvisninger pr. kamp, fordi kortene samles på de få forsvars- og midtbanespillere – Superligaen ≈0,1).
 export const CARD_RULES = Object.freeze({ DIRECT_RED_P: 0.07, SECOND_YELLOW_P: 0.17, SHORT_PER_MAN: 0.04, SHORT_DRAIN: 0.25 });
 // Højst så mange træthedsskift pr. hold ad gangen (v3.15, brugerens valg "spred skift"; Spilfører: en trippeludskiftning
-// er normal). Pausen ved 45' koster ingen skifte-pause og har intet loft.
+// er normal) – også i pausen ved 45', som ikke koster en skifte-pause. Flere trætte end loftet bruger altså flere pauser.
 export const FATIGUE_SUBS_AT_ONCE = 3;
 // En kamp kræver mindst 7 spillere (IFAB Law 3) – motoren udviser aldrig under det (ingen afbrudt kamp).
 export const MIN_PLAYERS = 7;

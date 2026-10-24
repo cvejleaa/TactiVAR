@@ -185,7 +185,7 @@ test('clean sheet: +0,5 til GK/CB/LB/RB, kun når holdet ikke lukker mål ind', 
   const xp = () => 9;
   const clean = finalizeSheet(mk(), 0, 0, fixed, xp).home, conceded = finalizeSheet(mk(), 0, 1, fixed, xp).home;
   assert.equal(clean.find((e) => e.playerId === 'gk').rating, 7);
-  assert.equal(conceded.find((e) => e.playerId === 'gk').rating, 6.5);
+  assert.equal(conceded.find((e) => e.playerId === 'gk').rating, 6.1);   // 6,5 − 0,4 nederlag (RESULT_BONUS v3.15), intet clean sheet
   assert.equal(clean.find((e) => e.playerId === 'st').rating, 6.5);
 });
 
