@@ -185,7 +185,7 @@ test('luftduel i to trin: 12 vinder og scorer (16 > 14), 10 vinder men reddes (1
 // (varGoalCheck, GOAL_CHECK_P 0,131 scriptet sand; GOAL_FOUL_SHARE 0,27 falsk → offside-tjekket). Samme regel som før,
 // nu i offsideCheck: varPulse + vsTrapLong·0,045 + rul·6 > forsvarer.positioning + rul·6 (v3.6; før ·0,025).
 // Rul 0,1: skud 10 + 0,8 mod MV 1 + 0,8 + 0,3 → mål; den tjekkede forsvarer er den første i forsvaret (plads 1, POS 11).
-function varRun(trap, { awayAttacks = false, check = true } = {}) {
+function varRun(trap, { awayAttacks = false, check = true, n = 2 } = {}) {
   const { H, A } = arena();
   const [att, def] = awayAttacks ? [A, H] : [H, A];
   if (awayAttacks) for (const p of mids(A)) p.skills.passing = 11;
@@ -193,7 +193,7 @@ function varRun(trap, { awayAttacks = false, check = true } = {}) {
   for (let i = 1; i <= 10; i++) { slot(att, i).varProfile.varPulse = 10; slot(att, i).counterTactics.vsTrapLong = trap; }
   const d = slot(def, 1); d.skills.positioning = 11; d.skills.intercepting = 20;
   slot(def, 0).skills.goalkeeping = 1;
-  const m = simulateMatch(H, A, stubRng({ 0.3: shots(2), 0.131: check, 0.27: false }, 0.1));
+  const m = simulateMatch(H, A, stubRng({ 0.3: shots(n), 0.131: check, 0.27: false }, 0.1));
   const shooter = [att.squad.find((p) => (awayAttacks ? m.ratings.away : m.ratings.home).some((e) => e.playerId === p.id && e.goals > 0))].find(Boolean) ?? slot(att, 9);
   return { m, shooter, d };
 }
@@ -209,11 +209,13 @@ test('VAR: mod-kunnen mod VAR-linjen afgør (10 + 23·0,045 = 11,035 > 11; 22·0
   assert.equal(ok.homeVarNet, 0); assert.equal(no.homeVarNet, -2);
   // Forsvareren, der holdt linjen: +0,45 og en taktisk sejr pr. annullering.
   assert.equal(no.ratings.away.find((x) => x.playerId === d.id).tacticWins, 2);
-  // Et godkendt mål giver skytten præcis det samme som et mål uden tjek (før: +1,3 for et VAR-mål mod +1,25).
-  const plain = varRun(23, { check: false });
-  assert.equal(plain.m.events.filter((e) => e.type === 'VAR_CHECK').length, 0);
-  assert.equal(ok.ratings.home.find((x) => x.playerId === shooter.id).rating, plain.m.ratings.home.find((x) => x.playerId === plain.shooter.id).rating);
-  assert.equal(shooter.id, plain.shooter.id);
+  // Et godkendt mål giver skytten præcis det samme som et mål uden tjek (før: +1,3 for et VAR-mål). Ét skud, så karakteren
+  // ikke rammer loftet 10: rul 0,1 → start 6,38; langskud (solo) +1,4; sejr +0,4; stopperens clean sheet +0,5 = 8,68 → 8,7.
+  const one = varRun(23, { n: 1 }), plain = varRun(23, { n: 1, check: false });
+  assert.deepEqual([one.m.stats.hVarChecks, plain.m.stats.hVarChecks, one.m.homeGoals, plain.m.homeGoals], [1, 0, 1, 1]);
+  assert.equal(one.shooter.id, plain.shooter.id); assert.equal(one.shooter.id, shooter.id);
+  const rt = (x) => x.m.ratings.home.find((e) => e.playerId === x.shooter.id).rating;
+  assert.deepEqual([rt(one), rt(plain)], [8.7, 8.7]);
 });
 test('VAR: fortegn på VAR-netto, når udeholdet angriber (godkendt 0, annulleret +1 for hjemmeholdet pr. mål)', () => {
   const ok = varRun(23, { awayAttacks: true }).m, no = varRun(22, { awayAttacks: true }).m;
