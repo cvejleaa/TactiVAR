@@ -1702,7 +1702,8 @@ test('løber → skud fra kanten: LONGSHOT uden oplæg, når han står uden for 
   assert.equal(save.m.stats.hOnTarget, 2); assert.equal(save.m.stats.hShots, 2);
   const txt = save.m.events.filter((e) => e.type === 'SAVE').map((e) => e.text);
   assert.equal(txt.length, 2);
-  for (const t of txt) assert.match(t, new RegExp(`^🧤 \\[.+\\] Flot redning af #\\d+ .+ på afslutning fra ${tg(save.runner).replace('#', '#')} \\(.+\\)\\. ${tg(save.runner)} løber sig fri på kanten og skyder\\.$`), t);
+  // Opspillet står FØR redningen (v3.16.5 – det skete først)
+  for (const t of txt) assert.match(t, new RegExp(`^🧤 \\[.+\\] ${tg(save.runner)} løber sig fri på kanten og skyder\\. Flot redning af #\\d+ .+ på afslutning fra ${tg(save.runner)} \\(.+\\)\\.$`), t);
   assert.equal(fx({ rm: { finishing: 15.1, passing: 1, pace: 1, ballControl: 1 }, gk: 16.75 }).m.homeGoals, 2);
   // Friskhed: løberen træt (0 %: 15 → 11,25 + 2 = 13,25 < 13 + 0,3 → redning; uden friskhed 17 > 13,3 → mål); målmanden træt
   // (22,2 → 16,65 + 0,3 = 16,95 < 15 + 2 = 17 → mål; uden: 22,5 → redning). Med kanten 3: 17 < 16 og 17 < 19,65.

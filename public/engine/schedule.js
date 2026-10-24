@@ -48,3 +48,5 @@ export function isValidSchedule(schedule, teams) {
 
 // Sæsonens runde (1–14) for en ligarunde.
 export const seasonRoundOf = (league, round) => round - league.seasonStartRound + 1;
+// Runder tilbage i sæsonen efter ligarunden (0 efter sæsonslut) – klummens "mester før tid" (v3.16.5).
+export const roundsLeftOf = (league, round, ended) => (ended ? 0 : SEASON_ROUNDS - seasonRoundOf(league, round));

@@ -15,7 +15,7 @@ import { renderStandings } from './ui/standings.js';
 import { playRound, commitRound, pairRound, sortStandings } from './engine/season.js';
 import { buildColumn } from './engine/column.js';
 import { gen } from './engine/clues.js';
-import { seasonRoundOf } from './engine/schedule.js';
+import { seasonRoundOf, roundsLeftOf } from './engine/schedule.js';
 import { renderLastRound, renderSchedule } from './ui/rounds.js';
 import { renderMatchCenter, renderGazette } from './ui/matchcenter.js';
 import { replayJump, clearReplays } from './ui/replay.js';
@@ -66,6 +66,7 @@ const NEWS = {
   '3.14.1': 'Rettelser: VAR tjekker nu offside for den forreste – scorer en spiller længere tilbage, er det hans forreste holdkammerat, der tjekkes, og billedet ved målet viser skytten, hvor han skød fra. Statistikken på Liga-fanen gælder sæsonen.',
   '3.14.2': 'Rettelse: Ved et VAR-tjek står den tjekkede nu, hvor han stod (forrest), i billedet ved målet – ikke flyttet bag en holdkammerat.',
   '3.14.3': 'Rettelser: Langskud tages fra skudafstand (ikke fra egen banehalvdel) i billedet ved målet, referatet fortæller et oplæg én gang, og efter sæsonens sidste runde viser tabellen slutstillingen og mesteren, til næste sæson går i gang.',
+  '3.16.5': '📰 Rettede tekster: dit opspil står nu før redningen, et rødt kort som VAR lader stå siger det, og et Hvis-Så-skift med færre mand siger "med ti mand". Klummen siger, når mesterskabet er afgjort før tid, og om rundens spiller også var kampens spiller. Kampene er uændrede.',
   '3.16.4': '⏱️ Rigtige minutter: referatet, tidslinjen, karakterarket og afspilningen viser nu kampens minut (7\', 38\', 45+2\', 90+4\') i stedet for kun hvert 3. minut. Hver halvleg får tillægstid efter det, der skete – skift, mål, kort, skader og VAR-tjek – og referatet siger, hvor meget der blev lagt til, og hvor meget af det VAR stod for. En Hvis-Så-regel står aldrig før det minut, du har sat. Kampene er uændrede; seneste runde fra før opdateringen viser de gamle minutter.',
   '3.16.3': '🎬 Afspilningen vender nu altid sådan, at dit hold angriber opad – også på udebane – og målmanden står ved sin mållinje. Startopstillingen under modstanderens zone-kort vender som kortet. 📍 ved målene er afløst af 🎬, der viser samme mål i afspilningen. Referatet: færre gentagelser ("styrer midtbanen", "stiger højest", "omorganiserer sig" og lynkontraen; en kamp gentager ikke en måltekst), rigtigt ejefald ("Rovers\' pres"), begge holdnavne når to spillere nævnes, og minuttet står ved linjen i stedet for i teksten. Klummen nævner røde kort, skriver "X slog Y 1-0" og forklarer ikke et uafgjort resultat med "havde bolden mindst". Sæsonslut: Liga-statistikken viser den afsluttede sæson, indtil den nye er i gang, VAR± står i slutstillingen, og mesterskabet siger, om det blev afgjort på point, målforskel eller scorede mål. Kampene er uændrede.',
   '3.16.2': '🎬 Afspilningen viser nu, hvor skuddet ender: efter hver afslutning går bolden i nettet, ind til målmanden, der redder, til forsvareren, der blokerer, på stolpen, over eller forbi – som referatet siger, og målet er tegnet på banen. 🎬 i referatet viser afslutningen og standser på udfaldet. Og har holdet bare bolden to gange i træk med samme spiller, spiller det den rundt bagfra, så billedet ikke står stille. Kampene er uændrede.',
@@ -112,7 +113,8 @@ function buildColumnNow() {
   const table = (end ? end.table : sortStandings(L.leagueMetadata.standings)).map((r) => ({ teamId: r.teamId, teamName: r.teamName, points: r.points }));
   let next = [];
   try { next = pairRound(L).map(([hI, aI]) => ({ homeId: L.teams[hI].id, homeName: L.teams[hI].name, awayId: L.teams[aI].id, awayName: L.teams[aI].name })); } catch { next = []; }
-  return buildColumn({ matches: lr.matches, gazette: lr.gazette, history, table, next, viewerTeamId: myTeam().id, round: lr.round, newSeason: !!end, champion: end?.champion ?? null });
+  return buildColumn({ matches: lr.matches, gazette: lr.gazette, history, table, next, viewerTeamId: myTeam().id, round: lr.round, newSeason: !!end, champion: end?.champion ?? null,
+    roundsLeft: roundsLeftOf(L, lr.round, !!end) });
 }
 
 function change(fn) { fn(); act.syncActivePreset(myTeam(), game.ui.activePresetIndex); persist(); render(); }

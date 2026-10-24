@@ -128,7 +128,7 @@ function scout(history, teamId, uptoRound = Infinity) {
 // Klummen for én seer. input: { matches, gazette, history (sæsonens runder, inkl. den spillede), table (sorteret
 // [{teamId, teamName, points}]), next ([{homeId, homeName, awayId, awayName}] – næste runde efter programmet),
 // viewerTeamId, round (ligarunde), seasonRound, newSeason }.
-export function buildColumn({ matches = [], gazette = null, history = [], table = [], next = [], viewerTeamId = null, round = 0, newSeason = false, champion = null }) {
+export function buildColumn({ matches = [], gazette = null, history = [], table = [], next = [], viewerTeamId = null, round = 0, newSeason = false, champion = null, roundsLeft = null }) {
   const facts = matches.map((m, i) => publicFacts(m, i));
   const vi = facts.findIndex((f) => f.home.id === viewerTeamId || f.away.id === viewerTeamId);
   const vf = vi >= 0 ? facts[vi] : null;
@@ -182,7 +182,9 @@ export function buildColumn({ matches = [], gazette = null, history = [], table 
   // 3. Rundens spiller og mål (begrundet i offentlige handlinger; karakteren kun for seerens egen spiller – UI'et).
   if (gazette) {
     const p = gazette.playerOfTheRound, star = p && facts.flatMap((f) => f.ratings).find((e) => e.playerId === p.playerId);
-    const why = star ? [star.goals && `${star.goals} ${star.goals === 1 ? 'mål' : 'mål'}`, star.assists && `${star.assists} oplæg`, star.saves && `${star.saves} redninger`, star.aerialWins >= 3 && `${star.aerialWins} vundne luftdueller`].filter(Boolean) : [];
+    // Kriteriet er karakteren (UI'et siger "rundens bedste karakter"); kampens spiller nævnes først, så "1 mål" ikke står
+    // alene, når en holdkammerat scorede to (Spilfører v3.16.4)
+    const why = star ? [star.isMotM && 'kampens spiller', star.goals && `${star.goals} mål`, star.assists && `${star.assists} oplæg`, star.saves && `${star.saves} redninger`, star.aerialWins >= 3 && `${star.aerialWins} vundne luftdueller`].filter(Boolean) : [];
     sections.push({ id: 'col-stars', title: 'Rundens spiller og mål', player: p ? { playerId: p.playerId, teamId: p.teamId, why: why.length ? `Begrundelse: ${why.join(', ')}.` : 'Begrundelse: stabil hele kampen.' } : null,
       goal: gazette.goalOfTheRound ? true : null, defensive: !gazette.goalOfTheRound && gazette.defensiveAction ? true : null });
   }
@@ -199,7 +201,20 @@ export function buildColumn({ matches = [], gazette = null, history = [], table 
     const gap = table[1] ? table[0].points - table[1].points : null;
     // Mesteren med den regel, der afgjorde (v3.16.3 – championText i season.js, samme tekst som slutstillingen)
     const myPos = table.findIndex((t) => t.teamId === viewerTeamId) + 1 || null;
-    formParas.push(newSeason ? `${championText(champion ?? { teamName: table[0].teamName, points: table[0].points }, myPos)}.` : gap === 0 ? `${table[0].teamName} og ${table[1].teamName} står lige i toppen med ${table[0].points} point.` : `${table[0].teamName} fører med ${table[0].points} point${gap != null ? `, ${gap} foran ${table[1].teamName}` : ''}.`);
+    // Titlen afgjort før tid (Spilfører v3.16.4): et forspring på MERE end 3 point pr. resterende runde kan ikke indhentes –
+    // ved lige point afgør målforskel, så lighed er ikke afgjort. roundsLeft kommer fra programmet (app.js), ikke fra historikken.
+    const decided = !newSeason && roundsLeft > 0 && gap != null && gap > 3 * roundsLeft;
+    // Overskrift kun i runden, det blev afgjort (Spilfører på planen: ellers samme overskrift resten af sæsonen) – pointene
+    // før runden regnes af rundens resultater i historikken
+    const earned = {};
+    for (const x of history.at(-1)?.results ?? []) {
+      earned[x.h] = (earned[x.h] ?? 0) + (x.hG > x.aG ? 3 : x.hG === x.aG ? 1 : 0);
+      earned[x.a] = (earned[x.a] ?? 0) + (x.aG > x.hG ? 3 : x.hG === x.aG ? 1 : 0);
+    }
+    const before = (t) => t.points - (earned[t.teamId] ?? 0);
+    const wasDecided = decided && before(table[0]) - Math.max(...table.slice(1).map(before)) > 3 * (roundsLeft + 1);
+    if (decided && !wasDecided) stories.push([95, `${table[0].teamName} er mester før tid`]);
+    formParas.push(decided ? `🏆 ${table[0].teamName} er mester – ${roundsLeft === 1 ? 'én runde' : `${roundsLeft} runder`} før tid (${gap} point foran ${table[1].teamName}).` : newSeason ? `${championText(champion ?? { teamName: table[0].teamName, points: table[0].points }, myPos)}.` : gap === 0 ? `${table[0].teamName} og ${table[1].teamName} står lige i toppen med ${table[0].points} point.` : `${table[0].teamName} fører med ${table[0].points} point${gap != null ? `, ${gap} foran ${table[1].teamName}` : ''}.`);
   }
   if (formParas.length) sections.push({ id: 'col-form', title: 'Formen', paras: formParas });
 
