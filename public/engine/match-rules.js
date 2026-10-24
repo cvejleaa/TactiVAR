@@ -42,4 +42,4 @@ export const MIN_PLAYERS = 7;
 export const VAR_RULES = Object.freeze({ GOAL_CHECK_P: 0.131, GOAL_FOUL_SHARE: 0.27, OFFSIDE_FLAG_P: 0.043, PEN_CHECK_P: 0.26, PEN_OFFSIDE_SHARE: 0.31, PEN_AWARD_P: 0.0023, RED_CHECK_P: 0.53, RED_UPGRADE_P: 0.041 });
 // Forbi (v3.15.1, Spilfører: 67 % af skuddene gik på mål – Superligaen ≈ 33–35 %): en afslutning, keeperen ikke skal
 // redde, går forbi, over, på stolpen eller blokeres med MISS_P; en blokeret giver hjørnespark med MISS_CORNER_P.
-export const MISS_P = 0.62, MISS_BLOCK_SHARE = 0.6, MISS_CORNER_P = 0.88;
+export const MISS_P = 0.62, MISS_BLOCK_SHARE = 0.66, MISS_CORNER_P = 0.88;

@@ -165,3 +165,24 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .gazette.column .col-sec p { margin: 0.25rem 0; }
 .gazette.column .headlines li { margin: 0.2rem 0; }
 .gazette.column .col-box { margin-top: 0.8rem; }
+
+/* 2D-afspilning (v3.16) – taktiktavle; brikkerne er faste noder, så overgangene virker (bolden først, så spillerne). */
+.replay { margin: .6rem 0; }
+.rp-pitch { position: relative; aspect-ratio: 68 / 100; max-width: 22rem; margin: .4rem auto; background: repeating-linear-gradient(0deg, #15803d, #15803d 6%, #166534 6%, #166534 12%); border: 1px solid #ffffff90; border-radius: .3rem; overflow: hidden; }
+.rp-half { position: absolute; left: 0; right: 0; top: 50%; border-top: 1px solid #ffffff70; }
+.rp-box { position: absolute; left: 25%; width: 50%; height: 14%; border: 1px solid #ffffff70; }
+.rp-box.top { top: -1px; } .rp-box.bottom { bottom: -1px; }
+.rp-token { position: absolute; transform: translate(-50%, -50%); width: 1.3rem; height: 1.3rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .6rem; font-weight: 700; transition: left .8s ease-in-out .3s, top .8s ease-in-out .3s; border: 2px solid #0008; }
+.rp-token[hidden] { display: none; }   /* QC v3.16: display:flex slog [hidden] – udskiftede og udviste stod på tavlen */
+.rp-token.home { background: #e2e8f0; color: #0f172a; } .rp-token.away { background: #f97316; color: #111; }
+.rp-token.own { box-shadow: 0 0 0 2px #a78bfa; }
+.rp-token.actor { border-color: #22c55e; box-shadow: 0 0 0 3px #22c55e99; z-index: 2; } .rp-token.assist { border-color: #60a5fa; }
+.rp-ball { position: absolute; transform: translate(-50%, -50%); color: #fff; font-size: .8rem; text-shadow: 0 0 3px #000; transition: left .4s ease-out, top .4s ease-out; z-index: 3; pointer-events: none; }
+.rp-caption { min-height: 2.6em; font-size: .85rem; text-align: center; } .rp-caption.moment { font-weight: 600; }
+.rp-controls { display: flex; gap: .3rem; justify-content: center; flex-wrap: wrap; }
+/* Heat map (v3.16) */
+.minipitch.heat .heat-cell { position: absolute; background: #f97316; pointer-events: none; }
+.heat-shot { position: absolute; transform: translate(-50%, -50%); font-size: .75rem; text-shadow: 0 0 3px #000; }
+.heat-shot.save { color: #60a5fa; } .heat-shot.miss { color: #e5e7eb; } .heat-shot.offside, .heat-shot.disallowed { color: #a78bfa; }
+tr.heat-sel td { background: #f9731633; } .ratings tr[title] { cursor: pointer; }
+.minipitch.heat { aspect-ratio: 68 / 100; max-width: 16rem; }

@@ -38,3 +38,37 @@ export function livePositions(tactics, { attacking = true, ballX = 50, runner = 
     return { x: Math.round(clamp(base.x + (ballX - 50) * BALL_PULL, 3, 97)), y: Math.round(clamp(y, FRONT_LIMIT, 95)) };
   });
 }
+
+// Koblede linjer (v3.16, Spilførerens sæsongennemgang: angriberne stod bag modstanderens sidste forsvarer i ≈100 % af
+// billederne – livePositions kender ikke modstanderen). Oven på holdenes egen form (livePositions, uændret):
+//  - holdet med bolden: offside-linjen er modstanderens sidste markspiller; ingen står foran den (ONSIDE_GAP), undtagen
+//    løberen, der har vundet sit løb (step frem fra sin plads – han ER sluppet igennem). Det er AFLEVERINGENS øjeblik;
+//    afslutningens billede flytter skytten ind i feltet (match.js momentAt – QC: ét billede pr. øjeblik).
+//  - holdet uden bold: rykkes som en blok hjem, så de forreste står PRESS_GAP[pres] foran boldholdets dybeste markspiller –
+//    angrebet hele vejen, midtbanen det halve, forsvaret ikke (QC: et hårdt loft gjorde lav blok og gegenpres ens).
+//    Springes over ved caught (kontra): det fangede hold står fremme i sin angrebsform.
+// caught: holdet med bolden har lige vundet den (kontra) – det står i forsvarsform, modstanderen i angrebsform.
+// Returnerer { ball, opp, line } – begge i hvert holds egne koordinater (lille y = ved modstanderens mål); line i boldholdets.
+export const ONSIDE_GAP = 1;
+export const PRESS_GAP = { LOW_BLOCK: 20, MID_BLOCK: 10, HIGH_GEGENPRESS: 2 };
+const SHIFT_BY_LINE = { ATT: 1, MID: 0.5, DEF: 0, GK: 0 };
+// ballOn/oppOn: hvilke pladser er besat (en udvist spillers plads er tom og tæller ikke som linjen) – standard alle.
+export function coupledPositions(ballTactics, oppTactics, { ballX = 50, caught = false, runner = -1, step = RUN_STEP, ballOn = null, oppOn = null } = {}) {
+  const ball = livePositions(ballTactics, { attacking: !caught, ballX });
+  const opp = livePositions(oppTactics, { attacking: caught, ballX: 100 - ballX });
+  const onO = (i) => !oppOn || oppOn[i], onB = (i) => !ballOn || ballOn[i];
+  const line = 100 - Math.max(...opp.map((p, i) => (i > 0 && onO(i) ? p.y : -Infinity)));
+  for (let i = 1; i < ball.length; i++) {
+    if (i === runner) ball[i] = { x: ball[i].x, y: Math.round(clamp(ball[i].y - step, FRONT_LIMIT, 95)) };
+    else ball[i] = { x: ball[i].x, y: Math.max(ball[i].y, line + ONSIDE_GAP) };
+  }
+  if (!caught) {
+    const deepest = Math.max(...ball.map((p, i) => (i > 0 && i !== runner && onB(i) ? p.y : -Infinity)));
+    const want = 100 - deepest + (PRESS_GAP[oppTactics.phases?.phase2_defending?.pressingHeight] ?? PRESS_GAP.MID_BLOCK);
+    const front = Math.min(...opp.map((p, i) => (i > 0 && onO(i) ? p.y : Infinity))), shift = Math.max(0, want - front);
+    const coords = FORMATIONS[oppTactics.baseFormation] || FORMATIONS['4-4-2'];
+    // … og ingen står foran den ønskede presse-linje (en offensiv midtbanespiller i gegenpres rykkes kun det halve)
+    for (let i = 1; i < opp.length; i++) opp[i] = { x: opp[i].x, y: Math.round(clamp(Math.max(want, opp[i].y + shift * (SHIFT_BY_LINE[lineOfRole(coords[i].r)] ?? 0)), FRONT_LIMIT, 95)) };
+  }
+  return { ball, opp, line };
+}

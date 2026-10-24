@@ -72,7 +72,7 @@ test('dit mål: 11 brikker på (x%, y%) fra billedet, scorer ⚽ og oplæg 🅰 
   const ball = byId(pitches[0], 'snap-ball')[0];
   assert.deepEqual([ball.style.left, ball.style.top], ['50%', '28%']);
   const title = byId(pitches[0], 'snap-title')[0].textContent;
-  assert.match(title, new RegExp(`^${m.events[i].min}' – mål af #\\d+ .+: sådan stod I$`));
+  assert.match(title, new RegExp(`^${m.events[i].min}' – mål af #\\d+ .+: sådan stod I, da bolden blev spillet$`));
   // Billedet ligger i DIT holds karakterark (hjemmeholdet er dig her); modstanderen viser stadig startopstillingen
   const ratings = all(root, (e) => cls(e, 'ratings'));
   assert.equal(ratings.length, 2);
@@ -80,6 +80,9 @@ test('dit mål: 11 brikker på (x%, y%) fra billedet, scorer ⚽ og oplæg 🅰 
   // Hændelsen er markeret; de andre ikke
   const marked = all(root, (e) => cls(e, 'ev') && cls(e, 'snapped'));
   assert.equal(marked.length, 1);
+  // Forklaringen under banen (v3.16, koblede linjer): angrebet står til modstanderens offside-linje, og løberen er sluppet igennem
+  const note = all(pitches[0], (e) => cls(e, 'muted')).map((e) => e.textContent);
+  assert.deepEqual(note, ['Spillerne rykker med i kampen: frem til modstanderens offside-linje, når I har bolden, og mod boldsiden – den, der vinder sit løb uden bold, er sluppet igennem.']);
 });
 test('mål imod: ingen scorer/oplæg-mærker, bolden spejlet på (50 %, 72 %), overskriften siger at modstanderens spillere ikke vises', () => {
   const { m, me } = played({ youAttack: false });
@@ -94,7 +97,8 @@ test('mål imod: ingen scorer/oplæg-mærker, bolden spejlet på (50 %, 72 %), o
   const ball = byId(pitch, 'snap-ball')[0];
   assert.deepEqual(snap.ball, [50, 72]);   // cutback-stedet (50,28) set fra modstanderens side
   assert.deepEqual([ball.style.left, ball.style.top], ['50%', '72%']);
-  assert.equal(byId(pitch, 'snap-title')[0].textContent, `${m.events[i].min}' – mål imod: sådan stod dit forsvar (modstanderens spillere vises ikke)`);
+  assert.equal(byId(pitch, 'snap-title')[0].textContent, `${m.events[i].min}' – mål imod: sådan stod dit forsvar, da bolden blev spillet`);
+  assert.deepEqual(all(pitch, (e) => cls(e, 'muted')).map((e) => e.textContent), ['Dit forsvar står efter dit pres og boldsiden.']);
   // Du er udeholdet: billedet står i udeholdets karakterark
   const ratings = all(root, (e) => cls(e, 'ratings'));
   assert.equal(all(ratings[1], (e) => e.attrs.id === 'snap-pitch').length, 1); assert.equal(all(ratings[0], (e) => e.attrs.id === 'snap-pitch').length, 0);

@@ -139,7 +139,7 @@ test('målene fordeler sig: angreb 56–66 % (før 53 %), midtbane 20–30 %, fo
   const r = measureGoalMix(150);
   const band = (k, lo, hi) => assert.ok(r[k] >= lo && r[k] <= hi, `${k} ${r[k].toFixed(3)} (bånd ${lo}–${hi})`);
   band('ATT', 0.56, 0.66); band('MID', 0.2, 0.3); band('DEF', 0.11, 0.17);
-  band('counter', 0.07, 0.14); band('longshot', 0.06, 0.13); band('setPiece', 0.18, 0.32);
+  band('counter', 0.07, 0.14); band('longshot', 0.06, 0.11); band('setPiece', 0.18, 0.32);   // langskud v3.16: 0,124 → ≈0,085 (koblede linjer, LONGSHOT_Y 30) – dokumentets 8–10 %
   assert.ok(r.goalsPerMatch >= 2.6 && r.goalsPerMatch <= 3.0, `mål pr. kamp ${r.goalsPerMatch}`);
 });
 // QC v3.12.1 (B1, "efterprøv på dét, den rammer"): langskudsbonussen må ikke gøre det bedre at stå uden
@@ -207,4 +207,28 @@ test('VAR og afslutninger som i Superligaen: på mål 30–45 % (før 60 %), ann
   band('penOverturnedShare', 0.08, 0.35); band('penAwarded', 0.02, 0.1);
   for (const k of ['goalChecks', 'penChecks', 'redChecks', 'redDown', 'redUp']) assert.ok(r[k] > 0, `${k} ${r[k]}`);
   assert.equal(r.varGoalOld, 0, 'ingen VAR-chancetype');
+});
+
+// v3.16 koblede linjer (Spilfører: "lav blok må ikke få flere mål imod end i dag, og langskud-andelen imod lav blok skal være
+// højere end imod gegenpres"). Målt 800 kampe pr. pres (forsvarsholdet sat til presset): før (7de6552) mål imod lav 1,34 /
+// mellem 1,36 / højt 1,27, langskud 10 / 11 / 12 %; nu ≈1,35 / 1,35 / 1,28 og 8 / 6 / 7 %. Uden kanten efter pres (EDGE_BY_PRESS)
+// var langskud imod lav blok 10 % mod 20 % imod gegenpres.
+test('pres og afslutning: lav blok lukker ikke flere mål ind end før (≤ 1,42; før 1,34) og giver mindst lige så mange langskud imod som gegenpres', async () => {
+  const { createRng } = await import('../../public/engine/rng.js');
+  const { createLeague } = await import('../../public/engine/generator.js');
+  const { simulateMatch } = await import('../../public/engine/match.js');
+  const r = {};
+  for (const P of ['LOW_BLOCK', 'HIGH_GEGENPRESS']) {
+    let ga = 0, g = 0, long = 0;
+    for (let s = 1; s <= 800; s++) {
+      const L = createLeague(createRng(s)), H = L.teams[s % 8], A = L.teams[(s + 3) % 8];
+      A.tactics.phases.phase2_defending.pressingHeight = P;
+      const m = simulateMatch(H, A, createRng(s * 31));
+      ga += m.homeGoals;
+      for (const x of m.goalsPool.filter((x) => x.teamName === H.name)) { g++; if (x.kind === 'LONGSHOT') long++; }
+    }
+    r[P] = { ga: ga / 800, long: long / g };
+  }
+  assert.ok(r.LOW_BLOCK.ga <= 1.42, JSON.stringify(r));
+  assert.ok(r.LOW_BLOCK.long >= r.HIGH_GEGENPRESS.long, JSON.stringify(r));
 });

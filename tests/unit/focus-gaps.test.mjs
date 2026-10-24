@@ -166,8 +166,11 @@ test('indlægget slås fra kanten (88,30) af den bedste afleverer, aldrig af hov
     a.H.tactics.customCoords = { 8: { x: 50, y: 16 } };
   });
   assert.ok(same.scorerIs(8)); assert.equal(same.assistOf(8), 0); assert.equal(same.assistOf(10), 2);
-  // Den anden kant (next < 0,5): venstre kant, LM 5
-  const left = run((a) => { slot(a.H, 9).aerialPower = 30; slot(a.H, 5).skills.passing = 20; }, 0.4);
+  // Den anden kant (next < 0,5): venstre kant, LM 5. v3.16 (koblede linjer): angriberne står på linjen (y 28, før 14), så alle står
+  // 12+ bag hovedstødspletten (50,16) og luftstyrken skal veje mere: med luft 30 lander lodtrækningen ved 0,4 på RM (plads 8, før
+  // ST 9 i rækken); med luft 60 (vægt 70 · e^(−26/16) ≈ 13,8 mod resten ≈ 15) er ST 9 stadig hovedstødsspilleren.
+  const left = run((a) => { slot(a.H, 9).aerialPower = 60; slot(a.H, 5).skills.passing = 20; }, 0.4);
+  assert.ok(left.scorerIs(9));
   assert.equal(left.assistOf(5), 2);
 });
 test('skytten i almindeligt spil vælges efter afslutning (ikke pasning) og ikke blot første mand: FIN 6/PAS 14 mod FIN 14/PAS 6, og omvendt', () => {
@@ -220,15 +223,18 @@ function cb({ next = 0.5, setup = null, script = {}, bot = false, press = 'MID_B
   return { a, m, d: m.duelLog[a.H.id], blocked: m.events.filter((e) => e.label === 'Kanten lukket'), win: m.events.filter((e) => e.label === 'Mod baglinjen') };
 }
 const strongBacks = (v = 30) => (a) => { for (const p of a.A.squad) Object.assign(p.skills, { pace: v, positioning: v }); };
-test('cutback: flanken følger terningen (next < 0,5 = venstre kant) og backen står på den MODSATTE side – RM mod LB ved 0,5, LM mod RB ved 0,4', () => {
+// v3.16 (koblede linjer): forsvaret rykkes som blok efter sit pres – midtbanen det halve (45 → 61), så kantmidtbanespilleren på
+// boldsiden står nu 14 fra cutback-forsvarets plet (100 − wx, 72) og kan selv lukke kanten. Ved 0,5 (højre kant) lander
+// lodtrækningen på LM (plads 5, (4, 61)); ved 0,4 (venstre kant) på RB (plads 4). Aldrig én fra den modsatte side.
+test('cutback: flanken følger terningen (next < 0,5 = venstre kant) og forsvareren står på den MODSATTE side – RM mod LM ved 0,5, LM mod RB ved 0,4', () => {
   const setup = (a) => { strongBacks()(a); for (const i of [5, 8]) Object.assign(slot(a.H, i).skills, { pace: 20, ballControl: 20 }); };
   const right = cb({ next: 0.5, setup }), left = cb({ next: 0.4, setup });
   assert.equal(right.blocked.length, 2); assert.equal(left.blocked.length, 2);
-  // v3.12.1: forsvaret forskydes mod boldsiden, så den nærmeste kan være backen eller stopperen på DEN side –
-  // aldrig én fra den modsatte side.
+  // v3.12.1: forsvaret forskydes mod boldsiden, så den nærmeste kan være backen, stopperen eller (v3.16) kantmidtbanespilleren på
+  // DEN side – aldrig én fra den modsatte side.
   const side = (r, ids, w) => r.blocked.every((e) => ids.some((i) => e.text.includes(`${tg(slot(r.a.A, i))} (`)) && e.text.includes(`lukker kanten mod ${tg(slot(r.a.H, w))}.`));
-  assert.ok(side(right, [1, 2], 8), right.blocked[0].text); assert.ok(!side(right, [3, 4], 8));
-  assert.ok(side(left, [3, 4], 5), left.blocked[0].text); assert.ok(!side(left, [1, 2], 5));
+  assert.ok(side(right, [5], 8), right.blocked[0].text); assert.ok(!side(right, [3, 4, 8], 8));
+  assert.ok(side(left, [4], 5), left.blocked[0].text); assert.ok(!side(left, [1, 2, 5], 5));
 });
 test('cutback: kantspilleren vælges efter PAC+BAL (begge dele) og backen efter PAC+POS (begge dele) – en anden med højere ene evne stjæler dem ikke', () => {
   const who = (hs, as) => cb({ setup: (a) => {
@@ -239,12 +245,15 @@ test('cutback: kantspilleren vælges efter PAC+BAL (begge dele) og backen efter 
   } });
   const ok = (r, w, b) => r.blocked.length === 2 && r.blocked.every((e) => e.text.includes(`${tg(slot(r.a.A, b))} (`) && e.text.includes(`lukker kanten mod ${tg(slot(r.a.H, w))}.`));
   // Kantspiller: RM (8) PAC 1 + BAL 28 mod ST (10) PAC 30 – og omvendt (PAC 28 + BAL 1 mod BAL 30).
-  // Back: LB (1) PAC 1 + POS 30 mod CB (2) PAC 30 – og omvendt (PAC 30 + POS 1 mod CB POS 30).
+  // Back: LB (1) PAC 1 + POS 60 mod CB (2) PAC 60 – og omvendt (PAC 60 + POS 1 mod CB POS 60).
   const w1 = who({ 8: { pace: 1, ballControl: 28 }, 10: { pace: 30, ballControl: 0 } }, { 1: { pace: 30, positioning: 30 } });
   const w2 = who({ 8: { pace: 28, ballControl: 1 }, 10: { pace: 0, ballControl: 30 } }, { 1: { pace: 30, positioning: 30 } });
   assert.ok(ok(w1, 8, 1), w1.blocked[0]?.text); assert.ok(ok(w2, 8, 1), w2.blocked[0]?.text);
-  const b1 = who({ 8: { pace: 10, ballControl: 10 } }, { 1: { pace: 1, positioning: 30 }, 2: { pace: 30, positioning: 0 } });
-  const b2 = who({ 8: { pace: 10, ballControl: 10 } }, { 1: { pace: 30, positioning: 1 }, 2: { pace: 1, positioning: 30 } });
+  // v3.16: midtbanen står 16 nærmere forsvarets plet (blok-rykningen), så de evneløse vejer mere (≈ 12,5 i alt mod før ≈ 6) – med
+  // 1 + 30 mod 30 vandt CB'en lodtrækningen. Nu 1 + 60 mod 60: LB 71 · 0,597 = 42,4 > halvdelen af 42,4 + CB 70 · 0,391 = 27,4 + 12,5;
+  // med kun PAC (eller kun POS) som vægt: LB 11 · 0,597 = 6,6 → CB'en.
+  const b1 = who({ 8: { pace: 10, ballControl: 10 } }, { 1: { pace: 1, positioning: 60 }, 2: { pace: 60, positioning: 0 } });
+  const b2 = who({ 8: { pace: 10, ballControl: 10 } }, { 1: { pace: 60, positioning: 1 }, 2: { pace: 1, positioning: 60 } });
   assert.ok(ok(b1, 8, 1), b1.blocked[0]?.text); assert.ok(ok(b2, 8, 1), b2.blocked[0]?.text);
 });
 test('cutback-duellen: PAC+BAL mod PAC+POS summeres begge dele på begge sider (15+5 mod 17+5 holder; 5+15 mod 5+17 holder) – 21,9 slår, 22 holder', () => {

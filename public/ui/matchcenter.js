@@ -7,6 +7,8 @@ import { viewRatingEntry } from '../engine/visibility.js';
 import { GOAL_KIND_LABEL, goalMatchIdx } from '../engine/gazette.js';
 import { FORMATIONS } from '../engine/formations.js';
 import { isStarter, placeLabel, lineupSort } from './lineup.js';
+import { replayEl } from './replay.js';
+import { heatGrid, shotsOf, thirds, COLS, ROWS } from '../engine/heatmap.js';
 
 export const REPORT_FILTERS = [['all', 'Alle hændelser'], ['tactic', 'Kun taktik'], ['key', 'Kun nøglemomenter']];
 // VAR_GOAL: kun i gem fra før v3.15.1 (VAR var en chancetype). VAR_CHECK/VAR_PEN/VAR_RED: VAR tjekker et mål, en straffe og
@@ -57,13 +59,21 @@ const TIP = Object.fromEntries(RATING_ICONS);
 // Mål og oplæg gentages (⚽⚽); redninger og luftdueller står som tal (🧤4).
 const REPEAT = new Set(['⚽', '🅰']);
 const icon = (sym, n = 0) => h('span', { class: 'ricon', title: TIP[sym] + (n ? `: ${n}` : '') }, !n ? sym : REPEAT.has(sym) ? sym.repeat(n) : `${sym}${n}`);
-function ratingsTable(list, isOwn, title, formation, snap = null, onSnap = null) {
+// heat (v3.16): { trace, side, mine, onHeat } – dit hold: heat map for holdet eller en spiller (mine = null | { playerId });
+// modstanderen: kun tredjedele (brugerens valg – et præsentationsvalg, se heatmap.js).
+function ratingsTable(list, isOwn, title, formation, snap = null, onSnap = null, heat = null) {
   const rows = lineupSort(list).map((e) => ({ ...viewRatingEntry(e, isOwn), place: placeLabel(e, formation) }));
-  return h('div', { class: 'ratings' }, h('h4', {}, title),
-    // Øjebliksbillede ved et mål (kun dit hold, v3.12.1) – ellers startopstillingen.
-    isOwn && snap ? snapPitch(rows, snap, onSnap)
+  const gkId = list.find((e) => e.role === 'GK')?.playerId ?? null;
+  const canHeat = heat?.trace && isOwn;
+  return h('div', { class: 'ratings' }, h('h4', {}, title,
+      canHeat ? h('button', { class: 'mini' + (heat.mine ? ' active' : ''), id: 'heat-btn', title: 'Hvor holdet stod og afsluttede i kampen – klik derefter på en spiller', onclick: () => heat.onHeat(heat.mine ? null : { playerId: null }) }, '🔥 Heat map') : null),
+    heat?.trace && !isOwn ? thirdsLine(heat.trace, heat.side, gkId) : null,
+    // Heat map (v3.16) – øjebliksbillede ved et mål (kun dit hold, v3.12.1) – ellers startopstillingen.
+    canHeat && heat.mine ? heatPitch(rows, heat, gkId)
+    : isOwn && snap ? snapPitch(rows, snap, onSnap)
       : formation && rows.some((e) => isStarter(e) && e.slot != null) ? miniPitch(rows.filter(isStarter), formation, isOwn) : null,
-    h('table', {}, h('tbody', {}, rows.map((e) => h('tr', { class: e.isMotM ? 'motm' : '' },
+    h('table', {}, h('tbody', {}, rows.map((e) => h('tr', { class: (e.isMotM ? 'motm' : '') + (canHeat && heat.mine?.playerId === e.playerId ? ' heat-sel' : ''),
+        onclick: canHeat && heat.mine ? () => heat.onHeat({ playerId: heat.mine.playerId === e.playerId ? null : e.playerId }) : null, title: canHeat && heat.mine ? 'Vis hans heat map' : null },
       h('td', {}, `#${e.shirtNumber} ${e.shortName}`, h('span', { class: 'place' }, ` · ${e.place}`)), h('td', { class: 'muted' }, minutes(e)),
       h('td', { class: 'icons' }, e.goals ? icon('⚽', e.goals) : null, e.assists ? icon('🅰', e.assists) : null, e.saves ? icon('🧤', e.saves) : null, e.aerialWins ? icon('✈', e.aerialWins) : null,
         e.yellowCard ? icon('🟨') : null, e.red ? icon('🟥') : null, e.injured ? icon('🚑') : null, e.isMotM ? icon('👑') : null),
@@ -89,7 +99,7 @@ function snapPitch(rows, { ev, snap }, onSnap) {
   const byId = new Map(rows.map((e) => [e.playerId, e]));
   const who = (id) => byId.get(id);
   const sc = who(snap.scorer);
-  const head = snap.attacking ? `${ev.min}' – mål${sc ? ` af #${sc.shirtNumber} ${sc.shortName}` : ''}: sådan stod I` : `${ev.min}' – mål imod: sådan stod dit forsvar (modstanderens spillere vises ikke)`;
+  const head = snap.attacking ? `${ev.min}' – mål${sc ? ` af #${sc.shirtNumber} ${sc.shortName}` : ''}: sådan stod I, da bolden blev spillet` : `${ev.min}' – mål imod: sådan stod dit forsvar, da bolden blev spillet`;
   return h('div', { class: 'minipitch-wrap', id: 'snap-pitch' }, h('div', { class: 'row' }, h('strong', { id: 'snap-title' }, head),
     h('button', { class: 'mini', id: 'snap-back', onclick: () => onSnap(null) }, '↩ Startopstilling')),
     h('div', { class: 'minipitch' },
@@ -98,10 +108,32 @@ function snapPitch(rows, { ev, snap }, onSnap) {
         return h('div', { class: 'mp-token' + mark, dataset: { pid: id }, style: { left: x + '%', top: y + '%' }, title: `#${e.shirtNumber} ${e.shortName}${mark === ' scorer' ? ' – målscorer' : mark === ' assist' ? ' – oplæg' : ''}` },
           h('span', { class: 'mp-val' }, id === snap.scorer ? '⚽' : id === snap.assist ? '🅰' : `#${e.shirtNumber}`), h('span', { class: 'mp-name' }, e.shortName)); }),
       h('div', { class: 'mp-ball', id: 'snap-ball', title: 'Bolden', style: { left: snap.ball[0] + '%', top: snap.ball[1] + '%' } }, '●')),
-    h('div', { class: 'muted' }, snap.attacking ? 'Spillerne rykker med i kampen: frem når I har bolden, mod boldsiden – og løb uden bold fører flere ind i feltet.' : 'Dit forsvar står efter dit pres og boldsiden.'));
+    h('div', { class: 'muted' }, snap.attacking ? 'Spillerne rykker med i kampen: frem til modstanderens offside-linje, når I har bolden, og mod boldsiden – den, der vinder sit løb uden bold, er sluppet igennem.' : 'Dit forsvar står efter dit pres og boldsiden.'));
 }
 
-const legend = (isOwn = true) => h('div', { class: 'muted legend', id: 'icon-legend' }, RATING_ICONS.map(([s, t]) => `${s} ${t}`).join(' · ') + ' · 📍 i referatet = se hvor dit hold stod, da målet faldt (åbent spil og kontra, efter slutfløjt) · HI = andel højintenst løb (over ca. 20 km/t) · "2/3 fri" = løb uden bold: kom fri 2 af 3 gange – begge kun dit hold');
+// Heat map (v3.16): tætheden af hvor holdet/spilleren stod (grundbilleder og afslutninger) og hans afslutninger efter udfald.
+const minutesOn = (e) => Math.max(0, (e.minOut ?? 90) - (e.minIn <= 1 ? 0 : e.minIn));
+const OUT_LABEL = { goal: 'mål', save: 'redning', miss: 'forbi/blokeret', offside: 'offside (flag)', disallowed: 'annulleret af VAR', assist: 'oplæg' };
+function heatPitch(rows, heat, gkId) {
+  const pid = heat.mine.playerId, e = rows.find((x) => x.playerId === pid);
+  const grid = heatGrid(heat.trace, heat.side, pid, gkId), shots = shotsOf(heat.trace, heat.side, pid);
+  const n = (k) => shots.filter((s) => s.outcome === k).length;
+  return h('div', { class: 'minipitch-wrap', id: 'heat-pitch' },
+    h('div', { class: 'row' }, h('strong', { id: 'heat-title' }, pid != null && e ? `🔥 #${e.shirtNumber} ${e.shortName}` : '🔥 Holdet (uden målmand)'),
+      pid != null ? h('button', { class: 'mini', id: 'heat-team', onclick: () => heat.onHeat({ playerId: null }) }, 'Holdet') : null,
+      h('button', { class: 'mini', id: 'heat-back', onclick: () => heat.onHeat(null) }, '↩ Startopstilling')),
+    h('div', { class: 'minipitch heat' },
+      grid.flatMap((r, y) => r.map((v, x) => v > 0 ? h('div', { class: 'heat-cell', style: { left: `${(x * 100) / COLS}%`, top: `${(y * 100) / ROWS}%`, width: `${100 / COLS}%`, height: `${100 / ROWS}%`, opacity: String(0.15 + v * 0.7) } }) : null)),
+      shots.map((s) => h('div', { class: `heat-shot ${s.outcome}`, style: { left: s.x + '%', top: s.y + '%' }, title: `${s.t * 3}' ${OUT_LABEL[s.outcome]}` }, s.outcome === 'goal' ? '⚽' : s.outcome === 'assist' ? '🅰' : '●'))),
+    h('div', { class: 'muted', id: 'heat-note' }, `Angriber opad. Farven: hvor ${pid != null ? 'han' : 'holdet'} stod i kampens ${heat.trace.frames.length} øjebliksbilleder og afslutninger${pid != null && e && minutesOn(e) < 90 ? ` (han var på banen i ${minutesOn(e)} min – kortet er mørkest, hvor han stod oftest)` : ''}. Prikker: ${shots.length ? `${n('goal')} mål, ${n('save')} reddet, ${n('miss')} forbi/blokeret${n('offside') ? `, ${n('offside')} offside` : ''}${n('disallowed') ? `, ${n('disallowed')} annulleret` : ''}${n('assist') ? `, ${n('assist')} oplæg` : ''}` : 'ingen afslutninger'}.${pid == null ? ' Klik på en spiller i listen.' : ''}`));
+}
+// Modstanderen groft (brugerens valg): andel af holdets placeringer i hver tredjedel – set fra deres egen banehalvdel.
+function thirdsLine(trace, side, gkId) {
+  const t = thirds(trace, side, gkId), pc = (v) => `${Math.round(v * 100)} %`;
+  return h('div', { class: 'muted', id: 'heat-thirds' }, `🔥 Tyngdepunkt (groft): egen tredjedel ${pc(t.defence)} · midten ${pc(t.middle)} · angrebstredjedelen ${pc(t.attack)}`);
+}
+
+const legend = (isOwn = true) => h('div', { class: 'muted legend', id: 'icon-legend' }, RATING_ICONS.map(([s, t]) => `${s} ${t}`).join(' · ') + ' · 🎬 i referatet = vis afslutningen i afspilningen · 📍 i referatet = se hvor dit hold stod, da målet faldt (åbent spil og kontra, efter slutfløjt) · HI = andel højintenst løb (over ca. 20 km/t) · "2/3 fri" = løb uden bold: kom fri 2 af 3 gange – begge kun dit hold');
 
 // onOpenMatch(i): åbner referatet af kamp i i runden (Liga: skift til Kamp; Kamp: vis kampen).
 // matches: rundens kampe – bruges til at finde kampen for mål fra før v3.7.1 (uden matchIdx).
@@ -174,6 +206,8 @@ export function renderMatchCenter({ mc, myTeamId, on, column = null }) {
   const last = shown.at(-1) || all[0];
   const isOwnSide = (side) => (side === 'home' ? m.homeId : m.awayId) === myTeamId;
   const feed = filterEvents(shown, mc.filter).slice().reverse();
+  const moments = new Set((m.trace?.moments ?? []).map((x) => x.ev));
+  const heatFor = (side) => (m.trace ? { trace: m.trace, side, mine: mc.heat ?? null, onHeat: on.heat } : null);
   return h('div', { class: 'panel matchcenter', id: 'match-center' },
     h('div', { class: 'row' }, h('h3', {}, `📺 Match Center – runde ${mc.round}`),
       mc.playing ? h('button', { class: 'mini', id: 'skip', onclick: on.skip }, '⚡ Spring til slutfløjt') : null,
@@ -187,19 +221,21 @@ export function renderMatchCenter({ mc, myTeamId, on, column = null }) {
       h('div', { class: 'score' }, h('div', { id: 'score' }, `${last.hG} - ${last.aG}`), h('div', { class: 'muted', id: 'minute' }, mc.playing ? `${last.min}'` : 'Slut')),
       h('div', { class: 'right' }, h('strong', {}, m.awayName), h('div', { class: 'muted' }, m.awayTacticStr))),
     timeline(shown),
+    mc.playing ? null : replayEl(m, isOwnSide('home') ? 'h' : isOwnSide('away') ? 'a' : null),
     last.varMsg && mc.playing ? h('div', { class: 'varbanner' }, `📺 VAR: ${last.varMsg}`) : null,
     h('div', { class: 'mc-grid' },
       h('div', {}, h('div', { class: 'toolbar' }, REPORT_FILTERS.map(([v, l]) => h('button', { class: 'mini' + (mc.filter === v ? ' active' : ''), onclick: () => on.filter(v) }, l))),
         // Et mål åbnet fra avisen markeres i referatet (samme minut, samme målscorer).
         h('div', { class: 'feed', id: 'feed' }, feed.map((e) => { const focus = mc.focus && /GOAL/.test(e.type) && e.min === mc.focus.min && e.text.includes(mc.focus.scorer);
           // Mål med øjebliksbillede (kun efter slutfløjt): 📍 viser, hvor dit hold stod.
+          const film = !mc.playing && moments.has(all.indexOf(e)) ? h('button', { class: 'mini replay-btn', title: 'Vis i afspilningen', onclick: () => on.replay(m, all.indexOf(e)) }, '🎬') : null;
           const pin = e.snapshot && !mc.playing ? h('button', { class: 'mini snap-btn', title: e.snapshot.attacking ? 'Se hvor dit hold stod, da målet faldt' : 'Se hvor dit forsvar stod, da målet faldt', onclick: () => on.snapshot(all.indexOf(e)) }, '📍') : null;
-          return h('div', { class: `ev ${e.category.toLowerCase()} ${e.type.toLowerCase()}${focus ? ' focus' : ''}${mc.snap === all.indexOf(e) ? ' snapped' : ''}`, id: focus ? 'goal-focus' : null }, h('span', { class: 'ev-min' }, `${e.min}'`), e.text, pin); }))),
+          return h('div', { class: `ev ${e.category.toLowerCase()} ${e.type.toLowerCase()}${focus ? ' focus' : ''}${mc.snap === all.indexOf(e) ? ' snapped' : ''}`, id: focus ? 'goal-focus' : null }, h('span', { class: 'ev-min' }, `${e.min}'`), e.text, film, pin); }))),
       h('div', {}, statsRows(m, last.stats))),
     // Karakterarkene side om side under referatet (stablet på smal skærm).
     mc.playing ? null : h('div', { class: 'ratings-grid' },
-      ratingsTable(m.ratings.home, isOwnSide('home'), `${m.homeName} – karakterer`, m.startFormations?.home, snapOf(m, mc), on.snapshot),
-      ratingsTable(m.ratings.away, isOwnSide('away'), `${m.awayName} – karakterer`, m.startFormations?.away, snapOf(m, mc), on.snapshot)),
+      ratingsTable(m.ratings.home, isOwnSide('home'), `${m.homeName} – karakterer`, m.startFormations?.home, snapOf(m, mc), on.snapshot, heatFor('h')),
+      ratingsTable(m.ratings.away, isOwnSide('away'), `${m.awayName} – karakterer`, m.startFormations?.away, snapOf(m, mc), on.snapshot, heatFor('a'))),
     mc.playing ? null : legend(),
     mc.playing ? null : renderGazette(mc.gazette, myTeamId, on.openGoal, mc.matches, column, on.view));
 }

@@ -17,6 +17,7 @@ import { buildColumn } from './engine/column.js';
 import { seasonRoundOf } from './engine/schedule.js';
 import { renderLastRound, renderSchedule } from './ui/rounds.js';
 import { renderMatchCenter, renderGazette } from './ui/matchcenter.js';
+import { replayJump, clearReplays } from './ui/replay.js';
 
 export const PLAYBACK_MS = 420;
 let mc = null;            // Match Center: { round, matches, gazette, viewIdx, filter, shownCount, playing }
@@ -64,6 +65,7 @@ const NEWS = {
   '3.14.1': 'Rettelser: VAR tjekker nu offside for den forreste – scorer en spiller længere tilbage, er det hans forreste holdkammerat, der tjekkes, og billedet ved målet viser skytten, hvor han skød fra. Statistikken på Liga-fanen gælder sæsonen.',
   '3.14.2': 'Rettelse: Ved et VAR-tjek står den tjekkede nu, hvor han stod (forrest), i billedet ved målet – ikke flyttet bag en holdkammerat.',
   '3.14.3': 'Rettelser: Langskud tages fra skudafstand (ikke fra egen banehalvdel) i billedet ved målet, referatet fortæller et oplæg én gang, og efter sæsonens sidste runde viser tabellen slutstillingen og mesteren, til næste sæson går i gang.',
+  '3.16.0': '🎬 Afspilning og 🔥 heat map: efter slutfløjt kan du se kampen som taktiktavle i Kamp-fanen – begge hold og bolden hvert 3. minut og ved hver afslutning i åbent spil og på kontra (dødbolde har intet billede), med ▶ afspil, trin frem og tilbage, hastighed og ⭐ Højdepunkter. 🎬 ved en afslutning i referatet springer dertil. I karakterarket viser 🔥 Heat map, hvor dit hold stod og afsluttede – klik på en spiller for hans eget kort med afslutningerne (mål, reddet, forbi). Modstanderen ses kun groft (tyngdepunkt i tredjedele). Samtidig regnes holdenes placering nu i forhold til hinanden: angriberne står på modstanderens offside-linje (ikke bag den), og den, der vinder sit løb, slipper igennem; uden bold rykker holdet sammen efter sit pres (lav blok dybt, gegenpres højt); mod en lav blok skydes der oftere udefra; kontraens skytte løber ind i feltet. Kampene ændrer sig lidt – målniveauet er det samme. Afspilning findes for seneste runde.',
   '3.15.1': 'VAR som i virkeligheden: VAR er ikke længere en chancetype – chancen afgøres først (mål, redning eller forbi), og VAR tjekker bagefter. Et mål kan tjekkes for offside eller et frispark i opspillet: du ser bolden i nettet og stillingen tælle op, så kendelsen – og annulleres målet, falder stillingen tilbage. VAR tjekker også straffespark (filmning giver gult) og kan selv give et, dommeren ikke så, og det tjekker røde kort (et kan blive gult, en grov tackling kan blive rødt). Linjedommeren kan løfte flaget efter en afslutning. Skud kan nu gå forbi, over, på stolpen eller blive blokeret – færre skud på mål, som i Superligaen. VAR ± i tabellen tæller nu kun de kendelser, VAR ændrede (et godkendt mål tæller ikke længere +1).',
   '3.15.0': 'Røde kort: andet gule kort giver rødt, og en grov tackling kan give direkte rødt. Den udviste må ikke erstattes – holdet spiller resten af kampen med ti mand og bliver både svagere og hurtigere træt. (Karantæne kommer senere.) Kampens spiller: mål tæller nu fuldt ud, vundne dueller på midtbanen mindre, og resultatet tæller med – en målmand på det tabende hold vinder sjældent. Træthedsskift sker højst tre ad gangen (også i pausen), så et hold ikke bruger alle sine skift på én gang.',
 };
@@ -338,7 +340,7 @@ function playNextRound() {
 }
 
 function openMatchCenter(result, live) {
-  clearInterval(timer);
+  clearInterval(timer); clearReplays();
   mc = { round: result.round, matches: result.matches, gazette: result.gazette, viewIdx: 0, filter: 'all', shownCount: live ? 1 : Infinity, playing: live };
   game.ui.tab = 'kamp';
   render();
@@ -368,7 +370,11 @@ const mcHandlers = {
   // Uden igangværende afspilning vises seneste runde; et valg af kamp/filter gemmer den som mc.
   view: (i) => { mc ||= lastRoundView(game.league.lastRound); mc.viewIdx = i; mc.focus = null; mc.snap = null; renderMc(); },
   // Øjebliksbillede ved et mål (v3.12.1): vis på dit holds minibane og rul derhen; null = startopstillingen.
-  snapshot: (i) => { mc ||= lastRoundView(game.league.lastRound); mc.snap = i; renderMc(); if (i != null) document.getElementById('snap-pitch')?.scrollIntoView({ block: 'center' }); },
+  // Heat map (v3.16): null = af; { playerId: null } = holdet; { playerId } = én spiller.
+  heat: (v) => { mc ||= lastRoundView(game.league.lastRound); mc.heat = v; if (v) mc.snap = null; renderMc(); },
+  // 2D-afspilningen springer til hændelsen (referatets 🎬).
+  replay: (m, i) => replayJump(m, i),
+  snapshot: (i) => { mc ||= lastRoundView(game.league.lastRound); mc.snap = i; if (i != null) mc.heat = null; renderMc(); if (i != null) document.getElementById('snap-pitch')?.scrollIntoView({ block: 'center' }); },
   openGoal: (i, goal) => openGoal(i, goal),
   filter: (f) => { mc ||= lastRoundView(game.league.lastRound); mc.filter = f; renderMc(); },
 };

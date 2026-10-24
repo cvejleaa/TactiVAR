@@ -57,6 +57,9 @@ export function normalizeLeague(league) {
   if (!Array.isArray(league.history)) league.history = [];
   league.scouting ||= {};
   league.lastRound ??= null;
+  // Kampens spor (v3.16) er afledt data: et spor med forkert form (fx en redigeret gemt fil) slettes, så Kamp-fanen viser
+  // "Ingen afspilning" i stedet for at vælte (Security Reviewer v3.16).
+  for (const m of league.lastRound?.matches || []) if (m && m.trace !== undefined && !isValidTrace(m.trace)) delete m.trace;
   // Kampprogrammet (v3.11): et ugyldigt eller manglende program genskabes deterministisk (holdenes
   // rækkefølge), og sæsonens start lægges, så næste runde altid er en af sæsonens 14.
   if (!isValidSchedule(league.schedule, league.teams)) league.schedule = buildSchedule(league.teams.map((t) => t.id));
@@ -83,4 +86,14 @@ export function normalizeLeague(league) {
     team.subsLimit = clampSubsLimit(team.subsLimit ?? profile.subs);
   });
   return { league, problems };
+}
+
+// Sporets form (v3.16, match.js "Kampens spor"): v 1, højst 31 grundbilleder, højst 11 spillere pr. side, id'er som tal eller
+// tekst, koordinater som endelige tal i 0–100.
+const okPts = (list) => Array.isArray(list) && list.length <= 11 && list.every((q) => Array.isArray(q) && q.length === 3 && (typeof q[0] === 'number' || typeof q[0] === 'string') && Number.isFinite(q[1]) && Number.isFinite(q[2]) && q[1] >= 0 && q[1] <= 100 && q[2] >= 0 && q[2] <= 100);
+const okBall = (b) => Array.isArray(b) && b.length === 2 && b.every((v) => Number.isFinite(v) && v >= 0 && v <= 100);
+export function isValidTrace(tr) {
+  return !!tr && tr.v === 1 && Array.isArray(tr.frames) && tr.frames.length <= 31 && Array.isArray(tr.moments) && tr.moments.length <= 400
+    && [...tr.frames, ...tr.moments].every((f) => f && Number.isInteger(f.t) && f.t >= 0 && f.t <= 30 && okBall(f.ball) && okPts(f.h) && okPts(f.a))
+    && tr.moments.every((m) => Number.isInteger(m.ev) && (m.side === 'h' || m.side === 'a'));
 }

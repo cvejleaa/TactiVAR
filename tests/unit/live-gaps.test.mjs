@@ -70,8 +70,10 @@ test('dit mål (kombination): billedet har ALLE 11 pladser med de levende koordi
   const evs = goalEvents(m, 'GOAL');
   assert.ok(evs.length >= 25 && evs.every((e) => e.snapshot), 'hvert mål i åbent spil har et billede');
   const snap = evs[0].snapshot, g = (i) => slot(a.H, i).id;
-  // GK uændret (50,90); back 95−20 = 75; CB 95−14 = 81; midtbane 95−16 = 79; ST1 28−6 = 22 (x 40 uændret ved bold midt); ST2 95−6 = 89
-  const want = pts(a.H, [[50, 90], [50, 75], [50, 81], [50, 81], [50, 75], [50, 79], [50, 79], [50, 79], [50, 79], [40, 22], [50, 89]]);
+  // GK uændret (50,90); back 95−20 = 75; CB 95−14 = 81; midtbane 95−16 = 79; ST2 95−6 = 89. ST1 28−6 = 22 står v3.16 (koblede
+  // linjer) ikke foran offside-linjen: modstanderens stopper i mellemblok på y 73 → linje 100 − 73 = 27, + ONSIDE_GAP 1 = 28
+  // (før 22; x 40 uændret ved bold midt)
+  const want = pts(a.H, [[50, 90], [50, 75], [50, 81], [50, 81], [50, 75], [50, 79], [50, 79], [50, 79], [50, 79], [40, 28], [50, 89]]);
   assert.deepEqual(snap, { attacking: true, formation: '4-4-2', pts: want, scorer: g(9), assist: g(5), ball: [50, 20] });
   // Billedet hænger på målets egen hændelse (ikke den første i kampen) – alle andre hændelser har intet
   assert.ok(m.events.filter((e) => e.snapshot).every((e) => e.type === 'GOAL') && m.events[0].snapshot === undefined);
@@ -137,16 +139,21 @@ function against({ focus = 'CENTRAL', script = {}, press = 'LOW_BLOCK' } = {}) {
   const m = simulateMatch(a.A, a.H, stubRng({ 0.48: true, 0.3: true, ...script }));
   return { a, m, snap: goalEvents(m, 'GOAL', 'HEADER_GOAL', 'VAR_GOAL').find((e) => e.snapshot)?.snapshot };
 }
-test('mål imod (åbent spil): dit forsvar i lav blok (alle +10, ST 28+10 = 38), ingen scorer/oplæg, bolden spejlet (50,80), ingen af modstanderens spillere i billedet', () => {
+// v3.16 (koblede linjer): dit forsvar rykkes som blok efter dit pres – de forreste PRESS_GAP.LOW_BLOCK 20 foran modstanderens
+// dybeste markspiller. Botten (3-5-2, alle andre trukket til y 95) har stopperne på 95 − 14 = 81 → ønsket 100 − 81 + 20 = 39;
+// din forreste (ST 28 + 10 = 38) → skift 1: angrebet ×1 → 39, midtbanen ×0,5 (95,5 → klemt 95), forsvaret ×0 (95).
+test('mål imod (åbent spil): dit forsvar i lav blok (alle +10, ST 28 + 10 = 38, rykket 1 til 39 – 20 foran bottens stoppere på 81), ingen scorer/oplæg, bolden spejlet (50,80), ingen af modstanderens spillere i billedet', () => {
   const { a, m, snap } = against();
   assert.ok(m.homeGoals >= 25 && snap);
-  assert.deepEqual(snap, { attacking: false, formation: '4-4-2', pts: pts(a.H, [[50, 90], [50, 95], [50, 95], [50, 95], [50, 95], [50, 95], [50, 95], [50, 95], [50, 95], [40, 38], [50, 95]]), scorer: null, assist: null, ball: [50, 80] });
+  // ST: før 38 (livePositions), nu 39 (seen[mine] fra coupledPositions)
+  assert.deepEqual(snap, { attacking: false, formation: '4-4-2', pts: pts(a.H, [[50, 90], [50, 95], [50, 95], [50, 95], [50, 95], [50, 95], [50, 95], [50, 95], [50, 95], [40, 39], [50, 95]]), scorer: null, assist: null, ball: [50, 80] });
   const enemy = a.A.squad.map((p) => p.id);
   assert.ok(!enemy.some((id) => JSON.stringify(snap).includes(id)), 'modstanderens spiller-id i billedet');
 });
 test('mål imod på et indlæg fra højre (bold 88): dit forsvar forskydes mod den SPEJLEDE boldside (12 → −11,4) og bolden spejles til (50,84)', () => {
   const { a, snap } = against({ focus: 'HIGH_CROSSES', script: { 0.52: true } });
-  assert.deepEqual(snap.pts, pts(a.H, [[50, 90], [39, 95], [39, 95], [39, 95], [39, 95], [39, 95], [39, 95], [39, 95], [39, 95], [29, 38], [39, 95]]));
+  // y som i testen ovenfor: ST 38 rykket 1 til 39 (før 38)
+  assert.deepEqual(snap.pts, pts(a.H, [[50, 90], [39, 95], [39, 95], [39, 95], [39, 95], [39, 95], [39, 95], [39, 95], [39, 95], [29, 39], [39, 95]]));
   assert.deepEqual([snap.attacking, snap.scorer, snap.assist, snap.ball], [false, null, null, [50, 84]]);
 });
 test('bot mod bot: ingen billeder (der er intet hold at vise) og ingen fejl', () => {
@@ -216,39 +223,50 @@ function runGoal({ rm, custom = null, runs = 'NORMAL', slotNo = 8, next = 0.5 })
   const m = simulateMatch(a.H, a.A, stubRng({ 0.3: shots(2) }, next));
   return { a, m, evs: goalEvents(m, 'GOAL') };
 }
-test('langskud er skytten på levende y ≥ 24 (ST 30 − 6 = 24 → langskud, 29 − 6 = 23 → kombination) og et langskud har intet oplæg i billedet – dræber LONGSHOT_Y 23/25, >= → > og solo-assist', () => {
+// v3.16: LONGSHOT_Y 24 → 30, og skyttens y er den koblede (bag offside-linjen 27 + 1 = 28 mod mellemblok). Før: plads 30 → 24
+// langskud, 29 → 23 kombination; nu: plads 36 → 30 langskud, 35 → 29 kombination.
+test('langskud er skytten på koblet y ≥ 30 (ST 36 − 6 = 30 → langskud, 35 − 6 = 29 → kombination) og et langskud har intet oplæg i billedet – dræber LONGSHOT_Y 29/31, >= → > og solo-assist', () => {
   const at = (y) => mine({ spots: { 9: { x: 50, y } } });
-  const lng = at(30), comb = at(29);
+  const lng = at(36), comb = at(35);
   assert.ok(lng.m.goalsPool.length >= 25 && lng.m.goalsPool.every((g) => g.kind === 'LONGSHOT'), lng.m.goalsPool.map((g) => g.kind).join());
   assert.ok(comb.m.goalsPool.length >= 25 && comb.m.goalsPool.every((g) => g.kind === 'COMBINATION'), comb.m.goalsPool.map((g) => g.kind).join());
   // Langskud: soloscoring → ingen oplægsmarkering trods en oplægsgiver (første midtbane) i truppen; kombination: oplægget er LM
   assert.ok(goalEvents(lng.m, 'GOAL').every((e) => e.snapshot.assist === null && e.snapshot.scorer === slot(lng.a.H, 9).id));
   assert.ok(goalEvents(comb.m, 'GOAL').every((e) => e.snapshot.assist === slot(comb.a.H, 5).id));
 });
-test('almindelig afslutning: EDGE_SHARE 0,5 (QC-kalibreringen; før 0,45) vælger feltets kant (50,32) som spot: terning 0,48 → kanten, 0,52 → målet (50,20) – dræber EDGE_SHARE 0,45/0,55 og spot-y', () => {
-  // slot 9 står på kanten (levende y 38 − 6 = 32), slot 10 ved målet (26 − 6 = 20); samme evner
-  const spots = { 9: { x: 50, y: 38 }, 10: { x: 50, y: 26 } };
-  const who = (spots, next) => { const r = mine({ spots, next }); assert.ok(r.m.goalsPool.length >= 25); return [...new Set(r.m.goalsPool.map((g) => g.scorer))]; };
-  const tg = (a, i) => `#${slot(a.H, i).shirtNumber} ${slot(a.H, i).shortName}`;
-  const a = mine({ spots }).a;
-  assert.deepEqual(who(spots, 0.48), [tg(a, 9)]);
-  assert.deepEqual(who(spots, 0.52), [tg(a, 10)]);
-  // Kantens y præcis 32 (ikke 30): slot 9 står 24 væk fra kanten, slot 10 4 væk – men terningen lander på slot 9 med y 32 og på slot 10 med y 30
-  const tight = { 9: { x: 50, y: 62 }, 10: { x: 50, y: 34 } };
-  assert.deepEqual(who(tight, 0.45), [tg(a, 9)]);   // 0,45 < EDGE_SHARE 0,5 → kanten; vægtningen ved 0,48 lander på næste plads
+// v3.16: kanten vælges efter FORSVARETS pres (EDGE_BY_PRESS: lav blok 0,75, mellemblok 0,5 = EDGE_SHARE, gegenpres 0,35) – før
+// altid EDGE_SHARE 0,5. Slot 9 står på kanten (38 − 6 = 32), slot 10 længere fremme (30 − 6 = 24; mod mellemblok/gegenpres klemt
+// til linjen 27 + 1 = 28, mod lav blok – linje 17 – står han på 24). Terningen er både tærsklen og modtager-lodtrækningen, så
+// afslutningsevnen (vægt 10 + FIN) er sat pr. pres, så kanten giver slot 9 og målet slot 10 på BEGGE sider af tærsklen.
+test('almindelig afslutning: kanten (50,32) vælges efter forsvarets pres – mellemblok 0,48 → kanten / 0,52 → målet (50,20), lav blok 0,73 / 0,77, gegenpres 0,33 / 0,37, ukendt pres som mellemblok – dræber EDGE_BY_PRESS-værdierne ±0,03, fast EDGE_SHARE og spot-y', async () => {
+  // v3.16: valget testes direkte (shotSpotFor) – før gennem hvem modtagerlodtrækningen landede på, som flyttede sig med hver
+  // motorændring (SHOT_REACH, koblede linjer). At motoren bruger forsvarets pres, ikke angriberens, bevises nedenfor.
+  const { shotSpotFor, SPOT, EDGE_SHARE } = await import('../../public/engine/match.js');
+  assert.deepEqual([SPOT.EDGE, SPOT.GOAL, EDGE_SHARE], [{ x: 50, y: 32 }, { x: 50, y: 20 }, 0.5]);
+  const y = (r, p) => shotSpotFor(r, p).y;
+  assert.deepEqual([y(0.48, 'MID_BLOCK'), y(0.52, 'MID_BLOCK'), y(0.73, 'LOW_BLOCK'), y(0.77, 'LOW_BLOCK'), y(0.33, 'HIGH_GEGENPRESS'), y(0.37, 'HIGH_GEGENPRESS'), y(0.48, undefined), y(0.52, undefined)],
+    [32, 20, 32, 20, 32, 20, 32, 20]);
+  // Motoren bruger FORSVARETS pres (defPh), ikke angriberens – ét kald (læst i kilden; en lodtrækning kan ikke skelne dem
+  // pålideligt, fordi presset også flytter forsvarets placering).
+  const src = (await import('node:fs')).readFileSync(new URL('../../public/engine/match.js', import.meta.url), 'utf8');
+  assert.equal(src.match(/shotSpotFor\(rng\.next\(\), defPh\.phase2_defending\.pressingHeight\)/g)?.length, 1);
 });
 
-test('løber, højre kant (RM, bold 88): løberen står 12 foran sin levende plads (96, 29 − 12 = 17), holdet 11 mod højre, bolden på (50,28), oplægget er løberen – dræber RUN_STEP, ballX-sidebytte, runner-ignoreret', () => {
+// v3.16 (koblede linjer): angriberne (14) står bag offside-linjen – modstanderens stopper på 73 → 27 + ONSIDE_GAP 1 = 28 –
+// men løberen er sluppet igennem og står foran den (17). Cutback-lodtrækningen (terning 0,5) lander nu på plads 7 (73, 32),
+// ikke plads 6: angriberen på (49, 28) står ved pletten, men vægtene foran ham i rækken (1–7) når netop halvdelen.
+test('løber, højre kant (RM, bold 88): løberen står 12 foran sin levende plads (96, 29 − 12 = 17) – foran linjen, angriberne bag den (14 → 28) – holdet 11 mod højre, bolden på (50,28), oplægget er løberen – dræber RUN_STEP, ballX-sidebytte, runner-ignoreret, løberen klemt', () => {
   const r = runGoal({ rm: { passing: 20, finishing: 1 } });
   assert.deepEqual(r.m.goalsPool.map((g) => g.kind), ['CUTBACK', 'CUTBACK']);
-  const want = pts(r.a.H, [[50, 90], [26, 50], [49, 59], [73, 59], [96, 50], [26, 29], [49, 32], [73, 32], [96, 17], [49, 14], [73, 14]]);
-  assert.deepEqual(r.evs[0].snapshot, { attacking: true, formation: '4-4-2', pts: want, scorer: slot(r.a.H, 6).id, assist: slot(r.a.H, 8).id, ball: [50, 28] });
+  const want = pts(r.a.H, [[50, 90], [26, 50], [49, 59], [73, 59], [96, 50], [26, 29], [49, 32], [73, 32], [96, 17], [49, 28], [73, 28]]);
+  assert.deepEqual(r.evs[0].snapshot, { attacking: true, formation: '4-4-2', pts: want, scorer: slot(r.a.H, 7).id, assist: slot(r.a.H, 8).id, ball: [50, 28] });
 });
-test('løber, venstre kant (LM, bold 12): holdet 11 mod venstre (LB 15 → 4), løberen på (4, 45 − 16 − 12 = 17)', () => {
+// v3.16: angriberne 14 → 28 (bag linjen 27 + 1), løberen foran den; lodtrækningen (0,25) lander på plads 7 (51, 32), før plads 6.
+test('løber, venstre kant (LM, bold 12): holdet 11 mod venstre (LB 15 → 4), løberen på (4, 45 − 16 − 12 = 17), angriberne bag linjen (28)', () => {
   const r = runGoal({ rm: { passing: 20, finishing: 1 }, slotNo: 5, next: 0.25 });
   assert.deepEqual(r.m.goalsPool.map((g) => g.kind), ['CUTBACK', 'CUTBACK']);
-  const want = pts(r.a.H, [[50, 90], [4, 50], [27, 59], [51, 59], [74, 50], [4, 17], [27, 32], [51, 32], [74, 29], [27, 14], [51, 14]]);
-  assert.deepEqual(r.evs[0].snapshot, { attacking: true, formation: '4-4-2', pts: want, scorer: slot(r.a.H, 6).id, assist: slot(r.a.H, 5).id, ball: [50, 28] });
+  const want = pts(r.a.H, [[50, 90], [4, 50], [27, 59], [51, 59], [74, 50], [4, 17], [27, 32], [51, 32], [74, 29], [27, 28], [51, 28]]);
+  assert.deepEqual(r.evs[0].snapshot, { attacking: true, formation: '4-4-2', pts: want, scorer: slot(r.a.H, 7).id, assist: slot(r.a.H, 5).id, ball: [50, 28] });
 });
 
 test('kontra: afslutteren er den FARTIGSTE nær målet (PAC), ikke den bedste afleverer – PAC 20/PAS 1 slår PAC 1/PAS 20 på samme sted – dræber skill → passing', () => {
@@ -270,10 +288,11 @@ test('almindelig afslutning inde i feltet: dribletur vægtes af PAC og BAL hver 
   assert.deepEqual(kinds({ pace: 8, ballControl: 8 }), ['COMBINATION']);
 });
 
-test('løb der ender i et skud: løberen står stadig 12 foran (RM trukket til (50,62): 62 − 16 − 12 = 34, ikke 46 → 38 = LONGSHOT_FAR) – billedet bruger løbets øjeblik, ikke skytte-kastet før – dræber "run seen ikke sat/uden runner"', () => {
+// v3.16: langskud fordi løberen står på 34 ≥ LONGSHOT_Y 30 (før: zonen afgjorde); angriberne bag linjen 14 → 28.
+test('løb der ender i et skud: løberen står stadig 12 foran (RM trukket til (50,62): 62 − 16 − 12 = 34 ≥ 30 → langskud, ikke 46 → 38 = LONGSHOT_FAR) – billedet bruger løbets øjeblik, ikke skytte-kastet før – dræber "run seen ikke sat/uden runner"', () => {
   const r = runGoal({ rm: { finishing: 20, passing: 1, pace: 1, ballControl: 1 }, custom: { 8: { x: 50, y: 62 } } });
   assert.deepEqual(r.m.goalsPool.map((g) => g.kind), ['LONGSHOT', 'LONGSHOT']);
-  const want = pts(r.a.H, [[50, 90], [15, 50], [38, 59], [62, 59], [85, 50], [15, 29], [38, 32], [62, 32], [50, 34], [38, 14], [62, 14]]);
+  const want = pts(r.a.H, [[50, 90], [15, 50], [38, 59], [62, 59], [85, 50], [15, 29], [38, 32], [62, 32], [50, 34], [38, 28], [62, 28]]);
   // Solo-mål: bolden står ved skytten (QC-rettelsen), ikke på (50, 20)
   assert.deepEqual(r.evs[0].snapshot, { attacking: true, formation: '4-4-2', pts: want, scorer: slot(r.a.H, 8).id, assist: null, ball: [50, 34] });
 });
@@ -308,7 +327,9 @@ function runAgainst(rm) {
 test('et løb imod dig på højre kant (bold 88): dit forsvar står forskudt 11 mod venstre (LB 15 → 4) og bolden er spejlet – både når løbet ender i en aflevering (cutback) og i et skud – dræber "run seenX ikke sat"', () => {
   const pass = runAgainst({ passing: 20, finishing: 1 });
   assert.deepEqual(pass.m.goalsPool.map((g) => g.kind), ['CUTBACK', 'CUTBACK']);
-  const want = pts(pass.a.H, [[50, 90], [4, 70], [27, 73], [51, 73], [74, 70], [4, 45], [27, 48], [51, 48], [74, 45], [27, 20], [51, 20]]);
+  // v3.16 (koblede linjer, dit pres mellemblok): botten har stopperne på 73 − 14 = 59 → dine forreste skal stå 100 − 59 + PRESS_GAP 10
+  // = 51; dine angribere stod på 20 → skift 31: angreb ×1 20 → 51, midtbane ×0,5 45/48 + 15,5 → 61/64 (før 45/48), forsvaret står.
+  const want = pts(pass.a.H, [[50, 90], [4, 70], [27, 73], [51, 73], [74, 70], [4, 61], [27, 64], [51, 64], [74, 61], [27, 51], [51, 51]]);
   assert.deepEqual(pass.snap, { attacking: false, formation: '4-4-2', pts: want, scorer: null, assist: null, ball: [50, 72] });
   // Skud fra kanten: ingen receiver-kald i løbs-grenen – bold-siden kommer kun fra løbets eget kald
   const shot = runAgainst({ finishing: 20, passing: 1, pace: 1, ballControl: 1 });

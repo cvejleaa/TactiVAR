@@ -4,11 +4,16 @@
 // Gemmer i OUT (standard walkthrough/): pr. runde alle fire kampes referater, statistik og klummen som tekst, og
 // skærmbilleder af Kamp-fanen (din kamp + det første 📍-billede) og Liga-fanen; til sidst slutstillingen og fejl.
 // Spilføreren (domaene-raadgiver) læser mappen bagefter – den kan ikke selv køre browseren.
+// v3.16 (brugeren: "spilføreren skal gennemspille 1 sæson mere, men hvor der nu kigger på alle funktionaliteter og især
+// spilmotor"): også alle faner (Trup, Taktik, Kamp, Liga med statistik), pr. runde afspilningen (et mål og et højdepunkt),
+// heat map for holdet og målscoreren, og kontrolværktøjets rapport for alle fire kampe (tools/trace-invariants.mjs) –
+// samlet i spor.md.
 //   node tools/season-walkthrough.mjs [OUT]        (BASE_URL=https://tactivar.web.app for den live side)
 import fs from 'node:fs';
 import path from 'node:path';
 import { chromium } from 'playwright-core';
 import { startServer } from './serve.mjs';
+import { checkTrace } from './trace-invariants.mjs';
 
 const OUT = path.resolve(process.argv[2] || 'walkthrough');
 const PORT = Number(process.env.PORT || 5077);
@@ -32,6 +37,7 @@ try {
   const box = async () => ((await page.locator('#fejlboks').isVisible()) ? fejl.push(`fejlboks: ${await page.textContent('#fejlboks')}`) : 0);
 
   for (const k of ['trup', 'taktik']) { await tab(k); await shot(`00-${k}.png`); }
+  const spor = [];
   const league = () => page.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league);
   for (let r = 1; r <= 14; r++) {
     const label = await page.textContent('#play-round');
@@ -48,8 +54,34 @@ try {
       const s = m.stats || {}, ps = (s.hPoss ?? 0) + (s.aPoss ?? 0) || 1, hp = Math.round((s.hPoss ?? 0) / ps * 100);   // som i Kamp-fanen (procent)
       lines.push('', `Kamptal (hjemme/ude): besiddelse ${hp} %/${100 - hp} % · skud ${s.hShots}/${s.aShots} · på mål ${s.hOnTarget}/${s.aOnTarget} · hjørner ${s.hCorners}/${s.aCorners} · gule ${s.hYellows}/${s.aYellows}`, '');
     }
+    // Kontrolværktøjet på rundens fire kampe (sporet i den gemte runde)
+    for (const m of L.lastRound.matches) {
+      const r = checkTrace(m), f = r.finding;
+      spor.push(`R${L.lastRound.round} ${m.homeName}–${m.awayName}: fejl ${r.errors.length}${r.errors.length ? " (" + r.errors.slice(0, 3).join("; ") + ")" : ""} · mål med billede ${f.goals} (scorer ved feltet ${f.scorerInBox}, langskud ${f.longshotOk}/${f.longshots}, kontramål langt ude ${f.counterFar}) · forreste bag sidste forsvarer ${f.frontBehind}/${f.frontFrames} · ${(JSON.stringify(m.trace ?? {}).length / 1024).toFixed(1)} KB`);
+      for (const mo of m.trace?.moments ?? []) {
+        const e = m.events[mo.ev], pts = mo[mo.side], who = pts.find((q) => q[0] === (mo.scorer ?? mo.shooter));
+        lines.push(`  · spor ${m.homeName}–${m.awayName} ${e.min}' ${mo.kind}${who ? ` skytte (${who[1]},${who[2]})` : ''} bold (${mo.ball}) – ${e.text.slice(0, 90)}`);
+      }
+    }
     await tab('kamp'); await box();
     await shot(`${nn}-kamp.png`);
+    // Afspilningen: et mål (eller første afslutning) og et grundbillede; heat map for holdet og for målscoreren
+    if (await page.locator('#rp-pitch').count()) {
+      const goalBtn = page.locator('#feed .ev.goal .replay-btn, #feed .ev.header_goal .replay-btn').first();
+      await ((await goalBtn.count()) ? goalBtn : page.locator('#feed .replay-btn').first()).click().catch(() => {});
+      await page.waitForTimeout(2400); await page.locator('#replay').screenshot({ path: path.join(OUT, `${nn}-afspilning-maal.png`) });   // øjeblikket er færdigt ved 80 % af 2,6 s (Spilfører)
+      lines.push('', `Afspilning (mål/afslutning): ${(await page.textContent('#rp-caption')).trim()}`);
+      await page.click('#rp-prev'); await page.waitForTimeout(1000); await page.locator('#replay').screenshot({ path: path.join(OUT, `${nn}-afspilning-foer.png`) });
+      lines.push(`Afspilning (trinet før): ${(await page.textContent('#rp-caption')).trim()}`);
+      await page.click('#heat-btn').catch(() => {});
+      if (await page.locator('#heat-pitch').count()) {
+        await page.locator('#heat-pitch').screenshot({ path: path.join(OUT, `${nn}-heat-hold.png`) });
+        const scorerRow = page.locator('.ratings tr[title]', { hasText: '⚽' }).first();
+        if (await scorerRow.count()) { await scorerRow.click(); await page.waitForTimeout(200); await page.locator('#heat-pitch').screenshot({ path: path.join(OUT, `${nn}-heat-spiller.png`) }); }
+        lines.push(`Heat map: ${(await page.textContent('#heat-title')).trim()} – ${(await page.textContent('#heat-note')).trim()} | ${(await page.textContent('#heat-thirds').catch(() => '')).trim()}`);
+        await page.click('#heat-back').catch(() => {});
+      }
+    } else lines.push('', 'Ingen afspilning i Kamp-fanen.');
     const pin = page.locator('#feed .snap-btn').first();
     if (await pin.count()) { await pin.click(); await shot(`${nn}-kamp-mal-billede.png`); }
     await tab('liga'); await box();
@@ -61,6 +93,8 @@ try {
   await tab('liga'); await page.locator('#stats details').evaluateAll((ds) => ds.forEach((d) => { d.open = true; }));
   await shot('15-saesonslut-liga.png');
   await tab('trup'); await shot('15-saesonslut-trup.png');
+  await tab('taktik'); await shot('15-saesonslut-taktik.png');
+  fs.writeFileSync(path.join(OUT, 'spor.md'), ['# Kontrolværktøjet (tools/trace-invariants.mjs) pr. kamp', '', ...spor].join('\n'));
 } finally {
   fs.writeFileSync(path.join(OUT, 'fejl.txt'), fejl.length ? fejl.join('\n') : 'Ingen sidefejl, konsolfejl eller fejlboks under hele sæsonen.');
   await browser.close(); server?.close();
