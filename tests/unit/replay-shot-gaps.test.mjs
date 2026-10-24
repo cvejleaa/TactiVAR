@@ -2,7 +2,7 @@
 // Forfatterens replay-shot.test.mjs bygger alle øjeblikke i hånden med få, pæne
 // koordinater og afspiller kun redning/stolpe/mål – så (1) "nærmest" kunne måles på én akse eller fra et andet punkt, (2) idOf/events
 // kunne tabes på vejen fra replayEl til replaySteps i ⭐ og 🎬 (kun direkte replaySteps-kald var testet), (3) ⭐ ryddede ikke 🎬's
-// timer, og (4) ⏮ lander på skudtrinnet med næste tick's brikker (FUND, todo). Hver test nævner, hvad den dræber.
+// timer, og (4) ⏮ lander på skudtrinnet med næste tick's brikker (FUND, rettet i baac8f9). Hver test nævner, hvad den dræber.
 import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -98,12 +98,12 @@ test('ledningen: blokeringen er den NAVNGIVNE (a3, ikke nærmeste a2) og stolpen
   for (let i = 0; i < 2; i++) click(el, 'rp-next');
   assert.deepEqual(ballAt(el), ['60%', '30%'], 'start: idOf');
   for (let i = 0; i < 2; i++) click(el, 'rp-next');
-  assert.deepEqual(ballAt(el), ['44%', '1%'], 'start: referatet (stolpen)');
+  assert.deepEqual(ballAt(el), ['44%', '3%'], 'start: referatet (stolpen)');
   // ⭐ fra første trin: højdepunkterne er byggede igen, med referat og idOf
   ({ m, el } = fresh()); click(el, 'rp-highlights');
   click(el, 'rp-next'); assert.equal(step(el), 1, 'højdepunkter: 0 blokeringen, 1 dens skudtrin');
   assert.deepEqual(ballAt(el), ['60%', '30%'], '⭐: idOf'); click(el, 'rp-next'); click(el, 'rp-next');
-  assert.deepEqual(ballAt(el), ['44%', '1%'], '⭐: referatet');
+  assert.deepEqual(ballAt(el), ['44%', '3%'], '⭐: referatet');
   // 🎬 mens ⭐ er til: højdepunkterne slås fra og fuld afspilning bygges igen – med referat og idOf
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
@@ -111,7 +111,7 @@ test('ledningen: blokeringen er den NAVNGIVNE (a3, ikke nærmeste a2) og stolpen
     replayJump(m, 1); assert.equal(step(el), 1, 'fuld afspilning igen'); mock.timers.tick(2600);
     assert.equal(step(el), 2); assert.deepEqual(ballAt(el), ['60%', '30%'], '🎬: idOf');
     replayJump(m, 2); mock.timers.tick(2600);
-    assert.equal(step(el), 4); assert.deepEqual(ballAt(el), ['44%', '1%'], '🎬: referatet');
+    assert.equal(step(el), 4); assert.deepEqual(ballAt(el), ['44%', '3%'], '🎬: referatet');
   } finally { clearReplays(); mock.timers.reset(); }
 });
 
@@ -126,13 +126,13 @@ test('⭐ rydder 🎬\'s ventende timer: efter 🎬 og ⭐ inden 2600 ms står a
 });
 
 // FUND: skudtrinnet tegner kun bolden. Går man ⏮ fra grundbilledet efter, lander man på skudtrinnet med BRIKKERNE fra grundbilledet
-// (næste tick) – skytten står midt på banen, mens bolden er i nettet. Rød indtil show() tegner brikkerne for et skudtrin også.
-test('⏮ fra grundbilledet lander på skudtrinnet med øjeblikkets brikker (skytten h9 ved (40, 22), ikke ved næste tick\'s (50, 50)) og bolden ved udfaldet', { todo: 'FUND v3.16.2: show() tegner ikke brikkerne i et skudtrin – rettelsen: tegn øjeblikkets brikker også dér' }, () => {
+// (næste tick) – skytten stod midt på banen, mens bolden var i nettet. Rettet: show() tegner brikkerne i skudtrinnet (baac8f9).
+test('⏮ fra grundbilledet lander på skudtrinnet med øjeblikkets brikker (skytten h9 ved (40, 22), ikke ved næste tick\'s (50, 50)) og bolden ved udfaldet', () => {
   const { el } = fresh();
   for (let i = 0; i < 5; i++) click(el, 'rp-next');   // grundbillede t2
   assert.deepEqual([tok(el, 'h9').style.left, tok(el, 'h9').style.top], ['50%', '50%']);
   click(el, 'rp-prev'); assert.equal(step(el), 4);
-  assert.deepEqual(ballAt(el), ['44%', '1%']);
+  assert.deepEqual(ballAt(el), ['44%', '3%']);
   assert.deepEqual([tok(el, 'h9').style.left, tok(el, 'h9').style.top], ['40%', '22%'], 'skytten, hvor han skød');
   assert.ok(cls(tok(el, 'h9'), 'actor'));
   assert.ok(cls(byId(el, 'rp-caption'), 'moment'), 'billedteksten er øjeblikkets (ikke grundbilledets)');
@@ -166,7 +166,7 @@ test('60 rigtige kampe: blokerede skud ender hos den NAVNGIVNE blokerer; mål i 
           const nm = e.text.match(/(#\d+ .+?) kaster sig ind/), id = idOf(nm?.[1]);
           assert.ok(id, `blokereren findes i karakterarket: ${nm?.[1]}`);
           assert.deepEqual(end, def.find((q) => q[0] === id).slice(1)); n.blok++;
-        } else if (/rammer stolpen/.test(e.text)) { assert.ok([44, 56].includes(end[0]) && end[1] === line(1)); n.stolpe++; }
+        } else if (/rammer stolpen/.test(e.text)) { assert.ok([44, 56].includes(end[0]) && end[1] === line(3)); n.stolpe++; /* stolpen i målets forkant (QC v3.16.2) */ }
         else if (/over (mål|overliggeren)/.test(e.text)) { assert.deepEqual(end, [50, line(0.5)]); n.over++; }
         else { assert.ok([38, 62].includes(end[0]) && end[1] === line(2), e.text); n.forbi++; }
       }
