@@ -43,8 +43,8 @@ const trace = {
   frames: [
     { t: 0, poss: null, ball: [50, 50], ...SHAPE(0) },
     { t: 1, poss: 'h', ball: [44, 50], ...SHAPE(1) },
-    { t: 2, poss: 'a', ball: [56, 50], h: SHAPE(2).h.slice(0, 2), a: SHAPE(2).a },
-    { t: 3, poss: 'h', ball: [44, 50], ...SHAPE(3) },
+    { t: 2, poss: 'a', lost: true, ball: [56, 50], h: SHAPE(2).h.slice(0, 2), a: SHAPE(2).a },
+    { t: 3, poss: 'h', run: true, ball: [44, 50], ...SHAPE(3) },
   ],
   moments: [
     { t: 1, ev: 1, kind: 'GOAL', side: 'h', ball: [41, 22], h: P('h', [[1, 50, 90], [2, 25, 62], [3, 41, 22]]), a: P('a', [[1, 50, 10], [2, 33, 39], [3, 67, 62]]), shooter: 'h3', scorer: 'h3', assist: 'h2' },
@@ -122,9 +122,11 @@ test('dit hold markeres: hjemme → hjemmebrikkerne har "own", ude → udebrikke
   }
 });
 
-test('trin frem og tilbage: bolden og brikkerne følger trinet; stillingen i et grundbillede er FØR tickets hændelser, et øjeblik viser sin egen linje; grænserne holder', () => {
+test('trin frem og tilbage: bolden og brikkerne følger trinet; stillingen i et grundbillede er FØR tickets hændelser og teksten siger duellens udfald (har bolden / erobrer – det ANDET hold / slipper igennem), et øjeblik viser sin egen linje; grænserne holder', () => {
   const { el } = fresh('h');
-  const want = ["0' · Hjemme 0-0 Ude", "3' · Hjemme 0-0 Ude", "3' · Hjemme 1-0 Ude · MÅL Hjemme", "6' · Hjemme 1-0 Ude", "6' · Hjemme 1-0 Ude · REDNING", "6' · Hjemme 1-0 Ude · FORBI", "9' · Hjemme 1-0 Ude", "9' · Hjemme 1-1 Ude · MÅL Ude"];
+  // v3.16.1: grundbilledets tekst siger, hvordan duellen gik – t 2 er udeholdets tick, men hjemme erobrer (lost), t 3 slipper
+  // hjemmes angriber igennem (run); afsparket (ingen besiddelse) har ingen duel-tekst.
+  const want = ["0' · Hjemme 0-0 Ude", "3' · Hjemme 0-0 Ude · Hjemme har bolden", "3' · Hjemme 1-0 Ude · MÅL Hjemme", "6' · Hjemme 1-0 Ude · Hjemme erobrer bolden", "6' · Hjemme 1-0 Ude · REDNING", "6' · Hjemme 1-0 Ude · FORBI", "9' · Hjemme 1-0 Ude · Hjemme: en angriber slipper igennem", "9' · Hjemme 1-1 Ude · MÅL Ude"];
   for (let i = 0; i < 8; i++) { assert.equal(step(el), i); assert.equal(cap(el), want[i], `trin ${i}`); if (i < 7) click(el, 'rp-next'); }
   click(el, 'rp-next'); assert.equal(step(el), 7, 'ikke forbi sidste trin'); assert.equal(cap(el), want[7]);
   click(el, 'rp-prev'); assert.equal(step(el), 6); assert.equal(cap(el), want[6]);
@@ -303,4 +305,15 @@ test('kamp uden spor (før v3.16): en tekst i stedet for en afspiller; et tomt s
   assert.ok(byId(empty, 'rp-pitch'));
   assert.doesNotThrow(() => { click(empty, 'rp-next'); click(empty, 'rp-prev'); click(empty, 'rp-highlights'); });
   assert.equal(empty.dataset.step, undefined, 'ingen trin at vise');
+});
+
+test('duellens tekst (v3.16.1): alle fire udfald for begge hold – erobringen nævner det hold, der IKKE havde tick\'et', async () => {
+  const { duelText } = await import('../../public/ui/replay.js');
+  const m = { homeName: 'Hjemme', awayName: 'Ude' };
+  assert.equal(duelText({ poss: 'a', duel: 'ball' }, m), ' · Ude har bolden');
+  assert.equal(duelText({ poss: 'a', duel: 'lost' }, m), ' · Hjemme erobrer bolden');
+  assert.equal(duelText({ poss: 'h', duel: 'lost' }, m), ' · Ude erobrer bolden');
+  assert.equal(duelText({ poss: 'h', duel: 'offside' }, m), ' · Hjemme: fanget offside');
+  assert.equal(duelText({ poss: 'a', duel: 'run' }, m), ' · Ude: en angriber slipper igennem');
+  assert.equal(duelText({ poss: null, duel: null }, m), '');
 });

@@ -105,3 +105,12 @@ test('modstanderens zone-kort set fra din side: hans angreb nederst, hans højre
   const shots = zoneShots({ frames: [], moments: [{ side: 'a', shooter: 2, kind: 'SAVE', t: 3, ev: 0, a: [[2, 30, 85]], h: [], ball: [30, 85] }] }, 'a');
   assert.deepEqual([shots[0].x, shots[0].y, shots[0].outcome], [30, 85, 'save']);   // fælles koordinater: ved dit mål nederst
 });
+
+test('afsparket med en højt trukket bagkæde (QC v3.16.1): egen halvdel vinder over dybden – forreste højst KICKOFF_OWN 51, ikke over midten', () => {
+  // Alle 10 markspillere trukket frem til y 30–40 (en bruger kan trække pladserne). MIN_DEPTH alene (bageste − 18) ville
+  // lade den forreste blive på ≈ 30 – over midten; uden KICKOFF_OWN-klemmen står de på 35,40,30,… (målt: rød).
+  const cc = Object.fromEntries([1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((i) => [i, { x: 8 + i * 8, y: 30 + (i % 3) * 5 }]));
+  const t = { baseFormation: '4-4-2', customCoords: cc, phases: { phase2_defending: { pressingHeight: 'MID_BLOCK' } } };
+  const ys = kickoffPositions(t).slice(1).map((q) => q.y);
+  assert.ok(ys.every((y) => y >= 51), ys.join(','));
+});

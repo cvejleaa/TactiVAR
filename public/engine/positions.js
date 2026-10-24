@@ -115,11 +115,12 @@ export function coupledPositions(ballTactics, oppTactics, { ballX = 50, caught =
 }
 // Afspark (v3.16.1, brugeren: "7 spillere stående på midterlinjen ved start"): holdet i sin forsvarsform, presset sammen
 // ind i egen halvdel (forreste på KICKOFF_Y), så formationen kan genkendes.
-export const KICKOFF_Y = 53;
+export const KICKOFF_Y = 53, KICKOFF_OWN = 51;
 export function kickoffPositions(tactics, on = null) {
   const pts = livePositions(tactics, { attacking: false, ballX: 50 });
   const idx = pts.map((p, i) => i).filter((i) => i > 0 && (!on || on[i]));
   squeeze(pts, idx, KICKOFF_Y, MIN_DEPTH);
+  squeeze(pts, idx, KICKOFF_OWN);   // egen halvdel vinder over dybden (QC v3.16.1: en bagkæde trukket over y 71)
   spread(pts, idx);
   return pts;
 }

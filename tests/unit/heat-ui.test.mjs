@@ -201,3 +201,15 @@ test('afspilningen kender dit hold: dine brikker er markeret, modstanderens ikke
     assert.equal(toks.filter((x) => cls(x, 'away')).every((x) => cls(x, 'own') === away), true, 'ude');
   }
 });
+
+test('modstanderens zone-kort (v3.16.1, QC): "Dit mål" og "din side" KUN i kampen mod dit hold – i rundens andre kampe neutral tekst', () => {
+  const goals = (el) => all(el, (x) => cls(x, 'zone-goal')).map((x) => x.textContent);
+  const notes = (el) => byId(el, 'heat-opp-note').map((x) => x.textContent);
+  const mine = render(mOf(), base.homeId).el;
+  assert.deepEqual(goals(mine), ['Deres mål', 'Dit mål']);
+  assert.equal(notes(mine).length, 1); assert.match(notes(mine)[0], /^Set fra din side: de angriber nedad mod dit mål/);
+  const other = render(mOf(), 'ingen-af-dem').el;
+  assert.deepEqual(goals(other), ['Deres mål', 'Modstanderens mål', 'Deres mål', 'Modstanderens mål']);
+  assert.equal(notes(other).length, 2);
+  for (const t of notes(other)) { assert.match(t, /^De angriber nedad\./); assert.doesNotMatch(t, /din|dit/i); }
+});
