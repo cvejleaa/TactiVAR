@@ -172,6 +172,9 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .rp-half { position: absolute; left: 0; right: 0; top: 50%; border-top: 1px solid #ffffff70; }
 .rp-box { position: absolute; left: 25%; width: 50%; height: 14%; border: 1px solid #ffffff70; }
 .rp-box.top { top: -1px; } .rp-box.bottom { bottom: -1px; }
+/* Målet (v3.16.2, QC: uden et tegnet mål lignede mål og forbi hinanden) – x 44–56, 3 % dybt */
+.rp-goal { position: absolute; left: 44%; width: 12%; height: 3%; border: 2px solid #fff; background: repeating-linear-gradient(45deg, #ffffff30 0 2px, transparent 2px 5px); }
+.rp-goal.top { top: -2px; border-top: none; } .rp-goal.bottom { bottom: -2px; border-bottom: none; }
 .rp-token { position: absolute; transform: translate(-50%, -50%); width: 1.3rem; height: 1.3rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .6rem; font-weight: 700; transition: left .8s ease-in-out .3s, top .8s ease-in-out .3s; border: 2px solid #0008; }
 .rp-token[hidden] { display: none; }   /* QC v3.16: display:flex slog [hidden] – udskiftede og udviste stod på tavlen */
 .rp-token.home { background: #e2e8f0; color: #0f172a; } .rp-token.away { background: #f97316; color: #111; }

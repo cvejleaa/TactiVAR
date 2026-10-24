@@ -406,12 +406,15 @@ bedre kan kontrollere spil motoren".
     linjen (`offside`). `poss` er tick'ets besiddelse; spillerne er dem på banen ved tick'ets start;
   - motoren måler som v3.16.0 (150 sæsoner: 2,90 mål, langskud 7 %, angreb 66 %); bånd og billedregler i
     tests/unit/replay-shapes.test.mjs (hvert rødt mod v3.16.0);
-  - v3.16.2 (brugeren: "minut 24 og 27 er ens i 2d"): uden duel står bolden i ulige tick hos holdets forsvarer nærmest
-    opspilleren (holdet spiller den rundt bagfra), i lige tick hos opspilleren; ville billedet være identisk med forrige,
-    tegnes det med bolden spejlet på tværs (100 − x), og er det stadig ens (midten), ude på en kant (20/80). Ingen træk –
-    kampene er uændrede. Afspilningen (replay.js `shotEnd`, brugeren: "Man ser aldrig bolden nærme sig målmanden"): efter
-    hvert mål, redning og forbi et trin (1,1 s), hvor kun bolden flytter sig – i nettet ved siden af målmanden, ind til
-    ham, eller uden for stolpen. VAR-tjek, annulleret mål og flag har intet sådant trin;
+  - v3.16.2 (brugeren: "minut 24 og 27 er ens i 2d"): ville et billede uden duel være identisk med forrige, står bolden
+    hos holdets forsvarer nærmest opspilleren (holdet spiller den rundt bagfra) – kun boldholderen skifter, formen er den
+    samme (en tegneregel, ingen motorviden; ingen træk, kampene uændrede). Efter en duel må to billeder være ens
+    (underteksten siger udfaldet);
+  - afspilningens ene tegnede trin (v3.16.2, replay.js `shotEnd`, brugeren: "Man ser aldrig bolden nærme sig målmanden"):
+    efter hvert mål, redning og forbi flytter kun bolden sig (1,1 s) derhen, referatets linje siger – i nettet ved siden
+    af målmanden, ind til ham, hos forsvareren nærmest skytten (blokeret), på stolpen, over overliggeren eller forbi den
+    fjerne stolpe. Målet er tegnet (x 44–56). VAR-tjek, annulleret mål og flag har intet sådant trin. 🎬 viser
+    afslutningen og standser på udfaldet;
   - modstanderens grove kort: 3 × 3 felter set fra din side (`zones`, procent pr. felt, målmanden ude) med hans afslutninger
     (`zoneShots`).
   Målt (`… 150 maal`, `… 1500 var`, 800 kampe pr. pres; før → efter): mål 2,80 → 2,79, langskud 12 → 8 %, angreb 61 →
@@ -422,7 +425,8 @@ bedre kan kontrollere spil motoren".
 - **2D-afspilningen** (Kamp-fanen, kun efter slutfløjt – den levende afspilning af referatet er uændret, så intet afsløres
   før tid): taktiktavle med begge hold og bolden, ▶/⏸, ⏮ ⏭ trin, 1×/2×/4×, ⭐ Højdepunkter (kun afslutningerne); 🎬 ved en
   afslutning i referatet springer dertil. Rolige tick 0,7 s, afslutninger 2,6 s med referatets linje som undertekst
-  (Spilfører). Bolden flytter først, spillerne glider efter; ingen opfundne mellembilleder. Et grundbillede viser
+  (Spilfører). Bolden flytter først, spillerne glider efter; ingen opfundne mellembilleder – undtagen afslutningens udfald (v3.16.2),
+  der er tegnet ud fra referatets linje. Et grundbillede viser
   stillingen fra FØR tick'ets hændelser.
 - **Heat map** (karakterarket, dit hold): 🔥 viser holdets tæthed (6 × 9 felter, uden målmand) af grundbilleder og
   øjeblikke, og et klik på en spiller hans – med hans afslutninger efter udfald (⚽ mål, reddet, forbi, offside, annulleret,
