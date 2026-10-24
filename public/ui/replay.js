@@ -6,18 +6,37 @@
 // grundbilledet pr. tick (hvert 3. minut) og afslutningernes øjeblikke fra sporet (match.js "Kampens spor").
 import { h } from './dom.js';
 
-export const STEP_MS = { frame: 700, moment: 2600 };
+export const STEP_MS = { frame: 700, moment: 2600, shot: 1100 };
 export const SPEEDS = [1, 2, 4];
 
-// Trinene: hvert tick sit grundbillede, derefter tick'ets afslutninger i referatets rækkefølge.
+// Trinene: hvert tick sit grundbillede, derefter tick'ets afslutninger i referatets rækkefølge – hver med et trin mere, hvor
+// bolden går derhen, skuddet endte (v3.16.2, brugeren: "Man ser aldrig bolden nærme sig målmanden som udfører en redning").
 export function replaySteps(trace, highlights = false) {
   if (!trace) return [];
   const steps = [];
   for (const f of trace.frames) {
     if (!highlights) steps.push({ kind: 'frame', t: f.t, h: f.h, a: f.a, ball: f.ball, ev: null, poss: f.poss ?? null, duel: f.lost ? 'lost' : f.run ? 'run' : f.offside ? 'offside' : f.poss ? 'ball' : null });
-    for (const m of trace.moments.filter((x) => x.t === f.t)) steps.push({ kind: 'moment', t: m.t, h: m.h, a: m.a, ball: m.ball, ev: m.ev, actor: m.scorer ?? m.shooter, assist: m.assist ?? null });
+    for (const m of trace.moments.filter((x) => x.t === f.t)) {
+      const step = { kind: 'moment', t: m.t, h: m.h, a: m.a, ball: m.ball, ev: m.ev, actor: m.scorer ?? m.shooter, assist: m.assist ?? null };
+      steps.push(step);
+      const end = shotEnd(m);
+      if (end) steps.push({ ...step, kind: 'shot', ball: end });
+    }
   }
   return steps;
+}
+// Hvor skuddet endte, i sporets fælles koordinater (hjemme angriber mod y 0, ude mod y 100). Målmanden = forsvarets spiller
+// nærmest målets midte (også efter en udvisning). Mål: i nettet ved siden af ham, mod skyttens side; redning: hos ham; forbi:
+// uden for stolpen på den side, han ikke dækker. VAR-tjek, annulleret mål og flag har intet trin – kendelsen er ingen boldbane.
+const SHOT_END = new Set(['GOAL', 'HEADER_GOAL', 'SAVE', 'MISS']);
+export function shotEnd(m) {
+  if (!SHOT_END.has(m.kind) || !m.ball) return null;
+  const goalY = m.side === 'h' ? 0 : 100, def = m[m.side === 'h' ? 'a' : 'h'] ?? [];
+  if (!def.length) return null;
+  const gk = def.reduce((b, q) => (Math.hypot(q[1] - 50, q[2] - goalY) < Math.hypot(b[1] - 50, b[2] - goalY) ? q : b));
+  if (m.kind === 'SAVE') return [gk[1], gk[2]];
+  if (m.kind === 'MISS') return [gk[1] >= 50 ? 40 : 60, goalY];
+  return [Math.min(56, Math.max(44, gk[1] + (m.ball[0] < gk[1] ? -5 : 5))), goalY === 0 ? 1 : 99];
 }
 // Trinet for en hændelse i referatet: dens øjeblik, ellers grundbilledet i dens tick.
 export function stepForEvent(steps, events, evIdx) {
@@ -73,6 +92,16 @@ export function replayEl(m, ownSide) {
     // Overgangene følger trinets længde ved alle hastigheder (QC: med faste 1,1 s hang brikkerne bagud ved 2× og 4×).
     // Grundbillede: bolden først (35 %), spillerne glider efter. Afslutning: skytten først, så bolden (Spilfører v3.16: bolden
     // stod i feltet, før der var nogen til at skyde) – alt er fremme ved 80 % af trinet.
+    if (s.kind === 'shot') {   // kun bolden flytter sig – fra skytten derhen, skuddet endte
+      const d = STEP_MS.shot / r.speed;
+      ball.style.transition = `left ${Math.round(d * 0.6)}ms ease-in, top ${Math.round(d * 0.6)}ms ease-in`;
+      ball.style.left = s.ball[0] + '%'; ball.style.top = s.ball[1] + '%';
+      const e = m.events[s.ev] ?? m.events[0];
+      caption.textContent = `${s.t * 3}' · ${m.homeName} ${e.hG}-${e.aG} ${m.awayName} · ${e.text}`;
+      flag(caption, 'moment', true);
+      el.dataset.step = String(r.i);
+      return;
+    }
     const d = STEP_MS[s.kind] / r.speed, shot = s.kind === 'moment';
     const glide = `${Math.round(d * (shot ? 0.45 : 0.6))}ms ease-in-out ${!shot && r.speed === 1 ? Math.round(d * 0.2) : 0}ms`;
     const bt = shot ? `${Math.round(d * 0.3)}ms ease-out ${Math.round(d * 0.5)}ms` : `${Math.round(d * 0.35)}ms ease-out`;

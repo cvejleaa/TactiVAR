@@ -320,31 +320,43 @@ export function simulateMatch(home, away, rng, opts = {}) {
   function tickFrame(t, att) {
     const def = other(att), st0 = new Map([[H, H.starters.slice()], [A, A.starters.slice()]]);
     let done = false;
-    return (outcome, { playmaker, presser, striker } = {}) => {
+    return (outcome, { playmaker, presser, striker, defs = [] } = {}) => {
       if (done) return; done = true;
       const on = (s) => st0.get(s).map(Boolean), slot = (s, p) => (p ? st0.get(s).indexOf(p) : -1);
       const pm = slot(att, playmaker), base = livePositions(att.tactics, { attacking: true, ballX: 50 });
-      const ballX = pm > 0 ? base[pm].x : seenX[att.team.id] ?? 50;
-      let ballSide = att, oppSide = def, k, at;
-      if (outcome === 'press') {
-        ballSide = def; oppSide = att;
-        k = coupledPositions(def.tactics, att.tactics, { ballX: 100 - ballX, caught: true, ballOn: on(def), oppOn: on(att) });
-        at = k.ball[slot(def, presser)];
-      } else {
-        // Opbygningen vundet: bolden spillet frem til angriberen på linjen – ikke et løb alene mod målmanden (Spilfører
-        // v3.16.1: løberen var ofte en anden end tick'ets skytte og stod ved keeperen, også når der slet ikke kom en afslutning)
-        const runner = outcome === 'trap' ? slot(att, striker) : -1;
-        k = coupledPositions(att.tactics, def.tactics, { ballX, runner, ballOn: on(att), oppOn: on(def) });
-        // Offside: angriberen lige foran linjen (OFFSIDE_DRAW), ikke et helt løb frem – han blev fanget, ikke sluppet igennem
-        if (outcome === 'trap' && runner > 0) {
-          k.ball[runner] = { x: k.ball[runner].x, y: k.line - OFFSIDE_DRAW };
-          apartFrom(k.ball, [runner], k.opp, k.opp.map((q, i) => i).filter((i) => on(def)[i]));   // ved siden af forsvareren, ikke oven i ham
+      const x0 = pm > 0 ? base[pm].x : seenX[att.team.id] ?? 50;
+      const draw = (ballX) => {
+        let ballSide = att, oppSide = def, k, at;
+        if (outcome === 'press') {
+          ballSide = def; oppSide = att;
+          k = coupledPositions(def.tactics, att.tactics, { ballX: 100 - ballX, caught: true, ballOn: on(def), oppOn: on(att) });
+          at = k.ball[slot(def, presser)];
+        } else {
+          // Opbygningen vundet: bolden spillet frem til angriberen på linjen – ikke et løb alene mod målmanden (Spilfører
+          // v3.16.1: løberen var ofte en anden end tick'ets skytte og stod ved keeperen, også når der slet ikke kom en afslutning)
+          const runner = outcome === 'trap' ? slot(att, striker) : -1;
+          k = coupledPositions(att.tactics, def.tactics, { ballX, runner, ballOn: on(att), oppOn: on(def) });
+          // Offside: angriberen lige foran linjen (OFFSIDE_DRAW), ikke et helt løb frem – han blev fanget, ikke sluppet igennem
+          if (outcome === 'trap' && runner > 0) {
+            k.ball[runner] = { x: k.ball[runner].x, y: k.line - OFFSIDE_DRAW };
+            apartFrom(k.ball, [runner], k.opp, k.opp.map((q, i) => i).filter((i) => on(def)[i]));   // ved siden af forsvareren, ikke oven i ham
+          }
+          // Ingen duel: holdet spiller den rundt – i ulige tick bagfra, hos forsvareren nærmest opspilleren (v3.16.2, brugeren: "minut
+          // 24 og 27 er ens i 2d" – samme opspiller to tick i træk gav det samme billede)
+          const back = outcome === 'none' && t % 2 && pm > 0 ? defs.map((p) => slot(att, p)).filter((i) => i > 0).sort((a, b) => Math.abs(k.ball[a].x - k.ball[pm].x) - Math.abs(k.ball[b].x - k.ball[pm].x) || a - b)[0] : undefined;
+          at = k.ball[runner > 0 ? runner : outcome === 'build' ? slot(att, striker) : back ?? pm];
         }
-        at = k.ball[runner > 0 ? runner : outcome === 'build' ? slot(att, striker) : pm];
-      }
-      const ball = at ? common(ballSide, at.x, at.y) : common(att, ballX, 50);
-      const shape = (s) => (s === ballSide ? k.ball : k.opp);
-      trace.frames.push({ t, poss: att === H ? 'h' : 'a', ...(outcome === 'press' ? { lost: true } : {}), ...(outcome === 'build' ? { run: true } : {}), ...(outcome === 'trap' ? { offside: true } : {}), ball, h: ptsOf(H, shape(H), null, st0.get(H)), a: ptsOf(A, shape(A), null, st0.get(A)) });
+        const ball = at ? common(ballSide, at.x, at.y) : common(att, ballX, 50);
+        const shape = (s) => (s === ballSide ? k.ball : k.opp);
+        return { t, poss: att === H ? 'h' : 'a', ...(outcome === 'press' ? { lost: true } : {}), ...(outcome === 'build' ? { run: true } : {}), ...(outcome === 'trap' ? { offside: true } : {}), ball, h: ptsOf(H, shape(H), null, st0.get(H)), a: ptsOf(A, shape(A), null, st0.get(A)) };
+      };
+      // Samme billede som forrige tick (samme opspiller og angriber to gange): spillet skifter side – bolden spejlet på tværs
+      // (v3.16.2, brugeren: "minut 24 og 27 er ens i 2d")
+      let f = draw(x0);
+      const prev = trace.frames.at(-1), key = (q) => JSON.stringify([q.h, q.a, q.ball]);
+      if (prev && key(prev) === key(f)) f = draw(100 - x0);
+      if (prev && key(prev) === key(f)) f = draw(x0 <= 50 ? 80 : 20);   // midten spejler til sig selv: ud på en kant
+      trace.frames.push(f);
     };
   }
   const observe = (player, text) => observations.push({ playerId: player.id, text });
@@ -968,7 +980,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
     const attR = homeHasBall ? hR : aR, defR = homeHasBall ? aR : hR;
     const attPh = att.tactics.phases, defPh = def.tactics.phases;
     const playmaker = rng.pick(attR.mids), presser = rng.pick(defR.mids), back = rng.pick(defR.defs), striker = rng.pick(attR.atts);
-    const who = { playmaker, presser, striker };
+    const who = { playmaker, presser, striker, defs: attR.defs };
 
     // Trukne positioner vurderes (25 %): uden for zonen straffes, inden for belønnes.
     const customs = customDragged(att);
