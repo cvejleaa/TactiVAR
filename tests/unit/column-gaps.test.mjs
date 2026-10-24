@@ -23,7 +23,7 @@ const variants = (make) => [0, 1, 2].map((r) => make(r)).sort();
 // ---------- publicFacts: hver værdi fra den rigtige side ----------
 const FULL = M({
   hG: 3, aG: 2, sf: { home: '4-4-2', away: '4-3-3' }, es: { home: { formation: '3-5-2' }, away: { formation: '5-4-1' } },
-  stats: { hPoss: 30, aPoss: 90, hShots: 11, aShots: 7, hOnTarget: 5, aOnTarget: 3, hCorners: 8, aCorners: 2, hAerialWon: 9, aAerialWon: 4, hYellows: 2, aYellows: 6, hXg: 99, aXg: 98, hVarChecks: 97, hTacticSuccess: 96, hFreeKicks: 95, hFouls: 94 },
+  stats: { hPoss: 30, aPoss: 90, hShots: 11, aShots: 7, hOnTarget: 5, aOnTarget: 3, hCorners: 8, aCorners: 2, hAerialWon: 9, aAerialWon: 4, hYellows: 2, aYellows: 6, hReds: 1, aReds: 3, hXg: 99, aXg: 98, hVarChecks: 97, hTacticSuccess: 96, hFreeKicks: 95, hFouls: 94 },
   ev: [[10, 'GOAL', true, 1, 0], [20, 'SUB', true, 1, 0], [30, 'INJURY', false, 1, 0], [40, 'TRIGGER', true, 1, 0], [41, 'TRIGGER', true, 1, 0], [50, 'TRIGGER', false, 1, 0],
     [60, 'HEADER_GOAL', false, 1, 1], [70, 'VAR_GOAL', true, 2, 1], [80, 'YELLOW', true, 2, 1], [85, 'INFO', false, 2, 1]],
   pool: [['COUNTER', 'Hjem'], ['COUNTER', 'Hjem'], ['HEADER', 'Hjem'], ['CORNER', 'Hjem'], ['PENALTY', 'Hjem'], ['LONGSHOT', 'Hjem'],
@@ -36,9 +36,9 @@ const FULL = M({
 test('publicFacts: hvert tal står på den rigtige side, og kun de offentlige tal kommer ud (ikke xG, VAR, frispark, fouls, tekst, label)', () => {
   const f = publicFacts(FULL, 3);
   assert.equal(f.idx, 3);
-  assert.deepEqual({ ...f.home }, { id: 'h1', name: 'Hjem', goals: 3, against: 2, formation: '4-4-2', endFormation: '3-5-2', poss: 25, shots: 11, onTarget: 5, corners: 8, aerialWon: 9, yellows: 2,
-    counterGoals: 2, setPieceGoals: 2, headerGoals: 1, reorganised: 2 });
-  assert.deepEqual({ ...f.away }, { id: 'a1', name: 'Ude', goals: 2, against: 3, formation: '4-3-3', endFormation: '5-4-1', poss: 75, shots: 7, onTarget: 3, corners: 2, aerialWon: 4, yellows: 6,
+  assert.deepEqual({ ...f.home }, { id: 'h1', name: 'Hjem', goals: 3, against: 2, formation: '4-4-2', endFormation: '3-5-2', poss: 25, shots: 11, onTarget: 5, corners: 8, aerialWon: 9, yellows: 2, reds: 1,
+    counterGoals: 2, setPieceGoals: 2, headerGoals: 1, reorganised: 2 });   // reds (v3.16.3): 1 hjemme ≠ 3 ude – en ombytning er rød
+  assert.deepEqual({ ...f.away }, { id: 'a1', name: 'Ude', goals: 2, against: 3, formation: '4-3-3', endFormation: '5-4-1', poss: 75, shots: 7, onTarget: 3, corners: 2, aerialWon: 4, yellows: 6, reds: 3,
     counterGoals: 1, setPieceGoals: 3, headerGoals: 2, reorganised: 1 });
   // Præcis de otte offentlige begivenheder, med præcis disse felter (SUB/INJURY/TRIGGER og alle tre måltyper; ingen tekst/label)
   assert.deepEqual(f.events, [
@@ -56,26 +56,26 @@ test('publicFacts: hvert tal står på den rigtige side, og kun de offentlige ta
 test('publicFacts: tomme/gamle kampe giver nuller og null (ikke NaN/undefined), og idx er 0 uden argument', () => {
   const f = publicFacts({ homeId: 'h', awayId: 'a', homeName: 'H', awayName: 'A', homeGoals: 1, awayGoals: 0 });
   assert.equal(f.idx, 0);
-  assert.deepEqual({ ...f.home }, { id: 'h', name: 'H', goals: 1, against: 0, formation: null, endFormation: null, poss: 0, shots: 0, onTarget: 0, corners: 0, aerialWon: 0, yellows: 0, counterGoals: 0, setPieceGoals: 0, headerGoals: 0, reorganised: 0 });
+  assert.deepEqual({ ...f.home }, { id: 'h', name: 'H', goals: 1, against: 0, formation: null, endFormation: null, poss: 0, shots: 0, onTarget: 0, corners: 0, aerialWon: 0, yellows: 0, reds: 0, counterGoals: 0, setPieceGoals: 0, headerGoals: 0, reorganised: 0 });   // reds: 0 (ikke undefined) for kampe fra før v3.16.3
   assert.equal(f.away.poss, 0);
   assert.deepEqual([f.events, f.goals, f.ratings], [[], [], []]);
 });
 test('de lukkede lister er bogstavelige: PUBLIC_FACT_KEYS og RATING_PUBLIC (ingen nøgle kan fjernes eller tilføjes uden at en test ser det)', () => {
-  assert.deepEqual(PUBLIC_FACT_KEYS, ['poss', 'shots', 'onTarget', 'corners', 'aerialWon', 'counterGoals', 'setPieceGoals', 'headerGoals', 'yellows', 'reorganised', 'goals', 'against']);
+  assert.deepEqual(PUBLIC_FACT_KEYS, ['poss', 'shots', 'onTarget', 'corners', 'aerialWon', 'counterGoals', 'setPieceGoals', 'headerGoals', 'yellows', 'reds', 'reorganised', 'goals', 'against']);   // 'reds' ny i v3.16.3 (13 nøgler)
   assert.deepEqual(RATING_PUBLIC, ['playerId', 'shirtNumber', 'shortName', 'teamId', 'teamName', 'goals', 'assists', 'saves', 'aerialWins', 'stars', 'isMotM']);
   assert.ok(RATING_PUBLIC.every((k) => !RATING_PRIVATE_FIELDS.includes(k)));
 });
-test('compactFacts og runde-historikkens facts: begge hold, nøglet på hold-id, præcis de 12 tal – for hver kamp i runden', () => {
+test('compactFacts og runde-historikkens facts: begge hold, nøglet på hold-id, præcis de 13 tal (v3.16.3: + reds) – for hver kamp i runden', () => {
   const f = publicFacts(FULL);
   const c = compactFacts(f);
   assert.deepEqual(Object.keys(c), ['h1', 'a1']);
-  assert.deepEqual(c.h1, { poss: 25, shots: 11, onTarget: 5, corners: 8, aerialWon: 9, counterGoals: 2, setPieceGoals: 2, headerGoals: 1, yellows: 2, reorganised: 2, goals: 3, against: 2 });
-  assert.deepEqual(c.a1, { poss: 75, shots: 7, onTarget: 3, corners: 2, aerialWon: 4, counterGoals: 1, setPieceGoals: 3, headerGoals: 2, yellows: 6, reorganised: 1, goals: 2, against: 3 });
+  assert.deepEqual(c.h1, { poss: 25, shots: 11, onTarget: 5, corners: 8, aerialWon: 9, counterGoals: 2, setPieceGoals: 2, headerGoals: 1, yellows: 2, reds: 1, reorganised: 2, goals: 3, against: 2 });
+  assert.deepEqual(c.a1, { poss: 75, shots: 7, onTarget: 3, corners: 2, aerialWon: 4, counterGoals: 1, setPieceGoals: 3, headerGoals: 2, yellows: 6, reds: 3, reorganised: 1, goals: 2, against: 3 });
   const m2 = M({ h: 'h2', a: 'a2', hn: 'Hjem2', an: 'Ude2', hG: 0, aG: 1, stats: { hPoss: 50, aPoss: 50, hShots: 1, aShots: 2 } });
   const hist = roundHistory(4, [FULL, m2]);
   assert.deepEqual(Object.keys(hist.facts), ['h1', 'a1', 'h2', 'a2'], 'begge kampe, begge hold');
   assert.deepEqual(hist.facts.h1, c.h1); assert.deepEqual(hist.facts.a1, c.a1);
-  assert.deepEqual(hist.facts.a2, { poss: 50, shots: 2, onTarget: 0, corners: 0, aerialWon: 0, counterGoals: 0, setPieceGoals: 0, headerGoals: 0, yellows: 0, reorganised: 0, goals: 1, against: 0 });
+  assert.deepEqual(hist.facts.a2, { poss: 50, shots: 2, onTarget: 0, corners: 0, aerialWon: 0, counterGoals: 0, setPieceGoals: 0, headerGoals: 0, yellows: 0, reds: 0, reorganised: 0, goals: 1, against: 0 });
   assert.deepEqual(JSON.parse(JSON.stringify(hist.facts)), hist.facts, 'JSON-rundtur');
 });
 
