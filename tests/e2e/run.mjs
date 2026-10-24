@@ -187,6 +187,14 @@ try {
   await g.click('#pitch .token[data-slot="4"]'); await tab('trup'); await tab('taktik'); await g.click('#pitch .token[data-slot="5"]');
   check('Et påbegyndt byt afbrydes af fanebyt (intet byt uden varsel)', (await nameAt(4)) === n4 && (await nameAt(5)) === n5);
   await g.click('#pitch .token[data-slot="5"]'); // klik igen = fravælg
+  // Test Manager v3.16.3: ejefald i notebeskeden (app.js gen) – et navn på -s får apostrof ("T. Jens' plads", ikke "T. Jenss"/"T. Jens's");
+  // spilleren omdøbes i det gemte spil (tilfældige navne ender sjældent på -s), siden genindlæses
+  await g.evaluate(() => { const d = JSON.parse(localStorage.getItem('tactivar_save')), t = d.league.teams.find((x) => !x.isBot); t.squad.find((p) => p.id === t.tactics.lineupSlots[6]).shortName = 'T. Jens'; localStorage.setItem('tactivar_save', JSON.stringify(d)); });
+  await g.reload(); await g.waitForSelector('body[data-klar="ja"]'); await tab('taktik');
+  await g.click('#pitch .token[data-slot="6"]');
+  const swapNote = await g.textContent('#notice');
+  check('Et påbegyndt byt nævner spilleren med rigtigt ejefald: "T. Jens\' plads"', swapNote.includes("for at bytte T. Jens' plads."), swapNote);
+  await g.click('#pitch .token[data-slot="6"]'); // fravælg igen
   // Indskiftning fra bænken under banen – uden at forlade Taktik
   await g.locator('#bench .bench-p').first().click(); await g.locator('#bench .bench-p').first().click();
   check('Bænken: klik igen på samme bænkspiller fravælger', (await g.locator('#bench .bench-p.active').count()) === 0 && (await g.locator('#notice').count()) === 0);
@@ -818,6 +826,20 @@ try {
     await tab('kamp');
     const kampNext = (await g.locator('#gazette #col-next p').allTextContents()).filter((t) => t.startsWith('Ny sæson: '));
     check('Sæsonslut, Kamp-fanen: samme klumme (Ny sæson-linjen og tabellen)', kampNext.length === 1 && kampNext[0].includes(sv.opp) && formOk(await g.locator('#gazette #col-form').textContent()), kampNext.join(' | '));
+    // Test Manager v3.16.3: mesterteksten følger den regel, der afgjorde det — på ALLE tre steder (klummen får champion fra app.js).
+    // Et tilfældigt forløb afgøres sjældent på målforskel, så mesteren i det gemte spil sættes til en målforskels-afgørelse (samme point).
+    const tie = await g.evaluate(() => {
+      const d = JSON.parse(localStorage.getItem('tactivar_save')), se = d.league.lastRound.gazette.seasonEnd, c = se.champion, t = se.table;
+      const mk = (r, gd, gf) => ({ teamName: r.teamName, points: c.points, goalDiff: gd, goalsFor: gf });
+      const champion = { ...c, ...mk(t[0], 7, 22), runnerUp: mk(t[1], 4, 30) };
+      se.champion = champion; d.league.seasons.at(-1).champion = champion;
+      localStorage.setItem('tactivar_save', JSON.stringify(d));
+      return { first: t[0].teamName, second: t[1].teamName, points: c.points, myPos: se.myPos };
+    });
+    await g.reload(); await g.waitForSelector('body[data-klar="ja"]'); await tab('liga');
+    const tieTxt = `${tie.first} er mester på målforskel – ${tie.myPos === 2 ? 'I' : `${tie.first} og ${tie.second}`} endte begge på ${tie.points} point`;
+    const tieCol = await g.textContent('#gazette #col-form'), tieBox = await g.textContent('#gazette #season-end'), tieTable = (await g.locator('#standings-champion').count()) ? await g.textContent('#standings-champion') : '';
+    check('Sæsonslut: afgjort på målforskel står der i klummen, avisens sæsonboks og slutstillingen (ens tekst alle tre steder)', tieCol.includes(`${tieTxt}.`) && tieBox.includes(`${tieTxt}.`) && tieTable.includes(`${tieTxt}.`), `${tieCol} | ${tieBox} | ${tieTable}`);
   }
 
   // Ødelagt gemt spil: aldrig tom side, data bevaret i backup
