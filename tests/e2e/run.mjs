@@ -435,8 +435,27 @@ try {
     return null;
   });
   check('Øjebliksbillede, dit mål: 11 brikker, scorer ⚽ og oplæg 🅰 markeret, bolden vist', !!snapT && snapT.a?.n === 11 && snapT.a.scorer === 1 && snapT.a.assist === 1 && snapT.a.ball && snapT.a.pitches === 1 && /mål af #\d+ .+: sådan stod I/.test(snapT.a.title), JSON.stringify(snapT?.a));
-  check('Øjebliksbillede, mål imod: kun dit forsvar (ingen scorer, ingen af modstanderens spillere) – gemt uden modstanderens positioner', !!snapT && snapT.b?.n === 11 && snapT.b.scorer === 0 && !snapT.b.oppName && snapT.b.title.includes('modstanderens spillere vises ikke') && snapT.ownOnly, JSON.stringify(snapT?.b));
+  check('Øjebliksbillede, mål imod: kun dit forsvar (ingen scorer, ingen af modstanderens spillere) – gemt uden modstanderens positioner', !!snapT && snapT.b?.n === 11 && snapT.b.scorer === 0 && !snapT.b.oppName && snapT.b.title.includes('begge hold ses i afspilningen') && snapT.ownOnly, JSON.stringify(snapT?.b));
   check('Uden valgt mål: intet øjebliksbillede, men 📍 ved hvert mål med billede', !!snapT && snapT.none.pitches === 0 && snapT.none.pins === snapT.none.want && snapT.none.want >= 2, JSON.stringify(snapT?.none));
+  // v3.16: 2D-afspilning og heat map efter slutfløjt (brikker for begge hold, 🎬 springer til hændelsen, ▶ kører, heat map for dit hold)
+  if (await g.locator('#replay #rp-pitch').count()) {
+    const rp0 = await g.evaluate(() => ({ tokens: [...document.querySelectorAll('#rp-pitch .rp-token')].filter((t) => !t.hidden).length, home: document.querySelectorAll('#rp-pitch .rp-token.home').length, away: document.querySelectorAll('#rp-pitch .rp-token.away').length, own: document.querySelectorAll('#rp-pitch .rp-token.own').length, films: document.querySelectorAll('#feed .replay-btn').length }));
+    check('Afspilning: begge hold på taktiktavlen (7–11 hver), dit hold markeret, 🎬 ved afslutningerne i referatet', rp0.home >= 7 && rp0.away >= 7 && rp0.own >= 7 && rp0.films >= 3, JSON.stringify(rp0));
+    const filmText = await g.locator('#feed .replay-btn').first().evaluate((b) => b.parentElement.textContent);
+    await g.locator('#feed .replay-btn').first().click();
+    const cap = await g.textContent('#rp-caption');
+    check('Afspilning: 🎬 springer til hændelsen – undertekst = referatets linje', filmText.replace(/^\d+'/, '').includes(cap.split(' · ').slice(2).join(' · ').slice(0, 30)), `${cap} | ${filmText}`);
+    await g.locator('#feed .replay-btn').last().click();   // den tidligste afslutning – så er der trin efter den
+    const s0 = await g.getAttribute('#replay', 'data-step');
+    await g.click('#rp-next'); const s1 = await g.getAttribute('#replay', 'data-step');
+    await g.click('#rp-play'); await g.waitForTimeout(1600); await g.click('#rp-play');
+    const s2 = await g.getAttribute('#replay', 'data-step');
+    check('Afspilning: ⏭ og ▶ flytter frem', Number(s1) === Number(s0) + 1 && Number(s2) > Number(s1), `${s0} → ${s1} → ${s2}`);
+    await g.click('#heat-btn'); await g.waitForSelector('#heat-pitch');
+    const heat = await g.evaluate(() => ({ cells: document.querySelectorAll('#heat-pitch .heat-cell').length, title: document.querySelector('#heat-title').textContent, thirds: document.querySelector('#heat-thirds')?.textContent ?? '' }));
+    check('Heat map: dit hold som felter, modstanderen kun groft i tredjedele', heat.cells >= 6 && /Holdet/.test(heat.title) && /Tyngdepunkt \(groft\)/.test(heat.thirds), JSON.stringify(heat));
+    await g.click('#heat-back');
+  } else check('Afspilning findes efter en spillet runde', false, (await g.locator('#replay').textContent().catch(() => 'intet #replay')) + ' | mc ' + (await g.locator('#match-center').count()));
   const allEvents = await g.locator('#feed .ev').count();
   await g.click('#match-center .toolbar button:nth-child(3)');
   check('Filteret "Kun nøglemomenter" viser færre hændelser', (await g.locator('#feed .ev').count()) < allEvents);

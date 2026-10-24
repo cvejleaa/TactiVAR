@@ -92,6 +92,14 @@ spillerobjekt; de skal ligge hos den der observerer.
   Kun SÆSONsummer, der følger en skjult indstilling, er private (§8b).
 - Offentligt: navn ("F. Efternavn" på banen), rygnummer, kæde, naturlig position, alder, højde, friskhed, skadesstatus 🚑, stjerner (★☆☆☆☆–★★★★★), holdets startformation. Intet andet om andre holds taktik (brugerens beslutning, afviger bevidst fra v2.5): ingen faser, planer, Hvis-Så-regler eller "typisk stil" (undtagelse fra v3.14, brugerens valg: klummen må gætte på et holds stil ud fra dets seneste OFFENTLIGE kampe – resultat, kamptal fra referatet, måltyper; buddet tager gennemsnittet af skud, hjørner, besiddelse og kontra-/dødbolds-/hovedstødsmål over op til 3 kampe – en accepteret lækage, da hver kamp kan åbnes enkeltvis – men navngiver aldrig en indstilling og påstår intet om pres; klummen ser kun kampene gennem `publicFacts` (column.js), aldrig tekst, labels, private karakterfelter eller andres kamprapport – bevist med en kanarie-test; en bots spillede indstillinger gemmes ikke længere i `endState`) – heller ikke i ligatabellen, kamphovedet, det taktiske oplæg eller referatet. Et modstanderholds Hvis-Så-skift vises kun som "omorganiserer sig". Referatet navngiver kun dine egne taktikvalg. Fra v3.12 (brugerens valg) følger chancetypen hvert holds eget angrebsfokus – man kan selv regne ud, at et hold slår mange indlæg eller cutbacks, men ordvalget navngiver aldrig indstillingen. Det gælder også fuldtids-analysens "🛡️ Dit felt: modstanderens cutbacks stoppet X af Y, luftdueller vundet …" – tal fra én kamp, som referatet allerede viser (som "kontraer imod i alt"), en bevidst og accepteret lækage. Ligeså (v3.13): minuttet for en bots træthedsskift plus den offentlige friskhed røber lidt om botens løb og STA over mange kampe; teksten nævner aldrig friskhed eller grænse, og botens grænse er skjult (lockboxen i Taktik). (Trin 1 lægger teksterne i motoren med det menneskestyrede hold som seer; trin 2 skal gøre dem seer-afhængige.)
 - Øjebliksbilledet ved mål (v3.12.1) gemmer kun DIT holds positioner – de afslører dit pres og dine løb, ikke modstanderens. Ved et modstandermål vises dit forsvar og bolden, aldrig modstanderens spillere eller scorerens plads. Accepteret: hvem der modtager bolden afhænger af hvert holds levende positioner (pres, løb), så over mange kampe kan man statistisk ane et holds indstilling – på linje med løbe-vægtene fra v3.9.
+- **Kampens spor og 2D-afspilningen (v3.16) – den største bevidste undtagelse** (brugerens valg 2026-10-24: "I spillet for
+  alle" – begge hold fuldt synlige): afspilningen efter slutfløjt viser begge holds placeringer i hvert tick og ved hver
+  afslutning, og sporet ligger i den gemte runde. Den afslører dermed modstanderens pres (lav blok trækker holdet ned),
+  løb uden bold (flere fremme), trukne pladser og minuttet for et Hvis-Så-skift – langt mere end de enkelte lækager ovenfor.
+  Accepteret af brugeren; skal gøres seer-afhængig sammen med resten i trin 2. Heat map'et viser kun modstanderen groft
+  (andel i tredjedele) – et PRÆSENTATIONSVALG (brugerens), ikke anti-spionage: en senere gennemgang skal ikke "lukke" det.
+  Klummen læser ikke sporet (`publicFacts`). Øjebliksbilledet 📍 er uændret (dit hold); dets mål-imod-tekst henviser til
+  afspilningen for begge hold – samme formel, så de to billeder ikke modsiger hinanden.
 - Kun ejer: 9 evner, spring, luftduel, arketype, løn/værdi, kasse, de præcise fasevalg og Hvis-Så-regler,
   eksakt karakter, mod-kunnen.
 - Ingen: VAR-profil (kun via clues og VAR-kendelser i referatet – v3.15.1: varPulse, theatre og cynicism afgør VAR's
@@ -344,6 +352,30 @@ Tick hvert 3. minut (1..90).
   permanent; skadet spiller heles −1 i samme runde (1-kamps skade forsvinder);
   der gemmes før stilling/karakterer er opdateret; avis og kampvælger vises
   ikke efter live-afspilning; motoren skal være deterministisk ved givet seed.
+
+### Kampens spor, 2D-afspilning og heat map (v3.16)
+Brugeren: "et heat map for kampen, både for holdet, men også for den enkelte spiller … en 2d simulering af kampen … så vi
+bedre kan kontrollere spil motoren".
+- **Sporet** `m.trace = { v: 1, frames, moments }` (match.js "Kampens spor"): 31 grundbilleder (t 0 = afspark, t = tick =
+  minut/3) efter boldbesiddelsen og tick'ets skift – `{ t, poss, ball, h: [[id, x, y]…], a }` – og et øjeblik pr. afslutning
+  i åbent spil og kontra (mål, redning, forbi/blokeret, linjedommerens flag, VAR-tjek, annulleret mål) med skytte, scorer og
+  oplæg. Dødbolde (straffe, frispark, hjørne) har bevidst intet billede. Ét koordinatsystem: hjemmeholdet angriber mod y 0,
+  udeholdet spejles; heltal. Kun aflæsning – intet rng-træk, ingen skrivning i `seen`/`seenX` (fingeraftryk af 20 kampe,
+  trace-golden.test.mjs). Ca. 18 KB pr. kamp; gemmes kun i seneste runde (`lastRound`), så ældre runder og gem fra før
+  v3.16 viser "Ingen afspilning".
+- **Kontrolværktøjet** `node tools/trace-invariants.mjs [N]`: regler (31 billeder, 7–11 spillere, på banen = arkets skift og
+  udvisninger, scoreren i billedet) og motor-viden: hvor målscorerne stod pr. måltype og – QC B2 – at holdets forreste står
+  bag modstanderens sidste forsvarer i ≈100 % af billederne med bolden (holdenes linjer regnes uafhængigt af hinanden;
+  en kobling ændrer modtagervalget og dermed kampene – en senere, bevidst ændring).
+- **2D-afspilningen** (Kamp-fanen, kun efter slutfløjt – den levende afspilning af referatet er uændret, så intet afsløres
+  før tid): taktiktavle med begge hold og bolden, ▶/⏸, ⏮ ⏭ trin, 1×/2×/4×, ⭐ Højdepunkter (kun afslutningerne); 🎬 ved en
+  afslutning i referatet springer dertil. Rolige tick 0,7 s, afslutninger 2,6 s med referatets linje som undertekst
+  (Spilfører). Bolden flytter først, spillerne glider efter; ingen opfundne mellembilleder. Et grundbillede viser
+  stillingen fra FØR tick'ets hændelser.
+- **Heat map** (karakterarket, dit hold): 🔥 viser holdets tæthed (6 × 9 felter, uden målmand) af grundbilleder og
+  øjeblikke, og et klik på en spiller hans – med hans afslutninger efter udfald (⚽ mål, reddet, forbi, offside, annulleret,
+  🅰 oplæg; Spilfører: positionerne alene er "der hvor du satte ham"). Modstanderen: "Tyngdepunkt (groft)" i tredjedele.
+  Kendt begrænsning: kun seneste runde (en sum over sæsonen er et senere ønske).
 
 ## 6. Karakterer, MotM, avis
 - Start 6,5 (±0,15), klemt 3,5–10,0 – fra v3.15 først til sidst (justeringerne summeres uden loft, så overskud fra mål

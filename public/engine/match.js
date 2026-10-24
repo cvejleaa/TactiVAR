@@ -238,8 +238,40 @@ export function simulateMatch(home, away, rng, opts = {}) {
   const k = (side, name) => (side.isHome ? 'h' : 'a') + name;
   const other = (side) => (side === H ? A : H);
 
-  const addEv = (min, type, category, isHome, plot, label, text, varMsg) =>
+  const addEv = (min, type, category, isHome, plot, label, text, varMsg) => {
     events.push({ min, type, category, isHome, plot, label, text, varMsg, hG, aG, stats: { ...st } });
+    shotMoment(type);
+  };
+  // ---------- Kampens spor (v3.16, brugeren: "et heat map for kampen … en 2d simulering af kampen, så vi bedre kan
+  // kontrollere spilmotoren"). Kun aflæsning: optageren trækker aldrig på rng og skriver aldrig i seen/seenX (QC B5 –
+  // fingeraftrykket i trace-golden.test.mjs). Ét koordinatsystem: hjemmeholdet angriber mod y 0, udeholdet spejles
+  // (100 − x, 100 − y); heltal. frames: et billede pr. tick (t = tick-indeks, 0 = afspark) efter boldbesiddelsen og
+  // skiftene; moments: afslutningerne (mål, redning, forbi, flag, VAR-tjek) med aktørerne, hvor motoren kender dem.
+  // Dødbolde (straffe, frispark, hjørne) får bevidst intet billede – motoren regner ingen placeringer dér.
+  // Spillere på banen = holdets 11 pladser (en skadet uden indskiftning halter videre og står der; en udvist er væk).
+  const trace = { v: 1, frames: [], moments: [] };
+  let shotSide = null, shotCaught = false, setPieceNow = false, shotBy = null;
+  const common = (side, x, y) => (side === H ? [Math.round(x), Math.round(y)] : [Math.round(100 - x), Math.round(100 - y)]);
+  const ptsOf = (side, pos, moves = null) => side.starters.map((p, i) => p && [p.id, ...common(side, ...(moves?.[p.id] ?? [pos[i].x, pos[i].y]))]).filter(Boolean);
+  function momentAt(side, atkPos, moves, spot, caught, extra = {}) {
+    const def = other(side), x = seenX[side.team.id] ?? 50;
+    const att = ptsOf(side, atkPos, moves), dpts = ptsOf(def, livePositions(def.tactics, { attacking: caught, ballX: caught ? 50 : 100 - x }));
+    let ball = common(side, spot.x, spot.y);
+    const b = extra.behind, sp = b && att.find((q) => q[0] === extra.scorer);
+    if (sp && (side === H ? sp[2] : 100 - sp[2]) < b.y) { sp[2] = side === H ? b.y : 100 - b.y; ball = [sp[1], sp[2]]; }
+    const shooter = extra.scorer ?? extra.shooter?.id ?? null;
+    trace.moments.push({ t: curMin / 3, ev: events.length - 1, kind: events.at(-1)?.type, side: side === H ? 'h' : 'a', ball, h: side === H ? att : dpts, a: side === H ? dpts : att,
+      shooter, ...(extra.scorer ? { scorer: extra.scorer, assist: extra.assist ?? null } : {}) });
+  }
+  const SHOT_MOMENTS = new Set(['SAVE', 'MISS', 'OFFSIDE_FLAG', 'VAR_CHECK', 'VAR_NO_GOAL']);
+  function shotMoment(type) {
+    if (setPieceNow || !shotSide || !SHOT_MOMENTS.has(type)) return;
+    momentAt(shotSide, seen[shotSide.team.id] ?? livePositions(shotSide.tactics, { attacking: true, ballX: 50 }), null, SPOT.GOAL, shotCaught, { shooter: shotBy });
+  }
+  function baseFrame(t, att, ballX) {
+    const shape = (side) => livePositions(side.tactics, { attacking: side === att, ballX: side === att || !att ? ballX : 100 - ballX });
+    trace.frames.push({ t, poss: att ? (att === H ? 'h' : 'a') : null, ball: att ? common(att, ballX, 50) : [50, 50], h: ptsOf(H, shape(H)), a: ptsOf(A, shape(A)) });
+  }
   const observe = (player, text) => observations.push({ playerId: player.id, text });
   // Løbet følger pladsen (v3.8): også en indskifter løber efter den rolle, han kommer ind på.
   // Friskhed i kampen (v3.13, freshness.js): tabet indtil nu efter arkets drain90 og minutterne på
@@ -291,6 +323,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // moves = { spiller-id: [x, y] }: hvor aktørerne var i selve hændelsen (cutbackens oplægsgiver ved baglinjen,
   // scoreren på pletten) – billedet viser handlingen, ikke kun holdets form (brugerens eksempel v3.13).
   function snapshot(side, scorer, helper, spot = SPOT.GOAL, caught = false, moves = null) {
+    if (seen[side.team.id]) momentAt(side, seen[side.team.id], moves, spot, caught, { scorer: scorer.id, assist: helper && helper !== scorer ? helper.id : null, behind: varBehind });
     const mine = [H, A].find(own);
     if (!mine) return;
     const ev = events.at(-1), attacking = side === mine;
@@ -388,9 +421,11 @@ export function simulateMatch(home, away, rng, opts = {}) {
   const fbCount = (side) => coordsOf(side.tactics).filter((c) => FB_ROLES.has(c.r)).length;
   // Kontra mod et hold, der lige har tabt bolden. Returnerer om der blev scoret.
   function counterAttack(win, lose, min, wR, lR) {
+    shotSide = win; shotCaught = true; setPieceNow = false; shotBy = null;
     // Kontraens afslutter: den hurtigste nær målet i øjeblikket (v3.12.1, dokumentet "Mål": kontramål
     // fordeles på angreb og midtbane) – ikke altid en angriber.
     const shooter = receiver(win, SPOT.GOAL, (p) => p.skills.pace, null, { attacking: false, ballX: 50 }), gk = lR.gk;
+    shotBy = shooter;
     duelLog[lose.team.id].countersAgainst++;
     st[k(win, 'Shots')]++;
     st[k(win, 'Xg')] += 0.2 + rng.next() * 0.2;
@@ -449,6 +484,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // source (åbent spil): 'cross' eller 'long' – kun til teksten for dit eget hold.
   // Returnerer 'goal', 'saved', 'missed', 'disallowed' (VAR) eller 'cleared'.
   function aerialDuel(att, def, cR, dR, min, shooter, assister, defender, setPiece = null, source = null, snapMoves = null) {
+    if (!setPiece) { shotSide = att; shotCaught = false; setPieceNow = false; shotBy = shooter; }
     const gk = dR.gk;
     const aDef = dR.cbs.length ? (dR.cbs.includes(defender) ? defender : dR.cbs[Math.max(0, dR.defs.indexOf(defender)) % dR.cbs.length]) : defender;
     const kind = setPiece ? SP_KIND[setPiece] : 'HEADER';
@@ -492,6 +528,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // Dødboldens hovedstødsspiller: en af de tre bedste i luften (også stopperne går med op).
   const headerTarget = (R, taker) => rng.pick(outfield(R).filter((p) => p && p !== taker).sort((a, b) => b.aerialPower - a.aerialPower).slice(0, 3));
   function corner(att, def, cR, dR, min) {
+    setPieceNow = true;
     st[k(att, 'Corners')]++; st[k(att, 'Shots')]++; st[k(att, 'Xg')] += 0.04; // hovedstødet er en afslutning
     const taker = best(outfield(cR), (p) => p.skills.passing);
     aerialDuel(att, def, cR, dR, min, headerTarget(cR, taker), taker, rng.pick(dR.defs), 'hjørnespark');
@@ -501,6 +538,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // (den almindelige afslutning vælger type efter evnerne). Langskud og dribletur er solo.
   // lead = dit holds egen indledning ("✅ … lægger den tilbage til …"). Returnerer om der blev scoret.
   function finishAttempt(att, def, cR, dR, min, finisher, helper, kind, { bonus = 0, lead = '', onGoal = null, snapMoves = null } = {}) {
+    shotSide = att; shotCaught = false; setPieceNow = false; shotBy = finisher;
     const gk = dR.gk, fs = finisher.skills;
     if (fs.finishing * ff(finisher) + rng.next() * 8 + bonus > gk.skills.goalkeeping * ff(gk) + rng.next() * 8 + KEEPER_EDGE) {
       const varOk = varGoalCheck(att, def, dR, min, finisher, null, kind === 'CUTBACK');
@@ -577,6 +615,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // given straffe med PEN_CHECK_P: filmning (den fældedes theatre – lodtrækning) eller offside i opspillet. Kendelsen falder
   // FØR straffen tælles (frispark, straffe, skud, xG, fælderens karakter – QC: ellers målte straffebåndet forkert).
   function penalty(att, def, cR, dR, min, byVar = false) {
+    setPieceNow = true;
     const taker = best(outfield(cR), (p) => p.skills.finishing), fouled = rng.pick(cR.atts.concat(cR.mids)), fouler = rng.pick(dR.defs), gk = dR.gk;
     let varNote = '';
     if (byVar) {
@@ -622,6 +661,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
     }
   }
   function freeKick(att, def, cR, dR, min) {
+    setPieceNow = true;
     const fouler = rng.pick(dR.defs.concat(dR.mids)), gk = dR.gk;
     st[k(def, 'Fouls')]++; st[k(att, 'FreeKicks')]++;
     if (rng.chance(FK_SHOT_P)) {
@@ -801,6 +841,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
     else addEv(min, 'TRIGGER', 'HIGHLIGHT', side.isHome, true, `${side.team.name} omorganiserer sig`, `🔁 [${side.team.name}] Holdet omorganiserer sig på banen.`);
   }
 
+  baseFrame(0, null, 50);
   for (let min = 3; min <= 90; min += 3) {
     // Flaget nulstilles ved hvert tick (QC v3.15.1: et kort for filmning i straffen – efter tjekket herunder – lækkede ellers
     // ind i næste minut og sprang dets dødbolde og chancer over).
@@ -823,6 +864,8 @@ export function simulateMatch(home, away, rng, opts = {}) {
     const homeHasBall = hMid + hAvg * 0.03 + rng.next() * 8 >= aMid + aAvg * 0.03 + rng.next() * 7.5;
     if (homeHasBall) st.hPoss += 3; else st.aPoss += 3;
     const att = homeHasBall ? H : A, def = homeHasBall ? A : H;
+    shotSide = null; setPieceNow = false;
+    baseFrame(min / 3, att, seenX[att.team.id] ?? 50);   // bolden står, hvor holdets seneste chance var (ingen nye træk – QC B1)
     const attR = homeHasBall ? hR : aR, defR = homeHasBall ? aR : hR;
     const attPh = att.tactics.phases, defPh = def.tactics.phases;
     const playmaker = rng.pick(attR.mids), presser = rng.pick(defR.mids), back = rng.pick(defR.defs), striker = rng.pick(attR.atts);
@@ -1108,7 +1151,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
     endState: { home: endOf(H, own(H)), away: endOf(A, own(A)) },
     ownReports,
     homeGoals: hG, awayGoals: aG, homeVarNet,
-    events, stats: st, ratings, goalsPool, injuries, observations,
+    events, stats: st, ratings, goalsPool, injuries, observations, trace,
   };
   // Holdenes private tællere pr. hold-id – kun til måleværktøjet; ikke-optællelig, så de
   // aldrig gemmes eller vises (de røber taktik).

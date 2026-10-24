@@ -94,7 +94,7 @@ test('mål imod: ingen scorer/oplæg-mærker, bolden spejlet på (50 %, 72 %), o
   const ball = byId(pitch, 'snap-ball')[0];
   assert.deepEqual(snap.ball, [50, 72]);   // cutback-stedet (50,28) set fra modstanderens side
   assert.deepEqual([ball.style.left, ball.style.top], ['50%', '72%']);
-  assert.equal(byId(pitch, 'snap-title')[0].textContent, `${m.events[i].min}' – mål imod: sådan stod dit forsvar (modstanderens spillere vises ikke)`);
+  assert.equal(byId(pitch, 'snap-title')[0].textContent, `${m.events[i].min}' – mål imod: sådan stod dit forsvar (begge hold ses i afspilningen 🎬)`);
   // Du er udeholdet: billedet står i udeholdets karakterark
   const ratings = all(root, (e) => cls(e, 'ratings'));
   assert.equal(all(ratings[1], (e) => e.attrs.id === 'snap-pitch').length, 1); assert.equal(all(ratings[0], (e) => e.attrs.id === 'snap-pitch').length, 0);
