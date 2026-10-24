@@ -96,6 +96,9 @@ spillerobjekt; de skal ligge hos den der observerer.
   alle" – begge hold fuldt synlige): afspilningen efter slutfløjt viser begge holds placeringer i hvert tick og ved hver
   afslutning, og sporet ligger i den gemte runde. Den afslører dermed modstanderens pres (lav blok trækker holdet ned),
   løb uden bold (flere fremme), trukne pladser og minuttet for et Hvis-Så-skift – langt mere end de enkelte lækager ovenfor.
+  Security Reviewer v3.16: det afslører også den enkelte modstanders vundne løb uden bold (løberen står RUN_STEP længere
+  fremme i afslutningens øjeblik end i tick'ets grundbillede – ≈2/3 af `freeRunsWon` kan tælles op), som ellers er privat
+  (visibility.js). Accepteret under samme valg; et spor med forkert form i en gemt fil slettes (sanitize.js `isValidTrace`).
   Accepteret af brugeren; skal gøres seer-afhængig sammen med resten i trin 2. Heat map'et viser kun modstanderen groft
   (andel i tredjedele) – et PRÆSENTATIONSVALG (brugerens), ikke anti-spionage: en senere gennemgang skal ikke "lukke" det.
   Klummen læser ikke sporet (`publicFacts`). Øjebliksbilledet 📍 er uændret (dit hold); dets mål-imod-tekst henviser til

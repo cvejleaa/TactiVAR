@@ -260,6 +260,10 @@ export function simulateMatch(home, away, rng, opts = {}) {
     const b = extra.behind, sp = b && att.find((q) => q[0] === extra.scorer);
     if (sp && (side === H ? sp[2] : 100 - sp[2]) < b.y) { sp[2] = side === H ? b.y : 100 - b.y; ball = [sp[1], sp[2]]; }
     const shooter = extra.scorer ?? extra.shooter?.id ?? null;
+    // Bolden ved skytten i afslutningens øjeblik (Spilfører v3.16: bolden stod på en fast plet, fx (50, 20), mens skytten stod
+    // ved hjørneflaget). 📍-billedet beholder sin plet (uændret visning).
+    const at = shooter != null && att.find((q) => q[0] === shooter);
+    if (at) ball = [at[1], at[2]];
     trace.moments.push({ t: curMin / 3, ev: events.length - 1, kind: events.at(-1)?.type, side: side === H ? 'h' : 'a', ball, h: side === H ? att : dpts, a: side === H ? dpts : att,
       shooter, ...(extra.scorer ? { scorer: extra.scorer, assist: extra.assist ?? null } : {}) });
   }
@@ -1041,7 +1045,8 @@ export function simulateMatch(home, away, rng, opts = {}) {
       {
         // Løb uden bold (v3.9): en markspiller forsøger at løbe sig fri. Vinder han løbet, træffer
         // han en beslutning (skud/aflevering/dribletur) efter zone og evner; ellers en almindelig
-        // afslutning som før. Kun DIT holds løb fortælles – modstanderens "fri" kan ikke tælles op.
+        // afslutning som før. Kun DIT holds løb fortælles i referatet. (v3.16: afspilningen viser løberen RUN_STEP længere
+        // fremme i afslutningens øjeblik – også modstanderens; brugerens valg "begge hold fuldt synlige", spec §3.)
         const runs = attPh.phase1_buildUp.offBallRuns ?? 'NORMAL';
         const attC = coordsOf(att.tactics);
         const pool = att.starters.map((p, i) => ({ p, i })).filter(({ p, i }) => i > 0 && p);

@@ -40,6 +40,12 @@ export function checkTrace(m) {
   }
   for (const mo of tr.moments) {
     if (!['h', 'a'].every((s) => mo[s].every(inside))) errors.push(`øjeblik ${mo.kind} t ${mo.t}: uden for banen`);
+    // Spillerne i øjeblikket: dem på banen i minuttet – før eller efter et skadesskift i samme minut (Spilfører v3.16)
+    for (const side of ['h', 'a']) {
+      const ids = mo[side].map((q) => q[0]), a = onPitch(side, mo.t * 3), b = onPitch(side, mo.t * 3 + 0.5);
+      if (ids.length < 7 || ids.length > 11 || new Set(ids).size !== ids.length || !ids.every((id) => a.has(id) || b.has(id))) errors.push(`øjeblik ${mo.kind} t ${mo.t} ${side}: spillerne passer ikke med arket (${ids.length})`);
+    }
+    if (mo.shooter != null && (!mo[mo.side].some((q) => q[0] === mo.shooter) || String(mo.ball) !== String(mo[mo.side].find((q) => q[0] === mo.shooter)?.slice(1)))) errors.push(`øjeblik ${mo.kind} t ${mo.t}: bolden står ikke ved skytten`);
     if (!mo.scorer) continue;
     const pts = mo[mo.side], sp = pts.find((q) => q[0] === mo.scorer);
     if (!sp) { errors.push(`mål t ${mo.t}: scoreren står ikke i billedet`); continue; }
