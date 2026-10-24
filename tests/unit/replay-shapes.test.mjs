@@ -115,3 +115,8 @@ test('afsparket med en højt trukket bagkæde (QC v3.16.1): egen halvdel vinder 
   const ys = kickoffPositions(t).slice(1).map((q) => q.y);
   assert.ok(ys.every((y) => y >= 51), ys.join(','));
 });
+
+test('gem-vagten (RM v3.16.1): alle 80 kampes spor består isValidTrace – ellers sletter indlæsningen afspilningen tavst', async () => {
+  const { isValidTrace } = await import('../../public/engine/sanitize.js');
+  for (const m of matches) assert.equal(isValidTrace(m.trace), true);
+});
