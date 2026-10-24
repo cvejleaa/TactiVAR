@@ -706,7 +706,8 @@ export function simulateMatch(home, away, rng, opts = {}) {
     if (missed(att, def, cR, dR, min, finisher)) return false;
     st[k(att, 'OnTarget')]++;
     sheet.adjust(gk.id, 0.5); sheet.bump(gk.id, 'saves'); sheet.adjust(finisher.id, 0.1);
-    addEv(min, 'SAVE', 'PLAY', def.isHome, false, 'Redning', `🧤 [${def.team.name}] Flot redning af ${tag(gk)} på afslutning fra ${tag(finisher)} (${att.team.name}).${lead ? ' ' + lead.replace('✅ ', '') : ''}`);
+    // Dit holds opspil (lead) står FØR redningen – det skete først (Spilfører v3.16.4)
+    addEv(min, 'SAVE', 'PLAY', def.isHome, false, 'Redning', `🧤 [${def.team.name}] ${lead ? lead.replace('✅ ', '') + ' ' : ''}Flot redning af ${tag(gk)} på afslutning fra ${tag(finisher)} (${att.team.name}).`);
     if (rng.chance(CORNER_P)) corner(att, def, cR, dR, min);
     return false;
   }
@@ -848,7 +849,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
     else sendOff(side, p, min, 'SECOND_YELLOW');
   }
   const canSendOff = (side, p) => { const e = sheet.entries[p.id]; return !!e && !e.red && side.starters.indexOf(p) >= 1 && side.starters.filter(Boolean).length > MIN_PLAYERS; };
-  function sendOff(side, p, min, kind) {
+  function sendOff(side, p, min, kind, varNote = '') {
     if (!canSendOff(side, p)) return;
     const e = sheet.entries[p.id], slot = side.starters.indexOf(p);
     e.red = kind; e.minOut = min; st[k(side, 'Reds')]++;
@@ -860,7 +861,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
     const left = side.starters.filter(Boolean).length;
     const why = kind === 'DIRECT' ? `Direkte rødt kort til ${tag(p)} for den grove tackling` : `Andet gule kort til ${tag(p)}`;
     observe(p, `Udvist (mod ${other(side).team.name}): ${kind === 'DIRECT' ? 'direkte rødt kort' : 'andet gule kort'}.`);
-    addEv(min, 'RED', 'HIGHLIGHT', side.isHome, true, `🟥 Udvist: ${tag(p)}`, `${kind === 'DIRECT' ? '🟥' : '🟨🟥'} [${side.team.name}] ${why} – han er udvist! ${side.team.name} må spille resten af kampen med ${MEN[left] ?? left} mand.`);
+    addEv(min, 'RED', 'HIGHLIGHT', side.isHome, true, `🟥 Udvist: ${tag(p)}`, `${kind === 'DIRECT' ? '🟥' : '🟨🟥'} [${side.team.name}] ${why} – han er udvist! ${side.team.name} må spille resten af kampen med ${MEN[left] ?? left} mand.${varNote}`);
   }
 
   function checkTriggers(side, min) {
@@ -888,7 +889,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
         side.tactics.customCoords = plan.customCoords || {};
         side.tactics.phases = plan.phases;
         const name = `Plan ${PLAN_LETTERS[rule.newPlan]}`;
-        announceShift(side, min, `${side.team.name} skifter til ${name}`, `📋 [${side.team.name} • Hvis-Så] Holdet skifter fra ${from} til ${name} (${plan.baseFormation}, ${TXT[plan.phases.phase1_buildUp.passingStyle]} / ${TXT[plan.phases.phase2_defending.pressingHeight]}).`);
+        announceShift(side, min, `${side.team.name} skifter til ${name}`, `📋 [${side.team.name} • Hvis-Så] Holdet skifter fra ${from} til ${name} (${plan.baseFormation}, ${TXT[plan.phases.phase1_buildUp.passingStyle]} / ${TXT[plan.phases.phase2_defending.pressingHeight]})${withMen(side)}.`);
         return;
       }
       if (!FORMATIONS[rule.newFormation]) return;
@@ -900,7 +901,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
       }
       side.tactics.baseFormation = rule.newFormation;
       side.tactics.customCoords = {};
-      announceShift(side, min, `${side.team.name} skifter til ${rule.newFormation}`, `📋 [${side.team.name} • Hvis-Så] Holdet skifter fra ${from} til ${rule.newFormation}.`);
+      announceShift(side, min, `${side.team.name} skifter til ${rule.newFormation}`, `📋 [${side.team.name} • Hvis-Så] Holdet skifter fra ${from} til ${rule.newFormation}${withMen(side)}.`);
     }
   }
 
@@ -964,6 +965,8 @@ export function simulateMatch(home, away, rng, opts = {}) {
     if (substitute(side, slot, min, 'Hvis-Så', inP, text)) events.at(-1).tactical = own(side);
   }
 
+  // Med færre mand siger planskiftet det (Spilfører v3.16.4: "4-4-2" med ti mand er ikke en 4-4-2)
+  const withMen = (side) => (side.down ? ` med ${MEN[side.starters.filter(Boolean).length]} mand` : '');
   // Et modstanderholds Hvis-Så-skift kan ses på banen, men ikke læses: ingen regel,
   // intet minut-kriterium, ingen ny formation.
   function announceShift(side, min, label, text) {
@@ -1118,7 +1121,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
               homeVarNet += foulSide === H ? 1 : -1;
               addEv(min, 'VAR_NO_RED', 'HIGHLIGHT', foulSide.isHome, true, '📺 VAR: rødt bliver gult', `📺 [${foulSide.team.name}] VAR-KENDELSE: Dommeren går ud til skærmen … ${tag(fouler)} ramte bolden først. Det røde kort trækkes tilbage – det bliver gult.`, `${foulSide.team.name}: rødt bliver gult`);
               booking(foulSide, fouler, min, 'Gult kort til', ' efter VAR-tjekket', true);
-            } else sendOff(foulSide, fouler, min, 'DIRECT');
+            } else sendOff(foulSide, fouler, min, 'DIRECT', ' 📺 VAR: det røde kort står.');
           } else sendOff(foulSide, fouler, min, 'DIRECT');
         } else if (canSendOff(foulSide, fouler) && rng.chance(VAR_RULES.RED_UPGRADE_P) && rng.next() * 22 < fouler.varProfile.cynicism) {
           st[k(foulSide, 'VarChecks')]++; homeVarNet += foulSide === H ? -1 : 1;

@@ -451,6 +451,12 @@ bedre kan kontrollere spil motoren".
   målets linje, og Rundens mål genfortæller samme hændelse;
   en kamp gentager ikke en måltekst, før typens tekster er brugt (samme rng-træk). Bevis: `tools/fingerprint.mjs` –
   noprose-hashen er uændret.
+- **Tekster (v3.16.5)**: dit holds opspil står før redningen ("X løber sig fri … Flot redning af …"); et rødt kort, VAR
+  tjekker og lader stå, siger "📺 VAR: det røde kort står."; et Hvis-Så-planskift med færre mand siger "… med ti mand"
+  (hullet efter den udviste følger ombytningen – bevidst, sjældent og kosmetisk). Klummen: "🏆 X er mester – N runder før
+  tid", når forspringet er STØRRE end 3 point pr. resterende runde (ved lige point afgør målforskel, så lighed er ikke
+  afgjort); overskrift kun i runden, det blev afgjort. Rundens spiller: "kampens spiller" står først i begrundelsen, når han
+  var det. Bevis: noprose-hashen er uændret.
 
 ### Rigtige minutter og tillægstid (v3.16.4)
 Brugeren: "rigtige minutter (45+2, 90+3)" og "der er også tillægstid for VAR". Motoren regner fortsat i tick à 3 minutter
