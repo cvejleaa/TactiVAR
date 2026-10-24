@@ -36,13 +36,13 @@ test('holdets dybde: forreste til bageste markspiller mindst 18 i hvert billede 
   }
 });
 
-test('ingen brikker oven i hinanden: under 1 % af billederne har to spillere (begge hold) nærmere end 4 – v3.16.0: 96 % (2385 af 2480), nu < 1 %', () => {
+test('ingen brikker oven i hinanden: intet billede har to spillere (begge hold) nærmere end 4 – v3.16.0: 96 % (2385 af 2480); før TM-fundet (angriber på målmanden ved erobring) 19; nu 0', () => {
   let bad = 0;
   for (const f of frames) {
     const all = [...f.h, ...f.a];
     if (all.some((p, i) => all.slice(i + 1).some((q) => Math.hypot(p[1] - q[1], p[2] - q[2]) < 4))) bad++;
   }
-  assert.ok(bad / frames.length < 0.01, `${bad} af ${frames.length}`);
+  assert.equal(bad, 0, `${bad} af ${frames.length}`);
 });
 
 test('afsparket: alle i egen halvdel, og højst 4 fra et hold inden for 3 af midterlinjen – v3.16.0: 7 på y 52', () => {
