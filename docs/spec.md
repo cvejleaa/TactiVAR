@@ -412,8 +412,9 @@ bedre kan kontrollere spil motoren".
     (underteksten siger udfaldet);
   - afspilningens ene tegnede trin (v3.16.2, replay.js `shotEnd`, brugeren: "Man ser aldrig bolden nærme sig målmanden"):
     efter hvert mål, redning og forbi flytter kun bolden sig (1,1 s) derhen, referatets linje siger – i nettet ved siden
-    af målmanden, ind til ham, hos forsvareren nærmest skytten (blokeret), på stolpen, over overliggeren eller forbi den
-    fjerne stolpe. Målet er tegnet (x 44–56). VAR-tjek, annulleret mål og flag har intet sådant trin. 🎬 viser
+    af målmanden, ind til ham, hos den blokerer, referatet nævner (ellers forsvareren nærmest skytten), på stolpen i
+    målets forkant, over overliggeren (bolden vokser og toner ud – set ovenfra lå punktet ellers i nettet) eller forbi den
+    fjerne stolpe. Brikkerne står som i øjeblikket, også når man går baglæns ind i trinnet. Målet er tegnet (x 44–56). VAR-tjek, annulleret mål og flag har intet sådant trin. 🎬 viser
     afslutningen og standser på udfaldet;
   - modstanderens grove kort: 3 × 3 felter set fra din side (`zones`, procent pr. felt, målmanden ude) med hans afslutninger
     (`zoneShots`).

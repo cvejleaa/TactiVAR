@@ -21,7 +21,7 @@ export function replaySteps(trace, highlights = false, events = null, idOf = nul
       const step = { kind: 'moment', t: m.t, h: m.h, a: m.a, ball: m.ball, ev: m.ev, actor: m.scorer ?? m.shooter, assist: m.assist ?? null };
       steps.push(step);
       const end = shotEnd(m, events?.[m.ev], idOf);
-      if (end) steps.push({ ...step, kind: 'shot', ball: end });
+      if (end) steps.push({ ...step, kind: 'shot', ball: end, over: shotOver(m, events?.[m.ev]) });
     }
   }
   return steps;
@@ -34,6 +34,9 @@ export function replaySteps(trace, highlights = false, events = null, idOf = nul
 //  - over: over overliggeren (x 50, y 0,5/99,5);   - ellers forbi: uden for stolpen på den fjerne side (x 38/62).
 // VAR-tjek, annulleret mål og flag har intet trin – kendelsen er ingen boldbane.
 const SHOT_END = new Set(['GOAL', 'HEADER_GOAL', 'SAVE', 'MISS']);
+// Over mål: bolden ender over målet (x 50) – men set ovenfra lå det punkt i det tegnede net, som et mål (QC v3.16.2), så trinnet
+// får sit eget træk: bolden vokser og toner ud (den flyver over overliggeren), klassen .over på bolden.
+export const shotOver = (m, ev) => m.kind === 'MISS' && ev?.label !== 'Blokeret' && /over (mål|overliggeren)/.test(ev?.text ?? '');
 export function shotEnd(m, ev = null, idOf = null) {
   if (!SHOT_END.has(m.kind) || !m.ball) return null;
   const top = m.side === 'h', def = m[top ? 'a' : 'h'] ?? [], line = (dy) => (top ? dy : 100 - dy);
@@ -48,7 +51,7 @@ export function shotEnd(m, ev = null, idOf = null) {
       const named = idOf && ev.text.match(/(#\d+ .+?) kaster sig ind/), q = named && field.find((p) => p[0] === idOf(named[1]));
       const b = q ?? near(field, m.ball[0], m.ball[1]); return [b[1], b[2]];
     }
-    if (/stolpe/.test(ev?.text ?? '') && !/forbi den lange stolpe/.test(ev.text)) return [left ? 44 : 56, line(1)];
+    if (/stolpe/.test(ev?.text ?? '') && !/forbi den lange stolpe/.test(ev.text)) return [left ? 44 : 56, line(3)];   // stolpen i målets forkant
     if (/over (mål|overliggeren)/.test(ev?.text ?? '')) return [50, line(0.5)];
     return [left ? 62 : 38, line(2)];
   }
@@ -103,6 +106,15 @@ export function replayEl(m, ownSide) {
     pitch.append(t); r.tokens.set(id, t);   // bolden ligger øverst via z-index
     return t;
   }
+  function place(s, transition) {
+    const here = new Set();
+    for (const side of ['h', 'a']) for (const [id, x, y] of s[side]) {
+      const t = token(id, side); here.add(id);
+      t.style.transition = transition; t.style.left = x + '%'; t.style.top = y + '%'; t.hidden = false;
+      flag(t, 'actor', id === s.actor); flag(t, 'assist', id === s.assist);
+    }
+    for (const [id, t] of r.tokens) if (!here.has(id)) t.hidden = true;
+  }
   function show() {
     const s = r.steps[r.i];
     if (!s) return;
@@ -110,9 +122,12 @@ export function replayEl(m, ownSide) {
     // Grundbillede: bolden først (35 %), spillerne glider efter. Afslutning: skytten først, så bolden (Spilfører v3.16: bolden
     // stod i feltet, før der var nogen til at skyde) – alt er fremme ved 80 % af trinet.
     if (s.kind === 'shot') {   // kun bolden flytter sig – fra skytten derhen, skuddet endte
-      const d = STEP_MS.shot / r.speed;
-      ball.style.transition = `left ${Math.round(d * 0.6)}ms ease-in, top ${Math.round(d * 0.6)}ms ease-in`;
-      ball.style.left = s.ball[0] + '%'; ball.style.top = s.ball[1] + '%';
+      const d = STEP_MS.shot / r.speed, bt = `${Math.round(d * 0.6)}ms ease-in`;
+      ball.style.transition = `left ${bt}, top ${bt}, transform ${bt}, opacity ${bt}`;
+      ball.style.left = s.ball[0] + '%'; ball.style.top = s.ball[1] + '%'; flag(ball, 'over', !!s.over);
+      // Brikkerne står som i øjeblikket – også når man kommer baglæns fra et senere trin (QC v3.16.2: ellers gik bolden ved ⏮
+      // hen til en tom plads); fremad flytter de sig ikke, for pladserne er de samme.
+      place(s, 'none');
       const e = m.events[s.ev] ?? m.events[0];
       caption.textContent = `${s.t * 3}' · ${m.homeName} ${e.hG}-${e.aG} ${m.awayName} · ${e.text}`;
       flag(caption, 'moment', true);
@@ -122,14 +137,8 @@ export function replayEl(m, ownSide) {
     const d = STEP_MS[s.kind] / r.speed, shot = s.kind === 'moment';
     const glide = `${Math.round(d * (shot ? 0.45 : 0.6))}ms ease-in-out ${!shot && r.speed === 1 ? Math.round(d * 0.2) : 0}ms`;
     const bt = shot ? `${Math.round(d * 0.3)}ms ease-out ${Math.round(d * 0.5)}ms` : `${Math.round(d * 0.35)}ms ease-out`;
-    ball.style.transition = `left ${bt}, top ${bt}`;
-    const here = new Set();
-    for (const side of ['h', 'a']) for (const [id, x, y] of s[side]) {
-      const t = token(id, side); here.add(id);
-      t.style.transition = `left ${glide}, top ${glide}`; t.style.left = x + '%'; t.style.top = y + '%'; t.hidden = false;
-      flag(t, 'actor', id === s.actor); flag(t, 'assist', id === s.assist);
-    }
-    for (const [id, t] of r.tokens) if (!here.has(id)) t.hidden = true;
+    ball.style.transition = `left ${bt}, top ${bt}`; flag(ball, 'over', false);
+    place(s, `left ${glide}, top ${glide}`);
     ball.style.left = s.ball[0] + '%'; ball.style.top = s.ball[1] + '%';
     // Stillingen og teksten: den seneste hændelse til og med trinet (et øjeblik viser sin egen linje)
     // Et grundbillede er tick'ets duel, før afslutningerne (v3.16.1) – stillingen er den fra før (aldrig et mål for tidligt),

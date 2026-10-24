@@ -80,7 +80,9 @@ test('trinene: frames i tick-orden, hvert tick efterfulgt af sine afslutninger i
   assert.deepEqual([s[5].actor, s[5].assist], ['a3', null], 'en redning: skytten er aktør, intet oplæg');
   assert.deepEqual([s[10].actor, s[10].assist], ['a3', null]);
   // skudtrinnet er øjeblikket med en anden bold: samme billede, aktører og hændelse
-  assert.deepEqual({ ...s[3], kind: 'moment', ball: s[2].ball }, s[2]);
+  const { over, ...shot3 } = s[3];
+  assert.equal(over, false, 'et mål flyver ikke over');
+  assert.deepEqual({ ...shot3, kind: 'moment', ball: s[2].ball }, s[2]);
   assert.deepEqual(s[1].ball, [44, 50]); assert.deepEqual(s[1].h, trace.frames[1].h);
 });
 

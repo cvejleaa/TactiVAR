@@ -25,7 +25,7 @@ class FakeEl extends FakeNode {
 }
 globalThis.Node = FakeNode;
 globalThis.document = { createElement: (t) => new FakeEl(t), createTextNode: (t) => new FakeText(t) };
-const { shotEnd, replaySteps, stepForEvent, replayEl, replayJump, clearReplays, STEP_MS } = await import('../../public/ui/replay.js');
+const { shotEnd, shotOver, replaySteps, stepForEvent, replayEl, replayJump, clearReplays, STEP_MS } = await import('../../public/ui/replay.js');
 
 const all = (el, pred, out = []) => { if (el instanceof FakeEl) { if (pred(el)) out.push(el); el.children.forEach((c) => all(c, pred, out)); } return out; };
 const byId = (el, id) => all(el, (e) => e.attrs.id === id)[0];
@@ -75,11 +75,11 @@ test('blokeret: hos forsvarets MARKSPILLER nærmest skytten (ikke keeperen, selv
   assert.deepEqual(shotEnd(mo('h', 'MISS', [58, 33], [['a1', 50, 10]]), blok), [38, 2]);
 });
 
-test('stolpen: på stolpen på skyttens side (x 44 / 56, linje 1) – men "forbi den lange stolpe" er forbi (fjerne side, linje 2) – hjemme og ude', () => {
-  assert.deepEqual(shotEnd(mo('h', 'MISS', [40, 20]), miss('rammer stolpen')), [44, 1]);
-  assert.deepEqual(shotEnd(mo('h', 'MISS', [60, 20]), miss('rammer stolpen')), [56, 1]);
-  assert.deepEqual(shotEnd(mo('a', 'MISS', [40, 80]), miss('rammer stolpen')), [44, 99]);
-  assert.deepEqual(shotEnd(mo('a', 'MISS', [50, 80]), miss('rammer stolpen')), [56, 99], 'x 50 er ikke < 50');
+test('stolpen: på stolpen i målets forkant på skyttens side (x 44 / 56, linje 3) – men "forbi den lange stolpe" er forbi (fjerne side, linje 2) – hjemme og ude', () => {
+  assert.deepEqual(shotEnd(mo('h', 'MISS', [40, 20]), miss('rammer stolpen')), [44, 3]);
+  assert.deepEqual(shotEnd(mo('h', 'MISS', [60, 20]), miss('rammer stolpen')), [56, 3]);
+  assert.deepEqual(shotEnd(mo('a', 'MISS', [40, 80]), miss('rammer stolpen')), [44, 97]);
+  assert.deepEqual(shotEnd(mo('a', 'MISS', [50, 80]), miss('rammer stolpen')), [56, 97], 'x 50 er ikke < 50');
   assert.deepEqual(shotEnd(mo('h', 'MISS', [40, 20]), miss('skyder forbi den lange stolpe')), [62, 2]);
   assert.deepEqual(shotEnd(mo('a', 'MISS', [60, 80]), miss('skyder forbi den lange stolpe')), [38, 98]);
 });
@@ -132,7 +132,7 @@ const fresh = () => { clearReplays(); const m = mk(); return { m, el: replayEl(m
 test('trinene med referatet: skudtrinnet lige efter sit øjeblik med udfaldet fra referatets linje; stepForEvent peger på øjeblikket, ikke skudtrinnet', () => {
   const m = mk(), s = replaySteps(m.trace, false, m.events);
   assert.deepEqual(s.map((x) => `${x.kind}:${x.ev}`), ['frame:null', 'moment:1', 'shot:1', 'moment:2', 'shot:2', 'frame:null', 'moment:3', 'shot:3']);
-  assert.deepEqual([s[2].ball, s[4].ball, s[7].ball], [[50, 10], [44, 1], [45, 2]]);
+  assert.deepEqual([s[2].ball, s[4].ball, s[7].ball], [[50, 10], [44, 3], [45, 2]]);
   assert.deepEqual(replaySteps(m.trace, false)[4].ball, [62, 2], 'uden referat: stolpeskuddet er forbi');
   assert.deepEqual([1, 2, 3].map((e) => stepForEvent(s, m.events, e)), [1, 3, 6]);
   const hl = replaySteps(m.trace, true, m.events);
@@ -151,21 +151,22 @@ test('skudtrinnet flytter KUN bolden: brikkernes plads, overgang, skjul og marke
   const { el } = fresh();
   click(el, 'rp-next'); click(el, 'rp-next'); click(el, 'rp-next');   // trin 3: stolpeskuddet
   const toks = all(el, (x) => cls(x, 'rp-token'));
-  const snap = () => toks.map((t) => JSON.stringify([t.dataset.pid, t.style, t.hidden, t.className]));
+  const snap = () => toks.map((t) => JSON.stringify([t.dataset.pid, t.style.left, t.style.top, t.hidden, t.className]));
   const before = snap(), cap = byId(el, 'rp-caption').textContent;
   click(el, 'rp-next');   // trin 4: skudtrinnet
   assert.equal(step(el), 4);
-  assert.deepEqual(snap(), before, 'ingen brik rørt');
+  assert.deepEqual(snap(), before, 'ingen brik flyttet');
+  assert.ok(toks.every((t) => t.style.transition === 'none'), 'brikkerne sættes uden overgang (QC v3.16.2: også baglæns)');
   const ball = byId(el, 'rp-ball');
-  assert.deepEqual([ball.style.left, ball.style.top], ['44%', '1%']);
-  assert.equal(ball.style.transition, 'left 660ms ease-in, top 660ms ease-in');
+  assert.deepEqual([ball.style.left, ball.style.top], ['44%', '3%']);
+  assert.equal(ball.style.transition, 'left 660ms ease-in, top 660ms ease-in, transform 660ms ease-in, opacity 660ms ease-in');
   assert.equal(byId(el, 'rp-caption').textContent, "3' · Hjemme 0-0 Ude · 🎯 rammer stolpen");
   assert.equal(byId(el, 'rp-caption').textContent, cap);
   assert.ok(cls(byId(el, 'rp-caption'), 'moment'));
   assert.ok(cls(toks.find((t) => t.dataset.pid === 'h9'), 'actor'), 'skytten er stadig markeret');
   click(el, 'rp-speed');   // 2×
   click(el, 'rp-prev'); click(el, 'rp-next');
-  assert.equal(ball.style.transition, 'left 330ms ease-in, top 330ms ease-in');
+  assert.equal(ball.style.transition, 'left 330ms ease-in, top 330ms ease-in, transform 330ms ease-in, opacity 330ms ease-in');
   click(el, 'rp-next');   // grundbilledet bagefter tegner igen brikker og fjerner 'moment'
   assert.equal(cls(byId(el, 'rp-caption'), 'moment'), false);
   clearReplays();
@@ -217,9 +218,8 @@ test('🎬 viser øjeblikket og efter 2600 ms / hastighed skudtrinnet og står d
   } finally { clearReplays(); mock.timers.reset(); }
 });
 
-// FUND (v3.16.2): play() rydder ikke 🎬's ventende timer (kun pause() gør) – ▶ inden for 2600 ms efter et spring giver to timere,
-// og afspilningen springer et trin over (redningens skudtrin vises kun ~1 s, så står den på stolpeskuddet). Rød indtil play()
-// (og ⭐, der heller ikke rydder) kalder clearTimeout(r.timer) først.
+// FUND (v3.16.2, rettet): play() ryddede ikke 🎬's ventende timer (kun pause() gjorde) – ▶ inden for 2600 ms efter et spring gav
+// to timere, og afspilningen sprang et trin over. Nu kalder play() og ⭐ clearTimeout(r.timer) først; testen vogter det.
 test('▶ lige efter 🎬: almindelig afspilning fra øjeblikket (2600 ms, så skudtrinnet 1100 ms) – ikke to timere', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
@@ -239,4 +239,36 @@ test('blokeret: bolden går til den blokerer, referatet NÆVNER (idOf), også n�
   assert.deepEqual(shotEnd(m, ev, idOf), [60, 30]);
   assert.deepEqual(shotEnd(m, ev), [40, 25], 'uden idOf: nærmeste markspiller');
   assert.deepEqual(shotEnd(m, { ...ev, text: '🧱 [Y] #99 Ukendt kaster sig ind foran afslutningen.' }, idOf), [40, 25]);
+});
+
+test('over mål (QC v3.16.2): trinnet har sit eget træk – .over på bolden (vokser og toner ud); intet andet udfald får det, og det fjernes igen', () => {
+  const m0 = mo('h', 'MISS', [50, 20]);
+  assert.equal(shotOver(m0, miss('sender bolden over mål')), true);
+  assert.equal(shotOver(m0, miss('banker bolden over overliggeren')), true);
+  for (const t of ['rammer stolpen', 'skyder en meter forbi', 'skyder forbi den lange stolpe']) assert.equal(shotOver(m0, miss(t)), false, t);
+  assert.equal(shotOver(m0, { type: 'MISS', label: 'Blokeret', text: '🧱 over mål' }), false);
+  assert.equal(shotOver(mo('h', 'GOAL', [50, 20]), miss('sender bolden over mål')), false);
+  assert.equal(shotOver(m0, null), false);
+  // I afspilleren: ev 2 er nu "over mål" – trin 4 (dets skudtrin) giver bolden .over, trin 5 (grundbilledet) fjerner den
+  clearReplays();
+  const m = mk(); m.events = events.map((e, i) => (i === 2 ? { ...e, text: '🎯 #9 S. Kytte sender bolden over mål.' } : e));
+  const el = replayEl(m, 'h'), ball = byId(el, 'rp-ball');
+  for (let i = 0; i < 3; i++) click(el, 'rp-next');
+  assert.equal(cls(ball, 'over'), false, 'stolpeskuddets øjeblik: ikke over');
+  click(el, 'rp-next'); assert.equal(step(el), 4); assert.equal(cls(ball, 'over'), true);
+  click(el, 'rp-next'); assert.equal(cls(ball, 'over'), false, 'fjernes i næste trin');
+  click(el, 'rp-prev'); assert.equal(cls(ball, 'over'), true);
+  click(el, 'rp-prev'); assert.equal(cls(ball, 'over'), false, 'og i øjeblikket før');
+  clearReplays();
+});
+
+test('⏮ baglæns ind i et skudtrin (QC v3.16.2): brikkerne står som i øjeblikket – skytten tilbage på sin plads (40, 22) fra grundbilledets (50, 50) og markeret', () => {
+  const { el } = fresh();
+  for (let i = 0; i < 5; i++) click(el, 'rp-next');   // trin 5: grundbilledet t 2 – skytten på (50, 50), ingen markering
+  const h9 = all(el, (x) => cls(x, 'rp-token')).find((t) => t.dataset.pid === 'h9');
+  assert.deepEqual([h9.style.left, h9.style.top, cls(h9, 'actor')], ['50%', '50%', false]);
+  click(el, 'rp-prev');   // trin 4: stolpeskuddets skudtrin
+  assert.equal(step(el), 4);
+  assert.deepEqual([h9.style.left, h9.style.top, cls(h9, 'actor')], ['40%', '22%', true]);
+  clearReplays();
 });

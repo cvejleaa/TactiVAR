@@ -181,6 +181,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .rp-token.own { box-shadow: 0 0 0 2px #a78bfa; }
 .rp-token.actor { border-color: #22c55e; box-shadow: 0 0 0 3px #22c55e99; z-index: 2; } .rp-token.assist { border-color: #60a5fa; }
 .rp-ball { position: absolute; transform: translate(-50%, -50%); color: #fff; font-size: .8rem; text-shadow: 0 0 3px #000; transition: left .4s ease-out, top .4s ease-out; z-index: 3; pointer-events: none; }
+.rp-ball.over { transform: translate(-50%, -50%) scale(2.2); opacity: 0; }   /* over overliggeren (v3.16.2) */
 .rp-caption { min-height: 2.6em; font-size: .85rem; text-align: center; } .rp-caption.moment { font-weight: 600; }
 .rp-controls { display: flex; gap: .3rem; justify-content: center; flex-wrap: wrap; }
 /* Heat map (v3.16) */
