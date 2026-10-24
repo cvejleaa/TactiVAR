@@ -45,8 +45,8 @@ try {
       const mine = m.homeId === me.id || m.awayId === me.id;
       lines.push(`## ${m.homeName} ${m.homeGoals}-${m.awayGoals} ${m.awayName}${mine ? '  ← dit hold' : ''}`, '');
       for (const e of m.events) lines.push(`- ${e.min}' ${e.text}${e.snapshot ? '  📍' : ''}`);
-      const s = m.stats || {};
-      lines.push('', `Kamptal (hjemme/ude): besiddelse ${s.hPoss}/${s.aPoss} · skud ${s.hShots}/${s.aShots} · på mål ${s.hOnTarget}/${s.aOnTarget} · hjørner ${s.hCorners}/${s.aCorners} · gule ${s.hYellows}/${s.aYellows}`, '');
+      const s = m.stats || {}, ps = (s.hPoss ?? 0) + (s.aPoss ?? 0) || 1, hp = Math.round((s.hPoss ?? 0) / ps * 100);   // som i Kamp-fanen (procent)
+      lines.push('', `Kamptal (hjemme/ude): besiddelse ${hp} %/${100 - hp} % · skud ${s.hShots}/${s.aShots} · på mål ${s.hOnTarget}/${s.aOnTarget} · hjørner ${s.hCorners}/${s.aCorners} · gule ${s.hYellows}/${s.aYellows}`, '');
     }
     await tab('kamp'); await box();
     await shot(`${nn}-kamp.png`);
