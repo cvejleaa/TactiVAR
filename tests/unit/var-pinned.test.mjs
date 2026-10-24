@@ -397,16 +397,16 @@ test('linjedommerens flag: afslutningen tæller hverken som redning, på mål, f
 });
 
 // ---------- Billedet ved et VAR-tjek af en holdkammerat (varBehind) ----------
-// Angriberne (plads 9 og 10) står i angrebsform på y 14 (trukket y 20 − 6); skytten (plads 5, FIN 20) trækkes til y 32 − 16 = 16.
-// v3.16 (koblede linjer): ingen står foran modstanderens sidste markspiller (stopper på 73 → linje 27 + ONSIDE_GAP 1 = 28), så
-// alle tre står på 28 – og holdets egen form (rå y 14, 14, 16) afgør rækkefølgen (frontOrder): to står foran skytten, så han er
-// ikke blandt de VAR_FRONT forreste, og hans forreste holdkammerat tjekkes. Billedet rykker skytten til den tjekkedes y +
-// VAR_BEHIND (28 + 4 = 32; før 14 + 4 = 18) og bolden med; uden varBehind stod han på 28 (bolden på 20). Står han længere tilbage
-// (52 − 16 = 36 > 32; før 48 − 16 = 32 > 18 – nu ville 32 være lig grænsen og intet bevise), rykkes han ikke.
-test('billedet ved et VAR-tjek af en holdkammerat: skytten tegnes mindst VAR_BEHIND (4) bag den tjekkede (koblet y 28 → 32), bolden ved ham – står han allerede længere tilbage (36), rykkes han ikke', () => {
+// Angriberne (plads 9 og 10) står i angrebsform på y 14 (trukket y 20 − 6); skytten (plads 5, FIN 20, x 46 – 8 fra stopperen på 38, så
+// han ikke skubbes på tværs) trækkes til y 32 − 16 = 16. v3.16.1 (sammenpresning): ingen står foran modstanderens sidste markspiller
+// (stopper på 73 → linje 27 + ONSIDE_GAP 1 = 28); [14, 40] mappes til [28, 40]: angriberne 28, skytten 28 + 2·12/26 = 28,9 → 29 – to står
+// foran ham, så han er ikke blandt de VAR_FRONT forreste, og hans forreste holdkammerat tjekkes. Billedet rykker skytten til den tjekkedes
+// y + VAR_BEHIND (28 + 4 = 32) og bolden med; uden varBehind stod han på 29 (bolden på 20). Står han længere tilbage (52 − 16 = 36 →
+// 28 + 22·12/26 = 38,2 → 38 > 32), rykkes han ikke.
+test('billedet ved et VAR-tjek af en holdkammerat: skytten tegnes mindst VAR_BEHIND (4) bag den tjekkede (koblet y 29 → 32), bolden ved ham – står han allerede længere tilbage (38), rykkes han ikke', () => {
   const run = (shooterY) => {
     const a = arena();
-    a.H.tactics.customCoords = { ...Object.fromEntries([1, 2, 3, 4, 6, 7, 8].map((j) => [j, { x: 50, y: 95 }])), 9: { x: 5, y: 20 }, 10: { x: 95, y: 20 }, 5: { x: 40, y: shooterY } };
+    a.H.tactics.customCoords = { ...Object.fromEntries([1, 2, 3, 4, 6, 7, 8].map((j) => [j, { x: 50, y: 95 }])), 9: { x: 5, y: 20 }, 10: { x: 95, y: 20 }, 5: { x: 46, y: shooterY } };
     for (const p of a.A.squad) p.skills.positioning = 20;   // løbene vindes ikke – almindelig afslutning
     for (const p of a.H.squad) p.skills.finishing = 1;
     slot(a.H, 5).skills.finishing = 20; slot(a.A, 0).skills.goalkeeping = 1;
@@ -421,11 +421,11 @@ test('billedet ved et VAR-tjek af en holdkammerat: skytten tegnes mindst VAR_BEH
     assert.equal(r.goal.snapshot.scorer, slot(r.a.H, 5).id);
   }
   const ys = (r) => Object.fromEntries(r.goal.snapshot.pts.map(([id, x, y]) => [id, [x, y]]));
-  assert.deepEqual(ys(near)[slot(near.a.H, 5).id], [40, 32]);
-  assert.deepEqual(near.goal.snapshot.ball, [40, 32], 'bolden ved skytten (x 40, ikke midten)');
+  assert.deepEqual(ys(near)[slot(near.a.H, 5).id], [46, 32]);
+  assert.deepEqual(near.goal.snapshot.ball, [46, 32], 'bolden ved skytten (x 46, ikke midten)');
   assert.deepEqual([ys(near)[slot(near.a.H, 9).id], ys(near)[slot(near.a.H, 10).id]], [[5, 28], [95, 28]], 'den tjekkede står, hvor han stod (på linjen)');
-  assert.deepEqual(ys(far)[slot(far.a.H, 5).id], [40, 36], 'allerede længere tilbage end 28 + 4: uændret');
-  assert.deepEqual(far.goal.snapshot.ball, [40, 36], 'langskud (36 ≥ LONGSHOT_Y 30): bolden ved skytten');
+  assert.deepEqual(ys(far)[slot(far.a.H, 5).id], [46, 38], 'allerede længere tilbage end 28 + 4: uændret');
+  assert.deepEqual(far.goal.snapshot.ball, [46, 38], 'langskud (38 ≥ LONGSHOT_Y 30): bolden ved skytten');
 });
 
 // Samme opstilling, men VAR-evnerne er forskellige: den tjekkede (plads 9/10) og skytten (plads 5) har hver sin varPulse, og

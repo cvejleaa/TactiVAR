@@ -223,12 +223,14 @@ function cb({ next = 0.5, setup = null, script = {}, bot = false, press = 'MID_B
   return { a, m, d: m.duelLog[a.H.id], blocked: m.events.filter((e) => e.label === 'Kanten lukket'), win: m.events.filter((e) => e.label === 'Mod baglinjen') };
 }
 const strongBacks = (v = 30) => (a) => { for (const p of a.A.squad) Object.assign(p.skills, { pace: v, positioning: v }); };
-// v3.16 (koblede linjer): forsvaret rykkes som blok efter sit pres – midtbanen det halve (45 → 61), så kantmidtbanespilleren på
-// boldsiden står nu 14 fra cutback-forsvarets plet (100 − wx, 72) og kan selv lukke kanten. Ved 0,5 (højre kant) lander
-// lodtrækningen på LM (plads 5, (4, 61)); ved 0,4 (venstre kant) på RB (plads 4). Aldrig én fra den modsatte side.
-test('cutback: flanken følger terningen (next < 0,5 = venstre kant) og forsvareren står på den MODSATTE side – RM mod LM ved 0,5, LM mod RB ved 0,4', () => {
+// v3.16.1 (sammenpresning): forsvaret presses sammen efter sit pres ([20, 63] til [51, 63]: midtbanen 45 → 58), så kantmidtbanespilleren
+// på boldsiden står 16 fra cutback-forsvarets plet (100 − wx, 72) og kan selv lukke kanten. Vægtene exp(−afstand/16) for (12, 72) med bolden
+// til venstre (−11,4): LB (4, 70) 0,60, CB (27, 73) 0,39, CB (51, 73) 0,09, RB 0,02, LM (4, 58) 0,37 … i alt 2,11. Ved 0,55 (højre kant)
+// lander lodtrækningen (1,16) på LM (plads 5); ved 0,5 lå den på den fjerne stopper (plads 3, x 51 – kumuleret 1,08 ≥ 1,06). Ved 0,4
+// (venstre kant, spejlet) på RB (plads 4). Aldrig én fra den modsatte side.
+test('cutback: flanken følger terningen (next < 0,5 = venstre kant) og forsvareren står på den MODSATTE side – RM mod LM ved 0,55, LM mod RB ved 0,4', () => {
   const setup = (a) => { strongBacks()(a); for (const i of [5, 8]) Object.assign(slot(a.H, i).skills, { pace: 20, ballControl: 20 }); };
-  const right = cb({ next: 0.5, setup }), left = cb({ next: 0.4, setup });
+  const right = cb({ next: 0.55, setup }), left = cb({ next: 0.4, setup });
   assert.equal(right.blocked.length, 2); assert.equal(left.blocked.length, 2);
   // v3.12.1: forsvaret forskydes mod boldsiden, så den nærmeste kan være backen, stopperen eller (v3.16) kantmidtbanespilleren på
   // DEN side – aldrig én fra den modsatte side.
@@ -288,17 +290,22 @@ test('cutback-afslutteren står nær (50,28) og er ikke kantspilleren selv; PAS 
   });
   assert.equal(near.m.homeGoals, 2);
   for (const t of text(near)) assert.ok(t.includes(`✅ ${tg(slot(near.a.H, 8))} når baglinjen og lægger den lavt tilbage til ${tg(slot(near.a.H, 9))}.`), t);
-  // Kantspilleren er bedst til afslutning og står på cutbackstedet – men er ekskluderet; plads 9 tager den
+  // Kantspilleren er bedst til afslutning og står på cutbackstedet – men er ekskluderet; plads 9 tager den.
+  // v3.16.1: plads 9 står ved siden af (40, 28), ikke oven i ham – to på samme plet skubbes fra hinanden (spread), og så kom plads 9
+  // (64, 32) inden for kantens rækkevidde (25 fra (88, 30)) og blev selv kantspiller. Nu: RM (61, 28) og ST (55, 32 – skubbet fra
+  // stopperen) begge uden for rækkevidden → kantspilleren vælges blandt alle efter PAC+BAL (100).
   const self = run((a) => {
     Object.assign(slot(a.H, 8).skills, { pace: 50, ballControl: 50, finishing: 20 }); Object.assign(slot(a.H, 9).skills, { finishing: 10 });
-    layout(a.H, { 8: { x: 50, y: 28 }, 9: { x: 50, y: 28 } });
+    layout(a.H, { 8: { x: 50, y: 28 }, 9: { x: 40, y: 28 } });
   });
   for (const t of text(self)) assert.ok(t.includes(`✅ ${tg(slot(self.a.H, 8))} når baglinjen og lægger den lavt tilbage til ${tg(slot(self.a.H, 9))}.`), t);
-  // Evne: FIN, ikke PAS (samme sted; P: FIN 6/PAS 14, Q: FIN 14/PAS 6)
+  // Evne: FIN, ikke PAS (samme afstand; P: FIN 6/PAS 14, Q: FIN 14/PAS 6). v3.16.1: to på samme plet skubbes fra hinanden (spread), og så
+  // afgjorde afstanden – derfor spejlet om pletten: x 36 / 42 + 11,4 (boldsiden) = 47 / 53, y 40 − 6 = 34 (RM rå 29 bag linjen 28: ingen
+  // sammenpresning), begge 6,7 fra (50, 28), 7 fra stopperne (y 27) og bottens midtbane (y 41) – ingen skubbes.
   const skill = run((a) => {
     Object.assign(slot(a.H, 8).skills, { pace: 15, ballControl: 15 });
     Object.assign(slot(a.H, 9).skills, { finishing: 6, passing: 14 }); Object.assign(slot(a.H, 10).skills, { finishing: 14, passing: 6 });
-    layout(a.H, { 8: { x: 85, y: 45 }, 9: { x: 50, y: 28 }, 10: { x: 50, y: 28 } });
+    layout(a.H, { 8: { x: 85, y: 45 }, 9: { x: 36, y: 40 }, 10: { x: 42, y: 40 } });
   });
   for (const t of text(skill)) assert.ok(t.includes(`lavt tilbage til ${tg(slot(skill.a.H, 10))}.`), t);
 });

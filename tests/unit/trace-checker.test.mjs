@@ -107,12 +107,16 @@ test('skiftereglerne: et træthedsskift sker FØR billedet i sit tick, et skades
   assert.ok(fat >= 6 && inj >= 6, `data: træthedsskift ${fat}, skadesskift ${inj}`);
 });
 
-test('fund og rapport: målene med billede tælles, billederne med bold er 30, rapporten giver ingen fejl og en størrelse', () => {
+// v3.16.1: linje-fundet tæller kun grundbilleder UDEN duel-udfald (run/lost/offside står med vilje forbi linjen) – ikke alle 30 med bold.
+test('fund og rapport: målene med billede tælles, linje-fundet tæller kun billeder med bold uden løb/erobring/offside (16 af 30), rapporten giver ingen fejl og en størrelse', () => {
   const r = checkTrace(M);
   assert.equal(r.finding.goals, M.trace.moments.filter((x) => x.scorer).length);
-  assert.equal(r.finding.frontFrames, 30);
+  const withBall = M.trace.frames.filter((f) => f.poss), flagged = withBall.filter((f) => f.run || f.lost || f.offside);
+  assert.deepEqual([withBall.length, flagged.length], [30, 14], 'data: både billeder med og uden duel-udfald');
+  assert.equal(r.finding.frontFrames, 16);   // 30 − 14 (alle 30 ville tælle de bevidste forbi-linjen-billeder med)
+  assert.equal(r.finding.frontBehind, 0);
   const rep = traceReport(6);
   assert.deepEqual(rep.errors, []);
   assert.ok(rep.bytesPerMatch > 3000 && rep.bytesPerMatch < 25000, `${rep.bytesPerMatch}`);
-  assert.equal(rep.sum.frontFrames, 180);
+  assert.equal(rep.sum.frontFrames, 104);   // 6 kampe · 30 billeder med bold = 180, heraf 104 uden duel-udfald
 });

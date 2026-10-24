@@ -2397,12 +2397,13 @@ test('cutback: kantspilleren (PAC+BAL 20 + 4) mod backen (PAC+POS + 4 − 2): 21
   assert.ok(Math.abs(shut.m.stats.hXg) < 1e-9, String(shut.m.stats.hXg));
   const ev = shut.m.events.filter((e) => e.label === 'Kanten lukket');
   assert.equal(ev.length, 2); assert.ok(ev.every((e) => e.isHome === false && /^❌ Dit cutback-forsøg stoppes: #\d+ .+ \(.+\) lukker kanten mod #\d+ /.test(e.text)), ev[0].text);
-  // v3.16 (koblede linjer): forsvaret rykkes som blok – midtbanen det halve (LM 45 → 61), så lodtrækningen om "den nærmeste" (rul 0,5,
-  // ens evner) lander på LM (plads 5, (4, 61)) og ikke LB'en (4, 70). Han får 6,5 + 2·0,3 = 7,1 – ingen clean sheet-bonus (kun LB/RB;
-  // før: LB 7,6 = 6,5 + 2·0,3 + 0,5). OBS: spec.md siger "mod den nærmeste back" – se rapporten.
+  // v3.16.1 (sammenpresning): forsvaret (bold 12 → −11,4) presses sammen fra [20, 63] til [51, 63] – LM 45 → 58 (v3.16: 61), bagkæden
+  // står. Vægtene exp(−afstand/16) til (12, 72) (rul 0,5, ens evner): LB (4, 70) 0,60, CB (27, 73) 0,39, CB (51, 73) 0,09 – summen af alle
+  // ti er 2,11, så halvdelen nås ved den anden stopper (plads 3), ikke LM'en (plads 5, (4, 58)) som i v3.16. Han får 6,5 + 2·0,3 + clean
+  // sheet 0,5 = 7,6 (LM'en: 7,1 uden bonus). OBS: spec.md siger "mod den nærmeste back" – lodtrækningen giver ikke altid den nærmeste.
   const back = shut.m.ratings.away.find((e) => e.tacticWins > 0);
-  assert.equal(back.playerId, slot(shut.a.A, 5).id);
-  assert.equal(back.tacticWins, 2); assert.equal(back.rating, 7.1);
+  assert.equal(back.playerId, slot(shut.a.A, 3).id);
+  assert.equal(back.tacticWins, 2); assert.equal(back.rating, 7.6);
 });
 // v3.12.1: CUTBACK_FINISH_BONUS 6 → 8; v3.13: KEEPER_EDGE 3,5 → 3; v3.15.1: 3 → 0,3 (med 3 reddede 17,6; før MV 14,9 / 15)
 test('cutback: afslutteren får CUTBACK_FINISH_BONUS 8 – FIN 10 + 4 + 8 = 22 mod MV + 4 + 0,3: MV 17,6 slås, 17,7 redder', () => {

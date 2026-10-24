@@ -16,7 +16,7 @@ import { createRng } from '../../public/engine/rng.js';
 import { createLeague } from '../../public/engine/generator.js';
 import { simulateMatch, VAR_BEHIND, COUNTER_RUN } from '../../public/engine/match.js';
 import { VAR_RULES } from '../../public/engine/match-rules.js';
-import { livePositions, coupledPositions } from '../../public/engine/positions.js';
+import { livePositions, coupledPositions, kickoffPositions } from '../../public/engine/positions.js';
 
 // Fælles koordinater: hjemmeholdet angriber mod y 0; udeholdet spejles (100 − x, 100 − y)
 const cm = (side, [x, y]) => (side === 'h' ? [Math.round(x), Math.round(y)] : [Math.round(100 - x), Math.round(100 - y)]);
@@ -29,32 +29,55 @@ function league(s) { const L = createLeague(createRng(s)); return { L, home: L.t
 const bots = (n) => { const out = []; for (let s = 1; s <= n; s++) { const { home, away } = league(s); out.push({ s, home, away, m: simulateMatch(home, away, createRng(s * 31)) }); } return out; };
 const DATA = bots(80);   // 80 seedede kampe mellem to botter (deles af testene herunder – kun læsning)
 
-// Grundbillederne (v3.16, koblede linjer – spec §5 "Koblede linjer"): afspark = begge hold i deres blok (livePositions, forsvar,
-// bolden på midten) med markspillerne i egen halvdel (y ≥ 52 i egne koordinater; målmanden urørt). Ellers holdenes placering i
-// forhold til modstanderen – coupledPositions(boldholdet, modstanderen, bolden som sidebelastning): boldholdet = .ball, det
-// andet = .opp. (Før v3.16: livePositions for hvert hold for sig – angriberne stod langt offside.)
-const kickoff = (team, side) => livePositions(team.tactics, { attacking: false, ballX: 50 }).map((p, i) => cm(side, [p.x, i ? Math.max(p.y, 52) : p.y]));
-const coupled = (T, att, ctx) => { const r = coupledPositions(T[att].tactics, T[otherSide(att)].tactics, ctx); return { [att]: r.ball.map((p) => cm(att, [p.x, p.y])), [otherSide(att)]: r.opp.map((p) => cm(otherSide(att), [p.x, p.y])) }; };
-test('grundbillederne er holdenes form: afspark begge i blok i egen halvdel; ellers koblede linjer – holdet med bolden mod offside-linjen (bolden som sidebelastning), modstanderen rykket som blok mod den spejlede bold', () => {
-  let ok = 0, kick = 0, poss = { h: 0, a: 0 };
+// Grundbillederne (v3.16.1 – tickFrame, tegnet EFTER duellen; spec §5 "Koblede linjer"): afspark = begge hold i forsvarsform
+// presset sammen ind i egen halvdel (kickoffPositions – positions.js' tal er bogstaveligt bevist i coupled-gaps), bolden på midten.
+// Ellers holdenes placering i forhold til modstanderen – coupledPositions(boldholdet, modstanderen, bolden som sidebelastning) – og
+// bolden HOS en spiller, efter duellens udfald (flaget på billedet):
+//  - intet flag (ingen duel / opbygningen uden løb): ballX = opspillerens levende x (en markspiller hos holdet med bolden), bolden hos ham;
+//  - run (opbygningen vandt): som ovenfor, men bolden hos angriberen, hvor han står (på linjen – intet løb frem, Spilfører v3.16.1);
+//  - lost (presset vandt): forsvaret har bolden i caught-formen (ballX spejlet), bolden hos presseren (en af dets markspillere);
+//  - offside (fælden): som run, men angriberen tegnes lige foran linjen (line − 3) – han springes over her (skubbet på tværs).
+// Oraklet prøver alle pladser som opspiller/løber/presser og kræver, at præcis billedet og bolden passer. (Før v3.16.1: bolden på
+// midterlinjen (y 50) ved holdets seneste chance – angriberne og bolden stod stille mellem chancerne.)
+const kickoff = (team, side) => kickoffPositions(team.tactics).map((p) => cm(side, [p.x, p.y]));
+const coupled = (T, att, ctx) => { const r = coupledPositions(T[att].tactics, T[otherSide(att)].tactics, ctx); return { line: r.line, [att]: r.ball.map((p) => cm(att, [p.x, p.y])), [otherSide(att)]: r.opp.map((p) => cm(otherSide(att), [p.x, p.y])) }; };
+const xOf = (team, i) => livePositions(team.tactics, { attacking: true, ballX: 50 })[i].x;
+function frameKind(T, f) {
+  const att = f.poss, def = otherSide(att), fits = (exp, own, i, skip = []) => same(f[att], exp[att], skip) && same(f[def], exp[def], skip) && f.ball[0] === exp[own][i][0] && f.ball[1] === exp[own][i][1];
+  for (let pm = 1; pm < 11; pm++) {
+    const bx = xOf(T[att], pm);
+    if (!f.run && !f.lost && !f.offside && fits(coupled(T, att, { ballX: bx }), att, pm)) return 'none';
+    for (let r = 1; r < 11; r++) {
+      if (f.run && fits(coupled(T, att, { ballX: bx }), att, r)) return 'run';   // v3.16.1 (Spilfører): bolden frem til angriberen på linjen, intet løb
+      if (f.offside) {
+        const exp = coupled(T, att, { ballX: bx, runner: r }), id = f[att][r]?.[0];
+        // den fangede står lige foran linjen (y i egne koordinater line − 3) – x skubbet væk fra forsvareren, så kun y tjekkes
+        const ownY = att === 'h' ? f.ball[1] : 100 - f.ball[1];
+        if (same(f[att], exp[att], [id]) && same(f[def], exp[def]) && f[att][r][1] === f.ball[0] && f[att][r][2] === f.ball[1] && ownY === exp.line - 3) return 'offside';
+      }
+    }
+    if (f.lost) for (let pr = 1; pr < 11; pr++) if (fits(coupled(T, def, { ballX: 100 - bx, caught: true }), def, pr)) return 'lost';
+  }
+  return null;
+}
+test('grundbillederne er holdenes form efter duellen: afspark begge sammenpresset i egen halvdel; ellers koblede linjer med bolden hos opspilleren, løberen, presseren eller den offside-fangede', () => {
+  let ok = 0, kick = 0; const poss = { h: 0, a: 0 }, kinds = { none: 0, run: 0, lost: 0, offside: 0 };
   for (const { s, home, away, m } of DATA) {
     const T = { h: home, a: away }, stop = stopOf(m);
     for (const f of m.trace.frames.filter((x) => x.t * 3 < stop)) {
       if (!f.poss) {
         assert.deepEqual(f.ball, [50, 50], `seed ${s} afspark: bolden på midten`);
         assert.ok(same(f.h, kickoff(home, 'h')) && same(f.a, kickoff(away, 'a')), `seed ${s} afspark`);
-        assert.ok(f.h.slice(1).every((q) => q[2] >= 52) && f.a.slice(1).every((q) => q[2] <= 48), `seed ${s} afspark: egen halvdel`);
+        assert.ok(f.h.slice(1).every((q) => q[2] >= 53) && f.a.slice(1).every((q) => q[2] <= 47), `seed ${s} afspark: egen halvdel (KICKOFF_Y 53)`);
         ok++; kick++; continue;
       }
-      const att = f.poss, def = otherSide(att), bx = att === 'h' ? f.ball[0] : 100 - f.ball[0];
-      assert.equal(f.ball[1], 50, `seed ${s} t ${f.t}: bolden på midterlinjen`);
-      const exp = coupled(T, att, { ballX: bx });
-      assert.ok(same(f[att], exp[att]), `seed ${s} t ${f.t}: ${att} har bolden (ballX ${bx})`);
-      assert.ok(same(f[def], exp[def]), `seed ${s} t ${f.t}: ${def} forsvarer`);
-      ok++; poss[att]++;
+      const k = frameKind(T, f);
+      assert.ok(k, `seed ${s} t ${f.t}: ${f.poss} har bolden (${JSON.stringify({ run: f.run, lost: f.lost, offside: f.offside, ball: f.ball })}) – ikke holdenes form`);
+      ok++; poss[f.poss]++; kinds[k]++;
     }
   }
-  assert.ok(ok > 1500 && kick >= 80 && poss.h > 400 && poss.a > 400, `data: ${ok} billeder, afspark ${kick}, bolden ${JSON.stringify(poss)}`);
+  assert.ok(ok > 1500 && kick >= 80 && poss.h > 400 && poss.a > 400 && kinds.none > 500 && kinds.run > 100 && kinds.lost > 100 && kinds.offside > 5,
+    `data: ${ok} billeder, afspark ${kick}, bolden ${JSON.stringify(poss)}, ${JSON.stringify(kinds)}`);
 });
 
 // Øjeblikket (v3.16): positionerne er AFLEVERINGENS øjeblik – coupledPositions for holdet med afslutningen (bolden på
@@ -205,6 +228,9 @@ test('sporets øjeblik for et mål = øjebliksbilledet (📍) for alle andre end
         if (sn.attacking && id === sn.scorer && !behind) {
           [cx, cy] = conv(clampShot([x, y], mo.long));
           if (!near(cx, conv([x, y])[0]) || !near(cy, conv([x, y])[1])) n.moved++;
+          // … og et skridt til siden fra modstanderens målmand, hvis han ellers stod nærmere end MIN_APART 6 (Spilfører v3.16.1)
+          const gk = mo[mo.side === 'h' ? 'a' : 'h'][0];
+          if (gk && Math.hypot(cx - gk[1], cy - gk[2]) < 6) { cx = gk[1] + (cx < gk[1] ? -1 : cx > gk[1] ? 1 : mo.side === 'h' ? 1 : -1) * 6; n.keeper = (n.keeper ?? 0) + 1; }
         }
         assert.ok(q && near(q[1], cx) && near(q[2], cy), `${tag}: ${id}${id === sn.scorer ? ' (skytten)' : ''} er ${JSON.stringify(q)}, forventet ${[cx, cy]}`);
       }
@@ -226,10 +252,11 @@ test('sporets øjeblik for et mål = øjebliksbilledet (📍) for alle andre end
 
 // ---------- VAR_BEHIND i sporet (bogstavelige tal) ----------
 // Samme opstilling som var-pinned.test.mjs ("billedet ved et VAR-tjek af en holdkammerat"), med koblede linjer (v3.16):
-// modstanderens sidste markspiller står på y 27 (i angribernes koordinater), så angriberne (plads 9/10) står på linjen 27 + 1 = 28.
-// Skytten (plads 5, FIN 20) trækkes fra kunden y C til C − 16; foran linjen klemmes han til 28. To står foran ham, så den forreste
-// tjekkes, og skytten rykkes til 28 + VAR_BEHIND = 32 med bolden – ikke ind i feltet (uden VAR_BEHIND: y 12). Står han allerede
-// længere tilbage (C 52 → 36, et langskud), rykkes han ikke. Som hjemmehold og som udehold (spejlet: y 68 / 64, x 60).
+// modstanderens sidste markspiller står på y 27 (i angribernes koordinater), så angriberne (plads 9/10, rå 14) står på linjen 27 + 1 = 28.
+// v3.16.1 (sammenpresning): skytten (plads 5, FIN 20, x 46 – 8 fra stopperen på 38, så han ikke skubbes på tværs) står rå på C − 16 og
+// mappes fra [14, 40] til [28, 40]: koblet = 28 + (C − 30)·12/26. To står foran ham, så den forreste tjekkes, og skytten rykkes til
+// 28 + VAR_BEHIND = 32 med bolden – ikke ind i feltet (uden VAR_BEHIND: y 12). Står han allerede længere tilbage (C 52 → rå 36 → 38,2 → 38,
+// et langskud), rykkes han ikke. Som hjemmehold og som udehold (spejlet: y 68 / 62, x 54).
 const SK = (v) => ({ pace: v, stamina: v, strength: v, ballControl: v, passing: v, finishing: v, positioning: v, intercepting: v, goalkeeping: v });
 function stubRng(script = {}, nextValue = 0.5) {
   const calls = {};
@@ -266,47 +293,50 @@ function shotAt(cx, cy, awayShooter, { varOn = true, saved = false } = {}) {
   const gi = m.events.findIndex((e) => e.type === 'GOAL'), id = slotOf(X, 5).id;
   return { a, X, m, gi, mo: m.trace.moments.find((x) => x.ev === gi), first: m.trace.moments.find((x) => x.shooter === id), id };
 }
-const behind = (shooterY, awayShooter) => shotAt(40, shooterY, awayShooter);
-test('VAR_BEHIND i sporet: skytten rykkes bag den tjekkede (y 28 → 32) og bolden med – ikke ind i feltet; allerede længere tilbage (36) rykkes han ikke – som hjemmehold', () => {
+const behind = (shooterY, awayShooter) => shotAt(46, shooterY, awayShooter);
+test('VAR_BEHIND i sporet: skytten rykkes bag den tjekkede (koblet y 29 → 32) og bolden med – ikke ind i feltet; allerede længere tilbage (38) rykkes han ikke – som hjemmehold', () => {
   const near = behind(32, false), far = behind(52, false);
   for (const r of [near, far]) { assert.ok(r.gi > 0 && r.mo, 'data: målet har et øjeblik'); assert.equal(r.mo.side, 'h'); assert.equal(r.mo.scorer, slotOf(r.X, 5).id); assert.match(r.m.events[r.gi].text, /VAR: målet står – #\d+ .+ foran/); }
   const at = (r, i) => r.mo.h.find((q) => q[0] === slotOf(r.X, i).id).slice(1);
-  assert.deepEqual([at(near, 5), at(near, 9), at(near, 10)], [[40, 32], [5, 28], [95, 28]]);
-  assert.deepEqual(near.mo.ball, [40, 32]);
-  assert.equal(near.mo.long, undefined, 'ikke et langskud (rå y 16 < 30)');
-  assert.deepEqual(at(far, 5), [40, 36]);
-  assert.deepEqual(far.mo.ball, [40, 36]);
-  assert.equal(far.mo.long, true, 'rå y 36 ≥ LONGSHOT_Y 30');
+  // near: C 32 → rå 16 → 28 + 2·12/26 = 28,9 → 29 < 32 → rykket til 32
+  assert.deepEqual([at(near, 5), at(near, 9), at(near, 10)], [[46, 32], [5, 28], [95, 28]]);
+  assert.deepEqual(near.mo.ball, [46, 32]);
+  assert.equal(near.mo.long, undefined, 'ikke et langskud (koblet y 29 < 30)');
+  assert.deepEqual(at(far, 5), [46, 38]);
+  assert.deepEqual(far.mo.ball, [46, 38]);
+  assert.equal(far.mo.long, true, 'koblet y 38 ≥ LONGSHOT_Y 30');
   // …og øjebliksbilledet (📍) siger det samme
-  assert.deepEqual(near.m.events[near.gi].snapshot.ball, [40, 32]);
-  assert.deepEqual(near.m.events[near.gi].snapshot.pts.find((q) => q[0] === slotOf(near.X, 5).id).slice(1), [40, 32]);
+  assert.deepEqual(near.m.events[near.gi].snapshot.ball, [46, 32]);
+  assert.deepEqual(near.m.events[near.gi].snapshot.pts.find((q) => q[0] === slotOf(near.X, 5).id).slice(1), [46, 32]);
 });
-test('VAR_BEHIND ved grænsen: rå y 31 rykkes til 32 (= 28 + 4), PRÆCIS 32 bliver, 33 bliver – hjemme og spejlet ude (68, 68, 67)', () => {
+// Grænsen: C 36 / 38 / 41 → rå 20 / 22 / 25 → koblet 30,8 → 31 / 31,7 → 32 / 33,1 → 33 (med C 47–49 som før v3.16.1 stod alle tre på 36–37).
+test('VAR_BEHIND ved grænsen: koblet y 31 rykkes til 32 (= 28 + 4), PRÆCIS 32 bliver, 33 bliver – hjemme og spejlet ude (68, 68, 67)', () => {
   const y = (r, side) => r.mo[side].find((q) => q[0] === slotOf(r.X, 5).id).slice(1);
-  assert.deepEqual([47, 48, 49].map((c) => y(behind(c, false), 'h')), [[40, 32], [40, 32], [40, 33]]);
-  assert.deepEqual([47, 48, 49].map((c) => behind(c, false).mo.ball), [[40, 32], [40, 32], [40, 33]]);
-  assert.deepEqual([47, 48, 49].map((c) => y(behind(c, true), 'a')), [[60, 68], [60, 68], [60, 67]]);
-  assert.deepEqual([47, 48, 49].map((c) => behind(c, true).mo.ball), [[60, 68], [60, 68], [60, 67]]);
+  assert.deepEqual([36, 38, 41].map((c) => y(behind(c, false), 'h')), [[46, 32], [46, 32], [46, 33]]);
+  assert.deepEqual([36, 38, 41].map((c) => behind(c, false).mo.ball), [[46, 32], [46, 32], [46, 33]]);
+  assert.deepEqual([36, 38, 41].map((c) => y(behind(c, true), 'a')), [[54, 68], [54, 68], [54, 67]]);
+  assert.deepEqual([36, 38, 41].map((c) => behind(c, true).mo.ball), [[54, 68], [54, 68], [54, 67]]);
 });
-test('VAR_BEHIND i sporet: som udehold er billedet spejlet (x 60, y 68 i stedet for 32; 64 i stedet for 36; angriberne 72)', () => {
+test('VAR_BEHIND i sporet: som udehold er billedet spejlet (x 54, y 68 i stedet for 32; 62 i stedet for 38; angriberne 72)', () => {
   const near = behind(32, true), far = behind(52, true);
   for (const r of [near, far]) { assert.ok(r.gi > 0 && r.mo, 'data: målet har et øjeblik'); assert.equal(r.mo.side, 'a'); assert.equal(r.mo.scorer, slotOf(r.X, 5).id); assert.match(r.m.events[r.gi].text, /VAR: målet står – #\d+ .+ foran/); }
   const at = (r, i) => r.mo.a.find((q) => q[0] === slotOf(r.X, i).id).slice(1);
-  assert.deepEqual([at(near, 5), at(near, 9), at(near, 10)], [[60, 68], [95, 72], [5, 72]]);
-  assert.deepEqual(near.mo.ball, [60, 68]);
-  assert.deepEqual(at(far, 5), [60, 64]);
-  assert.deepEqual(far.mo.ball, [60, 64]);
+  assert.deepEqual([at(near, 5), at(near, 9), at(near, 10)], [[54, 68], [95, 72], [5, 72]]);
+  assert.deepEqual(near.mo.ball, [54, 68]);
+  assert.deepEqual(at(far, 5), [54, 62]);
+  assert.deepEqual(far.mo.ball, [54, 62]);
 });
 
 // ---------- Skytten i afslutningens billede (bogstavelige tal, uden VAR) ----------
-// Samme opstilling uden VAR-tjek. Skyttens plads i afleveringens øjeblik (rå y = kunde-y − 16, klemt til linjen 28) flyttes i
-// afslutningens billede: en almindelig afslutning ind i feltet (y ≤ 12, x 30–70), et langskud (rå y ≥ 30) til skudafstand
-// (y 30–38, x 20–80) – også ved en REDNING (QC v3.16: kun målet var klemt). 📍 er afleveringens øjeblik og er uændret: ved den
-// almindelige afslutning står skytten dér på linjen (40, 28) og bolden på målpletten (50, 20) – sporet: (40, 12) med bolden.
+// Samme opstilling uden VAR-tjek. Skyttens plads i afleveringens øjeblik (rå y = kunde-y − 16, presset sammen fra [14, 40] til [28, 40])
+// flyttes i afslutningens billede: en almindelig afslutning ind i feltet (y ≤ 12, x 30–70), et langskud (koblet y ≥ 30) til skudafstand
+// (y 30–38, x 20–80) – også ved en REDNING (QC v3.16: kun målet var klemt). Kunde-y 52 → rå 36 → 38,2 → 38; 60 → rå 44 (bag 40, urørt)
+// → loftet 38; 32 → rå 16 → 29. 📍 er afleveringens øjeblik og er uændret: ved den almindelige afslutning står skytten dér (44, 29 – x
+// skubbet 6 fra stopperen på (38, 27)) og bolden på målpletten (50, 20) – sporet: (44, 12) med bolden.
 test('skytten i afslutningens billede: kantløberen ved hjørneflaget skyder langskud fra x 20/80, langt tilbage fra y 38, i feltet fra (30–70, 12) – mål og redning, hjemme og spejlet ude', () => {
   const cases = [   // [kunde-x, kunde-y] → [hjemme, ude (spejlet)], long
-    [[5, 52], [[20, 36], [80, 64]], true], [[95, 52], [[80, 36], [20, 64]], true], [[40, 60], [[40, 38], [60, 62]], true],
-    [[40, 32], [[40, 12], [60, 88]], false], [[5, 32], [[30, 12], [70, 88]], false], [[95, 32], [[70, 12], [30, 88]], false],
+    [[5, 52], [[20, 38], [80, 62]], true], [[95, 52], [[80, 38], [20, 62]], true], [[40, 60], [[40, 38], [60, 62]], true],
+    [[40, 32], [[44, 12], [56, 88]], false], [[5, 32], [[30, 12], [70, 88]], false], [[95, 32], [[70, 12], [30, 88]], false],
   ];
   for (const [[cx, cy], exp, long] of cases) for (const away of [false, true]) for (const saved of [false, true]) {
     const r = shotAt(cx, cy, away, { varOn: false, saved }), mo = r.first, tag = `(${cx}, ${cy})${away ? ' ude' : ''}${saved ? ' redning' : ' mål'}`;
@@ -320,6 +350,6 @@ test('skytten i afslutningens billede: kantløberen ved hjørneflaget skyder lan
   // 📍 for dit mål (hjemme): den almindelige afslutning i afleveringens øjeblik, langskuddet ved skytten (solo-mål)
   const plain = shotAt(40, 32, false, { varOn: false }).m, ls = shotAt(5, 52, false, { varOn: false }).m;
   const sn = (m) => { const e = m.events.find((x) => x.type === 'GOAL'); return [e.snapshot.ball, e.snapshot.pts.find((q) => q[0] === e.snapshot.scorer).slice(1)]; };
-  assert.deepEqual(sn(plain), [[50, 20], [40, 28]]);
-  assert.deepEqual(sn(ls), [[20, 36], [20, 36]]);
+  assert.deepEqual(sn(plain), [[50, 20], [44, 29]]);
+  assert.deepEqual(sn(ls), [[20, 38], [20, 38]]);
 });

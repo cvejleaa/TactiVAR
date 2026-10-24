@@ -21,8 +21,8 @@ import { createRng } from '../../public/engine/rng.js';
 import { createLeague } from '../../public/engine/generator.js';
 import { simulateMatch } from '../../public/engine/match.js';
 
-const GOLDEN_RESULTS_400 = '7385286247476d7d9f3f84080d6d261f3729a1faf8f44c400cb9fc542434a0bc';   // v3.16 (koblede linjer) – = hashen uden optageren
-const GOLDEN_TRACES_20 = '2e238fd9e0e057fb290057f2c6323d6a3ca0a63bb146f23d13f66e300b49dfb5';     // v3.16: koblede linjer, bolden ved skytten, skytten i feltet
+const GOLDEN_RESULTS_400 = 'f096161560c188324aaabf6ce8d3d8d39342438b17aa3c64e21d2fd71bff0012';   // v3.16.1 (sammenpresning; før 73852862… fra v3.16; f09616… efter TM-fundet: kun 📍-billederne ændret – kampene uden snapshot er identiske med 652cdcf8…) – = hashen uden optageren (kickoffFrame, tickFrame og momentAt tomme)
+const GOLDEN_TRACES_20 = '97b2f5140fe18529c86c7e6483fe1b9fed0d8c9a3926ddae5b71acc8a3571cfc';     // v3.16.1: sammenpresning, afsparket i blok, grundbilledet efter duellen (før 2e238fd9…) · v3.16: koblede linjer, bolden ved skytten, skytten i feltet
 function matchN(s) {
   const L = createLeague(createRng(s * 97)), me = L.teams.find((t) => !t.isBot), opp = L.teams[(s % 7) + 1];
   return s % 2 ? simulateMatch(me, opp, createRng(s * 131)) : simulateMatch(opp, me, createRng(s * 131));

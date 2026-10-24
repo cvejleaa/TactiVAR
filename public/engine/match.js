@@ -3,7 +3,7 @@
 // Rettet ift. v2.5b: auto-indskiftning sker i en kamplokal kopi (ændrede før lineupSlots
 // permanent), og Hvis-Så-reglerne kører for begge hold og skifter reelt formation.
 import { FORMATIONS, lineOfRole, isOutOfZone, slotPosition } from './formations.js';
-import { livePositions, coupledPositions, ONSIDE_GAP } from './positions.js';
+import { livePositions, coupledPositions, kickoffPositions, apartFrom, ONSIDE_GAP, MIN_APART } from './positions.js';
 import { masteryVs, counterXpForMatch } from './counter.js';
 import { createSheet, finalizeSheet } from './ratings.js';
 import { describeFinish, describeHeader, describeVarTiming, describeGoal, goalSpectacle } from './clues.js';
@@ -266,7 +266,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
   const trace = { v: 1, frames: [], moments: [] };
   let shotSide = null, shotCaught = false, setPieceNow = false, shotBy = null, shotLong = false, momentCheck = null;
   const common = (side, x, y) => (side === H ? [Math.round(x), Math.round(y)] : [Math.round(100 - x), Math.round(100 - y)]);
-  const ptsOf = (side, pos, moves = null) => side.starters.map((p, i) => p && [p.id, ...common(side, ...(moves?.[p.id] ?? [pos[i].x, pos[i].y]))]).filter(Boolean);
+  const ptsOf = (side, pos, moves = null, starters = side.starters) => starters.map((p, i) => p && [p.id, ...common(side, ...(moves?.[p.id] ?? [pos[i].x, pos[i].y]))]).filter(Boolean);
   // Ét billede pr. øjeblik (QC v3.16): positionerne i seen er AFLEVERINGENS øjeblik (koblede linjer). I et afslutnings-
   // øjeblik (mål, redning, forbi) er skytten sluppet ind i feltet – han tegnes på højst SHOT_BOX_Y og foran målet (et langskud
   // og en skytte bag en VAR-tjekket holdkammerat undtaget). I et offside-øjeblik (VAR-tjek, annulleret mål, flag) tegnes den
@@ -289,6 +289,9 @@ export function simulateMatch(home, away, rng, opts = {}) {
         : [Math.min(70, Math.max(30, c[0])), Math.min(c[1], SHOT_BOX_Y)];
     }
     if (b) { const c = ownXY(shooter); if (c && c[1] < b.y) mv[shooter] = [c[0], b.y]; }
+    // Skytten står ikke oven i målmanden (Spilfører v3.16.1: hovedstødsmålene lå alle på keeperen) – et skridt til siden
+    const s0 = shooter != null && ownXY(shooter), gk = def.starters[0] && [100 - defPos[0].x, 100 - defPos[0].y];
+    if (s0 && gk && Math.hypot(s0[0] - gk[0], s0[1] - gk[1]) < MIN_APART) mv[shooter] = [gk[0] + (s0[0] < gk[0] ? -1 : 1) * MIN_APART, s0[1]];
     const att = ptsOf(side, atkPos, mv), dpts = ptsOf(def, defPos);
     // Bolden ved skytten (Spilfører v3.16: bolden stod på en fast plet, mens skytten stod ved hjørneflaget). 📍 er uændret.
     const at = shooter != null && att.find((q) => q[0] === shooter);
@@ -302,11 +305,47 @@ export function simulateMatch(home, away, rng, opts = {}) {
     if (setPieceNow || !shotSide || !SHOT_MOMENTS.has(type)) return;
     momentAt(shotSide, seen[shotSide.team.id] ?? coupledPositions(shotSide.tactics, other(shotSide).tactics, onOf(shotSide, other(shotSide))).ball, null, SPOT.GOAL, shotCaught, { shooter: shotBy });
   }
-  function baseFrame(t, att, ballX) {
-    const k = att && coupledPositions(att.tactics, other(att).tactics, { ballX, ...onOf(att, other(att)) });   // optageren skriver ikke i seen (QC B5)
-    // Afspark: begge hold i egen halvdel (QC v3.16)
-    const shape = (side) => (!att ? livePositions(side.tactics, { attacking: false, ballX: 50 }).map((q, i) => (i ? { x: q.x, y: Math.max(q.y, 52) } : q)) : side === att ? k.ball : k.opp);
-    trace.frames.push({ t, poss: att ? (att === H ? 'h' : 'a') : null, ball: att ? common(att, ballX, 50) : [50, 50], h: ptsOf(H, shape(H)), a: ptsOf(A, shape(A)) });
+  // Afspark: begge hold i egen halvdel, presset sammen så formationen kan genkendes (v3.16.1: "7 spillere på midterlinjen").
+  function kickoffFrame() {
+    trace.frames.push({ t: 0, poss: null, ball: [50, 50], h: ptsOf(H, kickoffPositions(H.tactics, H.starters.map(Boolean))), a: ptsOf(A, kickoffPositions(A.tactics, A.starters.map(Boolean))) });
+  }
+  // Grundbilledet pr. tick (v3.16.1, brugeren: "ingen udvikling i starten af kampen"; QC B1): tick'ets opbygning FØR
+  // afslutningerne, men tegnet ud fra duellens udfald, som allerede er trukket (ingen nye træk – ingen kamp ændres):
+  //  - ingen duel: bolden hos opspilleren, og holdene forskudt efter hans side af banen;
+  //  - opbygningen vinder: bolden spillet frem til angriberen på linjen – run: true;
+  //  - presset vinder: forsvaret har erobret bolden (caught-formen), bolden hos presseren – lost: true;
+  //  - offside-fælden: angriberen står foran linjen, bolden hos ham – offside: true.
+  // poss er tick'ets besiddelse. Spillerne er dem på banen ved tick'ets start (et rødt kort i tick'et står efter billedet).
+  const OFFSIDE_DRAW = 3;
+  function tickFrame(t, att) {
+    const def = other(att), st0 = new Map([[H, H.starters.slice()], [A, A.starters.slice()]]);
+    let done = false;
+    return (outcome, { playmaker, presser, striker } = {}) => {
+      if (done) return; done = true;
+      const on = (s) => st0.get(s).map(Boolean), slot = (s, p) => (p ? st0.get(s).indexOf(p) : -1);
+      const pm = slot(att, playmaker), base = livePositions(att.tactics, { attacking: true, ballX: 50 });
+      const ballX = pm > 0 ? base[pm].x : seenX[att.team.id] ?? 50;
+      let ballSide = att, oppSide = def, k, at;
+      if (outcome === 'press') {
+        ballSide = def; oppSide = att;
+        k = coupledPositions(def.tactics, att.tactics, { ballX: 100 - ballX, caught: true, ballOn: on(def), oppOn: on(att) });
+        at = k.ball[slot(def, presser)];
+      } else {
+        // Opbygningen vundet: bolden spillet frem til angriberen på linjen – ikke et løb alene mod målmanden (Spilfører
+        // v3.16.1: løberen var ofte en anden end tick'ets skytte og stod ved keeperen, også når der slet ikke kom en afslutning)
+        const runner = outcome === 'trap' ? slot(att, striker) : -1;
+        k = coupledPositions(att.tactics, def.tactics, { ballX, runner, ballOn: on(att), oppOn: on(def) });
+        // Offside: angriberen lige foran linjen (OFFSIDE_DRAW), ikke et helt løb frem – han blev fanget, ikke sluppet igennem
+        if (outcome === 'trap' && runner > 0) {
+          k.ball[runner] = { x: k.ball[runner].x, y: k.line - OFFSIDE_DRAW };
+          apartFrom(k.ball, [runner], k.opp, k.opp.map((q, i) => i).filter((i) => on(def)[i]));   // ved siden af forsvareren, ikke oven i ham
+        }
+        at = k.ball[runner > 0 ? runner : outcome === 'build' ? slot(att, striker) : pm];
+      }
+      const ball = at ? common(ballSide, at.x, at.y) : common(att, ballX, 50);
+      const shape = (s) => (s === ballSide ? k.ball : k.opp);
+      trace.frames.push({ t, poss: att === H ? 'h' : 'a', ...(outcome === 'press' ? { lost: true } : {}), ...(outcome === 'build' ? { run: true } : {}), ...(outcome === 'trap' ? { offside: true } : {}), ball, h: ptsOf(H, shape(H), null, st0.get(H)), a: ptsOf(A, shape(A), null, st0.get(A)) });
+    };
   }
   const observe = (player, text) => observations.push({ playerId: player.id, text });
   // Løbet følger pladsen (v3.8): også en indskifter løber efter den rolle, han kommer ind på.
@@ -901,7 +940,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
     else addEv(min, 'TRIGGER', 'HIGHLIGHT', side.isHome, true, `${side.team.name} omorganiserer sig`, `🔁 [${side.team.name}] Holdet omorganiserer sig på banen.`);
   }
 
-  baseFrame(0, null, 50);
+  kickoffFrame();
   for (let min = 3; min <= 90; min += 3) {
     // Flaget nulstilles ved hvert tick (QC v3.15.1: et kort for filmning i straffen – efter tjekket herunder – lækkede ellers
     // ind i næste minut og sprang dets dødbolde og chancer over).
@@ -925,10 +964,11 @@ export function simulateMatch(home, away, rng, opts = {}) {
     if (homeHasBall) st.hPoss += 3; else st.aPoss += 3;
     const att = homeHasBall ? H : A, def = homeHasBall ? A : H;
     shotSide = null; setPieceNow = false;
-    baseFrame(min / 3, att, seenX[att.team.id] ?? 50);   // bolden står, hvor holdets seneste chance var (ingen nye træk – QC B1)
+    const frame = tickFrame(min / 3, att);
     const attR = homeHasBall ? hR : aR, defR = homeHasBall ? aR : hR;
     const attPh = att.tactics.phases, defPh = def.tactics.phases;
     const playmaker = rng.pick(attR.mids), presser = rng.pick(defR.mids), back = rng.pick(defR.defs), striker = rng.pick(attR.atts);
+    const who = { playmaker, presser, striker };
 
     // Trukne positioner vurderes (25 %): uden for zonen straffes, inden for belønnes.
     const customs = customDragged(att);
@@ -938,6 +978,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
         st[k(def, 'TacticSuccess')]++;
         sheet.adjust(cp.player.id, -0.45); sheet.adjust(presser.id, DUEL_BONUS); sheet.bump(presser.id, 'tacticWins');
         addEv(min, 'TACTIC_FAIL', 'TACTIC', def.isHome, false, 'Ude af zone', `⚠️ [TAKTIK FEJLER • CUSTOM POS] ${tag(cp.player)} (${att.team.name}) står for langt fra sin ${cp.role}-zone, og ${tag(presser)} udnytter hullet.`);
+        frame('press', who);
         continue;
       }
       st[k(att, 'TacticSuccess')]++;
@@ -972,6 +1013,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
           : own(def) ? `❌ [DIT PRES BRYDES] ${att.team.name} spiller sig igennem ${YOUR_PRESS[height]}.${note}`
           : `✅ [FASE 1 VIRKER • ${att.team.name}] ${att.team.name} spiller sig igennem ${def.team.name}s pres.${note}`;
         addEv(min, 'TACTIC_WIN', 'TACTIC', att.isHome, false, 'Fase 1 virker', text);
+        frame('build', who);
       } else {
         ballLost = true;
         duelLog[def.team.id].pressWon++;
@@ -983,6 +1025,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
             : own(att) ? `❌ [DIN OPBYGNING STOPPES] ${tag(striker)} fanges offside.`
             : `🛑 [FASE 2 VIRKER • ${def.team.name}] ${tag(striker)} (${att.team.name}) fanges offside.`;
           addEv(min, 'TACTIC_FAIL', 'TACTIC', def.isHome, false, 'Offside-fælde virker', offTxt);
+          frame('trap', who);
         } else {
           sheet.adjust(presser.id, DUEL_BONUS); sheet.adjust(playmaker.id, -0.2); sheet.bump(presser.id, 'tacticWins');
           // Kontra (v3.9): afgøres FØR teksten, så "din lynkontra" kun loves, når den kommer.
@@ -995,11 +1038,13 @@ export function simulateMatch(home, away, rng, opts = {}) {
             : own(att) ? `❌ [DIN OPBYGNING STOPPES] ${YOUR_PASS[pass]} kommer ikke igennem: ${tag(presser)} (${def.team.name}) erobrer bolden fra ${tag(playmaker)}.`
             : `🛑 [FASE 1 STOPPER MOD FASE 2] ${tag(presser)} (${def.team.name}) erobrer bolden fra ${tag(playmaker)}.`;
           addEv(min, 'TACTIC_FAIL', 'TACTIC', def.isHome, false, 'Fase 2 pres virker', text);
+          frame('press', who);
           if (goesCounter) counterAttack(def, att, min, defR, attR);
         }
       }
     }
 
+    frame('none', who);   // ingen duel i tick'et (no-op, hvis duellen allerede tegnede billedet)
     // Frispark (6 %), heraf skade (40 %) med indskiftning.
     if (rng.chance(0.06)) {
       const victimSide = rng.chance(0.5) ? H : A, foulSide = other(victimSide);

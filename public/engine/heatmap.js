@@ -49,3 +49,22 @@ export function thirds(trace, side, gkId = null) {
   const n = t[0] + t[1] + t[2] || 1;
   return { defence: t[0] / n, middle: t[1] / n, attack: t[2] / n };
 }
+
+// Modstanderen groft som kort (v3.16.1, brugeren: "Der er ingen heat map for modstander"; Spilfører: vend det fra din side,
+// procent i hvert felt, ingen enkeltspillere). 3 × 3 zoner set fra DIN side: modstanderen angriber nedad mod dit mål, og
+// kolonne 0 er din venstre side. rows[0] = hans egen tredjedel (øverst), rows[2] = ved dit mål. Målmanden tæller ikke med.
+export function zones(trace, side, gkId = null) {
+  const z = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+  let n = 0;
+  for (const [id, x, y] of tracePoints(trace, side)) {
+    if (id === gkId) continue;
+    // Hans egne koordinater (lille y = ved dit mål) → din visning: dit mål nederst, din venstre = hans højre (spejlet x)
+    const row = y >= 66.7 ? 0 : y >= 33.3 ? 1 : 2, col = 100 - x < 33.3 ? 0 : 100 - x < 66.7 ? 1 : 2;
+    z[row][col]++; n++;
+  }
+  return z.map((r) => r.map((v) => v / (n || 1)));
+}
+// Modstanderens afslutninger på samme kort (Spilfører: "hvor de var farlige mod mig") – står allerede i referatet.
+export function zoneShots(trace, side) {
+  return shotsOf(trace, side).map((s) => ({ ...s, x: 100 - s.x, y: 100 - s.y }));
+}

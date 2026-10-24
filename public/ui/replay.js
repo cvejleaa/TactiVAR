@@ -14,7 +14,7 @@ export function replaySteps(trace, highlights = false) {
   if (!trace) return [];
   const steps = [];
   for (const f of trace.frames) {
-    if (!highlights) steps.push({ kind: 'frame', t: f.t, h: f.h, a: f.a, ball: f.ball, ev: null });
+    if (!highlights) steps.push({ kind: 'frame', t: f.t, h: f.h, a: f.a, ball: f.ball, ev: null, poss: f.poss ?? null, duel: f.lost ? 'lost' : f.run ? 'run' : f.offside ? 'offside' : f.poss ? 'ball' : null });
     for (const m of trace.moments.filter((x) => x.t === f.t)) steps.push({ kind: 'moment', t: m.t, h: m.h, a: m.a, ball: m.ball, ev: m.ev, actor: m.scorer ?? m.shooter, assist: m.assist ?? null });
   }
   return steps;
@@ -86,10 +86,11 @@ export function replayEl(m, ownSide) {
     for (const [id, t] of r.tokens) if (!here.has(id)) t.hidden = true;
     ball.style.left = s.ball[0] + '%'; ball.style.top = s.ball[1] + '%';
     // Stillingen og teksten: den seneste hændelse til og med trinet (et øjeblik viser sin egen linje)
-    // Et grundbillede tages i starten af tick'et – før dets hændelser, så stillingen er den fra før (aldrig et mål for tidligt)
+    // Et grundbillede er tick'ets duel, før afslutningerne (v3.16.1) – stillingen er den fra før (aldrig et mål for tidligt),
+    // og teksten siger, hvordan duellen gik (QC v3.16.1: ellers står bolden pludselig hos modspilleren uden forklaring)
     const upto = s.ev ?? lastEventIdx(m.events, s.t * 3 - 1);
     const e = m.events[upto] ?? m.events[0];
-    caption.textContent = `${s.t * 3}' · ${m.homeName} ${e.hG}-${e.aG} ${m.awayName}${s.kind === 'moment' ? ' · ' + e.text : ''}`;
+    caption.textContent = `${s.t * 3}' · ${m.homeName} ${e.hG}-${e.aG} ${m.awayName}${s.kind === 'moment' ? ' · ' + e.text : duelText(s, m)}`;
     flag(caption, 'moment', s.kind === 'moment');
     el.dataset.step = String(r.i);
   }
@@ -107,5 +108,11 @@ export function replayEl(m, ownSide) {
   show();
   return el;
 }
+const DUEL_TEXT = { ball: (a) => `${a} har bolden`, run: (a) => `${a} spiller sig frem til angriberen`, lost: (a, d) => `${d} erobrer bolden`, offside: (a) => `${a}: fanget offside` };
+export const duelText = (s, m) => {
+  if (!s.duel) return '';
+  const [a, d] = s.poss === 'h' ? [m.homeName, m.awayName] : [m.awayName, m.homeName];
+  return ' · ' + DUEL_TEXT[s.duel](a, d);
+};
 const lastEventIdx = (events, min) => { let i = 0; events.forEach((e, j) => { if (e.min <= min) i = j; }); return i; };
 export function replayJump(m, evIdx) { const r = m?.trace && cache.get(m.trace); if (r) { r.jump(evIdx); r.el.scrollIntoView({ block: 'center' }); } }
