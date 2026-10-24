@@ -12,7 +12,7 @@ export const SPEEDS = [1, 2, 4];
 
 // Trinene: hvert tick sit grundbillede, derefter tick'ets afslutninger i referatets rækkefølge – hver med et trin mere, hvor
 // bolden går derhen, skuddet endte (v3.16.2, brugeren: "Man ser aldrig bolden nærme sig målmanden som udfører en redning").
-export function replaySteps(trace, highlights = false, events = null) {
+export function replaySteps(trace, highlights = false, events = null, idOf = null) {
   if (!trace) return [];
   const steps = [];
   for (const f of trace.frames) {
@@ -20,7 +20,7 @@ export function replaySteps(trace, highlights = false, events = null) {
     for (const m of trace.moments.filter((x) => x.t === f.t)) {
       const step = { kind: 'moment', t: m.t, h: m.h, a: m.a, ball: m.ball, ev: m.ev, actor: m.scorer ?? m.shooter, assist: m.assist ?? null };
       steps.push(step);
-      const end = shotEnd(m, events?.[m.ev]);
+      const end = shotEnd(m, events?.[m.ev], idOf);
       if (end) steps.push({ ...step, kind: 'shot', ball: end });
     }
   }
@@ -34,7 +34,7 @@ export function replaySteps(trace, highlights = false, events = null) {
 //  - over: over overliggeren (x 50, y 0,5/99,5);   - ellers forbi: uden for stolpen på den fjerne side (x 38/62).
 // VAR-tjek, annulleret mål og flag har intet trin – kendelsen er ingen boldbane.
 const SHOT_END = new Set(['GOAL', 'HEADER_GOAL', 'SAVE', 'MISS']);
-export function shotEnd(m, ev = null) {
+export function shotEnd(m, ev = null, idOf = null) {
   if (!SHOT_END.has(m.kind) || !m.ball) return null;
   const top = m.side === 'h', def = m[top ? 'a' : 'h'] ?? [], line = (dy) => (top ? dy : 100 - dy);
   if (!def.length) return null;
@@ -43,7 +43,11 @@ export function shotEnd(m, ev = null) {
   if (m.kind === 'SAVE') return [gk[1], gk[2]];
   if (m.kind === 'MISS') {
     const field = def.filter((q) => q !== gk);
-    if (ev?.label === 'Blokeret' && field.length) { const b = near(field, m.ball[0], m.ball[1]); return [b[1], b[2]]; }
+    if (ev?.label === 'Blokeret' && field.length) {
+      // Blokeren, referatet nævner (idOf: "#7 M. Kjær" → spiller-id), ellers forsvarets markspiller nærmest skytten
+      const named = idOf && ev.text.match(/(#\d+ .+?) kaster sig ind/), q = named && field.find((p) => p[0] === idOf(named[1]));
+      const b = q ?? near(field, m.ball[0], m.ball[1]); return [b[1], b[2]];
+    }
     if (/stolpe/.test(ev?.text ?? '') && !/forbi den lange stolpe/.test(ev.text)) return [left ? 44 : 56, line(1)];
     if (/over (mål|overliggeren)/.test(ev?.text ?? '')) return [50, line(0.5)];
     return [left ? 62 : 38, line(2)];
@@ -71,7 +75,8 @@ export function replayEl(m, ownSide) {
   if (!m.trace) return h('div', { class: 'muted', id: 'replay' }, '🎬 Ingen afspilning – kampen er spillet før v3.16 (afspilning findes for seneste runde).');
   if (cache.has(m.trace)) return cache.get(m.trace).el;
   const who = new Map([...m.ratings.home, ...m.ratings.away].map((e) => [e.playerId, e]));
-  const r = { i: 0, playing: false, speed: 1, highlights: false, timer: null, steps: replaySteps(m.trace, false, m.events), tokens: new Map() };
+  const byTag = new Map([...who.values()].map((e) => [`#${e.shirtNumber} ${e.shortName}`, e.playerId])), idOf = (t) => byTag.get(t);
+  const r = { i: 0, playing: false, speed: 1, highlights: false, timer: null, steps: replaySteps(m.trace, false, m.events, idOf), tokens: new Map() };
   const pitch = h('div', { class: 'rp-pitch', id: 'rp-pitch' }, h('div', { class: 'rp-half' }), h('div', { class: 'rp-box top' }), h('div', { class: 'rp-box bottom' }), h('div', { class: 'rp-goal top' }), h('div', { class: 'rp-goal bottom' }));
   const ball = h('div', { class: 'rp-ball', id: 'rp-ball' }, '●');
   pitch.append(ball);
@@ -79,7 +84,7 @@ export function replayEl(m, ownSide) {
   const playBtn = h('button', { class: 'mini', id: 'rp-play', onclick: () => (r.playing ? pause() : play()) }, '▶ Afspil');
   const speedBtn = h('button', { class: 'mini', id: 'rp-speed', title: 'Hastighed', onclick: () => { r.speed = SPEEDS[(SPEEDS.indexOf(r.speed) + 1) % SPEEDS.length]; speedBtn.textContent = `${r.speed}×`; } }, '1×');
   const hlBtn = h('button', { class: 'mini', id: 'rp-highlights', title: 'Kun afslutningerne i åbent spil og på kontra (mål, redninger, forbi, VAR) – ikke straffe, frispark og hjørnespark', onclick: () => {
-    const ev = r.steps[r.i]?.ev; r.highlights = !r.highlights; r.steps = replaySteps(m.trace, r.highlights, m.events);
+    clearTimeout(r.timer); const ev = r.steps[r.i]?.ev; r.highlights = !r.highlights; r.steps = replaySteps(m.trace, r.highlights, m.events, idOf);
     r.i = ev != null ? Math.max(0, r.steps.findIndex((s) => s.ev === ev)) : 0; flag(hlBtn, 'active', r.highlights); show(); } }, '⭐ Højdepunkter');
   const el = h('div', { class: 'replay', id: 'replay' },
     h('div', { class: 'row' }, h('strong', {}, '🎬 Afspilning'),
@@ -141,11 +146,11 @@ export function replayEl(m, ownSide) {
     r.i++; show();
     r.timer = setTimeout(tick, STEP_MS[r.steps[r.i].kind] / r.speed);
   }
-  function play() { if (r.i >= r.steps.length - 1) r.i = 0; r.playing = true; playBtn.textContent = '⏸ Pause'; show(); r.timer = setTimeout(tick, STEP_MS[r.steps[r.i].kind] / r.speed); }
+  function play() { clearTimeout(r.timer); if (r.i >= r.steps.length - 1) r.i = 0; r.playing = true; playBtn.textContent = '⏸ Pause'; show(); r.timer = setTimeout(tick, STEP_MS[r.steps[r.i].kind] / r.speed); }
   function pause() { r.playing = false; clearTimeout(r.timer); playBtn.textContent = '▶ Afspil'; }
   // 🎬: afslutningen og dens udfald – står på udfaldet (QC v3.16.2: ellers stoppede springet med bolden ved skytten)
   r.jump = (evIdx) => {
-    pause(); if (r.highlights) { r.highlights = false; r.steps = replaySteps(m.trace, false, m.events); flag(hlBtn, 'active', false); }
+    pause(); if (r.highlights) { r.highlights = false; r.steps = replaySteps(m.trace, false, m.events, idOf); flag(hlBtn, 'active', false); }
     r.i = stepForEvent(r.steps, m.events, evIdx); show();
     if (r.steps[r.i + 1]?.kind === 'shot' && r.steps[r.i + 1].ev === r.steps[r.i].ev) r.timer = setTimeout(() => { r.i++; show(); }, STEP_MS.moment / r.speed);
   };

@@ -129,3 +129,29 @@ test('erobring (caught): modstanderens forreste står ikke oven i boldholdets m�
     for (let i = 1; i < 11; i++) assert.ok(Math.hypot(gk.x - (100 - k.opp[i].x), gk.y - (100 - k.opp[i].y)) >= 4, `${f} ${runs}: angriber ${i} (${k.opp[i].x}, ${k.opp[i].y}) oven i målmanden (${gk.x}, ${gk.y})`);
   }
 });
+
+// v3.16.2 (QC): ingen duel og samme billede som forrige tick (samme opspiller igen) → bolden hos holdets forsvarer nærmest
+// opspillerens LEVENDE x (livePositions med ballX = hans x), ved lige afstand laveste plads; formen er den samme. Stub-pick =
+// første midtbanespiller hvert tick, og uden chancer er hvert tick 'none' → billederne skifter: opspiller, forsvarer, opspiller …
+// (Efter en duel må billederne gerne være ens: offside-/ude-af-zone-testene ovenfor har bolden hos den samme i alle 30 tick.)
+const holder = (t, f) => t.tactics.lineupSlots.indexOf(f.h.find((q) => q[1] === f.ball[0] && q[2] === f.ball[1])?.[0]);
+test('ens nabobillede uden duel (4-3-3): CDM (x 50) har bolden i t 1, 3, 5 …; i t 2, 4 … stopperen på plads 2 (x 38) – lige langt som plads 3 (x 62), laveste plads vinder; formen er den samme – dræber skiftet fjernet, nøglen uden bolden (t 3 også forsvareren), længst væk i stedet for nærmest og tie-break omvendt', () => {
+  const a = arena('4-3-3', '4-4-2');
+  const m = simulateMatch(a.H, a.A, stubRng({}));
+  const fr = m.trace.frames.slice(1, 11);
+  assert.ok(fr.every((f) => f.poss === 'h' && !f.lost && !f.run && !f.offside), 'data: ti tick uden duel');
+  assert.deepEqual(fr.map((f) => holder(a.H, f)), [5, 2, 5, 2, 5, 2, 5, 2, 5, 2]);
+  assert.deepEqual([fr[0].ball, fr[1].ball], [[50, 40], [38, 59]]);
+  for (const f of fr) assert.deepEqual([f.h, f.a], [fr[0].h, fr[0].a], `t ${f.t}: kun boldholderen skifter`);
+  for (let i = 1; i < fr.length; i++) assert.notDeepEqual(fr[i], { ...fr[i - 1], t: fr[i].t }, `t ${fr[i].t}: ikke magen til forrige`);
+});
+
+test('forsvareren vælges ud fra den LEVENDE x: LM trukket til x 12, LB 8, CB 15 – stillestående (ballX 50) er CB nærmest (3 mod 4), men forskudt mod bolden (ballX 12: −11,4) klemmes LM og LB til kanten 3 og CB til 4 → LB (plads 1) – dræber afstanden målt på pladsen (ballX 50) eller i det tegnede billede (LM 10, LB 3, CB 4 → CB)', () => {
+  const a = arena();
+  a.H.tactics.customCoords = { 5: { x: 12, y: 45 }, 1: { x: 8, y: 70 }, 2: { x: 15, y: 73 } };
+  const m = simulateMatch(a.H, a.A, stubRng({}));
+  const [, f1, f2, f3] = m.trace.frames;
+  assert.deepEqual([holder(a.H, f1), holder(a.H, f2), holder(a.H, f3)], [5, 1, 5]);
+  assert.deepEqual([f1.ball, f2.ball], [[10, 35], [3, 50]]);
+  assert.deepEqual(pt(f2, 'h', slot(a.H, 2).id).slice(1), [4, 59], 'stopperen står 1 fra LB i billedet – det er ikke ham');
+});
