@@ -272,3 +272,19 @@ test('⏮ baglæns ind i et skudtrin (QC v3.16.2): brikkerne står som i øjebli
   assert.deepEqual([h9.style.left, h9.style.top, cls(h9, 'actor')], ['40%', '22%', true]);
   clearReplays();
 });
+
+test('⭐ under afspilning (RM v3.16.2): afspilningen fortsætter fra det nye trin og knappen viser stadig ⏸ – ryddet timer uden ny standsede den tavst', () => {
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    const { el } = fresh();
+    click(el, 'rp-play'); mock.timers.tick(700);   // trin 1 (redningen)
+    assert.equal(step(el), 1);
+    click(el, 'rp-highlights');   // højdepunkter: redningen er trin 0
+    assert.equal(step(el), 0);
+    assert.equal(byId(el, 'rp-play').textContent, '⏸ Pause');
+    mock.timers.tick(STEP_MS.moment); assert.equal(step(el), 1, 'videre til skudtrinnet');
+    mock.timers.tick(STEP_MS.shot); assert.equal(step(el), 2, 'og videre');
+    click(el, 'rp-highlights');   // tilbage: samme hændelse, stadig kørende
+    const at = step(el); mock.timers.tick(STEP_MS.moment); assert.ok(step(el) > at, 'kører efter frakobling');
+  } finally { clearReplays(); mock.timers.reset(); }
+});

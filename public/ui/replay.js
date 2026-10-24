@@ -88,7 +88,9 @@ export function replayEl(m, ownSide) {
   const speedBtn = h('button', { class: 'mini', id: 'rp-speed', title: 'Hastighed', onclick: () => { r.speed = SPEEDS[(SPEEDS.indexOf(r.speed) + 1) % SPEEDS.length]; speedBtn.textContent = `${r.speed}×`; } }, '1×');
   const hlBtn = h('button', { class: 'mini', id: 'rp-highlights', title: 'Kun afslutningerne i åbent spil og på kontra (mål, redninger, forbi, VAR) – ikke straffe, frispark og hjørnespark', onclick: () => {
     clearTimeout(r.timer); const ev = r.steps[r.i]?.ev; r.highlights = !r.highlights; r.steps = replaySteps(m.trace, r.highlights, m.events, idOf);
-    r.i = ev != null ? Math.max(0, r.steps.findIndex((s) => s.ev === ev)) : 0; flag(hlBtn, 'active', r.highlights); show(); } }, '⭐ Højdepunkter');
+    r.i = ev != null ? Math.max(0, r.steps.findIndex((s) => s.ev === ev)) : 0; flag(hlBtn, 'active', r.highlights); show();
+    // Kører afspilningen, fortsætter den fra det nye trin (RM v3.16.2: ryddet timer uden ny standsede den tavst med "⏸ Pause")
+    if (r.playing) r.timer = setTimeout(tick, STEP_MS[r.steps[r.i].kind] / r.speed); } }, '⭐ Højdepunkter');
   const el = h('div', { class: 'replay', id: 'replay' },
     h('div', { class: 'row' }, h('strong', {}, '🎬 Afspilning'),
       h('span', { class: 'muted' }, ` – taktiktavle ud fra ${m.trace.frames.length} øjebliksbilleder (hvert 3. minut) og afslutningerne i åbent spil (dødbolde – straffe, frispark, hjørnespark – har intet billede). ${m.homeName} angriber opad.`)),
