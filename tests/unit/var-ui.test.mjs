@@ -28,17 +28,17 @@ function render(events) {
 }
 
 test('nøglemomenter: VAR-tjek, VAR-straffe, VAR-røde kort, annullerede mål og røde kort står med; skud forbi, flag, redninger og gule kort gør ikke', () => {
-  const types = ['GOAL', 'HEADER_GOAL', 'VAR_NO_GOAL', 'VAR_CHECK', 'VAR_PEN', 'VAR_RED', 'RED', 'INJURY', 'SUB', 'TRIGGER', 'MISS', 'OFFSIDE_FLAG', 'SAVE', 'FOUL', 'TACTIC_WIN', 'INFO'];
+  const types = ['GOAL', 'HEADER_GOAL', 'VAR_NO_GOAL', 'VAR_CHECK', 'VAR_PEN', 'VAR_NO_PEN', 'VAR_RED', 'VAR_NO_RED', 'RED', 'INJURY', 'SUB', 'TRIGGER', 'MISS', 'OFFSIDE_FLAG', 'SAVE', 'FOUL', 'TACTIC_WIN', 'INFO'];
   const events = types.map((t, i) => ev(t, i + 1, true));
-  assert.deepEqual(filterEvents(events, 'key').map((e) => e.type), ['GOAL', 'HEADER_GOAL', 'VAR_NO_GOAL', 'VAR_CHECK', 'VAR_PEN', 'VAR_RED', 'RED', 'INJURY', 'SUB', 'TRIGGER']);
+  assert.deepEqual(filterEvents(events, 'key').map((e) => e.type), ['GOAL', 'HEADER_GOAL', 'VAR_NO_GOAL', 'VAR_CHECK', 'VAR_PEN', 'VAR_NO_PEN', 'VAR_RED', 'VAR_NO_RED', 'RED', 'INJURY', 'SUB', 'TRIGGER']);
   assert.equal(filterEvents(events, 'all').length, types.length);
 });
 
 test('tidslinjen: annulleret mål, VAR-straffe, VAR-rødt og udvisning får hver sit tegn på den rigtige side', () => {
-  const events = [ev('VAR_NO_GOAL', 10, true, { plot: true }), ev('VAR_PEN', 20, false, { plot: true }), ev('VAR_RED', 30, true, { plot: true }), ev('RED', 40, false, { plot: true })];
+  const events = [ev('VAR_NO_GOAL', 10, true, { plot: true }), ev('VAR_NO_PEN', 20, false, { plot: true }), ev('VAR_NO_RED', 30, true, { plot: true }), ev('RED', 40, false, { plot: true }), ev('VAR_RED', 50, true, { plot: true }), ev('VAR_PEN', 60, false, { plot: true })];
   const marks = all(render(events), (e) => e.className.includes('tl-mark'));
-  assert.deepEqual(marks.map((e) => e.textContent), ['📺', '📺', '📺', '🟥']);
-  assert.deepEqual(marks.map((e) => /\bhome\b/.test(e.className)), [true, false, true, false]);
+  assert.deepEqual(marks.map((e) => e.textContent), ['📺', '📺', '📺', '🟥', '📺', '📺']);
+  assert.deepEqual(marks.map((e) => /\bhome\b/.test(e.className)), [true, false, true, false, true, false]);
   // Et godkendt tjek (plot falsk) og et forbi-skud står ikke i tidslinjen
   assert.equal(all(render([ev('VAR_CHECK', 10, true), ev('MISS', 20, true), ev('OFFSIDE_FLAG', 30, true)]), (e) => e.className.includes('tl-mark')).length, 0);
 });
