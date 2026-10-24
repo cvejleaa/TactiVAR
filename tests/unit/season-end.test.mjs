@@ -134,6 +134,14 @@ test('sæsonslut: slutstillingen har hvert holds VAR ± (med fortegn), samme tal
   const exp = last.table.map((r) => signed(before.find((b) => b.teamId === r.teamId).varNet));
   assert.deepEqual(varCol(el), exp);
   assert.ok(exp.some((x) => x !== '0'), `data: nogen har VAR-netto ≠ 0 (${exp})`);
+  // Den løbende tabel (samme helper): efter et par runder i sæson 2 står hvert holds VAR ± med fortegn
+  const rng = createRng(77);
+  for (let i = 0; i < 4; i++) commitRound(L, playRound(L, rng), rng);
+  const live = renderStandings({ league: L, onPick: () => {}, viewTeamId: null });
+  const names = all(byId(live, 'standings'), (e) => e.tag === 'tr').slice(1).map((tr) => tr.children[1].textContent);
+  const liveExp = names.map((n) => signed(L.leagueMetadata.standings.find((r) => r.teamName === n).varNet));
+  assert.deepEqual(varCol(live), liveExp);
+  assert.ok(liveExp.some((x) => x !== '0'), `data: VAR-netto ≠ 0 i sæson 2 (${liveExp})`);
   assert.equal(last.table.reduce((a, r) => a + r.varNet, 0), 0, 'VAR ± går i nul over ligaen');
   for (const k of TEAM_STAT_FIELDS) for (const r of last.table) assert.equal(r[k], before.find((b) => b.teamId === r.teamId)[k], `${k} for ${r.teamName}`);
 });
