@@ -588,6 +588,8 @@ export function simulateMatch(home, away, rng, opts = {}) {
       // Spilfører: straffen dømmes FØRST – så tjekker VAR, og kendelsen kan vende den.
       st[k(att, 'VarChecks')]++;
       const offside = rng.chance(VAR_RULES.PEN_OFFSIDE_SHARE);
+      // Positionerne i opspillet (TM v3.15.1: uden dem var den tjekkede altid den fældede – "den forreste" gjaldt ikke)
+      if (offside) { seen[att.team.id] = livePositions(att.tactics, { attacking: true, ballX: 50 }); seenX[att.team.id] = 50; }
       const o = offside ? offsideCheck(att, fouled, fouler) : { onside: rng.next() * 40 > fouled.varProfile.theatre };
       addEv(min, 'VAR_PEN', 'HIGHLIGHT', att.isHome, false, '📺 VAR tjekker straffen', `📺 [${att.team.name}] Dommeren peger på pletten – ${tag(fouled)} går ned i feltet efter kontakt med ${tag(fouler)} (${def.team.name}). Men VAR tjekker ${offside ? 'for offside i opspillet' : 'om der var kontakt nok'} …`, `${att.team.name}: straffesparket tjekkes …`);
       events.at(-1).var = { kind: offside ? 'OFFSIDE' : 'DIVE', verdict: o.onside ? 'STANDS' : 'OVERTURNED' };

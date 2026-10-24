@@ -353,7 +353,8 @@ Tick hvert 3. minut (1..90).
   Rundens spiller tre runder i træk). Målt (600 kampe): Kampens spiller fra det tabende hold 15 % → 2,5 %, målmand 32 % → 23 %.
   Målmanden svækkes også af ti mand (forenkling). Hovedstødsmål +1,35, mål
   +1,25, oplæg +0,55, redning +0,50 (skytte +0,10), forbi 0, annulleret mål for offside −0,40 til den tjekkede
-  (forsvarer +0,45; v3.15.1 – VAR-mål +1,30 fandtes til v3.15.0), annulleret for frispark −0,30, filmning −0,30, vundet luftduel +0,40, mål imod forsvarer −0,35 / GK
+  (forsvarer +0,45; v3.15.1 – VAR-mål +1,30 fandtes til v3.15.0), annulleret for frispark −0,30, filmning −0,30, straffe
+  annulleret for offside −0,20 til den tjekkede, linjedommerens flag −0,10 til den offside / +0,20 til forsvareren, blokering +0,10, vundet luftduel +0,40, mål imod forsvarer −0,35 / GK
   −0,25, clean sheet +0,50 til GK/CB/LB/RB (karakteren; i statistikken tæller clean sheet
   kun for målmanden – §8b).
 - Deltagerliste med minutter (også skadede og indskiftere).
