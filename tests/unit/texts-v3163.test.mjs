@@ -79,7 +79,7 @@ test('ingen gentaget måltekst i en kamp, før typens tre er brugt (Spilfører: 
   }
   assert.ok(groups > 300 && multi > 60, `data: ${groups} typer i kampe, ${multi} med mindst to mål af samme type`);
 });
-test('FUND (todo): hovedstødsmålene (HEADER/CORNER/SETPIECE) får ikke kampens brugte tekster – describeGoal kaldes uden goalTexts i luftduel-grenen', { todo: 'match.js luftduel: describeGoal(kind, …, min, rng) mangler goalTexts' }, () => {
+test('FUND (todo): hovedstødsmålene (HEADER/CORNER/SETPIECE) får ikke kampens brugte tekster – describeGoal kaldes uden goalTexts i luftduel-grenen', () => {
   for (const m of M200) {
     const per = {};
     for (const g of m.goalsPool) if (!WITH_USED.has(g.kind)) (per[g.kind] ??= []).push(variantOf(g));
@@ -87,7 +87,7 @@ test('FUND (todo): hovedstødsmålene (HEADER/CORNER/SETPIECE) får ikke kampens
   }
 });
 
-// ---------- Varianter uden rng: pickBy(liste, minut, id) ----------
+// ---------- Varianter uden rng: pickBy(liste, tick = minut / 3, id) ----------
 // Hver familie: alle varianter forekommer over mange kampe, og hver forekomst er netop pickBy(listen, minuttet, id'et) – samme
 // (minut, id) giver altså samme tekst. id'et findes ud fra tag'et i hændelsens holds karakterark (hjemme/ude efter isHome).
 const MID = ['styrer midtbanen', 'finder den frie mand', 'spiller sig ud af presset', 'vender op og sætter spillet i gang'];
@@ -123,30 +123,30 @@ const F = families([...M200, ...SEASON]);
 test('variant "styrer midtbanen" (4): alle fire forekommer, og hver er pickBy(listen, minuttet, playmakerens id)', () => {
   assert.ok(F.mid.length > 2000 && F.mid.every((x) => x.id), `data: ${F.mid.length}`);
   assert.deepEqual([...new Set(F.mid.map((x) => x.v))].sort(), [...MID].sort());
-  for (const x of F.mid) assert.equal(x.v, pickBy(MID, x.min, x.id), JSON.stringify(x));
+  for (const x of F.mid) assert.equal(x.v, pickBy(MID, x.min / 3, x.id), JSON.stringify(x));
 });
 test('variant "stiger højest og clearer" (4): alle fire forekommer, hver er pickBy(listen, minuttet, forsvarerens id), og skytten står med SIT hold', () => {
   assert.ok(F.clear.length > 200 && F.clear.every((x) => x.id), `data: ${F.clear.length}`);
   assert.deepEqual([...new Set(F.clear.map((x) => x.v))].sort(), [...CLEAR].sort());
-  for (const x of F.clear) { assert.equal(x.v, pickBy(CLEAR, x.min, x.id), JSON.stringify(x)); assert.equal(x.team, x.att, 'foran #X (angriberens hold)'); }
+  for (const x of F.clear) { assert.equal(x.v, pickBy(CLEAR, x.min / 3, x.id), JSON.stringify(x)); assert.equal(x.team, x.att, 'foran #X (angriberens hold)'); }
 });
 test('variant "omorganiserer sig" (3): etiket og tekst er samme variant (pickBy på minut og hold-id), alle tre forekommer – og stadig hverken regel, formation eller minut', () => {
   assert.ok(F.reorg.length > 100, `data: ${F.reorg.length}`);
   assert.deepEqual([...new Set(F.reorg.map((x) => x.v))].sort(), [...REORG_TEXT].sort());
   for (const x of F.reorg) {
-    assert.equal(x.v, pickBy(REORG_TEXT, x.min, x.id)); assert.equal(x.label, pickBy(REORG_LABEL, x.min, x.id));
+    assert.equal(x.v, pickBy(REORG_TEXT, x.min / 3, x.id)); assert.equal(x.label, pickBy(REORG_LABEL, x.min / 3, x.id));
     assert.equal(REORG_LABEL.indexOf(x.label), REORG_TEXT.indexOf(x.v), 'etiket og tekst følges ad');
   }
 });
 test('variant "Din lynkontra løber ind i …" (3): alle tre forekommer, hver er pickBy(listen, minuttet, presserens id)', () => {
   assert.ok(F.lyn.length > 100 && F.lyn.every((x) => x.id), `data: ${F.lyn.length}`);
   assert.deepEqual([...new Set(F.lyn.map((x) => x.v))].sort(), [...LYN].sort());
-  for (const x of F.lyn) assert.equal(x.v, pickBy(LYN, x.min, x.id), JSON.stringify(x));
+  for (const x of F.lyn) assert.equal(x.v, pickBy(LYN, x.min / 3, x.id), JSON.stringify(x));
 });
 // FUND: alle kampens minutter er tick-minutter (3, 6, …, 90 – deleligt med 3). pickBy = liste[(hash(id) + minut) % længde]: med tre
 // varianter er (hash + 3k) % 3 = hash % 3 – SAMME variant for samme hold/spiller i hvert minut og hver kamp. "omorganiserer sig"
 // og lynkontraen gentager sig altså stadig pr. hold/presser (det, Spilføreren klagede over); de fire-listede varierer.
-test('FUND (todo): et hold/en presser får mindst to forskellige af de tre varianter over en sæson (minuttet er altid deleligt med 3)', { todo: 'pickBy(liste af 3, min, id) med min = 3k giver altid samme variant pr. id' }, () => {
+test('FUND (todo): et hold/en presser får mindst to forskellige af de tre varianter over en sæson (minuttet er altid deleligt med 3)', () => {
   for (const fam of [F.reorg, F.lyn]) {
     const per = new Map();
     for (const x of fam) per.set(x.id, (per.get(x.id) ?? new Set()).add(x.v));

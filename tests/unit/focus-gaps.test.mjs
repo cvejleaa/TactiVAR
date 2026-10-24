@@ -330,11 +330,11 @@ test('fuldtids-analysen: dit angreb (forsøg/mål/stoppet, høje bolde/vundne/ho
   const me = mixedMatch({ meIsAttacker: true });
   assert.deepEqual([me.m.duelLog[me.m.homeId].crosses, me.m.duelLog[me.m.homeId].crossesWon, me.m.duelLog[me.m.homeId].headerGoals], [3, 2, 1]);
   assert.deepEqual([me.m.duelLog[me.m.homeId].cutbacks, me.m.duelLog[me.m.homeId].cutbackGoals, me.m.duelLog[me.m.homeId].cutbacksBlocked], [4, 2, 1]);
-  assert.ok(me.ft.text.endsWith(' ⚔️ Angreb (Lave cutbacks · direkte lange bolde): 4 cutbacks (2 mål) og 1 stoppet ved kanten, før de blev spillet, 3 høje bolde (2 vundne luftdueller i åbent spil, 1 hovedstødsmål). 🛡️ Dit felt: modstanderen fik 0 cutbacks spillet, og 0 blev stoppet ved kanten · luftdueller i åbent spil vundet 0 af 0.'), me.ft.text);
+  assert.ok(me.ft.text.endsWith(' ⚔️ Angreb (Lave cutbacks · direkte lange bolde): 4 cutbacks (2 mål, 1 stoppet ved kanten), 3 høje bolde (2 vundne luftdueller i åbent spil, 1 hovedstødsmål). 🛡️ Dit felt: modstanderens cutbacks stoppet 0 af 0 · luftdueller i åbent spil vundet 0 af 0.'), me.ft.text);
   // Samme kamp set fra forsvarets side: en bot angriber dig. Du har ikke selv noget angreb (Centralt · balanceret).
   const def = mixedMatch({ meIsAttacker: false });
   assert.equal(def.ft.isHome, false);
-  assert.ok(def.ft.text.endsWith(' ⚔️ Angreb (Centralt · balanceret): ingen cutbacks eller høje bolde. 🛡️ Dit felt: modstanderen fik 4 cutbacks spillet, og 1 blev stoppet ved kanten · luftdueller i åbent spil vundet 1 af 3.'), def.ft.text);
+  assert.ok(def.ft.text.endsWith(' ⚔️ Angreb (Centralt · balanceret): ingen cutbacks eller høje bolde. 🛡️ Dit felt: modstanderens cutbacks stoppet 1 af 4 · luftdueller i åbent spil vundet 1 af 3.'), def.ft.text);
 });
 test('fuldtids-analysen nævner alle ni kombinationer af fokus og pasningsstil med de rigtige danske navne', () => {
   const F = { CENTRAL: 'Centralt', HIGH_CROSSES: 'Høje indlæg', LOW_CUTBACKS: 'Lave cutbacks' };

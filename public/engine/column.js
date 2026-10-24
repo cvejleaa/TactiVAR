@@ -11,6 +11,7 @@
 // Ingen tilfældighed: varianter vælges ud fra runden og kampens tal (samme runde → samme klumme).
 import { RATING_PRIVATE_FIELDS, viewOwnReport } from './visibility.js';
 import { pickBy, gen } from './clues.js';
+import { championText } from './season.js';
 
 // De felter på en karakterlinje, klummen må læse (ingen af RATING_PRIVATE_FIELDS – testet).
 export const RATING_PUBLIC = ['playerId', 'shirtNumber', 'shortName', 'teamId', 'teamName', 'goals', 'assists', 'saves', 'aerialWins', 'stars', 'isMotM'];
@@ -125,7 +126,7 @@ function scout(history, teamId, uptoRound = Infinity) {
 // Klummen for én seer. input: { matches, gazette, history (sæsonens runder, inkl. den spillede), table (sorteret
 // [{teamId, teamName, points}]), next ([{homeId, homeName, awayId, awayName}] – næste runde efter programmet),
 // viewerTeamId, round (ligarunde), seasonRound, newSeason }.
-export function buildColumn({ matches = [], gazette = null, history = [], table = [], next = [], viewerTeamId = null, round = 0, newSeason = false }) {
+export function buildColumn({ matches = [], gazette = null, history = [], table = [], next = [], viewerTeamId = null, round = 0, newSeason = false, champion = null }) {
   const facts = matches.map((m, i) => publicFacts(m, i));
   const vi = facts.findIndex((f) => f.home.id === viewerTeamId || f.away.id === viewerTeamId);
   const vf = vi >= 0 ? facts[vi] : null;
@@ -190,7 +191,9 @@ export function buildColumn({ matches = [], gazette = null, history = [], table 
   if (cold) formParas.push(pickBy([`${name(cold[0])} har tabt ${cold[1].lose} i træk.`, `Krise hos ${name(cold[0])}: ${cold[1].lose} nederlag i træk.`, `${name(cold[0])} kan ikke finde vejen: ${cold[1].lose} nederlag i træk.`], round, 'cold', cold[0]));
   if (table.length && history.length >= 2) {
     const gap = table[1] ? table[0].points - table[1].points : null;
-    formParas.push(newSeason ? `${table[0].teamName} blev mester med ${table[0].points} point.` : gap === 0 ? `${table[0].teamName} og ${table[1].teamName} står lige i toppen med ${table[0].points} point.` : `${table[0].teamName} fører med ${table[0].points} point${gap != null ? `, ${gap} foran ${table[1].teamName}` : ''}.`);
+    // Mesteren med den regel, der afgjorde (v3.16.3 – championText i season.js, samme tekst som slutstillingen)
+    const myPos = table.findIndex((t) => t.teamId === viewerTeamId) + 1 || null;
+    formParas.push(newSeason ? `${championText(champion ?? { teamName: table[0].teamName, points: table[0].points }, myPos)}.` : gap === 0 ? `${table[0].teamName} og ${table[1].teamName} står lige i toppen med ${table[0].points} point.` : `${table[0].teamName} fører med ${table[0].points} point${gap != null ? `, ${gap} foran ${table[1].teamName}` : ''}.`);
   }
   if (formParas.length) sections.push({ id: 'col-form', title: 'Formen', paras: formParas });
 

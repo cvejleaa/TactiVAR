@@ -111,7 +111,7 @@ function buildColumnNow() {
   const table = (end ? end.table : sortStandings(L.leagueMetadata.standings)).map((r) => ({ teamId: r.teamId, teamName: r.teamName, points: r.points }));
   let next = [];
   try { next = pairRound(L).map(([hI, aI]) => ({ homeId: L.teams[hI].id, homeName: L.teams[hI].name, awayId: L.teams[aI].id, awayName: L.teams[aI].name })); } catch { next = []; }
-  return buildColumn({ matches: lr.matches, gazette: lr.gazette, history, table, next, viewerTeamId: myTeam().id, round: lr.round, newSeason: !!end });
+  return buildColumn({ matches: lr.matches, gazette: lr.gazette, history, table, next, viewerTeamId: myTeam().id, round: lr.round, newSeason: !!end, champion: end?.champion ?? null });
 }
 
 function change(fn) { fn(); act.syncActivePreset(myTeam(), game.ui.activePresetIndex); persist(); render(); }

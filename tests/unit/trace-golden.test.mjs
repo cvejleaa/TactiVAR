@@ -10,7 +10,7 @@ import { createRng } from '../../public/engine/rng.js';
 import { createLeague } from '../../public/engine/generator.js';
 import { simulateMatch } from '../../public/engine/match.js';
 
-const GOLDEN = '371b1c7bc9232f0460236e01d1631e5d6762b62160d9ffeb202b8e016f9a7e43';   // v3.16.3: kun tekst – noprose uændret (tools/fingerprint.mjs; før 072a48cf…) · v3.16.1 sammenpresning i stedet for klemning (bevidst ændret motor: modtagervalget læser positionerne – før d67fad2a… fra v3.16) · v3.16 koblede linjer + SHOT_REACH (bevidst ændret motor: modtagervalg, langskud, kontra, kant efter pres – før 9ae07870… fra v3.15.1)
+const GOLDEN = '7648f4ef77581cfd6a9c6d7e67b6aaaf74bbc038b8066b541d0c7de55f0cb767';   // v3.16.3: kun tekst – noprose uændret (tools/fingerprint.mjs; før 072a48cf…) · v3.16.1 sammenpresning i stedet for klemning (bevidst ændret motor: modtagervalget læser positionerne – før d67fad2a… fra v3.16) · v3.16 koblede linjer + SHOT_REACH (bevidst ændret motor: modtagervalg, langskud, kontra, kant efter pres – før 9ae07870… fra v3.15.1)
 export function goldenMatches() {
   const out = [];
   for (let s = 1; s <= 20; s++) {
