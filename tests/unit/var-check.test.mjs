@@ -112,25 +112,32 @@ test('straffe-VAR: en annulleret straffe tælles ikke (ingen straffe, skud eller
     const n = after(m, e), side = e.isHome ? 'h' : 'a';
     if (e.var.verdict === 'OVERTURNED') {
       over++;
+      // Spilfører: straffen dømmes først, så tjekket, så kendelsen i sin egen linje
+      assert.match(e.text, /^📺 \[.+\] Dommeren peger på pletten – #\d+ .+ går ned i feltet efter kontakt med #\d+ .+ \(.+\)\. Men VAR tjekker (for offside i opspillet|om der var kontakt nok) …$/, e.text);
+      const v = n; assert.equal(v.type, 'VAR_NO_PEN'); assert.match(v.text, /STRAFFESPARKET ANNULLERES|Straffesparket annulleres/);
       for (const f of ['Penalties', 'Shots', 'OnTarget']) assert.equal(m.events.filter((x) => x.min === e.min).at(-1).stats[side + f], e.stats[side + f], `${f}: ${e.text}`);
-      if (e.var.kind === 'DIVE') { dive++; assert.match(e.text, /Dommeren går ud til skærmen … ingen kontakt\. Straffesparket annulleres\./); assert.ok(n.type === 'FOUL' ? / for filmning\.$/.test(n.text) : n.type === 'RED', n.text); assert.equal(n.isHome, e.isHome, 'den fældede får kortet'); }
-      else assert.match(e.text, /stod offside i opspillet, før #\d+ .+ blev fældet\./);
+      const c = after(m, v);
+      if (e.var.kind === 'DIVE') { dive++; assert.match(v.text, /Dommeren går ud til skærmen … ingen kontakt\. Straffesparket annulleres\./); assert.ok(c.type === 'FOUL' ? / for filmning\.$/.test(c.text) : c.type === 'RED', c.text); assert.equal(c.isHome, e.isHome, 'den fældede får kortet'); }
+      else { assert.match(v.text, /(stod offside i opspillet, før #\d+ .+ blev fældet|#\d+ .+ stod offside, før han blev fældet)\./); const t = v.text.match(/(#\d+ [^ ]+ [^ ]+) stod offside i opspillet, før (#\d+ .+) blev fældet/); if (t) assert.notEqual(t[1], t[2], 'aldrig samme spiller to gange'); }
     } else {
       kicked++;
       assert.ok(/STRAFFESPARK/.test(n.text) && ['GOAL', 'SAVE'].includes(n.type), n.text);
+      assert.ok(n.text.endsWith(e.var.verdict === 'AWARDED' ? '(dømt efter VAR)' : ' 📺 VAR: straffesparket står.') || n.text.includes(e.var.verdict === 'AWARDED' ? '(dømt efter VAR)' : '📺 VAR: straffesparket står.'), n.text);
       assert.equal(n.stats[side + 'Penalties'], e.stats[side + 'Penalties'] + 1);
-      if (e.var.verdict === 'AWARDED') assert.match(e.text, /efter at have set skærmen dømmer han straffespark!$/);
+      if (e.var.verdict === 'AWARDED') assert.match(e.text, /Efter at have set skærmen dømmer han straffespark!$/);
     }
   }
   assert.ok(over >= 10 && dive >= 5 && kicked >= 20, `data: annulleret ${over} (filmning ${dive}), sparket ${kicked}`);
 });
 
-test('rødt-kort-VAR: bekræftet → udvisning; trukket tilbage → gult (ingen udvisning, medmindre han havde gult); opgraderet → udvisning', () => {
+test('rødt-kort-VAR: bekræftet → udvisning; trukket tilbage → gult (aldrig udvisning); opgraderet → udvisning', () => {
   const c = { CONFIRMED: 0, DOWNGRADED: 0, UPGRADED: 0 };
   for (const { m } of games(400, { [VAR_RULES.RED_CHECK_P]: true, [VAR_RULES.RED_UPGRADE_P]: true, 0.06: 0.15 })) for (const e of m.events.filter((x) => x.type === 'VAR_RED')) {
     const n = after(m, e); c[e.var.verdict]++;
     assert.equal(n.isHome, e.isHome);
-    if (e.var.verdict === 'DOWNGRADED') assert.ok(n.type === 'FOUL' ? / efter VAR-tjekket\.$/.test(n.text) : /^🟨🟥/.test(n.text), n.text);
+    if (e.var.verdict !== 'UPGRADED') assert.match(e.text, /Dommeren viser #\d+ .+ det røde kort for tacklingen – men VAR tjekker situationen …$/, 'kortet vises først');
+    // QC v3.15.1: et kort, der "bliver gult", må aldrig ende som udvisning (en spiller med gult tjekkes ikke)
+    if (e.var.verdict === 'DOWNGRADED') { assert.equal(n.type, 'VAR_NO_RED'); const y = after(m, n); assert.ok(y.type === 'FOUL' && / efter VAR-tjekket\.$/.test(y.text), y.text); }
     else assert.ok(n.type === 'RED' && /^🟥 .+ Direkte rødt kort/.test(n.text), n.text);
   }
   assert.ok(c.CONFIRMED >= 5 && c.DOWNGRADED >= 3 && c.UPGRADED >= 5, JSON.stringify(c));
@@ -147,6 +154,18 @@ test('forbi: et skud forbi eller blokeret er ikke på mål og ingen redning', ()
   assert.ok(miss >= 80, `data: ${miss}`);
 });
 
+test('VAR_RULES og forbi-tallene er indbyrdes forskellige og findes ikke som andre chance-værdier i motoren (testenes rng vælger på p-værdien)', async () => {
+  const fs = await import('node:fs');
+  const R = await import('../../public/engine/match-rules.js'), M = await import('../../public/engine/match.js');
+  const mine = [...Object.values(R.VAR_RULES), R.MISS_P, R.MISS_BLOCK_SHARE, R.MISS_CORNER_P];
+  assert.equal(new Set(mine).size, mine.length, `dubletter: ${mine}`);
+  const src = fs.readFileSync(new URL('../../public/engine/match.js', import.meta.url), 'utf8');
+  const literal = [...src.matchAll(/chance\((0\.\d+)\)/g)].map((x) => Number(x[1]));
+  const named = [M.PENALTY_P, M.FREEKICK_P, M.FK_SHOT_P, M.CORNER_P, M.QUIET_FOUL_P, M.QUIET_CARD_P, M.CROSS_CORNER_P, ...Object.values(M.CHANCE_P), ...Object.values(M.FOCUS_SHARE), ...Object.values(R.CARD_RULES)];
+  assert.ok(literal.length >= 5, 'data: literaler fundet');
+  for (const p of mine) assert.ok(!literal.includes(p) && !named.includes(p), `${p} findes også andetsteds`);
+});
+
 test('linjedommerens flag: afslutningen tæller ikke som på mål og er intet VAR-tjek', () => {
   let n = 0;
   for (const { m } of games(60, { [VAR_RULES.OFFSIDE_FLAG_P]: true })) for (const e of m.events.filter((x) => x.type === 'OFFSIDE_FLAG')) {
@@ -155,7 +174,30 @@ test('linjedommerens flag: afslutningen tæller ikke som på mål og er intet VA
     assert.equal(e.stats[att + 'OnTarget'], before(m, e).stats[att + 'OnTarget']);
     assert.equal(e.stats[att + 'VarChecks'], before(m, e).stats[att + 'VarChecks']);
     assert.ok(!e.var && !/VAR/.test(e.text), e.text);
-    assert.match(e.text, /^🚩 \[.+\] Linjedommeren løfter flaget efter afslutningen fra #\d+ .+ – (#\d+ .+ \(.+\) stod offside i opspillet|han \(.+\) stod offside)\.$/);
+    assert.match(e.text, /^🚩 \[.+\] Linjedommeren løfter flaget efter afslutningen fra #\d+ .+ – (#\d+ .+ \(.+\) stod offside i opspillet|han stod offside)\.$/);
   }
   assert.ok(n >= 30, `data: ${n}`);
+});
+
+test('fuldtids-analysen nævner resultatet rigtigt: sejr "til dig", nederlag og uafgjort uden (Spilfører: "0-2 til dig")', () => {
+  const seen = { Sejr: 0, Nederlag: 0, Uafgjort: 0 };
+  for (const { m, H, A } of games(60, {})) {
+    const ft = m.events.find((e) => e.type === 'FULLTIME');
+    if (!ft) continue;
+    const [my, opp] = ft.isHome ? [m.homeGoals, m.awayGoals] : [m.awayGoals, m.homeGoals];
+    const want = my > opp ? `Sejr ${my}-${opp} til dig.` : my < opp ? `Nederlag ${my}-${opp}.` : `Uafgjort ${my}-${opp}.`;
+    assert.ok(ft.text.startsWith(`📊 [90' FULDTIDS-ANALYSE] ${want} `), ft.text.slice(0, 60));
+    seen[want.split(' ')[0]]++;
+  }
+  assert.ok(seen.Sejr >= 3 && seen.Nederlag >= 3 && seen.Uafgjort >= 2, JSON.stringify(seen));
+});
+
+test('en cutback (bolden spillet tilbage) tjekkes aldrig for offside – kun for frispark', () => {
+  let n = 0;
+  for (const { m } of games(150, { [VAR_RULES.GOAL_CHECK_P]: true })) for (const e of m.events.filter((x) => x.type === 'VAR_CHECK')) {
+    const g = after(m, e);
+    if (!GOALS.has(g.type) || !m.goalsPool.some((x) => x.min === g.min && x.kind === 'CUTBACK' && g.text.includes(x.scorer))) continue;
+    n++; assert.equal(e.var.kind, 'FOUL', g.text);
+  }
+  assert.ok(n >= 3, `data: cutbackmål med tjek ${n}`);
 });

@@ -196,9 +196,12 @@ Tick hvert 3. minut (1..90).
     står – …") eller "MÅLET ANNULLERES!" med stillingen tilbage. Offside (den forreste, som ovenfor; varPulse +
     vsTrapLong·0,045 mod forsvarerens POS) eller 27 % frispark i opspillet (skyttens cynicism). Et annulleret mål tæller
     ingen steder (mål, skud på mål, karakter for mål, Rundens mål); den tjekkede −0,40, forsvareren +0,45.
-  - **Straffe**: 27 % tjekkes – filmning (den fældedes theatre; annulleret → gult kort for filmning) eller 30 % offside i
-    opspillet; kendelsen falder før straffen tælles. VAR kalder dommeren ud til et straffespark, han ikke så (0,23 % pr. tick).
-  - **Rødt kort** (kun direkte, IFAB): 53 % tjekkes – den kyniske beholder oftere kortet, ellers bliver det gult; en grov
+  - **Straffe**: 26 % tjekkes – filmning (den fældedes theatre; annulleret → gult kort for filmning) eller 31 % offside i
+    opspillet; kendelsen falder før straffen tælles. Referatet (Spilfører): "Dommeren peger på pletten … Men VAR tjekker …",
+    så kendelsen (VAR_NO_PEN) eller sparket med "📺 VAR: straffesparket står". Rødt kort ligeså: kortet vises, VAR tjekker,
+    så udvisningen eller VAR_NO_RED. En cutback (bolden spillet tilbage) tjekkes kun for frispark, aldrig offside. VAR kalder dommeren ud til et straffespark, han ikke så (0,23 % pr. tick).
+  - **Rødt kort** (kun direkte, IFAB): 53 % tjekkes (ikke når spilleren allerede har gult – et gult ville også give rødt) –
+    den kyniske beholder oftere kortet, ellers bliver det gult; en grov
     tackling uden kort kan opgraderes (4,1 %, oftere for den kyniske).
   - **Linjedommerens flag** (ikke VAR, Spilfører): en afslutning, der ikke går ind, kan være offside (4,3 %) – intet skud på
     mål, intet hjørne, ikke i VAR-tjek.
@@ -367,7 +370,8 @@ Tick hvert 3. minut (1..90).
   for typer med oplægsgiver):
   LONGSHOT (fra v3.12.1: skytten står uden for feltet, §5; før vægtet af FIN) og DRIBBLE (vægtet af PAC+BAL), begge uden oplæg, COMBINATION, CUTBACK (fra v3.12 kun fra
   en rigtig cutback – hændelsen eller et vundet løb på kanten, der ender i en aflevering – for alle
-  hold; før: DIT holds LOW_CUTBACKS 42 % af almindelige mål, andre tilfældige 12 %), HEADER, VAR. Fra v3.9
+  hold; før: DIT holds LOW_CUTBACKS 42 % af almindelige mål, andre tilfældige 12 %), HEADER, VAR (kun i gem fra før
+  v3.15.1 – nye mål får aldrig typen VAR; tekster og label beholdes til gamle gem). Fra v3.9
   afgør et vundet løb uden bold typen (se §5), og COUNTER kommer kun fra en rigtig kontra. Mindst 3 tekster pr. type (clues.js). Fælles skala 0–20
   (`goalSpectacle`); målt: langskud 36 %, VAR 22 %, dribletur 20 %, kontra 8 % … af
   rundens mål (`node tools/measure-duels.mjs 40 saeson`; efter friskheds-kalibreringen: langskud
