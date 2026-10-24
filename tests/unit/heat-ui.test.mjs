@@ -25,6 +25,7 @@ const { createLeague } = await import('../../public/engine/generator.js');
 const { simulateMatch } = await import('../../public/engine/match.js');
 const { renderMatchCenter } = await import('../../public/ui/matchcenter.js');
 const { clearReplays } = await import('../../public/ui/replay.js');
+const { evMin } = await import('../../public/engine/clock.js');
 
 const all = (el, pred, out = []) => { if (el instanceof FakeEl) { if (pred(el)) out.push(el); el.children.forEach((c) => all(c, pred, out)); } return out; };
 const byId = (el, id) => all(el, (e) => e.attrs.id === id);
@@ -122,8 +123,11 @@ test('holdets heat map: felterne (6×9) med den rigtige placering og styrke (tæ
   const dots = all(byId(el, 'heat-pitch')[0], (x) => cls(x, 'heat-shot'));
   assert.deepEqual(all(byId(el, 'heat-opp')[0], (x) => cls(x, 'heat-shot')).map((d) => [d.className, d.style.left, d.style.top]), [['heat-shot miss', '90%', '90%']]);
   assert.deepEqual(dots.map((d) => [d.className, d.style.left, d.style.top, d.textContent, d.attrs.title]), [
-    ['heat-shot goal', '12%', '30%', '⚽', "3' mål"], ['heat-shot save', '11%', '31%', '●', "6' redning"], ['heat-shot miss', '20%', '20%', '●', "9' forbi/blokeret"],
-    ['heat-shot offside', '20%', '20%', '●', "12' offside (flag)"], ['heat-shot disallowed', '20%', '20%', '●', "15' annulleret af VAR"], ['heat-shot miss', '20%', '20%', '●', "21' forbi/blokeret"]]);
+    ['heat-shot goal', '12%', '30%', '⚽', "4' mål"], ['heat-shot save', '11%', '31%', '●', "5' redning"], ['heat-shot miss', '20%', '20%', '●', "8' forbi/blokeret"],
+    ['heat-shot offside', '20%', '20%', '●', "10' offside (flag)"], ['heat-shot disallowed', '20%', '20%', '●', "12' annulleret af VAR"], ['heat-shot miss', '20%', '20%', '●', "17' forbi/blokeret"]]);
+  // v3.16.4: titlen er HÆNDELSENS ur (øjeblikkets ev 1, 2, 3, 4, 5, 7 → 4', 5', 7', 10', 11', 17'), ikke tick'ets start (t 1–7 → 1', 4', 7', 10', 13', 20'
+  // med S1 = 8) og ikke t·3 som før (3', 6', 9', 12', 15', 21')
+  assert.deepEqual([1, 2, 3, 4, 5, 7].map((i) => evMin(base.events[i])), ["4'", "5'", "8'", "10'", "12'", "17'"], 'data: kampens ur');
   assert.equal(byId(el, 'heat-note')[0].textContent, 'Angriber opad. Farven: hvor holdet stod i kampens 1 øjebliksbilleder og afslutninger. Prikker: 1 mål, 1 reddet, 2 forbi/blokeret, 1 offside, 1 annulleret. Klik på en spiller i listen.');
   // Knapperne
   const { el: e2, calls } = render(mOf(), base.homeId, { heat: { playerId: null } });
@@ -137,7 +141,7 @@ test('en spillers heat map: hans felter og prikker (afslutninger OG oplæg på h
   // hB: (55,50)→(4,3), (60,60)→(5,3), (60,80)→(7,3) – alle lige stærke
   assert.equal(cells.length, 3); assert.ok(cells.every((x) => x.style.opacity === '0.85'));
   const dots = all(byId(el, 'heat-pitch')[0], (x) => cls(x, 'heat-shot'));   // kun dit kort (modstanderens zone-kort har sine egne)
-  assert.deepEqual(dots.map((d) => [d.className, d.style.left, d.style.top, d.textContent, d.attrs.title]), [['heat-shot assist', '60%', '60%', '🅰', "3' oplæg"]]);
+  assert.deepEqual(dots.map((d) => [d.className, d.style.left, d.style.top, d.textContent, d.attrs.title]), [['heat-shot assist', '60%', '60%', '🅰', "4' oplæg"]]);
   assert.equal(byId(el, 'heat-note')[0].textContent, 'Angriber opad. Farven: hvor han stod i kampens 1 øjebliksbilleder og afslutninger. Prikker: 0 mål, 0 reddet, 0 forbi/blokeret, 1 oplæg.');
   byId(el, 'heat-team')[0].handlers.click(); byId(el, 'heat-back')[0].handlers.click();
   assert.deepEqual(calls.heat, [{ playerId: null }, null]);
@@ -185,8 +189,12 @@ test('🎬 i referatet: en knap ved hver afslutning, og et klik giver (kampen, h
   assert.ok(calls.replay.every(([mm]) => mm === m), 'kampen sendes med');
   assert.deepEqual(calls.replay.map(([, i]) => i), [7, 6, 5, 4, 3, 2, 1], 'referatet er nyeste først; hver knap sender SIN hændelses indeks');
   // Hver knap står i rækken for sin hændelse
-  for (const [, i] of calls.replay) { const row = rows.find((r) => all(r, (x) => cls(x, 'replay-btn')).length && r.textContent.startsWith(`${m.events[i].min}'`) && r.textContent.includes(m.events[i].text)); assert.ok(row, `række for hændelse ${i}`); }
-  assert.equal(rows.filter((r) => all(r, (x) => cls(x, 'replay-btn')).length === 0).length, m.events.length - 7, 'andre hændelser har ingen 🎬');
+  for (const [, i] of calls.replay) { const row = rows.find((r) => all(r, (x) => cls(x, 'replay-btn')).length && r.textContent.startsWith(evMin(m.events[i])) && r.textContent.includes(m.events[i].text)); assert.ok(row, `række for hændelse ${i}`); }
+  // v3.16.4: de to tillægstidslinjer (ev info stoppage) er ingen hændelser – de står uden for tællingen og har aldrig 🎬
+  const stops = rows.filter((r) => cls(r, 'stoppage'));
+  assert.deepEqual(stops.map((r) => r.attrs.id), ['stoppage-1', 'stoppage-0']);
+  assert.ok(stops.every((r) => all(r, (x) => cls(x, 'replay-btn')).length === 0));
+  assert.equal(rows.filter((r) => !cls(r, 'stoppage') && all(r, (x) => cls(x, 'replay-btn')).length === 0).length, m.events.length - 7, 'andre hændelser har ingen 🎬');
   // Under live: ingen
   const live = render(m, base.homeId, { playing: true, shownCount: m.events.length });
   assert.equal(all(live.el, (x) => cls(x, 'replay-btn')).length, 0);

@@ -6,6 +6,7 @@
 // grundbilledet pr. tick (hvert 3. minut) og afslutningernes øjeblikke fra sporet (match.js "Kampens spor"). Ét tegnet trin
 // (v3.16.2): efter et mål, en redning eller et skud forbi går bolden derhen, referatet siger – tegnet ud fra udfaldet, ikke motoren.
 import { h } from './dom.js';
+import { evMin, fmtMin, tickClock } from '../engine/clock.js';
 
 // Banens skala i tegningen (v3.16.3, Spilfører: målmanden stod 10 % ude, forsvarerne aldrig i eget felt): formationernes
 // y 90/10 (målmanden) tegnes ved mållinjen (≈97/3) – kun visningen; motoren og sporet er uændrede. Symmetrisk om 50, så
@@ -140,7 +141,7 @@ export function replayEl(m, ownSide) {
       // hen til en tom plads); fremad flytter de sig ikke, for pladserne er de samme.
       place(s, 'none');
       const e = m.events[s.ev] ?? m.events[0];
-      caption.textContent = `${s.t * 3}' · ${m.homeName} ${e.hG}-${e.aG} ${m.awayName} · ${e.text}`;
+      caption.textContent = `${evMin(e)} · ${m.homeName} ${e.hG}-${e.aG} ${m.awayName} · ${e.text}`;
       flag(caption, 'moment', true);
       el.dataset.step = String(r.i);
       return;
@@ -156,7 +157,9 @@ export function replayEl(m, ownSide) {
     // og teksten siger, hvordan duellen gik (QC v3.16.1: ellers står bolden pludselig hos modspilleren uden forklaring)
     const upto = s.ev ?? lastEventIdx(m.events, s.t * 3 - 1);
     const e = m.events[upto] ?? m.events[0];
-    caption.textContent = `${s.t * 3}' · ${m.homeName} ${e.hG}-${e.aG} ${m.awayName}${s.kind === 'moment' ? ' · ' + e.text : duelText(s, m)}`;
+    // Uret (v3.16.4): et øjeblik står på sin hændelses minut, et grundbillede på tick'ets første minut (QC C6 – billedet kommer
+    // før tick'ets afslutninger, så dets minut må ikke ligge efter deres)
+    caption.textContent = `${s.kind === 'moment' ? evMin(e) : fmtMin(tickClock(s.t, m.stoppage))} · ${m.homeName} ${e.hG}-${e.aG} ${m.awayName}${s.kind === 'moment' ? ' · ' + e.text : duelText(s, m)}`;
     flag(caption, 'moment', s.kind === 'moment');
     el.dataset.step = String(r.i);
   }

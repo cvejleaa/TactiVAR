@@ -2,14 +2,14 @@
 // eller VISNING – ikke kampene. Samme 400 seedede kampe som tests/unit/trace-golden-broad.test.mjs (sporet udeladt).
 //  - full:    hele resultatet
 //  - noprose: uden prosa (enhver tekststreng med mellemrum, fx referatets text/label og observationer) og uden visnings-
-//             felter (clock, snapshot) – tal, id'er, typer og minutter står tilbage. To versioner med samme noprose-hash
+//             felter (clock, stoppage, snapshot) – tal, id'er, typer og minutter står tilbage. To versioner med samme noprose-hash
 //             spiller præcis de samme kampe.
 // Kør: node tools/fingerprint.mjs [antal] [rod]   (rod = en anden checkout, fx en worktree af main)
 import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
 
-const VIEW_KEYS = new Set(['clock', 'snapshot', 'trace']);
+const VIEW_KEYS = new Set(['clock', 'snapshot', 'trace', 'stoppage']);   // stoppage: tillægstiden (visning, v3.16.4)
 const strip = (v) => {
   if (typeof v === 'string') return / /.test(v) ? '' : v;
   if (Array.isArray(v)) return v.map(strip);

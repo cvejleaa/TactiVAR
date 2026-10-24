@@ -26,6 +26,7 @@ const { simulateMatch } = await import('../../public/engine/match.js');
 const { renderMatchCenter } = await import('../../public/ui/matchcenter.js');
 const { replaySteps, stepForEvent, replayEl, replayJump, clearReplays } = await import('../../public/ui/replay.js');
 const { heatGrid, shotsOf, thirds } = await import('../../public/engine/heatmap.js');
+const { evMin, fmtMin, tickClock, clockNum } = await import('../../public/engine/clock.js');
 
 const all = (el, pred, out = []) => { if (el instanceof FakeEl) { if (pred(el)) out.push(el); el.children.forEach((c) => all(c, pred, out)); } return out; };
 const byId = (el, id) => all(el, (e) => e.attrs.id === id)[0];
@@ -68,6 +69,7 @@ test('afspilningen: brikker for begge hold, et spring viser hændelsens tekst; e
   replayJump(m, goal.ev);
   const cap = byId(el, 'rp-caption').textContent, e = m.events[goal.ev];
   assert.ok(cap.includes(e.text) && cap.includes(`${e.hG}-${e.aG}`), cap);
+  assert.ok(cap.startsWith(`${evMin(e)} · `), `øjeblikket står på hændelsens ur (v3.16.4): ${cap}`);
   const tokens = all(el, (x) => x.className.includes('rp-token') && !x.hidden);
   assert.equal(tokens.length, goal.h.length + goal.a.length);
   assert.ok(all(el, (x) => x.className.includes('actor')).some((x) => Number(x.dataset.pid) === goal.scorer || x.dataset.pid === goal.scorer), 'scoreren fremhævet');
@@ -75,7 +77,10 @@ test('afspilningen: brikker for begge hold, et spring viser hændelsens tekst; e
   const before = m.events.filter((x) => x.min < e.min).at(-1);
   byId(el, 'rp-prev').handlers.click();
   const cap2 = byId(el, 'rp-caption').textContent;
-  assert.ok(cap2.startsWith(`${e.min}' · ${m.homeName} ${before.hG}-${before.aG} `), `${cap2} (før: ${before.hG}-${before.aG}, efter: ${e.hG}-${e.aG})`);
+  // v3.16.4: grundbilledet står på tick'ets første minut (tickClock) – aldrig efter målets eget minut
+  const baseMin = tickClock(Math.round(e.min / 3), m.stoppage);
+  assert.ok(cap2.startsWith(`${fmtMin(baseMin)} · ${m.homeName} ${before.hG}-${before.aG} `), `${cap2} (før: ${before.hG}-${before.aG}, efter: ${e.hG}-${e.aG})`);
+  assert.ok(clockNum(baseMin) <= clockNum(e.clock), `${fmtMin(baseMin)} ≤ ${evMin(e)}`);
   // Samme element genbruges mellem tegningerne (faste brikker – CSS-overgange)
   assert.equal(replayEl(m, 'h'), el);
 });

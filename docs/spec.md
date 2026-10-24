@@ -452,6 +452,24 @@ bedre kan kontrollere spil motoren".
   en kamp gentager ikke en måltekst, før typens tekster er brugt (samme rng-træk). Bevis: `tools/fingerprint.mjs` –
   noprose-hashen er uændret.
 
+### Rigtige minutter og tillægstid (v3.16.4)
+Brugeren: "rigtige minutter (45+2, 90+3)" og "der er også tillægstid for VAR". Motoren regner fortsat i tick à 3 minutter
+(`e.min`: skift-vinduer, Hvis-Så, friskhed, karakterminutter, sporets t). Uret er et visningsfelt (`e.clock = { m, plus }`),
+lagt på bagefter af `assignClock` (public/engine/clock.js) – intet rng-træk; kampene er uændrede (`tools/fingerprint.mjs`
+noprose udelader clock og stoppage).
+- Pausen er grænsen: alt før pause-analysen er 1.–45.+S1, alt efter 46.–90.+S2 (pause-tick'ets spil står efter analysen og er
+  anden halvlegs første minutter). Første halvleg har 14 tick, anden 16; hændelserne i et tick fordeles stigende i tick'ets
+  vindue, og halvlegens sidste tick strækkes ind i tillægstiden. Pausen står på 45+S1, slutfløjtet og fuldtidsanalysen på 90+S2.
+- En Hvis-Så-hændelse står aldrig før reglens minut (minClock).
+- Tillægstid pr. halvleg (`stoppageFor`): 1 + ½ pr. skifte-vindue (pause-skift tæller ikke) + ½ pr. mål + ¼ pr. kort + 1 pr.
+  skade + 1 pr. VAR-tjek (hændelser med `e.var`) og 1 mere ved en omstødt kendelse; rundet op, højst 8; "heraf VAR" er højst
+  totalen. Gemmes som `m.stoppage = [{ S, var }, { S, var }]` – ingen ekstra hændelse (indeksene i spor, 🎬 og 📍 er uændrede);
+  referatet viser "⏱️ Tillægstid: S min (heraf X for VAR)." før halvlegens første tillægsminut.
+- Visning: referat, scoreboard, tidslinje (positionen efter uret, halvlegsstregen på (45+S1)/(90+S1+S2)), karakterarkets
+  ind–ud (fra SUB-, RED- og INJURY-linjernes ur – `playerSpan`), afspilningens undertekst (øjeblik = hændelsens ur, grundbillede
+  = tick'ets første minut – `tickClock`), heat-prikkernes titel og klummens "i 87. minut"/"i tillægstiden". Gamle gem uden ur
+  viser tick-minuttet.
+
 ## 6. Karakterer, MotM, avis
 - Start 6,5 (±0,15), klemt 3,5–10,0 – fra v3.15 først til sidst (justeringerne summeres uden loft, så overskud fra mål
   ikke tabes); vundet taktisk duel/pres +0,20 (`DUEL_BONUS`, før +0,35). Kampens og Rundens spiller rangeres ens

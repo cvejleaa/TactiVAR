@@ -40,11 +40,12 @@ test('publicFacts: hvert tal står på den rigtige side, og kun de offentlige ta
     counterGoals: 2, setPieceGoals: 2, headerGoals: 1, reorganised: 2 });   // reds (v3.16.3): 1 hjemme ≠ 3 ude – en ombytning er rød
   assert.deepEqual({ ...f.away }, { id: 'a1', name: 'Ude', goals: 2, against: 3, formation: '4-3-3', endFormation: '5-4-1', poss: 75, shots: 7, onTarget: 3, corners: 2, aerialWon: 4, yellows: 6, reds: 3,
     counterGoals: 1, setPieceGoals: 3, headerGoals: 2, reorganised: 1 });
-  // Præcis de otte offentlige begivenheder, med præcis disse felter (SUB/INJURY/TRIGGER og alle tre måltyper; ingen tekst/label)
+  // Præcis de otte offentlige begivenheder, med præcis disse felter (SUB/INJURY/TRIGGER og alle tre måltyper; ingen tekst/label;
+  // clock: null for hændelser uden ur – v3.16.4)
   assert.deepEqual(f.events, [
-    { type: 'GOAL', min: 10, isHome: true, hG: 1, aG: 0 }, { type: 'SUB', min: 20, isHome: true, hG: 1, aG: 0 }, { type: 'INJURY', min: 30, isHome: false, hG: 1, aG: 0 },
-    { type: 'TRIGGER', min: 40, isHome: true, hG: 1, aG: 0 }, { type: 'TRIGGER', min: 41, isHome: true, hG: 1, aG: 0 }, { type: 'TRIGGER', min: 50, isHome: false, hG: 1, aG: 0 },
-    { type: 'HEADER_GOAL', min: 60, isHome: false, hG: 1, aG: 1 }, { type: 'VAR_GOAL', min: 70, isHome: true, hG: 2, aG: 1 }]);
+    { type: 'GOAL', min: 10, clock: null, isHome: true, hG: 1, aG: 0 }, { type: 'SUB', min: 20, clock: null, isHome: true, hG: 1, aG: 0 }, { type: 'INJURY', min: 30, clock: null, isHome: false, hG: 1, aG: 0 },
+    { type: 'TRIGGER', min: 40, clock: null, isHome: true, hG: 1, aG: 0 }, { type: 'TRIGGER', min: 41, clock: null, isHome: true, hG: 1, aG: 0 }, { type: 'TRIGGER', min: 50, clock: null, isHome: false, hG: 1, aG: 0 },
+    { type: 'HEADER_GOAL', min: 60, clock: null, isHome: false, hG: 1, aG: 1 }, { type: 'VAR_GOAL', min: 70, clock: null, isHome: true, hG: 2, aG: 1 }]);
   assert.equal(f.goals.length, 12);
   assert.deepEqual(f.goals[0], { kind: 'COUNTER', min: 10, scorer: 'S0', teamName: 'Hjem' }, 'målene uden desc/spectacle');
   // Karakterlinjer: hjemme først, så ude; PRÆCIS de offentlige felter (positiv liste), aldrig rating/km/topfart/minIn/slot

@@ -256,14 +256,14 @@ test('"De øvrige kampe": seerens egen kamp er ikke med, hver kamp har sit indek
   for (const x of others) assert.equal(x.head, headlineOf(publicFacts(matches[x.idx], x.idx), 5), `overskrift ${x.idx}`);
   assert.notEqual(by[3].head, headlineOf(publicFacts(matches[3], 3), 0), 'runden indgår i overskriften (runde 5 ≠ 0 for denne kamp)');
   assert.deepEqual(variants((r) => sec(buildColumn(inp({ matches, round: r })), 'col-others').others[0].note), ['U0 kom bagfra og vandt.', 'U0 vendte kampen.', 'Comeback til U0.'].sort());
-  assert.deepEqual(variants((r) => sec(buildColumn(inp({ matches, round: r })), 'col-others').others[1].note), ['Afgjort i 83. minut.', 'H1 slog til sent – 83. minut.', 'Sejrsmålet faldt i 83. minut.'].sort());
+  assert.deepEqual(variants((r) => sec(buildColumn(inp({ matches, round: r })), 'col-others').others[1].note), ['Afgjort i 83. minut.', 'H1 slog til sent – i 83. minut.', 'Sejrsmålet faldt i 83. minut.'].sort());
   const say = (rule, name, idx) => `${name} ${pickBy(STYLE_RULES.find((r) => r.key === rule).say, 5, rule, idx)}.`;
   assert.equal(by[3].note, say('ball', 'U3', 3), 'udesejr: vinderen (ude) beskrives');
   assert.equal(by[4].note, say('ball', 'H4', 4), 'uafgjort: hjemmeholdet beskrives');
   assert.equal(by[5].note, '', 'uafgjort: hjemmeholdet har intet at sige (udeholdets besiddelse tæller ikke)');
   assert.equal(by[6].note, say('air', 'U6', 6), 'to regler passer: den første i tabellen');
   assert.equal(by[7].note, say('ball', 'H7', 7));
-  assert.match(by[8].note, /^(Afgjort i 85\. minut\.|U8 slog til sent – 85\. minut\.|Sejrsmålet faldt i 85\. minut\.)$/, 'udeholdet var aldrig bagud → sent mål, ikke comeback');
+  assert.match(by[8].note, /^(Afgjort i 85\. minut\.|U8 slog til sent – i 85\. minut\.|Sejrsmålet faldt i 85\. minut\.)$/, 'udeholdet var aldrig bagud → sent mål, ikke comeback');
   // Bogstavelige pinde i runde 5: valget afhænger af skabelon-nøglen OG kampens indeks (indeks 0 og 10 vælger hver sin comeback-tekst, 1 sin sent-mål-tekst)
   assert.deepEqual([by[0].note, by[10].note, by[1].note], ['Comeback til U0.', 'U10 kom bagfra og vandt.', 'Afgjort i 83. minut.']);
   assert.deepEqual(c.sections.map((x) => x.title), ['Din kamp', 'De øvrige kampe'], 'afsnitstitlerne');
