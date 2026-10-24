@@ -6,6 +6,7 @@ import { FORMATIONS, lineOfRole, isOutOfZone, slotPosition } from './formations.
 import { livePositions, coupledPositions, kickoffPositions, apartFrom, ONSIDE_GAP, MIN_APART } from './positions.js';
 import { masteryVs, counterXpForMatch } from './counter.js';
 import { createSheet, finalizeSheet } from './ratings.js';
+import { assignClock } from './clock.js';
 import { describeFinish, describeHeader, describeVarTiming, describeGoal, goalSpectacle, pickBy, gen } from './clues.js';
 import { MATCH_RULES, CARD_RULES, FATIGUE_SUBS_AT_ONCE, MIN_PLAYERS, VAR_RULES, MISS_P, MISS_BLOCK_SHARE, MISS_CORNER_P } from './match-rules.js';
 import { TIRED_PER_POINT, SUBS_LIMIT, matchCost, REST_SHARE } from './freshness.js';
@@ -261,6 +262,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
     if (advance) varyCount.set(k, c + 1);
     return pickBy(list, c, fam, id);
   };
+  const minClock = new Map();   // hændelsens indeks → tidligste minut på uret (Hvis-Så – clock.js)
   const goalTexts = new Set();   // kampens brugte måltekster (describeGoal – ingen gentagelse i en kamp)
   const addEv = (min, type, category, isHome, plot, label, text, varMsg) => {
     events.push({ min, type, category, isHome, plot, label, text, varMsg, hG, aG, stats: { ...st } });
@@ -864,6 +866,10 @@ export function simulateMatch(home, away, rng, opts = {}) {
   function checkTriggers(side, min) {
     const own = side.isHome ? hG : aG, opp = side.isHome ? aG : hG;
     side.tactics.conditionalRules.forEach((rule) => {
+      const n0 = events.length;   // reglens hændelser står aldrig før dens minut på uret (clock.js minClock)
+      try { checkRule(rule); } finally { for (let i = n0; i < events.length; i++) minClock.set(i, Math.max(minClock.get(i) ?? 0, rule.minuteTrigger | 0)); }
+    });
+    function checkRule(rule) {
       if (rule.used || min < rule.minuteTrigger) return;
       if (!ruleConditionMet(rule, own, opp)) return;
       if (rule.action === 'SUB') { rule.used = true; ruleSub(side, rule, min); return; }
@@ -895,7 +901,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
       side.tactics.baseFormation = rule.newFormation;
       side.tactics.customCoords = {};
       announceShift(side, min, `${side.team.name} skifter til ${rule.newFormation}`, `📋 [${side.team.name} • Hvis-Så] Holdet skifter fra ${from} til ${rule.newFormation}.`);
-    });
+    }
   }
 
   // Træthedsskift (v3.13, brugeren: grænsen skal gælde "uanset hvor langt man er kommet i kampen. Hvis
@@ -1280,6 +1286,8 @@ export function simulateMatch(home, away, rng, opts = {}) {
   const ratings = finalizeSheet(sheet, hG, aG, rng, counterXpForMatch);
   addEv(90, 'END', 'HIGHLIGHT', true, false, 'Slutfløjt', `🏁 SLUTFLØJT! ${home.name} ${hG} - ${aG} ${away.name}.${ratings.motm ? ` Kampens spiller: #${ratings.motm.shirtNumber} ${ratings.motm.shortName} (${ratings.motm.teamName}).` : ''}`);
 
+  // Rigtige minutter (v3.16.5): uret lægges på referatet bagefter – kun visning, intet træk (clock.js)
+  const stoppage = assignClock(events, minClock);
   const result = {
     round: opts.round ?? 0,
     homeId: home.id, awayId: away.id, homeName: home.name, awayName: away.name,
@@ -1288,7 +1296,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
     endState: { home: endOf(H, own(H)), away: endOf(A, own(A)) },
     ownReports,
     homeGoals: hG, awayGoals: aG, homeVarNet,
-    events, stats: st, ratings, goalsPool, injuries, observations, trace,
+    events, stats: st, ratings, goalsPool, injuries, observations, trace, stoppage,
   };
   // Holdenes private tællere pr. hold-id – kun til måleværktøjet; ikke-optællelig, så de
   // aldrig gemmes eller vises (de røber taktik).

@@ -12,6 +12,7 @@
 import { RATING_PRIVATE_FIELDS, viewOwnReport } from './visibility.js';
 import { pickBy, gen } from './clues.js';
 import { championText } from './season.js';
+import { inMinute } from './clock.js';
 
 // De felter på en karakterlinje, klummen må læse (ingen af RATING_PRIVATE_FIELDS – testet).
 export const RATING_PUBLIC = ['playerId', 'shirtNumber', 'shortName', 'teamId', 'teamName', 'goals', 'assists', 'saves', 'aerialWins', 'stars', 'isMotM'];
@@ -28,7 +29,7 @@ const SET_PIECE = new Set(['PENALTY', 'FREEKICK', 'CORNER', 'SETPIECE']);
 export function publicFacts(m, idx = 0) {
   const st = m.stats ?? {}, possSum = (st.hPoss ?? 0) + (st.aPoss ?? 0) || 1;
   const events = (m.events ?? []).filter((e) => GOAL_TYPES.has(e.type) || ['SUB', 'INJURY'].includes(e.type) || (e.type === 'TRIGGER' && e.category === 'HIGHLIGHT'))   // et Hvis-Så-skift, der ikke blev udført, er ingen omorganisering (QC F16)
-    .map((e) => ({ type: e.type, min: e.min, isHome: e.isHome, hG: e.hG, aG: e.aG }));
+    .map((e) => ({ type: e.type, min: e.min, clock: e.clock ?? null, isHome: e.isHome, hG: e.hG, aG: e.aG }));
   const goals = (m.goalsPool ?? []).map((g) => ({ kind: g.kind, min: g.min, scorer: g.scorer, teamName: g.teamName }));
   const side = (h) => {
     const p = h ? 'h' : 'a', name = h ? m.homeName : m.awayName, mine = goals.filter((g) => g.teamName === name);
@@ -59,7 +60,7 @@ function drama(f) {
   const late = last && last.min >= 80 && Math.abs(diff) === 1 && last.isHome === (diff > 0) && last.hG - last.aG === diff ? (diff > 0 ? f.home : f.away) : null;
   const behind = (h) => g.some((e) => (h ? e.hG - e.aG : e.aG - e.hG) <= -1);
   const comeback = diff > 0 && behind(true) ? f.home : diff < 0 && behind(false) ? f.away : null;
-  return { late, comeback, lateMin: last?.min };
+  return { late, comeback, lateMin: last?.min, lateAt: inMinute(last?.clock ?? { m: last?.min }) };   // lateAt: "i 87. minut" / "i tillægstiden" (v3.16.5)
 }
 
 // Stil-gæt for ét hold ud fra offentlige tal (QC B2: om kampen, i datid; aldrig indstillingens navn eller pres).
@@ -144,8 +145,8 @@ export function buildColumn({ matches = [], gazette = null, history = [], table 
       D: [`${me.name} og ${opp.name} delte point efter ${score}.`, `Uafgjort ${score} mellem ${me.name} og ${opp.name}.`, `Et point hver: ${me.name} – ${opp.name} ${score}.`] }[res];
     const paras = [pickBy(open, round, 'open', me.id)];
     if (d.comeback === me) paras.push('I kom bagfra – det siger noget om moralen.');
-    else if (d.late === me) paras.push(`Sejrsmålet kom i ${d.lateMin}. minut.`);
-    else if (d.late === opp) paras.push(`Det gjorde ondt: ${opp.name} afgjorde det i ${d.lateMin}. minut.`);
+    else if (d.late === me) paras.push(`Sejrsmålet kom ${d.lateAt}.`);
+    else if (d.late === opp) paras.push(`Det gjorde ondt: ${opp.name} afgjorde det ${d.lateAt}.`);
     paras.push(...yourVerdict(report, me, round));
     // Efter dommen over dit hold (Spilfører v3.16.3: "… mistede en mand på rødt kort. Det kostede: et kontramål imod." læstes som årsag)
     // Røde kort (v3.16.3, Spilfører: klummen nævnte aldrig en udvisning) – offentlige fakta (referatet), begge hold
@@ -165,14 +166,14 @@ export function buildColumn({ matches = [], gazette = null, history = [], table 
     const d = drama(f), w = f.home.goals > f.away.goals ? f.home : f.away.goals > f.home.goals ? f.away : null;
     let note;
     if (d.comeback) note = pickBy([`${d.comeback.name} kom bagfra og vandt.`, `${d.comeback.name} vendte kampen.`, `Comeback til ${d.comeback.name}.`], round, 'cb', f.idx);
-    else if (d.late) note = pickBy([`Afgjort i ${d.lateMin}. minut.`, `${d.late.name} slog til sent – ${d.lateMin}. minut.`, `Sejrsmålet faldt i ${d.lateMin}. minut.`], round, 'late', f.idx);
+    else if (d.late) note = pickBy([`Afgjort ${d.lateAt}.`, `${d.late.name} slog til sent – ${d.lateAt}.`, `Sejrsmålet faldt ${d.lateAt}.`], round, 'late', f.idx);
     else {
       // Ved uafgjort ingen "ventede/havde bolden mindst"-forklaring (Spilfører v3.16: den forklarer en sejr, ikke et point)
       const who = w ?? f.home, g = styleGuess(who).filter((r) => w || r.key !== 'wait')[0];
       note = g ? `${who.name} ${say(g, round, f.idx)}.` : '';
     }
     if (d.comeback) stories.push([70, `${d.comeback.name} vendte kampen`]);
-    if (d.late) stories.push([60, `Sent drama: ${d.late.name} afgjorde det i ${d.lateMin}. minut`]);
+    if (d.late) stories.push([60, `Sent drama: ${d.late.name} afgjorde det ${d.lateAt}`]);
     return { idx: f.idx, head: headlineOf(f, round), note };
   });
   if (others.length) sections.push({ id: 'col-others', title: 'De øvrige kampe', others });

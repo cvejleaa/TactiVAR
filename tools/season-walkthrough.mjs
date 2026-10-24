@@ -9,6 +9,7 @@
 // heat map for holdet og målscoreren, og kontrolværktøjets rapport for alle fire kampe (tools/trace-invariants.mjs) –
 // samlet i spor.md.
 //   node tools/season-walkthrough.mjs [OUT]        (BASE_URL=https://tactivar.web.app for den live side)
+import { evMin } from '../public/engine/clock.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { chromium } from 'playwright-core';
@@ -50,7 +51,7 @@ try {
     for (const m of L.lastRound.matches) {
       const mine = m.homeId === me.id || m.awayId === me.id;
       lines.push(`## ${m.homeName} ${m.homeGoals}-${m.awayGoals} ${m.awayName}${mine ? '  ← dit hold' : ''}`, '');
-      for (const e of m.events) lines.push(`- ${e.min}' ${e.text}${e.snapshot ? '  📍' : ''}`);
+      for (const e of m.events) lines.push(`- ${evMin(e)} ${e.text}${e.snapshot ? '  📍' : ''}`);
       const s = m.stats || {}, ps = (s.hPoss ?? 0) + (s.aPoss ?? 0) || 1, hp = Math.round((s.hPoss ?? 0) / ps * 100);   // som i Kamp-fanen (procent)
       lines.push('', `Kamptal (hjemme/ude): besiddelse ${hp} %/${100 - hp} % · skud ${s.hShots}/${s.aShots} · på mål ${s.hOnTarget}/${s.aOnTarget} · hjørner ${s.hCorners}/${s.aCorners} · gule ${s.hYellows}/${s.aYellows}`, '');
     }
@@ -60,7 +61,7 @@ try {
       spor.push(`R${L.lastRound.round} ${m.homeName}–${m.awayName}: fejl ${r.errors.length}${r.errors.length ? " (" + r.errors.slice(0, 3).join("; ") + ")" : ""} · mål med billede ${f.goals} (scorer ved feltet ${f.scorerInBox}, langskud ${f.longshotOk}/${f.longshots}, kontramål langt ude ${f.counterFar}) · forreste bag sidste forsvarer ${f.frontBehind}/${f.frontFrames} · ${(JSON.stringify(m.trace ?? {}).length / 1024).toFixed(1)} KB`);
       for (const mo of m.trace?.moments ?? []) {
         const e = m.events[mo.ev], pts = mo[mo.side], who = pts.find((q) => q[0] === (mo.scorer ?? mo.shooter));
-        lines.push(`  · spor ${m.homeName}–${m.awayName} ${e.min}' ${mo.kind}${who ? ` skytte (${who[1]},${who[2]})` : ''} bold (${mo.ball}) – ${e.text.slice(0, 90)}`);
+        lines.push(`  · spor ${m.homeName}–${m.awayName} ${evMin(e)} ${mo.kind}${who ? ` skytte (${who[1]},${who[2]})` : ''} bold (${mo.ball}) – ${e.text.slice(0, 90)}`);
       }
     }
     await tab('kamp'); await box();
