@@ -217,7 +217,7 @@ Tick hvert 3. minut (1..90).
   - **Linjedommerens flag** (ikke VAR, Spilfører): en afslutning, der ikke går ind, kan være offside (4,3 %) – intet skud på
     mål, intet hjørne, ikke i VAR-tjek.
   - **Forbi** (Spilfører: 67 % på mål – Superligaen ≈ 33–35 %): et skud, der ikke går ind, går forbi/over/på stolpen eller
-    blokeres med 62 % (blokeret 60 %, heraf hjørne 88 %).
+    blokeres med 62 % (blokeret 66 %, heraf hjørne 88 %; v3.16: 60 → 66 % for at holde hjørnesparkene efter de koblede linjer).
   - **VAR ±** i stillingen: kun kendelser, VAR ændrede – annulleret mål −1 og annulleret straffe −1 for angriberen,
     VAR-straffe +1, rødt trukket tilbage +1 og opgraderet −1 for holdet, der begik frisparket; et godkendt tjek 0 (før +1).
   - Målt (`node tools/measure-duels.mjs 1500 var`; før → efter): mål 2,79 → 2,79, skud på mål 60 % → 39 %, annullerede
@@ -367,9 +367,28 @@ bedre kan kontrollere spil motoren".
   trace-golden.test.mjs). Ca. 18 KB pr. kamp; gemmes kun i seneste runde (`lastRound`), så ældre runder og gem fra før
   v3.16 viser "Ingen afspilning".
 - **Kontrolværktøjet** `node tools/trace-invariants.mjs [N]`: regler (31 billeder, 7–11 spillere, på banen = arkets skift og
-  udvisninger, scoreren i billedet) og motor-viden: hvor målscorerne stod pr. måltype og – QC B2 – at holdets forreste står
-  bag modstanderens sidste forsvarer i ≈100 % af billederne med bolden (holdenes linjer regnes uafhængigt af hinanden;
-  en kobling ændrer modtagervalget og dermed kampene – en senere, bevidst ændring).
+  udvisninger, scoreren og spillerne i øjeblikkene, bolden ved skytten) og motor-viden: hvor målscorerne stod pr. måltype
+  og hvor ofte holdets forreste stod bag modstanderens sidste forsvarer (før de koblede linjer ≈100 %, nu 0 %).
+- **Koblede linjer (v3.16**, Spilførerens sæsongennemgang i afspilningen: angriberne stod altid langt offside, forsvarende
+  angribere ved modstanderens mål, kontramål fra midterlinjen, "langskud" fra hjørneflaget; brugeren valgte "ret linjerne
+  først"). `coupledPositions` (positions.js) oven på holdenes egen form (`livePositions`, uændret) – ét sted, som
+  modtagervalget, VAR-forreste, langskud, 📍 og sporet læser (match.js `shapes` → `seen`):
+  - holdet med bolden står på eller bag offside-linjen = modstanderens sidste markspiller (+1), undtagen løberen, der har
+    vundet sit løb (RUN_STEP frem – sluppet igennem). Udviste spilleres pladser tæller ikke som linjen;
+  - holdet uden bold rykker som en blok, så de forreste står PRESS_GAP foran boldholdets bageste (lav blok 20, mellemblok
+    10, højt gegenpres 2; angreb hele vejen, midtbane det halve, forsvar ikke – QC: et hårdt loft gjorde presset ens).
+    Ikke ved en kontra: det fangede hold står fremme;
+  - kontraens skytte løber COUNTER_RUN 24 mod målet fra sin plads; oplægsgiveren er aldrig skytten;
+  - langskud = skytten står på y ≥ LONGSHOT_Y 30 (før 24 – angriberne står nu på linjen ≈28), også efter et vundet løb
+    (før efter zonen); en kantløber skyder sjældnere selv (DECISION_ZONE.SHOT.WIDE 1 → 0,3);
+  - afslutning fra kanten efter modstanderens pres (`EDGE_BY_PRESS`: lav blok 0,75, mellem 0,5, højt 0,35 – Spilfører:
+    "lav blok lukker feltet: de skyder udefra");
+  - ét billede pr. øjeblik (QC): positionerne er afleveringens øjeblik; i afslutningens billede står skytten i feltet
+    (y ≤ SHOT_BOX_Y 12, x 30–70; langskud y 30–38, x 20–80), og i et offside-billede står den tjekkede på den side af
+    linjen, VAR-kendelsen siger (kendelsen er stadig lodtrækningen). Afsparksbilledet: begge hold i egen halvdel.
+  Målt (`… 150 maal`, `… 1500 var`, 800 kampe pr. pres; før → efter): mål 2,80 → 2,79, langskud 12 → 8 %, angreb 61 →
+  62 %, midtbane 24 → 22 %, kontra 13 → 10 %; mål imod lav blok 1,34 → 1,35, langskud imod lav blok 10 → 8 % (gegenpres
+  12 → 7 %). Hjørnespark holdt med MISS_BLOCK_SHARE 0,66.
 - **2D-afspilningen** (Kamp-fanen, kun efter slutfløjt – den levende afspilning af referatet er uændret, så intet afsløres
   før tid): taktiktavle med begge hold og bolden, ▶/⏸, ⏮ ⏭ trin, 1×/2×/4×, ⭐ Højdepunkter (kun afslutningerne); 🎬 ved en
   afslutning i referatet springer dertil. Rolige tick 0,7 s, afslutninger 2,6 s med referatets linje som undertekst

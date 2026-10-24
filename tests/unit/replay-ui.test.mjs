@@ -53,7 +53,9 @@ test('trinene: 31 grundbilleder + ét pr. afslutning i tick-orden; højdepunkter
 
 test('afspilningen: brikker for begge hold, et spring viser hændelsens tekst; et grundbillede viser stillingen FØR tickets mål', () => {
   clearReplays();
-  const { m } = game();
+  // En kamp med et mål i åbent spil (billede) – første seed fra 4
+  let m = null;
+  for (let s = 4; !m && s < 40; s++) { const g = game(s).m; if (g.trace.moments.some((x) => x.kind === 'GOAL')) m = g; }
   const el = replayEl(m, 'h');
   const goal = m.trace.moments.find((x) => x.kind === 'GOAL' && m.events[x.ev].hG + m.events[x.ev].aG >= 1);
   assert.ok(goal, 'data: et mål med billede');

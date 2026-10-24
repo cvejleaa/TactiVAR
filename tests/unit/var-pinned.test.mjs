@@ -397,10 +397,13 @@ test('linjedommerens flag: afslutningen tæller hverken som redning, på mål, f
 });
 
 // ---------- Billedet ved et VAR-tjek af en holdkammerat (varBehind) ----------
-// Angriberne (plads 9 og 10) står forrest på y 14 i angrebsform (trukket y 20 − 6); skytten (plads 5, FIN 20) trækkes til y 32 − 16 = 16:
-// to står foran ham, så han er ikke blandt de VAR_FRONT forreste, og hans forreste holdkammerat tjekkes. Skytten står kun 2 bag
-// ham – billedet rykker ham til forreste y + VAR_BEHIND (14 + 4 = 18) og bolden med; uden varBehind stod han på 16 (bolden på 20).
-test('billedet ved et VAR-tjek af en holdkammerat: skytten tegnes mindst VAR_BEHIND (4) bag den tjekkede (y 14 → 18), bolden ved ham – står han allerede længere tilbage, rykkes han ikke', () => {
+// Angriberne (plads 9 og 10) står i angrebsform på y 14 (trukket y 20 − 6); skytten (plads 5, FIN 20) trækkes til y 32 − 16 = 16.
+// v3.16 (koblede linjer): ingen står foran modstanderens sidste markspiller (stopper på 73 → linje 27 + ONSIDE_GAP 1 = 28), så
+// alle tre står på 28 – og holdets egen form (rå y 14, 14, 16) afgør rækkefølgen (frontOrder): to står foran skytten, så han er
+// ikke blandt de VAR_FRONT forreste, og hans forreste holdkammerat tjekkes. Billedet rykker skytten til den tjekkedes y +
+// VAR_BEHIND (28 + 4 = 32; før 14 + 4 = 18) og bolden med; uden varBehind stod han på 28 (bolden på 20). Står han længere tilbage
+// (52 − 16 = 36 > 32; før 48 − 16 = 32 > 18 – nu ville 32 være lig grænsen og intet bevise), rykkes han ikke.
+test('billedet ved et VAR-tjek af en holdkammerat: skytten tegnes mindst VAR_BEHIND (4) bag den tjekkede (koblet y 28 → 32), bolden ved ham – står han allerede længere tilbage (36), rykkes han ikke', () => {
   const run = (shooterY) => {
     const a = arena();
     a.H.tactics.customCoords = { ...Object.fromEntries([1, 2, 3, 4, 6, 7, 8].map((j) => [j, { x: 50, y: 95 }])), 9: { x: 5, y: 20 }, 10: { x: 95, y: 20 }, 5: { x: 40, y: shooterY } };
@@ -411,18 +414,18 @@ test('billedet ved et VAR-tjek af en holdkammerat: skytten tegnes mindst VAR_BEH
     const m = simulateMatch(a.H, a.A, stubRng({ 0.3: (n) => n < 1, [VAR_RULES.GOAL_CHECK_P]: true, [VAR_RULES.GOAL_FOUL_SHARE]: false }, 0.5));
     return { a, m, goal: evs(m, 'GOAL')[0] };
   };
-  const near = run(32), far = run(48);
+  const near = run(32), far = run(52);
   for (const r of [near, far]) {
     assert.equal(evs(r.m, 'VAR_CHECK').length, 1);
     assert.match(r.goal.text, /📺 VAR: målet står – #\d+ .+ foran #6 A\. Hansen stod ikke offside/, 'skytten (plads 5) var ikke den forreste');
     assert.equal(r.goal.snapshot.scorer, slot(r.a.H, 5).id);
   }
   const ys = (r) => Object.fromEntries(r.goal.snapshot.pts.map(([id, x, y]) => [id, [x, y]]));
-  assert.deepEqual(ys(near)[slot(near.a.H, 5).id], [40, 18]);
-  assert.deepEqual(near.goal.snapshot.ball, [40, 18], 'bolden ved skytten (x 40, ikke midten)');
-  assert.deepEqual([ys(near)[slot(near.a.H, 9).id], ys(near)[slot(near.a.H, 10).id]], [[5, 14], [95, 14]], 'den tjekkede står, hvor han stod');
-  assert.deepEqual(ys(far)[slot(far.a.H, 5).id], [40, 32], 'allerede længere tilbage end 14 + 4: uændret');
-  assert.deepEqual(far.goal.snapshot.ball, [40, 32], 'langskud: bolden ved skytten');
+  assert.deepEqual(ys(near)[slot(near.a.H, 5).id], [40, 32]);
+  assert.deepEqual(near.goal.snapshot.ball, [40, 32], 'bolden ved skytten (x 40, ikke midten)');
+  assert.deepEqual([ys(near)[slot(near.a.H, 9).id], ys(near)[slot(near.a.H, 10).id]], [[5, 28], [95, 28]], 'den tjekkede står, hvor han stod (på linjen)');
+  assert.deepEqual(ys(far)[slot(far.a.H, 5).id], [40, 36], 'allerede længere tilbage end 28 + 4: uændret');
+  assert.deepEqual(far.goal.snapshot.ball, [40, 36], 'langskud (36 ≥ LONGSHOT_Y 30): bolden ved skytten');
 });
 
 // Samme opstilling, men VAR-evnerne er forskellige: den tjekkede (plads 9/10) og skytten (plads 5) har hver sin varPulse, og
@@ -550,7 +553,7 @@ test('blokering: forsvareren (sidste forsvarer med pick = sidste element) bloker
 // ---------- Konstanterne er pinnet bogstaveligt (testene bruger dem som stub-nøgler, så en ændret værdi følger med) ----------
 test('VAR_RULES og MISS_*: værdierne og specifikationens procenter (docs/spec.md "VAR som i virkeligheden") følges ad', async () => {
   assert.deepEqual({ ...VAR_RULES }, { GOAL_CHECK_P: 0.131, GOAL_FOUL_SHARE: 0.27, OFFSIDE_FLAG_P: 0.043, PEN_CHECK_P: 0.26, PEN_OFFSIDE_SHARE: 0.31, PEN_AWARD_P: 0.0023, RED_CHECK_P: 0.53, RED_UPGRADE_P: 0.041 });
-  assert.deepEqual([MISS_P, MISS_BLOCK_SHARE, MISS_CORNER_P], [0.62, 0.6, 0.88]);
+  assert.deepEqual([MISS_P, MISS_BLOCK_SHARE, MISS_CORNER_P], [0.62, 0.66, 0.88]);
   const spec = (await import('node:fs')).readFileSync(new URL('../../docs/spec.md', import.meta.url), 'utf8');
   const sec = spec.slice(spec.indexOf('VAR som i virkeligheden (v3.15.1'));
   const pct = (v) => `${+(v * 100).toFixed(2)}`.replace('.', ',') + ' %';

@@ -108,7 +108,7 @@ function snapPitch(rows, { ev, snap }, onSnap) {
         return h('div', { class: 'mp-token' + mark, dataset: { pid: id }, style: { left: x + '%', top: y + '%' }, title: `#${e.shirtNumber} ${e.shortName}${mark === ' scorer' ? ' – målscorer' : mark === ' assist' ? ' – oplæg' : ''}` },
           h('span', { class: 'mp-val' }, id === snap.scorer ? '⚽' : id === snap.assist ? '🅰' : `#${e.shirtNumber}`), h('span', { class: 'mp-name' }, e.shortName)); }),
       h('div', { class: 'mp-ball', id: 'snap-ball', title: 'Bolden', style: { left: snap.ball[0] + '%', top: snap.ball[1] + '%' } }, '●')),
-    h('div', { class: 'muted' }, snap.attacking ? 'Spillerne rykker med i kampen: frem når I har bolden, mod boldsiden – og løb uden bold fører flere ind i feltet.' : 'Dit forsvar står efter dit pres og boldsiden.'));
+    h('div', { class: 'muted' }, snap.attacking ? 'Spillerne rykker med i kampen: frem til modstanderens offside-linje, når I har bolden, og mod boldsiden – den, der vinder sit løb uden bold, er sluppet igennem.' : 'Dit forsvar står efter dit pres og boldsiden.'));
 }
 
 // Heat map (v3.16): tætheden af hvor holdet/spilleren stod (grundbilleder og afslutninger) og hans afslutninger efter udfald.

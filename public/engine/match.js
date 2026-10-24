@@ -268,7 +268,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // tjekkede på den side af linjen, kendelsen siger (QC B2: billedet følger kendelsen; kendelsen er stadig lodtrækningen).
   function momentAt(side, atkPos, moves, spot, caught, extra = {}) {
     const def = other(side), x = seenX[side.team.id] ?? 50, kind = events.at(-1)?.type;
-    const defPos = seen[def.team.id] ?? coupledPositions(side.tactics, def.tactics, { ballX: x, caught }).opp;
+    const defPos = seen[def.team.id] ?? coupledPositions(side.tactics, def.tactics, { ballX: x, caught, ...onOf(side, def) }).opp;
     const mv = { ...(moves || {}) };
     const shooter = extra.scorer ?? extra.shooter?.id ?? null;
     const ownXY = (id) => { if (mv[id]) return mv[id]; const i = side.starters.findIndex((p) => p?.id === id); return i > 0 ? [atkPos[i].x, atkPos[i].y] : null; };
@@ -293,10 +293,10 @@ export function simulateMatch(home, away, rng, opts = {}) {
   const SHOT_MOMENTS = new Set(['SAVE', 'MISS', 'OFFSIDE_FLAG', 'VAR_CHECK', 'VAR_NO_GOAL']);
   function shotMoment(type) {
     if (setPieceNow || !shotSide || !SHOT_MOMENTS.has(type)) return;
-    momentAt(shotSide, seen[shotSide.team.id] ?? coupledPositions(shotSide.tactics, other(shotSide).tactics).ball, null, SPOT.GOAL, shotCaught, { shooter: shotBy });
+    momentAt(shotSide, seen[shotSide.team.id] ?? coupledPositions(shotSide.tactics, other(shotSide).tactics, onOf(shotSide, other(shotSide))).ball, null, SPOT.GOAL, shotCaught, { shooter: shotBy });
   }
   function baseFrame(t, att, ballX) {
-    const k = att && coupledPositions(att.tactics, other(att).tactics, { ballX });   // optageren skriver ikke i seen (QC B5)
+    const k = att && coupledPositions(att.tactics, other(att).tactics, { ballX, ...onOf(att, other(att)) });   // optageren skriver ikke i seen (QC B5)
     // Afspark: begge hold i egen halvdel (QC v3.16)
     const shape = (side) => (!att ? livePositions(side.tactics, { attacking: false, ballX: 50 }).map((q, i) => (i ? { x: q.x, y: Math.max(q.y, 52) } : q)) : side === att ? k.ball : k.opp);
     trace.frames.push({ t, poss: att ? (att === H ? 'h' : 'a') : null, ball: att ? common(att, ballX, 50) : [50, 50], h: ptsOf(H, shape(H)), a: ptsOf(A, shape(A)) });
@@ -337,14 +337,15 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // Begge holds positioner i øjeblikket (v3.16, koblede linjer – positions.js coupledPositions): ét sted, som modtagervalget,
   // VAR-forreste, langskud, 📍 og sporet læser (seen/seenX). ctx: attacking (side har bolden), caught (side har lige vundet
   // bolden – kontra, står i forsvarsform), ballX (side's egne koordinater), runner/step (løberen, der er sluppet igennem).
+  const onOf = (b, o) => ({ ballOn: b.starters.map(Boolean), oppOn: o.starters.map(Boolean) });   // tomme pladser (udvist) tæller ikke
   function shapes(side, ctx = {}) {
     const x = ctx.ballX ?? 50, o = other(side);
     if (ctx.attacking === false && !ctx.caught) {   // side forsvarer – modstanderen har bolden
-      const r = coupledPositions(o.tactics, side.tactics, { ballX: 100 - x });
+      const r = coupledPositions(o.tactics, side.tactics, { ballX: 100 - x, ...onOf(o, side) });
       seen[o.team.id] = r.ball; seenX[o.team.id] = 100 - x; seen[side.team.id] = r.opp; seenX[side.team.id] = x;
       return r.opp;
     }
-    const r = coupledPositions(side.tactics, o.tactics, { ballX: x, caught: !!ctx.caught, runner: ctx.runner ?? -1, step: ctx.step });
+    const r = coupledPositions(side.tactics, o.tactics, { ballX: x, caught: !!ctx.caught, runner: ctx.runner ?? -1, step: ctx.step, ...onOf(side, o) });
     seen[side.team.id] = r.ball; seenX[side.team.id] = x; seen[o.team.id] = r.opp; seenX[o.team.id] = 100 - x;
     return r.ball;
   }

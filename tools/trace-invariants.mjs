@@ -86,5 +86,5 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   console.log(`Fejl i sporet: ${r.errors.length}${r.errors.length ? '\n  ' + r.errors.slice(0, 20).join('\n  ') : ''}`);
   console.log(`Størrelse: ${(r.bytesPerMatch / 1024).toFixed(1)} KB pr. kamp.`);
   console.log(`Mål med billede: ${s.goals}. Scoreren i/ved feltet (ikke langskud): ${pc(s.scorerInBox, s.goals - s.longshots)}. Langskud fra skudafstand (y ${LONGSHOT_Y}–${LONGSHOT_FAR}): ${pc(s.longshotOk, s.longshots)} af ${s.longshots}. Kontramål med scoreren over y 40: ${s.counterFar}.`);
-  console.log(`Holdets forreste står bag modstanderens sidste forsvarer i ${pc(s.frontBehind, s.frontFrames)} af billederne med bolden (QC B2: linjerne regnes uafhængigt).`);
+  console.log(`Holdets forreste står bag modstanderens sidste forsvarer i ${pc(s.frontBehind, s.frontFrames)} af billederne med bolden (v3.16 koblede linjer: skal være 0 %).`);
 }
