@@ -38,7 +38,7 @@ jobs:
       - uses: actions/setup-node@v4
         if: env.HAS_KEY == 'true'
         with:
-          node-version: 20
+          node-version: 22   # som CI og engines (Release Manager v3.16)
 
       - name: Skriv servicekonto-nøgle
         if: env.HAS_KEY == 'true'
