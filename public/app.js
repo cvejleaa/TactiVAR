@@ -15,7 +15,7 @@ import { renderStandings } from './ui/standings.js';
 import { playRound, commitRound, pairRound, sortStandings } from './engine/season.js';
 import { buildColumn } from './engine/column.js';
 import { gen } from './engine/clues.js';
-import { seasonRoundOf, SEASON_ROUNDS } from './engine/schedule.js';
+import { seasonRoundOf, roundsLeftOf } from './engine/schedule.js';
 import { renderLastRound, renderSchedule } from './ui/rounds.js';
 import { renderMatchCenter, renderGazette } from './ui/matchcenter.js';
 import { replayJump, clearReplays } from './ui/replay.js';
@@ -114,7 +114,7 @@ function buildColumnNow() {
   let next = [];
   try { next = pairRound(L).map(([hI, aI]) => ({ homeId: L.teams[hI].id, homeName: L.teams[hI].name, awayId: L.teams[aI].id, awayName: L.teams[aI].name })); } catch { next = []; }
   return buildColumn({ matches: lr.matches, gazette: lr.gazette, history, table, next, viewerTeamId: myTeam().id, round: lr.round, newSeason: !!end, champion: end?.champion ?? null,
-    roundsLeft: end ? 0 : SEASON_ROUNDS - seasonRoundOf(L, lr.round) });
+    roundsLeft: roundsLeftOf(L, lr.round, !!end) });
 }
 
 function change(fn) { fn(); act.syncActivePreset(myTeam(), game.ui.activePresetIndex); persist(); render(); }

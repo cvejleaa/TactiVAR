@@ -7,6 +7,7 @@ import { createRng } from '../../public/engine/rng.js';
 import { createLeague } from '../../public/engine/generator.js';
 import { simulateMatch } from '../../public/engine/match.js';
 import { buildColumn } from '../../public/engine/column.js';
+import { roundsLeftOf } from '../../public/engine/schedule.js';
 
 const play = (s, setup = () => {}) => {
   const L = createLeague(createRng(s * 97)), me = L.teams.find((t) => !t.isBot), opp = L.teams[(s % 7) + 1];
@@ -34,20 +35,26 @@ test('VAR tjekker det røde kort: står det, siger udvisningen det – bliver de
   assert.ok(confirmed >= 5 && downgraded >= 3 && upgraded >= 1 && plain >= 20, `data: ${confirmed} bekræftet, ${downgraded} nedgraderet, ${upgraded} opgraderet, ${plain} uden tjek`);
 });
 
-test('Hvis-Så-formationsskift med færre mand: "… til 4-3-3 med ti mand." – med fuldt hold intet tal', () => {
-  const RX = /^📋 \[.+ • Hvis-Så\] Holdet skifter fra .+ til 4-3-3( med (ti|ni|otte) mand)?\.$/;
+// Begge grene af reglen: ny formation og en af holdets egne planer (Plan B) – hver med færre og fuldt hold.
+const shiftCase = (rule, RX) => {
   let short = 0, full = 0;
   for (let s = 1; s <= 400 && short < 5; s++) {
-    const ev = play(s, (me) => { me.tactics.conditionalRules = [{ ruleId: 1, condition: 'ANY', minuteTrigger: 72, margin: 1, action: 'FORMATION', newFormation: '4-3-3', newPlan: null, slotRemapping: null }]; }).events;
+    const ev = play(s, (me) => { me.tactics.conditionalRules = [{ ruleId: 1, condition: 'ANY', minuteTrigger: 72, margin: 1, slotRemapping: null, ...rule }]; }).events;
     const t = ev.find((e) => e.type === 'TRIGGER' && e.text.startsWith('📋'));
     if (!t) continue;
     const myName = t.text.match(/^📋 \[(.+) • Hvis-Så\]/)[1];
     const reds = ev.slice(0, ev.indexOf(t)).filter((e) => e.type === 'RED' && e.text.includes(`[${myName}]`)).length;   // RED = udvisningen (sendOff); VAR_RED er tjekket
     assert.match(t.text, RX);
-    if (reds) { short++; assert.ok(t.text.includes(` med ${{ 1: 'ti', 2: 'ni', 3: 'otte' }[reds]} mand.`), `${reds} røde: ${t.text}`); }
+    if (reds) { short++; assert.ok(t.text.endsWith(` med ${{ 1: 'ti', 2: 'ni', 3: 'otte' }[reds]} mand.`), `${reds} røde: ${t.text}`); }
     else { full++; assert.ok(!t.text.includes(' mand'), t.text); }
   }
   assert.ok(short >= 5 && full >= 50, `data: ${short} med færre mand, ${full} med fuldt hold`);
+};
+test('Hvis-Så-formationsskift med færre mand: "… til 4-3-3 med ti mand." – med fuldt hold intet tal', () => {
+  shiftCase({ action: 'FORMATION', newFormation: '4-3-3', newPlan: null }, /^📋 \[.+ • Hvis-Så\] Holdet skifter fra .+ til 4-3-3( med (ti|ni|otte) mand)?\.$/);
+});
+test('Hvis-Så-planskift med færre mand: "… til Plan B (4-4-2, … / …) med ti mand." – med fuldt hold intet tal', () => {
+  shiftCase({ action: 'FORMATION', newFormation: '4-4-2', newPlan: 1 }, /^📋 \[.+ • Hvis-Så\] Holdet skifter fra .+ til Plan B \(.+ \/ .+\)( med (ti|ni|otte) mand)?\.$/);
 });
 
 // ---------- Klummen ----------
@@ -78,6 +85,40 @@ test('klummen: "mester før tid" er overskrift kun i runden, titlen blev afgjort
   assert.notEqual(title([res('C', 'A', 1, 0), res('B', 'D', 2, 0)], [T('A', 'Aa', 30), T('B', 'Bb', 23), T('C', 'Cc', 3), T('D', 'Dd', 0)]), 'Aa er mester før tid');
   // Før runden var nr. 3 tættest: A 27, C 21 (tabte nu), B 20 → 6 ≤ 9: afgjort NU (alle forfølgere tæller, ikke kun nr. 2)
   assert.equal(title([res('A', 'D', 3, 0), res('B', 'C', 3, 0)], [T('A', 'Aa', 30), T('B', 'Bb', 23), T('C', 'Cc', 21), T('D', 'Dd', 0)]), 'Aa er mester før tid');
+});
+
+test('klummen: grænsen for "afgjort allerede" er forspring > 3·(resterende + 1) FØR runden – og pointene før regnes for hjemme/ude, sejr/uafgjort', () => {
+  // roundsLeft 2 → før runden var der 3 tilbage: grænse 9. Tabellen sorteret; C og D er fyld.
+  const title = (last, table) => col({ table, history: HIST(last), roundsLeft: 2 }).title;
+  const MEST = 'Aa er mester før tid';
+  // A vandt hjemme (27 før), B tabte ude (18 før): 9 → afgjort NU
+  assert.equal(title([res('A', 'C', 1, 0), res('D', 'B', 1, 0)], [T('A', 'Aa', 30), T('B', 'Bb', 18), T('D', 'Dd', 3), T('C', 'Cc', 0)]), MEST, 'før-forspring præcis 9');
+  // B 17 før: 10 → afgjort allerede
+  assert.notEqual(title([res('A', 'C', 1, 0), res('D', 'B', 1, 0)], [T('A', 'Aa', 30), T('B', 'Bb', 17), T('D', 'Dd', 3), T('C', 'Cc', 0)]), MEST, 'før-forspring præcis 10');
+  // B uafgjort hjemme (18 nu → 17 før): 27 − 17 = 10 → allerede (med 0 point for uafgjort: 9 → NU)
+  assert.notEqual(title([res('A', 'C', 1, 0), res('B', 'D', 1, 1)], [T('A', 'Aa', 30), T('B', 'Bb', 18), T('D', 'Dd', 1), T('C', 'Cc', 0)]), MEST, 'hjemme uafgjort = 1 point');
+  // A uafgjort ude (30 nu → 29 før), B tabte (20 før): 9 → NU (med 0 point: 10 → allerede)
+  assert.equal(title([res('C', 'A', 1, 1), res('D', 'B', 1, 0)], [T('A', 'Aa', 30), T('B', 'Bb', 20), T('D', 'Dd', 3), T('C', 'Cc', 1)]), MEST, 'ude uafgjort = 1 point');
+  // A vandt ude (27 før), B tabte (18 før): 9 → NU (med 0 point for udesejr: 12 → allerede)
+  assert.equal(title([res('C', 'A', 0, 1), res('D', 'B', 1, 0)], [T('A', 'Aa', 30), T('B', 'Bb', 18), T('D', 'Dd', 3), T('C', 'Cc', 0)]), MEST, 'udesejr = 3 point');
+  // Nr. 2 lå 10 bag før runden (B vandt: 22 → 19), men nr. 3 kun 8 (C tabte: 21) – A uafgjort ude (29 før): afgjort NU
+  assert.equal(title([res('D', 'A', 1, 1), res('B', 'C', 3, 0)], [T('A', 'Aa', 30), T('B', 'Bb', 22), T('C', 'Cc', 21), T('D', 'Dd', 1)]), MEST, 'alle forfølgere tæller, ikke kun nr. 2');
+});
+
+test('klummen: "mester før tid" går forud for rundens overraskelse (90) som overskrift', () => {
+  const gazette = { playerOfTheRound: null, goalOfTheRound: null, defensiveAction: null, upset: { winnerPos: 7, winner: 'Dd', loserPos: 3, loser: 'Cc', score: '1-0' } };
+  const c = col({ gazette, table: [T('A', 'Aa', 30), T('B', 'Bb', 18), T('C', 'Cc', 10), T('D', 'Dd', 3)], history: HIST([res('A', 'B', 1, 0), res('D', 'C', 1, 0)]), roundsLeft: 2 });
+  assert.equal(c.title, 'Aa er mester før tid');
+  assert.ok(paras(c).some((t) => t.startsWith('Rundens overraskelse')), 'kontrol: overraskelsen findes');
+});
+
+test('roundsLeftOf (app.js → klummen): 14 − sæsonrunden; 0 efter sæsonslut', () => {
+  const L = { seasonStartRound: 15 };
+  assert.equal(roundsLeftOf(L, 15, false), 13);
+  assert.equal(roundsLeftOf(L, 26, false), 2);
+  assert.equal(roundsLeftOf(L, 27, false), 1);
+  assert.equal(roundsLeftOf(L, 28, true), 0);
+  assert.equal(roundsLeftOf(L, 20, true), 0, 'sæsonslut vinder altid');
 });
 
 test('klummen: rundens spiller – "kampens spiller" står først, når han var det; ellers som før', () => {
