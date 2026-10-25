@@ -254,6 +254,9 @@ const endOf = (s, full) => ({ formation: s.tactics.baseFormation, starters: s.st
 
 // Opbygning og pres i pause- og fuldtidsanalysen (v3.16.7, Spilfører: "dit pres vandt bolden 2 af 2" var to offside-fælder): fælden
 // er med i pressets tal (presset stoppede opbygningen), men står for sig – og din egen opbygnings offsides ligeså.
+// Skifte-notens slutning, når loftet (FATIGUE_SUBS_AT_ONCE) er nået (v3.17.0): block = årsagen til, at der ikke kommer flere skift
+// (subBlock for næste tick, eller kampens slutning), ellers venter han med left skift tilbage – intet løfte om "næste skift".
+export const waitText = (block, left) => (block ? `og ${block}` : `han må vente til en senere skifte-pause (${left} skift tilbage)`);
 export function duelText(d, o, half = false) {
   const off = o.trapWon, trap = d.trapWon;
   const press = trap ? `dit pres ${half ? 'har stoppet' : 'stoppede'} opbygningen ${d.pressWon} af ${pl(d.press, 'gang', 'gange')} (${pl(d.pressWon - trap, 'erobring', 'erobringer')}, ${trap} på offside).`
@@ -1104,10 +1107,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
     }
     // Intet løfte om "næste skift" (v3.17.0, Spilfører: han kom aldrig ud – trættere fik de sidste skift, eller pauserne var
     // brugt): en senere pause med antallet tilbage, eller årsagen til, at der ikke kommer flere
-    const after = () => {
-      const why = min + 3 < 90 ? subBlock(side, min + 3) : 'kampen er snart slut', left = MATCH_RULES.maxSubs - side.subsUsed;
-      return why ? `og ${why}` : `han må vente til en senere skifte-pause (${left} skift tilbage)`;
-    };
+    const after = () => waitText(min + 3 < 90 ? subBlock(side, min + 3) : 'kampen er snart slut', MATCH_RULES.maxSubs - side.subsUsed);
     for (const c of waiting) note(c.p, `højst ${FATIGUE_SUBS_AT_ONCE} træthedsskift ad gangen – ${after()}`, 'loft');
     if (!done) return;
     for (const c of onPitch().filter((x) => x.f >= limit && x.f < limit + SUBS_LIMIT.near).sort((a, b) => a.f - b.f)) { if (done >= cap) break; if (swap(c, true)) done++; }

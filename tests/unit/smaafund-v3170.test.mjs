@@ -54,3 +54,26 @@ test('Hvis-Så til samme formation (bot): intet skift, ingen linje og ingen omby
   assert.ok(fired >= 20, `data: ${fired} skift fra 3-4-3 til 4-4-2`);
   assert.equal(same, 0);
 });
+
+test('skifte-noten ved loftet: årsagen, når der ikke kommer flere skift – ellers en senere pause med antallet tilbage', async () => {
+  const { waitText } = await import('../../public/engine/match.js');
+  assert.equal(waitText('alle 3 skifte-pauser er brugt', 2), 'og alle 3 skifte-pauser er brugt');
+  assert.equal(waitText('kampen er snart slut', 1), 'og kampen er snart slut');
+  assert.equal(waitText(null, 2), 'han må vente til en senere skifte-pause (2 skift tilbage)');
+});
+
+test('Hvis-Så til samme formation for DIT hold med trukne positioner: skiftet sker stadig (din regel nulstiller dine positioner) – uden trukne positioner sker det ikke', async () => {
+  const { createRng } = await import('../../public/engine/rng.js');
+  const { createLeague } = await import('../../public/engine/generator.js');
+  const { simulateMatch } = await import('../../public/engine/match.js');
+  const rule = [{ ruleId: 1, minuteTrigger: 3, condition: 'ANY', margin: 1, newFormation: '4-4-2', newPlan: null, slotRemapping: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], action: 'SHIFT', subOut: null, subIn: null }];
+  const run = (coords) => {
+    const L = createLeague(createRng(3)), me = L.teams[0];
+    assert.ok(!me.isBot && me.tactics.baseFormation === '4-4-2', 'data: dit hold i 4-4-2');
+    me.tactics.conditionalRules = structuredClone(rule); me.tactics.customCoords = coords;
+    const m = simulateMatch(me, L.teams[1], createRng(5));
+    return m.events.filter((e) => e.type === 'TRIGGER' && e.isHome).length;
+  };
+  assert.equal(run({ 6: { x: 40, y: 40 } }), 1, 'med trukne positioner: skiftet (og nulstillingen) sker');
+  assert.equal(run({}), 0, 'uden: intet skift til samme formation');
+});
