@@ -333,14 +333,21 @@ test('heat-prikkens titel er hændelsens minut (90+x – ikke tick\'ets start el
 });
 
 test('"på banen i X min" i heat-noten følger ind–ud-kolonnen (urets minutter)', () => {
-  for (const [s, name, col, x] of [[11, 'A. Jørgensen', "77'–90'", 14], [37, 'S. Møller', "47'–90'", 44], [8, 'A. Jakobsen', "14'–90'", 77]]) {
-    const m = game(s), e = m.ratings.home.find((r) => r.shortName === name);
-    assert.ok(e, `data: ${name}`);
-    const el = render(m, m.homeId, { heat: { playerId: e.playerId } });
-    const row = all(el, (r) => r.tag === 'tr').find((r) => r.children[0].textContent.startsWith(`#${e.shirtNumber} ${e.shortName}`));
-    assert.equal(row.children[1].textContent, col);
-    assert.match(byId(el, 'heat-note')[0].textContent, new RegExp(`han var på banen i ${x} min `), `${name}: ${col} → ${x}`);
+  // Datadrevet (v3.16.7 – før tre faste seeds, som hver motorændring flyttede): indskiftere i de første kampe; "A'–B'" → B − A + 1
+  let n = 0;
+  for (let s = 1; s <= 60 && n < 6; s++) {
+    const m = game(s);
+    for (const e of m.ratings.home.filter((r) => r.minIn > 1)) {
+      const el = render(m, m.homeId, { heat: { playerId: e.playerId } });
+      const row = all(el, (r) => r.tag === 'tr').find((r) => r.children[0].textContent.startsWith(`#${e.shirtNumber} ${e.shortName}`));
+      const mm = row?.children[1].textContent.match(/^(\d+)'–(\d+)'$/);
+      if (!mm) continue;
+      const x = +mm[2] - +mm[1] + 1;
+      assert.match(byId(el, 'heat-note')[0].textContent, new RegExp(`han var på banen i ${x} min `), `${e.shortName}: ${mm[0]} → ${x}`);
+      n++;
+    }
   }
+  assert.ok(n >= 6, `data: ${n} indskiftere`);
 });
 
 // ---------- Klummen: sent mål efter uret ----------

@@ -484,7 +484,8 @@ export function simulateMatch(home, away, rng, opts = {}) {
     const raw = livePositions(side.tactics, { attacking: true, ballX: seenX[side.team.id] ?? 50 });
     return side.starters.map((p, i) => ({ p, i })).filter(({ p, i }) => i > 0 && p).sort((a, b) => (pos[a.i].y - pos[b.i].y) || (raw[a.i].y - raw[b.i].y) || (a.i - b.i));
   }
-  function frontOf(side) { return frontOrder(side)?.[0]?.p ?? null; }
+  // exclude: oplægsgiveren – han spillede bolden og kan ikke være offside i sit eget oplæg (v3.16.7, Spilfører)
+  function frontOf(side, exclude = null) { return frontOrder(side)?.find((x) => x.p !== exclude)?.p ?? null; }
   function isFront(side, p) {
     const order = frontOrder(side);
     if (!order) return true;
@@ -496,8 +497,8 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // Offside-tjekket (VAR ved mål og straffe, linjedommerens flag): den forreste af VAR_FRONT tjekkes – står skytten bagved,
   // hans forreste holdkammerat (brugeren v3.14.1). Duellen fra før v3.15.1: løbets timing (varPulse) og modkunnen mod
   // fælden mod forsvarerens placering – en lodtrækning, så én kendelse ikke afslører spillerens trin (QC).
-  function offsideCheck(att, shooter, defender) {
-    const off = isFront(att, shooter) ? shooter : frontOf(att) ?? shooter;
+  function offsideCheck(att, shooter, defender, helper = null) {
+    const off = isFront(att, shooter) ? shooter : frontOf(att, helper) ?? shooter;
     const trapBonus = (off.counterTactics?.vsTrapLong ?? 15) * 0.045; // v3.6: samme effekt (≈0,8) på den lavere skala
     const onside = off.varProfile.varPulse + trapBonus + rng.next() * 6 > defender.skills.positioning + rng.next() * 6;
     return { off, other: off.id !== shooter.id, onside };
@@ -508,13 +509,14 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // tilbage. Returnerer null (annulleret) eller tillægget til målteksten ('' uden synligt tjek).
   // VAR ± i stillingen (season.js): kun kendelser, VAR ændrede – et godkendt mål giver 0 (før +1).
   // noOffside: bolden blev spillet tilbage (cutback) – modtageren kan ikke være offside, så kun frisparket tjekkes (Spilfører).
-  function varGoalCheck(att, def, dR, min, shooter, defender = null, noOffside = false) {
+  // helper: oplægsgiveren (tjekkes ikke for offside i sit eget oplæg)
+  function varGoalCheck(att, def, dR, min, shooter, defender = null, noOffside = false, helper = null) {
     varBehind = null;
     if (!rng.chance(VAR_RULES.GOAL_CHECK_P)) return '';
     defender ??= rng.pick(dR.defs) ?? dR.gk;
     st[k(att, 'VarChecks')]++;
     const foul = rng.chance(VAR_RULES.GOAL_FOUL_SHARE) || noOffside;
-    const o = foul ? { off: shooter, other: false, onside: rng.next() * 30 > shooter.varProfile.cynicism + 4 } : offsideCheck(att, shooter, defender);
+    const o = foul ? { off: shooter, other: false, onside: rng.next() * 30 > shooter.varProfile.cynicism + 4 } : offsideCheck(att, shooter, defender, helper);
     const what = foul ? `skubbede ${tag(shooter)} ${tag(defender)} i opspillet` : `stod ${tag(o.off)} offside`;
     momentCheck = foul ? null : { id: o.off.id, offside: !o.onside };
     if (att === H) hG++; else aG++;
@@ -582,7 +584,9 @@ export function simulateMatch(home, away, rng, opts = {}) {
     const fbSlot = fbSlots.filter((i) => runsOf(i) > 0).sort((x, y) => runsOf(y) - runsOf(x))[0] ?? -1;
     const why = fbSlot > 0 ? ` Din ${coordsOf(lose.tactics)[fbSlot].r} ${tag(lose.starters[fbSlot])} er højt oppe efter sit løb.` : '';
     if (shooter.skills.finishing * ff(shooter) + rng.next() * 8 + COUNTER_FINISH_BONUS > gk.skills.goalkeeping * ff(gk) + rng.next() * 8) {
-      const varOk = varGoalCheck(win, lose, lR, min, shooter);
+      // Oplægsgiveren vælges FØR VAR (v3.16.7): han spillede bolden og tjekkes ikke for offside
+      const helper = helperFor(wR, shooter, rng.pick(wR.mids.filter((p) => p !== shooter)));
+      const varOk = varGoalCheck(win, lose, lR, min, shooter, null, false, helper);
       if (varOk === null) return false;
       if (win === H) hG++; else aG++;
       st[k(win, 'OnTarget')]++;
@@ -590,7 +594,6 @@ export function simulateMatch(home, away, rng, opts = {}) {
       sheet.adjust(shooter.id, 1.25); sheet.bump(shooter.id, 'goals'); sheet.adjust(gk.id, -0.3);
       st[k(win, 'CounterGoals')]++;
       // Oplægsgiveren, teksten nævner, får også assisten (v3.10 – ellers modsagde statistikken referatet).
-      const helper = helperFor(wR, shooter, rng.pick(wR.mids.filter((p) => p !== shooter)));
       sheet.adjust(helper.id, 0.4); sheet.bump(helper.id, 'assists');
       const desc = describeGoal('COUNTER', tag(shooter), tag(helper), min, rng, goalTexts);
       goalsPool.push({ scorer: tag(shooter), teamName: win.team.name, match: `${home.name} - ${away.name}`, min, kind: 'COUNTER', spectacle: goalSpectacle('COUNTER', { pace: shooter.skills.pace }, min, rng), desc });
@@ -653,7 +656,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
     sheet.adjust(shooter.id, 0.4); sheet.bump(shooter.id, 'aerialWins');
     if (shooter.aerialPower * ff(shooter) + rng.next() * 8 > gk.skills.goalkeeping * ff(gk) + rng.next() * 8 + HEADER_GK_EDGE) {
       // VAR tjekker også hovedstød på dødbolde – dér tjekker det i virkeligheden oftest (QC).
-      const varOk = varGoalCheck(att, def, dR, min, shooter, aDef);
+      const varOk = varGoalCheck(att, def, dR, min, shooter, aDef, setPiece === 'hjørnespark', assister);   // intet offside direkte fra et hjørnespark (IFAB Law 11)
       if (varOk === null) return 'disallowed';
       goalFor(att); if (!setPiece) log.headerGoals++;
       sheet.adjust(shooter.id, 0.95); sheet.bump(shooter.id, 'goals');
@@ -694,7 +697,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
     helper = helperFor(cR, finisher, helper);
     const gk = dR.gk, fs = finisher.skills;
     if (fs.finishing * ff(finisher) + rng.next() * 8 + bonus > gk.skills.goalkeeping * ff(gk) + rng.next() * 8 + KEEPER_EDGE) {
-      const varOk = varGoalCheck(att, def, dR, min, finisher, null, kind === 'CUTBACK');
+      const varOk = varGoalCheck(att, def, dR, min, finisher, null, kind === 'CUTBACK', helper);
       if (varOk === null) return false;
       goalFor(att);
       const kd = typeof kind === 'function' ? kind() : kind, solo = kd === 'LONGSHOT' || kd === 'DRIBBLE';
@@ -725,8 +728,8 @@ export function simulateMatch(home, away, rng, opts = {}) {
     }
     // Linjedommerens flag (v3.15.1, Spilfører: offside uden mål er ikke VAR): afslutningen tæller ikke – ingen redning, intet
     // hjørne. Ikke et VAR-tjek (VarChecks) og intet i VAR ± – kun offside-duellen.
-    if (rng.chance(VAR_RULES.OFFSIDE_FLAG_P)) {
-      const flagDef = rng.pick(dR.defs) ?? gk, o = offsideCheck(att, finisher, flagDef);
+    if (kind !== 'CUTBACK' && rng.chance(VAR_RULES.OFFSIDE_FLAG_P)) {   // bolden er spillet tilbage – ingen offside (v3.16.7)
+      const flagDef = rng.pick(dR.defs) ?? gk, o = offsideCheck(att, finisher, flagDef, helper);
       if (!o.onside) {
         momentCheck = { id: o.off.id, offside: true };
         sheet.adjust(o.off.id, -0.1); sheet.adjust(flagDef.id, 0.2);

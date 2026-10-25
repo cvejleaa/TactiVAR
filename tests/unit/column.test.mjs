@@ -126,7 +126,7 @@ test('"Din kamp" og fuldtids-analysen bygger på samme rapport: opbygningstallet
     const r = m.ownReports[input.viewerTeamId], ft = m.events.find((e) => e.type === 'FULLTIME').text;
     assert.ok(ft.includes(`Din opbygning kom igennem ${r.buildWon} af ${r.build} gange`), ft);
     const mine = buildColumn(input).sections[0].paras.join(' ');
-    if (/opbygning|presset|kom I igennem/i.test(mine) && / af \d+ /.test(mine)) {
+    if (/Din opbygning|opbygninger kom forbi|kom I igennem|pres lukkede/.test(mine) && / af \d+ /.test(mine)) {   // opbygningens sætning (ikke "Dit pres stoppede opbygningen" – v3.16.7)
       seen++;
       assert.ok(mine.includes(`${r.buildWon} af ${r.build}`) || mine.includes(`${r.build - r.buildWon} af ${r.build}`), `${mine} | rapport ${r.buildWon}/${r.build}`);
     }

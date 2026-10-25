@@ -367,10 +367,11 @@ test('VAR-annullering efter en udvisning: udeholdets udviste back (rødt i 3. mi
 // angriberen på plads 9 (15 − 6 = 9) – i forsvarsform (24 mod 15) ville angriberen stå foran. Sammenpresningen bevarer rækkefølgen, så de to
 // står kun lige, fordi afrundingen samler dem: [8, 40] til [28, 40] giver 28 og 28,4 → 28. Skytten (plads 10, rå 36 − 6 = 30 → 36,3 → 36)
 // står bag begge og er nr. 3 → ikke blandt de to forreste: VAR tjekker den forreste, midtbanespilleren.
-test('VAR: når to står på linjen, afgør holdets angrebsform hvem der er forrest (midtbanen rå 8 før angriberen rå 9) – dræber tie-break efter forsvarsformen', () => {
+test('VAR: når to står på linjen, afgør holdets angrebsform hvem der er forrest (midtbanen før angriberen rå 9) – dræber tie-break efter forsvarsformen', () => {
+  // v3.16.7: oplægsgiveren (første midtbane, plads 5) tjekkes ikke for offside – de to på linjen er derfor plads 6 og 9
   const tg = (p) => `#${p.shirtNumber} ${p.shortName}`;
   const a = arena(); slot(a.A, 0).skills.goalkeeping = 1;
-  a.H.tactics.customCoords = { ...Object.fromEntries([1, 2, 3, 4, 6, 7, 8].map((j) => [j, { x: 50, y: 95 }])), 5: { x: 15, y: 24 }, 9: { x: 85, y: 15 }, 10: { x: 50, y: 36 } };
+  a.H.tactics.customCoords = { ...Object.fromEntries([1, 2, 3, 4, 5, 7, 8].map((j) => [j, { x: 50, y: 95 }])), 6: { x: 15, y: 24 }, 9: { x: 85, y: 15 }, 10: { x: 50, y: 36 } };
   for (const p of a.A.squad) p.skills.positioning = 20;
   for (const p of a.H.squad) p.skills.finishing = 1;
   slot(a.H, 10).skills.finishing = 20;
@@ -379,8 +380,8 @@ test('VAR: når to står på linjen, afgør holdets angrebsform hvem der er forr
   const goal = m.events.find((e) => e.type === 'GOAL');
   assert.equal(m.goalsPool[0].scorer, tg(slot(a.H, 10)));
   const y = Object.fromEntries(goal.snapshot.pts.map(([id, , yy]) => [id, yy]));
-  assert.deepEqual([y[slot(a.H, 5).id], y[slot(a.H, 9).id]], [28, 28], 'begge på linjen');
-  assert.match(goal.text, new RegExp(`📺 VAR: målet står – ${tg(slot(a.H, 5))} foran ${tg(slot(a.H, 10))} stod ikke offside`));
+  assert.deepEqual([y[slot(a.H, 6).id], y[slot(a.H, 9).id]], [28, 28], 'begge på linjen');
+  assert.match(goal.text, new RegExp(`📺 VAR: målet står – ${tg(slot(a.H, 6))} foran ${tg(slot(a.H, 10))} stod ikke offside`));
 });
 
 // ---------- VAR: frispark (skubbet) er ingen offside – skytten bliver, hvor formen satte ham ----------
