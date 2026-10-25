@@ -40,7 +40,7 @@ test('"Det kostede:" kun med årsag – ellers "Ét af målene imod kom på kont
   const R = (o) => ({ build: 0, buildWon: 0, press: 0, pressWon: 0, crosses: 0, crossesWon: 0, cutbacks: 0, cutbacksBlocked: 0, cutbackGoals: 0, runGoals: 0, counterGoalsAgainst: 0,
     start: { formation: '4-4-2', phases: { phase1_buildUp: { passingStyle: 'SHORT' } } }, end: { formation: '4-4-2', phases: { phase1_buildUp: { passingStyle: 'SHORT', offBallRuns: 'NORMAL' } } }, ...o });
   const v = (r, round = 5) => buildColumn({ matches: [M({ ownReports: { h1: r } })], viewerTeamId: 'h1', round }).sections[0].paras.slice(1);
-  assert.deepEqual(v(R({ counterGoalsAgainst: 1 })), ['Ét af målene imod kom på kontra.']);
+  assert.deepEqual(v(R({ counterGoalsAgainst: 1 })), ['Modstanderen slog én gang til på kontra.']);
   assert.ok(v(R({ counterGoalsAgainst: 1 })).every((t) => !t.includes('Det kostede')));
   // "fandt ingen vej": variant 2 (pickBy) – find runden, der vælger den, og sammenlign 0 og 3 gennembrud af 8
   const variant2 = [...Array(40).keys()].find((rd) => v(R({ build: 8, buildWon: 3 }), rd)[0]?.startsWith('Kun 3 af 8'));

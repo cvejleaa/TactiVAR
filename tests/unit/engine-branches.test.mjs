@@ -2101,10 +2101,10 @@ test('hovedstødsspiller blandt de tre bedste i luften (stopperne går med op): 
   assert.equal(pool[0].scorer, tg(slot(a.H, 7)));    // top-3 = 20, 19, 18 → sidste = plads 7 (18)
 });
 // v3.12.1 (dokumentets dødboldandel 25–30 %): SETPIECE_DEF_EDGE 4,5 → 3,75, CROSS_EDGE 1 → 2. Med 4,5 var 13,8 ikke mål.
-test('frisparksindlæg: forsvaret får SETPIECE_DEF_EDGE 3,75 (i åbent spil i stedet angriberen CROSS_EDGE 2): 13,7 slår ikke dødbolden men slår åbent indlæg; 13,8 er mål', () => {
+test('frisparksindlæg: forsvaret får SETPIECE_DEF_EDGE 4,1 (v3.17.0; før 3,75 – i åbent spil i stedet angriberen CROSS_EDGE 2): 14,05 slår ikke dødbolden men 13,7 slår åbent indlæg; 14,15 er mål', () => {
   const air = (v) => (a) => { for (const p of a.H.squad) p.aerialPower = v; };
-  assert.equal(spx({ script: { 0.061: true }, tweak: air(13.7) }).m.homeGoals, 0);    // 16,7 < 10 + 3 + 3,75
-  assert.equal(spx({ script: { 0.061: true }, tweak: air(13.8) }).m.homeGoals, 30);   // 16,8 > 16,75; hovedstød 17,8 > 10 + 4
+  assert.equal(spx({ script: { 0.061: true }, tweak: air(14.05) }).m.homeGoals, 0);    // 17,05 < 10 + 3 + 4,1 (med 3,75 var det mål)
+  assert.equal(spx({ script: { 0.061: true }, tweak: air(14.15) }).m.homeGoals, 30);   // 17,15 > 17,1; hovedstød 18,15 > 10 + 4
   const open = spx({ script: { 0.3: true, 0.52: true }, home: { p1: { attackFocus: 'HIGH_CROSSES' } }, tweak: air(13.7) });
   assert.equal(open.m.homeGoals, 30, 'åbent spil: tærskel 8 (CROSS_EDGE 2, ingen dødboldfordel)');
 });

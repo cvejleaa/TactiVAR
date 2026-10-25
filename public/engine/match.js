@@ -66,7 +66,7 @@ export const KEEPER_EDGE = 0.3;
 // 4,3 % (37 % direkte skud, ellers indlæg); hjørnespark efter redning/clearet luftduel 47 %;
 // "stille" frispark (kun talt) 58 %. Kalibreret med `node tools/measure-duels.mjs N`.
 export const PENALTY_P = 0.011, FREEKICK_P = 0.061, FK_SHOT_P = 0.37, CORNER_P = 0.9, QUIET_FOUL_P = 0.58, QUIET_CARD_P = 0.21;
-export const PENALTY_BONUS = 2.3, FK_SHOT_EDGE = 4, SETPIECE_DEF_EDGE = 3.75;
+export const PENALTY_BONUS = 2.3, FK_SHOT_EDGE = 4, SETPIECE_DEF_EDGE = 4.1;   // v3.17.0: 3,75 → 4,1 – midtstopperne header nu indlæggene i stedet for at slå dem (crossTaker)
 // Angrebsfokus (v3.12, brugeren: "Jeg har sat mit hold til cutbacks, og alligevel er der ikke en
 // eneste reference til cutbacks i referatet"): fokus afgør chancens type for ALLE hold – teksten
 // om modstanderen navngiver aldrig indstillingen (§3). Direkte lange bolde giver kun en mindre
@@ -690,10 +690,17 @@ export function simulateMatch(home, away, rng, opts = {}) {
   }
   // Dødboldens hovedstødsspiller: en af de tre bedste i luften (også stopperne går med op).
   const headerTarget = (R, taker) => rng.pick(fit(outfield(R).filter((p) => p && p !== taker)).sort((a, b) => b.aerialPower - a.aerialPower).slice(0, 3));
+  // Indlæggets tager ved hjørne og frispark (v3.17.0, Spilfører: midtstopperne slog hjørnerne – den bedste afleverer blandt
+  // alle): bedste afleverer på en kantplads (WIDE_ROLES, også backerne) eller på midtbanen; kun uden dem en anden. Ingen rng.
+  function crossTaker(side, R) {
+    const roles = coordsOf(side.tactics), role = (p) => roles[side.starters.indexOf(p)]?.r;
+    const pool = fit(outfield(R)), wide = pool.filter((p) => WIDE_ROLES.has(role(p)) || lineOfRole(role(p) ?? '') === 'MID');
+    return best(wide.length ? wide : pool, (p) => p.skills.passing);
+  }
   function corner(att, def, cR, dR, min) {
     setPieceNow = true;
     st[k(att, 'Corners')]++; st[k(att, 'Shots')]++; st[k(att, 'Xg')] += 0.04; // hovedstødet er en afslutning
-    const taker = best(fit(outfield(cR)), (p) => p.skills.passing);
+    const taker = crossTaker(att, cR);
     aerialDuel(att, def, cR, dR, min, headerTarget(cR, taker), taker, rng.pick(dR.defs), 'hjørnespark');
   }
   // Afslutning mod keeperen (v3.12: samlet fra løbs-grenen og den almindelige afslutning, så
@@ -874,7 +881,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
       }
       return;
     }
-    const taker = best(fit(outfield(cR)), (p) => p.skills.passing);
+    const taker = crossTaker(att, cR);
     st[k(att, 'Shots')]++; st[k(att, 'Xg')] += 0.1;
     aerialDuel(att, def, cR, dR, min, headerTarget(cR, taker), taker, rng.pick(dR.defs), 'frispark');
   }

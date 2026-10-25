@@ -108,17 +108,25 @@ test('skiftereglerne: et træthedsskift sker FØR billedet i sit tick, et skades
 });
 
 // v3.16.1: linje-fundet tæller kun grundbilleder UDEN duel-udfald (run/lost/offside står med vilje forbi linjen) – ikke alle 30 med bold.
-test('fund og rapport: målene med billede tælles, linje-fundet tæller kun billeder med bold uden løb/erobring/offside (16 af 30), rapporten giver ingen fejl og en størrelse', () => {
+test('fund og rapport: målene med billede tælles, linje-fundet tæller kun billeder med bold uden løb/erobring/offside (20 af 30; før 16), rapporten giver ingen fejl og en størrelse', () => {
   const r = checkTrace(M);
   assert.equal(r.finding.goals, M.trace.moments.filter((x) => x.scorer).length);
   const withBall = M.trace.frames.filter((f) => f.poss), flagged = withBall.filter((f) => f.run || f.lost || f.offside);
-  assert.deepEqual([withBall.length, flagged.length], [30, 14], 'data: både billeder med og uden duel-udfald');
-  assert.equal(r.finding.frontFrames, 16);   // 30 − 14 (alle 30 ville tælle de bevidste forbi-linjen-billeder med)
+  assert.deepEqual([withBall.length, flagged.length], [30, 10], 'data: både billeder med og uden duel-udfald');
+  assert.equal(r.finding.frontFrames, 20);   // 30 − 10 (v3.17.0; før 30 − 14) (alle 30 ville tælle de bevidste forbi-linjen-billeder med)
   assert.equal(r.finding.frontBehind, 0);
   const rep = traceReport(6);
   assert.deepEqual(rep.errors, []);
   assert.ok(rep.bytesPerMatch > 3000 && rep.bytesPerMatch < 25000, `${rep.bytesPerMatch}`);
   // 6 kampe · 30 billeder med bold = 180, heraf dem uden duel-udfald (104 i v3.16.6, 101 efter v3.16.7's rng-forskydning) – formlen
   // er bevist på M ovenfor; her kun, at rapporten summerer (et fast tal flyttede sig med hver motorændring)
-  assert.equal(rep.sum.frontFrames, 101);   // TM: fastholdt (et bånd rummede både 104 og 101); flytter sig ved bevidste motorændringer
+  // v3.17.0: summen regnes uafhængigt fra de samme 6 kampe (frames med bold uden duel-udfald) – et fast tal (101) flyttede sig
+  // med hver motorændring; formlen skal stadig give præcis summen (en rapport, der tæller forkert eller kun én kamp, er rød)
+  let want = 0;
+  for (let s = 1; s <= 6; s++) {
+    const L = createLeague(createRng(s));
+    want += simulateMatch(L.teams[s % 8], L.teams[(s + 3) % 8], createRng(s * 31)).trace.frames.filter((f) => f.poss && !f.run && !f.lost && !f.offside).length;
+  }
+  assert.ok(want > 60, `data: ${want}`);
+  assert.equal(rep.sum.frontFrames, want);
 });

@@ -15,7 +15,9 @@ import { fingerprint } from '../../tools/fingerprint.mjs';
 // v3.16.7 M3: cutbackens kant og back vælges efter plads (rækkevidden først) – rng-forskydning (før f2dc7fae…)
 // v3.16.7 M4: det røde kort før skadesskiftet (register trækker rng – forskudt); målets variant bruges ikke op af dit holds indledning (før d53d2d23…)
 // v3.17.0: listerne bygges igen efter skadesskiftet (den udskiftede nævnes ikke resten af minuttet) (før 728d3f6e…)
-const NOPROSE_400 = 'ae16c6825730f012f056094aa60f2232998c12a4541def2e2a55f2a0e777f918';
+// v3.17.0: dødboldens indlæg slås af kant/midtbane (crossTaker) (før ae16c682…)
+// v3.17.0: dødboldens indlæg slås af kant/midtbane (crossTaker), SETPIECE_DEF_EDGE 4,1 (før 3c768989…)
+const NOPROSE_400 = '043be8b7c7480b7bc76390260f29200ced6b5758dcd059b00c8e3acf754c66aa';
 
 test('fingeraftryk uden prosa: de 400 seedede kampe er de samme som ved sidste bevidste motorændring (v3.16.6 M5)', async () => {
   const r = await fingerprint(400);
