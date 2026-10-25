@@ -28,10 +28,11 @@ export const FATIGUE_SUBS_AT_ONCE = 3;
 // tæller med), og indtil until gemmes keep.subs udskiftninger og keep.windows skifte-pauser til en skade. Dit hold følger kun
 // din egen grænse (brugerens regel "grænsen gælder uanset minut").
 // En haltende spiller (skadet uden indskiftning, v3.16.6 – Spilfører: "#9 halter – #10 tager straffen"): han bliver på banen,
-// men hans evner tæller factor i duellerne, han får receive af en modtagers vægt, løber ikke fri og tager ingen dødbolde.
+// men hans evner tæller factor i duellerne, han løber ikke fri og tager ingen dødbolde. (En lavere modtagervægt blev målt og
+// droppet: × 0,25 og × 1 gav 2,4 % og 2,7 % af afslutningerne – han står sjældent nær bolden alligevel.)
 // Han skiftes ud i pausen, hvis der er et skift tilbage (pausen koster ingen skifte-pause). Målt i tools/measure-limp.mjs:
 // at halte skal koste mindre end et rødt kort.
-export const LIMP = Object.freeze({ factor: 0.6, receive: 0.25 });
+export const LIMP = Object.freeze({ factor: 0.6 });
 export const BOT_SUBS = Object.freeze({ fromMin: 45, until: 75, keep: Object.freeze({ subs: 1, windows: 1 }) });
 // En kamp kræver mindst 7 spillere (IFAB Law 3) – motoren udviser aldrig under det (ingen afbrudt kamp).
 export const MIN_PLAYERS = 7;

@@ -2533,3 +2533,15 @@ test('haltende: hans evner tæller LIMP.factor (0,6) – alle ti markspillere ha
   assert.equal(g.m.homeGoals, 0, 'alle reddet');
   assert.ok(pens.every((e) => e.text.includes(`redder fra ${tg(slot(g.a.H, 10))}`) && !/halter/.test(e.text)), pens[0]?.text);
 });
+test('haltende: direkte frispark – "#X halter – #Y tager frisparket."; frisparksindlæg – han er ikke hovedstødsspiller, selv om han er bedst i luften', () => {
+  const t = (a) => { noBench(a); slot(a.H, 1).skills.finishing = 15; slot(a.H, 10).skills.finishing = 12; };
+  const shot = sp({ script: { ...limpFirst, 0.061: true, 0.37: true }, tweak: t });
+  const lim = slot(shot.a.H, 1), next = slot(shot.a.H, 10);
+  const fks = shot.m.events.filter((e) => /FRISPARKSMÅL|redder .+ frispark/.test(e.text));
+  assert.ok(fks.length >= 25, `data: ${fks.length} direkte frispark`);
+  for (const e of fks) assert.ok(e.text.includes(`${tg(lim)} halter – ${tg(next)} tager frisparket. `), e.text);
+  const cross = sp({ script: { ...limpFirst, 0.061: true }, tweak: (a) => { noBench(a); slot(a.H, 1).aerialPower = 25; slot(a.H, 3).aerialPower = 20; } });
+  assert.ok(cross.kinds.filter((k) => k === 'SETPIECE').length >= 20, `data: ${cross.kinds.length} indlægsmål`);
+  assert.equal(rOf(cross.m, 'home', cross.a.H, 1).headerGoals, 0, 'den haltende (bedst i luften) header ikke');
+  assert.ok(rOf(cross.m, 'home', cross.a.H, 3).headerGoals >= 20, 'den næstbedste i luften tager dem');
+});

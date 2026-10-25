@@ -1,6 +1,6 @@
 // v3.16.6 (M2): den haltende spiller på korpus – dit hold uden bænk, en spiller skadet i 9' (tools/measure-limp.mjs forced).
-// Han løber ikke fri, tager ingen dødbolde og er sjældent med i afslutningerne (modtagervægt × LIMP.receive).
-// Før M2 (400 kampe): 3 løb, 8 dødbolde, med i 86 af 854 afslutningslinjer (10,1 %); efter: 0, 0, 19 af 785 (2,4 %).
+// Han løber ikke fri, tager ingen dødbolde og er derfor sjældent med i afslutningerne.
+// Før M2 (400 kampe): 3 løb, 8 dødbolde, med i 86 af 854 afslutningslinjer (10,1 %); efter: 0, 0, 21 af 770 (2,7 %).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRng } from '../../public/engine/rng.js';
