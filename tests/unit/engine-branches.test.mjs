@@ -618,9 +618,10 @@ test('pause-analysen tæller dine opbygninger og dit pres hver for sig', () => {
     for (const p of mids(H)) p.skills.intercepting = ownInt;
     return simulateMatch(H, A, stubRng({ 0.48: true })).events.find((e) => e.type === 'HALFTIME').text;
   };
-  assert.ok(half(true, 1, 10).includes('kommet igennem 14 af 14 gange; dit pres har vundet bolden 0 af 0 gange'), half(true, 1, 10));
-  assert.ok(half(false, 10, 20).includes('kommet igennem 0 af 0 gange; dit pres har vundet bolden 14 af 14 gange'), half(false, 10, 20));
-  assert.ok(half(false, 10, 1).includes('dit pres har vundet bolden 0 af 14 gange'), half(false, 10, 1));
+  // v3.16.7: aldrig "0 af 0 gange" – kun de dele, kampen havde
+  assert.ok(half(true, 1, 10).includes('kommet igennem 14 af 14 gange.') && !half(true, 1, 10).includes('dit pres'), half(true, 1, 10));
+  assert.ok(half(false, 10, 20).includes(' Dit pres har vundet bolden 14 af 14 gange.') && !half(false, 10, 20).includes('opbygning'), half(false, 10, 20));
+  assert.ok(half(false, 10, 1).includes('Dit pres har vundet bolden 0 af 14 gange'), half(false, 10, 1));
 });
 
 // ---------- v3.6: alle dine stile i referatet ----------
@@ -648,7 +649,8 @@ test('referatet navngiver hver af dine pasningsstile og presshøjder rigtigt –
   for (const p of mids(o.A)) p.skills.passing = 11;
   for (const p of mids(o.H)) p.skills.intercepting = 20;
   const ot = simulateMatch(o.H, o.A, stubRng({ 0.48: true, 0.45: true })).events.filter((e) => e.label === 'Offside-fælde virker').map((e) => e.text);
-  assert.ok(ot.length === 30 && ot.every((x) => x.startsWith('✅ [DIN OFFSIDE-FÆLDE VIRKER]')), ot[0]);
+  // v3.16.7: det fulde banner første gang pr. halvleg, ellers den korte "[DIN OFFSIDE-FÆLDE]"-linje
+  assert.ok(ot.length === 30 && ot.filter((x) => x.startsWith('✅ [DIN OFFSIDE-FÆLDE VIRKER]')).length === 2 && ot.every((x) => x.startsWith('✅ [DIN OFFSIDE-FÆLDE')), ot.join(' | '));
   const { L } = arena();
   for (const t of [L.teams[2], L.teams[3]]) { t.tactics.phases.phase2_defending.offsideTrap = 'NORMAL'; for (const p of t.squad) p.skills.intercepting = 20; }
   const bt = simulateMatch(L.teams[2], L.teams[3], stubRng({ 0.48: true, 0.45: true })).events.filter((e) => e.label === 'Offside-fælde virker').map((e) => e.text);
@@ -1755,7 +1757,7 @@ test('løber → dribletur: vundet er DRIBBLE uden oplæg (+1,4); tabt er en ops
   const defd = slot(lost.a.A, 1);
   for (const e of lost.m.events.filter((x) => x.label === 'Opsnappet')) {
     assert.equal(e.isHome, false);
-    assert.match(e.text, new RegExp(`^❌ ${tg(lost.runner)} løber sig fri på kanten, men ${tg(defd)} \\(.+\\) tager bolden i driblingen\\.$`), e.text);
+    assert.match(e.text, new RegExp(`^❌ \\[.+\\] ${tg(lost.runner)} løber sig fri på kanten, men ${tg(defd)} \\(.+\\) tager bolden i driblingen\\.$`), e.text);
   }
   assert.equal(rOf(lost.m, 'away', lost.a.A, 1).rating, 7.6);      // 6,5 + 2·0,3 + 0,5 clean sheet (LB)
   assert.equal(rOf(lost.m, 'away', lost.a.A, 1).tacticWins, 2);
@@ -2229,8 +2231,8 @@ test('fuldtids-analyse: hvert tal står på sin plads (dit hold hjemme), kun for
   assert.deepEqual(stNums(m, 'h', 'Penalties', 'PenaltyGoals', 'FreeKicks', 'Corners'), [2, 0, 4, 0]);
   const poss = Math.round(st.hPoss / (st.hPoss + st.aPoss) * 100);
   assert.equal(poss, 91);
-  assert.equal(ft[0].text, `📊 [FULDTIDS-ANALYSE] Sejr ${m.homeGoals}-${m.awayGoals} til dig. Du havde 91% af bolden og ${st.hShots} afslutninger (${st.hOnTarget} på mål). Din opbygning kom igennem 30 af 30 gange; dit pres vandt bolden 0 af 0 gange.`
-    + ` Dødbolde: 4 frispark i skudafstand, 0 hjørnespark, 2 straffe (0 mål) · frispark begået ${st.hFouls}, tilkendt ${st.aFouls}.`
+  assert.equal(ft[0].text, `📊 [FULDTIDS-ANALYSE] Sejr ${m.homeGoals}-${m.awayGoals} til dig. Du havde 91% af bolden og ${st.hShots} afslutninger (${st.hOnTarget} på mål). Din opbygning kom igennem 30 af 30 gange.`
+    + ` Dødbolde: 4 frispark i skudafstand, 0 hjørnespark, 2 straffespark (0 mål) · frispark begået ${st.hFouls}, tilkendt ${st.aFouls}.`
     + ft[0].text.slice(ft[0].text.indexOf(' 🎯 Løb uden bold (Normal): ')));
   assert.match(ft[0].text, / 🎯 Løb uden bold \(Normal\): \d+ løb, \d+ kom fri \(\d+ mål\) · kontraer imod i alt: 0 \(0 mål\)\. ⚔️ Angreb \(Centralt · balanceret\): ingen cutbacks eller høje bolde\. 🛡️ /);
   // Kun dit hold: har modstanderen ikke et brugerhold, står der ingen analyse for ham (bot hjemme, dig ude)
@@ -2419,8 +2421,9 @@ test('cutback: kantspilleren (PAC+BAL 20 + 4) mod backen (PAC+POS + 4 − 2): 21
   // står. Vægtene exp(−afstand/16) til (12, 72) (rul 0,5, ens evner): LB (4, 70) 0,60, CB (27, 73) 0,39, CB (51, 73) 0,09 – summen af alle
   // ti er 2,11, så halvdelen nås ved den anden stopper (plads 3), ikke LM'en (plads 5, (4, 58)) som i v3.16. Han får 6,5 + 2·0,3 + clean
   // sheet 0,5 = 7,6 (LM'en: 7,1 uden bonus). OBS: spec.md siger "mod den nærmeste back" – lodtrækningen giver ikke altid den nærmeste.
+  // v3.16.7 (Spilfører: midtstoppere og angribere lukkede kanten): backen på sin side (LB, plads 1) – ikke lodtrækningens stopper
   const back = shut.m.ratings.away.find((e) => e.tacticWins > 0);
-  assert.equal(back.playerId, slot(shut.a.A, 3).id);
+  assert.equal(back.playerId, slot(shut.a.A, 1).id);
   assert.equal(back.tacticWins, 2); assert.equal(back.rating, 7.6);
 });
 // v3.12.1: CUTBACK_FINISH_BONUS 6 → 8; v3.13: KEEPER_EDGE 3,5 → 3; v3.15.1: 3 → 0,3 (med 3 reddede 17,6; før MV 14,9 / 15)
@@ -2634,4 +2637,33 @@ test('modstanderens løbs-cutback (TM v3.16.6): hele linjen er "↩️ [hold] #N
     }
   }
   assert.ok(seen >= 100, `data: ${seen} linjer`);
+});
+test('forbi mål (v3.16.7): 30 skud forbi i én kamp – hver tekst én gang pr. omgang af seks, så forfra (ingen tom liste)', () => {
+  const g = sp({ script: { 0.3: true, 0.62: true } , gk: 30 });   // skud i hvert tick, alle reddes/forbi; MISS_P sand, MISS_BLOCK_SHARE falsk
+  const miss = g.m.events.filter((e) => e.type === 'MISS' && e.text.startsWith('🎯')).map((e) => e.text.replace(/^🎯 \[.+?\] #\d+ \S+ /, ''));
+  assert.ok(miss.length >= 18, `data: ${miss.length} forbi`);
+  for (let i = 0; i + 6 <= miss.length; i += 6) assert.equal(new Set(miss.slice(i, i + 6)).size, 6, `omgang ${i / 6}: ${miss.slice(i, i + 6).join(' | ')}`);
+  assert.ok(miss.every((t) => t && !/undefined/.test(t)), 'aldrig en tom tekst');   // TM: "Pedersen undefined." slap før igennem
+});
+// TM v3.16.7: oplægsgiveren tjekkes aldrig for offside – kontra, hovedstød og linjedommerens flag (konstrueret: han står forrest)
+import { VAR_RULES as VR } from '../../public/engine/match-rules.js';
+test('VAR/flag (M1): oplægsgiveren står forrest, men tjekkes ikke – kontraens og afslutningens VAR og linjedommerens flag nævner en anden', () => {
+  const CHECK = { [VR.GOAL_CHECK_P]: true, [VR.GOAL_FOUL_SHARE]: false };
+  // Kontra (som "kontramål: oplægsgiveren …"): udeholdets første midtbane (5) er oplægsgiver – trukket helt frem
+  const a = arena();
+  for (const p of a.A.squad) p.skills.intercepting = 20;
+  slot(a.A, 9).skills.pace = 14;
+  a.A.tactics.customCoords = { 5: { x: 50, y: 6 } };
+  const m = simulateMatch(a.H, a.A, stubRng({ 0.48: shots(2), 0.032: shots(2), ...CHECK }, 0.5));
+  const chk = m.events.filter((e) => e.type === 'VAR_CHECK');
+  assert.ok(chk.length >= 1 && m.events.some((e) => e.type === 'GOAL' && /KONTRA/.test(e.text)), `data: ${chk.length} tjek`);
+  assert.ok(chk.every((e) => !e.text.includes(`stod ${tg(slot(a.A, 5))} offside`)), chk[0]?.text);
+  // Linjedommerens flag ved en almindelig afslutning: oplægsgiveren (første midtbane, 5) trukket forrest – flaget rammer ikke ham
+  const b = arena(); slot(b.A, 0).skills.goalkeeping = 30;
+  for (const p of b.H.squad) p.varProfile.varPulse = 0;
+  b.H.tactics.customCoords = { 5: { x: 50, y: 4 } };
+  const f = simulateMatch(b.H, b.A, stubRng({ 0.3: shots(3), [VR.OFFSIDE_FLAG_P]: true }, 0.5));
+  const flags = f.events.filter((e) => e.type === 'OFFSIDE_FLAG');
+  assert.ok(flags.length >= 1, `data: ${flags.length} flag`);
+  assert.ok(flags.every((e) => !e.text.includes(`${tg(slot(b.H, 5))} (`)), flags[0]?.text);
 });

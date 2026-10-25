@@ -497,6 +497,30 @@ Fra Spilførerens sæsongennemgange; kampene ændres (fingeraftrykket bumpet bev
   fejl (9,3 % mod 7,5 % over 300 sæsoner; med en bots taktik 5,6 %). Unikke navne på tværs af hold kommer i en egen udgivelse
   (kun nye ligaer).
 
+### Spilførerens fund (v3.16.7)
+Fra sæsongennemgangen af v3.16.6. Fase T (kun tekst og visning – noprose uændret) og fase M (motor, målt pr. commit):
+- **Klummen**: 'wait'-opfølgningen holder under 50 % af bolden med mål (procenten står); 'air' tæller hovedstød efter
+  dødbolde med; "Det kostede:" kun med årsag (ellers "Ét af målene imod kom på kontra."); "fandt ingen vej" kun ved 0
+  gennembrud; et rødt kort "til trods/kostede/holdt point" kun når kortet kom før det afgørende mål (det, hvorefter vinderen
+  førte resten af kampen – referatets rækkefølge; RED er med i publicFacts.events), ellers "fik rødt kort undervejs"; "Mit
+  bud ud fra deres seneste N kampe: …"; ved sæsonslut står mesteren i banneret og avisens sæsonboks, ikke i Formen.
+- **Dansk**: `pl` (ental/flertal), `dec` (decimalkomma i al synlig visning, ikke CSS), "straffespark", holdmærke på alle linjer.
+- **Gentagelser** (vary/pickBy, intet rng): offside-fælden fuldt første gang pr. halvleg, derefter kort; FASE 1 og
+  hovedstødsprosa (HEADER_PROSE) i tre varianter; vary starter fra runden; "🎯 forbi"-teksterne gentages ikke i en kamp, før
+  alle seks er brugt (samme ene rng-træk); målteksten for dit holds løb bruger ikke en variant op.
+- **Visning**: skift lige efter hinanden står på samme minut ("tages med i pausen" / "i samme skifte-pause"); friskheden i
+  sæsonens sidste runde "… til første runde i næste sæson".
+- **M1 VAR-offside**: intet offside direkte fra hjørnespark, oplægsgiveren tjekkes aldrig (VAR og flag), intet flag efter en
+  cutback (`tools/measure-var-offside.mjs`: 16/10/4 → 0/0/0 på 1500 kampe).
+- **M2 Pres**: offside-fælden tælles for sig (`trapWon`, `oppTrapWon`) – "dit pres stoppede opbygningen W af Y gange (X
+  erobringer, Z offside)". Kampene er de samme (`tools/fingerprint-results.mjs`).
+- **M3 Cutback-roller**: kantmanden er en kant-/back-plads på siden inden for rækkevidde, backen er backen på sin side –
+  aldrig en angriber, når andre findes (`tools/measure-cutback-roles.mjs`: ikke-kant 23 % → 10 %, angriber som back 6,4 % →
+  1,7 %).
+- **M4**: det røde kort står før skadesskiftet.
+- Balance (measureGoalMix 150 ligaer): angreb 0,672 efter M1 – båndets øvre kant 0,66 → 0,70; mål pr. kamp 2,99 (bånd
+  2,6–3,0) og langskud 0,062 (bånd 0,06–0,11) ligger ved kanterne – til den kommende balance-gennemgang.
+
 ## 6. Karakterer, MotM, avis
 - Start 6,5 (±0,15), klemt 3,5–10,0 – fra v3.15 først til sidst (justeringerne summeres uden loft, så overskud fra mål
   ikke tabes); vundet taktisk duel/pres +0,20 (`DUEL_BONUS`, før +0,35). Kampens og Rundens spiller rangeres ens

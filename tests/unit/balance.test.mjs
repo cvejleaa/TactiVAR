@@ -113,7 +113,7 @@ test('Rundens mål: bred fordeling – cutback ≥ 8 %, dribletur ≥ 8 %, ingen
 // (Hovedstødsandelen af alle mål var 16 % også før – den domineredes af dødbolde – og bevises ikke her.)
 test('angrebsfokus mærkes: cutbacks ≥ 1 pr. kamp, angriberen vinder 35–55 % af de åbne luftdueller, intet fokus dominerer (netto inden for 0,3), og modgiften virker', async () => {
   const { measureFocus } = await import('../../tools/measure-duels.mjs');
-  const N = 60;
+  const N = 150;   // v3.16.7: 60 var for støjende til nettobåndet (spredning 0,33 ved 60, 0,19 ved 200 kampe – tools/measure-duels fokus)
   const cut = measureFocus({ focus: 'LOW_CUTBACKS' }, N), cross = measureFocus({ focus: 'HIGH_CROSSES' }, N), central = measureFocus({ focus: 'CENTRAL' }, N);
   assert.ok(cut.cutbacks >= 1, `cutbacks ${cut.cutbacks} (før 0)`);
   // v3.15: et forsvar med færre mand taber flere luftdueller – målt over 400 kampe 0,545 → 0,555 (her med 60: 0,535 → 0,570);
@@ -136,11 +136,13 @@ test('angrebsfokus mærkes: cutbacks ≥ 1 pr. kamp, angriberen vinder 35–55 %
 // afslutningen, så angriberne scorer flere (Spilfører: "angriberen scorer næsten aldrig i åbent spil"). Målt (150 ligaer,
 // før 28efc6d → nu): angreb 0,534 → 0,612, midtbane 0,278 → 0,245, forsvar 0,188 → 0,143; dokumentets 44–56 / 25–38 /
 // 14–24 % er bevidst forladt (spec §5 "VAR som i virkeligheden") – båndene er røde mod den gamle fordeling.
-test('målene fordeler sig: angreb 56–66 % (før 53 %), midtbane 20–30 %, forsvar 11–17 % (før 19 %); kontra 7–14 %, langskud 6–13 %, dødbolde 18–32 %', async () => {
+// v3.16.7 M1 (oplægsgiveren tjekkes ikke for offside, intet offside fra hjørnespark): angreb 0,660 → 0,672 (150 ligaer, samme
+// opsætning) – øvre kant 0,66 → 0,70; den gamle fordeling fra før v3.15.1 (0,534) er stadig rød.
+test('målene fordeler sig: angreb 56–70 % (før 53 %), midtbane 20–30 %, forsvar 11–17 % (før 19 %); kontra 7–14 %, langskud 6–13 %, dødbolde 18–32 %', async () => {
   const { measureGoalMix } = await import('../../tools/measure-duels.mjs');
   const r = measureGoalMix(150);
   const band = (k, lo, hi) => assert.ok(r[k] >= lo && r[k] <= hi, `${k} ${r[k].toFixed(3)} (bånd ${lo}–${hi})`);
-  band('ATT', 0.56, 0.66); band('MID', 0.2, 0.3); band('DEF', 0.11, 0.17);
+  band('ATT', 0.56, 0.70); band('MID', 0.2, 0.3); band('DEF', 0.11, 0.17);
   band('counter', 0.07, 0.14); band('longshot', 0.06, 0.11); band('setPiece', 0.18, 0.32);   // langskud v3.16: 0,124 → ≈0,085 (koblede linjer, LONGSHOT_Y 30) – dokumentets 8–10 %
   assert.ok(r.goalsPerMatch >= 2.6 && r.goalsPerMatch <= 3.0, `mål pr. kamp ${r.goalsPerMatch}`);
 });

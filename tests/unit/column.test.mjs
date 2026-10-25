@@ -124,9 +124,9 @@ test('"Din kamp" og fuldtids-analysen bygger på samme rapport: opbygningstallet
   for (const { input } of season(21, 10)) {
     const m = input.matches.find((x) => x.homeId === input.viewerTeamId || x.awayId === input.viewerTeamId);
     const r = m.ownReports[input.viewerTeamId], ft = m.events.find((e) => e.type === 'FULLTIME').text;
-    assert.ok(ft.includes(`Din opbygning kom igennem ${r.buildWon} af ${r.build} gange`), ft);
+    assert.ok(ft.includes(`Din opbygning kom igennem ${r.buildWon} af ${r.build} ${r.build === 1 ? 'gang' : 'gange'}`), ft);   // v3.16.7: ental
     const mine = buildColumn(input).sections[0].paras.join(' ');
-    if (/opbygning|presset|kom I igennem/i.test(mine) && / af \d+ /.test(mine)) {
+    if (/Din opbygning|opbygninger kom forbi|kom I igennem|pres lukkede/.test(mine) && / af \d+ /.test(mine)) {   // opbygningens sætning (ikke "Dit pres stoppede opbygningen" – v3.16.7)
       seen++;
       assert.ok(mine.includes(`${r.buildWon} af ${r.build}`) || mine.includes(`${r.build - r.buildWon} af ${r.build}`), `${mine} | rapport ${r.buildWon}/${r.build}`);
     }
@@ -148,8 +148,8 @@ test('optakt-scouting og opfølgning: næste modstander gættes ud fra hans sene
   let bud = 0, follow = 0;
   for (const { input } of season(41, 14)) {
     const t = (buildColumn(input).sections.find((s) => s.id === 'col-next')?.paras ?? []).join(' ');
-    if (/Mit bud: .+ ud fra deres seneste/.test(t)) bud++;   // v3.16.3: "ud fra" (før "i deres seneste")
-    if (/Før kampen skrev jeg, at .+ – (det holdt|det gjorde de ikke|de scorede igen, men havde mere af bolden)/.test(t)) follow++;
+    if (/Mit bud ud fra deres seneste (kamp|\d kampe): /.test(t)) bud++;   // v3.16.7: "Mit bud ud fra …:" (før efter verbet)
+    if (/Før kampen skrev jeg, at .+ – (det holdt|det gjorde de ikke|de scorede igen, men de havde \d+ % af bolden)/.test(t)) follow++;
   }
   assert.ok(bud >= 5 && follow >= 3, `bud ${bud}, opfølgning ${follow}`);
 });
@@ -181,7 +181,7 @@ const rep = (offBallRuns, extra = {}) => ({ H: { side: 'home', build: 0, buildWo
 test('F2: et kontramål imod får kun årsagen "mange spillere fremme" med belæg i din spillede taktik', () => {
   const base = { homeGoals: 0, awayGoals: 1, events: [goalEv(40, false, 0, 1)], goalsPool: [{ kind: 'COUNTER', min: 40, teamName: 'Ude' }] };
   const few = mineText(hand({ ...base, ownReports: rep('FEW') }));
-  assert.match(few, /et kontramål imod\./); assert.doesNotMatch(few, /mange spillere fremme/);
+  assert.match(few, /Ét af målene imod kom på kontra\./); assert.doesNotMatch(few, /mange spillere fremme|Det kostede/);   // v3.16.7: uden årsag intet "Det kostede:"
   assert.match(mineText(hand({ ...base, ownReports: rep('MANY') })), /et kontramål imod, da bolden blev tabt med mange spillere fremme\./);
 });
 test('F3: ét hovedstødsmål ud af tre gør ikke holdet til et luft-hold – to ud af tre gør', () => {

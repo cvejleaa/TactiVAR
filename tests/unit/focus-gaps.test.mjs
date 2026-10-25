@@ -229,14 +229,15 @@ const strongBacks = (v = 30) => (a) => { for (const p of a.A.squad) Object.assig
 // til venstre (−11,4): LB (4, 70) 0,60, CB (27, 73) 0,39, CB (51, 73) 0,09, RB 0,02, LM (4, 58) 0,37 … i alt 2,11. Ved 0,55 (højre kant)
 // lander lodtrækningen (1,16) på LM (plads 5); ved 0,5 lå den på den fjerne stopper (plads 3, x 51 – kumuleret 1,08 ≥ 1,06). Ved 0,4
 // (venstre kant, spejlet) på RB (plads 4). Aldrig én fra den modsatte side.
-test('cutback: flanken følger terningen (next < 0,5 = venstre kant) og forsvareren står på den MODSATTE side – RM mod LM ved 0,55, LM mod RB ved 0,4', () => {
+test('cutback: flanken følger terningen (next < 0,5 = venstre kant) og forsvareren står på den MODSATTE side – RM mod LB ved 0,55, LM mod RB ved 0,4', () => {
+  // v3.16.7: backen er backen på sin side (før den nærmeste – i v3.16 LM'en)
   const setup = (a) => { strongBacks()(a); for (const i of [5, 8]) Object.assign(slot(a.H, i).skills, { pace: 20, ballControl: 20 }); };
   const right = cb({ next: 0.55, setup }), left = cb({ next: 0.4, setup });
   assert.equal(right.blocked.length, 2); assert.equal(left.blocked.length, 2);
   // v3.12.1: forsvaret forskydes mod boldsiden, så den nærmeste kan være backen, stopperen eller (v3.16) kantmidtbanespilleren på
   // DEN side – aldrig én fra den modsatte side.
   const side = (r, ids, w) => r.blocked.every((e) => ids.some((i) => e.text.includes(`${tg(slot(r.a.A, i))} (`)) && e.text.includes(`lukker kanten mod ${tg(slot(r.a.H, w))}.`));
-  assert.ok(side(right, [5], 8), right.blocked[0].text); assert.ok(!side(right, [3, 4, 8], 8));
+  assert.ok(side(right, [1], 8), right.blocked[0].text); assert.ok(!side(right, [2, 3, 4, 5, 8], 8));
   assert.ok(side(left, [4], 5), left.blocked[0].text); assert.ok(!side(left, [1, 2, 5], 5));
 });
 test('cutback: kantspilleren vælges efter PAC+BAL (begge dele) og backen efter PAC+POS (begge dele) – en anden med højere ene evne stjæler dem ikke', () => {
@@ -414,4 +415,24 @@ test('almindelig afslutning: en dribletur bruger skyttens PAC og BAL hver for si
   const g = r.m.goalsPool[0];
   assert.equal(g.spectacle, goalSpectacle('DRIBBLE', { finishing: 8, pace: 28, ballControl: 8, passing: 10 }, g.min, { next: () => 0.5 }));
   assert.notEqual(g.spectacle, goalSpectacle('DRIBBLE', { finishing: 8, pace: 8, ballControl: 8, passing: 10 }, g.min, { next: () => 0.5 }));
+});
+test('cutback-backen (v3.16.7): uden back og kant på siden er det en forsvars-/midtbanespiller – aldrig angriberen, selv når han står nærmest', () => {
+  // Venstre kant (0,4) → forsvarets højre side: RB (4) og RM (8) er væk (ingen bænk), og angriberen (9) står på pletten (88, 72)
+  const setup = (a) => {
+    strongBacks()(a);
+    // Pladserne tømmes FØR resten skades – ellers fylder motoren dem igen med netop RB og RM
+    a.A.tactics.lineupSlots[4] = null; a.A.tactics.lineupSlots[8] = null;
+    for (const p of a.A.squad) if (!a.A.tactics.lineupSlots.includes(p.id)) p.injuryMatchesLeft = 5;
+    a.A.tactics.customCoords = { 9: { x: 88, y: 72 } };
+    // Angriberne vægter langt tungest (fart + placering 400 mod 60): uden reglen ville lodtrækningen lande på dem
+    for (const i of [9, 10]) if (slot(a.A, i)) Object.assign(slot(a.A, i).skills, { pace: 200, positioning: 200 });
+    for (const i of [5, 8]) Object.assign(slot(a.H, i).skills, { pace: 20, ballControl: 20 });
+  };
+  const r = cb({ next: 0.4, setup });
+  assert.ok(r.blocked.length === 2, `data: ${r.blocked.length}`);
+  const att = [9, 10].map((i) => slot(r.a.A, i)).filter(Boolean);
+  assert.ok(r.blocked.every((e) => att.every((p) => !e.text.includes(`${tg(p)} (`))), r.blocked[0].text);
+  // Kontrol: med RB på banen er det ham
+  const ok = cb({ next: 0.4, setup: (a) => { strongBacks()(a); for (const i of [5, 8]) Object.assign(slot(a.H, i).skills, { pace: 20, ballControl: 20 }); a.A.tactics.customCoords = { 9: { x: 88, y: 72 } }; } });
+  assert.ok(ok.blocked.every((e) => e.text.includes(`${tg(slot(ok.a.A, 4))} (`)), ok.blocked[0].text);
 });

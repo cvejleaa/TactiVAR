@@ -111,7 +111,7 @@ function families(ms) {
   ms.forEach((m, mi) => {
     const idOf = (home, t) => (home ? m.ratings.home : m.ratings.away).find((e) => tag(e) === t)?.playerId;
     const seen = new Map();
-    const push = (fam, x) => { const k = `${fam}|${x.id}`, n = seen.get(k) ?? 0; seen.set(k, n + 1); out[fam].push({ ...x, mi, n }); };
+    const push = (fam, x) => { const k = `${fam}|${x.id}`, n = seen.get(k) ?? 0; seen.set(k, n + 1); out[fam].push({ ...x, mi, n, r: m.round ?? 0 }); };   // r: runden (v3.16.7 – vary starter fra runden)
     for (const e of m.events) {
       const mid = e.type === 'TACTIC_WIN' && e.text.match(new RegExp(`(#\\d+ \\S+(?: \\S+)*?) (${MID.map(esc).join('|')})\\.$`));
       if (mid) push('mid', { min: e.min, id: idOf(e.isHome, mid[1]), v: mid[2] });
@@ -137,7 +137,7 @@ const runs = (fam) => { const g = new Map(); for (const x of fam) { const k = `$
 // samme aktør i en kamp; (3) de første min(antal, listens længde) forekomster er alle forskellige; (4) alle varianter forekommer.
 function varyRule(fam, list, key, { min, minRepeat, minFull }) {
   assert.ok(fam.length > min && fam.every((x) => x.id), `data: ${fam.length} forekomster`);
-  for (const x of fam) assert.equal(x.v, pickBy(list, x.n, key, x.id), JSON.stringify(x));
+  for (const x of fam) assert.equal(x.v, pickBy(list, x.n + x.r, key, x.id), JSON.stringify(x));
   const g = runs(fam), rep = g.filter((r) => r.length >= 2), full = g.filter((r) => r.length >= list.length);
   assert.ok(rep.length > minRepeat && full.length > minFull, `data: ${rep.length} aktører med mindst 2 i en kamp, ${full.length} med mindst ${list.length}`);
   for (const r of rep) {
@@ -168,7 +168,7 @@ test('variant "omorganiserer sig" (3): vary pr. hold ("reorg"); etiket og tekst 
   assert.ok(R5.length >= 50, `data: ${R5.length} omorganiseringer i ${REORG5.length} kampe`);
   varyRule(R5, REORG_TEXT, 'reorg', { min: 49, minRepeat: 10, minFull: 10 });   // 60, 12 hold med 5 hver
   for (const x of [...F.reorg, ...R5]) {
-    assert.equal(x.label, pickBy(REORG_LABEL, x.n, 'reorg', x.id), JSON.stringify(x));
+    assert.equal(x.label, pickBy(REORG_LABEL, x.n + x.r, 'reorg', x.id), JSON.stringify(x));
     assert.equal(REORG_LABEL.indexOf(x.label), REORG_TEXT.indexOf(x.v), 'etiket og tekst følges ad');
   }
 });
@@ -180,7 +180,7 @@ test('variant "Din lynkontra løber ind i …" (3): vary pr. presser ("lyn")', (
 test('vary: tælleren starter forfra i hver kamp og er pr. aktør – hver aktørs første forekomst i en kamp er pickBy(listen, 0, familie, id)', () => {
   let firsts = 0, multi = 0;
   for (const [fam, list, key] of [[F.mid, MID, 'mid'], [F.clear, CLEAR, 'clear'], [F.reorg, REORG_TEXT, 'reorg'], [F.lyn, LYN, 'lyn']]) {
-    for (const r of runs(fam)) { assert.equal(r[0].v, pickBy(list, 0, key, r[0].id)); firsts++; }
+    for (const r of runs(fam)) { assert.equal(r[0].v, pickBy(list, r[0].r, key, r[0].id)); firsts++; }
     const perMatch = new Map();
     for (const x of fam) (perMatch.get(x.mi) ?? perMatch.set(x.mi, new Set()).get(x.mi)).add(x.id);
     multi += [...perMatch.values()].filter((s) => s.size >= 2).length;

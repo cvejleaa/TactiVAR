@@ -9,7 +9,7 @@ import { createLeague } from '../../public/engine/generator.js';
 import { simulateMatch } from '../../public/engine/match.js';
 
 const league = (seed) => createLeague(createRng(seed));
-const KEYS = ['build', 'buildWon', 'counterGoalsAgainst', 'countersAgainst', 'crosses', 'crossesWon', 'cutbackGoals', 'cutbacks', 'cutbacksBlocked', 'end', 'headerGoals', 'oppCrosses', 'oppCrossesWon', 'oppCutbacks', 'oppCutbacksBlocked', 'press', 'pressWon', 'runGoals', 'runs', 'runsWon', 'side', 'start'];
+const KEYS = ['build', 'buildWon', 'counterGoalsAgainst', 'countersAgainst', 'crosses', 'crossesWon', 'cutbackGoals', 'cutbacks', 'cutbacksBlocked', 'end', 'headerGoals', 'oppCrosses', 'oppCrossesWon', 'oppCutbacks', 'oppCutbacksBlocked', 'oppTrapWon', 'press', 'pressWon', 'runGoals', 'runs', 'runsWon', 'side', 'start', 'trapWon'];   // v3.16.7: trapWon/oppTrapWon
 
 test('endState: faser og trukne positioner gemmes kun for MENNESKESTYREDE sider – hjemme, ude, begge og ingen', () => {
   const mk = (seed, human) => { const L = league(seed); const [A, B] = [L.teams[0], L.teams[1]]; A.isBot = !human.includes('home'); B.isBot = !human.includes('away'); A.tactics.customCoords = { 6: { x: 40, y: 40 } }; B.tactics.customCoords = { 7: { x: 60, y: 30 } }; return { A, B, m: simulateMatch(A, B, createRng(seed + 1)) }; };
@@ -54,7 +54,7 @@ test('ownReport: siden (hjemme/ude), præcis de gemte felter, og start- og slut-
 });
 
 test('ownReport: modstander-tallene er modstanderens egne (cutbacks og høje bolde mod mig = hans cutbacks og høje bolde), og fuldtids-teksten læser dem', () => {
-  let nCut = 0, nBlk = 0, nCr = 0, nWon = 0, nDiffer = 0, nText = 0;
+  let nCut = 0, nBlk = 0, nCr = 0, nWon = 0, nDiffer = 0, nText = 0, nTrap = 0, nOff = 0;
   for (let seed = 1; seed <= 40; seed++) {
     const L = league(seed), [A, B] = [L.teams[0], L.teams[1]]; B.isBot = false;
     // Varier angrebsfokus, så både cutbacks og høje bolde optræder
@@ -71,9 +71,18 @@ test('ownReport: modstander-tallene er modstanderens egne (cutbacks og høje bol
     const ownerRep = ft.isHome ? a : b;
     // v3.16.3-ordlyden: "cutbacks stoppet M af N · luftdueller i åbent spil vundet …"
     assert.ok(ft.text.includes(`Dit felt: modstanderens cutbacks stoppet ${ownerRep.oppCutbacksBlocked} af ${ownerRep.oppCutbacks} · luftdueller i åbent spil vundet ${ownerRep.oppCrosses - ownerRep.oppCrossesWon} af ${ownerRep.oppCrosses}.`), `${ft.text.slice(-120)} | ${JSON.stringify(ownerRep)}`);
-    assert.ok(ft.text.includes(`Din opbygning kom igennem ${ownerRep.buildWon} af ${ownerRep.build} gange; dit pres vandt bolden ${ownerRep.pressWon} af ${ownerRep.press} gange.`));
+    const g = (n) => `${n} ${n === 1 ? 'gang' : 'gange'}`;   // v3.16.7: "af 1 gang"
+    // v3.16.7: offside-fælden står for sig – egne offsides i opbygningen, fælde-sejre i presset
+    const off = ownerRep.oppTrapWon, trap = ownerRep.trapWon;
+    const bld = `Din opbygning kom igennem ${ownerRep.buildWon} af ${g(ownerRep.build)}${off ? ` (af de ${ownerRep.build - ownerRep.buildWon} stop var ${off} offside)` : ''}`;
+    const prs = trap ? `dit pres stoppede opbygningen ${ownerRep.pressWon} af ${g(ownerRep.press)} (${ownerRep.pressWon - trap} ${ownerRep.pressWon - trap === 1 ? 'erobring' : 'erobringer'}, ${trap} på offside).` : `dit pres vandt bolden ${ownerRep.pressWon} af ${g(ownerRep.press)}.`;
+    const want = !ownerRep.press ? `${bld}.` : !ownerRep.build ? `D${prs.slice(1)}` : `${bld}; ${prs}`;   // v3.16.7: aldrig "0 af 0"
+
+    assert.ok(ft.text.includes(want), `${want} | ${ft.text.slice(0, 260)}`);
+    if (trap) nTrap++; if (off) nOff++;
     if (ownerRep.oppCutbacks !== ownerRep.cutbacks || ownerRep.oppCrosses !== ownerRep.crosses) nText++;
   }
+  assert.ok(nTrap >= 3 && nOff >= 3, `data: ${nTrap} med egen fælde, ${nOff} med egne offsides`);
   assert.ok(nCut > 10 && nBlk > 3 && nCr > 10 && nWon > 3 && nDiffer > 10 && nText > 10, `data nok: cutbacks ${nCut}, stoppet ${nBlk}, høje ${nCr}, vundet ${nWon}, forskellige ${nDiffer}, tekst ${nText}`);
 });
 

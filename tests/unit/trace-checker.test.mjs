@@ -118,5 +118,7 @@ test('fund og rapport: målene med billede tælles, linje-fundet tæller kun bil
   const rep = traceReport(6);
   assert.deepEqual(rep.errors, []);
   assert.ok(rep.bytesPerMatch > 3000 && rep.bytesPerMatch < 25000, `${rep.bytesPerMatch}`);
-  assert.equal(rep.sum.frontFrames, 104);   // 6 kampe · 30 billeder med bold = 180, heraf 104 uden duel-udfald
+  // 6 kampe · 30 billeder med bold = 180, heraf dem uden duel-udfald (104 i v3.16.6, 101 efter v3.16.7's rng-forskydning) – formlen
+  // er bevist på M ovenfor; her kun, at rapporten summerer (et fast tal flyttede sig med hver motorændring)
+  assert.equal(rep.sum.frontFrames, 101);   // TM: fastholdt (et bånd rummede både 104 og 101); flytter sig ved bevidste motorændringer
 });

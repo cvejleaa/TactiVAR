@@ -193,7 +193,7 @@ test('linjedommerens flag: afslutningen tæller ikke som på mål og er intet VA
 
 test('fuldtids-analysen nævner resultatet rigtigt: sejr "til dig", nederlag og uafgjort uden (Spilfører: "0-2 til dig")', () => {
   const seen = { Sejr: 0, Nederlag: 0, Uafgjort: 0 };
-  for (const { m, H, A } of games(60, {})) {
+  for (const { m, H, A } of games(100, {})) {   // 100 (v3.16.7: med 60 var der 2 sejre efter rng-forskydningen)
     const ft = m.events.find((e) => e.type === 'FULLTIME');
     if (!ft) continue;
     const [my, opp] = ft.isHome ? [m.homeGoals, m.awayGoals] : [m.awayGoals, m.homeGoals];

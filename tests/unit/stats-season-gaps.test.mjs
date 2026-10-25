@@ -55,7 +55,7 @@ test('sæson 2, statistik fra sæsonens runde 4: overskrifter, kolonner og noter
   const { root } = season2(18);
   assert.deepEqual(titles(root).slice(0, 2), ['Spillere (sæson 2, fra runde 4)', 'Holdtal (sæson 2, fra runde 4)']);
   assert.deepEqual(heads(root), ['Spiller', 'Kampe (fra R4)', 'Snit (i alt)', 'km/90 (i alt)', '% HI (i alt)', 'Fri (fra R4)', 'Friskhed']);
-  assert.match(byId(root, 'my-team-stats').textContent, /^Sæson 2, fra runde 4, pr\. kamp: 12\.5 afslutninger/);
+  assert.match(byId(root, 'my-team-stats').textContent, /^Sæson 2, fra runde 4, pr\. kamp: 12,5 afslutninger/);
   assert.ok(byId(root, 'stats-mine').textContent.endsWith('Kampe og frie løb tælles for sæson 2, fra runde 4; snit, km og HI gælder alle hans kampe (de nulstilles ikke ved sæsonskifte).'));
   // linjen om de manglende runder: præcis én, i spillere-sektionen, som afsnit — og ikke i de andre sektioner
   const gaps = all(root, (e) => e.attrs.id === 'stats-gap');
@@ -70,7 +70,7 @@ test('sæson 2, statistik fra sæsonens start (K = 1): "sæson" i kolonnerne og 
   const { root } = season2(15);
   assert.deepEqual(titles(root), ['Spillere (sæson 2)', 'Holdtal (sæson 2)', 'Ligaens forløb (sæson 2)', 'Dit hold (privat, sæson 2)']);
   assert.deepEqual(heads(root), ['Spiller', 'Kampe (sæson)', 'Snit (i alt)', 'km/90 (i alt)', '% HI (i alt)', 'Fri (sæson)', 'Friskhed']);
-  assert.match(byId(root, 'my-team-stats').textContent, /^Sæson 2, pr\. kamp: 12\.5 afslutninger/);
+  assert.match(byId(root, 'my-team-stats').textContent, /^Sæson 2, pr\. kamp: 12,5 afslutninger/);
   assert.ok(byId(root, 'stats-mine').textContent.endsWith('Kampe og frie løb tælles for sæson 2; snit, km og HI gælder alle hans kampe (de nulstilles ikke ved sæsonskifte).'));
   assert.equal(all(root, (e) => e.attrs.id === 'stats-gap').length, 0);
 });
