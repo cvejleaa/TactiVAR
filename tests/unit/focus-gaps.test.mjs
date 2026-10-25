@@ -420,9 +420,12 @@ test('cutback-backen (v3.16.7): uden back og kant på siden er det en forsvars-/
   // Venstre kant (0,4) → forsvarets højre side: RB (4) og RM (8) er væk (ingen bænk), og angriberen (9) står på pletten (88, 72)
   const setup = (a) => {
     strongBacks()(a);
-    for (const p of a.A.squad) if (!a.A.tactics.lineupSlots.includes(p.id)) p.injuryMatchesLeft = 5;
+    // Pladserne tømmes FØR resten skades – ellers fylder motoren dem igen med netop RB og RM
     a.A.tactics.lineupSlots[4] = null; a.A.tactics.lineupSlots[8] = null;
+    for (const p of a.A.squad) if (!a.A.tactics.lineupSlots.includes(p.id)) p.injuryMatchesLeft = 5;
     a.A.tactics.customCoords = { 9: { x: 88, y: 72 } };
+    // Angriberne vægter langt tungest (fart + placering 400 mod 60): uden reglen ville lodtrækningen lande på dem
+    for (const i of [9, 10]) if (slot(a.A, i)) Object.assign(slot(a.A, i).skills, { pace: 200, positioning: 200 });
     for (const i of [5, 8]) Object.assign(slot(a.H, i).skills, { pace: 20, ballControl: 20 });
   };
   const r = cb({ next: 0.4, setup });
