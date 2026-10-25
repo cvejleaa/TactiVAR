@@ -12,3 +12,13 @@ test('cutback-roller (1500 kampe): højst 15 % fra en ikke-kantplads (før 23 %)
   assert.ok(r.wingerCentral / r.cutbacks <= 0.15, `ikke-kant ${r.wingerCentral} af ${r.cutbacks}`);
   assert.ok(r.backAttacker / r.cutbacks <= 0.03, `angriber som back ${r.backAttacker} af ${r.cutbacks}`);
 });
+
+// v3.17.0: løbs-cutbacken møder backen på sin kant (flankBack, samme forsvarer i løbet, driblingen og teksten), og kanten
+// lukkes aldrig af en kantangriber (efter Hvis-Så til 3-4-3 var det angriberen). 1500 kampe: backen på samme side som
+// kantmanden 123 af 709 (17 %) → 9 af 999 (0,9 %); angriber som back 17 → 0.
+test('cutback-backen (v3.17.0): modsat side af kantmanden i ≥97 % (før 83 %), aldrig en angriber (før 17 af 1040)', async () => {
+  const r = await measureCutbackRoles(1500);
+  assert.ok(r.sided >= 700, `data: ${r.sided} med side-pladser`);
+  assert.ok(r.wrongSide / r.sided <= 0.03, `samme side ${r.wrongSide} af ${r.sided}`);
+  assert.equal(r.backAttacker, 0);
+});

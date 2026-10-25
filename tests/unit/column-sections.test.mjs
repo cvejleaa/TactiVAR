@@ -138,10 +138,11 @@ test('afsnit 5: optakt-scouting – modstanderens seneste 3 offentlige kampe, ge
   assert.equal(bud([{ poss: 60 }]), text('ball', 1), '1 kamp: "deres seneste kamp"');
   assert.equal(bud([{ poss: 0 }, { poss: 57 }, { poss: 57 }, { poss: 57 }]), undefined, 'snit 57 af de tre seneste: ingen regel');
   assert.equal(bud([{ shots: 5 }, { shots: 5 }, { shots: 5 }]), undefined, 'summen (15) er ikke gennemsnittet (5)');
-  assert.equal(bud([{ shots: 0 }, { shots: 0 }, { shots: 12 }]), undefined, 'kun den sidste (12) er ikke gennemsnittet (4)');
-  assert.equal(bud([{ shots: 12 }, { shots: 12 }, { shots: 12 }]), text('shots', 3));
-  assert.equal(bud([{ shots: 11 }, { shots: 12 }, { shots: 13 }]), text('shots', 3), 'snit 12 er grænsen (≥)');
-  assert.equal(bud([{ shots: 11 }, { shots: 12 }, { shots: 12 }]), undefined, 'snit 11,67');
+  assert.equal(bud([{ shots: 0 }, { shots: 0 }, { shots: 24 }]), undefined, 'kun den sidste (24) er ikke gennemsnittet (8)');
+  assert.equal(bud([{ shots: 24 }, { shots: 24 }, { shots: 24 }]), text('shots', 3));   // v3.17.0: grænsen 12 → 24
+  assert.equal(bud([{ shots: 23 }, { shots: 24 }, { shots: 25 }]), text('shots', 3), 'snit 24 er grænsen (≥)');
+  assert.equal(bud([{ shots: 23 }, { shots: 24 }, { shots: 24 }]), undefined, 'snit 23,67');
+  assert.equal(bud([{ shots: 12 }, { shots: 12 }, { shots: 12 }]), undefined, 'den gamle grænse 12 giver intet bud');
   // Næste-runde-buddet bygger på ALLE hans kampe til og med den netop spillede runde 5 (ikke kun til runde 4)
   assert.equal(bud([{ poss: 60 }, { poss: 60 }, { poss: 60 }, { poss: 60 }, { poss: 0 }]), undefined, 'runde 5 (poss 0) er med: snit (60+60+0)/3 = 40');
   assert.equal(bud([{ poss: 0 }, { poss: 0 }, { poss: 60 }, { poss: 60 }, { poss: 60 }]), text('ball', 3), 'de tre seneste er runde 3-5');

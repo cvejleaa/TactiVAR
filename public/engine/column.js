@@ -74,8 +74,12 @@ export const STYLE_RULES = [
     say: ['havde bolden det meste af tiden', 'styrede rytmen med bolden', 'spillede roligt bolden rundt', 'satte sig på kampen med bolden', 'lod modstanderen løbe efter bolden'] },
   { key: 'wait', basis: ['poss', 'goals'], test: (s) => s.poss <= 42 && s.goals >= 1,
     say: ['havde under halvdelen af bolden og scorede alligevel', 'klarede sig uden meget af bolden', 'scorede, selv om de havde bolden mindst', 'fik meget ud af lidt', 'var effektive på få muligheder'] },
-  { key: 'shots', basis: ['shots'], test: (s) => s.shots >= 12,
-    say: ['skød fra alle vinkler', 'pressede mange afslutninger igennem', 'testede målmanden igen og igen', 'havde skudstøvlerne på', 'afsluttede, hver gang muligheden bød sig'] },
+  // v3.17.0 (≈ 25 skud pr. kamp): tærsklerne er 95-percentilen for ét hold i én kamp som før (12 skud var det i v3.16.7 – nu 24
+  // skud og 10 på mål – `node tools/measure-duels.mjs 800 percentil`). "Testede målmanden" bærer kun skud PÅ mål (Spilfører – halvdelen går forbi).
+  { key: 'shots', basis: ['shots'], test: (s) => s.shots >= 24,
+    say: ['skød fra alle vinkler', 'havde skudstøvlerne på', 'afsluttede, hver gang muligheden bød sig', 'skød på alt, der bevægede sig', 'prøvede lykken igen og igen'] },
+  { key: 'target', basis: ['onTarget'], test: (s) => s.onTarget >= 10,
+    say: ['testede målmanden igen og igen', 'pressede mange afslutninger igennem på mål', 'gav målmanden travlt', 'ramte målet igen og igen', 'holdt målmanden i ilden'] },
   { key: 'dead', basis: ['setPieceGoals'], test: (s) => s.setPieceGoals >= 1,
     say: ['fik dødboldene til at tælle', 'var skarpe på de faste situationer', 'slog til på dødbolde', 'var farlige, når bolden lå stille', 'høstede på standardsituationerne'] },
   { key: 'switch', basis: ['reorganised'], test: (s) => s.reorganised >= 1,
@@ -99,9 +103,10 @@ function yourVerdict(r, mine, round) {
   if (r.cutbacks >= 3 && r.cutbacksBlocked / r.cutbacks >= 0.6) out.push([2, `Kanten blev lukket: ${r.cutbacksBlocked} af ${r.cutbacks} cutback-forsøg stoppet.`]);
   // Årsagen kun med belæg (QC F2); uden den ingen "Det kostede:" – det lovede en årsag (Spilfører v3.16.6, R12)
   if (r.counterGoalsAgainst >= 1) out.push([3, ph.offBallRuns === 'MANY' ? `Det kostede: ${r.counterGoalsAgainst === 1 ? 'et kontramål' : `${r.counterGoalsAgainst} kontramål`} imod, da bolden blev tabt med mange spillere fremme.`
-    : r.counterGoalsAgainst === 1 ? 'Ét af målene imod kom på kontra.' : `${r.counterGoalsAgainst} af målene imod kom på kontra.`]);
+    : r.counterGoalsAgainst === 1 ? pickBy(['Ét af målene imod kom på kontra.', 'Et af målene imod faldt på en kontra.', 'Modstanderen slog én gang til på kontra.'], round, 'ck')
+      : `${r.counterGoalsAgainst} af målene imod kom på kontra.`]);   // varianter: sætningen gik igen 4 gange på en sæson (v3.17.0)
   if (r.press >= 4 && r.pressWon / r.press >= 0.5) out.push([2, r.trapWon ? `Dit pres stoppede opbygningen ${r.pressWon} af ${pl(r.press, 'gang', 'gange')} (${pl(r.pressWon - r.trapWon, 'erobring', 'erobringer')}, ${r.trapWon} på offside).` : `Dit pres vandt bolden ${r.pressWon} af ${pl(r.press, 'gang', 'gange')}.`]);   // gamle gem uden trapWon: som før
-  if (r.runGoals >= 1) out.push([3, `Løbene uden bold gav ${r.runGoals === 1 ? 'et mål' : `${r.runGoals} mål`}.`]);
+  if (r.runGoals >= 1) out.push([3, r.runGoals === 1 ? pickBy(['Løbene uden bold gav et mål.', 'Et af løbene uden bold endte i nettet.', 'Løbene i dybden betalte sig med et mål.'], round, 'rg') : `Løbene uden bold gav ${r.runGoals} mål.`]);   // varianter (v3.17.0: 4 gange på en sæson)
   if (r.start?.formation && r.end?.formation && r.start.formation !== r.end.formation) out.push([2, pickBy([`Skiftet fra ${r.start.formation} til ${r.end.formation} undervejs.`, `I gik fra ${r.start.formation} til ${r.end.formation} i løbet af kampen.`, `Formationen blev lagt om fra ${r.start.formation} til ${r.end.formation}.`, `Undervejs blev ${r.start.formation} til ${r.end.formation}.`, `Holdet sluttede i ${r.end.formation} efter at have startet i ${r.start.formation}.`], round, 'sw')]);   // neutralt: skiftet alene beviser ikke udfaldet (QC F4)
   return out.sort((a, b) => b[0] - a[0]).slice(0, 2).map(([, t]) => t);   // højst 2 sætninger om dit hold (Spilfører)
 }

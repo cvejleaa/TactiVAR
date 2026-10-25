@@ -70,15 +70,19 @@ const TIERS = {
 // subs = udskiftningsgrænsen i % (v3.13): hold med mange løb skifter tidligere (75), lav blok senere (65), resten 70.
 // runs = løb uden bold (v3.9): gegenpres-hold mange, lav blok få, resten normal. Profil 0 er
 // KUN brugerens hold (idx 0) – den skal stå på NORMAL.
+// rule (v3.17.0, Spilfører: alle hold havde samme Hvis-Så – "skift til 3-4-3 bagud i 65'" – så klummens "Mit bud" sagde
+// "omorganiserede sig" om næsten alle): uden feltet standardreglen; null = ingen regel; { min, to, remap } = bagud fra min
+// skiftes til to – femmerkæden sender en stopper op på midtbanen (remap: ny plads ← gammel plads). Gælder nye ligaer – gemte
+// hold beholder deres regler.
 export const BOT_PROFILES = [
   { form: '4-4-2', pass: 'BALANCED', focus: 'CENTRAL', press: 'MID_BLOCK', offside: 'NORMAL', tackle: 'NORMAL', won: 'FAST_COUNTER', lost: 'DROP_BACK', runs: 'NORMAL', subs: 70 },
-  { form: '4-2-3-1', pass: 'SHORT', focus: 'LOW_CUTBACKS', press: 'HIGH_GEGENPRESS', offside: 'EXTREME_VAR_LINE', tackle: 'AGGRESSIVE', won: 'KEEP_POSSESSION', lost: 'COUNTER_PRESS_5S', runs: 'MANY', subs: 75 },
-  { form: '5-3-2', pass: 'DIRECT_LONG', focus: 'HIGH_CROSSES', press: 'LOW_BLOCK', offside: 'OFF', tackle: 'CAUTIOUS', won: 'FAST_COUNTER', lost: 'DROP_BACK', runs: 'FEW', subs: 65 },
-  { form: '4-3-3', pass: 'SHORT', focus: 'CENTRAL', press: 'HIGH_GEGENPRESS', offside: 'EXTREME_VAR_LINE', tackle: 'NORMAL', won: 'KEEP_POSSESSION', lost: 'COUNTER_PRESS_5S', runs: 'MANY', subs: 75 },
+  { form: '4-2-3-1', pass: 'SHORT', focus: 'LOW_CUTBACKS', press: 'HIGH_GEGENPRESS', offside: 'EXTREME_VAR_LINE', tackle: 'AGGRESSIVE', won: 'KEEP_POSSESSION', lost: 'COUNTER_PRESS_5S', runs: 'MANY', subs: 75, rule: null },
+  { form: '5-3-2', pass: 'DIRECT_LONG', focus: 'HIGH_CROSSES', press: 'LOW_BLOCK', offside: 'OFF', tackle: 'CAUTIOUS', won: 'FAST_COUNTER', lost: 'DROP_BACK', runs: 'FEW', subs: 65, rule: { min: 70, to: '4-4-2', remap: [0, 1, 2, 3, 5, 6, 7, 4, 8, 9, 10] } },
+  { form: '4-3-3', pass: 'SHORT', focus: 'CENTRAL', press: 'HIGH_GEGENPRESS', offside: 'EXTREME_VAR_LINE', tackle: 'NORMAL', won: 'KEEP_POSSESSION', lost: 'COUNTER_PRESS_5S', runs: 'MANY', subs: 75, rule: null },
   { form: '3-5-2', pass: 'BALANCED', focus: 'HIGH_CROSSES', press: 'MID_BLOCK', offside: 'NORMAL', tackle: 'NORMAL', won: 'FAST_COUNTER', lost: 'DROP_BACK', runs: 'NORMAL', subs: 70 },
   { form: '4-4-2', pass: 'DIRECT_LONG', focus: 'HIGH_CROSSES', press: 'MID_BLOCK', offside: 'NORMAL', tackle: 'AGGRESSIVE', won: 'FAST_COUNTER', lost: 'DROP_BACK', runs: 'NORMAL', subs: 70 },
-  { form: '5-4-1', pass: 'DIRECT_LONG', focus: 'CENTRAL', press: 'LOW_BLOCK', offside: 'OFF', tackle: 'CAUTIOUS', won: 'FAST_COUNTER', lost: 'DROP_BACK', runs: 'FEW', subs: 65 },
-  { form: '3-4-3', pass: 'BALANCED', focus: 'LOW_CUTBACKS', press: 'HIGH_GEGENPRESS', offside: 'NORMAL', tackle: 'AGGRESSIVE', won: 'KEEP_POSSESSION', lost: 'COUNTER_PRESS_5S', runs: 'MANY', subs: 75 },
+  { form: '5-4-1', pass: 'DIRECT_LONG', focus: 'CENTRAL', press: 'LOW_BLOCK', offside: 'OFF', tackle: 'CAUTIOUS', won: 'FAST_COUNTER', lost: 'DROP_BACK', runs: 'FEW', subs: 65, rule: { min: 70, to: '4-4-2', remap: [0, 1, 2, 3, 5, 6, 7, 4, 9, 8, 10] } },
+  { form: '3-4-3', pass: 'BALANCED', focus: 'LOW_CUTBACKS', press: 'HIGH_GEGENPRESS', offside: 'NORMAL', tackle: 'AGGRESSIVE', won: 'KEEP_POSSESSION', lost: 'COUNTER_PRESS_5S', runs: 'MANY', subs: 75, rule: null },
 ];
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -202,7 +206,9 @@ export function defaultTactics(starterIds, profile) {
       phase2_defending: { pressingHeight: p.press, offsideTrap: p.offside, tacklingIntensity: p.tackle },
       phase3_transition: { onBallWon: p.won, onBallLost: p.lost },
     },
-    conditionalRules: [{ ruleId: 1, minuteTrigger: 65, condition: 'TRAILING', margin: 1, newFormation: '3-4-3', newPlan: null, slotRemapping: [0, 1, 2, 3, 5, 6, 7, 4, 8, 9, 10], action: 'SHIFT', subOut: null, subIn: null }],
+    conditionalRules: p.rule === null ? [] : [p.rule
+      ? { ruleId: 1, minuteTrigger: p.rule.min, condition: 'TRAILING', margin: 1, newFormation: p.rule.to, newPlan: null, slotRemapping: p.rule.remap, action: 'SHIFT', subOut: null, subIn: null }
+      : { ruleId: 1, minuteTrigger: 65, condition: 'TRAILING', margin: 1, newFormation: '3-4-3', newPlan: null, slotRemapping: [0, 1, 2, 3, 5, 6, 7, 4, 8, 9, 10], action: 'SHIFT', subOut: null, subIn: null }],
   };
 }
 

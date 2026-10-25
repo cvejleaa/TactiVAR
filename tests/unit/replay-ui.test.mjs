@@ -49,8 +49,12 @@ test('trinene: 31 grundbilleder + ét pr. afslutning i tick-orden, et skudtrin e
   assert.deepEqual(s.filter((x) => x.kind === 'shot').map((x) => x.ev), shots.map((x) => x.ev));
   assert.ok(s.every((x, i) => x.kind !== 'shot' || (s[i - 1].kind === 'moment' && s[i - 1].ev === x.ev)), 'skudtrinnet lige efter sit øjeblik');
   assert.ok(s.every((x, i) => i === 0 || x.t >= s[i - 1].t), 'tick-orden');
-  assert.deepEqual(hl.filter((x) => x.kind === 'moment').map((x) => x.ev), m.trace.moments.map((x) => x.ev));
-  assert.deepEqual(hl, s.filter((x) => x.kind !== 'frame'), 'højdepunkter = de samme trin uden grundbillederne');
+  // v3.17.0: Højdepunkter springer halvchancen over, medmindre den blev til mål (Spilfører: ellers en halv afspilning)
+  const keep = (x) => !(x.half && !x.scorer);
+  assert.ok(m.trace.moments.some((x) => x.half) && m.trace.moments.some((x) => !x.half), 'data: både halvchancer og andre afslutninger');
+  assert.deepEqual(hl.filter((x) => x.kind === 'moment').map((x) => x.ev), m.trace.moments.filter(keep).map((x) => x.ev));
+  const halfEv = new Set(m.trace.moments.filter((x) => !keep(x)).map((x) => x.ev));
+  assert.deepEqual(hl, s.filter((x) => x.kind !== 'frame' && !halfEv.has(x.ev)), 'højdepunkter = de samme trin uden grundbillederne og halvchancerne');
   const mo = m.trace.moments[2];
   assert.equal(s[stepForEvent(s, m.events, mo.ev)].ev, mo.ev);
   // En hændelse uden øjeblik (fx et gult kort) → grundbilledet i dens tick
@@ -62,9 +66,10 @@ test('afspilningen: brikker for begge hold, et spring viser hændelsens tekst; e
   clearReplays();
   // En kamp med et mål i åbent spil (billede) – første seed fra 4
   let m = null;
-  for (let s = 4; !m && s < 40; s++) { const g = game(s).m; if (g.trace.moments.some((x) => x.kind === 'GOAL')) m = g; }
+  for (let s = 4; !m && s < 40; s++) { const g = game(s).m; if (g.trace.moments.some((x) => x.kind === 'GOAL' && g.events[x.ev].hG + g.events[x.ev].aG >= 1 && !g.trace.moments.some((y) => y.t === x.t && y.ev < x.ev))) m = g; }
   const el = replayEl(m, 'h');
-  const goal = m.trace.moments.find((x) => x.kind === 'GOAL' && m.events[x.ev].hG + m.events[x.ev].aG >= 1);
+  // Målet er tick'ets første øjeblik – så er forrige trin grundbilledet (v3.17.0: halvchancen kan stå før i samme tick)
+  const goal = m.trace.moments.find((x) => x.kind === 'GOAL' && m.events[x.ev].hG + m.events[x.ev].aG >= 1 && !m.trace.moments.some((y) => y.t === x.t && y.ev < x.ev));
   assert.ok(goal, 'data: et mål med billede');
   replayJump(m, goal.ev);
   const cap = byId(el, 'rp-caption').textContent, e = m.events[goal.ev];

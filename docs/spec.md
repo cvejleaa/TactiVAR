@@ -188,6 +188,8 @@ Tick hvert 3. minut (1..90).
 - **Træthedsskift spredes (v3.15**, brugerens valg): højst `FATIGUE_SUBS_AT_ONCE` = 3 ad gangen (også i pausen; flere trætte bruger flere pauser);
   grænsen gælder fortsat uanset minut, og dit hold får besked, når en træt spiller må vente.
 - Chance 30 % (v3.9: Få 26 %, Normal 30 %, Mange 36 %; v3.12.1: Få 28,5 %); xG 0,13–0,35 pr. afslutning.
+  v3.17.0: chancen løftes efter en vundet opbygning og dæmpes uden duel (BUILD_LIFT_P/OPEN_DAMP_P), og halvchancen kommer
+  oven i – se "Balance-gennemgangen (v3.17.0)".
 - **Angrebsfokus afgør chancens type (v3.12**, brugeren: "Jeg har sat mit hold til cutbacks, og
   alligevel er der ikke en eneste reference til cutbacks i referatet … min modstander vinder 11
   luftdueller"). For ALLE hold (brugerens valg); teksten om en modstander navngiver aldrig
@@ -297,6 +299,7 @@ Tick hvert 3. minut (1..90).
   **v3.13** (`… 30 saeson`): langskud 27 %, cutback 19 %, frispark 16 %, hovedstød 16 %, dribletur 9 %
   (v3.12.1: 13 % – trætte spillere og KEEPER_EDGE 3; båndet sænket fra 9 til 8 %).
 - VAR-tjek: se "VAR som i virkeligheden" (v3.15.1; før en chancetype ved roll < 0,22).
+- Halvchancen (v3.17.0) afgøres ikke af denne duel, men af HALF_XG · målmand · skytte – se "Balance-gennemgangen (v3.17.0)".
 - Afslutning: `FIN + rnd·8 > GK + rnd·8 + 0,3` (v3.15.1: 0,3 – VAR-chancetypens mål skulle erstattes; v3.9 havde en målmandsfordel på 5; v3.10 fjernede den;
   v3.12 gav 3 tilbage, v3.12.1 3,5 – kalibreret til målfordelingen ovenfor; v3.13 3, fordi målmændene
   taber mindst friskhed i kampen – ellers faldt målene til ≈ 2,5).
@@ -520,6 +523,33 @@ Fra sæsongennemgangen af v3.16.6. Fase T (kun tekst og visning – noprose uæn
 - **M4**: det røde kort står før skadesskiftet.
 - Balance (measureGoalMix 150 ligaer): angreb 0,672 efter M1 – båndets øvre kant 0,66 → 0,70; mål pr. kamp 2,99 (bånd
   2,6–3,0) og langskud 0,062 (bånd 0,06–0,11) ligger ved kanterne – til den kommende balance-gennemgang.
+
+### Balance-gennemgangen (v3.17.0)
+Fra Spilførerens gennemgang af v3.16.7; brugerens valg: "fuldt realistisk" (≈ 25 afslutninger, hver med sin linje), opbygningen
+skal styre chancen, alle småfund med. Hvert motortal er målt (`node tools/measure-duels.mjs N skud|opbygning|maal`):
+- **Opbygningen styrer chancen**: P(chance) ≈ 0,53 efter vundet opbygning (CHANCE_P eller `BUILD_LIFT_P` – pr. "Løb uden
+  bold": Få 0,298, Normal 0,331, Mange 0,418, så Mange/Få bevarer forholdet til Normal), ≈ 0,09 uden duel (`OPEN_DAMP_P`
+  0,712); før 0,30 begge. xG pr. tick efter vundet opbygning / uden duel 1,02 → 2,99; hovedchancer 1,03 → 4,9;
+  korrelation opbygnings-forskel/måldifferens 0,45 → 0,52.
+- **Halvchancen**: et skud uden stor fare oven i tick'et (`HALF_P` 0,761 efter vundet opbygning, 0,531 uden duel; aldrig
+  efter tabt bold eller et mål i tick'et). Skudsted `shotSpotFor`, skytte som den almindelige afslutning, langskud efter
+  `LONGSHOT_Y`. Udfaldet er en lodtrækning: `HALF_XG` (feltet 0,02, kanten 0,055) · `gkFactor` (1 + 0,06·(10 − MV·ff),
+  0,5–1,8) · `finFactor` (FIN·ff/12, 0,5–1,5); ellers forbi/blokeret (`HALF_MISS_P` 0,613; egne tekster uden stolpe) eller en
+  let redning (`easySaves`: med i 🧤, ikke i karakterfradraget over SAVES_FULL); en blokering/redning giver hjørne med
+  `HALF_CORNER_P` 0,147/0,071. Mål fra kanten er LONGSHOT, i feltet SCRAMBLE ("Løs bold i feltet", intet oplæg).
+  Linjerne er dæmpede (`minor`), øjeblikket mærket `half` – Højdepunkter viser det kun som mål.
+- **Målt (400 kampe; v3.16.7 → v3.17.0)**: skud 12,1 → 25,8; på mål 4,8 → 10,0 (andel 40 % → 39 %); konvertering 61 % →
+  27 %; forbi/blokeret 3,0 → 11,3; redninger 1,9 → 7,3; hjørner 3,0 → 3,7; xG/mål 0,78 → 0,91; målmand 6 mod 16: 2,48 →
+  2,43 mål imod mere (bevaret – den betød allerede meget); Højdepunkter 13,4 → 11,6 trin; kampen 66 → 83 kB; heatmappets
+  angrebstredjedel 16,3 % → 15,7 %. Sæsonmålingen: 2,96 mål, langskud 8 %, angreb 64/midt 22/forsvar 14 %. KEEPER_EDGE
+  er uændret 0,3 (målniveauet holdes af løftet/dæmpningen). Båndene i `tests/unit/balance-v3170.test.mjs`; forbi 2–5 →
+  8–14, cutbacks ≥ 1 → ≥ 0,8.
+- **Småfund**: listerne (hR/aR) bygges igen efter skadesskiftet; hjørne- og frisparksindlæg slås af kant/midtbane
+  (`crossTaker`; SETPIECE_DEF_EDGE 3,75 → 4,1); løbs-cutbacken møder backen på sin kant (`flankBack`, aldrig en
+  kantangriber); bot-profilerne har hver sin Hvis-Så (nye ligaer), og et skift til samme formation sker ikke (bot eller uden
+  trukne positioner); botternes FASE-linjer vises kun første gang pr. hold og slags (resten `quiet`); pres-linjen har
+  holdmærke; skifte-noten lover ikke "næste skift"; Rundens mål uden dobbelt etiket; klummens skud-regel 12 → 24 og en egen
+  regel på skud på mål (≥ 10) – 95-percentilen for ét hold i én kamp som før (`node tools/measure-duels.mjs 800 percentil`: v3.16.7 12 skud / 6 på mål, nu 24 / 10).
 
 ## 6. Karakterer, MotM, avis
 - Start 6,5 (±0,15), klemt 3,5–10,0 – fra v3.15 først til sidst (justeringerne summeres uden loft, så overskud fra mål

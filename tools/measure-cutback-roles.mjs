@@ -1,5 +1,5 @@
 // Hvem laver og lukker cutbacks (v3.16.7 M3, Spilfører: midtstoppere laver cutbacks, angribere lukker kanten i eget felt).
-// Kantmanden = spilleren i "kommer forbi"/"lukker kanten mod"-linjen fra cutback() (løbs-cutbacks er løberens egne og tælles ikke),
+// Kantmanden = spilleren i "kommer forbi"/"lukker kanten mod"-linjen fra cutback() og løbs-cutbacken (samme tekst),
 // backen = den, der kom forbi eller lukkede. Rollen er spillerens plads i formationen (karakterarkets role). Pr. formation.
 // Kør: node tools/measure-cutback-roles.mjs [antal] [rod]
 import { pathToFileURL } from 'node:url';
@@ -12,7 +12,7 @@ export async function measureCutbackRoles(N = 1500, root = resolve(import.meta.d
   const { createRng } = await imp('public/engine/rng.js');
   const { createLeague } = await imp('public/engine/generator.js');
   const { simulateMatch } = await imp('public/engine/match.js');
-  const out = { cutbacks: 0, wingerWide: 0, wingerCentral: 0, backWideOrDef: 0, backAttacker: 0, byFormation: {} };
+  const out = { cutbacks: 0, wingerWide: 0, wingerCentral: 0, backWideOrDef: 0, backAttacker: 0, sided: 0, wrongSide: 0, byFormation: {} };
   for (let s = 1; s <= N; s++) {
     const L = createLeague(createRng(s * 97)), me = L.teams.find((t) => !t.isBot), opp = L.teams[(s % 7) + 1];
     const m = s % 2 ? simulateMatch(me, opp, createRng(s * 131)) : simulateMatch(opp, me, createRng(s * 131));
@@ -34,6 +34,8 @@ export async function measureCutbackRoles(N = 1500, root = resolve(import.meta.d
       out.cutbacks++; f.n++;
       if (WIDE.has(wr)) out.wingerWide++; else { out.wingerCentral++; f.central++; }
       if (ATT.has(br)) out.backAttacker++; else out.backWideOrDef++;
+      // v3.17.0: begge på en side-plads – backen skal stå på den modsatte side (LM mod RB); før valgte løbs-cutbacken en tilfældig
+      if (/^[LR]/.test(wr) && WIDE.has(wr) && /^[LR]/.test(br) && WIDE.has(br)) { out.sided++; if (wr[0] === br[0]) out.wrongSide++; }
     });
   }
   return out;

@@ -1705,7 +1705,8 @@ test('løber → skud fra kanten: LONGSHOT uden oplæg, når han står uden for 
   const txt = save.m.events.filter((e) => e.type === 'SAVE').map((e) => e.text);
   assert.equal(txt.length, 2);
   // Opspillet står FØR redningen (v3.16.5 – det skete først)
-  for (const t of txt) assert.match(t, new RegExp(`^🧤 \\[.+\\] ${tg(save.runner)} løber sig fri på kanten og skyder – men #\\d+ .+ redder\\.$`), t);
+  // v3.17.0: linjen fortæller dit løb, så den bærer dit holdmærke – målmanden med sit hold
+  for (const t of txt) assert.match(t, new RegExp(`^🧤 \\[${save.a.H.name}\\] ${tg(save.runner)} løber sig fri på kanten og skyder – men #\\d+ .+ \\(${save.a.A.name}\\) redder\\.$`), t);
   assert.equal(fx({ rm: { finishing: 15.1, passing: 1, pace: 1, ballControl: 1 }, gk: 16.75 }).m.homeGoals, 2);
   // Friskhed: løberen træt (0 %: 15 → 11,25 + 2 = 13,25 < 13 + 0,3 → redning; uden friskhed 17 > 13,3 → mål); målmanden træt
   // (22,2 → 16,65 + 0,3 = 16,95 < 15 + 2 = 17 → mål; uden: 22,5 → redning). Med kanten 3: 17 < 16 og 17 < 19,65.
@@ -2101,10 +2102,10 @@ test('hovedstødsspiller blandt de tre bedste i luften (stopperne går med op): 
   assert.equal(pool[0].scorer, tg(slot(a.H, 7)));    // top-3 = 20, 19, 18 → sidste = plads 7 (18)
 });
 // v3.12.1 (dokumentets dødboldandel 25–30 %): SETPIECE_DEF_EDGE 4,5 → 3,75, CROSS_EDGE 1 → 2. Med 4,5 var 13,8 ikke mål.
-test('frisparksindlæg: forsvaret får SETPIECE_DEF_EDGE 3,75 (i åbent spil i stedet angriberen CROSS_EDGE 2): 13,7 slår ikke dødbolden men slår åbent indlæg; 13,8 er mål', () => {
+test('frisparksindlæg: forsvaret får SETPIECE_DEF_EDGE 4,1 (v3.17.0; før 3,75 – i åbent spil i stedet angriberen CROSS_EDGE 2): 14,05 slår ikke dødbolden men 13,7 slår åbent indlæg; 14,15 er mål', () => {
   const air = (v) => (a) => { for (const p of a.H.squad) p.aerialPower = v; };
-  assert.equal(spx({ script: { 0.061: true }, tweak: air(13.7) }).m.homeGoals, 0);    // 16,7 < 10 + 3 + 3,75
-  assert.equal(spx({ script: { 0.061: true }, tweak: air(13.8) }).m.homeGoals, 30);   // 16,8 > 16,75; hovedstød 17,8 > 10 + 4
+  assert.equal(spx({ script: { 0.061: true }, tweak: air(14.05) }).m.homeGoals, 0);    // 17,05 < 10 + 3 + 4,1 (med 3,75 var det mål)
+  assert.equal(spx({ script: { 0.061: true }, tweak: air(14.15) }).m.homeGoals, 30);   // 17,15 > 17,1; hovedstød 18,15 > 10 + 4
   const open = spx({ script: { 0.3: true, 0.52: true }, home: { p1: { attackFocus: 'HIGH_CROSSES' } }, tweak: air(13.7) });
   assert.equal(open.m.homeGoals, 30, 'åbent spil: tærskel 8 (CROSS_EDGE 2, ingen dødboldfordel)');
 });
@@ -2364,7 +2365,7 @@ test('goalSpectacle for dødbolde: straffespark sjældent flot, frispark på FIN
 });
 test('avisens etiketter for alle måltyper (også de fire dødbolde)', async () => {
   const { GOAL_KIND_LABEL } = await import('../../public/engine/gazette.js');
-  assert.deepEqual(GOAL_KIND_LABEL, { LONGSHOT: 'Langskud', DRIBBLE: 'Dribletur', COUNTER: 'Kontra', CUTBACK: 'Cutback', COMBINATION: 'Kombination', HEADER: 'Hovedstød', VAR: 'VAR-drama', PENALTY: 'Straffespark', FREEKICK: 'Frispark', CORNER: 'Hjørnespark', SETPIECE: 'Frisparksindlæg' });
+  assert.deepEqual(GOAL_KIND_LABEL, { LONGSHOT: 'Langskud', DRIBBLE: 'Dribletur', COUNTER: 'Kontra', CUTBACK: 'Cutback', COMBINATION: 'Kombination', SCRAMBLE: 'Løs bold i feltet', HEADER: 'Hovedstød', VAR: 'VAR-drama', PENALTY: 'Straffespark', FREEKICK: 'Frispark', CORNER: 'Hjørnespark', SETPIECE: 'Frisparksindlæg' });
 });
 
 test('kampstatistik: gule kort tælles løbende (st.*Yellows) og passer med karakterarkene; højst ét gult pr. spiller', () => {
@@ -2625,7 +2626,7 @@ test('frispark i samme tick som skade-tacklingen (TM v3.16.6): samme tackler i b
 test('modstanderens løbs-cutback (TM v3.16.6): hele linjen er "↩️ [hold] #N løber kommer forbi #M forsvarer (dit hold) og spiller bolden tilbage i feltet." – og aldrig for dit hold', async () => {
   const { createRng: cr } = await import('../../public/engine/rng.js');
   let seen = 0;
-  for (let s = 1; s <= 200; s++) {
+  for (let s = 1; s <= 260; s++) {   // v3.17.0: 200 → 260 (færre hovedchancer)
     const L = createLeague(cr(s * 97)), me = L.teams.find((t) => !t.isBot), opp = L.teams[(s % 7) + 1];
     const m = s % 2 ? simLive(me, opp, cr(s * 131)) : simLive(opp, me, cr(s * 131));
     const mineTags = new Set(me.squad.map(tg)), oppTags = new Set(opp.squad.map(tg));
@@ -2666,4 +2667,41 @@ test('VAR/flag (M1): oplægsgiveren står forrest, men tjekkes ikke – kontraen
   const flags = f.events.filter((e) => e.type === 'OFFSIDE_FLAG');
   assert.ok(flags.length >= 1, `data: ${flags.length} flag`);
   assert.ok(flags.every((e) => !e.text.includes(`${tg(slot(b.H, 5))} (`)), flags[0]?.text);
+});
+
+// ---------- v3.17.0: halvchancen (terning-scriptet: kun HALF_P.OPEN slået til – ingen duel, ingen chance, ingen dødbolde) ----------
+const HM = await import('../../public/engine/match.js');
+test('halvchancen: gkFactor og finFactor – tallene og grænserne', () => {
+  assert.equal(HM.gkFactor(10), 1); assert.ok(Math.abs(HM.gkFactor(6) - 1.24) < 1e-9 && Math.abs(HM.gkFactor(16) - 0.64) < 1e-9);
+  assert.equal(HM.gkFactor(-50), 1.8); assert.equal(HM.gkFactor(50), 0.5);
+  assert.equal(HM.finFactor(12), 1); assert.equal(HM.finFactor(18), 1.5); assert.equal(HM.finFactor(6), 0.5); assert.equal(HM.finFactor(30), 1.5);
+});
+test('halvchancen: målet afgøres af xG · målmand · skytte – ved terningen 0,05 (kanten, xG 0,055): MV 6 scorer imod, MV 16 ikke; FIN 18 scorer, FIN 6 ikke', () => {
+  const play = (gk, fin) => {
+    const a = arena();
+    for (const p of a.H.squad) p.skills.finishing = fin;
+    slot(a.A, 0).skills.goalkeeping = gk;
+    return simulateMatch(a.H, a.A, stubRng({ [HM.HALF_P.OPEN]: true }, 0.05));
+  };
+  // FIN 10 (0,833): MV 6 → 0,055·1,24·0,833 = 0,057 > 0,05 mål; MV 16 → 0,029 redning (med gkFactor = 1: 0,046 – ingen mål)
+  const weak = play(6, 10), strong = play(16, 10);
+  assert.ok(weak.homeGoals >= 20, `MV 6: ${weak.homeGoals}`);
+  assert.equal(strong.homeGoals, 0);
+  // MV 10: FIN 18 → 0,0825 mål; FIN 6 → 0,0275 ingen (med finFactor = 1: 0,055 – mål for begge)
+  assert.ok(play(10, 18).homeGoals >= 20);
+  assert.equal(play(10, 6).homeGoals, 0);
+});
+test('halvchancen: en let redning tæller i 🧤, men ikke i karakterfradraget – 30 lette redninger giver ikke 6,5 i fradrag; efter et mål på halvchancen ingen ny afslutning i minuttet', () => {
+  const a = arena();
+  const m = simulateMatch(a.H, a.A, stubRng({ [HM.HALF_P.OPEN]: true }, 0.5));   // terningen 0,5: aldrig mål, aldrig forbi → redning hver gang
+  const gk = rOf(m, 'away', a.A, 0);
+  assert.equal(gk.saves, 30, 'data: 30 lette redninger');
+  assert.ok(!('easySaves' in gk), 'det midlertidige felt gemmes ikke');
+  assert.ok(gk.rating >= 9, `rating ${gk.rating} (med fradraget: 6,5 + 3 + 0,5 − 0,25·26 = 3,5)`);
+  assert.equal(m.events.filter((e) => e.type === 'SAVE' && e.minor).length, 30);
+  // Mål på halvchancen (terningen 0,001) med chancen også slået til: chancen kommer ikke i samme minut
+  const b = arena();
+  const g = simulateMatch(b.H, b.A, stubRng({ [HM.HALF_P.OPEN]: true, [HM.CHANCE_P.NORMAL]: true }, 0.001));
+  assert.ok(g.homeGoals >= 20, `data: ${g.homeGoals} mål`);
+  assert.equal(g.stats.hShots, g.homeGoals, 'én afslutning pr. minut – halvchancens mål');
 });

@@ -52,7 +52,8 @@ try {
       const mine = m.homeId === me.id || m.awayId === me.id;
       lines.push(`## ${m.homeName} ${m.homeGoals}-${m.awayGoals} ${m.awayName}${mine ? '  ← dit hold' : ''}`, '');
       if (m.stoppage) lines.push(`- ⏱️ Tillægstid: 1. halvleg ${m.stoppage[0].S} min (heraf ${m.stoppage[0].var} VAR), 2. halvleg ${m.stoppage[1].S} min (heraf ${m.stoppage[1].var} VAR)`);
-      for (const e of m.events) lines.push(`- ${evMin(e)} ${e.text}${e.snapshot ? '  📍' : ''}`);
+      // v3.17.0: [skjult] = står i data, ikke i Kamp-fanen (botternes gentagne FASE-linjer); [lille] = halvchancen (nedtonet)
+      for (const e of m.events) lines.push(`- ${evMin(e)} ${e.quiet ? '[skjult] ' : ''}${e.minor ? '[lille] ' : ''}${e.text}${e.snapshot ? '  📍' : ''}`);
       const s = m.stats || {}, ps = (s.hPoss ?? 0) + (s.aPoss ?? 0) || 1, hp = Math.round((s.hPoss ?? 0) / ps * 100);   // som i Kamp-fanen (procent)
       lines.push('', `Kamptal (hjemme/ude): besiddelse ${hp} %/${100 - hp} % · skud ${s.hShots}/${s.aShots} · på mål ${s.hOnTarget}/${s.aOnTarget} · hjørner ${s.hCorners}/${s.aCorners} · gule ${s.hYellows}/${s.aYellows}`, '');
     }

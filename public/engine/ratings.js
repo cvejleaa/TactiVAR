@@ -31,7 +31,7 @@ export function createSheet() {
         teamId: team.id, teamName: team.name, isUserTeam: !team.isBot, isHome, role, line: player.line, slot,
         minIn, minOut: 90, rating: START_RATING + (rng.next() * 0.3 - 0.15), stars: 0,
         startCounterMastery: oppMastery, gainedCounterXp: 0,
-        goals: 0, assists: 0, saves: 0, aerialWins: 0, tacticWins: 0, freeRuns: 0, freeRunsWon: 0, headerGoals: 0, penaltyGoals: 0, setPieceGoals: 0, yellowCard: false, yellows: 0, red: null, injured: false, isMotM: false,
+        goals: 0, assists: 0, saves: 0, easySaves: 0, aerialWins: 0, tacticWins: 0, freeRuns: 0, freeRunsWon: 0, headerGoals: 0, penaltyGoals: 0, setPieceGoals: 0, yellowCard: false, yellows: 0, red: null, injured: false, isMotM: false,
         km90: run.km90, drain90: run.drain90, topSpeed: run.topSpeed, hiShare: run.hiShare, distanceKm: 0, hiKm: 0,
       };
       return entries[player.id];
@@ -106,6 +106,9 @@ export function finalizeSheet(sheet, homeGoals, awayGoals, rng, xpFor) {
     const scored = e.isHome ? homeGoals : awayGoals;
     e.rating += scored > conceded ? RESULT_BONUS : scored < conceded ? -RESULT_BONUS : 0;
     if ((e.saves ?? 0) > SAVES_FULL) e.rating -= 0.25 * (e.saves - SAVES_FULL);
+    // Lette redninger (halvchancer, v3.17.0) tæller med i 🧤-tallet, men ikke i fradraget – ellers sænkede flere redninger
+    // karakteren (QC). Feltet er midlertidigt og gemmes ikke (som km90).
+    e.saves = (e.saves ?? 0) + (e.easySaves ?? 0); delete e.easySaves;
     e.rating = clamp(e.rating, RATING_MIN, RATING_MAX);
     // Clean sheet i statistikken: kun målmanden (v3.11, brugeren: "Det er kun målmanden der får
     // Clean sheet" – før også forsvaret), 0 mål imod og mindst 59 spilleminutter (minOut − minIn;

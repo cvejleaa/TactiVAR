@@ -14,7 +14,15 @@ import { fingerprint } from '../../tools/fingerprint.mjs';
 // v3.16.7 M1: VAR-offside kun hvor der kan være offside (ikke fra hjørnespark, ikke oplægsgiveren, intet flag efter cutback) – rng forskudt (før 59774fd1…)
 // v3.16.7 M3: cutbackens kant og back vælges efter plads (rækkevidden først) – rng-forskydning (før f2dc7fae…)
 // v3.16.7 M4: det røde kort før skadesskiftet (register trækker rng – forskudt); målets variant bruges ikke op af dit holds indledning (før d53d2d23…)
-const NOPROSE_400 = '728d3f6ee2491f9f5884555d5d4f19816a1496df840c9c79371d26ea5dc64677';
+// v3.17.0: listerne bygges igen efter skadesskiftet (den udskiftede nævnes ikke resten af minuttet) (før 728d3f6e…)
+// v3.17.0: dødboldens indlæg slås af kant/midtbane (crossTaker) (før ae16c682…)
+// v3.17.0: dødboldens indlæg slås af kant/midtbane (crossTaker), SETPIECE_DEF_EDGE 4,1 (før 3c768989…)
+// v3.17.0: løbs-cutbacken møder backen på sin kant (flankBack) (før 043be8b7…)
+// v3.17.0: egen Hvis-Så pr. bot-profil, intet skift til samme formation (før dd970075…)
+// v3.17.0: opbygningen styrer chancen (BUILD_LIFT_P/OPEN_DAMP_P) (før e2b30f35…)
+// v3.17.0: halvchancen (≈ 25 skud), KEEPER_EDGE 1,9, løft pr. løbe-indstilling (før df778b60…)
+// v3.17.0: halvchancen (≈ 25 skud, 27 % konvertering), opbygningens løft pr. løbe-indstilling (før 5aab5417…)
+const NOPROSE_400 = '47d94e7a7e4eb985fa92a7057b05f60e1a354210395c239d6451c38358a1e6ba';
 
 test('fingeraftryk uden prosa: de 400 seedede kampe er de samme som ved sidste bevidste motorændring (v3.16.6 M5)', async () => {
   const r = await fingerprint(400);

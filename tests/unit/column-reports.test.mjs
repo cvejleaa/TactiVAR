@@ -12,7 +12,7 @@ const league = (seed) => createLeague(createRng(seed));
 const KEYS = ['build', 'buildWon', 'counterGoalsAgainst', 'countersAgainst', 'crosses', 'crossesWon', 'cutbackGoals', 'cutbacks', 'cutbacksBlocked', 'end', 'headerGoals', 'oppCrosses', 'oppCrossesWon', 'oppCutbacks', 'oppCutbacksBlocked', 'oppTrapWon', 'press', 'pressWon', 'runGoals', 'runs', 'runsWon', 'side', 'start', 'trapWon'];   // v3.16.7: trapWon/oppTrapWon
 
 test('endState: faser og trukne positioner gemmes kun for MENNESKESTYREDE sider – hjemme, ude, begge og ingen', () => {
-  const mk = (seed, human) => { const L = league(seed); const [A, B] = [L.teams[0], L.teams[1]]; A.isBot = !human.includes('home'); B.isBot = !human.includes('away'); A.tactics.customCoords = { 6: { x: 40, y: 40 } }; B.tactics.customCoords = { 7: { x: 60, y: 30 } }; return { A, B, m: simulateMatch(A, B, createRng(seed + 1)) }; };
+  const mk = (seed, human) => { const L = league(seed); const [A, B] = [L.teams[0], L.teams[1]]; A.isBot = !human.includes('home'); B.isBot = !human.includes('away'); A.tactics.customCoords = { 6: { x: 40, y: 40 } }; B.tactics.customCoords = { 7: { x: 60, y: 30 } }; A.tactics.conditionalRules = [];   /* intet Hvis-Så-skift, der nulstiller positionerne (v3.17.0: hjemme kom bagud) */ return { A, B, m: simulateMatch(A, B, createRng(seed + 1)) }; };
   const has = (e) => ['phases' in e, 'customCoords' in e];
   for (const [human, home, away] of [[['home'], [true, true], [false, false]], [['away'], [false, false], [true, true]], [['home', 'away'], [true, true], [true, true]], [[], [false, false], [false, false]]]) {
     const { A, B, m } = mk(3, human);
@@ -74,7 +74,8 @@ test('ownReport: modstander-tallene er modstanderens egne (cutbacks og høje bol
     const g = (n) => `${n} ${n === 1 ? 'gang' : 'gange'}`;   // v3.16.7: "af 1 gang"
     // v3.16.7: offside-fælden står for sig – egne offsides i opbygningen, fælde-sejre i presset
     const off = ownerRep.oppTrapWon, trap = ownerRep.trapWon;
-    const bld = `Din opbygning kom igennem ${ownerRep.buildWon} af ${g(ownerRep.build)}${off ? ` (af de ${ownerRep.build - ownerRep.buildWon} stop var ${off} offside)` : ''}`;
+    const stops = ownerRep.build - ownerRep.buildWon, offT = !off ? '' : stops === 1 ? ' (stoppet var offside)' : off === stops ? ` (alle ${stops} stop var offside)` : ` (af de ${stops} stop var ${off} offside)`;   // v3.17.0
+    const bld = `Din opbygning kom igennem ${ownerRep.buildWon} af ${g(ownerRep.build)}${offT}`;
     const prs = trap ? `dit pres stoppede opbygningen ${ownerRep.pressWon} af ${g(ownerRep.press)} (${ownerRep.pressWon - trap} ${ownerRep.pressWon - trap === 1 ? 'erobring' : 'erobringer'}, ${trap} på offside).` : `dit pres vandt bolden ${ownerRep.pressWon} af ${g(ownerRep.press)}.`;
     const want = !ownerRep.press ? `${bld}.` : !ownerRep.build ? `D${prs.slice(1)}` : `${bld}; ${prs}`;   // v3.16.7: aldrig "0 af 0"
 

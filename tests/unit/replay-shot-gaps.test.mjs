@@ -165,7 +165,7 @@ test('60 rigtige kampe: blokerede skud ender hos den NAVNGIVNE blokerer; mål i 
         assert.ok(def.some((q) => q[1] === end[0] && q[2] === end[1]), 'hos en forsvarer'); assert.ok(Math.abs(end[1] - line(0)) < 25, 'ved målet'); n.save++;
       } else if (mm.kind === 'MISS') {
         if (e.label === 'Blokeret') {
-          const nm = e.text.match(/(#\d+ .+?) kaster sig ind/), id = idOf(nm?.[1]);
+          const nm = e.text.match(/(#\d+ .+?) (?:kaster sig ind|blokerer|får et ben|lukker af)/), id = idOf(nm?.[1]);
           assert.ok(id, `blokereren findes i karakterarket: ${nm?.[1]}`);
           assert.deepEqual(end, def.find((q) => q[0] === id).slice(1)); n.blok++;
         } else if (/rammer stolpen/.test(e.text)) { assert.ok([44, 56].includes(end[0]) && end[1] === line(3)); n.stolpe++; /* stolpen i målets forkant (QC v3.16.2) */ }

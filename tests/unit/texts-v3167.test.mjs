@@ -40,7 +40,7 @@ test('"Det kostede:" kun med årsag – ellers "Ét af målene imod kom på kont
   const R = (o) => ({ build: 0, buildWon: 0, press: 0, pressWon: 0, crosses: 0, crossesWon: 0, cutbacks: 0, cutbacksBlocked: 0, cutbackGoals: 0, runGoals: 0, counterGoalsAgainst: 0,
     start: { formation: '4-4-2', phases: { phase1_buildUp: { passingStyle: 'SHORT' } } }, end: { formation: '4-4-2', phases: { phase1_buildUp: { passingStyle: 'SHORT', offBallRuns: 'NORMAL' } } }, ...o });
   const v = (r, round = 5) => buildColumn({ matches: [M({ ownReports: { h1: r } })], viewerTeamId: 'h1', round }).sections[0].paras.slice(1);
-  assert.deepEqual(v(R({ counterGoalsAgainst: 1 })), ['Ét af målene imod kom på kontra.']);
+  assert.deepEqual(v(R({ counterGoalsAgainst: 1 })), ['Modstanderen slog én gang til på kontra.']);
   assert.ok(v(R({ counterGoalsAgainst: 1 })).every((t) => !t.includes('Det kostede')));
   // "fandt ingen vej": variant 2 (pickBy) – find runden, der vælger den, og sammenlign 0 og 3 gennembrud af 8
   const variant2 = [...Array(40).keys()].find((rd) => v(R({ build: 8, buildWon: 3 }), rd)[0]?.startsWith('Kun 3 af 8'));
@@ -103,13 +103,13 @@ test('forbi mål: samme "🎯"-tekst gentages ikke i en kamp, før alle seks er 
   let n = 0, rounds = 0;
   for (const m of C) {
     const used = new Set();
-    for (const e of m.events.filter((x) => x.type === 'MISS' && x.text.startsWith('🎯'))) {
+    for (const e of m.events.filter((x) => x.type === 'MISS' && !x.minor && x.text.startsWith('🎯'))) {   // halvchancens forbi (minor) har sin egen liste (v3.17.0)
       const t = MISS_TXT.find((x) => e.text.endsWith(` ${x}.`)); assert.ok(t, e.text);
       assert.ok(!used.has(t), `gentaget før alle var brugt: ${t}`); used.add(t); n++;
       if (used.size === MISS_TXT.length) { used.clear(); rounds++; }
     }
   }
-  assert.ok(n >= 250, `data: ${n} forbi-linjer`);   // ≈1 pr. kamp – "alle seks brugt" bevises i engine-branches (tvunget)
+  assert.ok(n >= 180, `data: ${n} forbi-linjer`);   // v3.17.0: 250 → 180 (færre hovedchancer; halvchancens forbi har sin egen liste)   // ≈1 pr. kamp – "alle seks brugt" bevises i engine-branches (tvunget)
 });
 test('vary + runden: samme kamp i to forskellige runder giver (for nogle aktører) en anden første variant – og samme kamp', () => {
   const a = corpus(40, 0), b = corpus(40, 1);

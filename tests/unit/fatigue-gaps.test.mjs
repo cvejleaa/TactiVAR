@@ -236,7 +236,7 @@ test('samlingen: højst 3 ad gangen – de trætteste først, den fjerde venter 
   assert.ok(first.every((e) => /under din grænse/.test(e.text) && !/tages med/.test(e.text)), 'ingen tæt-på, når loftet er nået');
   const wait = at3(blocked(m));
   assert.equal(wait.length, 1);
-  assert.match(wait[0].text, new RegExp(`${tag(waiting)} .*højst 3 træthedsskift ad gangen – han venter til næste skift\\.$`));
+  assert.match(wait[0].text, new RegExp(`${tag(waiting)} .*højst 3 træthedsskift ad gangen – han må vente til en senere skifte-pause \\(2 skift tilbage\\)\\.$`));
   const next = subs(m).filter((e) => e.min === 6);
   assert.equal(next.length, 2, next.map((e) => e.text).join(' | '));
   assert.ok(next[0].text.includes(`${tag(waiting)} ud`) && next[1].text.includes(`${tag(slot(H, 10))} ud`) && /tages med/.test(next[1].text), next.map((e) => e.text).join(' | '));
@@ -405,11 +405,11 @@ test('afslutninger: en træt målmand (STA 0) slipper mål ind senere i kampen �
 });
 // Resten af kaldstederne (hovedstød, kontra, indlæg, cutback, løb, dribling, opbygning/pres) er kun bundet af denne vagt:
 // hvert tal i en duel går gennem ff(...), aldrig direkte gennem freshFactor(...) – ellers er tabet i kampen væk dér.
-test('match.js bruger ff(...) i alle dueller – freshFactor kaldes kun inde i ff selv (20 kald)', async () => {
+test('match.js bruger ff(...) i alle dueller – freshFactor kaldes kun inde i ff selv (22 kald; v3.17.0 + halvchancens målmand og skytte)', async () => {
   const fs = await import('node:fs');
   const src = fs.readFileSync(new URL('../../public/engine/match.js', import.meta.url), 'utf8').replace(/\/\/.*$/gm, '');
   assert.equal((src.match(/\bfreshFactor\(/g) ?? []).length, 1, 'kun ff-definitionen kalder freshFactor(');
-  assert.equal((src.match(/(?<![A-Za-z])ff\(/g) ?? []).length, 20);
+  assert.equal((src.match(/(?<![A-Za-z])ff\(/g) ?? []).length, 22);
 });
 
 // ---------- Hvis-Så og reserverede bænkspillere ----------
@@ -520,13 +520,21 @@ test('beskeden gentages ikke, men en NY grund til samme spiller får sin egen be
   const mine = blocked(m).filter((e) => e.text.includes(tag(p)));
   assert.deepEqual(mine.map((e) => [e.min, e.text.replace(/^.*men /, '')]), [[3, 'der er ingen frisk angriber på bænken.'], [15, 'alle 3 skifte-pauser er brugt.']]);
 });
-test('et nyt holds standardregel er et planskift (bagud 65\' → 3-4-3) uden spillere – ikke en udskiftning', () => {
+// v3.17.0: hver bot-profil har sin egen regel (eller ingen) – dit hold og profilerne uden `rule` standardreglen
+test('et nyt holds standardregel er et planskift uden spillere – ikke en udskiftning; dit hold bagud 65\' → 3-4-3, botterne efter profilen', () => {
   const L = createLeague(createRng(5));
-  for (const t of L.teams) for (const tac of [t.tactics, ...t.tacticPresets.slice(0, 1)]) {
-    const [r, ...rest] = tac.conditionalRules;
-    assert.equal(rest.length, 0);
-    assert.deepEqual([r.condition, r.minuteTrigger, r.newFormation, r.action, r.subOut, r.subIn], ['TRAILING', 65, '3-4-3', 'SHIFT', null, null]);
-  }
+  const want = ['3-4-3', null, '4-4-2', null, '3-4-3', '3-4-3', '4-4-2', null];   // pr. hold (profil 0–7): ny formation, null = ingen regel
+  const minute = { '3-4-3': 65, '4-4-2': 70 };
+  L.teams.forEach((t, i) => {
+    for (const tac of [t.tactics, ...t.tacticPresets.slice(0, 1)]) {
+      const [r, ...rest] = tac.conditionalRules;
+      assert.equal(rest.length, 0);
+      if (want[i] === null) { assert.equal(r, undefined, t.name); continue; }
+      assert.deepEqual([r.condition, r.minuteTrigger, r.newFormation, r.action, r.subOut, r.subIn], ['TRAILING', minute[want[i]], want[i], 'SHIFT', null, null], t.name);
+      assert.equal(new Set(r.slotRemapping).size, 11);
+    }
+  });
+  assert.equal(L.teams.filter((t) => t.tactics.conditionalRules.length === 0).length, 3);
 });
 test('ruleConditionMet: "uanset stilling" er sand ved alle stillinger; uafgjort kun ved lighed; ukendt betingelse falsk', () => {
   const c = (condition, own, opp, margin = 1) => ruleConditionMet({ condition, margin }, own, opp);

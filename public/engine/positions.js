@@ -112,7 +112,8 @@ export function coupledPositions(ballTactics, oppTactics, { ballX = 50, caught =
   spread(opp, outO);
   apartFrom(ball, outB, opp, [0, ...outO]);   // også løberen og ved målmanden
   // Ved en erobring står det fangede hold i angrebsform: dets enlige angriber kan stå på boldholdets målmand (TM v3.16.1)
-  if (caught) apartFrom(opp, outO, ball, [0]);
+  // – og skubbet væk fra målmanden må han ikke lande på en forsvarer (v3.17.0: 5-3-2 → 4-4-2 gav to brikker oven i hinanden)
+  if (caught) apartFrom(opp, outO, ball, [0, ...outB]);
   return { ball, opp, line };
 }
 // Afspark (v3.16.1, brugeren: "7 spillere stående på midterlinjen ved start"): holdet i sin forsvarsform, presset sammen

@@ -17,7 +17,7 @@ const forceVar = (r, foul = false) => ({ ...r, chance: (p) => (p === VAR_RULES.G
 const next = (m, e) => m.events[m.events.indexOf(e) + 1];
 test('VAR-tjekket nævner kun en af de forreste som offside-mand – og en skytte længere tilbage får sin forreste holdkammerat tjekket', () => {
   let plain = 0, ahead = 0;
-  for (let seed = 1; seed <= 60; seed++) {
+  for (let seed = 1; seed <= 120; seed++) {   // v3.17.0: 60 → 120 (færre hovedchancer)
     const L = createLeague(createRng(seed)), H = L.teams[0], A = L.teams[1];
     const m = simulateMatch(H, A, forceVar(createRng(seed * 7)));
     const cut = Math.min(...m.events.filter((e) => e.isHome && ['SUB', 'TRIGGER', 'RED'].includes(e.type)).map((e) => e.min), 91);

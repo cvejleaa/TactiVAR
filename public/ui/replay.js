@@ -23,7 +23,8 @@ export function replaySteps(trace, highlights = false, events = null, idOf = nul
   const steps = [];
   for (const f of trace.frames) {
     if (!highlights) steps.push({ kind: 'frame', t: f.t, h: f.h, a: f.a, ball: f.ball, ev: null, poss: f.poss ?? null, duel: f.lost ? 'lost' : f.run ? 'run' : f.offside ? 'offside' : f.poss ? 'ball' : null });
-    for (const m of trace.moments.filter((x) => x.t === f.t)) {
+    // Højdepunkter: halvchancen (v3.17.0, half) kun som mål – ellers blev uddraget en halv afspilning (Spilfører)
+    for (const m of trace.moments.filter((x) => x.t === f.t && !(highlights && x.half && !x.scorer))) {
       const step = { kind: 'moment', t: m.t, h: m.h, a: m.a, ball: m.ball, ev: m.ev, actor: m.scorer ?? m.shooter, assist: m.assist ?? null };
       steps.push(step);
       const end = shotEnd(m, events?.[m.ev], idOf);
@@ -55,7 +56,7 @@ export function shotEnd(m, ev = null, idOf = null) {
     const field = def.filter((q) => q !== gk);
     if (ev?.label === 'Blokeret' && field.length) {
       // Blokeren, referatet nævner (idOf: "#7 M. Kjær" → spiller-id), ellers forsvarets markspiller nærmest skytten
-      const named = idOf && ev.text.match(/(#\d+ .+?) kaster sig ind/), q = named && field.find((p) => p[0] === idOf(named[1]));
+      const named = idOf && ev.text.match(/(#\d+ .+?) (?:kaster sig ind|blokerer|får et ben|lukker af)/), q = named && field.find((p) => p[0] === idOf(named[1]));
       const b = q ?? near(field, m.ball[0], m.ball[1]); return [b[1], b[2]];
     }
     if (/stolpe/.test(ev?.text ?? '') && !/forbi den lange stolpe/.test(ev.text)) return [left ? 44 : 56, line(3)];   // stolpen i målets forkant
@@ -96,9 +97,10 @@ export function replayEl(m, ownSide) {
   const caption = h('div', { class: 'rp-caption', id: 'rp-caption' });
   const playBtn = h('button', { class: 'mini', id: 'rp-play', onclick: () => (r.playing ? pause() : play()) }, '▶ Afspil');
   const speedBtn = h('button', { class: 'mini', id: 'rp-speed', title: 'Hastighed', onclick: () => { r.speed = SPEEDS[(SPEEDS.indexOf(r.speed) + 1) % SPEEDS.length]; speedBtn.textContent = `${r.speed}×`; } }, '1×');
-  const hlBtn = h('button', { class: 'mini', id: 'rp-highlights', title: 'Kun afslutningerne i åbent spil og på kontra (mål, redninger, forbi, VAR) – ikke straffe, frispark og hjørnespark', onclick: () => {
+  const hlBtn = h('button', { class: 'mini', id: 'rp-highlights', title: 'Kun afslutningerne i åbent spil og på kontra (mål, redninger, forbi, VAR) – ikke straffe, frispark og hjørnespark, og de små skud kun, når de gik ind', onclick: () => {
     clearTimeout(r.timer); const ev = r.steps[r.i]?.ev; r.highlights = !r.highlights; r.steps = replaySteps(m.trace, r.highlights, m.events, idOf);
-    r.i = ev != null ? Math.max(0, r.steps.findIndex((s) => s.ev === ev)) : 0; flag(hlBtn, 'active', r.highlights); show();
+    const at = ev != null ? r.steps.findIndex((s) => s.ev === ev) : -1;   // en sprunget halvchance: nærmeste trin efter den (QC – før trin 0)
+    r.i = at >= 0 ? at : ev != null ? Math.max(0, r.steps.findIndex((s) => s.ev > ev)) : 0; flag(hlBtn, 'active', r.highlights); show();
     // Kører afspilningen, fortsætter den fra det nye trin (RM v3.16.2: ryddet timer uden ny standsede den tavst med "⏸ Pause")
     if (r.playing) r.timer = setTimeout(tick, STEP_MS[r.steps[r.i].kind] / r.speed); } }, '⭐ Højdepunkter');
   const el = h('div', { class: 'replay', id: 'replay' },

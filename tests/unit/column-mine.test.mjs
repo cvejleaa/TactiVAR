@@ -138,7 +138,7 @@ test('kampvurdering: hver regels tekst og tærskel (begge sider af grænsen), é
   assert.deepEqual(only(R({ cutbacks: 10, cutbacksBlocked: 5 })), [], '50 % er under 60 %');
   assert.deepEqual(only(R({ cutbacks: 10, cutbacksBlocked: 6 })).length, 1, '60 % er grænsen (≥)');
   // kontramål imod, pres, løb
-  assert.deepEqual(only(R({ counterGoalsAgainst: 1 })), ['Ét af målene imod kom på kontra.']);   // årsagen kun med belæg (QC F2); uden den ingen "Det kostede:" (v3.16.7)
+  assert.deepEqual(only(R({ counterGoalsAgainst: 1 })), ['Modstanderen slog én gang til på kontra.']);   // årsagen kun med belæg (QC F2); uden den ingen "Det kostede:" (v3.16.7; variant efter runden v3.17.0)
   assert.deepEqual(only(R({ counterGoalsAgainst: 2 })), ['2 af målene imod kom på kontra.']);
   const MANY = { phase1_buildUp: { passingStyle: 'SHORT', attackFocus: 'CENTRAL', offBallRuns: 'MANY' } };
   assert.deepEqual(only(R({ counterGoalsAgainst: 1, endPhases: MANY })), ['Det kostede: et kontramål imod, da bolden blev tabt med mange spillere fremme.']);
@@ -147,7 +147,7 @@ test('kampvurdering: hver regels tekst og tærskel (begge sider af grænsen), é
   assert.deepEqual(only(R({ press: 10, pressWon: 7 })), ['Dit pres vandt bolden 7 af 10 gange.']);
   assert.deepEqual(only(R({ press: 3, pressWon: 3 })), [], 'under 4 pres-dueller');
   assert.deepEqual(only(R({ press: 10, pressWon: 4 })), [], '40 % er under 50 %');
-  assert.deepEqual(only(R({ runGoals: 1 })), ['Løbene uden bold gav et mål.']);
+  assert.deepEqual(only(R({ runGoals: 1 })), ['Et af løbene uden bold endte i nettet.']);
   assert.deepEqual(only(R({ runGoals: 3 })), ['Løbene uden bold gav 3 mål.']);
   // formationsskift: kun når begge formationer kendes og er forskellige; "holdt" kun ved sejr
   const sw = (end, start = '4-4-2') => R({ startFormation: start, endFormation: end });
@@ -214,13 +214,13 @@ test('kun seerens egen kamprapport læses: to menneskehold i samme kamp får hve
   const rep = { h1: R({ runGoals: 1 }), a1: R({ counterGoalsAgainst: 2 }) };
   const m = () => M({ hG: 1, aG: 1, ownReports: rep });
   const para = (viewer) => buildColumn(inp({ matches: [m()], viewerTeamId: viewer })).sections[0].paras.slice(1);
-  assert.deepEqual(para('h1'), ['Løbene uden bold gav et mål.']);
+  assert.deepEqual(para('h1'), ['Et af løbene uden bold endte i nettet.']);
   assert.deepEqual(para('a1'), ['2 af målene imod kom på kontra.']);   // årsagen kun med belæg (QC F2)
   // En bot-modstander (ingen rapport for dem) og en seer, hvis side mangler rapport (gammelt gem): ingen vurdering
   const only = (viewer, key) => buildColumn(inp({ matches: [M({ hG: 1, aG: 1, ownReports: { [key]: R({ runGoals: 1 }) } })], viewerTeamId: viewer })).sections[0].paras.slice(1);
   assert.deepEqual(only('a1', 'h1'), [], 'udeholdets seer får ikke hjemmeholdets rapport');
   assert.deepEqual(only('h1', 'a1'), [], 'hjemmeholdets seer får ikke udeholdets rapport');
-  assert.deepEqual(only('a1', 'a1'), ['Løbene uden bold gav et mål.']);
+  assert.deepEqual(only('a1', 'a1'), ['Et af løbene uden bold endte i nettet.']);
   // Kanarie: den andens rapport kaster, når den røres
   for (const [viewer, other] of [['h1', 'a1'], ['a1', 'h1']]) {
     const mm = m(); const orig = mm.ownReports; mm.ownReports = { [viewer]: orig[viewer] };
@@ -364,7 +364,7 @@ test('"Din kamp": røde kort for begge hold – dit holds linje efter resultatet
 test('"Din kamp": de røde kort står EFTER dommen over dit hold (Spilfører v3.16.3: "… mistede en mand på rødt kort. Det kostede: et kontramål imod." læstes som årsag)', () => {
   const paras = (hR, aR) => buildColumn(inp({ matches: [M({ hG: 0, aG: 1, ev: cardsFirst(hR, aR, 0, 1), stats: { hPoss: 50, aPoss: 50, hReds: hR, aReds: aR }, ownReports: { h1: R({ counterGoalsAgainst: 1 }) } })], round: 5 })).sections[0].paras;
   const p = paras(1, 1);
-  const iv = p.findIndex((t) => t.startsWith('Ét af målene imod kom på kontra'));
+  const iv = p.findIndex((t) => /kontra\.$/.test(t) && !/rødt/.test(t));
   const im = p.findIndex((t) => /Hjem måtte spille med 10 mand|Med 10 mand efter udvisningen/.test(t)), io = p.indexOf('Ude fik rødt kort undervejs.');
   assert.ok(iv > 0 && im > 0 && io > 0, `data: dom, dit kort og modstanderens kort står alle (${JSON.stringify(p)})`);
   assert.ok(iv < im && im < io, `rækkefølge: dom (${iv}) < dit kort (${im}) < modstanderens (${io})`);

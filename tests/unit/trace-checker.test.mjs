@@ -18,7 +18,8 @@ function play(s, limit = 0) {
 }
 const errorsAfter = (m, f) => { const c = structuredClone(m); f(c); return checkTrace(c).errors; };
 const tagOf = (e) => `#${e.shirtNumber} ${e.shortName}`;
-const entry = (m, tag) => [...m.ratings.home, ...m.ratings.away].find((e) => tagOf(e) === tag);
+// side: 'h'/'a' – samme nummer og navn kan findes på begge hold (v3.17.0: "#8 M. Jensen" hos begge i seed 1)
+const entry = (m, tag, side = null) => (side ? m.ratings[side === 'h' ? 'home' : 'away'] : [...m.ratings.home, ...m.ratings.away]).find((e) => tagOf(e) === tag);
 const M = play(3);
 
 test('kontrol: en uberørt kamp giver ingen fejl, et spor med forkert version/uden spor melder det', () => {
@@ -84,7 +85,7 @@ test('skiftereglerne: et træthedsskift sker FØR billedet i sit tick, et skades
     const m = play(s, 85);
     assert.deepEqual(checkTrace(m).errors, [], `seed ${s} (udskiftningsgrænse 85)`);
     for (const e of m.events.filter((x) => x.type === 'SUB')) {
-      const [subTag, outTag] = e.label.replace(/^🔄 /, '').split(' ind for '), sub = entry(m, subTag).playerId, out = entry(m, outTag).playerId, side = e.isHome ? 'h' : 'a';
+      const side = e.isHome ? 'h' : 'a', [subTag, outTag] = e.label.replace(/^🔄 /, '').split(' ind for '), sub = entry(m, subTag, side).playerId, out = entry(m, outTag, side).playerId;
       const has = (c, t, id) => c.trace.frames[t][side].some((q) => q[0] === id);
       const t = e.min / 3, injury = /Skadesskift/.test(e.text);
       const swap = (c, tt) => { const f = c.trace.frames[tt][side]; const a = f.find((q) => q[0] === sub), b = f.find((q) => q[0] === out); if (a) a[0] = out; if (b) b[0] = sub; };
@@ -108,17 +109,26 @@ test('skiftereglerne: et træthedsskift sker FØR billedet i sit tick, et skades
 });
 
 // v3.16.1: linje-fundet tæller kun grundbilleder UDEN duel-udfald (run/lost/offside står med vilje forbi linjen) – ikke alle 30 med bold.
-test('fund og rapport: målene med billede tælles, linje-fundet tæller kun billeder med bold uden løb/erobring/offside (16 af 30), rapporten giver ingen fejl og en størrelse', () => {
+test('fund og rapport: målene med billede tælles, linje-fundet tæller kun billeder med bold uden løb/erobring/offside (30 minus duel-billederne), rapporten giver ingen fejl og en størrelse', () => {
   const r = checkTrace(M);
   assert.equal(r.finding.goals, M.trace.moments.filter((x) => x.scorer).length);
   const withBall = M.trace.frames.filter((f) => f.poss), flagged = withBall.filter((f) => f.run || f.lost || f.offside);
-  assert.deepEqual([withBall.length, flagged.length], [30, 14], 'data: både billeder med og uden duel-udfald');
-  assert.equal(r.finding.frontFrames, 16);   // 30 − 14 (alle 30 ville tælle de bevidste forbi-linjen-billeder med)
+  // v3.17.0: antallet af duel-billeder flytter sig med hver motorændring (16 → 10 → 20) – formlen er det, der bevises
+  assert.ok(withBall.length === 30 && flagged.length >= 4 && flagged.length <= 26, `data: både billeder med og uden duel-udfald (${flagged.length})`);
+  assert.equal(r.finding.frontFrames, 30 - flagged.length);   // alle 30 ville tælle de bevidste forbi-linjen-billeder med
   assert.equal(r.finding.frontBehind, 0);
   const rep = traceReport(6);
   assert.deepEqual(rep.errors, []);
   assert.ok(rep.bytesPerMatch > 3000 && rep.bytesPerMatch < 25000, `${rep.bytesPerMatch}`);
   // 6 kampe · 30 billeder med bold = 180, heraf dem uden duel-udfald (104 i v3.16.6, 101 efter v3.16.7's rng-forskydning) – formlen
   // er bevist på M ovenfor; her kun, at rapporten summerer (et fast tal flyttede sig med hver motorændring)
-  assert.equal(rep.sum.frontFrames, 101);   // TM: fastholdt (et bånd rummede både 104 og 101); flytter sig ved bevidste motorændringer
+  // v3.17.0: summen regnes uafhængigt fra de samme 6 kampe (frames med bold uden duel-udfald) – et fast tal (101) flyttede sig
+  // med hver motorændring; formlen skal stadig give præcis summen (en rapport, der tæller forkert eller kun én kamp, er rød)
+  let want = 0;
+  for (let s = 1; s <= 6; s++) {
+    const L = createLeague(createRng(s));
+    want += simulateMatch(L.teams[s % 8], L.teams[(s + 3) % 8], createRng(s * 31)).trace.frames.filter((f) => f.poss && !f.run && !f.lost && !f.offside).length;
+  }
+  assert.ok(want > 60, `data: ${want}`);
+  assert.equal(rep.sum.frontFrames, want);
 });
