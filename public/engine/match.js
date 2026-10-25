@@ -566,9 +566,9 @@ export function simulateMatch(home, away, rng, opts = {}) {
       sheet.adjust(shooter.id, 1.25); sheet.bump(shooter.id, 'goals'); sheet.adjust(gk.id, -0.3);
       st[k(win, 'CounterGoals')]++;
       // Oplægsgiveren, teksten nævner, får også assisten (v3.10 – ellers modsagde statistikken referatet).
-      const helper = rng.pick(wR.mids.filter((p) => p !== shooter)) ?? null;   // aldrig "#7 fandt #7" (Spilfører v3.16)
-      if (helper && helper.id !== shooter.id) { sheet.adjust(helper.id, 0.4); sheet.bump(helper.id, 'assists'); }
-      const desc = describeGoal('COUNTER', tag(shooter), tag(helper ?? shooter), min, rng, goalTexts);
+      const helper = helperFor(wR, shooter, rng.pick(wR.mids.filter((p) => p !== shooter)));
+      sheet.adjust(helper.id, 0.4); sheet.bump(helper.id, 'assists');
+      const desc = describeGoal('COUNTER', tag(shooter), tag(helper), min, rng, goalTexts);
       goalsPool.push({ scorer: tag(shooter), teamName: win.team.name, match: `${home.name} - ${away.name}`, min, kind: 'COUNTER', spectacle: goalSpectacle('COUNTER', { pace: shooter.skills.pace }, min, rng), desc });
       addEv(min, 'GOAL', 'HIGHLIGHT', win.isHome, true, `⚽ Kontramål: ${tag(shooter)}`, `⚽ [${win.team.name} • ${hG}-${aG}] MÅÅÅL PÅ KONTRA!${why} ${desc}${varOk}`);
       snapshot(win, shooter, helper, SPOT.GOAL, true);
@@ -592,6 +592,10 @@ export function simulateMatch(home, away, rng, opts = {}) {
   const goalFor = (side) => { if (side === H) hG++; else aG++; st[k(side, 'OnTarget')]++; };
   const best = (list, f) => list.filter(Boolean).reduce((b, p) => (f(p) > f(b) ? p : b));
   const outfield = (R) => [...R.defs, ...R.mids, ...R.atts];
+  // Oplægsgiveren er aldrig skytten selv (Spilfører v3.16.4: "#7 fandt #7" – fx kontraen, når skytten er kædens eneste
+  // midtbanespiller). Er kandidaten skytten eller ingen, tages den bedste afleverer blandt de andre markspillere; intet rng,
+  // så kun de kampe ændres. Én vagt for alle mål med oplæg: kontra, finishAttempt og luftduellen (tools/measure-assist.mjs).
+  const helperFor = (R, shooter, cand) => (cand && cand !== shooter ? cand : best(outfield(R).filter((p) => p && p !== shooter), (p) => p.skills.passing));
   const SP_KIND = { hjørnespark: 'CORNER', frispark: 'SETPIECE' };
   const isSetPieceKind = (kind) => kind === 'PENALTY' || kind === 'FREEKICK' || kind === 'CORNER' || kind === 'SETPIECE';
   // Bogfører et mål af typen kind for skytten (måltype pr. spiller og pr. hold til statistikken).
@@ -606,7 +610,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // source (åbent spil): 'cross' eller 'long' – kun til teksten for dit eget hold.
   // Returnerer 'goal', 'saved', 'missed', 'disallowed' (VAR) eller 'cleared'.
   function aerialDuel(att, def, cR, dR, min, shooter, assister, defender, setPiece = null, source = null, snapMoves = null) {
-    if (!setPiece) { shotSide = att; shotCaught = false; setPieceNow = false; shotBy = shooter; shotLong = false; momentCheck = null; }
+    if (!setPiece) { shotSide = att; shotCaught = false; setPieceNow = false; shotBy = shooter; shotLong = false; momentCheck = null; assister = helperFor(cR, shooter, assister); }
     const gk = dR.gk;
     const aDef = dR.cbs.length ? (dR.cbs.includes(defender) ? defender : dR.cbs[Math.max(0, dR.defs.indexOf(defender)) % dR.cbs.length]) : defender;
     const kind = setPiece ? SP_KIND[setPiece] : 'HEADER';
@@ -661,6 +665,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // lead = dit holds egen indledning ("✅ … lægger den tilbage til …"). Returnerer om der blev scoret.
   function finishAttempt(att, def, cR, dR, min, finisher, helper, kind, { bonus = 0, lead = '', onGoal = null, snapMoves = null } = {}) {
     shotSide = att; shotCaught = false; setPieceNow = false; shotBy = finisher; shotLong = kind === 'LONGSHOT'; momentCheck = null;
+    helper = helperFor(cR, finisher, helper);
     const gk = dR.gk, fs = finisher.skills;
     if (fs.finishing * ff(finisher) + rng.next() * 8 + bonus > gk.skills.goalkeeping * ff(gk) + rng.next() * 8 + KEEPER_EDGE) {
       const varOk = varGoalCheck(att, def, dR, min, finisher, null, kind === 'CUTBACK');

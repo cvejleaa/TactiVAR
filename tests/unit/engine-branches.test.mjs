@@ -2163,12 +2163,12 @@ test('hjørnespark efter redning: kun efter en reddet afslutning i åbent spil o
   assert.equal(run.m.stats.hCorners, run.m.events.filter((e) => e.label === 'Redning').length);
   assert.ok(run.m.stats.hCorners >= 2, String(run.m.stats.hCorners));
 });
-test('lang bold: er oplægsgiveren samme spiller som hovedstødsspilleren, bogføres ingen assist (kun målet)', () => {
+test('lang bold: er oplægsgiveren samme spiller som hovedstødsspilleren, går assisten til en ANDEN (v3.16.6: aldrig "#7 fandt #7")', () => {
   // v3.12: hovedstødsspilleren er den, der står i feltet – plads 8 trukket ind på (50, 16); lastPick:
   // den lange bolds oplægsgiver = sidste midtbanespiller = samme spiller. (Et indlæg slås fra kanten af en anden.)
   const { a, m, pool } = spx({ script: { 0.3: once, 0.15: true }, home: { p1: { passingStyle: 'DIRECT_LONG' } }, wrap: lastPick, tweak: (a2) => { slot(a2.H, 8).aerialPower = 20; a2.H.tactics.customCoords = { 8: { x: 50, y: 16 } }; } });
   assert.equal(pool.length, 1); assert.equal(pool[0].scorer, tg(slot(a.H, 8)));
-  assert.equal(rOf(m, 'home', a.H, 8).goals, 1); assert.equal(rOf(m, 'home', a.H, 8).assists, 0); assert.equal(sumOf(m, 'home', 'assists'), 0);
+  assert.equal(rOf(m, 'home', a.H, 8).goals, 1); assert.equal(rOf(m, 'home', a.H, 8).assists, 0); assert.equal(sumOf(m, 'home', 'assists'), 1, 'holdets bedste afleverer blandt de andre');
 });
 test('hjørnespark: oplægsgiveren er den bedste afleverer; hovedstødsspilleren en anden end ham, selv om han er bedst i luften', () => {
   const t = (a) => { slot(a.H, 6).skills.passing = 15; slot(a.H, 6).aerialPower = 25; slot(a.H, 9).skills.finishing = 15; slot(a.H, 3).aerialPower = 20; };

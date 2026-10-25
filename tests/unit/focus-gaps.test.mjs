@@ -396,10 +396,11 @@ function plainShot({ shooterSkills = {}, spots = { 9: { x: 50, y: 10 } }, setup 
   const m = simulateMatch(a.H, a.A, stubRng({ 0.3: shots(2) }));
   return { a, m };
 }
-test('almindelig afslutning: skytten er også første midtbane (oplægsgiveren) → ingen assist til sig selv, og ratingen er 6,5 + 2·1,25 (ikke solo)', () => {
+test('almindelig afslutning: skytten er også første midtbane (oplægsgiveren) → assisten går til en anden (v3.16.6), og ratingen er 6,5 + 2·1,25 (ikke solo)', () => {
   const r = plainShot({ spots: { 5: { x: 50, y: 10 } }, setup: (a) => { Object.assign(slot(a.H, 5).skills, { finishing: 10 }); slot(a.H, 9).skills.finishing = 0; } });
   assert.deepEqual(r.m.goalsPool.map((g) => [g.kind, g.scorer]), [['COMBINATION', tg(slot(r.a.H, 5))], ['COMBINATION', tg(slot(r.a.H, 5))]]);
-  assert.equal(r.m.ratings.home.reduce((s, e) => s + e.assists, 0), 0);
+  assert.equal(r.m.ratings.home.reduce((s, e) => s + e.assists, 0), 2, 'én assist pr. mål – til en anden end skytten');
+  assert.equal(r.m.ratings.home.find((e) => e.playerId === slot(r.a.H, 5).id).assists, 0);
   assert.equal(r.m.ratings.home.find((e) => e.playerId === slot(r.a.H, 5).id).rating, 9.4);   // + 0,4 sejr (v3.15)
 });
 test('almindelig afslutning: målmanden er aldrig modtager, selv om han er trukket helt frem og har den bedste afslutning', () => {

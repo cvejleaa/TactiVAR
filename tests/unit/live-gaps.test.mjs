@@ -81,12 +81,14 @@ test('dit mål (kombination): billedet har ALLE 11 pladser med de levende koordi
   // Billedet hænger på målets egen hændelse (ikke den første i kampen) – alle andre hændelser har intet
   assert.ok(m.events.filter((e) => e.snapshot).every((e) => e.type === 'GOAL') && m.events[0].snapshot === undefined);
 });
-test('oplægsgiveren markeres ikke, når han selv scorer (helper === scorer) – dræber assist-vagten helper !== scorer', () => {
+test('er oplægsgiveren skytten selv, markeres holdets bedste afleverer blandt de andre (v3.16.6 helperFor – aldrig "#7 fandt #7")', () => {
   // LM (plads 5) er både første midtbane (oplægsgiver) og den, der står nærmest: kombination uden eget oplæg
   const { a, m } = mine({ spots: { 5: { x: 50, y: 20 } } });
   const e = goalEvents(m, 'GOAL')[0];
   assert.equal(e.snapshot.scorer, slot(a.H, 5).id);
-  assert.equal(e.snapshot.assist, null);
+  const others = [1, 2, 3, 4, 6, 7, 8, 9, 10].map((i) => slot(a.H, i)), top = Math.max(...others.map((p) => p.skills.passing));
+  assert.ok(e.snapshot.assist && e.snapshot.assist !== slot(a.H, 5).id, `oplæg: ${e.snapshot.assist}`);
+  assert.equal(others.find((p) => p.id === e.snapshot.assist)?.skills.passing, top, 'den bedste afleverer');
 });
 test('hovedstødsmål: bolden på (50,16), bold-siden (88) rykker holdet 11 mod højre, scorer og indlægsgiver – og et dødbolds-hovedstød har intet billede', () => {
   const { a, m } = mine({ spots: { 9: { x: 40, y: 28 } }, home: { p1: { attackFocus: 'HIGH_CROSSES' } }, script: { 0.52: true } });
