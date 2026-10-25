@@ -491,7 +491,7 @@ Fra Spilførerens sæsongennemgange; kampene ændres (fingeraftrykket bumpet bev
   besiddelse og modtagervalg bruger de rå evner), løber ikke fri og
   tager ingen dødbolde; referatet: "X halter – Y tager straffen/frisparket". I pausen skiftes han ud, hvis der er et skift
   tilbage ("Pauseskift for den haltende" – automatisk, også for dit hold, og det bruger et af dine skift; den friskeste i
-  kæden, der ikke er sat til en Hvis-Så-regel). At halte koster mindre end et rødt kort (målforskel −0,10 mod −0,67,
+  kæden, der ikke er sat til en Hvis-Så-regel). At halte koster mindre end et rødt kort (målforskel −0,17 mod −0,67,
   `tools/measure-limp.mjs` – uden bænk, så han halter hele kampen: en øvre grænse). En lavere modtagervægt blev målt uden effekt og droppet.
 - **Bevidst ikke**: langskudsandelen i dine kampe (33 % i en sæson) er taktikken "Centralt" og en uheldig sæson, ikke en
   fejl (9,3 % mod 7,5 % over 300 sæsoner; med en bots taktik 5,6 %). Unikke navne på tværs af hold kommer i en egen udgivelse

@@ -638,7 +638,7 @@ test('bot: før 75\' bruges højst 4 træthedsskift og 2 skifte-pauser (én af h
   const before = fatigue.filter((e) => e.min < 75), windows = new Set(before.filter((e) => e.min !== 45).map((e) => e.min));
   assert.ok(before.length === 4, `før 75': ${before.map((e) => e.min).join()} (5 uden reserven)`);
   assert.ok(windows.size <= 1, `pauser før 75' (pausen 45' tæller ikke): ${[...windows].join()}`);
-  assert.ok(fatigue.length === 5 && fatigue.some((e) => e.min >= 75), `efter 75' det sidste: ${fatigue.map((e) => e.min).join()}`);
+  assert.deepEqual(fatigue.map((e) => e.min), [45, 45, 45, 48, 75], 'det femte i præcis 75\' (until 75, ikke 78 og ikke <=)');
 });
 test('bot: skifte-pausen gemmes til skaden – skader i 51\' og 60\' og en træt i 63\': den trætte venter, skaden i 72\' får en indskiftning', () => {
   // Uden pause-reserven (keep.windows 0) tager træthedsskiftet i 63' den tredje pause, og skaden i 72' må spille videre haltende
@@ -648,4 +648,33 @@ test('bot: skifte-pausen gemmes til skaden – skader i 51\' og 60\' og en træt
   const m = simulateMatch(H, A, stubRng({ 0.06: (n) => n === 16 || n === 19 || n === 23, 0.5: true, 0.4: true }));
   const home = m.events.filter((e) => e.isHome && (e.type === 'SUB' || e.type === 'INJURY' || /Ingen indskiftning/.test(e.text ?? ''))).map((e) => `${e.min}:${e.type}`);
   assert.deepEqual(home, ['51:INJURY', '51:SUB', '60:INJURY', '60:SUB', '72:INJURY', '72:SUB'], home.join(' '));
+});
+test('rotation (TM v3.16.6): to trætte i samme kæde og ÉN frisk på bænken → kun én rotation, ingen spiller to gange i opstillingen', () => {
+  const { H, A } = arena({ homeLimit: 0, homeBot: true });
+  slot(H, 6).freshness = 60; slot(H, 7).freshness = 60;
+  const mids = bench(H).filter((p) => p.line === 'MID');
+  mids.forEach((p, i) => { p.freshness = 100; if (i > 0) p.injuryMatchesLeft = 3; });
+  const m = simulateMatch(H, A, stubRng({}), { liveEnergy: false });
+  const rot = m.events.filter((e) => e.type === 'LINEUP' && e.text.includes('starter i stedet for en træt'));
+  const ids = m.ratings.home.filter((e) => e.minIn <= 1).map((e) => e.playerId);
+  assert.equal(rot.length, 1, rot.map((e) => e.text).join(' | '));
+  assert.equal(new Set(ids).size, ids.length, 'ingen dublet');
+  assert.equal(ids.length, 11);
+});
+test('skadeserstatning (TM v3.16.6): lige friske i kæden → den bedste (avgSkill) vælges', () => {
+  const { H, A } = arena({ homeLimit: 0, homeBot: false });
+  slot(H, 7).injuryMatchesLeft = 2;
+  const mids = bench(H).filter((p) => p.line === 'MID');
+  mids.forEach((p, i) => { p.freshness = 100; p.skills = SK(i === mids.length - 1 ? 11 : 10); });
+  const m = simulateMatch(H, A, stubRng({}), { liveEnergy: false });
+  assert.ok(mids.length >= 2);
+  assert.ok(m.events.some((e) => e.text === `📋 [${H.name}] ${tag(slot(H, 7))} er skadet og erstattes i startopstillingen af ${tag(mids.at(-1))}.`), m.events.filter((e) => e.type === 'LINEUP').map((e) => e.text).join(' | '));
+});
+test('bot: med én skade (51\') må træthedsskiftet i 63\' tage pause 2 af 3 – kun den sidste pause gemmes (keep.windows 1, ikke 2)', () => {
+  const { H, A } = arena({ homeLimit: 75, homeBot: true });
+  slot(H, 6).freshness = 86;
+  for (const p of bench(H)) p.freshness = 89;
+  const m = simulateMatch(H, A, stubRng({ 0.06: (n) => n === 16, 0.5: true, 0.4: true }));
+  const home = m.events.filter((e) => e.isHome && (e.type === 'SUB' || e.type === 'INJURY')).map((e) => `${e.min}:${e.type}`);
+  assert.deepEqual(home, ['51:INJURY', '51:SUB', '63:SUB'], home.join(' '));
 });

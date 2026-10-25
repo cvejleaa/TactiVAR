@@ -806,7 +806,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
   function freeKick(att, def, cR, dR, min) {
     setPieceNow = true;
     // Samme forseelse som tick'ets kort/skade (fortalt og talt én gang); ellers en ny, der tælles her
-    const same = tickFoul?.side === def && dR.defs.concat(dR.mids).includes(tickFoul.p);
+    const same = tickFoul?.side === def;   // en udvist tackler når aldrig hertil (rødt kort stopper tick'et)
     const fouler = same ? tickFoul.p : rng.pick(dR.defs.concat(dR.mids)), gk = dR.gk;
     if (!same) st[k(def, 'Fouls')]++;
     st[k(att, 'FreeKicks')]++;
