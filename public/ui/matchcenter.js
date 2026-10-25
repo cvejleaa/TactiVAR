@@ -24,7 +24,7 @@ const ICON = { GOAL: '⚽', HEADER_GOAL: '⚽', VAR_GOAL: '📺', VAR_NO_GOAL: '
 // kort indledning før kolon, der nævner typen, fjernes den – typen står allerede i parentesen
 export function goalDesc(goal) {
   const label = GOAL_KIND_LABEL[goal.kind]?.toLowerCase(), i = goal.desc.indexOf(': ');
-  if (!label || i < 0 || i > 25 || !goal.desc.slice(0, i).toLowerCase().includes(label)) return goal.desc;
+  if (!label || i < 0 || i > 32 || !goal.desc.slice(0, i).toLowerCase().includes(label)) return goal.desc;
   const rest = goal.desc.slice(i + 2);
   return rest.charAt(0).toUpperCase() + rest.slice(1);
 }

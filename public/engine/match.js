@@ -254,11 +254,12 @@ const endOf = (s, full) => ({ formation: s.tactics.baseFormation, starters: s.st
 
 // Opbygning og pres i pause- og fuldtidsanalysen (v3.16.7, Spilfører: "dit pres vandt bolden 2 af 2" var to offside-fælder): fælden
 // er med i pressets tal (presset stoppede opbygningen), men står for sig – og din egen opbygnings offsides ligeså.
-function duelText(d, o, half = false) {
+export function duelText(d, o, half = false) {
   const off = o.trapWon, trap = d.trapWon;
   const press = trap ? `dit pres ${half ? 'har stoppet' : 'stoppede'} opbygningen ${d.pressWon} af ${pl(d.press, 'gang', 'gange')} (${pl(d.pressWon - trap, 'erobring', 'erobringer')}, ${trap} på offside).`
     : `dit pres ${half ? 'har vundet' : 'vandt'} bolden ${d.pressWon} af ${pl(d.press, 'gang', 'gange')}.`;
-  const build = `Din opbygning ${half ? 'er kommet' : 'kom'} igennem ${d.buildWon} af ${pl(d.build, 'gang', 'gange')}${off ? ` (af de ${d.build - d.buildWon} stop var ${off} offside)` : ''}`;
+  const stops = d.build - d.buildWon, offTxt = !off ? '' : stops === 1 ? ' (stoppet var offside)' : off === stops ? ` (alle ${stops} stop var offside)` : ` (af de ${stops} stop var ${off} offside)`;   // v3.17.0: ikke "af de 1 stop var 1"
+  const build = `Din opbygning ${half ? 'er kommet' : 'kom'} igennem ${d.buildWon} af ${pl(d.build, 'gang', 'gange')}${offTxt}`;
   // Aldrig "0 af 0 gange" (Spilfører v3.16.7): kun de dele, kampen havde
   if (!d.press) return `${build}.`;
   if (!d.build) return `${press[0].toUpperCase()}${press.slice(1)}`;
@@ -790,6 +791,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // skytte (lodtrækning, ikke keeper-duellen); ellers forbi/blokeret (egne tekster uden stolpe – stolpen er et højdepunkt,
   // Spilfører) eller en let redning (easySaves: tæller i 🧤, ikke i fradraget). Ingen hjørne og intet flag. Linjerne er
   // dæmpede (minor), og øjeblikket er mærket half – Højdepunkter viser det kun som mål. Returnerer om der blev scoret.
+  const BLOCK_VERBS = ['kaster sig ind foran', 'blokerer', 'får et ben i vejen for', 'lukker af for'];
   const HALF_MISS_TXT = ['skyder forbi', 'sender bolden over mål', 'skyder et godt stykke forbi', 'rammer den ikke rent – den går forbi', 'skyder højt over mål'];   // "over mål": replay.js tegner den over (shotOver)
   const halfMissUsed = new Set();
   // Botternes FASE-linjer (v3.17.0, Spilfører: ≈ 14 pr. kamp i referaterne mellem to botter): kun den første pr. hold og slags
@@ -816,7 +818,8 @@ export function simulateMatch(home, away, rng, opts = {}) {
       if (rng.chance(MISS_BLOCK_SHARE)) {
         const blocker = rng.pick(dR.defs) ?? gk;
         sheet.adjust(blocker.id, 0.05);
-        addEv(min, 'MISS', 'PLAY', def.isHome, false, 'Blokeret', `🧱 [${def.team.name}] ${tag(blocker)} kaster sig ind foran ${how} fra ${tag(shooter)} (${att.team.name}).`);
+        // Varianter (v3.17.0, Spilfører: "kaster sig ind foran" 484 gange på en sæson); replay.js finder blokeren på verbet
+        addEv(min, 'MISS', 'PLAY', def.isHome, false, 'Blokeret', `🧱 [${def.team.name}] ${tag(blocker)} ${vary(BLOCK_VERBS, 'block', def.team.id)} ${how} fra ${tag(shooter)} (${att.team.name}).`);
         mark();
         if (rng.chance(HALF_CORNER_P.BLOCK)) corner(att, def, cR, dR, min);
         return false;
@@ -1233,7 +1236,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
           // "dirigerer linjen perfekt" 30 gange) – intet rng
           const half = min < 45 ? 1 : 2, shown = (def.trapShown ||= new Set()).has(half);   // 45'-tick'et er 2. halvlegs første (efter pausen – clock.js)
           def.trapShown.add(half);
-          const offTxt = own(def) ? (shown ? `✅ [DIN OFFSIDE-FÆLDE] ${vary([`${tag(striker)} (${att.team.name}) fanget offside igen – ${tag(back)} holder linjen.`, `Offside igen: ${tag(striker)} (${att.team.name}) går for tidligt.`, `Linjen holder – ${tag(striker)} (${att.team.name}) står offside.`], 'trap', def.team.id)}`
+          const offTxt = own(def) ? (shown ? `✅ [DIN OFFSIDE-FÆLDE] ${vary([`${tag(striker)} (${att.team.name}) fanget offside – ${tag(back)} holder linjen.`, `Offside: ${tag(striker)} (${att.team.name}) går for tidligt.`, `Linjen holder – ${tag(striker)} (${att.team.name}) står offside.`], 'trap', def.team.id)}`
               : `✅ [DIN OFFSIDE-FÆLDE VIRKER] ${tag(striker)} (${att.team.name}) fanges. ${tag(back)} dirigerer linjen perfekt.`)
             : own(att) ? `❌ [DIN OPBYGNING STOPPES] ${tag(striker)} fanges offside.`
             : `🛑 [FASE 2 VIRKER • ${def.team.name}] ${tag(striker)} (${att.team.name}) fanges offside.`;

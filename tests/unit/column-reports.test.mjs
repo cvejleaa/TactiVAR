@@ -74,7 +74,8 @@ test('ownReport: modstander-tallene er modstanderens egne (cutbacks og høje bol
     const g = (n) => `${n} ${n === 1 ? 'gang' : 'gange'}`;   // v3.16.7: "af 1 gang"
     // v3.16.7: offside-fælden står for sig – egne offsides i opbygningen, fælde-sejre i presset
     const off = ownerRep.oppTrapWon, trap = ownerRep.trapWon;
-    const bld = `Din opbygning kom igennem ${ownerRep.buildWon} af ${g(ownerRep.build)}${off ? ` (af de ${ownerRep.build - ownerRep.buildWon} stop var ${off} offside)` : ''}`;
+    const stops = ownerRep.build - ownerRep.buildWon, offT = !off ? '' : stops === 1 ? ' (stoppet var offside)' : off === stops ? ` (alle ${stops} stop var offside)` : ` (af de ${stops} stop var ${off} offside)`;   // v3.17.0
+    const bld = `Din opbygning kom igennem ${ownerRep.buildWon} af ${g(ownerRep.build)}${offT}`;
     const prs = trap ? `dit pres stoppede opbygningen ${ownerRep.pressWon} af ${g(ownerRep.press)} (${ownerRep.pressWon - trap} ${ownerRep.pressWon - trap === 1 ? 'erobring' : 'erobringer'}, ${trap} på offside).` : `dit pres vandt bolden ${ownerRep.pressWon} af ${g(ownerRep.press)}.`;
     const want = !ownerRep.press ? `${bld}.` : !ownerRep.build ? `D${prs.slice(1)}` : `${bld}; ${prs}`;   // v3.16.7: aldrig "0 af 0"
 

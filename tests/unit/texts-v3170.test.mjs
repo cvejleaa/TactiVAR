@@ -16,7 +16,8 @@ test('Rundens mål: en indledning, der gentager typen, fjernes ("Kontra: bolden 
   assert.equal(goalDesc({ kind: 'COMBINATION', desc: 'Kombinationsfodbold: #8 E. F spillede #9 fri.' }), '#8 E. F spillede #9 fri.');
   assert.equal(goalDesc({ kind: 'COUNTER', desc: 'Flot kontra' }), 'Flot kontra', 'uden kolon');
   assert.equal(goalDesc({ kind: 'HEADER', desc: 'Kontra: noget andet.' }), 'Kontra: noget andet.', 'indledningen nævner ikke typen');
-  assert.equal(goalDesc({ kind: 'COUNTER', desc: 'En meget lang indledning om kontra og meget mere: rest' }), 'En meget lang indledning om kontra og meget mere: rest', 'over 25 tegn er ikke en etiket');
+  assert.equal(goalDesc({ kind: 'COUNTER', desc: 'En meget lang indledning om kontra og meget mere: rest' }), 'En meget lang indledning om kontra og meget mere: rest', 'over 32 tegn er ikke en etiket');
+  assert.equal(goalDesc({ kind: 'FREEKICK', desc: 'Et frispark for vitrineskabet: #9 A. B krøllede den ind.' }), '#9 A. B krøllede den ind.', 'Spilfører R11');
   assert.equal(goalDesc({ kind: 'UKENDT', desc: 'X: y' }), 'X: y');
 });
 
@@ -60,4 +61,30 @@ test('botternes FASE-linjer: kun den første pr. hold og slags vises (≤ 4 pr. 
     assert.ok(!fase.some((e) => e.text.includes('STOPPER MOD')), 'den gamle linje uden holdmærke');
   }
   assert.ok(games >= 60 && quiet > shown, `data: ${games} kampe, ${shown} viste, ${quiet} quiet`);
+});
+
+test('opbygningens offside-parentes: "stoppet var offside" (1 stop), "alle N stop" (alle), ellers "af de N stop var Z" – aldrig "af de 1 stop var 1"', async () => {
+  const { duelText } = await import('../../public/engine/match.js');
+  const d = (build, buildWon) => ({ build, buildWon, press: 0, pressWon: 0, trapWon: 0 });
+  assert.match(duelText(d(5, 4), { trapWon: 1 }), /igennem 4 af 5 gange \(stoppet var offside\)/);
+  assert.match(duelText(d(6, 2), { trapWon: 4 }), /igennem 2 af 6 gange \(alle 4 stop var offside\)/);
+  assert.match(duelText(d(6, 2), { trapWon: 3 }), /igennem 2 af 6 gange \(af de 4 stop var 3 offside\)/);
+  assert.doesNotMatch(duelText(d(6, 2), { trapWon: 0 }), /offside/);
+});
+
+test('blokeringen varierer (Spilfører: "kaster sig ind foran" 484 gange) – og afspilningen finder stadig blokeren på hvert verbum', async () => {
+  const { shotEnd } = await import('../../public/ui/replay.js');
+  const verbs = new Map();
+  for (const m of M) for (const e of m.events.filter((x) => x.minor && x.label === 'Blokeret')) {
+    const v = e.text.match(/^🧱 \[.+?\] #\d+ \S+ \S+ (kaster sig ind foran|blokerer|får et ben i vejen for|lukker af for) /)?.[1];
+    assert.ok(v, e.text); verbs.set(v, (verbs.get(v) ?? 0) + 1);
+  }
+  assert.equal(verbs.size, 4, JSON.stringify([...verbs]));
+  // hvert verbum: blokeren slås op ved navn (idOf) – ikke den nærmeste
+  const ids = { '#4 A. B': 'p4' }, idOf = (t) => ids[t];
+  for (const v of verbs.keys()) {
+    const mo = { kind: 'MISS', side: 'h', ball: [50, 20], h: [['s', 50, 20]], a: [['gk', 50, 2], ['p4', 80, 80], ['p5', 50, 18]] };
+    const end = shotEnd(mo, { label: 'Blokeret', text: `🧱 [X] #4 A. B ${v} skuddet fra #9 C. D (Y).` }, idOf);
+    assert.deepEqual(end, [80, 80], v);
+  }
 });

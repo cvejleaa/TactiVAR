@@ -161,7 +161,7 @@ test('forbi: et skud forbi eller blokeret er ikke på mål og ingen redning', ()
     miss++;
     const side = /^🧱/.test(e.text) ? (e.isHome ? 'a' : 'h') : (e.isHome ? 'h' : 'a');   // en blokering står på forsvarets side
     assert.equal(e.stats[side + 'OnTarget'], before(m, e).stats[side + 'OnTarget'], e.text);
-    assert.match(e.text, /^(🎯 \[.+\] #\d+ .+ (skyder|sender|rammer|får|banker) .+\.|🧱 \[.+\] #\d+ .+ kaster sig ind foran .+ fra #\d+ .+ \(.+\)\.)$/);
+    assert.match(e.text, /^(🎯 \[.+\] #\d+ .+ (skyder|sender|rammer|får|banker) .+\.|🧱 \[.+\] #\d+ .+ (kaster sig ind foran|blokerer|får et ben i vejen for|lukker af for) .+ fra #\d+ .+ \(.+\)\.)$/);
   }
   assert.ok(miss >= 80, `data: ${miss}`);
 });

@@ -56,7 +56,7 @@ export function shotEnd(m, ev = null, idOf = null) {
     const field = def.filter((q) => q !== gk);
     if (ev?.label === 'Blokeret' && field.length) {
       // Blokeren, referatet nævner (idOf: "#7 M. Kjær" → spiller-id), ellers forsvarets markspiller nærmest skytten
-      const named = idOf && ev.text.match(/(#\d+ .+?) kaster sig ind/), q = named && field.find((p) => p[0] === idOf(named[1]));
+      const named = idOf && ev.text.match(/(#\d+ .+?) (?:kaster sig ind|blokerer|får et ben|lukker af)/), q = named && field.find((p) => p[0] === idOf(named[1]));
       const b = q ?? near(field, m.ball[0], m.ball[1]); return [b[1], b[2]];
     }
     if (/stolpe/.test(ev?.text ?? '') && !/forbi den lange stolpe/.test(ev.text)) return [left ? 44 : 56, line(3)];   // stolpen i målets forkant
