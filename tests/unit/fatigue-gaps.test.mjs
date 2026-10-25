@@ -569,3 +569,50 @@ test('en bots Hvis-Så-skift er ikke dit "taktik"-skift; og kun planlagte starte
   assert.equal(subs(mc).length, 2);
   assert.equal(mc.events.find((e) => e.label === 'Udskiftninger')?.text, `🔋 [${c.H.name}] Din udskiftede spiller sparede ca. 8 point friskhed til næste runde.`);   // 14 · 0,59 = 8,3 → 8
 });
+
+// ---------- v3.16.6 (M1): skade før rotation, og en hvilet spiller forbliver brugt ----------
+// Spilfører: "#16 starter i stedet for en træt #10" og straks "#8 er skadet og erstattes af #10". Nu: den skadede erstattes
+// først (af den friskeste i kæden), rotationen rører ikke den plads, og den hvilede kommer ikke ind igen.
+test('bot med træt plads 6 og skadet plads 7 og ÉN brugbar midtbanespiller på bænken: den skadede erstattes, den trætte spiller', () => {
+  const { H, A } = arena({ homeLimit: 0, homeBot: true });
+  slot(H, 6).freshness = 60; slot(H, 7).injuryMatchesLeft = 2;
+  const mids = bench(H).filter((p) => p.line === 'MID');
+  mids.forEach((p, i) => { p.freshness = 100; if (i > 0) p.injuryMatchesLeft = 3; });
+  const m = simulateMatch(H, A, stubRng({}), { liveEnergy: false });
+  const lines = m.events.filter((e) => e.type === 'LINEUP').map((e) => e.text);
+  assert.ok(mids.length >= 2, 'data: to midtbanespillere på bænken (den ene skadet)');
+  assert.ok(lines.includes(`📋 [${H.name}] ${tag(slot(H, 7))} er skadet og erstattes i startopstillingen af ${tag(mids[0])}.`), lines.join(' | '));
+  assert.ok(!lines.some((t) => t.includes('starter i stedet for en træt')), `ingen hvile – bænken er brugt: ${lines.join(' | ')}`);
+  assert.ok(!lines.some((t) => t.endsWith(`af ${tag(slot(H, 6))}.`)), 'den trætte er aldrig erstatning');
+  assert.ok(m.ratings.home.some((e) => e.playerId === slot(H, 6).id), 'den trætte spiller kampen');
+});
+test('en hvilet spiller er ikke erstatning for en skadet senere i opstillingen (used beholder ham)', () => {
+  const { H, A } = arena({ homeLimit: 0, homeBot: true });
+  slot(H, 6).freshness = 60; slot(H, 2).injuryMatchesLeft = 2;   // en forsvarsspiller skadet; ingen forsvarsspiller på bænken
+  for (const p of bench(H)) { p.freshness = 100; if (p.line !== 'MID') p.injuryMatchesLeft = 3; }
+  const m = simulateMatch(H, A, stubRng({}), { liveEnergy: false });
+  const lines = m.events.filter((e) => e.type === 'LINEUP').map((e) => e.text);
+  assert.ok(lines.some((t) => t.includes(`er skadet og erstattes i startopstillingen af`)), `data: skaden erstattes – ${lines.join(' | ')}`);
+  assert.ok(!lines.some((t) => t.endsWith(`af ${tag(slot(H, 6))}.`)), `den trætte/hvilede er aldrig erstatning: ${lines.join(' | ')}`);
+});
+test('skadeserstatningen er den friskeste i kæden (ikke den første på bænken)', () => {
+  const { H, A } = arena({ homeLimit: 0, homeBot: false });
+  slot(H, 7).injuryMatchesLeft = 2;
+  const mids = bench(H).filter((p) => p.line === 'MID');
+  mids.forEach((p, i) => { p.freshness = i === mids.length - 1 ? 95 : 70; });
+  const m = simulateMatch(H, A, stubRng({}), { liveEnergy: false });
+  assert.ok(mids.length >= 2);
+  assert.ok(m.events.some((e) => e.text === `📋 [${H.name}] ${tag(slot(H, 7))} er skadet og erstattes i startopstillingen af ${tag(mids.at(-1))}.`), m.events.filter((e) => e.type === 'LINEUP').map((e) => e.text).join(' | '));
+});
+test('en hvilet spiller kommer heller ikke ind i kampen: skade i 3. minut med kun den hvilede på bænken → ingen indskiftning af ham', () => {
+  const { H, A } = arena({ homeLimit: 0, homeBot: true });
+  slot(H, 6).freshness = 60;
+  const mids = bench(H).filter((p) => p.line === 'MID');
+  for (const p of bench(H)) { p.freshness = 100; if (p !== mids[0]) p.injuryMatchesLeft = 3; }
+  // Første tick: frispark (0,06) til hjemmeholdets offer (0,5 → H, int → plads 1), skade (0,4)
+  const m = simulateMatch(H, A, stubRng({ 0.06: (n) => n === 0, 0.5: (n) => n === 0, 0.4: (n) => n === 0 }), { liveEnergy: false });
+  const lines = m.events.filter((e) => e.type === 'LINEUP').map((e) => e.text);
+  assert.ok(lines.includes(`📋 [${H.name}] ${tag(mids[0])} starter i stedet for en træt ${tag(slot(H, 6))}.`), `data: rotationen – ${lines.join(' | ')}`);
+  assert.ok(m.events.some((e) => e.type === 'INJURY' && e.min === 3), `data: skaden i 3' – ${m.events.filter((e) => e.min === 3).map((e) => e.type).join()}`);
+  assert.ok(!m.events.some((e) => e.type === 'SUB' && e.label?.startsWith(`🔄 ${tag(slot(H, 6))} ind`)), m.events.filter((e) => e.type === 'SUB').map((e) => e.label).join(' | '));
+});

@@ -186,20 +186,24 @@ function prepareSide(team, isHome, notes) {
   // v3.13 (QC): rotationen følger botens udskiftningsgrænse – ellers stillede en bot med grænse 75 en
   // starter på 72 % og skiftede ham ud i 3. minut. Uden grænse (0) som før: under 70, frisk ≥ 85.
   const rest = team.subsLimit ? team.subsLimit + ROTATE_MARGIN : 70, freshMin = team.subsLimit ? team.subsLimit + ROTATE_MARGIN + 5 : 85;
+  // v3.16.6 (Spilfører: "#16 starter for en træt #10" og straks "skadet, erstattes af #10"): skadede erstattes FØR rotationen
+  // – af den friskeste i kæden, så rotationen aldrig hviler ham (den kræver en friskere i kæden) – og en hvilet spiller
+  // forbliver brugt (kommer ikke ind i kampen, heller ikke ved skade).
+  const freshest = (list) => list.slice().sort((a, b) => (b.freshness ?? 100) - (a.freshness ?? 100) || avgSkill(b) - avgSkill(a))[0];
+  starters.forEach((p, slot) => {
+    if (p && isAvailable(p)) return;
+    const line = p ? p.line : lineOfRole(coordsOf(tactics)[slot].r);
+    const sub = freshest(bench().filter((b) => b.line === line)) || bench()[0];
+    if (!sub) return;
+    if (p) notes.push({ isHome, text: `📋 [${team.name}] ${tag(p)} er skadet og erstattes i startopstillingen af ${tag(sub)}.` });
+    starters[slot] = sub; used.add(sub.id);
+  });
   if (team.isBot) starters.forEach((p, slot) => {
     if (!p || !isAvailable(p) || (p.freshness ?? 100) >= rest) return;
     const fresh = bench().filter((b) => b.line === p.line && (b.freshness ?? 100) >= freshMin && avgSkill(b) >= avgSkill(p) - ROTATE_SKILL);
     if (!fresh.length) return;
     const sub = fresh.sort((a, b) => avgSkill(b) - avgSkill(a))[0];
     notes.push({ isHome, text: `📋 [${team.name}] ${tag(sub)} starter i stedet for en træt ${tag(p)}.` });
-    starters[slot] = sub; used.add(sub.id); used.delete(p.id);
-  });
-  starters.forEach((p, slot) => {
-    if (p && isAvailable(p)) return;
-    const line = p ? p.line : lineOfRole(coordsOf(tactics)[slot].r);
-    const sub = bench().find((b) => b.line === line) || bench()[0];
-    if (!sub) return;
-    if (p) notes.push({ isHome, text: `📋 [${team.name}] ${tag(p)} er skadet og erstattes i startopstillingen af ${tag(sub)}.` });
     starters[slot] = sub; used.add(sub.id);
   });
   return { team, isHome, tactics, starters, used, subsUsed: 0, windows: 0, lastSubMin: null, benchAvailable: bench };
