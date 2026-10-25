@@ -8,7 +8,7 @@ import { masteryVs, counterXpForMatch } from './counter.js';
 import { createSheet, finalizeSheet } from './ratings.js';
 import { assignClock } from './clock.js';
 import { describeFinish, describeHeader, describeVarTiming, describeGoal, goalSpectacle, pickBy, gen } from './clues.js';
-import { MATCH_RULES, CARD_RULES, FATIGUE_SUBS_AT_ONCE, BOT_SUBS, MIN_PLAYERS, VAR_RULES, MISS_P, MISS_BLOCK_SHARE, MISS_CORNER_P } from './match-rules.js';
+import { MATCH_RULES, CARD_RULES, FATIGUE_SUBS_AT_ONCE, BOT_SUBS, LIMP, MIN_PLAYERS, VAR_RULES, MISS_P, MISS_BLOCK_SHARE, MISS_CORNER_P } from './match-rules.js';
 import { TIRED_PER_POINT, SUBS_LIMIT, matchCost, REST_SHARE } from './freshness.js';
 
 const PLAN_LETTERS = ['A', 'B', 'C'];
@@ -392,7 +392,10 @@ export function simulateMatch(home, away, rng, opts = {}) {
   const lostAt = (p) => { const e = sheet.entries[p.id]; return live && e?.drain90 ? e.drain90 * (Math.max(0, curMin - e.minIn) + CARD_RULES.SHORT_DRAIN * shortMinutes(sideOf(p), e.minIn)) / 90 : 0; };
   const matchFresh = (p) => (p.freshness ?? 100) - lostAt(p);
   const shortF = (side) => 1 - CARD_RULES.SHORT_PER_MAN * (side?.down ?? 0);
-  const ff = (p) => freshFactor(p) * (1 - TIRED_PER_POINT * lostAt(p)) * shortF(sideOf(p));
+  // Haltende: skadet i kampen uden indskiftning (sheet.entries.injured – en udskiftet skadet står ikke på banen)
+  const limping = (p) => !!(p && sheet.entries[p.id]?.injured);
+  const fit = (list) => { const f = list.filter((p) => p && !limping(p)); return f.length ? f : list; };
+  const ff = (p) => freshFactor(p) * (1 - TIRED_PER_POINT * lostAt(p)) * shortF(sideOf(p)) * (limping(p) ? LIMP.factor : 1);
   const register = (side, p, role, minIn, slot) => sheet.register(p, side.team, side.isHome, role, minIn, rng, masteryVs(p, other(side).team), slot, slot != null ? coordsOf(side.tactics)[slot].r : role);
 
   for (const side of [H, A]) side.starters.forEach((p, i) => p && register(side, p, coordsOf(side.tactics)[i].r, 1, i));
@@ -431,7 +434,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
     const all = side.starters.map((p, i) => ({ p, i })).filter(({ p, i }) => i > 0 && p && p !== exclude);
     const near = all.filter(({ i }) => Math.hypot(pos[i].x - spot.x, pos[i].y - spot.y) <= reach);
     const cand = near.length ? near : all;
-    const w = cand.map(({ p, i }) => Math.exp(-Math.hypot(pos[i].x - spot.x, pos[i].y - spot.y) / RECEIVE_SPREAD) * (RECEIVE_BASE + Math.max(0, skill(p))));
+    const w = cand.map(({ p, i }) => Math.exp(-Math.hypot(pos[i].x - spot.x, pos[i].y - spot.y) / RECEIVE_SPREAD) * (RECEIVE_BASE + Math.max(0, skill(p))) * (limping(p) ? LIMP.receive : 1));
     let r = rng.next() * w.reduce((a, b) => a + b, 0);
     return (cand[w.findIndex((x) => (r -= x) < 0)] ?? cand.at(-1)).p;
   }
@@ -658,11 +661,11 @@ export function simulateMatch(home, away, rng, opts = {}) {
     return 'saved';
   }
   // Dødboldens hovedstødsspiller: en af de tre bedste i luften (også stopperne går med op).
-  const headerTarget = (R, taker) => rng.pick(outfield(R).filter((p) => p && p !== taker).sort((a, b) => b.aerialPower - a.aerialPower).slice(0, 3));
+  const headerTarget = (R, taker) => rng.pick(fit(outfield(R).filter((p) => p && p !== taker)).sort((a, b) => b.aerialPower - a.aerialPower).slice(0, 3));
   function corner(att, def, cR, dR, min) {
     setPieceNow = true;
     st[k(att, 'Corners')]++; st[k(att, 'Shots')]++; st[k(att, 'Xg')] += 0.04; // hovedstødet er en afslutning
-    const taker = best(outfield(cR), (p) => p.skills.passing);
+    const taker = best(fit(outfield(cR)), (p) => p.skills.passing);
     aerialDuel(att, def, cR, dR, min, headerTarget(cR, taker), taker, rng.pick(dR.defs), 'hjørnespark');
   }
   // Afslutning mod keeperen (v3.12: samlet fra løbs-grenen og den almindelige afslutning, så
@@ -754,7 +757,8 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // FØR straffen tælles (frispark, straffe, skud, xG, fælderens karakter – QC: ellers målte straffebåndet forkert).
   function penalty(att, def, cR, dR, min, byVar = false) {
     setPieceNow = true;
-    const taker = best(outfield(cR), (p) => p.skills.finishing), fouled = rng.pick(cR.atts.concat(cR.mids)), fouler = rng.pick(dR.defs), gk = dR.gk;
+    const taker = best(fit(outfield(cR)), (p) => p.skills.finishing), fouled = rng.pick(cR.atts.concat(cR.mids)), fouler = rng.pick(dR.defs), gk = dR.gk;
+    const skipped = best(outfield(cR), (p) => p.skills.finishing), limps = skipped !== taker;   // den sædvanlige skytte halter
     let varNote = '';
     if (byVar) {
       st[k(att, 'VarChecks')]++; homeVarNet += att === H ? 1 : -1;
@@ -791,11 +795,11 @@ export function simulateMatch(home, away, rng, opts = {}) {
       bookKind(att, taker, 'PENALTY');
       const desc = describeGoal('PENALTY', tag(taker), tag(fouled), min, rng, goalTexts);
       goalsPool.push({ scorer: tag(taker), teamName: att.team.name, match: `${home.name} - ${away.name}`, min, kind: 'PENALTY', spectacle: goalSpectacle('PENALTY', {}, min, rng), desc });
-      addEv(min, 'GOAL', 'HIGHLIGHT', att.isHome, true, `⚽ Straffespark: ${tag(taker)}`, `⚽ [${att.team.name} • ${hG}-${aG}] STRAFFESPARK – MÅL! ${why}, og ${self ? 'han tager det selv og sender' : `${tag(taker)} sender`} bolden sikkert i nettet.${varNote}`);
+      addEv(min, 'GOAL', 'HIGHLIGHT', att.isHome, true, `⚽ Straffespark: ${tag(taker)}`, `⚽ [${att.team.name} • ${hG}-${aG}] STRAFFESPARK – MÅL! ${why}${limps ? `. ${tag(skipped)} halter – ${self ? 'den fældede' : tag(taker)} tager straffen og sender` : `, og ${self ? 'han tager det selv og sender' : `${tag(taker)} sender`}`} bolden sikkert i nettet.${varNote}`);
     } else {
       st[k(att, 'OnTarget')]++;
       sheet.adjust(gk.id, 0.8); sheet.bump(gk.id, 'saves'); sheet.adjust(taker.id, -0.4);
-      addEv(min, 'SAVE', 'HIGHLIGHT', def.isHome, true, `🧤 Straffe reddet: ${tag(gk)}`, `🧤 [${def.team.name}] STRAFFESPARK REDDET! ${why}, men ${tag(gk)} redder fra ${self ? 'ham' : tag(taker)}.${varNote}`);
+      addEv(min, 'SAVE', 'HIGHLIGHT', def.isHome, true, `🧤 Straffe reddet: ${tag(gk)}`, `🧤 [${def.team.name}] STRAFFESPARK REDDET! ${why}${limps ? `. ${tag(skipped)} halter – ${tag(taker)} tager straffen, men ${tag(gk)} redder` : `, men ${tag(gk)} redder fra ${self ? 'ham' : tag(taker)}`}.${varNote}`);
     }
   }
   function freeKick(att, def, cR, dR, min) {
@@ -806,7 +810,8 @@ export function simulateMatch(home, away, rng, opts = {}) {
     if (!same) st[k(def, 'Fouls')]++;
     st[k(att, 'FreeKicks')]++;
     if (rng.chance(FK_SHOT_P)) {
-      const taker = best(outfield(cR), (p) => p.skills.finishing + p.skills.passing);
+      const taker = best(fit(outfield(cR)), (p) => p.skills.finishing + p.skills.passing);
+      const skipped = best(outfield(cR), (p) => p.skills.finishing + p.skills.passing), halt = skipped !== taker ? `${tag(skipped)} halter – ${tag(taker)} tager frisparket. ` : '';
       st[k(att, 'Shots')]++; st[k(att, 'Xg')] += 0.07;
       if (taker.skills.finishing * ff(taker) + rng.next() * 8 > gk.skills.goalkeeping * ff(gk) + rng.next() * 8 + FK_SHOT_EDGE) {
         goalFor(att);
@@ -814,15 +819,15 @@ export function simulateMatch(home, away, rng, opts = {}) {
         bookKind(att, taker, 'FREEKICK');
         const desc = describeGoal('FREEKICK', tag(taker), tag(taker), min, rng, goalTexts);
         goalsPool.push({ scorer: tag(taker), teamName: att.team.name, match: `${home.name} - ${away.name}`, min, kind: 'FREEKICK', spectacle: goalSpectacle('FREEKICK', { finishing: taker.skills.finishing }, min, rng), desc });
-        addEv(min, 'GOAL', 'HIGHLIGHT', att.isHome, true, `⚽ Frisparksmål: ${tag(taker)}`, `⚽ [${att.team.name} • ${hG}-${aG}] FRISPARKSMÅL! Frispark efter ${gen(tag(fouler))} (${def.team.name}) forseelse – ${desc}`);
+        addEv(min, 'GOAL', 'HIGHLIGHT', att.isHome, true, `⚽ Frisparksmål: ${tag(taker)}`, `⚽ [${att.team.name} • ${hG}-${aG}] FRISPARKSMÅL! Frispark efter ${gen(tag(fouler))} (${def.team.name}) forseelse – ${halt}${desc}`);
       } else if (!missed(att, def, cR, dR, min, taker, false, 'frisparket')) {
         st[k(att, 'OnTarget')]++;
         sheet.adjust(gk.id, 0.4); sheet.bump(gk.id, 'saves');
-        addEv(min, 'SAVE', 'PLAY', def.isHome, false, 'Frispark reddet', `🧤 [${def.team.name}] ${tag(gk)} redder ${gen(tag(taker))} frispark (${att.team.name}) fra kanten af feltet.`);
+        addEv(min, 'SAVE', 'PLAY', def.isHome, false, 'Frispark reddet', `🧤 [${def.team.name}] ${halt}${tag(gk)} redder ${gen(tag(taker))} frispark (${att.team.name}) fra kanten af feltet.`);
       }
       return;
     }
-    const taker = best(outfield(cR), (p) => p.skills.passing);
+    const taker = best(fit(outfield(cR)), (p) => p.skills.passing);
     st[k(att, 'Shots')]++; st[k(att, 'Xg')] += 0.1;
     aerialDuel(att, def, cR, dR, min, headerTarget(cR, taker), taker, rng.pick(dR.defs), 'frispark');
   }
@@ -1005,6 +1010,8 @@ export function simulateMatch(home, away, rng, opts = {}) {
       const yours = mine && duelLog[mine.team.id].build + duelLog[mine.team.id].press ? ` Din opbygning er kommet igennem ${duelLog[mine.team.id].buildWon} af ${duelLog[mine.team.id].build} gange; dit pres har vundet bolden ${duelLog[mine.team.id].pressWon} af ${duelLog[mine.team.id].press} gange.` : '';
       addEv(min, 'HALFTIME', 'TACTIC', true, false, 'Pause-analyse', `⏸️ [PAUSE-ANALYSE] Stillingen er ${hG}-${aG}. ${home.name} har haft ${hp}% af bolden. ${leader.name} har vundet flest taktiske dueller (${Math.max(st.hTacticSuccess, st.aTacticSuccess)}).${yours}`);
     }
+    // I pausen skiftes en haltende ud, hvis der er et skift tilbage (pausen koster ingen skifte-pause) – v3.16.6
+    if (min === 45) for (const side of [H, A]) side.starters.forEach((p, slot) => { if (slot > 0 && limping(p)) substitute(side, slot, min, 'Pauseskift for den haltende'); });
     checkTriggers(H, min); checkTriggers(A, min);
     fatigueSubs(H, min); fatigueSubs(A, min);
 
@@ -1114,7 +1121,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
         observe(victim, `Kamp-skade (mod ${foulSide.team.name}): ${victim.shortName} måtte udgå efter en hård tackling.`);
         addEv(min, 'INJURY', 'HIGHLIGHT', victimSide.isHome, true, `🚑 Skade: ${tag(victim)}`, `🚑 [${victimSide.team.name}] ${tag(victim)} bliver skadet efter en tackling fra ${tag(fouler)} (${foulSide.team.name}) og er ude i ${matches} ${matches === 1 ? 'kamp' : 'kampe'}.`);
         if (!substitute(victimSide, slot, min, 'Skadesskift')) {
-          sheet.entries[victim.id].minOut = min;
+          // Han bliver på banen (haltende – LIMP) og spiller videre: intet udminut
           // Årsagen er offentlig (skift og pauser ses i referatet) – QC v3.13.
           const why = subBlock(victimSide, min) ?? 'der er ingen rask spiller på bænken';
           addEv(min, 'INFO', 'PLAY', victimSide.isHome, false, 'Ingen indskiftning', `🚑 [${victimSide.team.name}] Ingen indskiftning mulig (${why}) – holdet spiller videre med ${tag(victim)} haltende.`);
@@ -1203,7 +1210,8 @@ export function simulateMatch(home, away, rng, opts = {}) {
         // fremme i afslutningens øjeblik – også modstanderens; brugerens valg "begge hold fuldt synlige", spec §3.)
         const runs = attPh.phase1_buildUp.offBallRuns ?? 'NORMAL';
         const attC = coordsOf(att.tactics);
-        const pool = att.starters.map((p, i) => ({ p, i })).filter(({ p, i }) => i > 0 && p);
+        const all = att.starters.map((p, i) => ({ p, i })).filter(({ p, i }) => i > 0 && p), sound = all.filter(({ p }) => !limping(p));
+        const pool = sound.length ? sound : all;   // en haltende løber ikke fri
         const wts = pool.map(({ i }) => RUN_WEIGHT[runGroup(attC[i].r)][runs] ?? 1);
         let rr = rng.next() * wts.reduce((x, y) => x + y, 0);
         const pick = pool[Math.max(0, wts.findIndex((w) => (rr -= w) < 0))] ?? pool.at(-1);

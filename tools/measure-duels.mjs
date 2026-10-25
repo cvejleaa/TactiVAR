@@ -264,7 +264,7 @@ export function measureSubs(N = ARG_N, rounds = 10, overrides = {}) {
         for (const e of m.events) {
           if (e.type === 'SUB') {
             subs++;
-            const k = /træt|erstatter/.test(e.text) && !/Skadesskift/.test(e.text) ? (/Hvis-Så/.test(e.text) ? 'rule' : 'fatigue') : /Hvis-Så/.test(e.text) ? 'rule' : 'injury';
+            const k = /træt|erstatter/.test(e.text) && !/Skadesskift|haltende/.test(e.text) ? (/Hvis-Så/.test(e.text) ? 'rule' : 'fatigue') : /Hvis-Så/.test(e.text) ? 'rule' : 'injury';
             why[k]++;
             mins[e.min <= 45 ? '1–45' : e.min <= 60 ? '46–60' : e.min <= 75 ? '61–75' : '76–90']++;
           }

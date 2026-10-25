@@ -2504,3 +2504,32 @@ test('fuldtids-analysens angreb nævner kun det, dine valg (eller kampen) gav: c
   const run = ft({ attackFocus: 'CENTRAL' }, {}, (a) => { Object.assign(slot(a.H, 8).skills, { passing: 20, finishing: 1 }); for (const p of mids(a.A)) p.skills.passing = 1; for (const i of [1, 2, 3, 4]) Object.assign(slot(a.A, i).skills, { positioning: 1, intercepting: 1, strength: 1 }); });
   assert.equal(run, '⚔️ Angreb (Centralt · balanceret): 2 cutbacks (2 mål, 0 stoppet ved kanten).');   // v3.16.3-ordlyden
 });
+
+// ---------- v3.16.6 (M2): den haltende spiller ----------
+// Hjemmeholdet uden bænk (alle skadet) → en skadet bliver på banen og halter. int → a: offeret er første markspiller (plads 1).
+const noBench = (a) => { for (const p of a.H.squad) if (!a.H.tactics.lineupSlots.includes(p.id)) p.injuryMatchesLeft = 5; };
+const limpFirst = { 0.06: (n) => n === 0, 0.5: (n) => n === 0, 0.4: (n) => n === 0 };
+test('haltende: holdets bedste afslutter (plads 1) halter – en anden tager straffene, og referatet siger "#X halter – #Y tager straffen"', () => {
+  const g = sp({ script: { ...limpFirst, 0.011: true }, tweak: (a) => { noBench(a); slot(a.H, 1).skills.finishing = 15; slot(a.H, 10).skills.finishing = 12; } });
+  const lim = slot(g.a.H, 1), next = slot(g.a.H, 10);   // plads 10, ikke 9: den fældede er første angriber (plads 9)
+  assert.ok(g.m.events.some((e) => e.min === 3 && /Ingen indskiftning/.test(e.text) && e.text.includes(`${tg(lim)} haltende`)), 'data: han halter fra 3\'');
+  const pens = g.m.events.filter((e) => /STRAFFESPARK (– MÅL|REDDET)/.test(e.text));
+  assert.ok(pens.length >= 25, `data: ${pens.length} straffe`);
+  for (const e of pens) assert.ok(e.text.includes(`${tg(lim)} halter – ${tg(next)} tager straffen`), e.text);
+  assert.equal(rOf(g.m, 'home', g.a.H, 1).penaltyGoals, 0);
+  // Uden halten: plads 1 tager dem (kontrol)
+  const ok = sp({ script: { 0.011: true }, tweak: (a) => { noBench(a); slot(a.H, 1).skills.finishing = 15; slot(a.H, 10).skills.finishing = 12; } });
+  assert.ok(ok.m.events.filter((e) => /STRAFFESPARK – MÅL/.test(e.text)).every((e) => !/halter/.test(e.text)) && rOf(ok.m, 'home', ok.a.H, 1).penaltyGoals >= 25);
+});
+test('haltende: hans evner tæller LIMP.factor (0,6) – alle ti markspillere halter, så den bedste (FIN 15) må tage straffen og brænder mod MV 17', () => {
+  // int(0, n) → tick'ets nummer: offeret er plads 1, 2, … 10 i de første ti tick; straffe fra tick 11. FIN 15·0,6 + 4 + 2,3 = 15,3
+  // < MV 17 + 4 = 21 → reddet; uden faktoren 15 + 6,3 = 21,3 > 21 → mål. Ingen "halter"-tekst: den sædvanlige skytte ER skytten.
+  let t = -1;
+  const wrap = (r) => ({ ...r, int: (a, b) => (a === 0 && b >= 8 ? ++t % 10 : a) });
+  const g = spx({ script: { 0.06: (n) => n < 10, 0.5: (n) => n < 10, 0.4: (n) => n < 10, 0.011: (n) => n >= 10 }, gk: 17, wrap, tweak: (a) => { noBench(a); slot(a.H, 10).skills.finishing = 15; } });
+  const limp = g.m.events.filter((e) => /Ingen indskiftning/.test(e.text) && e.isHome).length;
+  const pens = g.m.events.filter((e) => /STRAFFESPARK (– MÅL|REDDET)/.test(e.text));
+  assert.ok(limp === 10 && pens.length >= 15, `data: ${limp} haltende, ${pens.length} straffe`);
+  assert.equal(g.m.homeGoals, 0, 'alle reddet');
+  assert.ok(pens.every((e) => e.text.includes(`redder fra ${tg(slot(g.a.H, 10))}`) && !/halter/.test(e.text)), pens[0]?.text);
+});

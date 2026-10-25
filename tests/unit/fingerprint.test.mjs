@@ -9,7 +9,8 @@ import { fingerprint } from '../../tools/fingerprint.mjs';
 
 // v3.16.6 M5 (motor, bevidst): frisparket i samme tick som kortet/skaden er den forseelse – ét rng-træk færre (før e45a5498…)
 // v3.16.6 M4: modstanderens løbs-cutback står i referatet (nye hændelser) (før 3bd4687d…)
-const NOPROSE_400 = 'fc304e5d8f124b343c342c079d45befd27498b392ade56d13d02968f2ef6fae2';
+// v3.16.6 M2: den haltende spiller (LIMP) og pauseskift for ham (før fc304e5d…)
+const NOPROSE_400 = '56ee202f66a6c3207cb7743ebefe4bf83a7e9273a3a7d65ae3bb8d82513a7603';
 
 test('fingeraftryk uden prosa: de 400 seedede kampe er de samme som ved sidste bevidste motorændring (v3.16.6 M5)', async () => {
   const r = await fingerprint(400);

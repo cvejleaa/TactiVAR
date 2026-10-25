@@ -243,20 +243,21 @@ test('skade giver indskiftning fra bænken af samme kæde og højst MATCH_RULES.
 
 // v3.13 (IFAB Law 3, match-rules.js): 5 skift i højst 3 pauser; halvlegen (45') er gratis. Skade i HVERT tick:
 // tre pauser (skadens hold trækkes tilfældigt) + pausen 45' → præcis 4 skift (før v3.13: 3 = den gamle MAX_SUBS; 5 ville betyde, at pauserne ikke binder).
-test('skade i hvert tick: 3 pauser binder (ude 3 skift), halvlegen er gratis (hjemme 4), og første skift er fra samme kæde', () => {
+test('skade i hvert tick: 3 pauser binder (ude 3 skift), halvlegen er gratis (begge 3 + 2 i pausen), og første skift er fra samme kæde', () => {
   const L = league(22), base = createRng(3);
   // Tving frispark og skade i hvert tick, så der er langt flere skader end skift – skiftevis hjemme/ude
-  // (0,5 = skadens hold): tick 45 er det 15. → en hjemmeskade i halvlegen. Hjemme: 3 pauser + 45' = 4; ude: 3.
+  // (0,5 = skadens hold): tick 45 er det 15. → en hjemmeskade i halvlegen. Hjemme: 3 pauser + 45' = 4; ude: 3. v3.16.6: i pausen
+  // skiftes også de haltende fra 1. halvleg ud (pausen er gratis): begge hold 3 pauser (3, 9, 15 / 6, 12, 18) + 2 i 45' = 5.
   let flip = false;
   const rng = { ...base, chance: (p) => (p === 0.06 || p === 0.4 ? true : p === 0.5 ? (flip = !flip) : base.chance(p)) };
   const m = simulateMatch(L.teams[0], L.teams[1], rng);
   assert.ok(m.injuries.length > 8);
-  for (const [list, want] of [[m.ratings.home, 4], [m.ratings.away, 3]]) {
+  for (const [list, want] of [[m.ratings.home, 5], [m.ratings.away, 5]]) {
     const subs = list.filter((r) => r.role.startsWith('SUB'));
     assert.equal(subs.length, want);
     const mins = subs.map((r) => r.minIn);
     assert.equal(new Set(mins.filter((x) => x !== 45)).size, 3, mins.join());
-    assert.equal(mins.includes(45), want === 4, mins.join());
+    assert.equal(mins.filter((x) => x === 45).length, 2, mins.join());
     assert.equal(subs.sort((a, b) => a.minIn - b.minIn)[0].role, `SUB (${subs[0].line})`);
   }
   for (const side of [true, false]) {
