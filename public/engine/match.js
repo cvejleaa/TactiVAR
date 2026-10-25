@@ -721,7 +721,8 @@ export function simulateMatch(home, away, rng, opts = {}) {
     st[k(att, 'OnTarget')]++;
     sheet.adjust(gk.id, 0.5); sheet.bump(gk.id, 'saves'); sheet.adjust(finisher.id, 0.1);
     // Dit holds opspil (lead) står FØR redningen – det skete først (Spilfører v3.16.4)
-    addEv(min, 'SAVE', 'PLAY', def.isHome, false, 'Redning', `🧤 [${def.team.name}] ${lead ? lead.replace('✅ ', '') + ' ' : ''}Flot redning af ${tag(gk)} på afslutning fra ${tag(finisher)} (${att.team.name}).`);
+    // – og så kun "men X redder" (Spilfører v3.16.6: skytten stod ellers to gange i samme linje)
+    addEv(min, 'SAVE', 'PLAY', def.isHome, false, 'Redning', lead ? `🧤 [${def.team.name}] ${lead.replace('✅ ', '').replace(/\.$/, '')} – men ${tag(gk)} redder.` : `🧤 [${def.team.name}] Flot redning af ${tag(gk)} på afslutning fra ${tag(finisher)} (${att.team.name}).`);
     if (rng.chance(CORNER_P)) corner(att, def, cR, dR, min);
     return false;
   }
@@ -819,7 +820,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
         bookKind(att, taker, 'FREEKICK');
         const desc = describeGoal('FREEKICK', tag(taker), tag(taker), min, rng, goalTexts);
         goalsPool.push({ scorer: tag(taker), teamName: att.team.name, match: `${home.name} - ${away.name}`, min, kind: 'FREEKICK', spectacle: goalSpectacle('FREEKICK', { finishing: taker.skills.finishing }, min, rng), desc });
-        addEv(min, 'GOAL', 'HIGHLIGHT', att.isHome, true, `⚽ Frisparksmål: ${tag(taker)}`, `⚽ [${att.team.name} • ${hG}-${aG}] FRISPARKSMÅL! Frispark efter ${gen(tag(fouler))} (${def.team.name}) forseelse${halt ? `. ${halt}` : ''} – ${desc}`);
+        addEv(min, 'GOAL', 'HIGHLIGHT', att.isHome, true, `⚽ Frisparksmål: ${tag(taker)}`, `⚽ [${att.team.name} • ${hG}-${aG}] FRISPARKSMÅL! Frispark efter ${gen(tag(fouler))} (${def.team.name}) forseelse${halt ? `. ${halt}` : ''}: ${desc}`);
       } else if (!missed(att, def, cR, dR, min, taker, false, 'frisparket')) {
         st[k(att, 'OnTarget')]++;
         sheet.adjust(gk.id, 0.4); sheet.bump(gk.id, 'saves');
