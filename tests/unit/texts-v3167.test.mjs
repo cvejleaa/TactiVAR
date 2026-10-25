@@ -159,3 +159,21 @@ test('friskheden: "… til næste runde" – i sæsonens sidste runde "… til f
   }
   assert.ok(mid >= 10 && last >= 1, `data: ${mid} midt i sæsonen, ${last} i sidste runde`);
 });
+test('pres (M2): trapWon = referatets offside-fælder for holdet; pressWon tæller dem stadig med; klummen og analysen siger det', () => {
+  let traps = 0, offs = 0;
+  for (const m of C) for (const [id, r] of Object.entries(m.ownReports ?? {})) {
+    const home = r.side === 'home';
+    const mine = m.events.filter((e) => e.label === 'Offside-fælde virker' && e.isHome === home).length;
+    const theirs = m.events.filter((e) => e.label === 'Offside-fælde virker' && e.isHome !== home).length;
+    assert.equal(r.trapWon, mine, `${id}: fælder`); assert.equal(r.oppTrapWon, theirs, `${id}: egne offsides`);
+    assert.ok(r.trapWon <= r.pressWon);
+    traps += mine; offs += theirs;
+  }
+  assert.ok(traps >= 50 && offs >= 50, `data: ${traps} fælder, ${offs} egne offsides`);
+  // Klummen: med fælder "stoppede opbygningen … (X erobringer, Z offside)"; uden (eller gammelt gem) "vandt bolden"
+  const R = (o) => ({ build: 0, buildWon: 0, press: 6, pressWon: 4, crosses: 0, crossesWon: 0, cutbacks: 0, cutbacksBlocked: 0, cutbackGoals: 0, runGoals: 0, counterGoalsAgainst: 0, start: { formation: '4-4-2' }, end: { formation: '4-4-2' }, ...o });
+  const v = (r) => buildColumn({ matches: [M({ ownReports: { h1: r } })], viewerTeamId: 'h1', round: 5 }).sections[0].paras.slice(1);
+  assert.deepEqual(v(R({ trapWon: 3 })), ['Dit pres stoppede opbygningen 4 af 6 gange (1 erobring, 3 offside).']);
+  assert.deepEqual(v(R({ trapWon: 0 })), ['Dit pres vandt bolden 4 af 6 gange.']);
+  assert.deepEqual(v(R({})), ['Dit pres vandt bolden 4 af 6 gange.'], 'gammelt gem uden trapWon');
+});

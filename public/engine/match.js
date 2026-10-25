@@ -237,6 +237,15 @@ const avg = (arr, f) => arr.reduce((a, p) => a + f(p), 0) / Math.max(1, arr.leng
 // en bots fulde indstillinger i det gemte spil, selv om intet viste dem.
 const endOf = (s, full) => ({ formation: s.tactics.baseFormation, starters: s.starters.map((p) => p?.id ?? null), ...(full ? { customCoords: structuredClone(s.tactics.customCoords), phases: structuredClone(s.tactics.phases) } : {}) });
 
+// Opbygning og pres i pause- og fuldtidsanalysen (v3.16.7, Spilfører: "dit pres vandt bolden 2 af 2" var to offside-fælder): fælden
+// er med i pressets tal (presset stoppede opbygningen), men står for sig – og din egen opbygnings offsides ligeså.
+function duelText(d, o, half = false) {
+  const off = o.trapWon, trap = d.trapWon;
+  return `Din opbygning ${half ? 'er kommet' : 'kom'} igennem ${d.buildWon} af ${pl(d.build, 'gang', 'gange')}${off ? ` (${off} ${off === 1 ? 'gang' : 'gange'} fanget offside)` : ''}; `
+    + (trap ? `dit pres ${half ? 'har stoppet' : 'stoppede'} opbygningen ${d.pressWon} af ${pl(d.press, 'gang', 'gange')} (${pl(d.pressWon - trap, 'erobring', 'erobringer')}, ${trap} offside).`
+      : `dit pres ${half ? 'har vundet' : 'vandt'} bolden ${d.pressWon} af ${pl(d.press, 'gang', 'gange')}.`);
+}
+
 // Fuldtids-analysens angrebsdel (QC v3.12): kun de dele, dine valg (eller kampen) gav – ellers
 // stod der "0 cutbacks, 0 høje bolde" til et centralt hold. Cutbacks fra løb på kanten tæller med.
 function attackLine(d, ph) {
@@ -411,7 +420,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
   const own = (s) => !s.team.isBot;
   // Fase-dueller pr. hold til pause-analysen: forsøg/sejre med opbygning og med pres.
   const duelLog = Object.fromEntries([H, A].map((s) => [s.team.id, { build: 0, buildWon: 0, press: 0, pressWon: 0, runs: 0, runsWon: 0, runGoals: 0, countersAgainst: 0, counterGoalsAgainst: 0,
-    crosses: 0, crossesWon: 0, headerGoals: 0, cutbacks: 0, cutbacksBlocked: 0, cutbackGoals: 0 }]));
+    crosses: 0, crossesWon: 0, headerGoals: 0, cutbacks: 0, cutbacksBlocked: 0, cutbackGoals: 0, trapWon: 0 }]));   // trapWon: pres-sejre ved offside-fælden (v3.16.7)
   // Modtageren: spilleren nær det sted, bolden spilles hen (se RECEIVE_SPREAD). exclude = afleveren.
   // ctx = { attacking, ballX } – øjeblikket (positions.js). Positionerne huskes til øjebliksbilledet ved mål.
   let seen = {}, seenX = {};
@@ -1016,7 +1025,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
       const leader = st.hTacticSuccess >= st.aTacticSuccess ? home : away;
       // Dit holds egen duel-statistik (kun egne valg nævnes – modstanderens stil røbes ikke).
       const mine = [H, A].find(own);
-      const yours = mine && duelLog[mine.team.id].build + duelLog[mine.team.id].press ? ` Din opbygning er kommet igennem ${duelLog[mine.team.id].buildWon} af ${pl(duelLog[mine.team.id].build, 'gang', 'gange')}; dit pres har vundet bolden ${duelLog[mine.team.id].pressWon} af ${pl(duelLog[mine.team.id].press, 'gang', 'gange')}.` : '';
+      const yours = mine && duelLog[mine.team.id].build + duelLog[mine.team.id].press ? ` ${duelText(duelLog[mine.team.id], duelLog[other(mine).team.id], true)}` : '';
       addEv(min, 'HALFTIME', 'TACTIC', true, false, 'Pause-analyse', `⏸️ [PAUSE-ANALYSE] Stillingen er ${hG}-${aG}. ${home.name} har haft ${hp}% af bolden. ${leader.name} har vundet flest taktiske dueller (${Math.max(st.hTacticSuccess, st.aTacticSuccess)}).${yours}`);
     }
     // I pausen skiftes en haltende ud, hvis der er et skift tilbage (pausen koster ingen skifte-pause) – v3.16.6
@@ -1094,6 +1103,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
         duelLog[def.team.id].pressWon++;
         st[k(def, 'TacticSuccess')]++;
         if (defPh.phase2_defending.offsideTrap !== 'OFF' && rng.chance(0.45)) {
+          duelLog[def.team.id].trapWon++;   // med i pressWon (presset stoppede opbygningen), men tælles for sig (Spilfører v3.16.6)
           sheet.adjust(back.id, 0.4); sheet.adjust(striker.id, -0.25); sheet.bump(back.id, 'tacticWins');
           // Kun din egen offside-fælde navngives; hos modstandere er det blot en offside.
           // Det fulde banner første gang pr. halvleg, derefter en kort linje (v3.16.7, Spilfører: 399 banner-linjer på en sæson,
@@ -1319,14 +1329,14 @@ export function simulateMatch(home, away, rng, opts = {}) {
   const ownReports = Object.fromEntries([H, A].filter(own).map((s) => {
     const d = duelLog[s.team.id], o = duelLog[other(s).team.id], side = s.isHome ? 'home' : 'away';
     return [s.team.id, { side, start: { formation: startFormations[side], phases: startPhases[side] }, end: { formation: s.tactics.baseFormation, phases: structuredClone(s.tactics.phases) },
-      ...d, oppCutbacks: o.cutbacks, oppCutbacksBlocked: o.cutbacksBlocked, oppCrosses: o.crosses, oppCrossesWon: o.crossesWon }];
+      ...d, oppCutbacks: o.cutbacks, oppCutbacksBlocked: o.cutbacksBlocked, oppCrosses: o.crosses, oppCrossesWon: o.crossesWon, oppTrapWon: o.trapWon }];
   }));
   if (meSide) {
     const d = ownReports[meSide.team.id], ph = meSide.tactics.phases.phase1_buildUp, runs = ph.offBallRuns ?? 'NORMAL';
     const p = meSide.isHome ? 'h' : 'a', poss = Math.round((st[p + 'Poss'] / (st.hPoss + st.aPoss)) * 100);
     const [myG, oppG] = meSide.isHome ? [hG, aG] : [aG, hG];
     addEv(90, 'FULLTIME', 'TACTIC', meSide.isHome, false, 'Fuldtids-analyse',
-      `📊 [FULDTIDS-ANALYSE] ${myG > oppG ? `Sejr ${myG}-${oppG} til dig` : myG < oppG ? `Nederlag ${myG}-${oppG}` : `Uafgjort ${myG}-${oppG}`}. Du havde ${poss}% af bolden og ${pl(st[p + 'Shots'], 'afslutning', 'afslutninger')} (${st[p + 'OnTarget']} på mål). Din opbygning kom igennem ${d.buildWon} af ${pl(d.build, 'gang', 'gange')}; dit pres vandt bolden ${d.pressWon} af ${pl(d.press, 'gang', 'gange')}.`
+      `📊 [FULDTIDS-ANALYSE] ${myG > oppG ? `Sejr ${myG}-${oppG} til dig` : myG < oppG ? `Nederlag ${myG}-${oppG}` : `Uafgjort ${myG}-${oppG}`}. Du havde ${poss}% af bolden og ${pl(st[p + 'Shots'], 'afslutning', 'afslutninger')} (${st[p + 'OnTarget']} på mål). ${duelText(d, duelLog[other(meSide).team.id])}`
       + ` Dødbolde: ${st[p + 'FreeKicks']} frispark i skudafstand, ${st[p + 'Corners']} hjørnespark, ${st[p + 'Penalties']} straffespark (${st[p + 'PenaltyGoals']} mål) · frispark begået ${st[p + 'Fouls']}, tilkendt ${st[(p === 'h' ? 'a' : 'h') + 'Fouls']}.`
       + ` 🎯 Løb uden bold (${RUNS_LABEL[runs]}): ${d.runs} løb, ${d.runsWon} kom fri (${d.runGoals} mål) · kontraer imod i alt: ${d.countersAgainst} (${d.counterGoalsAgainst} mål).`
       // v3.12 (brugeren: "ikke en eneste reference til cutbacks"): dit angreb efter dine valg og
