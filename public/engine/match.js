@@ -1069,7 +1069,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
     checkTriggers(H, min); checkTriggers(A, min);
     fatigueSubs(H, min); fatigueSubs(A, min);
 
-    const hR = rolesOf(H), aR = rolesOf(A);
+    let hR = rolesOf(H), aR = rolesOf(A);
     const hMid = avg(hR.mids, (p) => p.skills.passing + p.skills.ballControl) * shortF(H);
     const aMid = avg(aR.mids, (p) => p.skills.passing + p.skills.ballControl) * shortF(A);
     const homeHasBall = hMid + hAvg * 0.03 + rng.next() * 8 >= aMid + aAvg * 0.03 + rng.next() * 7.5;
@@ -1213,6 +1213,9 @@ export function simulateMatch(home, away, rng, opts = {}) {
           const why = subBlock(victimSide, min) ?? 'der er ingen rask spiller på bænken';
           addEv(min, 'INFO', 'PLAY', victimSide.isHome, false, 'Ingen indskiftning', `🚑 [${victimSide.team.name}] Ingen indskiftning mulig (${why}) – holdet spiller videre med ${tag(victim)} haltende.`);
         }
+        // Listerne bygges igen efter skiftet (v3.17.0, Spilfører: den skadet udskiftede fik gult kort i det stille frispark
+        // lige efter) – resten af tick'et (frispark, chance) bruger indskifteren. rolesOf trækker ingen rng.
+        hR = rolesOf(H); aR = rolesOf(A);
       } else {
         // Gult kort kun her – skade-frisparkets tekst nævner intet kort (v3.10). Andet gule giver rødt (v3.15).
         booking(foulSide, fouler, min, 'Taktisk frispark og gult kort til');
