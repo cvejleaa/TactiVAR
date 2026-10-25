@@ -520,13 +520,21 @@ test('beskeden gentages ikke, men en NY grund til samme spiller får sin egen be
   const mine = blocked(m).filter((e) => e.text.includes(tag(p)));
   assert.deepEqual(mine.map((e) => [e.min, e.text.replace(/^.*men /, '')]), [[3, 'der er ingen frisk angriber på bænken.'], [15, 'alle 3 skifte-pauser er brugt.']]);
 });
-test('et nyt holds standardregel er et planskift (bagud 65\' → 3-4-3) uden spillere – ikke en udskiftning', () => {
+// v3.17.0: hver bot-profil har sin egen regel (eller ingen) – dit hold og profilerne uden `rule` standardreglen
+test('et nyt holds standardregel er et planskift uden spillere – ikke en udskiftning; dit hold bagud 65\' → 3-4-3, botterne efter profilen', () => {
   const L = createLeague(createRng(5));
-  for (const t of L.teams) for (const tac of [t.tactics, ...t.tacticPresets.slice(0, 1)]) {
-    const [r, ...rest] = tac.conditionalRules;
-    assert.equal(rest.length, 0);
-    assert.deepEqual([r.condition, r.minuteTrigger, r.newFormation, r.action, r.subOut, r.subIn], ['TRAILING', 65, '3-4-3', 'SHIFT', null, null]);
-  }
+  const want = ['3-4-3', null, '4-4-2', null, '3-4-3', '3-4-3', '4-4-2', null];   // pr. hold (profil 0–7): ny formation, null = ingen regel
+  const minute = { '3-4-3': 65, '4-4-2': 70 };
+  L.teams.forEach((t, i) => {
+    for (const tac of [t.tactics, ...t.tacticPresets.slice(0, 1)]) {
+      const [r, ...rest] = tac.conditionalRules;
+      assert.equal(rest.length, 0);
+      if (want[i] === null) { assert.equal(r, undefined, t.name); continue; }
+      assert.deepEqual([r.condition, r.minuteTrigger, r.newFormation, r.action, r.subOut, r.subIn], ['TRAILING', minute[want[i]], want[i], 'SHIFT', null, null], t.name);
+      assert.equal(new Set(r.slotRemapping).size, 11);
+    }
+  });
+  assert.equal(L.teams.filter((t) => t.tactics.conditionalRules.length === 0).length, 3);
 });
 test('ruleConditionMet: "uanset stilling" er sand ved alle stillinger; uafgjort kun ved lighed; ukendt betingelse falsk', () => {
   const c = (condition, own, opp, margin = 1) => ruleConditionMet({ condition, margin }, own, opp);

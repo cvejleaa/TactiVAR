@@ -436,7 +436,7 @@ test('normalizeLeague genskaber manglende felter uden at røre data', () => {
   assert.deepEqual(N.teams[1].squad[0].counterTactics, { vsPress: 15, vsLowBlock: 15, vsTrapLong: 15 });
   assert.equal(N.teams[2].tacticPresets.length, 3);
   assert.equal(N.teams[4].tactics.lineupSlots.length, 11);
-  assert.equal(N.teams[6].tactics.conditionalRules[0].minuteTrigger, 65);
+  assert.equal(N.teams[6].tactics.conditionalRules[0].minuteTrigger, 70);   // 5-4-1-profilens regel (v3.17.0; før standardens 65)
   assert.equal(N.teams[3].squad[2].skills.passing, keep);
 });
 

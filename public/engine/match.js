@@ -976,6 +976,9 @@ export function simulateMatch(home, away, rng, opts = {}) {
       }
       if (!FORMATIONS[rule.newFormation]) return;
       rule.used = true;
+      // Allerede i formationen (v3.17.0: 3-4-3 "skiftede" til 3-4-3 og blandede pladserne): intet skift og ingen linje – men kun
+      // for en bot eller uden trukne positioner; ellers nulstiller dit skift dine positioner, og det er din regel (QC)
+      if (rule.newFormation === from && (side.team.isBot || !Object.keys(side.tactics.customCoords || {}).length)) return;
       const remap = rule.slotRemapping;
       if (Array.isArray(remap) && remap.length === 11 && new Set(remap).size === 11 && remap.every((i) => i >= 0 && i < 11)) {
         const old = side.starters.slice();
