@@ -640,3 +640,12 @@ test('bot: før 75\' bruges højst 4 træthedsskift og 2 skifte-pauser (én af h
   assert.ok(windows.size <= 1, `pauser før 75' (pausen 45' tæller ikke): ${[...windows].join()}`);
   assert.ok(fatigue.length === 5 && fatigue.some((e) => e.min >= 75), `efter 75' det sidste: ${fatigue.map((e) => e.min).join()}`);
 });
+test('bot: skifte-pausen gemmes til skaden – skader i 51\' og 60\' og en træt i 63\': den trætte venter, skaden i 72\' får en indskiftning', () => {
+  // Uden pause-reserven (keep.windows 0) tager træthedsskiftet i 63' den tredje pause, og skaden i 72' må spille videre haltende
+  const { H, A } = arena({ homeLimit: 75, homeBot: true });
+  slot(H, 6).freshness = 86;
+  for (const p of bench(H)) p.freshness = 89;   // < 90: ingen rotation før kampen
+  const m = simulateMatch(H, A, stubRng({ 0.06: (n) => n === 16 || n === 19 || n === 23, 0.5: true, 0.4: true }));
+  const home = m.events.filter((e) => e.isHome && (e.type === 'SUB' || e.type === 'INJURY' || /Ingen indskiftning/.test(e.text ?? ''))).map((e) => `${e.min}:${e.type}`);
+  assert.deepEqual(home, ['51:INJURY', '51:SUB', '60:INJURY', '60:SUB', '72:INJURY', '72:SUB'], home.join(' '));
+});
