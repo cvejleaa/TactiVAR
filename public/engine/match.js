@@ -46,6 +46,8 @@ const WIDE_ROLES = new Set(['LB', 'RB', 'LWB', 'RWB', 'LM', 'RM', 'LW', 'RW']); 
 // man er på banen kan det blive til en dribletur, en aflevering (incl. tværaflevering) eller
 // skud. Beslutningen kan også blive påvirket af spillerens evner til skud eller aflevering").
 export const CHANCE_P = { FEW: 0.285, NORMAL: 0.3, MANY: 0.36 };
+// v3.17.0 (opbygningen styrer chancen): løft efter vundet opbygning, dæmpning uden duel – se tick'ets chance
+export const BUILD_LIFT_P = 0.432, OPEN_DAMP_P = 0.498;   // P(chance) ≈ 0,60 efter vundet opbygning, ≈ 0,15 uden duel (før 0,30 begge)
 export const RUN_WEIGHT = {
   ST: { FEW: 3, NORMAL: 3, MANY: 3 }, WIDE: { FEW: 2, NORMAL: 2.5, MANY: 3 }, CM: { FEW: 1, NORMAL: 1.5, MANY: 2.5 },
   FB: { FEW: 0.2, NORMAL: 0.8, MANY: 2 }, CB: { FEW: 0.05, NORMAL: 0.1, MANY: 0.3 },
@@ -1119,7 +1121,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
     // Fase 1 mod fase 2 (48 %) med sten-saks-papir-bonus og mod-kunnen. Vinder forsvaret
     // duellen, er bolden tabt, og angriberen får ingen chance i samme tick (v3.6 – før kunne
     // "❌ din opbygning stoppes" efterfølges af dit mål i samme minut).
-    let ballLost = false;
+    let ballLost = false, tickDuel = 'OPEN';   // tickDuel (v3.17.0): BUILD = opbygningen vundet, LOST = stoppet, OPEN = ingen duel
     if (rng.chance(0.48)) {
       const pmM = masteryVs(playmaker, def.team), prM = masteryVs(presser, att.team);
       let build = (playmaker.skills.passing + playmaker.skills.ballControl) * ff(playmaker) + pmM * MASTERY_WEIGHT + rng.next() * 7;
@@ -1131,6 +1133,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
       if (height === 'HIGH_GEGENPRESS' && pass === 'SHORT') press += STYLE_BONUS;
       if (height === 'LOW_BLOCK' && focus === 'CENTRAL') press += STYLE_BONUS;
       duelLog[att.team.id].build++; duelLog[def.team.id].press++;
+      tickDuel = build >= press ? 'BUILD' : 'LOST';
       if (build >= press) {
         duelLog[att.team.id].buildWon++;
         st[k(att, 'TacticSuccess')]++;
@@ -1260,7 +1263,11 @@ export function simulateMatch(home, away, rng, opts = {}) {
     else if (!ballLost && rng.chance(FREEKICK_P)) freeKick(att, def, att === H ? hR : aR, def === H ? hR : aR, min);
     // Chance (30 %): angrebsfokus afgør typen (v3.12) – høj bold, cutback – ellers en afslutning (løb uden bold eller
     // almindeligt skud). Ikke efter tabt bold. VAR er ikke en chancetype (v3.15.1) – det tjekker målet bagefter.
-    else if (!ballLost && rng.chance(CHANCE_P[attPh.phase1_buildUp.offBallRuns] ?? CHANCE_P.NORMAL)) {
+    // Opbygningen styrer chancen (v3.17.0, Spilfører: "0 af 10" og alligevel 3-1): efter en vundet opbygning løftes chancen
+    // (BUILD_LIFT_P oven i), uden duel dæmpes den (OPEN_DAMP_P) – samlet omtrent lige mange chancer. Egne p-værdier, så
+    // testenes scriptede terning (CHANCE_P.NORMAL = 0,3) er uændret.
+    else if (!ballLost && !(tickDuel === 'OPEN' && rng.chance(OPEN_DAMP_P))
+      && (rng.chance(CHANCE_P[attPh.phase1_buildUp.offBallRuns] ?? CHANCE_P.NORMAL) || (tickDuel === 'BUILD' && rng.chance(BUILD_LIFT_P)))) {
       const cR = att === H ? hR : aR, dR = def === H ? hR : aR;
       const ph1 = attPh.phase1_buildUp, focus = ph1.attackFocus;
       const assister = rng.pick(cR.mids), defender = rng.pick(dR.defs), gk = dR.gk;

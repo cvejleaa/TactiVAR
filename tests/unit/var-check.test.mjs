@@ -166,10 +166,10 @@ test('forbi: et skud forbi eller blokeret er ikke på mål og ingen redning', ()
   assert.ok(miss >= 80, `data: ${miss}`);
 });
 
-test('VAR_RULES og forbi-tallene er indbyrdes forskellige og findes ikke som andre chance-værdier i motoren (testenes rng vælger på p-værdien)', async () => {
+test('VAR_RULES, forbi-tallene og opbygningens løft/dæmpning er indbyrdes forskellige og findes ikke som andre chance-værdier i motoren (testenes rng vælger på p-værdien)', async () => {
   const fs = await import('node:fs');
   const R = await import('../../public/engine/match-rules.js'), M = await import('../../public/engine/match.js');
-  const mine = [...Object.values(R.VAR_RULES), R.MISS_P, R.MISS_BLOCK_SHARE, R.MISS_CORNER_P];
+  const mine = [...Object.values(R.VAR_RULES), R.MISS_P, R.MISS_BLOCK_SHARE, R.MISS_CORNER_P, M.BUILD_LIFT_P, M.OPEN_DAMP_P];   // + opbygningens løft/dæmpning (v3.17.0)
   assert.equal(new Set(mine).size, mine.length, `dubletter: ${mine}`);
   const src = fs.readFileSync(new URL('../../public/engine/match.js', import.meta.url), 'utf8');
   const literal = [...src.matchAll(/chance\((0\.\d+)\)/g)].map((x) => Number(x[1]));

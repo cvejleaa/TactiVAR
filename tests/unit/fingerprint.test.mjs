@@ -19,7 +19,8 @@ import { fingerprint } from '../../tools/fingerprint.mjs';
 // v3.17.0: dødboldens indlæg slås af kant/midtbane (crossTaker), SETPIECE_DEF_EDGE 4,1 (før 3c768989…)
 // v3.17.0: løbs-cutbacken møder backen på sin kant (flankBack) (før 043be8b7…)
 // v3.17.0: egen Hvis-Så pr. bot-profil, intet skift til samme formation (før dd970075…)
-const NOPROSE_400 = 'e2b30f351f4711ac588fee45835cd0e0efc53a2f2bf6760c0d9bb6f6ad381db6';
+// v3.17.0: opbygningen styrer chancen (BUILD_LIFT_P/OPEN_DAMP_P) (før e2b30f35…)
+const NOPROSE_400 = 'df778b605ee4fbc79d9c2d10b069b7c4b671529594736f47855b2db277ef736d';
 
 test('fingeraftryk uden prosa: de 400 seedede kampe er de samme som ved sidste bevidste motorændring (v3.16.6 M5)', async () => {
   const r = await fingerprint(400);

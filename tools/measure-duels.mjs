@@ -415,22 +415,24 @@ export function measureKeeper(N = 400, low = 6, high = 16) {
 // stoppet, ellers ingen duel) og om det skød i samme tick (skud-tallet i hændelsernes stats-kopi, tick for tick).
 // Plus: hold med højst 1 vundet af mindst 6 opbygninger – hvor ofte vinder de alligevel?
 export function measureBuild(N = 400) {
-  const t = { run: [0, 0], stop: [0, 0], none: [0, 0] };
+  // pr. udfald: [tick, med skud, xG i alt, med stor chance (xG-spring ≥ 0,13 = en hovedchance)]
+  const t = { run: [0, 0, 0, 0], stop: [0, 0, 0, 0], none: [0, 0, 0, 0] };
   let weak = 0, weakWins = 0;
   const pairs = [];
   for (let s = 1; s <= N; s++) {
     const L = createLeague(createRng(s));
     const m = simulateMatch(L.teams[s % 8], L.teams[(s + 3) % 8], createRng(s * 31));
-    const shotsAt = new Map();   // tick → [hShots, aShots] efter tick'et
-    for (const e of m.events) if (e.stats && e.min % 3 === 0) shotsAt.set(e.min / 3, [e.stats.hShots, e.stats.aShots]);
-    let prev = [0, 0];
+    const at = new Map();   // tick → [hShots, aShots, hXg, aXg] efter tick'et (hændelsernes stats-kopi)
+    for (const e of m.events) if (e.stats && e.min % 3 === 0) at.set(e.min / 3, [e.stats.hShots, e.stats.aShots, e.stats.hXg, e.stats.aXg]);
+    let prev = [0, 0, 0, 0];
     const duel = { h: [0, 0], a: [0, 0] };
     for (let k = 1; k <= 30; k++) {
-      const cur = shotsAt.get(k) ?? prev, f = m.trace.frames.find((q) => q.t === k);
+      const cur = at.get(k) ?? prev, f = m.trace.frames.find((q) => q.t === k);
       if (f?.poss) {
-        const i = f.poss === 'h' ? 0 : 1, shot = cur[i] > prev[i];
+        // Kun holdet med bolden (pres-vinderens egne afslutninger i samme tick tælles ikke her – QC)
+        const i = f.poss === 'h' ? 0 : 1, shot = cur[i] > prev[i], xg = cur[2 + i] - prev[2 + i];
         const kind = f.run ? 'run' : f.lost || f.offside ? 'stop' : 'none';
-        t[kind][0]++; if (shot) t[kind][1]++;
+        t[kind][0]++; if (shot) t[kind][1]++; t[kind][2] += Math.max(0, xg); if (xg >= 0.13) t[kind][3]++;
         if (kind !== 'none') { duel[f.poss][1]++; if (kind === 'run') duel[f.poss][0]++; }
       }
       prev = cur;
@@ -441,10 +443,11 @@ export function measureBuild(N = 400) {
       if (all >= 6 && won <= 1) { weak++; if (gf > ga) weakWins++; }
     }
   }
-  const p = (k) => t[k][1] / Math.max(1, t[k][0]);
+  const p = (k, j = 1) => t[k][j] / Math.max(1, t[k][0]);
   const mx = pairs.reduce((a, q) => a + q[0], 0) / pairs.length, my = pairs.reduce((a, q) => a + q[1], 0) / pairs.length;
   const cov = pairs.reduce((a, q) => a + (q[0] - mx) * (q[1] - my), 0), vx = pairs.reduce((a, q) => a + (q[0] - mx) ** 2, 0), vy = pairs.reduce((a, q) => a + (q[1] - my) ** 2, 0);
-  return { pRun: p('run'), pStop: p('stop'), pNone: p('none'), lift: p('run') / p('none'), corr: cov / Math.sqrt(vx * vy), weak, weakWinShare: weak ? weakWins / weak : 0 };
+  return { pRun: p('run'), pStop: p('stop'), pNone: p('none'), lift: p('run') / p('none'), xgRun: p('run', 2), xgNone: p('none', 2), xgLift: p('run', 2) / p('none', 2),
+    bigRun: p('run', 3), bigNone: p('none', 3), bigLift: p('run', 3) / p('none', 3), corr: cov / Math.sqrt(vx * vy), weak, weakWinShare: weak ? weakWins / weak : 0 };
 }
 // FASE-linjer i kampe uden dit hold (bot mod bot) pr. kamp
 export function measureFaseLines(N = 400) {
