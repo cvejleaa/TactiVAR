@@ -11,6 +11,7 @@ import { playPairs, fixedPairs, commitRound } from '../public/engine/season.js';
 import { COUNTER_KEYS } from '../public/engine/counter.js';
 import { simulateMatch } from '../public/engine/match.js';
 import { lineOfRole } from '../public/engine/formations.js';
+import { replaySteps } from '../public/ui/replay.js';
 
 const ARG_N = Number(process.argv[2] || 20);
 const ROLE_GROUP = { CDM: 'CM', LB: 'FB', RB: 'FB', LWB: 'WB/kant', RWB: 'WB/kant', LM: 'WB/kant', RM: 'WB/kant', LW: 'WB/kant', RW: 'WB/kant', CAM: 'CAM/CF', CF: 'CAM/CF' };
@@ -156,7 +157,7 @@ const phases = (pass, focus, height) => (t) => {
   Object.assign(t.tactics.phases.phase1_buildUp, { passingStyle: pass, attackFocus: focus });
   Object.assign(t.tactics.phases.phase2_defending, { pressingHeight: height, offsideTrap: 'OFF' });
 };
-if (import.meta.url === `file://${process.argv[1]}` && !['saeson', 'loeb', 'fokus', 'maal', 'formation', 'skift', 'var'].includes(process.argv[3])) {
+if (import.meta.url === `file://${process.argv[1]}` && !['saeson', 'loeb', 'fokus', 'maal', 'formation', 'skift', 'var', 'skud', 'opbygning'].includes(process.argv[3])) {
   const pct = (x) => `${(x * 100).toFixed(1)} %`;
   const liga = measure();
   console.log(`Ligaens egne taktikker: fase 1 vinder ${pct(liga.rate)} (${liga.n} dueller, ${ARG_N} ligaer × 3 runder); ${liga.goalsPerMatch.toFixed(2)} mål pr. kamp, heraf ${liga.headersPerMatch.toFixed(2)} hovedstød.`);
@@ -375,4 +376,92 @@ export function measureVar(N = 1500) {
 if (import.meta.url === `file://${process.argv[1]}` && process.argv[3] === 'var') {
   const r = measureVar(ARG_N), f = (x) => x.toFixed(3);
   console.log(Object.entries(r).map(([k, v]) => `${k} ${Number.isInteger(v) ? v : f(v)}`).join('\n'));
+}
+
+// Skud og afslutninger (v3.17.0, balance-gennemgangen): skud, andel på mål, konvertering (mål pr. skud på mål), forbi,
+// redninger, hjørner og xG mod mål pr. kamp – plus målmandens effekt (hjemmeholdets keeper sat til 6 og til 16, samme
+// kampe), kampens størrelse (JSON-bytes, det gemte resultat vokser med hændelserne) og trin i Højdepunkter.
+export function measureShots(N = 400) {
+  const c = { games: 0, goals: 0, shots: 0, onTarget: 0, miss: 0, saves: 0, corners: 0, xg: 0, bytes: 0, highlightSteps: 0 };
+  for (let s = 1; s <= N; s++) {
+    const L = createLeague(createRng(s));
+    const m = simulateMatch(L.teams[s % 8], L.teams[(s + 3) % 8], createRng(s * 31));
+    const st = m.stats; c.games++;
+    c.goals += m.homeGoals + m.awayGoals; c.shots += st.hShots + st.aShots; c.onTarget += st.hOnTarget + st.aOnTarget;
+    c.corners += st.hCorners + st.aCorners; c.xg += st.hXg + st.aXg;
+    c.miss += m.events.filter((e) => e.type === 'MISS').length; c.saves += m.events.filter((e) => e.type === 'SAVE').length;
+    c.bytes += JSON.stringify(m).length;
+    c.highlightSteps += replaySteps(m.trace, true, m.events).length;   // Højdepunkter: afslutninger + skud-trin
+  }
+  const per = Object.fromEntries(Object.entries(c).filter(([k]) => k !== 'games').map(([k, v]) => [k, v / c.games]));
+  return { ...per, games: c.games, onTargetShare: c.onTarget / c.shots, conversion: c.goals / c.onTarget, xgPerGoal: c.xg / c.goals };
+}
+export function measureKeeper(N = 400, low = 6, high = 16) {
+  const against = (gk) => {
+    let ga = 0;
+    for (let s = 1; s <= N; s++) {
+      const L = createLeague(createRng(s));
+      const H = L.teams[s % 8], A = L.teams[(s + 3) % 8];
+      const keeper = H.squad.find((p) => p.id === H.tactics.lineupSlots[0]);
+      keeper.skills.goalkeeping = gk;
+      ga += simulateMatch(H, A, createRng(s * 31)).awayGoals;
+    }
+    return ga / N;
+  };
+  const lo = against(low), hi = against(high);
+  return { low: lo, high: hi, diff: lo - hi };
+}
+// Opbygningen og chancen (v3.17.0): pr. tick holdet med bolden (trace.frames: run = opbygningen vundet, lost/offside =
+// stoppet, ellers ingen duel) og om det skød i samme tick (skud-tallet i hændelsernes stats-kopi, tick for tick).
+// Plus: hold med højst 1 vundet af mindst 6 opbygninger – hvor ofte vinder de alligevel?
+export function measureBuild(N = 400) {
+  const t = { run: [0, 0], stop: [0, 0], none: [0, 0] };
+  let weak = 0, weakWins = 0;
+  const pairs = [];
+  for (let s = 1; s <= N; s++) {
+    const L = createLeague(createRng(s));
+    const m = simulateMatch(L.teams[s % 8], L.teams[(s + 3) % 8], createRng(s * 31));
+    const shotsAt = new Map();   // tick → [hShots, aShots] efter tick'et
+    for (const e of m.events) if (e.stats && e.min % 3 === 0) shotsAt.set(e.min / 3, [e.stats.hShots, e.stats.aShots]);
+    let prev = [0, 0];
+    const duel = { h: [0, 0], a: [0, 0] };
+    for (let k = 1; k <= 30; k++) {
+      const cur = shotsAt.get(k) ?? prev, f = m.trace.frames.find((q) => q.t === k);
+      if (f?.poss) {
+        const i = f.poss === 'h' ? 0 : 1, shot = cur[i] > prev[i];
+        const kind = f.run ? 'run' : f.lost || f.offside ? 'stop' : 'none';
+        t[kind][0]++; if (shot) t[kind][1]++;
+        if (kind !== 'none') { duel[f.poss][1]++; if (kind === 'run') duel[f.poss][0]++; }
+      }
+      prev = cur;
+    }
+    for (const [side, gf, ga] of [['h', m.homeGoals, m.awayGoals], ['a', m.awayGoals, m.homeGoals]]) {
+      const [won, all] = duel[side];
+      pairs.push([won - (duel[side === 'h' ? 'a' : 'h'][0]), gf - ga]);
+      if (all >= 6 && won <= 1) { weak++; if (gf > ga) weakWins++; }
+    }
+  }
+  const p = (k) => t[k][1] / Math.max(1, t[k][0]);
+  const mx = pairs.reduce((a, q) => a + q[0], 0) / pairs.length, my = pairs.reduce((a, q) => a + q[1], 0) / pairs.length;
+  const cov = pairs.reduce((a, q) => a + (q[0] - mx) * (q[1] - my), 0), vx = pairs.reduce((a, q) => a + (q[0] - mx) ** 2, 0), vy = pairs.reduce((a, q) => a + (q[1] - my) ** 2, 0);
+  return { pRun: p('run'), pStop: p('stop'), pNone: p('none'), lift: p('run') / p('none'), corr: cov / Math.sqrt(vx * vy), weak, weakWinShare: weak ? weakWins / weak : 0 };
+}
+// FASE-linjer i kampe uden dit hold (bot mod bot) pr. kamp
+export function measureFaseLines(N = 400) {
+  let lines = 0, games = 0;
+  for (let s = 1; s <= N; s++) {
+    const L = createLeague(createRng(s));
+    const H = L.teams[s % 8], A = L.teams[(s + 3) % 8];
+    if (!H.isBot || !A.isBot) continue;
+    const m = simulateMatch(H, A, createRng(s * 31));
+    games++; lines += m.events.filter((e) => /^\S+ \[FASE /.test(e.text ?? '')).length;
+  }
+  return { perMatch: lines / Math.max(1, games), games };
+}
+if (import.meta.url === `file://${process.argv[1]}` && process.argv[3] === 'skud') {
+  const N = ARG_N;
+  console.log(JSON.stringify({ shots: measureShots(N), keeper: measureKeeper(N), fase: measureFaseLines(N) }, (k, v) => (typeof v === 'number' ? Math.round(v * 1000) / 1000 : v), 1));
+}
+if (import.meta.url === `file://${process.argv[1]}` && process.argv[3] === 'opbygning') {
+  console.log(JSON.stringify(measureBuild(ARG_N), (k, v) => (typeof v === 'number' ? Math.round(v * 1000) / 1000 : v), 1));
 }
