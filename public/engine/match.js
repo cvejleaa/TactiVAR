@@ -705,35 +705,46 @@ export function simulateMatch(home, away, rng, opts = {}) {
     helper = helperFor(cR, finisher, helper);
     const gk = dR.gk, fs = finisher.skills;
     if (fs.finishing * ff(finisher) + rng.next() * 8 + bonus > gk.skills.goalkeeping * ff(gk) + rng.next() * 8 + KEEPER_EDGE) {
-      const varOk = varGoalCheck(att, def, dR, min, finisher, null, kind === 'CUTBACK', helper);
-      if (varOk === null) return false;
-      goalFor(att);
-      const kd = typeof kind === 'function' ? kind() : kind, solo = kd === 'LONGSHOT' || kd === 'DRIBBLE';
-      shotLong = kd === 'LONGSHOT';
-      onGoal?.(kd);
-      bookKind(att, finisher, kd);
-      sheet.adjust(finisher.id, solo ? 1.4 : 1.25); sheet.bump(finisher.id, 'goals'); sheet.adjust(gk.id, -0.3);
-      if (!solo && helper && helper.id !== finisher.id) { sheet.adjust(helper.id, 0.5); sheet.bump(helper.id, 'assists'); }
-      const prose = describeFinish(fs.finishing);
-      observe(finisher, `Scoring (mod ${def.team.name}): ${finisher.shortName} afsluttede med ${prose}.`);
-      const desc = describeGoal(kd, tag(finisher), tag(helper ?? finisher), min, rng, lead ? null : goalTexts);   // med dit holds indledning vises desc ikke – den må ikke bruge en variant op (v3.16.7; samme rng-træk)
-      // Med dit holds indledning (lead) fortæller den allerede oplægget – kun en kort slutning, ikke hele beskrivelsen
-      // igen (brugeren v3.14.3: "cutback bliver noteret 2 gange i teksten"). "Rundens mål" bruger den fulde (desc).
-      // Slutter indledningen med afslutterens navn ("… lægger den tilbage til #7."), sparker han den ind; ellers (løberen
-      // skød selv – også "løber sig fri og skyder" i en kombination) sad bolden i nettet (QC v3.14.3).
-      const end = !lead ? desc : lead.endsWith(`${tag(finisher)}.`) ? 'Han sparkede den ind.' : 'Bolden sad i nettet.';
-      // I selve målets linje uden løbets ✅ (Spilfører v3.16.3: "MÅÅÅL! ✅ …"); Rundens mål genfortæller samme hændelse
-      const told = lead ? `${lead.replace(/^✅ /, '')} ${end}` : desc;
-      goalsPool.push({ scorer: tag(finisher), teamName: att.team.name, match: `${home.name} - ${away.name}`, min, kind: kd, spectacle: goalSpectacle(kd, { finishing: fs.finishing, pace: fs.pace, ballControl: fs.ballControl, passing: (helper ?? finisher).skills.passing }, min, rng), desc: told });
-      addEv(min, 'GOAL', 'HIGHLIGHT', att.isHome, true, `⚽ Mål: ${tag(finisher)}`, `⚽ [${att.team.name} • ${hG}-${aG}] MÅÅÅL! ${told}${varOk}`);
-      // Solo-mål (langskud, dribletur): bolden står ved skytten – ikke på en fast plet i feltet (QC). Et langskud fra
-      // skudafstand: skytten flyttes højst til LONGSHOT_FAR (v3.14.3).
-      const live = solo && seen[att.team.id]?.[att.starters.indexOf(finisher)];
-      const at = live && (kd === 'LONGSHOT' ? { x: Math.min(LONGSHOT_X[1], Math.max(LONGSHOT_X[0], live.x)), y: Math.min(live.y, LONGSHOT_FAR) } : live);
-      const moves = at && at !== live ? { ...snapMoves, [finisher.id]: [at.x, at.y] } : snapMoves;
-      snapshot(att, finisher, solo ? null : helper, at || (kd === 'CUTBACK' ? SPOT.CUTBACK : SPOT.GOAL), false, moves);
-      return true;
+      return scoreFinish(att, def, dR, min, finisher, helper, kind, { lead, onGoal, snapMoves });
     }
+    return noGoal(att, def, cR, dR, min, finisher, helper, kind, lead);
+  }
+  // Målet fra en afslutning (v3.17.0 trukket ud af finishAttempt – også halvchancen bruger det): VAR før bogføringen,
+  // karakterer, Rundens mål, linjen og øjebliksbilledet. false = VAR annullerede.
+  function scoreFinish(att, def, dR, min, finisher, helper, kind, { lead = '', onGoal = null, snapMoves = null } = {}) {
+    const gk = dR.gk, fs = finisher.skills;
+    const varOk = varGoalCheck(att, def, dR, min, finisher, null, kind === 'CUTBACK', helper);
+    if (varOk === null) return false;
+    goalFor(att);
+    const kd = typeof kind === 'function' ? kind() : kind, solo = kd === 'LONGSHOT' || kd === 'DRIBBLE';
+    shotLong = kd === 'LONGSHOT';
+    onGoal?.(kd);
+    bookKind(att, finisher, kd);
+    sheet.adjust(finisher.id, solo ? 1.4 : 1.25); sheet.bump(finisher.id, 'goals'); sheet.adjust(gk.id, -0.3);
+    if (!solo && helper && helper.id !== finisher.id) { sheet.adjust(helper.id, 0.5); sheet.bump(helper.id, 'assists'); }
+    const prose = describeFinish(fs.finishing);
+    observe(finisher, `Scoring (mod ${def.team.name}): ${finisher.shortName} afsluttede med ${prose}.`);
+    const desc = describeGoal(kd, tag(finisher), tag(helper ?? finisher), min, rng, lead ? null : goalTexts);   // med dit holds indledning vises desc ikke – den må ikke bruge en variant op (v3.16.7; samme rng-træk)
+    // Med dit holds indledning (lead) fortæller den allerede oplægget – kun en kort slutning, ikke hele beskrivelsen
+    // igen (brugeren v3.14.3: "cutback bliver noteret 2 gange i teksten"). "Rundens mål" bruger den fulde (desc).
+    // Slutter indledningen med afslutterens navn ("… lægger den tilbage til #7."), sparker han den ind; ellers (løberen
+    // skød selv – også "løber sig fri og skyder" i en kombination) sad bolden i nettet (QC v3.14.3).
+    const end = !lead ? desc : lead.endsWith(`${tag(finisher)}.`) ? 'Han sparkede den ind.' : 'Bolden sad i nettet.';
+    // I selve målets linje uden løbets ✅ (Spilfører v3.16.3: "MÅÅÅL! ✅ …"); Rundens mål genfortæller samme hændelse
+    const told = lead ? `${lead.replace(/^✅ /, '')} ${end}` : desc;
+    goalsPool.push({ scorer: tag(finisher), teamName: att.team.name, match: `${home.name} - ${away.name}`, min, kind: kd, spectacle: goalSpectacle(kd, { finishing: fs.finishing, pace: fs.pace, ballControl: fs.ballControl, passing: (helper ?? finisher).skills.passing }, min, rng), desc: told });
+    addEv(min, 'GOAL', 'HIGHLIGHT', att.isHome, true, `⚽ Mål: ${tag(finisher)}`, `⚽ [${att.team.name} • ${hG}-${aG}] MÅÅÅL! ${told}${varOk}`);
+    // Solo-mål (langskud, dribletur): bolden står ved skytten – ikke på en fast plet i feltet (QC). Et langskud fra
+    // skudafstand: skytten flyttes højst til LONGSHOT_FAR (v3.14.3).
+    const live = solo && seen[att.team.id]?.[att.starters.indexOf(finisher)];
+    const at = live && (kd === 'LONGSHOT' ? { x: Math.min(LONGSHOT_X[1], Math.max(LONGSHOT_X[0], live.x)), y: Math.min(live.y, LONGSHOT_FAR) } : live);
+    const moves = at && at !== live ? { ...snapMoves, [finisher.id]: [at.x, at.y] } : snapMoves;
+    snapshot(att, finisher, solo ? null : helper, at || (kd === 'CUTBACK' ? SPOT.CUTBACK : SPOT.GOAL), false, moves);
+    return true;
+  }
+  // Ingen mål efter keeper-duellen: linjedommerens flag, forbi eller redning (+ evt. hjørne)
+  function noGoal(att, def, cR, dR, min, finisher, helper, kind, lead) {
+    const gk = dR.gk;
     // Linjedommerens flag (v3.15.1, Spilfører: offside uden mål er ikke VAR): afslutningen tæller ikke – ingen redning, intet
     // hjørne. Ikke et VAR-tjek (VarChecks) og intet i VAR ± – kun offside-duellen.
     if (kind !== 'CUTBACK' && rng.chance(VAR_RULES.OFFSIDE_FLAG_P)) {   // bolden er spillet tilbage – ingen offside (v3.16.7)
