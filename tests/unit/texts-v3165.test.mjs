@@ -74,7 +74,7 @@ test('klummen: mester før tid kun, når forspringet er STØRRE end 3 point pr. 
   assert.equal(at(3, 1), 'Aa fører med 30 point, 3 foran Bb.');
   assert.equal(at(40, 0), 'Aa fører med 30 point, 40 foran Bb.', 'ingen runder tilbage, men ikke sæsonslut: ikke "før tid"');
   assert.equal(at(7, null), 'Aa fører med 30 point, 7 foran Bb.', 'uden programmet (roundsLeft) intet gæt');
-  assert.ok(!paras(col({ table: [T('A', 'Aa', 30), T('B', 'Bb', 20)], history: HIST([]), roundsLeft: 2, newSeason: true, champion: { teamName: 'Aa', points: 30 } }))[0].includes('før tid'), 'sæsonslut: mesterteksten');
+  assert.ok(!paras(col({ table: [T('A', 'Aa', 30), T('B', 'Bb', 20)], history: HIST([]), roundsLeft: 2, newSeason: true, champion: { teamName: 'Aa', points: 30 } })).some((t) => t.includes('før tid')), 'sæsonslut: ikke "før tid" (mesteren står i banneret – v3.16.7)');
 });
 
 test('klummen: "mester før tid" er overskrift kun i runden, titlen blev afgjort – ikke resten af sæsonen', () => {

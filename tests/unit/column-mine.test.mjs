@@ -113,7 +113,7 @@ test('kampvurdering: hver regels tekst og tærskel (begge sider af grænsen), é
   assert.deepEqual(only(R({ build: 4, buildWon: 3 })).length, 1, 'fra 4 forsøg');
   assert.deepEqual(only(R({ build: 3, buildWon: 3 })), [], 'under 4 forsøg: intet');
   assert.deepEqual(variants((rd) => only(R({ build: 20, buildWon: 8 }), { round: rd })[0]), [
-    'Din opbygning sad fast – kun 8 af 20 gange kom I igennem.', 'Kun 8 af 20 opbygninger kom forbi presset; de korte pasninger fandt ingen vej.', 'Modstanderens pres lukkede 12 af 20 opbygninger.'].sort());
+    'Din opbygning sad fast – kun 8 af 20 gange kom I igennem.', 'Kun 8 af 20 opbygninger kom forbi presset; de korte pasninger sad fast.', 'Modstanderens pres lukkede 12 af 20 opbygninger.'].sort());
   assert.deepEqual(only(R({ build: 20, buildWon: 9 })), [], '9/20 = 45 %: ikke dårligt nok');
   assert.deepEqual(only(R({ build: 4, buildWon: 0 })).length, 1, 'fra 4 forsøg (dårlig)');
   assert.deepEqual(only(R({ build: 3, buildWon: 0 })), []);
@@ -138,7 +138,8 @@ test('kampvurdering: hver regels tekst og tærskel (begge sider af grænsen), é
   assert.deepEqual(only(R({ cutbacks: 10, cutbacksBlocked: 5 })), [], '50 % er under 60 %');
   assert.deepEqual(only(R({ cutbacks: 10, cutbacksBlocked: 6 })).length, 1, '60 % er grænsen (≥)');
   // kontramål imod, pres, løb
-  assert.deepEqual(only(R({ counterGoalsAgainst: 1 })), ['Det kostede: et kontramål imod.']);   // årsagen kun med belæg (QC F2)
+  assert.deepEqual(only(R({ counterGoalsAgainst: 1 })), ['Ét af målene imod kom på kontra.']);   // årsagen kun med belæg (QC F2); uden den ingen "Det kostede:" (v3.16.7)
+  assert.deepEqual(only(R({ counterGoalsAgainst: 2 })), ['2 af målene imod kom på kontra.']);
   const MANY = { phase1_buildUp: { passingStyle: 'SHORT', attackFocus: 'CENTRAL', offBallRuns: 'MANY' } };
   assert.deepEqual(only(R({ counterGoalsAgainst: 1, endPhases: MANY })), ['Det kostede: et kontramål imod, da bolden blev tabt med mange spillere fremme.']);
   assert.deepEqual(only(R({ counterGoalsAgainst: 2, endPhases: MANY })), ['Det kostede: 2 kontramål imod, da bolden blev tabt med mange spillere fremme.']);
@@ -174,12 +175,12 @@ test('kampvurdering: opbygningens stil står som SLUT-taktikken (ikke start), al
   assert.match(txt('UKENDT'), /gange – opbygningen bar spillet\..*– opbygningen virkede\./);
   assert.match(txt(null), /gange – opbygningen bar spillet\..*– opbygningen virkede\./);
   assert.doesNotMatch(txt(null), /undefined/);
-  assert.match(txt('SHORT', 'SHORT', { build: 20, buildWon: 8 }), /de korte pasninger fandt ingen vej/);
-  assert.match(txt('DIRECT_LONG', 'DIRECT_LONG', { build: 20, buildWon: 8 }), /Kun 8 af 20 opbygninger kom forbi presset; de lange bolde fandt ingen vej\./);
-  assert.match(txt(null, 'SHORT', { build: 20, buildWon: 8 }), /presset; opbygningen fandt ingen vej\./);
+  assert.match(txt('SHORT', 'SHORT', { build: 20, buildWon: 8 }), /de korte pasninger sad fast/);
+  assert.match(txt('DIRECT_LONG', 'DIRECT_LONG', { build: 20, buildWon: 8 }), /Kun 8 af 20 opbygninger kom forbi presset; de lange bolde sad fast\./);
+  assert.match(txt(null, 'SHORT', { build: 20, buildWon: 8 }), /presset; opbygningen sad fast\./);
   // regressionsstik på varianten i runde 7 (nøglen 'b' hhv. 'bf' indgår i valget)
   assert.deepEqual([verdict(R({ build: 20, buildWon: 13 }), { round: 7 })[0], verdict(R({ build: 20, buildWon: 8 }), { round: 7 })[0]],
-    ['13 af 20 angreb kom forbi presset – de korte pasninger virkede.', 'Kun 8 af 20 opbygninger kom forbi presset; de korte pasninger fandt ingen vej.']);
+    ['13 af 20 angreb kom forbi presset – de korte pasninger virkede.', 'Kun 8 af 20 opbygninger kom forbi presset; de korte pasninger sad fast.']);
 });
 
 // Prioritet og begrænsning: højst to sætninger, de to vigtigste (4 > 3 > 2), lige prioritet i kildens rækkefølge
@@ -214,7 +215,7 @@ test('kun seerens egen kamprapport læses: to menneskehold i samme kamp får hve
   const m = () => M({ hG: 1, aG: 1, ownReports: rep });
   const para = (viewer) => buildColumn(inp({ matches: [m()], viewerTeamId: viewer })).sections[0].paras.slice(1);
   assert.deepEqual(para('h1'), ['Løbene uden bold gav et mål.']);
-  assert.deepEqual(para('a1'), ['Det kostede: 2 kontramål imod.']);   // årsagen kun med belæg (QC F2)
+  assert.deepEqual(para('a1'), ['2 af målene imod kom på kontra.']);   // årsagen kun med belæg (QC F2)
   // En bot-modstander (ingen rapport for dem) og en seer, hvis side mangler rapport (gammelt gem): ingen vurdering
   const only = (viewer, key) => buildColumn(inp({ matches: [M({ hG: 1, aG: 1, ownReports: { [key]: R({ runGoals: 1 }) } })], viewerTeamId: viewer })).sections[0].paras.slice(1);
   assert.deepEqual(only('a1', 'h1'), [], 'udeholdets seer får ikke hjemmeholdets rapport');
@@ -324,8 +325,16 @@ test('overskriften: sejrsserie brudt (≥ 3 sejre før kampen, ikke sejr nu) er 
 // Dit holds linje følger resultatet (QC v3.16.3: "kostede" lovede en årsag, også efter en sejr): sejr "til trods", nederlag
 // en af to varianter (pickBy på runden), uafgjort "holdt point". Modstanderens linje: kun "fik rødt kort undervejs" – ingen
 // påstand om, hvor længe de spillede med færre (før: "Ude fik rødt kort og spillede med 10 mand.").
+// Referatet til røde-kort-testene: kortene i 5' (før alle mål), derefter målene skiftevis, så vinderens sidste mål er det afgørende
+// (v3.16.7: linjen kræver, at kortet kom FØR det afgørende mål – se testen nedenfor for kortet efter).
+const cardsFirst = (hR, aR, hG, aG) => {
+  const ev = [...Array(hR)].map(() => [5, 'RED', true]).concat([...Array(aR)].map(() => [5, 'RED', false]));
+  let h = 0, a = 0;
+  while (h < hG || a < aG) { const home = (h <= a && h < hG) || a >= aG; if (home) h++; else a++; ev.push([20 + ev.length, 'GOAL', home, h, a]); }
+  return ev;
+};
 test('"Din kamp": røde kort for begge hold – dit holds linje efter resultatet (sejr/nederlag/uafgjort, 1 eller 2 kort), modstanderens "fik rødt kort undervejs"; seerens side vender; ingen linje uden rødt', () => {
-  const reds = (hR, aR, { viewer = 'h1', round = 5, hG = 1, aG = 1 } = {}) => buildColumn(inp({ matches: [M({ hG, aG, stats: { hPoss: 50, aPoss: 50, hReds: hR, aReds: aR } })], viewerTeamId: viewer, round }))
+  const reds = (hR, aR, { viewer = 'h1', round = 5, hG = 1, aG = 1 } = {}) => buildColumn(inp({ matches: [M({ hG, aG, ev: cardsFirst(hR, aR, hG, aG), stats: { hPoss: 50, aPoss: 50, hReds: hR, aReds: aR } })], viewerTeamId: viewer, round }))
     .sections[0].paras.slice(1).filter((t) => /rødt|røde|udvis/.test(t));
   const both = (hR, aR, o) => [0, 1].map((round) => reds(hR, aR, { ...o, round })).map((x) => x.join(' | ')).sort();
   assert.deepEqual(reds(0, 0), [], 'ingen røde kort → ingen linje');
@@ -353,9 +362,9 @@ test('"Din kamp": røde kort for begge hold – dit holds linje efter resultatet
   assert.deepEqual(reds(1, 1), ['Hjem holdt point med 10 mand efter udvisningen.', 'Ude fik rødt kort undervejs.']);
 });
 test('"Din kamp": de røde kort står EFTER dommen over dit hold (Spilfører v3.16.3: "… mistede en mand på rødt kort. Det kostede: et kontramål imod." læstes som årsag)', () => {
-  const paras = (hR, aR) => buildColumn(inp({ matches: [M({ hG: 0, aG: 1, stats: { hPoss: 50, aPoss: 50, hReds: hR, aReds: aR }, ownReports: { h1: R({ counterGoalsAgainst: 1 }) } })], round: 5 })).sections[0].paras;
+  const paras = (hR, aR) => buildColumn(inp({ matches: [M({ hG: 0, aG: 1, ev: cardsFirst(hR, aR, 0, 1), stats: { hPoss: 50, aPoss: 50, hReds: hR, aReds: aR }, ownReports: { h1: R({ counterGoalsAgainst: 1 }) } })], round: 5 })).sections[0].paras;
   const p = paras(1, 1);
-  const iv = p.findIndex((t) => t.startsWith('Det kostede: et kontramål imod'));
+  const iv = p.findIndex((t) => t.startsWith('Ét af målene imod kom på kontra'));
   const im = p.findIndex((t) => /Hjem måtte spille med 10 mand|Med 10 mand efter udvisningen/.test(t)), io = p.indexOf('Ude fik rødt kort undervejs.');
   assert.ok(iv > 0 && im > 0 && io > 0, `data: dom, dit kort og modstanderens kort står alle (${JSON.stringify(p)})`);
   assert.ok(iv < im && im < io, `rækkefølge: dom (${iv}) < dit kort (${im}) < modstanderens (${io})`);

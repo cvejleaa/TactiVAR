@@ -152,3 +152,9 @@ test('Match Center: klummen kommer med efter afspilningen (ikke under), og kampo
   assert.equal(byId(old, 'col-title'), undefined, 'uden klumme: den gamle avis');
   assert.ok(byId(old, 'gazette'));
 });
+test('de øvrige kampe (v3.16.7): har overskriften selv en tankestreg, sættes noten med punktum – ingen "A – B – C"-kæde', () => {
+  const others = [{ idx: 2, head: 'Beta får klø – Alfa vinder 4-0', note: 'alfa afsluttede 14 gange.' }, { idx: 3, head: 'Alfa slår Beta 2-0', note: 'Alfa havde bolden.' }];
+  const c = { ...COL, sections: COL.sections.map((s) => (s.id === 'col-others' ? { ...s, others } : s)) };
+  const lis = all(byId(renderGazette(G(), 'h1', null, MATCHES, c, null), 'headlines'), (e) => e.tag === 'li').map(txt);
+  assert.deepEqual(lis, ['Beta får klø – Alfa vinder 4-0. Alfa afsluttede 14 gange.', 'Alfa slår Beta 2-0 – Alfa havde bolden.']);
+});

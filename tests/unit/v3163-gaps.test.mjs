@@ -175,19 +175,18 @@ test('championText: mangler målforskel hos mesteren, hos nr. 2 – eller nr. 2 
 });
 
 // ---------- klummens "Formen" ved sæsonslut ----------
-test('klummen ved sæsonslut: mesteren med den regel, der afgjorde det – "I" kun for nr. 2, gammelt arkiv (uden champion) = point', () => {
+test('klummen ved sæsonslut: mesteren står IKKE i Formen (v3.16.7 – banneret og avisens sæsonslut-afsnit har ham; championText testes i season-end)', () => {
   const T = (id, teamName, points) => ({ teamId: id, teamName, points });
   const table = [T('t1', 'Alfa', 29), T('t2', 'Beta', 29), T('t3', 'Gamma', 20)];
   const GD = { teamId: 't1', ...row('Alfa', 29, 11, 21), runnerUp: row('Beta', 29, 8, 29) };
-  const form = (champion, viewerTeamId) => buildColumn({ matches: [], gazette: null, history: [{ round: 13 }, { round: 14 }], table, next: [], viewerTeamId, round: 14, newSeason: true, champion })
-    .sections.find((s) => s.id === 'col-form').paras;
-  assert.deepEqual(form(GD, 't2'), ['Alfa er mester på målforskel – I endte begge på 29 point.']);
-  assert.deepEqual(form(GD, 't3'), ['Alfa er mester på målforskel – Alfa og Beta endte begge på 29 point.']);
-  assert.deepEqual(form(GD, 't1'), ['Alfa er mester på målforskel – Alfa og Beta endte begge på 29 point.'], 'du er mester: ikke "I"');
-  assert.deepEqual(form(GD, 'ukendt'), ['Alfa er mester på målforskel – Alfa og Beta endte begge på 29 point.']);
-  // Intet champion (arkiv fra før v3.16.3 / null): mesteren og hans point står i tabellen
-  assert.deepEqual(form(null, 't2'), ['Alfa er mester med 29 point.']);
-  assert.deepEqual(form(undefined, 't2'), ['Alfa er mester med 29 point.']);
+  const col = (newSeason, champion) => buildColumn({ matches: [], gazette: null, history: [{ round: 13 }, { round: 14 }], table, next: [], viewerTeamId: 't2', round: 14, newSeason, champion });
+  for (const c of [GD, null, undefined]) {
+    const all = col(true, c).sections.flatMap((x) => x.paras ?? []).join(' | ');
+    assert.ok(!/er mester/.test(all), all);
+    assert.equal(col(true, c).sections.find((x) => x.id === 'col-form'), undefined, 'Formen har ellers intet at sige her');
+  }
+  // Kontrol: midt i sæsonen står toppen i Formen
+  assert.deepEqual(col(false, null).sections.find((x) => x.id === 'col-form').paras, ['Alfa og Beta står lige i toppen med 29 point.']);
 });
 
 // ---------- endSeason: manglende felter i tabellen ----------
@@ -276,8 +275,15 @@ test('direkte frisparksmål: kampens brugte måltekster gælder også frisparken
 // ---------- røde kort i klummen: variantvalget pr. runde og hold (bogstaveligt) ----------
 // Forfatterens test samler runde 0 og 1 i en sorteret liste og kan derfor ikke se, hvilken variant der hører til hvilken runde
 // – eller at modstanderens linje vælges på HANS id (ikke dit). Hold h1/a1: runde 0 giver dit "Med 10 mand …" og hans "Ude fik …".
+function cardsFirst(hG, aG) {
+  const ev = [{ min: 5, type: 'RED', isHome: true }, { min: 5, type: 'RED', isHome: false }];
+  let h = 0, a = 0;
+  while (h < hG || a < aG) { const home = (h <= a && h < hG) || a >= aG; if (home) h++; else a++; ev.push({ min: 20 + ev.length, type: 'GOAL', isHome: home, hG: h, aG: a }); }
+  return ev;
+}
 test('røde kort i klummen: dit holds nederlagslinje vælges pr. runde på DIT id; uafgjort og modstanderens linje er faste (bogstaveligt, runde 0–3)', () => {
-  const m = (hG, aG) => ({ homeId: 'h1', awayId: 'a1', homeName: 'Hjem', awayName: 'Ude', homeGoals: hG, awayGoals: aG, events: [], goalsPool: [], stats: { hPoss: 50, aPoss: 50, hReds: 1, aReds: 1 } });
+  const m = (hG, aG) => ({ homeId: 'h1', awayId: 'a1', homeName: 'Hjem', awayName: 'Ude', homeGoals: hG, awayGoals: aG, events: cardsFirst(hG, aG), goalsPool: [], stats: { hPoss: 50, aPoss: 50, hReds: 1, aReds: 1 } });
+  // v3.16.7: kortene står i referatet før målene (linjen kræver kortet før det afgørende mål)
   const reds = (round, hG, aG) => buildColumn({ matches: [m(hG, aG)], gazette: null, history: [], table: [], next: [], viewerTeamId: 'h1', round }).sections[0].paras.filter((t) => /rødt kort|med 10 mand|udvisningen/.test(t));
   const loss = ['Et rødt kort kostede: Hjem måtte spille med 10 mand.', 'Med 10 mand efter udvisningen blev det op ad bakke.'];
   const pick = (round) => pickBy(loss, round, 'red', 'h1');

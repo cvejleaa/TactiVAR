@@ -129,7 +129,7 @@ test('afsnit 5: optakt-scouting – modstanderens seneste 3 offentlige kampe, ge
   const bud = (rows, o = {}) => (next({ next: [NX('h1', 'o2')], history: H('o2', rows), ...o }) ?? [])[1];
   const say = (rule, round = 5) => pickBy(RULE(rule).say, round, rule, 'scout');
   // v3.16.3 (Spilfører): "… havde bolden det meste af tiden i deres seneste 3 kampe" læstes som en påstand om kampene – nu "ud fra"
-  const text = (rule, n, round = 5) => `Mit bud: Opp2 ${say(rule, round)} ud fra ${n === 1 ? 'deres seneste kamp' : `deres seneste ${n} kampe`} – det kan blive kampens tema.`;
+  const text = (rule, n, round = 5) => `Mit bud ud fra ${n === 1 ? 'deres seneste kamp' : `deres seneste ${n} kampe`}: Opp2 ${say(rule, round)} – det kan blive kampens tema.`;   // v3.16.7: "ud fra" først
   assert.doesNotMatch(bud([{ poss: 60 }, { poss: 60 }]), / i deres seneste/, 'ikke "i deres seneste"');
   // Gennemsnittet af de TRE seneste (ikke de fire, ikke de to, ikke kun den sidste, ikke summen): 75, 60, 40 → 58,3 ≥ 58 = "ball"
   assert.equal(bud([{ poss: 0 }, { poss: 75 }, { poss: 60 }, { poss: 40 }]), text('ball', 3));
@@ -206,13 +206,16 @@ test('afsnit 5: opfølgning – "Før kampen skrev jeg …" bruger historikken F
 });
 // v3.16.3 (Spilfører): "wait" er to-delt (lidt af bolden OG scorede). Holdt den ikke, men de scorede, er det besiddelsen, der
 // ikke holdt – og det siges. Kun for "wait": en anden regel, der ikke holdt, får "det gjorde de ikke", også når de scorede.
-test('afsnit 5: opfølgning på spådommens to dele ("wait") – scorede de, men havde mere af bolden: "de scorede igen, men havde mere af bolden mod jer"', () => {
+test('afsnit 5: opfølgning på spådommens to dele ("wait") – scorede de, men havde halvdelen af bolden eller mere: "de scorede igen, men de havde N % af bolden mod jer"', () => {
   const fu = (rows, hG, aG, played) => (sec(buildColumn(inp({ matches: [M({ hG, aG, stats: played })], history: H('a1', rows), round: 5 })), 'col-next')?.paras ?? []).find((t) => t.startsWith('Før kampen')) ?? null;
   const W = Array.from({ length: 5 }, () => ({ poss: 40, goals: 1 }));
   const s = pickBy(RULE('wait').say, 4, 'wait', 'scout'), pre = `Før kampen skrev jeg, at Ude ${s} – `;
   assert.equal(fu(W, 0, 1, { hPoss: 60, aPoss: 40 }), `${pre}det holdt også mod jer.`, 'begge dele holdt (40 %, 1 mål)');
-  assert.equal(fu(W, 1, 1, { hPoss: 40, aPoss: 60 }), `${pre}de scorede igen, men havde mere af bolden mod jer.`, '60 % og 1 mål: besiddelsen holdt ikke');
-  assert.equal(fu(W, 0, 2, { hPoss: 40, aPoss: 60 }), `${pre}de scorede igen, men havde mere af bolden mod jer.`, '2 mål tæller også');
+  // v3.16.7 (Spilfører: "havde mere af bolden" ved 47 %): procenten står; under 50 % holdt den, fra 50 % ikke
+  assert.equal(fu(W, 1, 1, { hPoss: 40, aPoss: 60 }), `${pre}de scorede igen, men de havde 60 % af bolden mod jer.`, '60 % og 1 mål: besiddelsen holdt ikke');
+  assert.equal(fu(W, 0, 2, { hPoss: 40, aPoss: 60 }), `${pre}de scorede igen, men de havde 60 % af bolden mod jer.`, '2 mål tæller også');
+  assert.equal(fu(W, 1, 1, { hPoss: 53, aPoss: 47 }), `${pre}det holdt også mod jer – de scorede med 47 % af bolden.`, '47 % er under halvdelen: det holdt (før: "mere af bolden")');
+  assert.equal(fu(W, 1, 1, { hPoss: 50, aPoss: 50 }), `${pre}de scorede igen, men de havde 50 % af bolden mod jer.`, '50 % er ikke under halvdelen');
   assert.equal(fu(W, 1, 0, { hPoss: 70, aPoss: 30 }), `${pre}det gjorde de ikke mod jer.`, '30 %, men ingen mål: "scorede igen" ville være forkert');
   assert.equal(fu(W, 1, 0, { hPoss: 40, aPoss: 60 }), `${pre}det gjorde de ikke mod jer.`, 'hverken lidt bold eller mål');
   // En anden regel ("ball"), der ikke holdt, mens de scorede: ingen "scorede igen"

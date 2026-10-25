@@ -203,7 +203,7 @@ function renderColumn(g, myTeamId, onOpenMatch, matches, col, onOpenReport) {
     h('p', { class: 'muted' }, `Runden bød på ${g.totalGoals} ${g.totalGoals === 1 ? 'scoring' : 'scoringer'} og ${g.totalVarChecks} VAR-tjek på tværs af de ${matches?.length ?? 4} stadions.`),
     ...col.sections.map((s) => {
       if (s.id === 'col-others') return sec(s, h('ul', { class: 'headlines', id: 'headlines' }, s.others.map((o) => h('li', {},
-        onOpenReport ? h('button', { class: 'linklike col-match', title: 'Åbn referatet', onclick: () => onOpenReport(o.idx) }, h('strong', {}, o.head)) : h('strong', {}, o.head), o.note ? ` – ${o.note}` : ''))));
+        onOpenReport ? h('button', { class: 'linklike col-match', title: 'Åbn referatet', onclick: () => onOpenReport(o.idx) }, h('strong', {}, o.head)) : h('strong', {}, o.head), o.note ? (o.head.includes(' – ') ? `. ${o.note[0].toUpperCase()}${o.note.slice(1)}` : ` – ${o.note}`) : ''))));   // ingen tankestreg-kæde (Spilfører v3.16.6)
       if (s.id === 'col-stars') return sec(s,
         pr ? h('p', { id: 'player-of-round' }, h('strong', { title: 'Bedste karakter i runden' }, '🏆 Rundens spiller: '), `#${pr.shirtNumber} ${pr.shortName} (${pr.teamName}) – `, 'rating' in pr ? `karakter ${dec(pr.rating, 1)}` : 'rundens bedste karakter', s.player?.why ? ` • ${s.player.why}` : '') : null,
         goal ? h('p', { id: 'goal-of-round' }, h('strong', {}, '🚀 Rundens mål'), GOAL_KIND_LABEL[goal.kind] ? ` (${GOAL_KIND_LABEL[goal.kind]})` : '', h('strong', {}, ': '), goal.desc,
