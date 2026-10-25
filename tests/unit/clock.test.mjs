@@ -255,15 +255,22 @@ test('playerSpan: ind/ud fra SUB-linjen, udvist/skadet fra linjen; to ens navne 
 });
 
 // ---------- Match Center: tillægstidslinjen ----------
-const L4 = createLeague(createRng(4)), me4 = L4.teams.find((t) => !t.isBot);
-const M4 = simulateMatch(me4, L4.teams[(4 % 7) + 1], createRng(4 * 13));
+// Datadrevet (v3.16.7 – før én fast seed, som hver motorændring flyttede): den første kamp med VAR-tid i 1. halvleg og ingen i 2.
+const M4 = (() => {
+  for (let s = 1; s <= 200; s++) {
+    const L = createLeague(createRng(s)), me = L.teams.find((t) => !t.isBot), m = simulateMatch(me, L.teams[(s % 7) + 1], createRng(s * 13));
+    if (m.stoppage[0].var >= 1 && m.stoppage[1].var === 0 && m.stoppage[0].S !== m.stoppage[1].S) return m;
+  }
+  return null;
+})();
 test('tillægstidslinjen i referatet: "⏱️ Tillægstid: S min (heraf X for VAR)." lige under halvlegens første hændelse i tillægstid (nyeste øverst)', () => {
-  assert.deepEqual(M4.stoppage, [{ S: 8, var: 4 }, { S: 2, var: 0 }], 'data: VAR i første halvleg, ingen i anden');
+  assert.ok(M4, 'data: en kamp med VAR i første halvleg, ingen i anden');
+  const [{ S: S1, var: V1 }, { S: S2 }] = M4.stoppage;
   const el = render(M4, M4.homeId), feed = byId(el, 'feed')[0].children;
   const s0 = byId(el, 'stoppage-0'), s1 = byId(el, 'stoppage-1');
   assert.equal(s0.length, 1); assert.equal(s1.length, 1);
-  assert.equal(s0[0].textContent, "45'⏱️ Tillægstid: 8 min (heraf 4 for VAR).");
-  assert.equal(s1[0].textContent, "90'⏱️ Tillægstid: 2 min.", 'ingen "heraf" uden VAR');
+  assert.equal(s0[0].textContent, `45'⏱️ Tillægstid: ${S1} min (heraf ${V1} for VAR).`);
+  assert.equal(s1[0].textContent, `90'⏱️ Tillægstid: ${S2} min.`, 'ingen "heraf" uden VAR');
   const { ht, end } = halves(M4);
   for (const [row, from, to] of [[s0[0], 0, ht], [s1[0], ht + 1, end]]) {
     const anchor = M4.events.slice(from, to + 1).find((e) => e.clock.plus);
@@ -315,7 +322,8 @@ test('tillægstidslinjen under live: ikke før ankeret er vist – derefter med'
 
 test('scoreboard og tidslinje følger uret: halvlegsstregen på (45+S1)/T, mærkerne på timelinePos, titlen med evMin', () => {
   const el = render(M4, M4.homeId), tl = byId(el, 'timeline')[0];
-  assert.equal(all(tl, (x) => cls(x, 'tl-half'))[0].style.left, `${((53 / 100) * 100).toFixed(1)}%`, 'S1 8, S2 2: 53 / 100');
+  const [S1, S2] = M4.stoppage.map((x) => x.S);
+  assert.equal(all(tl, (x) => cls(x, 'tl-half'))[0].style.left, `${(((45 + S1) / (90 + S1 + S2)) * 100).toFixed(1)}%`, `S1 ${S1}, S2 ${S2}: (45 + S1) / T`);
   const marks = all(tl, (x) => cls(x, 'tl-mark')), plotted = M4.events.filter((e) => e.plot);
   assert.equal(marks.length, plotted.length);
   marks.forEach((x, i) => { assert.equal(x.style.left, `${(timelinePos(plotted[i], M4.stoppage) * 100).toFixed(1)}%`); assert.ok(x.attrs.title.startsWith(evMin(plotted[i]) + ' ')); });

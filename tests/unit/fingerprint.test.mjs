@@ -13,7 +13,8 @@ import { fingerprint } from '../../tools/fingerprint.mjs';
 // v3.16.7 M2: offside-fælden tælles for sig (trapWon/oppTrapWon i ownReports) – intet rng, kampene er de samme (før 56ee202f…)
 // v3.16.7 M1: VAR-offside kun hvor der kan være offside (ikke fra hjørnespark, ikke oplægsgiveren, intet flag efter cutback) – rng forskudt (før 59774fd1…)
 // v3.16.7 M3: cutbackens kant og back vælges efter plads (rækkevidden først) – rng-forskydning (før f2dc7fae…)
-const NOPROSE_400 = 'd53d2d23ee44b284143b713eaa0602188b8f508bbce05fbb294515ee3a011d8c';
+// v3.16.7 M4: det røde kort før skadesskiftet (register trækker rng – forskudt); målets variant bruges ikke op af dit holds indledning (før d53d2d23…)
+const NOPROSE_400 = '728d3f6ee2491f9f5884555d5d4f19816a1496df840c9c79371d26ea5dc64677';
 
 test('fingeraftryk uden prosa: de 400 seedede kampe er de samme som ved sidste bevidste motorændring (v3.16.6 M5)', async () => {
   const r = await fingerprint(400);

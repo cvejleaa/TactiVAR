@@ -712,7 +712,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
       if (!solo && helper && helper.id !== finisher.id) { sheet.adjust(helper.id, 0.5); sheet.bump(helper.id, 'assists'); }
       const prose = describeFinish(fs.finishing);
       observe(finisher, `Scoring (mod ${def.team.name}): ${finisher.shortName} afsluttede med ${prose}.`);
-      const desc = describeGoal(kd, tag(finisher), tag(helper ?? finisher), min, rng, goalTexts);
+      const desc = describeGoal(kd, tag(finisher), tag(helper ?? finisher), min, rng, lead ? null : goalTexts);   // med dit holds indledning vises desc ikke – den må ikke bruge en variant op (v3.16.7; samme rng-træk)
       // Med dit holds indledning (lead) fortæller den allerede oplægget – kun en kort slutning, ikke hele beskrivelsen
       // igen (brugeren v3.14.3: "cutback bliver noteret 2 gange i teksten"). "Rundens mål" bruger den fulde (desc).
       // Slutter indledningen med afslutterens navn ("… lægger den tilbage til #7."), sparker han den ind; ellers (løberen
@@ -1165,12 +1165,6 @@ export function simulateMatch(home, away, rng, opts = {}) {
         if (sheet.entries[victim.id]) sheet.entries[victim.id].injured = true;
         observe(victim, `Kamp-skade (mod ${foulSide.team.name}): ${victim.shortName} måtte udgå efter en hård tackling.`);
         addEv(min, 'INJURY', 'HIGHLIGHT', victimSide.isHome, true, `🚑 Skade: ${tag(victim)}`, `🚑 [${victimSide.team.name}] ${tag(victim)} bliver skadet efter en tackling fra ${tag(fouler)} (${foulSide.team.name}) og er ude i ${matches} ${matches === 1 ? 'kamp' : 'kampe'}.`);
-        if (!substitute(victimSide, slot, min, 'Skadesskift')) {
-          // Han bliver på banen (haltende – LIMP) og spiller videre: intet udminut
-          // Årsagen er offentlig (skift og pauser ses i referatet) – QC v3.13.
-          const why = subBlock(victimSide, min) ?? 'der er ingen rask spiller på bænken';
-          addEv(min, 'INFO', 'PLAY', victimSide.isHome, false, 'Ingen indskiftning', `🚑 [${victimSide.team.name}] Ingen indskiftning mulig (${why}) – holdet spiller videre med ${tag(victim)} haltende.`);
-        }
         // Skade-frisparket giver intet gult kort, men den grove tackling kan koste et direkte rødt kort (v3.15) – kun her, så tilfældighederne i resten af kampen
         // ikke flytter sig (QC). Frisparket er offentligt; kortet afhænger ikke af nogen skjult indstilling.
         // Rødt-kort-VAR (v3.15.1, IFAB: kun direkte rødt tjekkes): RED_CHECK_P af de røde kort tjekkes – den kyniske
@@ -1196,6 +1190,13 @@ export function simulateMatch(home, away, rng, opts = {}) {
           addEv(min, 'VAR_RED', 'HIGHLIGHT', foulSide.isHome, true, '📺 VAR: opgraderet til rødt', `📺 [${foulSide.team.name}] VAR kalder dommeren ud til skærmen: ${gen(tag(fouler))} tackling var med knopperne forrest. Efter at have set skærmen giver han rødt kort!`, `${foulSide.team.name}: rødt kort`);
           events.at(-1).var = { kind: 'RED', verdict: 'UPGRADED' };
           sendOff(foulSide, fouler, min, 'DIRECT');
+        }
+        // Kortet står FØR indskiftningen (v3.16.7, Spilfører: skade 57', skift 58', rødt kort 59') – dommeren giver kortet, så skiftes der
+        if (!substitute(victimSide, slot, min, 'Skadesskift')) {
+          // Han bliver på banen (haltende – LIMP) og spiller videre: intet udminut
+          // Årsagen er offentlig (skift og pauser ses i referatet) – QC v3.13.
+          const why = subBlock(victimSide, min) ?? 'der er ingen rask spiller på bænken';
+          addEv(min, 'INFO', 'PLAY', victimSide.isHome, false, 'Ingen indskiftning', `🚑 [${victimSide.team.name}] Ingen indskiftning mulig (${why}) – holdet spiller videre med ${tag(victim)} haltende.`);
         }
       } else {
         // Gult kort kun her – skade-frisparkets tekst nævner intet kort (v3.10). Andet gule giver rødt (v3.15).

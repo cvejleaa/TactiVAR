@@ -97,14 +97,18 @@ test('resultatet og redningerne: sejr +0,4, nederlag −0,4, og redninger over 4
   assert.equal(sheet.entries[st.id].rating, 8.2);
 });
 
-test('et rødt kort stopper spillet: intet sker resten af det minut (den udviste dukker ikke op igen i samme tick)', () => {
-  let n = 0;
+test('et rødt kort stopper spillet: intet sker resten af det minut (den udviste dukker ikke op igen i samme tick) – kun offerets skadesskift', () => {
+  // v3.16.7: kortet står før skadesskiftet (Spilfører: skade 57', skift 58', rødt 59') – skiftet af OFFERET (det andet hold) hører
+  // til samme situation og må stå efter kortet; intet andet
+  let n = 0, subAfter = 0;
   for (const { m } of M) m.events.forEach((e, i) => {
     if (e.type !== 'RED') return;
     n++;
-    assert.ok(m.events.slice(i + 1).every((x) => x.min !== e.min || x.type === 'FULLTIME' || x.type === 'END' || (x.min === 90 && x.type === 'INFO')), `${e.min}': ${m.events.slice(i + 1).filter((x) => x.min === e.min).map((x) => x.text).join(' | ')}`);
+    const victimSub = (x) => (x.type === 'SUB' && /Skadesskift/.test(x.text) || /Ingen indskiftning/.test(x.text ?? '')) && x.isHome !== e.isHome;
+    if (m.events.slice(i + 1).some((x) => x.min === e.min && victimSub(x))) subAfter++;
+    assert.ok(m.events.slice(i + 1).every((x) => x.min !== e.min || victimSub(x) || x.type === 'FULLTIME' || x.type === 'END' || (x.min === 90 && x.type === 'INFO')), `${e.min}': ${m.events.slice(i + 1).filter((x) => x.min === e.min).map((x) => x.text).join(' | ')}`);
   });
-  assert.ok(n >= 20, `udvisninger: ${n}`);
+  assert.ok(n >= 20 && subAfter >= 3, `udvisninger: ${n}, heraf ${subAfter} med offerets skift efter kortet`);
 });
 
 test('højst 3 træthedsskift ad gangen – også i pausen (Spilfører: botterne skiftede 4–5 i 45. minut; uden loftet i pausen: 5)', async () => {
