@@ -8,7 +8,7 @@ import { masteryVs, counterXpForMatch } from './counter.js';
 import { createSheet, finalizeSheet } from './ratings.js';
 import { assignClock } from './clock.js';
 import { describeFinish, describeHeader, describeVarTiming, describeGoal, goalSpectacle, pickBy, gen } from './clues.js';
-import { MATCH_RULES, CARD_RULES, FATIGUE_SUBS_AT_ONCE, MIN_PLAYERS, VAR_RULES, MISS_P, MISS_BLOCK_SHARE, MISS_CORNER_P } from './match-rules.js';
+import { MATCH_RULES, CARD_RULES, FATIGUE_SUBS_AT_ONCE, BOT_SUBS, MIN_PLAYERS, VAR_RULES, MISS_P, MISS_BLOCK_SHARE, MISS_CORNER_P } from './match-rules.js';
 import { TIRED_PER_POINT, SUBS_LIMIT, matchCost, REST_SHARE } from './freshness.js';
 
 const PLAN_LETTERS = ['A', 'B', 'C'];
@@ -829,8 +829,9 @@ export function simulateMatch(home, away, rng, opts = {}) {
 
   // Udskiftningsreglerne (match-rules.js): højst maxSubs skift i højst maxWindows pauser; flere skift i
   // samme tick er én pause, og halvlegen (45') tæller ikke. Årsag, når der IKKE kan skiftes, eller null.
-  const subBlock = (side, min) => side.subsUsed >= MATCH_RULES.maxSubs ? `alle ${MATCH_RULES.maxSubs} udskiftninger er brugt`
-    : (min !== 45 && min !== side.lastSubMin && side.windows >= MATCH_RULES.maxWindows) ? `alle ${MATCH_RULES.maxWindows} skifte-pauser er brugt` : null;
+  // keep: udskiftninger/pauser, der holdes tilbage (botternes skade-reserve, BOT_SUBS) – teksten gælder kun uden (dit hold).
+  const subBlock = (side, min, keep = null) => side.subsUsed >= MATCH_RULES.maxSubs - (keep?.subs ?? 0) ? `alle ${MATCH_RULES.maxSubs} udskiftninger er brugt`
+    : (min !== 45 && min !== side.lastSubMin && side.windows >= MATCH_RULES.maxWindows - (keep?.windows ?? 0)) ? `alle ${MATCH_RULES.maxWindows} skifte-pauser er brugt` : null;
   // Indskiftning i den kamplokale kopi. Returnerer indskifteren eller null. pick = den valgte
   // bænkspiller (træthed/Hvis-Så); text = referatets tekst (ellers skadesskiftets).
   function substitute(side, slot, min, reason, pick = null, text = null) {
@@ -928,6 +929,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
   function fatigueSubs(side, min) {
     const limit = side.team.subsLimit || 0;
     if (!limit || min >= 90) return;   // i sidste tick sparer et skift intet og koster indskifteren bænkens +15 (QC)
+    if (!own(side) && min < BOT_SUBS.fromMin) return;   // botter: træthedsskift først fra pausen (BOT_SUBS)
     const reserved = new Set(side.tactics.conditionalRules.filter((r) => r.action === 'SUB' && !r.used).map((r) => r.subIn));
     const onPitch = () => side.starters.map((p, i) => ({ p, i, f: p && matchFresh(p) })).filter(({ p, i }) => i > 0 && p && !sheet.entries[p.id]?.injured);
     const tired = onPitch().filter((c) => c.f < limit).sort((a, b) => a.f - b.f);
@@ -935,7 +937,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
     side.noted ||= new Set();
     const note = (p, why) => { if (!own(side) || side.noted.has(p.id + why)) return; side.noted.add(p.id + why); addEv(min, 'INFO', 'TACTIC', side.isHome, false, 'Udskiftning ikke mulig', `📋 [${side.team.name}] ${tag(p)} er under din udskiftningsgrænse (${Math.floor(matchFresh(p))} % – grænse ${limit} %), men ${why}.`); };
     const swap = (c, near) => {
-      const block = subBlock(side, min);
+      const block = subBlock(side, min, !own(side) && min < BOT_SUBS.until ? BOT_SUBS.keep : null);
       if (block) { if (!near) note(c.p, block); return false; }
       const pick = side.benchAvailable().filter((b) => b.line === c.p.line && !reserved.has(b.id) && (b.freshness ?? 100) >= limit + SUBS_LIMIT.near)
         .sort((a, b) => avgSkill(b) * (b.freshness ?? 100) - avgSkill(a) * (a.freshness ?? 100))[0];

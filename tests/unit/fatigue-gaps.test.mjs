@@ -616,3 +616,27 @@ test('en hvilet spiller kommer heller ikke ind i kampen: skade i 3. minut med ku
   assert.ok(m.events.some((e) => e.type === 'INJURY' && e.min === 3), `data: skaden i 3' – ${m.events.filter((e) => e.min === 3).map((e) => e.type).join()}`);
   assert.ok(!m.events.some((e) => e.type === 'SUB' && e.label?.startsWith(`🔄 ${tag(slot(H, 6))} ind`)), m.events.filter((e) => e.type === 'SUB').map((e) => e.label).join(' | '));
 });
+
+// ---------- v3.16.6 (M6): botternes træthedsskift fra pausen, og ét skift + én pause gemt til skade indtil 75' ----------
+// Alle markspillere starter på 74 % med grænse 75: de er under grænsen fra første minut. Bænken er frisk.
+function tiredMatch({ homeBot, script = {} }) {
+  const { H, A } = arena({ homeLimit: 75, homeBot });
+  for (const p of H.squad) p.freshness = H.tactics.lineupSlots.includes(p.id) && p.line !== 'GK' ? 74 : 89;   // bænk 89 < 90: ingen rotation før kampen (grænse + 15)
+  const m = simulateMatch(H, A, stubRng(script));
+  const subs = m.events.filter((e) => e.type === 'SUB' && e.isHome);
+  return { H, m, subs, fatigue: subs.filter((e) => !/Skadesskift/.test(e.text)) };
+}
+test('bot: ingen træthedsskift før pausen, selv om alle er under grænsen – dit hold med samme grænse skifter før', () => {
+  const bot = tiredMatch({ homeBot: true }), mine = tiredMatch({ homeBot: false });
+  assert.ok(bot.fatigue.length >= 3, `data: botten skifter (${bot.fatigue.map((e) => e.min).join()})`);
+  assert.equal(bot.fatigue.filter((e) => e.min < 45).length, 0, bot.fatigue.map((e) => e.min).join());
+  assert.ok(bot.fatigue.some((e) => e.min === 45), 'pausen tæller med');
+  assert.ok(mine.fatigue.some((e) => e.min < 45), `dit hold følger kun grænsen: ${mine.fatigue.map((e) => e.min).join()}`);
+});
+test('bot: før 75\' bruges højst 4 træthedsskift og 2 skifte-pauser (én af hver gemt til skade); efter 75\' må resten bruges', () => {
+  const { fatigue } = tiredMatch({ homeBot: true });
+  const before = fatigue.filter((e) => e.min < 75), windows = new Set(before.filter((e) => e.min !== 45).map((e) => e.min));
+  assert.ok(before.length === 4, `før 75': ${before.map((e) => e.min).join()} (5 uden reserven)`);
+  assert.ok(windows.size <= 1, `pauser før 75' (pausen 45' tæller ikke): ${[...windows].join()}`);
+  assert.ok(fatigue.length === 5 && fatigue.some((e) => e.min >= 75), `efter 75' det sidste: ${fatigue.map((e) => e.min).join()}`);
+});
