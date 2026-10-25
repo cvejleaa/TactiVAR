@@ -10,7 +10,7 @@
 // de offentlige tal – aldrig en indstilling ved navn, aldrig noget om pres (intet offentligt tal måler pres).
 // Ingen tilfældighed: varianter vælges ud fra runden og kampens tal (samme runde → samme klumme).
 import { RATING_PRIVATE_FIELDS, viewOwnReport } from './visibility.js';
-import { pickBy, gen } from './clues.js';
+import { pickBy, gen, pl } from './clues.js';
 import { championText } from './season.js';
 import { inMinute } from './clock.js';
 
@@ -92,14 +92,14 @@ function yourVerdict(r, mine, round) {
   const ph = r.end?.phases?.phase1_buildUp ?? {}, out = [];
   const same = r.start?.phases?.phase1_buildUp?.passingStyle === ph.passingStyle;   // QC F6: ændret undervejs → intet stilnavn
   const TXTp = (k) => (same ? TXT[k] : null);
-  if (r.build >= 4 && r.buildWon / r.build >= 0.65) out.push([3, pickBy([`Din opbygning kom igennem ${r.buildWon} af ${r.build} gange – ${TXTp(ph.passingStyle) ?? 'opbygningen'} bar spillet.`, `${r.buildWon} af ${r.build} angreb kom forbi presset – ${TXTp(ph.passingStyle) ?? 'opbygningen'} virkede.`, `Opbygningen sad: ${r.buildWon} af ${r.build} gange kom I igennem.`], round, 'b')]);
-  if (r.build >= 4 && r.buildWon / r.build <= 0.4) out.push([3, pickBy([`Din opbygning sad fast – kun ${r.buildWon} af ${r.build} gange kom I igennem.`, `Kun ${r.buildWon} af ${r.build} opbygninger kom forbi presset; ${TXTp(ph.passingStyle) ?? 'opbygningen'} fandt ingen vej.`, `Modstanderens pres lukkede ${r.build - r.buildWon} af ${r.build} opbygninger.`], round, 'bf')]);
+  if (r.build >= 4 && r.buildWon / r.build >= 0.65) out.push([3, pickBy([`Din opbygning kom igennem ${r.buildWon} af ${pl(r.build, 'gang', 'gange')} – ${TXTp(ph.passingStyle) ?? 'opbygningen'} bar spillet.`, `${r.buildWon} af ${r.build} angreb kom forbi presset – ${TXTp(ph.passingStyle) ?? 'opbygningen'} virkede.`, `Opbygningen sad: ${r.buildWon} af ${pl(r.build, 'gang', 'gange')} kom I igennem.`], round, 'b')]);
+  if (r.build >= 4 && r.buildWon / r.build <= 0.4) out.push([3, pickBy([`Din opbygning sad fast – kun ${r.buildWon} af ${pl(r.build, 'gang', 'gange')} kom I igennem.`, `Kun ${r.buildWon} af ${r.build} opbygninger kom forbi presset; ${TXTp(ph.passingStyle) ?? 'opbygningen'} fandt ingen vej.`, `Modstanderens pres lukkede ${r.build - r.buildWon} af ${r.build} opbygninger.`], round, 'bf')]);
   if (ph.attackFocus === 'HIGH_CROSSES' && mine.headerGoals >= 1) out.push([4, `${mine.headerGoals === 1 ? 'Et hovedstødsmål' : `${mine.headerGoals} hovedstødsmål`} fra åbent spil: ${TXT.HIGH_CROSSES} betalte sig.`]);
   if (ph.attackFocus === 'HIGH_CROSSES' && r.crosses >= 3 && !mine.headerGoals) out.push([2, `${r.crosses} høje bolde i feltet, men intet hovedstødsmål – ${r.crossesWon * 2 < r.crosses ? 'kun ' : ''}${r.crossesWon} ${r.crossesWon === 1 ? 'luftduel' : 'luftdueller'} blev vundet.`]);
   if (r.cutbackGoals >= 1) out.push([4, `${r.cutbackGoals === 1 ? 'En cutback' : `${r.cutbackGoals} cutbacks`} fra baglinjen endte i nettet.`]);
   if (r.cutbacks >= 3 && r.cutbacksBlocked / r.cutbacks >= 0.6) out.push([2, `Kanten blev lukket: ${r.cutbacksBlocked} af ${r.cutbacks} cutback-forsøg stoppet.`]);
   if (r.counterGoalsAgainst >= 1) out.push([3, `Det kostede: ${r.counterGoalsAgainst === 1 ? 'et kontramål' : `${r.counterGoalsAgainst} kontramål`} imod${ph.offBallRuns === 'MANY' ? ', da bolden blev tabt med mange spillere fremme' : ''}.`]);   // årsagen kun med belæg (QC F2)
-  if (r.press >= 4 && r.pressWon / r.press >= 0.5) out.push([2, `Dit pres vandt bolden ${r.pressWon} af ${r.press} gange.`]);
+  if (r.press >= 4 && r.pressWon / r.press >= 0.5) out.push([2, `Dit pres vandt bolden ${r.pressWon} af ${pl(r.press, 'gang', 'gange')}.`]);
   if (r.runGoals >= 1) out.push([3, `Løbene uden bold gav ${r.runGoals === 1 ? 'et mål' : `${r.runGoals} mål`}.`]);
   if (r.start?.formation && r.end?.formation && r.start.formation !== r.end.formation) out.push([2, pickBy([`Skiftet fra ${r.start.formation} til ${r.end.formation} undervejs.`, `I gik fra ${r.start.formation} til ${r.end.formation} i løbet af kampen.`, `Formationen blev lagt om fra ${r.start.formation} til ${r.end.formation}.`, `Undervejs blev ${r.start.formation} til ${r.end.formation}.`, `Holdet sluttede i ${r.end.formation} efter at have startet i ${r.start.formation}.`], round, 'sw')]);   // neutralt: skiftet alene beviser ikke udfaldet (QC F4)
   return out.sort((a, b) => b[0] - a[0]).slice(0, 2).map(([, t]) => t);   // højst 2 sætninger om dit hold (Spilfører)

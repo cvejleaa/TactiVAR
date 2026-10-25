@@ -1,7 +1,7 @@
 // Statistik på Liga-fanen (v3.10, brugeren: "Jeg vil gerne have noget statistik med på liga siden
 // af al mulig slags" – og "mål på hovedstød, straffe eller dødbolde. Antallet af frispark").
 // Fire sammenfoldede sektioner nederst. Hvem ser hvad afgøres i engine/visibility.js.
-import { h } from './dom.js';
+import { h, dec } from './dom.js';
 import { starsEl } from './labels.js';
 import { viewPlayer, viewTeamStats } from '../engine/visibility.js';
 import { runStats, PLAYER_SEASON_DEFAULTS, TEAM_STAT_FIELDS } from '../engine/stats.js';
@@ -87,7 +87,7 @@ function leagueFlow(league) {
   const biggest = hist.map((r) => r.biggest).filter(Boolean).sort((a, b) => b.diff - a.diff)[0];
   const most = hist.map((r) => r.most).filter(Boolean).sort((a, b) => b.goals - a.goals)[0];
   return h('div', {},
-    h('p', { id: 'flow-summary' }, `${goals} mål i ${matches} kampe (${(goals / Math.max(1, matches)).toFixed(2)} pr. kamp) · ${goals ? Math.round(sp / goals * 100) : 0} % på dødbolde.`),
+    h('p', { id: 'flow-summary' }, `${goals} mål i ${matches} kampe (${dec((goals / Math.max(1, matches)), 2)} pr. kamp) · ${goals ? Math.round(sp / goals * 100) : 0} % på dødbolde.`),
     h('div', { class: 'round-bars', id: 'round-bars' }, hist.map((r, _, __, k = r.round - (league.seasonStartRound ?? 1) + 1) => h('div', { class: 'round-bar', title: `Runde ${k}: ${r.goals} mål` },
       h('span', { class: 'rb-label' }, `R${k}`), h('span', { class: 'rb-fill', style: { width: `${Math.round(r.goals / max * 100)}%` } }), h('span', { class: 'rb-val' }, String(r.goals))))),
     h('h4', {}, 'Måltyper'),
@@ -102,13 +102,13 @@ function myTeam(league, myTeamId) {
   const n = Math.max(1, s.sMatches);
   return h('div', {},
     h('p', { id: 'my-team-stats' }, s.sMatches
-      ? `${since(league)[0].toUpperCase()}${since(league).slice(1)}, pr. kamp: ${(s.shots / n).toFixed(1)} afslutninger (${(s.onTarget / n).toFixed(1)} på mål), xG ${(s.xg / n).toFixed(2)}, ${(s.corners / n).toFixed(1)} hjørnespark, ${(s.freeKicks / n).toFixed(1)} frispark i skudafstand. I alt: kontramål ${s.counterGoals} for / ${s.counterGoalsAgainst} imod, ${s.varChecks} VAR-tjek.`
+      ? `${since(league)[0].toUpperCase()}${since(league).slice(1)}, pr. kamp: ${dec((s.shots / n), 1)} afslutninger (${dec((s.onTarget / n), 1)} på mål), xG ${dec((s.xg / n), 2)}, ${dec((s.corners / n), 1)} hjørnespark, ${dec((s.freeKicks / n), 1)} frispark i skudafstand. I alt: kontramål ${s.counterGoals} for / ${s.counterGoalsAgainst} imod, ${s.varChecks} VAR-tjek.`
       : 'Kommer efter første runde.'),
     h('div', { class: 'tablewrap-x' }, h('table', { class: 'standings', id: 'my-players' },
       h('thead', {}, h('tr', {}, ['Spiller', `Kampe (${statsFromK(league) > 1 ? `fra R${statsFromK(league)}` : 'sæson'})`, 'Snit (i alt)', 'km/90 (i alt)', '% HI (i alt)', `Fri (${statsFromK(league) > 1 ? `fra R${statsFromK(league)}` : 'sæson'})`, 'Friskhed'].map((x) => h('th', {}, x)))),
       h('tbody', {}, team.squad.map((p) => { const r = runStats(p); return h('tr', {},
-        h('td', {}, `#${p.shirtNumber} ${p.shortName}`), h('td', {}, p.sGames), h('td', {}, p.ratingGames ? (p.ratingSum / p.ratingGames).toFixed(1) : '–'),
-        h('td', {}, r.km90 != null ? r.km90.toFixed(1) : '–'), h('td', {}, r.hiPct != null ? `${r.hiPct} %` : '–'),
+        h('td', {}, `#${p.shirtNumber} ${p.shortName}`), h('td', {}, p.sGames), h('td', {}, p.ratingGames ? dec((p.ratingSum / p.ratingGames), 1) : '–'),
+        h('td', {}, r.km90 != null ? dec(r.km90, 1) : '–'), h('td', {}, r.hiPct != null ? `${r.hiPct} %` : '–'),
         h('td', {}, p.freeRunsSum ? `${p.freeRunsWonSum}/${p.freeRunsSum}` : '–'), h('td', {}, `${p.freshness} %`)); })))),
     h('p', { class: 'muted' }, `Kun du ser disse tal – de røber evner og dine taktiske valg. Kampe og frie løb tælles for ${since(league)}; snit, km og HI gælder alle hans kampe (de nulstilles ikke ved sæsonskifte).`));
 }

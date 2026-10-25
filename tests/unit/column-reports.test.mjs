@@ -71,7 +71,8 @@ test('ownReport: modstander-tallene er modstanderens egne (cutbacks og høje bol
     const ownerRep = ft.isHome ? a : b;
     // v3.16.3-ordlyden: "cutbacks stoppet M af N · luftdueller i åbent spil vundet …"
     assert.ok(ft.text.includes(`Dit felt: modstanderens cutbacks stoppet ${ownerRep.oppCutbacksBlocked} af ${ownerRep.oppCutbacks} · luftdueller i åbent spil vundet ${ownerRep.oppCrosses - ownerRep.oppCrossesWon} af ${ownerRep.oppCrosses}.`), `${ft.text.slice(-120)} | ${JSON.stringify(ownerRep)}`);
-    assert.ok(ft.text.includes(`Din opbygning kom igennem ${ownerRep.buildWon} af ${ownerRep.build} gange; dit pres vandt bolden ${ownerRep.pressWon} af ${ownerRep.press} gange.`));
+    const g = (n) => `${n} ${n === 1 ? 'gang' : 'gange'}`;   // v3.16.7: "af 1 gang"
+    assert.ok(ft.text.includes(`Din opbygning kom igennem ${ownerRep.buildWon} af ${g(ownerRep.build)}; dit pres vandt bolden ${ownerRep.pressWon} af ${g(ownerRep.press)}.`));
     if (ownerRep.oppCutbacks !== ownerRep.cutbacks || ownerRep.oppCrosses !== ownerRep.crosses) nText++;
   }
   assert.ok(nCut > 10 && nBlk > 3 && nCr > 10 && nWon > 3 && nDiffer > 10 && nText > 10, `data nok: cutbacks ${nCut}, stoppet ${nBlk}, høje ${nCr}, vundet ${nWon}, forskellige ${nDiffer}, tekst ${nText}`);

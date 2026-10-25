@@ -29,3 +29,5 @@ export function select(value, options, onChange, attrs = {}) {
 }
 
 export const LOCK = '🔒 ??';
+// Decimaltal på dansk (v3.16.7, Spilfører: "12.7 km") – komma, ikke punktum
+export const dec = (x, d = 1) => x.toFixed(d).replace('.', ',');

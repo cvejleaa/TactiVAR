@@ -7,7 +7,7 @@ import { livePositions, coupledPositions, kickoffPositions, apartFrom, ONSIDE_GA
 import { masteryVs, counterXpForMatch } from './counter.js';
 import { createSheet, finalizeSheet } from './ratings.js';
 import { assignClock } from './clock.js';
-import { describeFinish, describeHeader, describeVarTiming, describeGoal, goalSpectacle, pickBy, gen } from './clues.js';
+import { describeFinish, describeHeader, describeVarTiming, describeGoal, goalSpectacle, pickBy, gen, pl } from './clues.js';
 import { MATCH_RULES, CARD_RULES, FATIGUE_SUBS_AT_ONCE, BOT_SUBS, LIMP, MIN_PLAYERS, VAR_RULES, MISS_P, MISS_BLOCK_SHARE, MISS_CORNER_P } from './match-rules.js';
 import { TIRED_PER_POINT, SUBS_LIMIT, matchCost, REST_SHARE } from './freshness.js';
 
@@ -241,8 +241,8 @@ const endOf = (s, full) => ({ formation: s.tactics.baseFormation, starters: s.st
 // stod der "0 cutbacks, 0 høje bolde" til et centralt hold. Cutbacks fra løb på kanten tæller med.
 function attackLine(d, ph) {
   const parts = [];
-  if (ph.attackFocus === 'LOW_CUTBACKS' || d.cutbacks) parts.push(`${d.cutbacks} cutbacks (${d.cutbackGoals} mål, ${d.cutbacksBlocked} stoppet ved kanten)`);
-  if (ph.attackFocus === 'HIGH_CROSSES' || ph.passingStyle === 'DIRECT_LONG' || d.crosses) parts.push(`${d.crosses} høje bolde (${d.crossesWon} vundne luftdueller i åbent spil, ${d.headerGoals} hovedstødsmål)`);
+  if (ph.attackFocus === 'LOW_CUTBACKS' || d.cutbacks) parts.push(`${pl(d.cutbacks, 'cutback', 'cutbacks')} (${d.cutbackGoals} mål, ${d.cutbacksBlocked} stoppet ved kanten)`);
+  if (ph.attackFocus === 'HIGH_CROSSES' || ph.passingStyle === 'DIRECT_LONG' || d.crosses) parts.push(`${pl(d.crosses, 'høj bold', 'høje bolde')} (${pl(d.crossesWon, 'vundet luftduel', 'vundne luftdueller')} i åbent spil, ${d.headerGoals} hovedstødsmål)`);
   return parts.length ? parts.join(', ') : 'ingen cutbacks eller høje bolde';
 }
 
@@ -1008,7 +1008,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
       const leader = st.hTacticSuccess >= st.aTacticSuccess ? home : away;
       // Dit holds egen duel-statistik (kun egne valg nævnes – modstanderens stil røbes ikke).
       const mine = [H, A].find(own);
-      const yours = mine && duelLog[mine.team.id].build + duelLog[mine.team.id].press ? ` Din opbygning er kommet igennem ${duelLog[mine.team.id].buildWon} af ${duelLog[mine.team.id].build} gange; dit pres har vundet bolden ${duelLog[mine.team.id].pressWon} af ${duelLog[mine.team.id].press} gange.` : '';
+      const yours = mine && duelLog[mine.team.id].build + duelLog[mine.team.id].press ? ` Din opbygning er kommet igennem ${duelLog[mine.team.id].buildWon} af ${pl(duelLog[mine.team.id].build, 'gang', 'gange')}; dit pres har vundet bolden ${duelLog[mine.team.id].pressWon} af ${pl(duelLog[mine.team.id].press, 'gang', 'gange')}.` : '';
       addEv(min, 'HALFTIME', 'TACTIC', true, false, 'Pause-analyse', `⏸️ [PAUSE-ANALYSE] Stillingen er ${hG}-${aG}. ${home.name} har haft ${hp}% af bolden. ${leader.name} har vundet flest taktiske dueller (${Math.max(st.hTacticSuccess, st.aTacticSuccess)}).${yours}`);
     }
     // I pausen skiftes en haltende ud, hvis der er et skift tilbage (pausen koster ingen skifte-pause) – v3.16.6
@@ -1255,7 +1255,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
               // Opsnapning: ingen afslutning – og samme kontra-tjek som efter et vundet pres.
               st[k(att, 'Shots')]--; st[k(att, 'Xg')] -= shotXg;
               sheet.adjust(defender.id, 0.3); sheet.bump(defender.id, 'tacticWins');
-              addEv(min, 'INFO', 'PLAY', def.isHome, false, 'Opsnappet', own(att) ? `❌ ${tag(runner)} løber sig fri ${where}, men ${tag(defender)} (${def.team.name}) tager bolden i driblingen.` : `🛡️ [${def.team.name}] ${tag(defender)} tager bolden fra ${tag(runner)} (${att.team.name}).`);
+              addEv(min, 'INFO', 'PLAY', def.isHome, false, 'Opsnappet', own(att) ? `❌ [${att.team.name}] ${tag(runner)} løber sig fri ${where}, men ${tag(defender)} (${def.team.name}) tager bolden i driblingen.` : `🛡️ [${def.team.name}] ${tag(defender)} tager bolden fra ${tag(runner)} (${att.team.name}).`);
               if (rng.chance(counterChance(runs, attPh.phase3_transition.onBallLost, defPh.phase3_transition.onBallWon, fbCount(att)))) counterAttack(def, att, min, dR, cR);
               continue;
             }
@@ -1313,8 +1313,8 @@ export function simulateMatch(home, away, rng, opts = {}) {
     const p = meSide.isHome ? 'h' : 'a', poss = Math.round((st[p + 'Poss'] / (st.hPoss + st.aPoss)) * 100);
     const [myG, oppG] = meSide.isHome ? [hG, aG] : [aG, hG];
     addEv(90, 'FULLTIME', 'TACTIC', meSide.isHome, false, 'Fuldtids-analyse',
-      `📊 [FULDTIDS-ANALYSE] ${myG > oppG ? `Sejr ${myG}-${oppG} til dig` : myG < oppG ? `Nederlag ${myG}-${oppG}` : `Uafgjort ${myG}-${oppG}`}. Du havde ${poss}% af bolden og ${st[p + 'Shots']} afslutninger (${st[p + 'OnTarget']} på mål). Din opbygning kom igennem ${d.buildWon} af ${d.build} gange; dit pres vandt bolden ${d.pressWon} af ${d.press} gange.`
-      + ` Dødbolde: ${st[p + 'FreeKicks']} frispark i skudafstand, ${st[p + 'Corners']} hjørnespark, ${st[p + 'Penalties']} straffe (${st[p + 'PenaltyGoals']} mål) · frispark begået ${st[p + 'Fouls']}, tilkendt ${st[(p === 'h' ? 'a' : 'h') + 'Fouls']}.`
+      `📊 [FULDTIDS-ANALYSE] ${myG > oppG ? `Sejr ${myG}-${oppG} til dig` : myG < oppG ? `Nederlag ${myG}-${oppG}` : `Uafgjort ${myG}-${oppG}`}. Du havde ${poss}% af bolden og ${pl(st[p + 'Shots'], 'afslutning', 'afslutninger')} (${st[p + 'OnTarget']} på mål). Din opbygning kom igennem ${d.buildWon} af ${pl(d.build, 'gang', 'gange')}; dit pres vandt bolden ${d.pressWon} af ${pl(d.press, 'gang', 'gange')}.`
+      + ` Dødbolde: ${st[p + 'FreeKicks']} frispark i skudafstand, ${st[p + 'Corners']} hjørnespark, ${st[p + 'Penalties']} straffespark (${st[p + 'PenaltyGoals']} mål) · frispark begået ${st[p + 'Fouls']}, tilkendt ${st[(p === 'h' ? 'a' : 'h') + 'Fouls']}.`
       + ` 🎯 Løb uden bold (${RUNS_LABEL[runs]}): ${d.runs} løb, ${d.runsWon} kom fri (${d.runGoals} mål) · kontraer imod i alt: ${d.countersAgainst} (${d.counterGoalsAgainst} mål).`
       // v3.12 (brugeren: "ikke en eneste reference til cutbacks"): dit angreb efter dine valg og
       // dit felt – modstanderens indstilling navngives ikke, kun hvad dit forsvar mødte.

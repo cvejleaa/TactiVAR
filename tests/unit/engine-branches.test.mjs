@@ -1755,7 +1755,7 @@ test('løber → dribletur: vundet er DRIBBLE uden oplæg (+1,4); tabt er en ops
   const defd = slot(lost.a.A, 1);
   for (const e of lost.m.events.filter((x) => x.label === 'Opsnappet')) {
     assert.equal(e.isHome, false);
-    assert.match(e.text, new RegExp(`^❌ ${tg(lost.runner)} løber sig fri på kanten, men ${tg(defd)} \\(.+\\) tager bolden i driblingen\\.$`), e.text);
+    assert.match(e.text, new RegExp(`^❌ \\[.+\\] ${tg(lost.runner)} løber sig fri på kanten, men ${tg(defd)} \\(.+\\) tager bolden i driblingen\\.$`), e.text);
   }
   assert.equal(rOf(lost.m, 'away', lost.a.A, 1).rating, 7.6);      // 6,5 + 2·0,3 + 0,5 clean sheet (LB)
   assert.equal(rOf(lost.m, 'away', lost.a.A, 1).tacticWins, 2);
@@ -2230,7 +2230,7 @@ test('fuldtids-analyse: hvert tal står på sin plads (dit hold hjemme), kun for
   const poss = Math.round(st.hPoss / (st.hPoss + st.aPoss) * 100);
   assert.equal(poss, 91);
   assert.equal(ft[0].text, `📊 [FULDTIDS-ANALYSE] Sejr ${m.homeGoals}-${m.awayGoals} til dig. Du havde 91% af bolden og ${st.hShots} afslutninger (${st.hOnTarget} på mål). Din opbygning kom igennem 30 af 30 gange; dit pres vandt bolden 0 af 0 gange.`
-    + ` Dødbolde: 4 frispark i skudafstand, 0 hjørnespark, 2 straffe (0 mål) · frispark begået ${st.hFouls}, tilkendt ${st.aFouls}.`
+    + ` Dødbolde: 4 frispark i skudafstand, 0 hjørnespark, 2 straffespark (0 mål) · frispark begået ${st.hFouls}, tilkendt ${st.aFouls}.`
     + ft[0].text.slice(ft[0].text.indexOf(' 🎯 Løb uden bold (Normal): ')));
   assert.match(ft[0].text, / 🎯 Løb uden bold \(Normal\): \d+ løb, \d+ kom fri \(\d+ mål\) · kontraer imod i alt: 0 \(0 mål\)\. ⚔️ Angreb \(Centralt · balanceret\): ingen cutbacks eller høje bolde\. 🛡️ /);
   // Kun dit hold: har modstanderen ikke et brugerhold, står der ingen analyse for ham (bot hjemme, dig ude)

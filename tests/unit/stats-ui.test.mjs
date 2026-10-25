@@ -125,7 +125,7 @@ test('ligaens forløb: overskrift, søjler (bredde i forhold til rundens mål), 
     { round: 4, matches: 4, goals: 6, setPiece: 1, kinds: { LONGSHOT: 3, FREEKICK: 1, COMBINATION: 2 }, biggest: { diff: 4, label: 'E 4-0 F' }, most: { goals: 4, label: 'G 2-2 H' } },
   ];
   const flow = render(L, me);
-  assert.equal(byId(flow, 'flow-summary').textContent, '18 mål i 8 kampe (2.25 pr. kamp) · 22 % på dødbolde.');   // 4 af 18 = 22,2 %
+  assert.equal(byId(flow, 'flow-summary').textContent, '18 mål i 8 kampe (2,25 pr. kamp) · 22 % på dødbolde.');   // 4 af 18 = 22,2 %
   const bars = all(byId(flow, 'round-bars'), (e) => e.className === 'round-bar');
   assert.deepEqual(bars.map((b) => [b.attrs.title, b.children[0].textContent, b.children[1].style.width, b.children[2].textContent]), [['Runde 3: 12 mål', 'R3', '100%', '12'], ['Runde 4: 6 mål', 'R4', '50%', '6']]);
   const kinds = all(byId(flow, 'goal-kinds'), (e) => e.tag === 'li').map((li) => li.textContent);
@@ -135,7 +135,7 @@ test('ligaens forløb: overskrift, søjler (bredde i forhold til rundens mål), 
   // Kun indeværende sæson (v3.11): ny sæson fra runde 4 → runde 3 hører til den afsluttede
   L.seasonStartRound = 4;
   const f2 = render(L, me);
-  assert.equal(byId(f2, 'flow-summary').textContent, '6 mål i 4 kampe (1.50 pr. kamp) · 17 % på dødbolde.');
+  assert.equal(byId(f2, 'flow-summary').textContent, '6 mål i 4 kampe (1,50 pr. kamp) · 17 % på dødbolde.');
   assert.deepEqual(all(byId(f2, 'round-bars'), (e) => e.className === 'round-bar').map((b) => [b.attrs.title, b.children[0].textContent]), [['Runde 1: 6 mål', 'R1']]);   // sæsonens runde 1 (global runde 4) – v3.14.1
   L.seasonStartRound = 5;
   assert.equal(all(byId(render(L, me), 'stats-flow'), (e) => e.tag === 'p')[0].textContent, 'Kommer efter sæsonens første runde.');
@@ -156,11 +156,11 @@ test('dit hold (privat): pr.-kamp-tal, sæsonsummer og spillertabellen med snit,
   const p = me.squad[4];
   Object.assign(p, { sGames: 3, ratingSum: 27, ratingGames: 4, minutesSum: 360, distanceSum: 42, hiKmSum: 3, hiDistSum: 12, freeRunsSum: 8, freeRunsWonSum: 3, freshness: 62 });
   const root = render(L, me);
-  assert.equal(byId(root, 'my-team-stats').textContent, 'Sæson 1, fra runde 3, pr. kamp: 12.5 afslutninger (5.0 på mål), xG 1.50, 5.5 hjørnespark, 2.5 frispark i skudafstand. I alt: kontramål 3 for / 2 imod, 9 VAR-tjek.');
+  assert.equal(byId(root, 'my-team-stats').textContent, 'Sæson 1, fra runde 3, pr. kamp: 12,5 afslutninger (5,0 på mål), xG 1,50, 5,5 hjørnespark, 2,5 frispark i skudafstand. I alt: kontramål 3 for / 2 imod, 9 VAR-tjek.');
   const rows = all(byId(root, 'my-players'), (e) => e.tag === 'tr' && e.children[0].tag === 'td');
   assert.equal(rows.length, 18);
   assert.deepEqual(all(byId(root, 'my-players'), (e) => e.tag === 'th').map((t) => t.textContent), ['Spiller', 'Kampe (fra R3)', 'Snit (i alt)', 'km/90 (i alt)', '% HI (i alt)', 'Fri (fra R3)', 'Friskhed']);
-  assert.deepEqual(cells(rows[4]), [`#${p.shirtNumber} ${p.shortName}`, '3', '6.8', '10.5', '25 %', '3/8', '62 %']);   // snit 27/4 = 6,75 → 6,8 · 42/360·90 = 10,5 km
+  assert.deepEqual(cells(rows[4]), [`#${p.shirtNumber} ${p.shortName}`, '3', '6,8', '10,5', '25 %', '3/8', '62 %']);   // snit 27/4 = 6,75 → 6,8 · 42/360·90 = 10,5 km
   assert.deepEqual(cells(rows[5]).slice(1), [String(me.squad[5].sGames), '–', '–', '–', '–', `${me.squad[5].freshness} %`]);
   assert.ok(!byId(root, 'stats-mine').textContent.includes('99'), 'modstanderens spillere vises ikke');
   assert.ok(byId(root, 'stats-mine').textContent.endsWith('Kun du ser disse tal – de røber evner og dine taktiske valg. Kampe og frie løb tælles for sæson 1, fra runde 3; snit, km og HI gælder alle hans kampe (de nulstilles ikke ved sæsonskifte).'));

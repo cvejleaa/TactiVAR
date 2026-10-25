@@ -46,7 +46,7 @@ test('uden klumme får gamle visninger den gamle avis (ingen col-title), og uden
   assert.ok(byId(old, 'headlines') && txt(byId(old, 'headlines')).includes('Gammel overskrift'));
   // v3.16.3: også den gamle avis viser modstanderens rundens spiller som "rundens bedste karakter" (ingen stjerner, intet tal)
   assert.equal(txt(byId(old, 'player-of-round')), '🏆 Rundens spiller: #9 Hansen (Ude) – rundens bedste karakter');
-  assert.equal(txt(byId(renderGazette(G(), 'a1', null, MATCHES), 'player-of-round')), '🏆 Rundens spiller: #9 Hansen (Ude) – karakter 8.4');
+  assert.equal(txt(byId(renderGazette(G(), 'a1', null, MATCHES), 'player-of-round')), '🏆 Rundens spiller: #9 Hansen (Ude) – karakter 8,4');
   assert.equal(renderGazette(null, 'h1', null, MATCHES, COL), null, 'ingen gazette → intet, også selv om en klumme er givet');
   assert.equal(renderGazette(null, 'h1'), null);
 });
@@ -89,7 +89,7 @@ test('klummen, afsnit 3: modstanderens spiller med "rundens bedste karakter" (al
   assert.equal(txt(p), '🏆 Rundens spiller: #9 Hansen (Ude) – rundens bedste karakter • Begrundelse: 2 mål.');
   assert.doesNotMatch(txt(opp), /8\.4|karakter \d|★/, 'modstanderens karakter røbes ikke (og ingen stjerner)');
   const own = renderGazette(G(), 'a1', () => {}, MATCHES, COL);
-  assert.equal(txt(byId(own, 'player-of-round')), '🏆 Rundens spiller: #9 Hansen (Ude) – karakter 8.4 • Begrundelse: 2 mål.');
+  assert.equal(txt(byId(own, 'player-of-round')), '🏆 Rundens spiller: #9 Hansen (Ude) – karakter 8,4 • Begrundelse: 2 mål.');
   assert.equal(txt(byId(renderGazette(G(), 'h1', null, MATCHES, { ...COL, sections: [{ ...COL.sections[2], player: { playerId: 'p1', teamId: 'a1', why: '' } }] }), 'player-of-round')), '🏆 Rundens spiller: #9 Hansen (Ude) – rundens bedste karakter', 'uden begrundelse ingen •');
   // Rundens mål: type, beskrivelse og link til kampen (matchIdx), som åbner (indeks, mål)
   const opened = [];
@@ -130,9 +130,9 @@ test('klummen: defensiv aktion kun uden mål; overraskelsen er #upset (kun den s
   assert.equal(txt(byId(renderGazette(G({ seasonEnd: { seasonNumber: 1 } }), 'h1', null, MATCHES, COL), 'season-end')), '🏆 Sæson 1 er slut: En ny sæson starter med nulstillet tabel – se Tidligere sæsoner på Liga-fanen.');
   // Dit holds løber: kun for dit hold
   const run = { teamId: 'h1', shirtNumber: 8, shortName: 'Løber', distanceKm: 11.234, hiShare: 45.4, topSpeed: 31.56 };
-  assert.equal(txt(byId(renderGazette(G({ myRunner: run }), 'h1', null, MATCHES, COL), 'my-runner')), '🏃 Dit holds løber: #8 Løber – 11.2 km, 45 % højintenst, topfart 31.6 km/t.');
+  assert.equal(txt(byId(renderGazette(G({ myRunner: run }), 'h1', null, MATCHES, COL), 'my-runner')), '🏃 Dit holds løber: #8 Løber – 11,2 km, 45 % højintenst, topfart 31,6 km/t.');
   assert.equal(byId(renderGazette(G({ myRunner: run }), 'a1', null, MATCHES, COL), 'my-runner'), undefined, 'en anden seer ser ikke dit holds løber');
-  assert.equal(txt(byId(renderGazette(G({ myRunner: { ...run, hiShare: null, topSpeed: 0 } }), 'h1', null, MATCHES, COL), 'my-runner')), '🏃 Dit holds løber: #8 Løber – 11.2 km.');
+  assert.equal(txt(byId(renderGazette(G({ myRunner: { ...run, hiShare: null, topSpeed: 0 } }), 'h1', null, MATCHES, COL), 'my-runner')), '🏃 Dit holds løber: #8 Løber – 11,2 km.');
 });
 
 test('Match Center: klummen kommer med efter afspilningen (ikke under), og kampoverskrifterne åbner via on.view', () => {

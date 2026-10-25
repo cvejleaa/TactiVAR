@@ -368,30 +368,30 @@ try {
   const ownRatings = await g.locator('.ratings').nth(own).locator('td.rating').allTextContents();
   const starColors = await g.evaluate(() => { const s = document.querySelector('.ratings .star-on'), o = document.querySelector('.ratings .star-off'); return s && o ? [getComputedStyle(s).color, getComputedStyle(o).color] : null; });
   check('Stjerner er læsbare: udfyldte og tomme har forskellig farve', !!starColors && starColors[0] !== starColors[1], String(starColors));
-  check('Karakterark: eget hold eksakte karakterer, modstander kun stjerner', ownRatings.every((t) => /^\d+\.\d$/.test(t)) && oppRatings.length >= 11 && oppRatings.every((t) => /^[★☆]{5}$/.test(t)));
+  check('Karakterark: eget hold eksakte karakterer, modstander kun stjerner', ownRatings.every((t) => /^\d+,\d$/.test(t)) && oppRatings.length >= 11 && oppRatings.every((t) => /^[★☆]{5}$/.test(t)));
   // Karakterark: opstillingsorden med plads efter navnet, minibane og ikon-forklaring
   const ownRows = await g.locator('.ratings').nth(own).locator('tbody tr td:first-child').allTextContents();
   check('Karakterark: plads efter navnet, målmanden først', ownRows.length >= 11 && /· GK$/.test(ownRows[0]) && ownRows.every((t) => / · \S/.test(t)), ownRows.slice(0, 3).join(' | '));
   const mpOwn = await g.locator('.ratings').nth(own).locator('.mp-token .mp-val').allTextContents();
   const mpOpp = await g.locator('.ratings').nth(1 - own).locator('.mp-token .mp-val').allTextContents();
-  check('Minibane: 11 startere pr. hold – egne med karakter, modstanderens kun stjerner', mpOwn.length === 11 && mpOwn.every((t) => /^\d+\.\d$/.test(t)) && mpOpp.length === 11 && mpOpp.every((t) => /^[★☆]{5}$/.test(t)), `${mpOwn.length}/${mpOpp.length}`);
+  check('Minibane: 11 startere pr. hold – egne med karakter, modstanderens kun stjerner', mpOwn.length === 11 && mpOwn.every((t) => /^\d+,\d$/.test(t)) && mpOpp.length === 11 && mpOpp.every((t) => /^[★☆]{5}$/.test(t)), `${mpOwn.length}/${mpOpp.length}`);
   const runs = await g.locator('.ratings').nth(own).locator('td.run').allTextContents();
-  const runExpect = await g.evaluate(() => { const m = JSON.parse(localStorage.getItem('tactivar_save')).league.lastRound.matches[0]; const own = [m.ratings.home, m.ratings.away].find((l) => l[0].isUserTeam); const e = own.find((x) => x.hiShare != null && x.distanceKm > 0); return `${e.distanceKm.toFixed(1)} km · ${Math.round(e.hiShare)} % HI`; });
+  const runExpect = await g.evaluate(() => { const m = JSON.parse(localStorage.getItem('tactivar_save')).league.lastRound.matches[0]; const own = [m.ratings.home, m.ratings.away].find((l) => l[0].isUserTeam); const e = own.find((x) => x.hiShare != null && x.distanceKm > 0); return `${e.distanceKm.toFixed(1).replace('.', ',')} km · ${Math.round(e.hiShare)} % HI`; });
   check('Karakterark: HI-andelen er spillerens afrundede tal', runs.some((t) => t.startsWith(runExpect)), runExpect);
-  check('Karakterark: dit hold har løbet distance og topfart, modstanderen ikke', runs.length >= 11 && runs.filter((t) => /^\d+\.\d km · \d+ % HI · \d+\.\d km\/t$/.test(t)).length >= 11 && (await g.locator('.ratings').nth(1 - own).locator('td.run').count()) === 0, runs.slice(0, 2).join(' | '));
+  check('Karakterark: dit hold har løbet distance og topfart, modstanderen ikke', runs.length >= 11 && runs.filter((t) => /^\d+,\d km · \d+ % HI · \d+,\d km\/t$/.test(t)).length >= 11 && (await g.locator('.ratings').nth(1 - own).locator('td.run').count()) === 0, runs.slice(0, 2).join(' | '));
   // v3.9: "fri" (løb uden bold) kun for dit hold – og opsummeringen kun i din kamp
   const fri = await g.locator('.ratings').nth(own).locator('td.fri').allTextContents();
   const friExpect = await g.evaluate(() => { const m = JSON.parse(localStorage.getItem('tactivar_save')).league.lastRound.matches[0]; const own = [m.ratings.home, m.ratings.away].find((l) => l[0].isUserTeam); return own.filter((e) => e.freeRuns > 0).map((e) => `${e.freeRunsWon}/${e.freeRuns} fri`); });
   check('Karakterark: "fri" for dit hold matcher de gemte løb, modstanderen har ingen kolonne', fri.length >= 11 && JSON.stringify(fri.filter(Boolean).sort()) === JSON.stringify([...friExpect].sort()) /* præcis de spillere med løb – ingen "0/0 fri" til resten; tilfældig liga: ca. hver 5. kamp uden løb, så står alle tomme (unit-testene dækker indholdet) */ && fri.every((t) => t === '' || /^\d+\/\d+ fri$/.test(t)) && (await g.locator('.ratings').nth(1 - own).locator('td.fri').count()) === 0, `${fri.join(',')} / ${friExpect.join(',')}`);
   const runSum = await g.textContent('#match-center');
-  check('Fuldtids-analyse med løb uden bold i din kamp', /📊 \[FULDTIDS-ANALYSE\] (Sejr \d+-\d+ til dig|Nederlag \d+-\d+|Uafgjort \d+-\d+)\. Du havde \d+% af bolden og \d+ afslutninger \(\d+ på mål\)\. Din opbygning kom igennem \d+ af \d+ gange; dit pres vandt bolden \d+ af \d+ gange\. Dødbolde: \d+ frispark i skudafstand, \d+ hjørnespark, \d+ straffe \(\d+ mål\) · frispark begået \d+, tilkendt \d+\. 🎯 Løb uden bold \(Normal\): \d+ løb, \d+ kom fri \(\d+ mål\) · kontraer imod i alt: \d+ \(\d+ mål\)\./.test(runSum), runSum.match(/🎯[^.]*\./)?.[0] ?? 'mangler');
+  check('Fuldtids-analyse med løb uden bold i din kamp', /📊 \[FULDTIDS-ANALYSE\] (Sejr \d+-\d+ til dig|Nederlag \d+-\d+|Uafgjort \d+-\d+)\. Du havde \d+% af bolden og \d+ afslutning(er)? \(\d+ på mål\)\. Din opbygning kom igennem \d+ af \d+ gange?; dit pres vandt bolden \d+ af \d+ gange?\. Dødbolde: \d+ frispark i skudafstand, \d+ hjørnespark, \d+ straffespark \(\d+ mål\) · frispark begået \d+, tilkendt \d+\. 🎯 Løb uden bold \(Normal\): \d+ løb, \d+ kom fri \(\d+ mål\) · kontraer imod i alt: \d+ \(\d+ mål\)\./.test(runSum), runSum.match(/🎯[^.]*\./)?.[0] ?? 'mangler');
   check('Fuldtids-analysen viser dit angreb (fokus · pasningsstil) og dit felt (v3.12)', /⚔️ Angreb \((Centralt|Høje indlæg|Lave cutbacks) · (korte pasninger|balanceret|direkte lange bolde)\): (ingen cutbacks eller høje bolde|(\d+ cutbacks \(\d+ mål, \d+ stoppet ved kanten\))?(, )?(\d+ høje bolde \(\d+ vundne luftdueller i åbent spil, \d+ hovedstødsmål\))?)\. 🛡️ Dit felt: modstanderens cutbacks stoppet \d+ af \d+ · luftdueller i åbent spil vundet \d+ af \d+\./.test(runSum), runSum.match(/⚔️[^🛡]*🛡️[^.]*\./)?.[0] ?? 'mangler');
   const gzText = await g.textContent('#gazette');
   // v3.14: avisen er en klumme – overskrift, "Din kamp", de 3 øvrige kampe (fed overskrift, klik = referatet),
   // rundens spiller og mål, næste runde; dit holds løber står stadig som boks.
   const colIds = await g.locator('#gazette .col-sec').evaluateAll((ss) => ss.map((x) => x.id));
   check('Klummen: overskrift, "Din kamp" først, 3 øvrige kampe, rundens spiller og mål, næste runde – og dit holds løber', (await g.locator('#col-title').count()) === 1 && colIds[0] === 'col-mine' && colIds.includes('col-others') && colIds.includes('col-stars') && colIds.includes('col-next')
-    && (await g.locator('#headlines li').count()) === 3 && /Dit holds løber: #\d+ .+ – \d+\.\d km, \d+ % højintenst/.test(gzText), `${colIds.join(',')} | ${gzText.slice(0, 160)}`);
+    && (await g.locator('#headlines li').count()) === 3 && /Dit holds løber: #\d+ .+ – \d+,\d km, \d+ % højintenst/.test(gzText), `${colIds.join(',')} | ${gzText.slice(0, 160)}`);
   const myMatchTxt = await g.textContent('#col-mine');
   const myName = await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((t) => !t.isBot).name);
   check('Klummen, "Din kamp": handler om dit hold (seeren)', myMatchTxt.includes(myName), myMatchTxt.slice(0, 160));
@@ -402,7 +402,7 @@ try {
   check('Forklaring af "fri" og HI (rigtig vej rundt: 2/3 = kom fri 2 af 3 gange)', legendTxt.includes('"2/3 fri" = løb uden bold: kom fri 2 af 3 gange') && legendTxt.includes('HI = andel højintenst løb') && legendTxt.endsWith('begge kun dit hold'), legendTxt);
   const por = await g.textContent('#player-of-round');
   const porIsMine = (await g.locator('.ratings').nth(own).textContent()).includes(por.match(/#\d+ [^ ]+ [^ (]+/)[0]);
-  check('Avisen kårer rundens spiller – med karakter kun hvis det er din spiller, ellers "rundens bedste karakter" (v3.16.3, ingen stjerner)', porIsMine ? /karakter \d+\.\d/.test(por) : (por.includes('rundens bedste karakter') && !/[★☆]/.test(por) && !/karakter \d/.test(por)), por);
+  check('Avisen kårer rundens spiller – med karakter kun hvis det er din spiller, ellers "rundens bedste karakter" (v3.16.3, ingen stjerner)', porIsMine ? /karakter \d+,\d/.test(por) : (por.includes('rundens bedste karakter') && !/[★☆]/.test(por) && !/karakter \d/.test(por)), por);
   // v3.16.3: 📍 kun hvor afspilningen ikke har afslutningen (QC: ellers to knapper, én handling) – i en ny kamp har hvert mål med
   // billede en 🎬, så 📍 står kun ved et mål med billede UDEN øjeblik i sporet. 📍-flowet køres længere nede på et gem uden spor.
   const pinWant = await g.evaluate(() => { const m = JSON.parse(localStorage.getItem('tactivar_save')).league.lastRound.matches[0]; const mo = new Set((m.trace?.moments ?? []).map((x) => x.ev)); return { snaps: m.events.filter((e) => e.snapshot).length, noFilm: m.events.filter((e, i) => e.snapshot && !mo.has(i)).length, trace: !!m.trace }; });
@@ -548,7 +548,7 @@ try {
   check('Ligatabellen er opdateret efter runde 1', stHead.includes('sæson 1, efter 1 af 14 runder'), stHead);
   await g.selectOption('#team-select', '2');
   // Spillerkortet viser sæsonens løb (km pr. 90 min og bedste topfart) for en spiller, der har spillet
-  const card = await g.evaluate(() => { const t = JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((x) => !x.isBot); const p = t.squad.find((x) => x.minutesSum > 0 && x.hiDistSum > 0); return { nr: p.shirtNumber, km: (p.distanceSum / p.minutesSum * 90).toFixed(1), ts: p.topSpeedMax.toFixed(1), hi: Math.round(p.hiKmSum / p.hiDistSum * 100) }; });
+  const card = await g.evaluate(() => { const t = JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((x) => !x.isBot); const p = t.squad.find((x) => x.minutesSum > 0 && x.hiDistSum > 0); return { nr: p.shirtNumber, km: (p.distanceSum / p.minutesSum * 90).toFixed(1).replace('.', ','), ts: p.topSpeedMax.toFixed(1).replace('.', ','), hi: Math.round(p.hiKmSum / p.hiDistSum * 100) }; });
   await g.selectOption('#team-select', '0');
   await g.locator('#matrix tbody tr', { has: g.locator('td:first-child', { hasText: new RegExp(`#${card.nr}$`) }) }).first().click();
   const rs = await g.textContent('#run-stats');
@@ -610,8 +610,8 @@ try {
     const theirs = renderGazette({ ...base, playerOfTheRound: { ...p, teamId: 'them' } }, 'me').querySelector('#player-of-round').textContent;
     return { mine, theirs };
   });
-  check('Avisen: din spiller vises med karakter', gaz.mine.includes('karakter 8.7') && gaz.mine.includes('2 mål'), gaz.mine);
-  check('Avisen: modstanderens spiller som "rundens bedste karakter" (v3.16.3) – aldrig tallet, ingen stjerner', gaz.theirs.includes('– rundens bedste karakter') && !gaz.theirs.includes('8.7') && !/[★☆]/.test(gaz.theirs) && !/karakter \d/.test(gaz.theirs), gaz.theirs);
+  check('Avisen: din spiller vises med karakter', gaz.mine.includes('karakter 8,7') && gaz.mine.includes('2 mål'), gaz.mine);
+  check('Avisen: modstanderens spiller som "rundens bedste karakter" (v3.16.3) – aldrig tallet, ingen stjerner', gaz.theirs.includes('– rundens bedste karakter') && !gaz.theirs.includes('8,7') && !/[★☆]/.test(gaz.theirs) && !/karakter \d/.test(gaz.theirs), gaz.theirs);
 
   // Mislykkes backuppen ved "Ny liga" (fuldt lager), står det gamle spil urørt – også efter næste gem
   await g.selectOption('#team-select', '0');

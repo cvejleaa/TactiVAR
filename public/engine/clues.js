@@ -1,5 +1,7 @@
 // Ejefald (flyttet fra column.js v3.16.3 – "Roverss"/"Tacticianss" i referatet): "Aarhus'", "Kjærs".
 export const gen = (n) => (/[sxz]$/i.test(n) ? `${n}'` : `${n}s`);
+// Tal med ental/flertal (v3.16.7, Spilfører: "1 af 1 gange", "1 afslutninger", "1 cutbacks"): pl(1, 'gang', 'gange') → "1 gang"
+export const pl = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 // Variant: hash af nøglerne + runden/minuttet – samme nøgler giver samme valg (intet rng-træk, så ingen kamp ændres),
 // næste runde/minut rykker én videre, så den samme skabelon ikke kommer to gange i træk (QC N4, flyttet fra column.js).
 export function pickBy(list, round, ...keys) {
