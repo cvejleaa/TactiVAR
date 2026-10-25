@@ -1223,6 +1223,9 @@ export function simulateMatch(home, away, rng, opts = {}) {
             finisher = receiver(att, zone === 'WIDE' ? SPOT.CUTBACK : SPOT.GOAL, (p) => p.skills.finishing, runner, rctx);
             helper = runner; kind = zone === 'WIDE' ? 'CUTBACK' : 'COMBINATION';
             lead = yourRun && `${yourRun} og ${zone !== 'WIDE' ? 'spiller' : focus === 'LOW_CUTBACKS' ? 'lægger den lavt tilbage til' : 'lægger den tværs til'} ${tag(finisher)}.`;
+            // Modstanderens løbs-cutback står også i referatet – neutralt som cutback() (§3) – så "Dit felt: cutbacks stoppet
+            // x af y" passer med de linjer, du kan læse (QC v3.16.5-planen; før blev de talt uden at blive vist)
+            if (zone === 'WIDE' && !own(att)) addEv(min, 'INFO', 'PLAY', att.isHome, false, 'Mod baglinjen', `↩️ [${att.team.name}] ${tag(runner)} kommer forbi ${tag(defender)} og spiller bolden tilbage i feltet.`);
           } else if (choice === 'DRIBBLE') {
             const beat = (rs.pace + rs.ballControl) * ff(runner) + rng.next() * 8
               > (defender.skills.positioning + defender.skills.strength * 0.5) * ff(defender) + rng.next() * 8 + DRIBBLE_DEF_EDGE;

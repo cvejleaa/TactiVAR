@@ -10,7 +10,7 @@ import { createRng } from '../../public/engine/rng.js';
 import { createLeague } from '../../public/engine/generator.js';
 import { simulateMatch } from '../../public/engine/match.js';
 
-const GOLDEN = 'b3bbaca0702deb2e03e8a443b828269daa4552a73fcbd3ddb6d02857d8d90f6f';   // v3.16.6 M5: frisparket = tick'ets forseelse (motor; før e1ab251c…) · v3.16.5: kun tekst – noprose uændret (før b91c88f5…) · v3.16.4: kun ur (clock/stoppage) – noprose uændret (før d46c1314…) · v3.16.3: kun tekst – noprose uændret (tools/fingerprint.mjs; før 7648f4ef… – vary, målets linje, fuldtidsanalysen – og før det 072a48cf… fra v3.16.2) · v3.16.1 sammenpresning i stedet for klemning (bevidst ændret motor: modtagervalget læser positionerne – før d67fad2a… fra v3.16) · v3.16 koblede linjer + SHOT_REACH (bevidst ændret motor: modtagervalg, langskud, kontra, kant efter pres – før 9ae07870… fra v3.15.1)
+const GOLDEN = '25bbe918f0305a154098c2af6a5e4a202cf78219bd2b539f7611cfe78c407968';   // v3.16.6 M4: modstanderens løbs-cutback står i referatet (nye hændelser) (før b3bbaca0…) · v3.16.6 M5: frisparket = tick'ets forseelse (motor; før e1ab251c…) · v3.16.5: kun tekst – noprose uændret (før b91c88f5…) · v3.16.4: kun ur (clock/stoppage) – noprose uændret (før d46c1314…) · v3.16.3: kun tekst – noprose uændret (tools/fingerprint.mjs; før 7648f4ef… – vary, målets linje, fuldtidsanalysen – og før det 072a48cf… fra v3.16.2) · v3.16.1 sammenpresning i stedet for klemning (bevidst ændret motor: modtagervalget læser positionerne – før d67fad2a… fra v3.16) · v3.16 koblede linjer + SHOT_REACH (bevidst ændret motor: modtagervalg, langskud, kontra, kant efter pres – før 9ae07870… fra v3.15.1)
 export function goldenMatches() {
   const out = [];
   for (let s = 1; s <= 20; s++) {
