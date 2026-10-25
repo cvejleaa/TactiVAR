@@ -17,7 +17,8 @@ import { fingerprint } from '../../tools/fingerprint.mjs';
 // v3.17.0: listerne bygges igen efter skadesskiftet (den udskiftede nævnes ikke resten af minuttet) (før 728d3f6e…)
 // v3.17.0: dødboldens indlæg slås af kant/midtbane (crossTaker) (før ae16c682…)
 // v3.17.0: dødboldens indlæg slås af kant/midtbane (crossTaker), SETPIECE_DEF_EDGE 4,1 (før 3c768989…)
-const NOPROSE_400 = '043be8b7c7480b7bc76390260f29200ced6b5758dcd059b00c8e3acf754c66aa';
+// v3.17.0: løbs-cutbacken møder backen på sin kant (flankBack) (før 043be8b7…)
+const NOPROSE_400 = 'dd9700755377688ac25a4ed1abc721f83725e3b45a1e8b4f6d9ae106a7a31d2d';
 
 test('fingeraftryk uden prosa: de 400 seedede kampe er de samme som ved sidste bevidste motorændring (v3.16.6 M5)', async () => {
   const r = await fingerprint(400);

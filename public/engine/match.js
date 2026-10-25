@@ -775,17 +775,25 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // Cutback (v3.12): en kantspiller går mod baglinjen (side efter terning) og møder den back, der
   // står nærmest; vinder han, lægges bolden lavt tilbage til en afslutter ved straffesparkspletten.
   // Kaldt med et allerede talt skud (xg) – en lukket kant er ingen afslutning.
+  // Forsvareren på kanten (v3.16.7 fra cutback(); v3.17.0 også løbs-cutbacken): backen på sin side, ellers en kantspiller dér
+  // (kantmidtbane, ikke en kantangriber – efter et Hvis-Så-skift til 3-4-3 var det angriberen), ellers en forsvars- eller
+  // midtbanespiller – aldrig en angriber. wx = angrebets kant (angriberens koordinater). Ét rng-træk.
+  function flankBack(def, wx) {
+    const dRole = (i) => coordsOf(def.tactics)[i].r, bSide = wx < 50 ? 'R' : 'L';
+    return receiver(def, { x: 100 - wx, y: 72 }, (p) => p.skills.pace + p.skills.positioning, null, { attacking: false, ballX: 100 - wx }, Infinity,
+      [(i) => FB_ROLES.has(dRole(i)) && dRole(i)[0] === bSide, (i) => WIDE_ROLES.has(dRole(i)) && lineOfRole(dRole(i)) !== 'ATT' && dRole(i)[0] === bSide,
+      (i) => lineOfRole(dRole(i)) !== 'ATT']);
+  }
   function cutback(att, def, cR, dR, min, xg) {
     const wx = rng.next() < 0.5 ? 12 : 88;
     // Roller (v3.16.7, Spilfører: midtstoppere lavede cutbacks, angribere lukkede kanten i eget felt): kantmanden er en kant- eller
     // back-plads på den side, ellers den nærmeste (smal formation); backen er backen på sin side, ellers en kantspiller dér,
     // ellers en forsvars- eller midtbanespiller – aldrig en angriber. Samme ene rng-træk pr. valg.
     const roleOf = (side) => (i) => coordsOf(side.tactics)[i].r, flank = (x) => (x < 50 ? 'L' : 'R');
-    const aR = roleOf(att), dRole = roleOf(def), wSide = flank(wx), bSide = flank(100 - wx);
+    const aR = roleOf(att), wSide = flank(wx);
     const winger = receiver(att, { x: wx, y: 30 }, (p) => p.skills.pace + p.skills.ballControl, null, { attacking: true, ballX: wx }, RECEIVE_REACH,
       [(i) => WIDE_ROLES.has(aR(i)) && aR(i)[0] === wSide]);
-    const back = receiver(def, { x: 100 - wx, y: 72 }, (p) => p.skills.pace + p.skills.positioning, null, { attacking: false, ballX: 100 - wx }, Infinity,
-      [(i) => FB_ROLES.has(dRole(i)) && dRole(i)[0] === bSide, (i) => WIDE_ROLES.has(dRole(i)) && dRole(i)[0] === bSide, (i) => lineOfRole(dRole(i)) !== 'ATT']);
+    const back = flankBack(def, wx);
     const log = duelLog[att.team.id], ws = winger.skills, bs = back.skills;
     log.cutbacks++;
     if ((ws.pace + ws.ballControl) * ff(winger) + rng.next() * 8
@@ -1286,13 +1294,15 @@ export function simulateMatch(home, away, rng, opts = {}) {
         const wts = pool.map(({ i }) => RUN_WEIGHT[runGroup(attC[i].r)][runs] ?? 1);
         let rr = rng.next() * wts.reduce((x, y) => x + y, 0);
         const pick = pool[Math.max(0, wts.findIndex((w) => (rr -= w) < 0))] ?? pool.at(-1);
-        const runner = pick.p, rs = runner.skills;
+        const runner = pick.p, rs = runner.skills, zone = runZone(slotPosition(att.tactics, pick.i));
+        // En kantløber møder backen på sin kant (v3.17.0, Spilfører: løbs-cutbacken nævnte en tilfældig forsvarer) – samme
+        // forsvarer i løbet, driblingen og teksten
+        const marker = zone === 'WIDE' ? flankBack(def, slotPosition(att.tactics, pick.i).x < 50 ? 12 : 88) : defender;
         sheet.bump(runner.id, 'freeRuns'); duelLog[att.team.id].runs++;
         const runWon = (rs.positioning + rs.pace * 0.5) * ff(runner) + rng.next() * 8 + (RUN_DUEL_BONUS[runs] ?? 0)
-          > (defender.skills.positioning + defender.skills.intercepting * 0.5) * ff(defender) + rng.next() * 8 + (RUN_COVER[defPh.phase1_buildUp.offBallRuns] ?? 0);
+          > (marker.skills.positioning + marker.skills.intercepting * 0.5) * ff(marker) + rng.next() * 8 + (RUN_COVER[defPh.phase1_buildUp.offBallRuns] ?? 0);
         if (runWon) {
           sheet.bump(runner.id, 'freeRunsWon'); duelLog[att.team.id].runsWon++; sheet.adjust(runner.id, 0.15);
-          const zone = runZone(slotPosition(att.tactics, pick.i));
           // Løberen står nu længere fremme end sin levende position (positions.js) – det er dét
           // billede, afleveringen spilles ud fra, og som ses på minibanen ved målet.
           const rctx = { attacking: true, ballX: zone === 'WIDE' ? (slotPosition(att.tactics, pick.i).x < 50 ? 12 : 88) : 50, runner: pick.i };
@@ -1310,20 +1320,20 @@ export function simulateMatch(home, away, rng, opts = {}) {
             lead = yourRun && `${yourRun} og ${zone !== 'WIDE' ? 'spiller' : focus === 'LOW_CUTBACKS' ? 'lægger den lavt tilbage til' : 'lægger den tværs til'} ${tag(finisher)}.`;
             // Modstanderens løbs-cutback står også i referatet – neutralt som cutback() (§3) – så "Dit felt: cutbacks stoppet
             // x af y" passer med de linjer, du kan læse (QC v3.16.5-planen; før blev de talt uden at blive vist)
-            if (zone === 'WIDE' && !own(att)) addEv(min, 'INFO', 'PLAY', att.isHome, false, 'Mod baglinjen', `↩️ [${att.team.name}] ${tag(runner)} kommer forbi ${tag(defender)} og spiller bolden tilbage i feltet.`);
+            if (zone === 'WIDE' && !own(att)) addEv(min, 'INFO', 'PLAY', att.isHome, false, 'Mod baglinjen', `↩️ [${att.team.name}] ${tag(runner)} kommer forbi ${tag(marker)} og spiller bolden tilbage i feltet.`);
           } else if (choice === 'DRIBBLE') {
             const beat = (rs.pace + rs.ballControl) * ff(runner) + rng.next() * 8
-              > (defender.skills.positioning + defender.skills.strength * 0.5) * ff(defender) + rng.next() * 8 + DRIBBLE_DEF_EDGE;
+              > (marker.skills.positioning + marker.skills.strength * 0.5) * ff(marker) + rng.next() * 8 + DRIBBLE_DEF_EDGE;
             if (!beat) {
               // Opsnapning: ingen afslutning – og samme kontra-tjek som efter et vundet pres.
               st[k(att, 'Shots')]--; st[k(att, 'Xg')] -= shotXg;
-              sheet.adjust(defender.id, 0.3); sheet.bump(defender.id, 'tacticWins');
-              addEv(min, 'INFO', 'PLAY', def.isHome, false, 'Opsnappet', own(att) ? `❌ [${att.team.name}] ${tag(runner)} løber sig fri ${where}, men ${tag(defender)} (${def.team.name}) tager bolden i driblingen.` : `🛡️ [${def.team.name}] ${tag(defender)} tager bolden fra ${tag(runner)} (${att.team.name}).`);
+              sheet.adjust(marker.id, 0.3); sheet.bump(marker.id, 'tacticWins');
+              addEv(min, 'INFO', 'PLAY', def.isHome, false, 'Opsnappet', own(att) ? `❌ [${att.team.name}] ${tag(runner)} løber sig fri ${where}, men ${tag(marker)} (${def.team.name}) tager bolden i driblingen.` : `🛡️ [${def.team.name}] ${tag(marker)} tager bolden fra ${tag(runner)} (${att.team.name}).`);
               if (rng.chance(counterChance(runs, attPh.phase3_transition.onBallLost, defPh.phase3_transition.onBallWon, fbCount(att)))) counterAttack(def, att, min, dR, cR);
               continue;
             }
             kind = 'DRIBBLE';
-            lead = yourRun && `${yourRun}, dribler ${tag(defender)} af og afslutter selv.`;
+            lead = yourRun && `${yourRun}, dribler ${tag(marker)} af og afslutter selv.`;
           } else {
             // Langskud efter samme regel som den almindelige afslutning: løberen står uden for feltet (LONGSHOT_Y) i øjeblikket
             // (v3.16 – før gav zonen langskud, også for en kantløber ved hjørneflaget).
