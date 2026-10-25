@@ -823,11 +823,12 @@ try {
     check('Sæsonslut, Liga: tabellen er slutstillingen for den afsluttede sæson, med mesteren', /slutstilling, sæson \d+$/.test(stTitle) && champ.startsWith(`🏆 ${sv.top[0]} er mester `) && champ.includes(` ${sv.top[1]} point`) && champ.endsWith('starter med næste runde.'), `${stTitle} | ${champ}`);
     const colForm = (await g.locator('#gazette #col-form p').allTextContents()).join(' | ');
     const [t0, p0, t1, p1] = sv.top;
-    const formOk = (t) => p0 !== 0 && t.includes(`${t0} er mester `) && t.includes(`${p0} point`)   /* v3.16.3: championText */ && !/fører med|står lige i toppen/.test(t);   // ved sæsonslut: mesteren, ikke "fører" (QC F9)
-    check('Sæsonslut: formen bygger på den AFSLUTTEDE sæsons tabel og forløb (ikke den nye sæsons nulstillede)', formOk(colForm), `${colForm} | forventet ${t0} ${p0}, ${t1} ${p1}`);
+    // v3.16.7: ved sæsonslut står mesteren i banneret og avisens sæsonboks – ikke en tredje gang i Formen; og aldrig "fører" (QC F9)
+    const formOk = (t) => p0 !== 0 && !t.includes('er mester') && !/fører med|står lige i toppen/.test(t);
+    check('Sæsonslut: Formen gentager ikke mesteren og siger ikke "fører" (den nye sæsons nulstillede tabel)', formOk(colForm), `${colForm} | mester ${t0} ${p0}, ${t1} ${p1}`);
     await tab('kamp');
     const kampNext = (await g.locator('#gazette #col-next p').allTextContents()).filter((t) => t.startsWith('Ny sæson: '));
-    check('Sæsonslut, Kamp-fanen: samme klumme (Ny sæson-linjen og tabellen)', kampNext.length === 1 && kampNext[0].includes(sv.opp) && formOk(await g.locator('#gazette #col-form').textContent()), kampNext.join(' | '));
+    check('Sæsonslut, Kamp-fanen: samme klumme (Ny sæson-linjen og tabellen)', kampNext.length === 1 && kampNext[0].includes(sv.opp) && formOk((await g.locator('#gazette #col-form p').allTextContents()).join(' | ')), kampNext.join(' | '));
     // Test Manager v3.16.3: mesterteksten følger den regel, der afgjorde det — på ALLE tre steder (klummen får champion fra app.js).
     // Et tilfældigt forløb afgøres sjældent på målforskel, så mesteren i det gemte spil sættes til en målforskels-afgørelse (samme point).
     const tie = await g.evaluate(() => {
@@ -840,8 +841,8 @@ try {
     });
     await g.reload(); await g.waitForSelector('body[data-klar="ja"]'); await tab('liga');
     const tieTxt = `${tie.first} er mester på målforskel – ${tie.myPos === 2 ? 'I' : `${tie.first} og ${tie.second}`} endte begge på ${tie.points} point`;
-    const tieCol = await g.textContent('#gazette #col-form'), tieBox = await g.textContent('#gazette #season-end'), tieTable = (await g.locator('#standings-champion').count()) ? await g.textContent('#standings-champion') : '';
-    check('Sæsonslut: afgjort på målforskel står der i klummen, avisens sæsonboks og slutstillingen (ens tekst alle tre steder)', tieCol.includes(`${tieTxt}.`) && tieBox.includes(`${tieTxt}.`) && tieTable.includes(`${tieTxt}.`), `${tieCol} | ${tieBox} | ${tieTable}`);
+    const tieCol = (await g.locator('#gazette #col-form p').allTextContents()).join(' | '), tieBox = await g.textContent('#gazette #season-end'), tieTable = (await g.locator('#standings-champion').count()) ? await g.textContent('#standings-champion') : '';
+    check('Sæsonslut: afgjort på målforskel står der i avisens sæsonboks og slutstillingen (ens tekst) – ikke en tredje gang i Formen (v3.16.7)', !tieCol.includes('er mester') && tieBox.includes(`${tieTxt}.`) && tieTable.includes(`${tieTxt}.`), `${tieCol} | ${tieBox} | ${tieTable}`);
   }
 
   // Ødelagt gemt spil: aldrig tom side, data bevaret i backup

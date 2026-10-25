@@ -142,7 +142,7 @@ test('samling i pausen: når en pause bruges, tages også en spiller med, der h�
     return subs(m).filter((e) => e.min === 3).map((e) => e.text);
   };
   const near = run(74.9), far = run(76);
-  assert.equal(near.length, 2); assert.match(near[1], /tages med i samme pause/);
+  assert.equal(near.length, 2); assert.match(near[1], /tages med i samme skifte-pause/);   // v3.16.7 (i 45': "tages med i pausen")
   assert.equal(far.length, 1);
 });
 

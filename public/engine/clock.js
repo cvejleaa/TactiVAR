@@ -53,7 +53,10 @@ export function assignClock(events, minClock = new Map()) {
       const w = b - a + 1;
       idx.forEach((i, j) => {
         const lo = Math.floor((j * w) / n), span = Math.max(1, Math.floor(((j + 1) * w) / n) - lo);
-        let m = Math.max(prev, a + lo + (hashOf(`${k}|${i}|${events[i].type}`) % span), minClock.get(i) ?? 0);
+        // Skift lige efter hinanden i tick'et er samme skifte-pause – samme minut (v3.16.7, Spilfører: "tages med i samme pause"
+        // stod ved 76', 76' og 77')
+        const samePause = j > 0 && events[i].type === 'SUB' && events[idx[j - 1]].type === 'SUB';
+        let m = samePause ? prev : Math.max(prev, a + lo + (hashOf(`${k}|${i}|${events[i].type}`) % span), minClock.get(i) ?? 0);
         prev = m;
         events[i].clock = asClock(h, m);
       });

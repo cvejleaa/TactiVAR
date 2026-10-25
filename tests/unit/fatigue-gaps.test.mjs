@@ -215,7 +215,7 @@ test('samlingen: er hovedskiftet umuligt, tages en tæt-på ikke med; lykkes ét
   assert.equal(at3(blocked(only)).length, 1, 'kun B får besked');
   const s = at3(subs(both));
   assert.equal(s.length, 2);
-  assert.match(s[0].text, /under din grænse 70 %/); assert.match(s[1].text, /tages med i samme pause/);
+  assert.match(s[0].text, /under din grænse 70 %/); assert.match(s[1].text, /tages med i samme skifte-pause/);
   assert.equal(at3(blocked(both)).length, 1, 'B får stadig sin besked; C (tæt på) aldrig');
 });
 // v3.15 (brugerens valg "spred skift"): højst 3 træthedsskift ad gangen – de trætteste først; den fjerde venter til

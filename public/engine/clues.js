@@ -33,10 +33,17 @@ export function describeFinish(finishing) {
   return 'et klodset forsøg, der på mirakuløs vis gled ind';
 }
 
-export function describeHeader(aerialPower) {
-  if (aerialPower >= 15) return 'en tårnhøj magtdemonstration i luftrummet';
-  if (aerialPower >= 11) return 'et kraftfuldt og veltimet hovedstød';
-  return 'et kluntet, men effektivt nik';
+// Tre varianter pr. bånd (v3.16.7, Spilfører: "tårnhøj magtdemonstration" 22 og "kraftfuldt og veltimet" 18 gange på en sæson) –
+// båndets betydning (scouting i ord) er den samme i alle tre; n vælges af kalderen (vary – intet rng).
+export const HEADER_PROSE = Object.freeze({
+  high: ['en tårnhøj magtdemonstration i luftrummet', 'et hovedstød fra en etage over alle andre', 'et nik, ingen i feltet kunne nå op til'],
+  mid: ['et kraftfuldt og veltimet hovedstød', 'et solidt og velplaceret nik', 'et hårdt hovedstød med god timing'],
+  low: ['et kluntet, men effektivt nik', 'et halvklodset nik, der alligevel gik ind', 'et skævt hovedstød, der fandt vej'],
+});
+export const headerBand = (aerialPower) => (aerialPower >= 15 ? HEADER_PROSE.high : aerialPower >= 11 ? HEADER_PROSE.mid : HEADER_PROSE.low);
+export function describeHeader(aerialPower, n = 0) {
+  const b = headerBand(aerialPower);
+  return b[n % b.length];
 }
 
 export function describeVarTiming(varPulse) {

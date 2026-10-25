@@ -7,7 +7,7 @@ import { livePositions, coupledPositions, kickoffPositions, apartFrom, ONSIDE_GA
 import { masteryVs, counterXpForMatch } from './counter.js';
 import { createSheet, finalizeSheet } from './ratings.js';
 import { assignClock } from './clock.js';
-import { describeFinish, describeHeader, describeVarTiming, describeGoal, goalSpectacle, pickBy, gen, pl } from './clues.js';
+import { describeFinish, headerBand, describeVarTiming, describeGoal, goalSpectacle, pickBy, gen, pl } from './clues.js';
 import { MATCH_RULES, CARD_RULES, FATIGUE_SUBS_AT_ONCE, BOT_SUBS, LIMP, MIN_PLAYERS, VAR_RULES, MISS_P, MISS_BLOCK_SHARE, MISS_CORNER_P } from './match-rules.js';
 import { TIRED_PER_POINT, SUBS_LIMIT, matchCost, REST_SHARE } from './freshness.js';
 
@@ -264,7 +264,8 @@ export function simulateMatch(home, away, rng, opts = {}) {
   const vary = (list, fam, id, advance = true) => {
     const k = `${fam}|${id}`, c = varyCount.get(k) ?? 0;
     if (advance) varyCount.set(k, c + 1);
-    return pickBy(list, c, fam, id);
+    // + runden (v3.16.7, QC): ellers fik samme spiller samme første variant i hver kamp hele sæsonen
+    return pickBy(list, c + (opts.round ?? 0), fam, id);
   };
   const minClock = new Map();   // hændelsens indeks → tidligste minut på uret (Hvis-Så – clock.js)
   const goalTexts = new Set();   // kampens brugte måltekster (describeGoal – ingen gentagelse i en kamp)
@@ -533,6 +534,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // Forbi (v3.15.1): en afslutning, keeperen ikke skal redde. Ét sted for alle afslutninger (åbent spil, kontra, hovedstød,
   // frispark). Ingen redning, intet skud på mål; en blokeret afslutning kan give hjørnespark (withCorner = false: kalderen giver selv hjørnet).
   // Returnerer om skuddet gik forbi.
+  const missUsed = new Set();
   const MISS_TXT = ['skyder forbi den lange stolpe', 'sender bolden over mål', 'rammer stolpen', 'skyder en meter forbi', 'får ikke ram på bolden – den triller forbi', 'banker bolden over overliggeren'];
   function missed(att, def, cR, dR, min, shooter, withCorner = true, how = 'afslutningen') {
     if (!rng.chance(MISS_P)) return false;
@@ -543,7 +545,11 @@ export function simulateMatch(home, away, rng, opts = {}) {
       if (withCorner && rng.chance(MISS_CORNER_P)) corner(att, def, cR, dR, min);
       return true;
     }
-    addEv(min, 'MISS', 'PLAY', att.isHome, false, 'Forbi', `🎯 [${att.team.name}] ${tag(shooter)} ${rng.pick(MISS_TXT)}.`);
+    // Samme ene rng-træk som rng.pick, men blandt de tekster, kampen ikke har brugt (v3.16.7, Spilfører: "rammer stolpen" 3 gange
+    // på 18 minutter); alle brugt → forfra. Listen er uændret (replay.js læser "stolpe"/"over" i teksten).
+    const r = rng.next(), free = MISS_TXT.filter((t) => !missUsed.has(t)), miss = free[Math.floor(r * free.length)];
+    missUsed.add(miss); if (missUsed.size === MISS_TXT.length) missUsed.clear();
+    addEv(min, 'MISS', 'PLAY', att.isHome, false, 'Forbi', `🎯 [${att.team.name}] ${tag(shooter)} ${miss}.`);
     return true;
   }
 
@@ -645,11 +651,13 @@ export function simulateMatch(home, away, rng, opts = {}) {
       if (assister && assister.id !== shooter.id) { sheet.adjust(assister.id, 0.55); sheet.bump(assister.id, 'assists'); }
       sheet.adjust(aDef.id, -0.35); sheet.adjust(gk.id, -0.25);
       bookKind(att, shooter, kind);
-      const prose = describeHeader(shooter.aerialPower);
+      const prose = vary(headerBand(shooter.aerialPower), 'head', shooter.id);
       observe(shooter, `Luftduel (mod ${def.team.name}): ${shooter.shortName} scorede med ${prose}.`);
       goalsPool.push({ scorer: tag(shooter), teamName: att.team.name, match: `${home.name} - ${away.name}`, min, kind, spectacle: goalSpectacle(kind, { aerialPower: shooter.aerialPower }, min, rng), desc: describeGoal(kind, tag(shooter), tag(assister ?? shooter), min, rng, goalTexts) });
       const how = setPiece ? `MÅÅÅL PÅ ${setPiece.toUpperCase()}! ${tag(assister)} slår ${setPiece}et ind, og ${tag(shooter)} (${shooter.heightCm} cm) header bolden ind – ${prose}.`
-        : `MÅÅÅL! ${tag(shooter)} (${shooter.heightCm} cm) header bolden ind – ${prose}.`;
+        // Oplægsgiveren nævnes, som Rundens mål gør (v3.16.7, Spilfører) – "oplæg", ikke "indlæg": en lang bold er ingen
+        // indlæg, og kilden må ikke røbe modstanderens stil (QC)
+        : `MÅÅÅL! ${tag(shooter)} (${shooter.heightCm} cm) header bolden ind efter oplæg fra ${tag(assister)} – ${prose}.`;
       addEv(min, 'HEADER_GOAL', 'HIGHLIGHT', att.isHome, true, `⚽ Hovedstødsmål: ${tag(shooter)}`, `⚽ [${att.team.name} • ${hG}-${aG}] ${how}${varOk}`);
       if (!setPiece) snapshot(att, shooter, assister, SPOT.CROSS, false, snapMoves);
       return 'goal';
@@ -954,7 +962,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
       }
       const f = Math.floor(c.f);   // rundet NED: 69,6 må ikke stå som "70 % – under din grænse 70 %"
       const text = own(side)
-        ? `🔄 [${side.team.name}] ${tag(c.p)} ud (træt, ${f} % – ${near ? 'tages med i samme pause' : `under din grænse ${limit} %`}) – ${tag(pick)} ind.`
+        ? `🔄 [${side.team.name}] ${tag(c.p)} ud (træt, ${f} % – ${near ? (min === 45 ? 'tages med i pausen' : 'tages med i samme skifte-pause') : `under din grænse ${limit} %`}) – ${tag(pick)} ind.`
         : `🔄 [${side.team.name}] ${tag(pick)} erstatter ${tag(c.p)}.`;
       const ok = !!substitute(side, c.i, min, 'Udskiftning', pick, text);
       if (ok && own(side)) events.at(-1).tactical = true;   // dit valg (grænsen) – med i "Kun taktik"
@@ -1078,7 +1086,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
         // Teksten er den samme, uanset om en stilbonus afgjorde duellen (ellers røbede ordvalget modstanderens stil).
         const text = own(att) ? `✅ [DIN OPBYGNING VIRKER] ${YOUR_PASS[pass]} bryder igennem ${gen(def.team.name)} pres.${note}`
           : own(def) ? `❌ [DIT PRES BRYDES] ${att.team.name} spiller sig igennem ${YOUR_PRESS[height]}.${note}`
-          : `✅ [FASE 1 VIRKER • ${att.team.name}] ${att.team.name} spiller sig igennem ${gen(def.team.name)} pres.${note}`;
+          : `✅ [FASE 1 VIRKER • ${att.team.name}] ${vary([`${att.team.name} spiller sig igennem ${gen(def.team.name)} pres.`, `${att.team.name} kommer forbi ${gen(def.team.name)} pres.`, `${gen(def.team.name)} pres bliver spillet over.`], 'fase1', att.team.id)}${note}`;
         addEv(min, 'TACTIC_WIN', 'TACTIC', att.isHome, false, 'Fase 1 virker', text);
         frame('build', who);
       } else {
@@ -1088,7 +1096,12 @@ export function simulateMatch(home, away, rng, opts = {}) {
         if (defPh.phase2_defending.offsideTrap !== 'OFF' && rng.chance(0.45)) {
           sheet.adjust(back.id, 0.4); sheet.adjust(striker.id, -0.25); sheet.bump(back.id, 'tacticWins');
           // Kun din egen offside-fælde navngives; hos modstandere er det blot en offside.
-          const offTxt = own(def) ? `✅ [DIN OFFSIDE-FÆLDE VIRKER] ${tag(striker)} (${att.team.name}) fanges. ${tag(back)} dirigerer linjen perfekt.`
+          // Det fulde banner første gang pr. halvleg, derefter en kort linje (v3.16.7, Spilfører: 399 banner-linjer på en sæson,
+          // "dirigerer linjen perfekt" 30 gange) – intet rng
+          const half = min <= 45 ? 1 : 2, shown = (def.trapShown ||= new Set()).has(half);
+          def.trapShown.add(half);
+          const offTxt = own(def) ? (shown ? `✅ [DIN OFFSIDE-FÆLDE] ${vary([`${tag(striker)} (${att.team.name}) fanget offside igen – ${tag(back)} holder linjen.`, `Offside igen: ${tag(striker)} (${att.team.name}) går for tidligt.`, `Linjen holder – ${tag(striker)} (${att.team.name}) står offside.`], 'trap', def.team.id)}`
+              : `✅ [DIN OFFSIDE-FÆLDE VIRKER] ${tag(striker)} (${att.team.name}) fanges. ${tag(back)} dirigerer linjen perfekt.`)
             : own(att) ? `❌ [DIN OPBYGNING STOPPES] ${tag(striker)} fanges offside.`
             : `🛑 [FASE 2 VIRKER • ${def.team.name}] ${tag(striker)} (${att.team.name}) fanges offside.`;
           addEv(min, 'TACTIC_FAIL', 'TACTIC', def.isHome, false, 'Offside-fælde virker', offTxt);
@@ -1298,7 +1311,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
     const off = Object.values(sheet.entries).filter((e) => e.teamId === meSide.team.id && e.minIn <= 1 && e.minOut < 90 && !e.injured && !e.red);
     // Efter restitutionen (41 % af det, der mangler) er gevinsten 59 % af den sparede pris (QC: ellers stod 12 for 7).
     const saved = Math.round((1 - REST_SHARE) * off.reduce((a, e) => a + matchCost(e.km90 * (90 - e.minOut) / 90, meSide.team.squad.find((p) => p.id === e.playerId)?.skills.stamina ?? 10), 0));
-    if (off.length && saved >= 1) addEv(90, 'INFO', 'TACTIC', meSide.isHome, false, 'Udskiftninger', `🔋 [${meSide.team.name}] ${off.length === 1 ? 'Din udskiftede spiller' : `Dine ${off.length} udskiftede spillere`} sparede ca. ${saved} point friskhed til næste runde.`);
+    if (off.length && saved >= 1) addEv(90, 'INFO', 'TACTIC', meSide.isHome, false, 'Udskiftninger', `🔋 [${meSide.team.name}] ${off.length === 1 ? 'Din udskiftede spiller' : `Dine ${off.length} udskiftede spillere`} sparede ca. ${saved} point friskhed til ${opts.lastOfSeason ? 'første runde i næste sæson' : 'næste runde'}.`);
   }
   // Dit holds egen kamprapport (v3.14, brugerens valg: klummen skal kunne bruge fuldtids-analysens tal): den
   // spillede taktik (start/slut) og dueltallene pr. menneskestyret side. Ejer-privat (visibility.js

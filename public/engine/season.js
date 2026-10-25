@@ -41,7 +41,9 @@ export function fixedPairs(league, opponentIdx) {
 // Spiller faste par – måleværktøjet og tests styrer selv parringen.
 export function playPairs(league, pairs, rng) {
   const round = (league.leagueMetadata.round || 0) + 1;
-  const matches = pairs.map(([h, a]) => simulateMatch(league.teams[h], league.teams[a], rng, { round }));
+  // lastOfSeason: friskheden følger med over sæsonskiftet – referatet siger "til første runde i næste sæson" (v3.16.7)
+  const lastOfSeason = seasonRoundOf(league, round) === SEASON_ROUNDS;
+  const matches = pairs.map(([h, a]) => simulateMatch(league.teams[h], league.teams[a], rng, { round, lastOfSeason }));
   // Hvert mål ved, hvilken kamp i runden det faldt i (avisen linker til referatet, v3.7.1).
   matches.forEach((m, i) => m.goalsPool.forEach((g) => { g.matchIdx = i; }));
   return { round, matches, gazette: buildGazette(matches, { positions: tableBefore(league, round), round }) };

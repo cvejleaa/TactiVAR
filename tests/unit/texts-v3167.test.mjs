@@ -61,3 +61,101 @@ test('opfølgning på "air": hovedstød efter dødbolde tæller med – "det hol
   assert.equal(fu([['CORNER', 'Ude'], ['COMBINATION', 'Ude'], ['LONGSHOT', 'Ude']], 3), `${pre} – det gjorde de ikke mod jer.`, '1 af 3 er ikke luft-holdet (QC F3)');
   assert.equal(fu([], 0), `${pre} – det gjorde de ikke mod jer.`);
 });
+
+// ---------- Gentagelser (T3 – tekst, intet rng; noprose uændret) ----------
+import { createRng } from '../../public/engine/rng.js';
+import { createLeague } from '../../public/engine/generator.js';
+import { simulateMatch } from '../../public/engine/match.js';
+import { HEADER_PROSE } from '../../public/engine/clues.js';
+const MISS_TXT = ['skyder forbi den lange stolpe', 'sender bolden over mål', 'rammer stolpen', 'skyder en meter forbi', 'får ikke ram på bolden – den triller forbi', 'banker bolden over overliggeren'];
+const corpus = (n, round = 0) => Array.from({ length: n }, (_, i) => {
+  const s = i + 1, L = createLeague(createRng(s * 97)), me = L.teams.find((t) => !t.isBot), opp = L.teams[(s % 7) + 1];
+  return s % 2 ? simulateMatch(me, opp, createRng(s * 131), { round }) : simulateMatch(opp, me, createRng(s * 131), { round });
+});
+const C = corpus(300);
+test('offside: det fulde banner "[DIN OFFSIDE-FÆLDE VIRKER] … dirigerer linjen perfekt" højst én gang pr. halvleg – resten den korte linje', () => {
+  let full = 0, short = 0;
+  for (const m of C) for (const half of [1, 2]) {
+    const ev = m.events.filter((e) => e.label === 'Offside-fælde virker' && e.text.startsWith('✅ [DIN OFFSIDE-FÆLDE') && (half === 1 ? e.min <= 45 : e.min > 45));
+    const f = ev.filter((e) => e.text.includes('dirigerer linjen perfekt'));
+    assert.ok(f.length <= 1, `${f.length} fulde i ${half}. halvleg`);
+    if (ev.length) assert.ok(ev[0].text.startsWith('✅ [DIN OFFSIDE-FÆLDE VIRKER]'), `første er det fulde: ${ev[0].text}`);
+    full += f.length; short += ev.length - f.length;
+  }
+  assert.ok(full >= 30 && short >= 30, `data: ${full} fulde, ${short} korte`);
+});
+test('hovedstød: båndets tre varianter, aldrig samme to gange i træk for samme spiller; dit/deres åbne spil nævner oplægsgiveren', () => {
+  const all = [...HEADER_PROSE.high, ...HEADER_PROSE.mid, ...HEADER_PROSE.low];
+  let goals = 0, named = 0; const seen = new Set();
+  for (const m of C) {
+    const last = new Map();
+    for (const e of m.events.filter((x) => x.type === 'HEADER_GOAL')) {
+      const pr = all.find((p) => e.text.includes(`– ${p}.`)); assert.ok(pr, e.text); seen.add(pr);
+      const who = e.text.match(/(#\d+ [^(]+?) \(\d+ cm\) header/)[1];
+      assert.notEqual(last.get(who), pr, `samme prosa to gange i træk: ${who}`); last.set(who, pr);
+      goals++;
+      if (/MÅÅÅL! /.test(e.text)) { assert.match(e.text, /header bolden ind efter oplæg fra #\d+ .+ – /); named++; }
+    }
+  }
+  assert.ok(goals >= 100 && named >= 30 && seen.size >= 6, `data: ${goals} hovedstødsmål, ${named} i åbent spil, ${seen.size} forskellige prosa`);
+});
+test('forbi mål: samme "🎯"-tekst gentages ikke i en kamp, før alle seks er brugt', () => {
+  let n = 0, rounds = 0;
+  for (const m of C) {
+    const used = new Set();
+    for (const e of m.events.filter((x) => x.type === 'MISS' && x.text.startsWith('🎯'))) {
+      const t = MISS_TXT.find((x) => e.text.endsWith(` ${x}.`)); assert.ok(t, e.text);
+      assert.ok(!used.has(t), `gentaget før alle var brugt: ${t}`); used.add(t); n++;
+      if (used.size === MISS_TXT.length) { used.clear(); rounds++; }
+    }
+  }
+  assert.ok(n >= 250, `data: ${n} forbi-linjer`);   // ≈1 pr. kamp – "alle seks brugt" bevises i engine-branches (tvunget)
+});
+test('vary + runden: samme kamp i to forskellige runder giver (for nogle aktører) en anden første variant – og samme kamp', () => {
+  const a = corpus(40, 0), b = corpus(40, 1);
+  let diff = 0;
+  a.forEach((m, i) => {
+    assert.equal(`${m.homeGoals}-${m.awayGoals}`, `${b[i].homeGoals}-${b[i].awayGoals}`, 'runden ændrer ikke kampen');
+    const t = (x) => x.events.filter((e) => e.type === 'TACTIC_WIN').map((e) => e.text).join('|');
+    if (t(m) !== t(b[i])) diff++;
+  });
+  assert.ok(diff >= 20, `data: ${diff} af 40 kampe med andre varianter`);
+});
+
+// ---------- Skift i samme pause (T4) og friskheden ved sæsonslut ----------
+import { playRound, commitRound } from '../../public/engine/season.js';
+const seasonMatches = (() => {
+  const out = [];
+  for (const seed of [3, 7]) {
+    const rng = createRng(seed * 7919), L = createLeague(rng);
+    for (let r = 0; r < 10; r++) { const res = playRound(L, rng); out.push(...res.matches); commitRound(L, res, rng); }
+  }
+  return out;
+})();
+test('skift lige efter hinanden i samme tick står på samme minut; "tages med i pausen" i 45\', ellers "i samme skifte-pause"', () => {
+  let pairs = 0, near45 = 0, nearOther = 0;
+  for (const m of seasonMatches) {
+    m.events.forEach((e, i) => {
+      const p = m.events[i - 1];
+      if (e.type === 'SUB' && p?.type === 'SUB' && p.min === e.min) { assert.deepEqual(e.clock, p.clock, `${e.min}: ${JSON.stringify(p.clock)} / ${JSON.stringify(e.clock)}`); pairs++; }
+      if (e.type === 'SUB' && /tages med i/.test(e.text)) {
+        if (e.min === 45) { assert.match(e.text, /tages med i pausen/); near45++; } else { assert.match(e.text, /tages med i samme skifte-pause/); nearOther++; }
+      }
+    });
+  }
+  assert.ok(pairs >= 20 && near45 + nearOther >= 3, `data: ${pairs} skift i samme tick, ${near45} samlet i pausen, ${nearOther} ellers`);
+});
+test('friskheden: "… til næste runde" – i sæsonens sidste runde "… til første runde i næste sæson" (friskheden følger med)', () => {
+  let mid = 0, last = 0;
+  for (const seed of [3, 5, 7, 11]) {
+    const rng = createRng(seed * 7919), L = createLeague(rng);
+    for (let r = 1; r <= 14; r++) {
+      const res = playRound(L, rng);
+      for (const e of res.matches.flatMap((m) => m.events).filter((x) => x.label === 'Udskiftninger' && x.text.startsWith('🔋'))) {
+        if (r === 14) { assert.match(e.text, /friskhed til første runde i næste sæson\.$/); last++; } else { assert.match(e.text, /friskhed til næste runde\.$/); mid++; }
+      }
+      commitRound(L, res, rng);
+    }
+  }
+  assert.ok(mid >= 10 && last >= 1, `data: ${mid} midt i sæsonen, ${last} i sidste runde`);
+});

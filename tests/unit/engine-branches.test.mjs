@@ -648,7 +648,8 @@ test('referatet navngiver hver af dine pasningsstile og presshøjder rigtigt –
   for (const p of mids(o.A)) p.skills.passing = 11;
   for (const p of mids(o.H)) p.skills.intercepting = 20;
   const ot = simulateMatch(o.H, o.A, stubRng({ 0.48: true, 0.45: true })).events.filter((e) => e.label === 'Offside-fælde virker').map((e) => e.text);
-  assert.ok(ot.length === 30 && ot.every((x) => x.startsWith('✅ [DIN OFFSIDE-FÆLDE VIRKER]')), ot[0]);
+  // v3.16.7: det fulde banner første gang pr. halvleg, ellers den korte "[DIN OFFSIDE-FÆLDE]"-linje
+  assert.ok(ot.length === 30 && ot.filter((x) => x.startsWith('✅ [DIN OFFSIDE-FÆLDE VIRKER]')).length === 2 && ot.every((x) => x.startsWith('✅ [DIN OFFSIDE-FÆLDE')), ot.join(' | '));
   const { L } = arena();
   for (const t of [L.teams[2], L.teams[3]]) { t.tactics.phases.phase2_defending.offsideTrap = 'NORMAL'; for (const p of t.squad) p.skills.intercepting = 20; }
   const bt = simulateMatch(L.teams[2], L.teams[3], stubRng({ 0.48: true, 0.45: true })).events.filter((e) => e.label === 'Offside-fælde virker').map((e) => e.text);
@@ -2634,4 +2635,11 @@ test('modstanderens løbs-cutback (TM v3.16.6): hele linjen er "↩️ [hold] #N
     }
   }
   assert.ok(seen >= 100, `data: ${seen} linjer`);
+});
+test('forbi mål (v3.16.7): 30 skud forbi i én kamp – hver tekst én gang pr. omgang af seks, så forfra (ingen tom liste)', () => {
+  const g = sp({ script: { 0.3: true, 0.62: true } , gk: 30 });   // skud i hvert tick, alle reddes/forbi; MISS_P sand, MISS_BLOCK_SHARE falsk
+  const miss = g.m.events.filter((e) => e.type === 'MISS' && e.text.startsWith('🎯')).map((e) => e.text.replace(/^🎯 \[.+?\] #\d+ \S+ /, ''));
+  assert.ok(miss.length >= 18, `data: ${miss.length} forbi`);
+  for (let i = 0; i + 6 <= miss.length; i += 6) assert.equal(new Set(miss.slice(i, i + 6)).size, 6, `omgang ${i / 6}: ${miss.slice(i, i + 6).join(' | ')}`);
+  assert.ok(miss.every((t) => t && t !== 'undefined.'), 'aldrig en tom tekst');
 });
