@@ -2533,15 +2533,35 @@ test('haltende: hans evner tæller LIMP.factor (0,6) – alle ti markspillere ha
   assert.equal(g.m.homeGoals, 0, 'alle reddet');
   assert.ok(pens.every((e) => e.text.includes(`redder fra ${tg(slot(g.a.H, 10))}`) && !/halter/.test(e.text)), pens[0]?.text);
 });
-test('haltende: direkte frispark – "#X halter – #Y tager frisparket."; frisparksindlæg – han er ikke hovedstødsspiller, selv om han er bedst i luften', () => {
+test('haltende: direkte frispark – "#X halter, så #Y tager frisparket"; frisparksindlæg – han er ikke hovedstødsspiller, selv om han er bedst i luften', () => {
   const t = (a) => { noBench(a); slot(a.H, 1).skills.finishing = 15; slot(a.H, 10).skills.finishing = 12; };
   const shot = sp({ script: { ...limpFirst, 0.061: true, 0.37: true }, tweak: t });
   const lim = slot(shot.a.H, 1), next = slot(shot.a.H, 10);
   const fks = shot.m.events.filter((e) => /FRISPARKSMÅL|redder .+ frispark/.test(e.text));
   assert.ok(fks.length >= 25, `data: ${fks.length} direkte frispark`);
-  for (const e of fks) assert.ok(e.text.includes(`${tg(lim)} halter – ${tg(next)} tager frisparket. `), e.text);
+  for (const e of fks) assert.ok(e.text.includes(`${tg(lim)} halter, så ${tg(next)} tager frisparket`), e.text);
   const cross = sp({ script: { ...limpFirst, 0.061: true }, tweak: (a) => { noBench(a); slot(a.H, 1).aerialPower = 25; slot(a.H, 3).aerialPower = 20; } });
   assert.ok(cross.kinds.filter((k) => k === 'SETPIECE').length >= 20, `data: ${cross.kinds.length} indlægsmål`);
   assert.equal(rOf(cross.m, 'home', cross.a.H, 1).headerGoals, 0, 'den haltende (bedst i luften) header ikke');
   assert.ok(rOf(cross.m, 'home', cross.a.H, 3).headerGoals >= 20, 'den næstbedste i luften tager dem');
+});
+test('pauseskift for den haltende: den friskeste i kæden, der IKKE er sat til en Hvis-Så-regel, og aldrig en reservemålmand', () => {
+  // Tre Hvis-Så-skift (3', 6', 9') bruger de tre pauser; skaden i 12' (plads 1, forsvar) kan derfor ikke skiftes → han halter.
+  // I pausen (gratis): bænkens forsvarsspillere – den første er sat til en regel i 80', den anden er 70 % frisk.
+  const run = (reserveFirst) => {
+    const a = arena();
+    const bench = a.H.squad.filter((p) => !a.H.tactics.lineupSlots.includes(p.id));
+    const defs = bench.filter((p) => p.line === 'DEF'), others = bench.filter((p) => p.line !== 'DEF' && p.line !== 'GK').slice(0, 3);
+    defs.forEach((p, i) => { p.freshness = i === 0 ? 100 : 70; });
+    const R = (i, min, out, inP) => ({ ruleId: i, minuteTrigger: min, condition: 'ANY', margin: 1, newFormation: '4-4-2', newPlan: null, slotRemapping: [...Array(11).keys()], action: 'SUB', subOut: out.id, subIn: inP.id });
+    a.H.tactics.conditionalRules = [R(1, 3, slot(a.H, 5), others[0]), R(2, 6, slot(a.H, 6), others[1]), R(3, 9, slot(a.H, 7), others[2]),
+      ...(reserveFirst ? [R(4, 80, slot(a.H, 2), defs[0])] : [])];
+    const m = simulateMatch(a.H, a.A, stubRng({ 0.06: (n) => n === 3, 0.5: (n) => n === 0, 0.4: (n) => n === 0 }));
+    return { a, defs, m, sub: m.events.find((e) => e.type === 'SUB' && e.min === 45 && /Pauseskift for den haltende/.test(e.text)) };
+  };
+  const r = run(true), f = run(false);
+  assert.ok(r.defs.length >= 2, 'data: to forsvarsspillere på bænken');
+  assert.ok(r.m.events.some((e) => e.min === 12 && /Ingen indskiftning/.test(e.text)), 'data: han halter fra 12\'');
+  assert.ok(r.sub && r.sub.label === `🔄 ${tg(r.defs[1])} ind for ${tg(slot(r.a.H, 1))}`, `reserveret springes over: ${r.sub?.label}`);
+  assert.ok(f.sub && f.sub.label === `🔄 ${tg(f.defs[0])} ind for ${tg(slot(f.a.H, 1))}`, `ellers den friskeste (100 > 70): ${f.sub?.label}`);
 });

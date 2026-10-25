@@ -811,7 +811,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
     st[k(att, 'FreeKicks')]++;
     if (rng.chance(FK_SHOT_P)) {
       const taker = best(fit(outfield(cR)), (p) => p.skills.finishing + p.skills.passing);
-      const skipped = best(outfield(cR), (p) => p.skills.finishing + p.skills.passing), halt = skipped !== taker ? `${tag(skipped)} halter – ${tag(taker)} tager frisparket. ` : '';
+      const skipped = best(outfield(cR), (p) => p.skills.finishing + p.skills.passing), halt = skipped !== taker ? `${tag(skipped)} halter, så ${tag(taker)} tager frisparket` : '';
       st[k(att, 'Shots')]++; st[k(att, 'Xg')] += 0.07;
       if (taker.skills.finishing * ff(taker) + rng.next() * 8 > gk.skills.goalkeeping * ff(gk) + rng.next() * 8 + FK_SHOT_EDGE) {
         goalFor(att);
@@ -819,11 +819,11 @@ export function simulateMatch(home, away, rng, opts = {}) {
         bookKind(att, taker, 'FREEKICK');
         const desc = describeGoal('FREEKICK', tag(taker), tag(taker), min, rng, goalTexts);
         goalsPool.push({ scorer: tag(taker), teamName: att.team.name, match: `${home.name} - ${away.name}`, min, kind: 'FREEKICK', spectacle: goalSpectacle('FREEKICK', { finishing: taker.skills.finishing }, min, rng), desc });
-        addEv(min, 'GOAL', 'HIGHLIGHT', att.isHome, true, `⚽ Frisparksmål: ${tag(taker)}`, `⚽ [${att.team.name} • ${hG}-${aG}] FRISPARKSMÅL! Frispark efter ${gen(tag(fouler))} (${def.team.name}) forseelse – ${halt}${desc}`);
+        addEv(min, 'GOAL', 'HIGHLIGHT', att.isHome, true, `⚽ Frisparksmål: ${tag(taker)}`, `⚽ [${att.team.name} • ${hG}-${aG}] FRISPARKSMÅL! Frispark efter ${gen(tag(fouler))} (${def.team.name}) forseelse${halt ? `. ${halt}` : ''} – ${desc}`);
       } else if (!missed(att, def, cR, dR, min, taker, false, 'frisparket')) {
         st[k(att, 'OnTarget')]++;
         sheet.adjust(gk.id, 0.4); sheet.bump(gk.id, 'saves');
-        addEv(min, 'SAVE', 'PLAY', def.isHome, false, 'Frispark reddet', `🧤 [${def.team.name}] ${halt}${tag(gk)} redder ${gen(tag(taker))} frispark (${att.team.name}) fra kanten af feltet.`);
+        addEv(min, 'SAVE', 'PLAY', def.isHome, false, 'Frispark reddet', `🧤 [${def.team.name}] ${tag(gk)} redder ${gen(tag(taker))} frispark (${att.team.name}) fra kanten af feltet.${halt ? ` (${att.team.name}: ${halt}.)` : ''}`);
       }
       return;
     }
@@ -1011,7 +1011,14 @@ export function simulateMatch(home, away, rng, opts = {}) {
       addEv(min, 'HALFTIME', 'TACTIC', true, false, 'Pause-analyse', `⏸️ [PAUSE-ANALYSE] Stillingen er ${hG}-${aG}. ${home.name} har haft ${hp}% af bolden. ${leader.name} har vundet flest taktiske dueller (${Math.max(st.hTacticSuccess, st.aTacticSuccess)}).${yours}`);
     }
     // I pausen skiftes en haltende ud, hvis der er et skift tilbage (pausen koster ingen skifte-pause) – v3.16.6
-    if (min === 45) for (const side of [H, A]) side.starters.forEach((p, slot) => { if (slot > 0 && limping(p)) substitute(side, slot, min, 'Pauseskift for den haltende'); });
+    if (min === 45) for (const side of [H, A]) side.starters.forEach((p, slot) => {
+      if (slot === 0 || !limping(p)) return;
+      // Som træthedsskiftet: den friskeste i kæden, der ikke er sat til en Hvis-Så-regel – ellers en anden markspiller (QC)
+      const reserved = new Set(side.tactics.conditionalRules.filter((r) => r.action === 'SUB' && !r.used).map((r) => r.subIn));
+      const free = side.benchAvailable().filter((b) => !reserved.has(b.id) && b.line !== 'GK').sort((a, b) => (b.freshness ?? 100) - (a.freshness ?? 100));
+      const pick = free.find((b) => b.line === p.line) ?? free[0];
+      if (pick) substitute(side, slot, min, 'Pauseskift for den haltende', pick);
+    });
     checkTriggers(H, min); checkTriggers(A, min);
     fatigueSubs(H, min); fatigueSubs(A, min);
 

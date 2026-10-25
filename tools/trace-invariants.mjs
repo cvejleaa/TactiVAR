@@ -21,7 +21,7 @@ export function checkTrace(m) {
   const tagOf = (e) => `#${e.shirtNumber} ${e.shortName}`;
   // Skiftene fra referatets 🔄-mærke "X ind for Y" pr. hold. Træthedsskift og Hvis-Så sker i starten af tick'et, før
   // billedet; et skadesskift sker midt i tick'et, efter billedet (et halvt minut senere her). Den haltende (skadet uden
-  // indskiftning) har minOut, men står på banen til slut.
+  // indskiftning) står på banen (fra v3.16.6 uden minOut) – til slut eller til pauseskiftet i starten af 45'-tick'et.
   const inAt = { h: new Map(), a: new Map() }, outAt = { h: new Map(), a: new Map() };
   for (const e of m.events.filter((x) => x.type === 'SUB')) {
     const [sub, out] = e.label.replace(/^🔄 /, '').split(' ind for '), side = e.isHome ? 'h' : 'a', t = e.min + (/Skadesskift/.test(e.text) ? 0.5 : 0);

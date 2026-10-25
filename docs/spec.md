@@ -481,16 +481,18 @@ Fra Spilførerens sæsongennemgange; kampene ændres (fingeraftrykket bumpet bev
 - **Oplæg** (`helperFor`): oplægsgiveren er aldrig målscoreren selv – er kandidaten skytten (eller ingen), tages holdets
   bedste afleverer blandt de andre markspillere (intet rng). Gælder kontra, afslutning og luftduel. `tools/measure-assist.mjs`.
 - **Frispark** (`tickFoul`): et frispark i samme tick som et kort/en skade-tackling for samme hold er den forseelse – samme
-  spiller i referatet, talt én gang (frispark begået 20,72 → 20,49 pr. kamp).
+  spiller i referatet, talt én gang (frispark begået 20,72 → 20,49 pr. kamp, `node tools/measure-fouls.mjs`).
 - **Cutback**: modstanderens løbs-cutback står i referatet (neutralt, §3), så "Dit felt: cutbacks stoppet x af y" = linjerne.
 - **Skade før rotation** (`prepareSide`): en skadet erstattes af den friskeste i kæden FØR botternes rotation; en hvilet
   spiller forbliver brugt (kommer ikke ind i kampen, heller ikke ved skade).
 - **Botternes skift** (`BOT_SUBS`, match-rules.js): træthedsskift først fra pausen (45'), og indtil 75' holdes ét skift og
   én skifte-pause tilbage til en skade. Dit hold følger kun din grænse. Bot-skift før pausen 11,1 % → 0 %.
-- **Haltende** (`LIMP`): en skadet uden indskiftning bliver på banen (intet udminut) med evnerne × 0,6, løber ikke fri og
+- **Haltende** (`LIMP`): en skadet uden indskiftning bliver på banen (intet udminut) med evnerne × 0,6 i duellerne (`ff` –
+  besiddelse og modtagervalg bruger de rå evner), løber ikke fri og
   tager ingen dødbolde; referatet: "X halter – Y tager straffen/frisparket". I pausen skiftes han ud, hvis der er et skift
-  tilbage ("Pauseskift for den haltende"). At halte koster mindre end et rødt kort (målforskel −0,10 mod −0,67,
-  `tools/measure-limp.mjs`). En lavere modtagervægt blev målt uden effekt og droppet.
+  tilbage ("Pauseskift for den haltende" – automatisk, også for dit hold, og det bruger et af dine skift; den friskeste i
+  kæden, der ikke er sat til en Hvis-Så-regel). At halte koster mindre end et rødt kort (målforskel −0,10 mod −0,67,
+  `tools/measure-limp.mjs` – uden bænk, så han halter hele kampen: en øvre grænse). En lavere modtagervægt blev målt uden effekt og droppet.
 - **Bevidst ikke**: langskudsandelen i dine kampe (33 % i en sæson) er taktikken "Centralt" og en uheldig sæson, ikke en
   fejl (9,3 % mod 7,5 % over 300 sæsoner; med en bots taktik 5,6 %). Unikke navne på tværs af hold kommer i en egen udgivelse
   (kun nye ligaer).
