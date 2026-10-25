@@ -449,7 +449,7 @@ export function measureBuild(N = 400) {
   return { pRun: p('run'), pStop: p('stop'), pNone: p('none'), lift: p('run') / p('none'), xgRun: p('run', 2), xgNone: p('none', 2), xgLift: p('run', 2) / p('none', 2),
     bigRun: p('run', 3), bigNone: p('none', 3), bigLift: p('run', 3) / p('none', 3), corr: cov / Math.sqrt(vx * vy), weak, weakWinShare: weak ? weakWins / weak : 0 };
 }
-// FASE-linjer i kampe uden dit hold (bot mod bot) pr. kamp
+// FASE-linjer i referatet i kampe uden dit hold (bot mod bot) pr. kamp
 export function measureFaseLines(N = 400) {
   let lines = 0, games = 0;
   for (let s = 1; s <= N; s++) {
@@ -457,7 +457,7 @@ export function measureFaseLines(N = 400) {
     const H = L.teams[s % 8], A = L.teams[(s + 3) % 8];
     if (!H.isBot || !A.isBot) continue;
     const m = simulateMatch(H, A, createRng(s * 31));
-    games++; lines += m.events.filter((e) => /^\S+ \[FASE /.test(e.text ?? '')).length;
+    games++; lines += m.events.filter((e) => !e.quiet && /^\S+ \[FASE /.test(e.text ?? '')).length;   // de viste (quiet står kun i data)
   }
   return { perMatch: lines / Math.max(1, games), games };
 }

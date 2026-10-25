@@ -227,16 +227,18 @@ test('ejefald i referatet: med navne på -s står der aldrig "…ss" – frispar
   assert.ok(n(/\[FASE 1 VIRKER • .+\] .+ spiller sig igennem .+s' pres\./) >= 500, 'bot mod bot: opbygning virker');
   assert.ok(n(/\[DIN OPBYGNING VIRKER\] .+ bryder igennem .+s' pres\./) >= 300, 'din opbygning virker');
 });
-test('begge holdnavne: den neutrale "FASE 1 STOPPER MOD FASE 2" nævner presserens OG boldholderens hold (to spillere med samme nummer kan ikke forveksles)', () => {
+// v3.17.0: "[FASE 1 STOPPER MOD FASE 2]" → holdmærket som de andre ("[FASE 2 VIRKER • presserens hold]"), boldholderens hold i parentes
+test('begge holdnavne: den neutrale pres-linje "[FASE 2 VIRKER • hold] … erobrer bolden fra … (hold)" nævner presserens OG boldholderens hold (to spillere med samme nummer kan ikke forveksles)', () => {
   let n = 0;
   for (const m of SM) {
     const side = (home) => (home ? m.ratings.home : m.ratings.away);
-    for (const e of m.events.filter((x) => x.text.startsWith('🛑 [FASE 1 STOPPER MOD FASE 2] '))) {
-      const t = e.text.match(/^🛑 \[FASE 1 STOPPER MOD FASE 2\] (#\d+ .+?) \((.+?)\) erobrer bolden fra (#\d+ .+?) \((.+?)\)\.$/);
+    assert.ok(!m.events.some((x) => x.text.includes('FASE 1 STOPPER MOD FASE 2')), 'den gamle linje uden holdmærke');
+    for (const e of m.events.filter((x) => x.text.startsWith('🛑 [FASE 2 VIRKER • ') && x.text.includes(' erobrer bolden fra '))) {
+      const t = e.text.match(/^🛑 \[FASE 2 VIRKER • (.+?)\] (#\d+ .+?) erobrer bolden fra (#\d+ .+?) \((.+?)\)\.$/);
       assert.ok(t, e.text);
       const [defName, attName] = e.isHome ? [m.homeName, m.awayName] : [m.awayName, m.homeName];
-      assert.deepEqual([t[2], t[4]], [defName, attName], e.text);
-      assert.ok(side(e.isHome).some((r) => `#${r.shirtNumber} ${r.shortName}` === t[1]) && side(!e.isHome).some((r) => `#${r.shirtNumber} ${r.shortName}` === t[3]), 'presseren er forsvarets, boldholderen angrebets');
+      assert.deepEqual([t[1], t[4]], [defName, attName], e.text);
+      assert.ok(side(e.isHome).some((r) => `#${r.shirtNumber} ${r.shortName}` === t[2]) && side(!e.isHome).some((r) => `#${r.shirtNumber} ${r.shortName}` === t[3]), 'presseren er forsvarets, boldholderen angrebets');
       n++;
     }
   }

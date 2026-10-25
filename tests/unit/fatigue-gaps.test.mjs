@@ -236,7 +236,7 @@ test('samlingen: højst 3 ad gangen – de trætteste først, den fjerde venter 
   assert.ok(first.every((e) => /under din grænse/.test(e.text) && !/tages med/.test(e.text)), 'ingen tæt-på, når loftet er nået');
   const wait = at3(blocked(m));
   assert.equal(wait.length, 1);
-  assert.match(wait[0].text, new RegExp(`${tag(waiting)} .*højst 3 træthedsskift ad gangen – han venter til næste skift\\.$`));
+  assert.match(wait[0].text, new RegExp(`${tag(waiting)} .*højst 3 træthedsskift ad gangen – han må vente til en senere skifte-pause \\(2 skift tilbage\\)\\.$`));
   const next = subs(m).filter((e) => e.min === 6);
   assert.equal(next.length, 2, next.map((e) => e.text).join(' | '));
   assert.ok(next[0].text.includes(`${tag(waiting)} ud`) && next[1].text.includes(`${tag(slot(H, 10))} ud`) && /tages med/.test(next[1].text), next.map((e) => e.text).join(' | '));

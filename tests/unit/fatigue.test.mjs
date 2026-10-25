@@ -118,8 +118,8 @@ test('højst MATCH_RULES.maxSubs (5) skift – højst 3 ad gangen (v3.15); dit h
   // v3.15: højst 3 ad gangen – 3 i 3. minut, de 2 sidste i næste tick (to pauser)
   assert.deepEqual(s.map((e) => e.min), [3, 3, 3, 6, 6]);
   const why = m.events.filter((e) => e.label === 'Udskiftning ikke mulig' && e.isHome);
-  assert.ok(why.some((e) => /højst 3 træthedsskift ad gangen – han venter til næste skift\.$/.test(e.text)), 'besked om loftet');
-  assert.ok(why.length >= 1 && why.every((e) => /er under din udskiftningsgrænse \(\d+ % – grænse 80 %\), men (alle 5 udskiftninger er brugt|der er ingen frisk \w+ på bænken|højst 3 træthedsskift ad gangen – han venter til næste skift)\.$/.test(e.text)), why.map((e) => e.text).join(' | '));
+  assert.ok(why.some((e) => /højst 3 træthedsskift ad gangen – han må vente til en senere skifte-pause \(\d skift tilbage\)\.$/.test(e.text)), 'besked om loftet');
+  assert.ok(why.length >= 1 && why.every((e) => /er under din udskiftningsgrænse \(\d+ % – grænse 80 %\), men (alle 5 udskiftninger er brugt|der er ingen frisk \w+ på bænken|højst 3 træthedsskift ad gangen – (han må vente til en senere skifte-pause \(\d skift tilbage\)|og alle \d (udskiftninger|skifte-pauser) er brugt))\.$/.test(e.text)), why.map((e) => e.text).join(' | '));
 });
 test('pauserne binder: fire trætte i hver sit tick – 3 pauser bruges, den fjerde får besked om pauserne', () => {
   // STA 1, tab pr. min: CM 0,278, CB 0,224, ST 0,236. CM 71 → 6'; CB 78 → 39'; CM 87 → 63'; ST 90 → 87' (i 90' skiftes ikke). Ved hver

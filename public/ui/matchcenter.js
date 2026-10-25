@@ -20,7 +20,16 @@ export const REPORT_FILTERS = [['all', 'Alle hændelser'], ['tactic', 'Kun takti
 const KEY_TYPES = new Set(['GOAL', 'HEADER_GOAL', 'VAR_GOAL', 'VAR_NO_GOAL', 'VAR_CHECK', 'VAR_PEN', 'VAR_NO_PEN', 'VAR_RED', 'VAR_NO_RED', 'RED', 'INJURY', 'SUB', 'TRIGGER', 'END', 'HALFTIME', 'FULLTIME']);
 const ICON = { GOAL: '⚽', HEADER_GOAL: '⚽', VAR_GOAL: '📺', VAR_NO_GOAL: '📺', VAR_CHECK: '📺', VAR_PEN: '📺', VAR_NO_PEN: '📺', VAR_RED: '📺', VAR_NO_RED: '📺', INJURY: '🚑', SUB: '🔄', TRIGGER: '📋', FOUL: '🟨', RED: '🟥', OFFSIDE_FLAG: '🚩' };
 
+// Rundens mål uden dobbelt etiket (v3.17.0, Spilfører: "Rundens mål (Kontra): Kontra: bolden blev …"): starter teksten med en
+// kort indledning før kolon, der nævner typen, fjernes den – typen står allerede i parentesen
+export function goalDesc(goal) {
+  const label = GOAL_KIND_LABEL[goal.kind]?.toLowerCase(), i = goal.desc.indexOf(': ');
+  if (!label || i < 0 || i > 25 || !goal.desc.slice(0, i).toLowerCase().includes(label)) return goal.desc;
+  const rest = goal.desc.slice(i + 2);
+  return rest.charAt(0).toUpperCase() + rest.slice(1);
+}
 export function filterEvents(events, filter) {
+  events = events.filter((e) => !e.quiet);   // v3.17.0: botternes gentagne FASE-linjer (quiet) står i data, ikke i referatet
   if (filter === 'tactic') return events.filter((e) => e.category === 'TACTIC' || e.type === 'TRIGGER' || e.tactical);   // v3.13: dine træthedsskift og Hvis-Så-skift
   if (filter === 'key') return events.filter((e) => KEY_TYPES.has(e.type));
   return events;
@@ -177,7 +186,7 @@ export function renderGazette(g, myTeamId, onOpenMatch = null, matches = null, c
     h('p', {}, `Runden bød på ${g.totalGoals} ${g.totalGoals === 1 ? 'scoring' : 'scoringer'} og ${g.totalVarChecks} VAR-tjek på tværs af de 4 stadions. ${g.myResult}`),
     pr ? h('p', { id: 'player-of-round' }, h('strong', { title: 'Bedste karakter i runden' }, '🏆 Rundens spiller: '), `#${pr.shirtNumber} ${pr.shortName} (${pr.teamName}) – `, 'rating' in pr ? `karakter ${dec(pr.rating, 1)}` : 'rundens bedste karakter', feats ? ` • ${feats}` : '') : null,
     g.headlines?.length ? h('ul', { class: 'headlines', id: 'headlines' }, g.headlines.map((x) => h('li', {}, x))) : null,
-    g.goalOfTheRound ? h('p', { id: 'goal-of-round' }, h('strong', {}, '🚀 Rundens mål'), GOAL_KIND_LABEL[g.goalOfTheRound.kind] ? ` (${GOAL_KIND_LABEL[g.goalOfTheRound.kind]})` : '', h('strong', {}, ': '), g.goalOfTheRound.desc,
+    g.goalOfTheRound ? h('p', { id: 'goal-of-round' }, h('strong', {}, '🚀 Rundens mål'), GOAL_KIND_LABEL[g.goalOfTheRound.kind] ? ` (${GOAL_KIND_LABEL[g.goalOfTheRound.kind]})` : '', h('strong', {}, ': '), goalDesc(g.goalOfTheRound),
       // Hvilken kamp – som link til referatet, når runden ved det (fra v3.7.1).
       g.goalOfTheRound.match ? ' ' : null,
       g.goalOfTheRound.match ? (onOpenMatch && goalIdx >= 0
@@ -206,7 +215,7 @@ function renderColumn(g, myTeamId, onOpenMatch, matches, col, onOpenReport) {
         onOpenReport ? h('button', { class: 'linklike col-match', title: 'Åbn referatet', onclick: () => onOpenReport(o.idx) }, h('strong', {}, o.head)) : h('strong', {}, o.head), o.note ? (o.head.includes(' – ') ? `. ${o.note[0].toUpperCase()}${o.note.slice(1)}` : ` – ${o.note}`) : ''))));   // ingen tankestreg-kæde (Spilfører v3.16.6)
       if (s.id === 'col-stars') return sec(s,
         pr ? h('p', { id: 'player-of-round' }, h('strong', { title: 'Bedste karakter i runden' }, '🏆 Rundens spiller: '), `#${pr.shirtNumber} ${pr.shortName} (${pr.teamName}) – `, 'rating' in pr ? `karakter ${dec(pr.rating, 1)}` : 'rundens bedste karakter', s.player?.why ? ` • ${s.player.why}` : '') : null,
-        goal ? h('p', { id: 'goal-of-round' }, h('strong', {}, '🚀 Rundens mål'), GOAL_KIND_LABEL[goal.kind] ? ` (${GOAL_KIND_LABEL[goal.kind]})` : '', h('strong', {}, ': '), goal.desc,
+        goal ? h('p', { id: 'goal-of-round' }, h('strong', {}, '🚀 Rundens mål'), GOAL_KIND_LABEL[goal.kind] ? ` (${GOAL_KIND_LABEL[goal.kind]})` : '', h('strong', {}, ': '), goalDesc(goal),
           goal.match ? ' ' : null,
           goal.match ? (onOpenMatch && goalIdx >= 0
             ? h('button', { class: 'linklike', id: 'goal-of-round-match', title: 'Åbn referatet af kampen – målet er markeret', onclick: () => onOpenMatch(goalIdx, goal) }, `📺 ${goal.match.replace(' - ', ' – ')}`)

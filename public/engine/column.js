@@ -74,8 +74,12 @@ export const STYLE_RULES = [
     say: ['havde bolden det meste af tiden', 'styrede rytmen med bolden', 'spillede roligt bolden rundt', 'satte sig på kampen med bolden', 'lod modstanderen løbe efter bolden'] },
   { key: 'wait', basis: ['poss', 'goals'], test: (s) => s.poss <= 42 && s.goals >= 1,
     say: ['havde under halvdelen af bolden og scorede alligevel', 'klarede sig uden meget af bolden', 'scorede, selv om de havde bolden mindst', 'fik meget ud af lidt', 'var effektive på få muligheder'] },
-  { key: 'shots', basis: ['shots'], test: (s) => s.shots >= 12,
-    say: ['skød fra alle vinkler', 'pressede mange afslutninger igennem', 'testede målmanden igen og igen', 'havde skudstøvlerne på', 'afsluttede, hver gang muligheden bød sig'] },
+  // v3.17.0 (≈ 25 skud pr. kamp): tærsklerne er 95-percentilen for ét hold i én kamp som før (12 skud var det i v3.16.7 – nu 24
+  // skud og 10 på mål; tools: se commit). "Testede målmanden" bærer kun skud PÅ mål (Spilfører – halvdelen går forbi).
+  { key: 'shots', basis: ['shots'], test: (s) => s.shots >= 24,
+    say: ['skød fra alle vinkler', 'havde skudstøvlerne på', 'afsluttede, hver gang muligheden bød sig', 'skød på alt, der bevægede sig', 'prøvede lykken igen og igen'] },
+  { key: 'target', basis: ['onTarget'], test: (s) => s.onTarget >= 10,
+    say: ['testede målmanden igen og igen', 'pressede mange afslutninger igennem på mål', 'gav målmanden travlt', 'ramte målet igen og igen', 'holdt målmanden i ilden'] },
   { key: 'dead', basis: ['setPieceGoals'], test: (s) => s.setPieceGoals >= 1,
     say: ['fik dødboldene til at tælle', 'var skarpe på de faste situationer', 'slog til på dødbolde', 'var farlige, når bolden lå stille', 'høstede på standardsituationerne'] },
   { key: 'switch', basis: ['reorganised'], test: (s) => s.reorganised >= 1,

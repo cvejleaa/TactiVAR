@@ -792,6 +792,14 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // dæmpede (minor), og øjeblikket er mærket half – Højdepunkter viser det kun som mål. Returnerer om der blev scoret.
   const HALF_MISS_TXT = ['skyder forbi', 'sender bolden over mål', 'skyder et godt stykke forbi', 'får ikke ramt den rent – den går forbi', 'skyder over'];
   const halfMissUsed = new Set();
+  // Botternes FASE-linjer (v3.17.0, Spilfører: ≈ 14 pr. kamp i referaterne mellem to botter): kun den første pr. hold og slags
+  // (opbygning igennem / stoppet) vises – de øvrige står i data (quiet; målingerne tæller dem) men ikke i referatet. Pr. halvleg
+  // gav det 6,2 pr. kamp (bånd ≤ 6). Intet rng. Mærker seneste hændelse.
+  const faseSeen = new Set();
+  function faseQuiet(team, kind) {
+    const key = `${team.id}|${kind}`;
+    if (faseSeen.has(key)) events.at(-1).quiet = true; else faseSeen.add(key);
+  }
   function halfChance(att, def, cR, dR, min) {
     const spot = shotSpotFor(rng.next(), def.tactics.phases.phase2_defending.pressingHeight);
     const shooter = receiver(att, spot, (p) => p.skills.finishing, null, { attacking: true, ballX: 50 }, SHOT_REACH);
@@ -1085,10 +1093,18 @@ export function simulateMatch(home, away, rng, opts = {}) {
     // botterne stadig 4–5 i 45'). De trætteste først; resten venter til næste skift (dit hold får det at vide).
     const cap = FATIGUE_SUBS_AT_ONCE;
     let done = 0;
+    const waiting = [];
     for (const c of tired) {
-      if (done >= cap) { note(c.p, `højst ${FATIGUE_SUBS_AT_ONCE} træthedsskift ad gangen – han venter til næste skift`); continue; }
+      if (done >= cap) { waiting.push(c); continue; }
       if (swap(c, false)) done++;
     }
+    // Intet løfte om "næste skift" (v3.17.0, Spilfører: han kom aldrig ud – trættere fik de sidste skift, eller pauserne var
+    // brugt): en senere pause med antallet tilbage, eller årsagen til, at der ikke kommer flere
+    const after = () => {
+      const why = min + 3 < 90 ? subBlock(side, min + 3) : 'kampen er snart slut', left = MATCH_RULES.maxSubs - side.subsUsed;
+      return why ? `og ${why}` : `han må vente til en senere skifte-pause (${left} skift tilbage)`;
+    };
+    for (const c of waiting) note(c.p, `højst ${FATIGUE_SUBS_AT_ONCE} træthedsskift ad gangen – ${after()}`);
     if (!done) return;
     for (const c of onPitch().filter((x) => x.f >= limit && x.f < limit + SUBS_LIMIT.near).sort((a, b) => a.f - b.f)) { if (done >= cap) break; if (swap(c, true)) done++; }
   }
@@ -1202,6 +1218,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
           : own(def) ? `❌ [DIT PRES BRYDES] ${att.team.name} spiller sig igennem ${YOUR_PRESS[height]}.${note}`
           : `✅ [FASE 1 VIRKER • ${att.team.name}] ${vary([`${att.team.name} spiller sig igennem ${gen(def.team.name)} pres.`, `${att.team.name} kommer forbi ${gen(def.team.name)} pres.`, `${gen(def.team.name)} pres bliver spillet over.`], 'fase1', att.team.id)}${note}`;
         addEv(min, 'TACTIC_WIN', 'TACTIC', att.isHome, false, 'Fase 1 virker', text);
+        if (!own(att) && !own(def)) faseQuiet(att.team, 'win');
         frame('build', who);
       } else {
         ballLost = true;
@@ -1220,6 +1237,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
             : own(att) ? `❌ [DIN OPBYGNING STOPPES] ${tag(striker)} fanges offside.`
             : `🛑 [FASE 2 VIRKER • ${def.team.name}] ${tag(striker)} (${att.team.name}) fanges offside.`;
           addEv(min, 'TACTIC_FAIL', 'TACTIC', def.isHome, false, 'Offside-fælde virker', offTxt);
+          if (!own(att) && !own(def)) faseQuiet(def.team, 'stop');
           frame('trap', who);
         } else {
           sheet.adjust(presser.id, DUEL_BONUS); sheet.adjust(playmaker.id, -0.2); sheet.bump(presser.id, 'tacticWins');
@@ -1231,8 +1249,9 @@ export function simulateMatch(home, away, rng, opts = {}) {
             : (goesCounter ? ' Dit hold ser hullet og går direkte.' : ' Dit hold falder til ro på bolden.');
           const text = own(def) ? `✅ [DIT PRES VIRKER] ${cap(YOUR_PRESS[height])} lukker af: ${tag(presser)} erobrer bolden fra ${tag(playmaker)} (${att.team.name}).${counter}`
             : own(att) ? `❌ [DIN OPBYGNING STOPPES] ${YOUR_PASS[pass]} kommer ikke igennem: ${tag(presser)} (${def.team.name}) erobrer bolden fra ${tag(playmaker)} (${att.team.name}).`
-            : `🛑 [FASE 1 STOPPER MOD FASE 2] ${tag(presser)} (${def.team.name}) erobrer bolden fra ${tag(playmaker)} (${att.team.name}).`;
+            : `🛑 [FASE 2 VIRKER • ${def.team.name}] ${tag(presser)} erobrer bolden fra ${tag(playmaker)} (${att.team.name}).`;   // holdmærke som de andre (v3.17.0)
           addEv(min, 'TACTIC_FAIL', 'TACTIC', def.isHome, false, 'Fase 2 pres virker', text);
+          if (!own(att) && !own(def)) faseQuiet(def.team, 'stop');
           frame('press', who);
           if (goesCounter) counterAttack(def, att, min, defR, attR);
         }

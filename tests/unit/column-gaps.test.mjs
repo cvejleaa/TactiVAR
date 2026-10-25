@@ -84,7 +84,7 @@ test('compactFacts og runde-historikkens facts: begge hold, nøglet på hold-id,
 const ZERO = { poss: 50, shots: 0, onTarget: 0, corners: 0, aerialWon: 0, counterGoals: 0, setPieceGoals: 0, headerGoals: 0, yellows: 0, reorganised: 0, goals: 0, against: 0 };
 const guess = (o) => styleGuess({ ...ZERO, ...o }).map((r) => r.key);
 test('stil-gæt: hver tærskel på begge sider af grænsen (kun den ene regel rammes)', () => {
-  assert.deepEqual(STYLE_RULES.map((r) => r.key), ['air', 'break', 'ball', 'wait', 'shots', 'dead', 'switch']);
+  assert.deepEqual(STYLE_RULES.map((r) => r.key), ['air', 'break', 'ball', 'wait', 'shots', 'target', 'dead', 'switch']);   // 'target' ny i v3.17.0
   assert.deepEqual(guess({}), []);
   assert.deepEqual([guess({ headerGoals: 0 }), guess({ headerGoals: 1 })], [[], ['air']]);
   assert.deepEqual([guess({ corners: 6 }), guess({ corners: 7 })], [[], ['air']]);
@@ -92,11 +92,12 @@ test('stil-gæt: hver tærskel på begge sider af grænsen (kun den ene regel ra
   assert.deepEqual([guess({ poss: 57 }), guess({ poss: 58 })], [[], ['ball']]);
   assert.deepEqual([guess({ poss: 43, goals: 3 }), guess({ poss: 42, goals: 1 }), guess({ poss: 42, goals: 0 }), guess({ poss: 41, goals: 2 })], [[], ['wait'], [], ['wait']]);
   assert.deepEqual([guess({ poss: 30, goals: 0 }), guess({ goals: 5 })], [[], []], 'wait kræver BÅDE lav besiddelse og mål');
-  assert.deepEqual([guess({ shots: 11 }), guess({ shots: 12 })], [[], ['shots']]);
+  assert.deepEqual([guess({ shots: 23 }), guess({ shots: 24 })], [[], ['shots']]);   // v3.17.0: 12 → 24 (11/12 er nu begge under)
+  assert.deepEqual([guess({ shots: 12 }), guess({ onTarget: 9 }), guess({ onTarget: 10 })], [[], [], ['target']]);
   assert.deepEqual([guess({ setPieceGoals: 0 }), guess({ setPieceGoals: 1 })], [[], ['dead']]);
   assert.deepEqual([guess({ reorganised: 0 }), guess({ reorganised: 1 })], [[], ['switch']]);
   // Rækkefølgen er tabellens (første træf styrer noten); intet filtreres væk eller vendes
-  assert.deepEqual(guess({ headerGoals: 2, poss: 60, shots: 20, reorganised: 1 }), ['air', 'ball', 'shots', 'switch']);
+  assert.deepEqual(guess({ headerGoals: 2, poss: 60, shots: 30, onTarget: 12, reorganised: 1 }), ['air', 'ball', 'shots', 'target', 'switch']);
 });
 test('stil-gæt: "basis" er præcis de fakta, reglen læser (målt med en proxy) – ellers kan basis lyve uden at nogen ser det', () => {
   for (const r of STYLE_RULES) {
