@@ -12,7 +12,8 @@ import { fingerprint } from '../../tools/fingerprint.mjs';
 // v3.16.6 M2: den haltende spiller (LIMP) og pauseskift for ham (før fc304e5d…)
 // v3.16.7 M2: offside-fælden tælles for sig (trapWon/oppTrapWon i ownReports) – intet rng, kampene er de samme (før 56ee202f…)
 // v3.16.7 M1: VAR-offside kun hvor der kan være offside (ikke fra hjørnespark, ikke oplægsgiveren, intet flag efter cutback) – rng forskudt (før 59774fd1…)
-const NOPROSE_400 = 'f2dc7faee8599d469c75eb865b97fe8a18781a602bef34096fceae7b74c329a3';
+// v3.16.7 M3: cutbackens kant og back vælges efter plads (rækkevidden først) – rng-forskydning (før f2dc7fae…)
+const NOPROSE_400 = 'd53d2d23ee44b284143b713eaa0602188b8f508bbce05fbb294515ee3a011d8c';
 
 test('fingeraftryk uden prosa: de 400 seedede kampe er de samme som ved sidste bevidste motorændring (v3.16.6 M5)', async () => {
   const r = await fingerprint(400);

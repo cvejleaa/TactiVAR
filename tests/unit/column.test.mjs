@@ -124,7 +124,7 @@ test('"Din kamp" og fuldtids-analysen bygger på samme rapport: opbygningstallet
   for (const { input } of season(21, 10)) {
     const m = input.matches.find((x) => x.homeId === input.viewerTeamId || x.awayId === input.viewerTeamId);
     const r = m.ownReports[input.viewerTeamId], ft = m.events.find((e) => e.type === 'FULLTIME').text;
-    assert.ok(ft.includes(`Din opbygning kom igennem ${r.buildWon} af ${r.build} gange`), ft);
+    assert.ok(ft.includes(`Din opbygning kom igennem ${r.buildWon} af ${r.build} ${r.build === 1 ? 'gang' : 'gange'}`), ft);   // v3.16.7: ental
     const mine = buildColumn(input).sections[0].paras.join(' ');
     if (/Din opbygning|opbygninger kom forbi|kom I igennem|pres lukkede/.test(mine) && / af \d+ /.test(mine)) {   // opbygningens sætning (ikke "Dit pres stoppede opbygningen" – v3.16.7)
       seen++;

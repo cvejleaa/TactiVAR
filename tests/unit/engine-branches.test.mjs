@@ -2420,8 +2420,9 @@ test('cutback: kantspilleren (PAC+BAL 20 + 4) mod backen (PAC+POS + 4 − 2): 21
   // står. Vægtene exp(−afstand/16) til (12, 72) (rul 0,5, ens evner): LB (4, 70) 0,60, CB (27, 73) 0,39, CB (51, 73) 0,09 – summen af alle
   // ti er 2,11, så halvdelen nås ved den anden stopper (plads 3), ikke LM'en (plads 5, (4, 58)) som i v3.16. Han får 6,5 + 2·0,3 + clean
   // sheet 0,5 = 7,6 (LM'en: 7,1 uden bonus). OBS: spec.md siger "mod den nærmeste back" – lodtrækningen giver ikke altid den nærmeste.
+  // v3.16.7 (Spilfører: midtstoppere og angribere lukkede kanten): backen på sin side (LB, plads 1) – ikke lodtrækningens stopper
   const back = shut.m.ratings.away.find((e) => e.tacticWins > 0);
-  assert.equal(back.playerId, slot(shut.a.A, 3).id);
+  assert.equal(back.playerId, slot(shut.a.A, 1).id);
   assert.equal(back.tacticWins, 2); assert.equal(back.rating, 7.6);
 });
 // v3.12.1: CUTBACK_FINISH_BONUS 6 → 8; v3.13: KEEPER_EDGE 3,5 → 3; v3.15.1: 3 → 0,3 (med 3 reddede 17,6; før MV 14,9 / 15)

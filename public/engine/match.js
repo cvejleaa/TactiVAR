@@ -41,6 +41,7 @@ export const COUNTER_WON = { FAST_COUNTER: 1.8, KEEP_POSSESSION: 0.4 };
 export const COUNTER_FINISH_BONUS = 3;   // ubalanceret forsvar (kalibreres sammen med løbene)
 export const CALM_BUILD_BONUS = 2;       // "Hold på bolden": næste opbygning sidder bedre
 const FB_ROLES = new Set(['LB', 'RB', 'LWB', 'RWB']);
+const WIDE_ROLES = new Set(['LB', 'RB', 'LWB', 'RWB', 'LM', 'RM', 'LW', 'RW']);   // cutbackens kant (v3.16.7)
 // Løb uden bold (v3.9, brugeren: "Alle kan være med til at løbe i position og afhængig af hvor
 // man er på banen kan det blive til en dribletur, en aflevering (incl. tværaflevering) eller
 // skud. Beslutningen kan også blive påvirket af spillerens evner til skud eller aflevering").
@@ -439,11 +440,14 @@ export function simulateMatch(home, away, rng, opts = {}) {
     seen[side.team.id] = r.ball; seenX[side.team.id] = x; seen[o.team.id] = r.opp; seenX[o.team.id] = 100 - x;
     return r.ball;
   }
-  function receiver(side, spot, skill, exclude = null, ctx = { attacking: true, ballX: 50 }, reach = Infinity) {
+  // prefer: plads-filtre (i → bool) i prioriteret rækkefølge (v3.16.7). Rækkevidden går forud for pladsen: først de
+  // foretrukne inden for rækkevidde, så alle inden for rækkevidde, så de foretrukne, så alle.
+  function receiver(side, spot, skill, exclude = null, ctx = { attacking: true, ballX: 50 }, reach = Infinity, prefer = null) {
     const pos = shapes(side, ctx);
     const all = side.starters.map((p, i) => ({ p, i })).filter(({ p, i }) => i > 0 && p && p !== exclude);
     const near = all.filter(({ i }) => Math.hypot(pos[i].x - spot.x, pos[i].y - spot.y) <= reach);
-    const cand = near.length ? near : all;
+    const pick = (l) => (prefer ?? []).map((f) => l.filter(({ i }) => f(i))).find((x) => x.length);
+    const cand = pick(near) ?? (near.length ? near : null) ?? pick(all) ?? all;
     const w = cand.map(({ p, i }) => Math.exp(-Math.hypot(pos[i].x - spot.x, pos[i].y - spot.y) / RECEIVE_SPREAD) * (RECEIVE_BASE + Math.max(0, skill(p))));
     let r = rng.next() * w.reduce((a, b) => a + b, 0);
     return (cand[w.findIndex((x) => (r -= x) < 0)] ?? cand.at(-1)).p;
@@ -751,8 +755,15 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // Kaldt med et allerede talt skud (xg) – en lukket kant er ingen afslutning.
   function cutback(att, def, cR, dR, min, xg) {
     const wx = rng.next() < 0.5 ? 12 : 88;
-    const winger = receiver(att, { x: wx, y: 30 }, (p) => p.skills.pace + p.skills.ballControl, null, { attacking: true, ballX: wx }, RECEIVE_REACH);
-    const back = receiver(def, { x: 100 - wx, y: 72 }, (p) => p.skills.pace + p.skills.positioning, null, { attacking: false, ballX: 100 - wx });
+    // Roller (v3.16.7, Spilfører: midtstoppere lavede cutbacks, angribere lukkede kanten i eget felt): kantmanden er en kant- eller
+    // back-plads på den side, ellers den nærmeste (smal formation); backen er backen på sin side, ellers en kantspiller dér,
+    // ellers en forsvars- eller midtbanespiller – aldrig en angriber. Samme ene rng-træk pr. valg.
+    const roleOf = (side) => (i) => coordsOf(side.tactics)[i].r, flank = (x) => (x < 50 ? 'L' : 'R');
+    const aR = roleOf(att), dRole = roleOf(def), wSide = flank(wx), bSide = flank(100 - wx);
+    const winger = receiver(att, { x: wx, y: 30 }, (p) => p.skills.pace + p.skills.ballControl, null, { attacking: true, ballX: wx }, RECEIVE_REACH,
+      [(i) => WIDE_ROLES.has(aR(i)) && aR(i)[0] === wSide]);
+    const back = receiver(def, { x: 100 - wx, y: 72 }, (p) => p.skills.pace + p.skills.positioning, null, { attacking: false, ballX: 100 - wx }, Infinity,
+      [(i) => FB_ROLES.has(dRole(i)) && dRole(i)[0] === bSide, (i) => WIDE_ROLES.has(dRole(i)) && dRole(i)[0] === bSide, (i) => lineOfRole(dRole(i)) !== 'ATT']);
     const log = duelLog[att.team.id], ws = winger.skills, bs = back.skills;
     log.cutbacks++;
     if ((ws.pace + ws.ballControl) * ff(winger) + rng.next() * 8

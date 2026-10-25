@@ -113,7 +113,7 @@ test('Rundens mål: bred fordeling – cutback ≥ 8 %, dribletur ≥ 8 %, ingen
 // (Hovedstødsandelen af alle mål var 16 % også før – den domineredes af dødbolde – og bevises ikke her.)
 test('angrebsfokus mærkes: cutbacks ≥ 1 pr. kamp, angriberen vinder 35–55 % af de åbne luftdueller, intet fokus dominerer (netto inden for 0,3), og modgiften virker', async () => {
   const { measureFocus } = await import('../../tools/measure-duels.mjs');
-  const N = 60;
+  const N = 150;   // v3.16.7: 60 var for støjende til nettobåndet (spredning 0,33 ved 60, 0,19 ved 200 kampe – tools/measure-duels fokus)
   const cut = measureFocus({ focus: 'LOW_CUTBACKS' }, N), cross = measureFocus({ focus: 'HIGH_CROSSES' }, N), central = measureFocus({ focus: 'CENTRAL' }, N);
   assert.ok(cut.cutbacks >= 1, `cutbacks ${cut.cutbacks} (før 0)`);
   // v3.15: et forsvar med færre mand taber flere luftdueller – målt over 400 kampe 0,545 → 0,555 (her med 60: 0,535 → 0,570);
