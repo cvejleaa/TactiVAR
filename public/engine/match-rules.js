@@ -24,6 +24,17 @@ export const CARD_RULES = Object.freeze({ DIRECT_RED_P: 0.07, SECOND_YELLOW_P: 0
 // Højst så mange træthedsskift pr. hold ad gangen (v3.15, brugerens valg "spred skift"; Spilfører: en trippeludskiftning
 // er normal) – også i pausen ved 45', som ikke koster en skifte-pause. Flere trætte end loftet bruger altså flere pauser.
 export const FATIGUE_SUBS_AT_ONCE = 3;
+// En haltende spiller (skadet uden indskiftning, v3.16.6 – Spilfører: "#9 halter – #10 tager straffen"): han bliver på banen,
+// men hans evner tæller factor i duellerne, han løber ikke fri og tager ingen dødbolde. (En lavere modtagervægt blev målt og
+// droppet: × 0,25 og × 1 gav 2,4 % og 2,7 % af afslutningerne – han står sjældent nær bolden alligevel.)
+// Han skiftes ud i pausen, hvis der er et skift tilbage (pausen koster ingen skifte-pause) – af den friskeste i kæden, der
+// ikke er sat til en Hvis-Så-regel, aldrig en reservemålmand. Målt i tools/measure-limp.mjs: at halte skal koste mindre end
+// et rødt kort.
+export const LIMP = Object.freeze({ factor: 0.6 });
+// Botternes træthedsskift (v3.16.6, Spilfører: "botten skifter tre ud i 30'"): ingen før pausen (fromMin – pausen selv
+// tæller med), og indtil until gemmes keep.subs udskiftninger og keep.windows skifte-pauser til en skade. Dit hold følger kun
+// din egen grænse (brugerens regel "grænsen gælder uanset minut").
+export const BOT_SUBS = Object.freeze({ fromMin: 45, until: 75, keep: Object.freeze({ subs: 1, windows: 1 }) });
 // En kamp kræver mindst 7 spillere (IFAB Law 3) – motoren udviser aldrig under det (ingen afbrudt kamp).
 export const MIN_PLAYERS = 7;
 // VAR som i virkeligheden (v3.15.1, brugeren: "VAR skal virke som i virkeligheden … nogle gange tjekker for offside

@@ -569,3 +569,112 @@ test('en bots Hvis-Så-skift er ikke dit "taktik"-skift; og kun planlagte starte
   assert.equal(subs(mc).length, 2);
   assert.equal(mc.events.find((e) => e.label === 'Udskiftninger')?.text, `🔋 [${c.H.name}] Din udskiftede spiller sparede ca. 8 point friskhed til næste runde.`);   // 14 · 0,59 = 8,3 → 8
 });
+
+// ---------- v3.16.6 (M1): skade før rotation, og en hvilet spiller forbliver brugt ----------
+// Spilfører: "#16 starter i stedet for en træt #10" og straks "#8 er skadet og erstattes af #10". Nu: den skadede erstattes
+// først (af den friskeste i kæden), rotationen rører ikke den plads, og den hvilede kommer ikke ind igen.
+test('bot med træt plads 6 og skadet plads 7 og ÉN brugbar midtbanespiller på bænken: den skadede erstattes, den trætte spiller', () => {
+  const { H, A } = arena({ homeLimit: 0, homeBot: true });
+  slot(H, 6).freshness = 60; slot(H, 7).injuryMatchesLeft = 2;
+  const mids = bench(H).filter((p) => p.line === 'MID');
+  mids.forEach((p, i) => { p.freshness = 100; if (i > 0) p.injuryMatchesLeft = 3; });
+  const m = simulateMatch(H, A, stubRng({}), { liveEnergy: false });
+  const lines = m.events.filter((e) => e.type === 'LINEUP').map((e) => e.text);
+  assert.ok(mids.length >= 2, 'data: to midtbanespillere på bænken (den ene skadet)');
+  assert.ok(lines.includes(`📋 [${H.name}] ${tag(slot(H, 7))} er skadet og erstattes i startopstillingen af ${tag(mids[0])}.`), lines.join(' | '));
+  assert.ok(!lines.some((t) => t.includes('starter i stedet for en træt')), `ingen hvile – bænken er brugt: ${lines.join(' | ')}`);
+  assert.ok(!lines.some((t) => t.endsWith(`af ${tag(slot(H, 6))}.`)), 'den trætte er aldrig erstatning');
+  assert.ok(m.ratings.home.some((e) => e.playerId === slot(H, 6).id), 'den trætte spiller kampen');
+});
+test('en hvilet spiller er ikke erstatning for en skadet senere i opstillingen (used beholder ham)', () => {
+  const { H, A } = arena({ homeLimit: 0, homeBot: true });
+  slot(H, 6).freshness = 60; slot(H, 2).injuryMatchesLeft = 2;   // en forsvarsspiller skadet; ingen forsvarsspiller på bænken
+  for (const p of bench(H)) { p.freshness = 100; if (p.line !== 'MID') p.injuryMatchesLeft = 3; }
+  const m = simulateMatch(H, A, stubRng({}), { liveEnergy: false });
+  const lines = m.events.filter((e) => e.type === 'LINEUP').map((e) => e.text);
+  assert.ok(lines.some((t) => t.includes(`er skadet og erstattes i startopstillingen af`)), `data: skaden erstattes – ${lines.join(' | ')}`);
+  assert.ok(!lines.some((t) => t.endsWith(`af ${tag(slot(H, 6))}.`)), `den trætte/hvilede er aldrig erstatning: ${lines.join(' | ')}`);
+});
+test('skadeserstatningen er den friskeste i kæden (ikke den første på bænken)', () => {
+  const { H, A } = arena({ homeLimit: 0, homeBot: false });
+  slot(H, 7).injuryMatchesLeft = 2;
+  const mids = bench(H).filter((p) => p.line === 'MID');
+  mids.forEach((p, i) => { p.freshness = i === mids.length - 1 ? 95 : 70; });
+  const m = simulateMatch(H, A, stubRng({}), { liveEnergy: false });
+  assert.ok(mids.length >= 2);
+  assert.ok(m.events.some((e) => e.text === `📋 [${H.name}] ${tag(slot(H, 7))} er skadet og erstattes i startopstillingen af ${tag(mids.at(-1))}.`), m.events.filter((e) => e.type === 'LINEUP').map((e) => e.text).join(' | '));
+});
+test('en hvilet spiller kommer heller ikke ind i kampen: skade i 3. minut med kun den hvilede på bænken → ingen indskiftning af ham', () => {
+  const { H, A } = arena({ homeLimit: 0, homeBot: true });
+  slot(H, 6).freshness = 60;
+  const mids = bench(H).filter((p) => p.line === 'MID');
+  for (const p of bench(H)) { p.freshness = 100; if (p !== mids[0]) p.injuryMatchesLeft = 3; }
+  // Første tick: frispark (0,06) til hjemmeholdets offer (0,5 → H, int → plads 1), skade (0,4)
+  const m = simulateMatch(H, A, stubRng({ 0.06: (n) => n === 0, 0.5: (n) => n === 0, 0.4: (n) => n === 0 }), { liveEnergy: false });
+  const lines = m.events.filter((e) => e.type === 'LINEUP').map((e) => e.text);
+  assert.ok(lines.includes(`📋 [${H.name}] ${tag(mids[0])} starter i stedet for en træt ${tag(slot(H, 6))}.`), `data: rotationen – ${lines.join(' | ')}`);
+  assert.ok(m.events.some((e) => e.type === 'INJURY' && e.min === 3), `data: skaden i 3' – ${m.events.filter((e) => e.min === 3).map((e) => e.type).join()}`);
+  assert.ok(!m.events.some((e) => e.type === 'SUB' && e.label?.startsWith(`🔄 ${tag(slot(H, 6))} ind`)), m.events.filter((e) => e.type === 'SUB').map((e) => e.label).join(' | '));
+});
+
+// ---------- v3.16.6 (M6): botternes træthedsskift fra pausen, og ét skift + én pause gemt til skade indtil 75' ----------
+// Alle markspillere starter på 74 % med grænse 75: de er under grænsen fra første minut. Bænken er frisk.
+function tiredMatch({ homeBot, script = {} }) {
+  const { H, A } = arena({ homeLimit: 75, homeBot });
+  for (const p of H.squad) p.freshness = H.tactics.lineupSlots.includes(p.id) && p.line !== 'GK' ? 74 : 89;   // bænk 89 < 90: ingen rotation før kampen (grænse + 15)
+  const m = simulateMatch(H, A, stubRng(script));
+  const subs = m.events.filter((e) => e.type === 'SUB' && e.isHome);
+  return { H, m, subs, fatigue: subs.filter((e) => !/Skadesskift/.test(e.text)) };
+}
+test('bot: ingen træthedsskift før pausen, selv om alle er under grænsen – dit hold med samme grænse skifter før', () => {
+  const bot = tiredMatch({ homeBot: true }), mine = tiredMatch({ homeBot: false });
+  assert.ok(bot.fatigue.length >= 3, `data: botten skifter (${bot.fatigue.map((e) => e.min).join()})`);
+  assert.equal(bot.fatigue.filter((e) => e.min < 45).length, 0, bot.fatigue.map((e) => e.min).join());
+  assert.ok(bot.fatigue.some((e) => e.min === 45), 'pausen tæller med');
+  assert.ok(mine.fatigue.some((e) => e.min < 45), `dit hold følger kun grænsen: ${mine.fatigue.map((e) => e.min).join()}`);
+});
+test('bot: før 75\' bruges højst 4 træthedsskift og 2 skifte-pauser (én af hver gemt til skade); efter 75\' må resten bruges', () => {
+  const { fatigue } = tiredMatch({ homeBot: true });
+  const before = fatigue.filter((e) => e.min < 75), windows = new Set(before.filter((e) => e.min !== 45).map((e) => e.min));
+  assert.ok(before.length === 4, `før 75': ${before.map((e) => e.min).join()} (5 uden reserven)`);
+  assert.ok(windows.size <= 1, `pauser før 75' (pausen 45' tæller ikke): ${[...windows].join()}`);
+  assert.deepEqual(fatigue.map((e) => e.min), [45, 45, 45, 48, 75], 'det femte i præcis 75\' (until 75, ikke 78 og ikke <=)');
+});
+test('bot: skifte-pausen gemmes til skaden – skader i 51\' og 60\' og en træt i 63\': den trætte venter, skaden i 72\' får en indskiftning', () => {
+  // Uden pause-reserven (keep.windows 0) tager træthedsskiftet i 63' den tredje pause, og skaden i 72' må spille videre haltende
+  const { H, A } = arena({ homeLimit: 75, homeBot: true });
+  slot(H, 6).freshness = 86;
+  for (const p of bench(H)) p.freshness = 89;   // < 90: ingen rotation før kampen
+  const m = simulateMatch(H, A, stubRng({ 0.06: (n) => n === 16 || n === 19 || n === 23, 0.5: true, 0.4: true }));
+  const home = m.events.filter((e) => e.isHome && (e.type === 'SUB' || e.type === 'INJURY' || /Ingen indskiftning/.test(e.text ?? ''))).map((e) => `${e.min}:${e.type}`);
+  assert.deepEqual(home, ['51:INJURY', '51:SUB', '60:INJURY', '60:SUB', '72:INJURY', '72:SUB'], home.join(' '));
+});
+test('rotation (TM v3.16.6): to trætte i samme kæde og ÉN frisk på bænken → kun én rotation, ingen spiller to gange i opstillingen', () => {
+  const { H, A } = arena({ homeLimit: 0, homeBot: true });
+  slot(H, 6).freshness = 60; slot(H, 7).freshness = 60;
+  const mids = bench(H).filter((p) => p.line === 'MID');
+  mids.forEach((p, i) => { p.freshness = 100; if (i > 0) p.injuryMatchesLeft = 3; });
+  const m = simulateMatch(H, A, stubRng({}), { liveEnergy: false });
+  const rot = m.events.filter((e) => e.type === 'LINEUP' && e.text.includes('starter i stedet for en træt'));
+  const ids = m.ratings.home.filter((e) => e.minIn <= 1).map((e) => e.playerId);
+  assert.equal(rot.length, 1, rot.map((e) => e.text).join(' | '));
+  assert.equal(new Set(ids).size, ids.length, 'ingen dublet');
+  assert.equal(ids.length, 11);
+});
+test('skadeserstatning (TM v3.16.6): lige friske i kæden → den bedste (avgSkill) vælges', () => {
+  const { H, A } = arena({ homeLimit: 0, homeBot: false });
+  slot(H, 7).injuryMatchesLeft = 2;
+  const mids = bench(H).filter((p) => p.line === 'MID');
+  mids.forEach((p, i) => { p.freshness = 100; p.skills = SK(i === mids.length - 1 ? 11 : 10); });
+  const m = simulateMatch(H, A, stubRng({}), { liveEnergy: false });
+  assert.ok(mids.length >= 2);
+  assert.ok(m.events.some((e) => e.text === `📋 [${H.name}] ${tag(slot(H, 7))} er skadet og erstattes i startopstillingen af ${tag(mids.at(-1))}.`), m.events.filter((e) => e.type === 'LINEUP').map((e) => e.text).join(' | '));
+});
+test('bot: med én skade (51\') må træthedsskiftet i 63\' tage pause 2 af 3 – kun den sidste pause gemmes (keep.windows 1, ikke 2)', () => {
+  const { H, A } = arena({ homeLimit: 75, homeBot: true });
+  slot(H, 6).freshness = 86;
+  for (const p of bench(H)) p.freshness = 89;
+  const m = simulateMatch(H, A, stubRng({ 0.06: (n) => n === 16, 0.5: true, 0.4: true }));
+  const home = m.events.filter((e) => e.isHome && (e.type === 'SUB' || e.type === 'INJURY')).map((e) => `${e.min}:${e.type}`);
+  assert.deepEqual(home, ['51:INJURY', '51:SUB', '63:SUB'], home.join(' '));
+});

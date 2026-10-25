@@ -243,6 +243,8 @@ export function measureSubs(N = ARG_N, rounds = 10, overrides = {}) {
   let games = 0, subs = 0, goals = 0;
   const why = { fatigue: 0, injury: 0, rule: 0 }, mins = { '1–45': 0, '46–60': 0, '61–75': 0, '76–90': 0 }, blocked = { n: 0 };
   const fresh = [];
+  // v3.16.6 (M6): botternes træthedsskift før pausen, kampe hvor en bot skifter 3+ før pausen, og haltende uden indskiftning
+  const bot = { fatigue: 0, early: 0, tripleEarly: 0, limping: 0, teamGames: 0 };
   for (let s = 1; s <= N; s++) {
     const rng = createRng(s * 15485863);
     const L = createLeague(rng);
@@ -251,10 +253,18 @@ export function measureSubs(N = ARG_N, rounds = 10, overrides = {}) {
       const res = playPairs(L, fixedPairs(L, 1 + (r % 7)), rng);
       for (const m of res.matches) {
         games += 2; goals += m.homeGoals + m.awayGoals;
+        const me = L.teams.find((t) => !t.isBot)?.name;
+        for (const name of [m.homeName, m.awayName].filter((n) => n !== me)) {
+          bot.teamGames++;
+          const fat = m.events.filter((e) => e.type === 'SUB' && e.text.startsWith(`🔄 [${name}] #`) && / erstatter /.test(e.text));   // ikke "Skadesskift:"
+          const early = fat.filter((e) => e.min < 45).length;
+          bot.fatigue += fat.length; bot.early += early; if (early >= 3) bot.tripleEarly++;
+          bot.limping += m.events.filter((e) => e.text?.startsWith(`🚑 [${name}] Ingen indskiftning`)).length;
+        }
         for (const e of m.events) {
           if (e.type === 'SUB') {
             subs++;
-            const k = /træt|erstatter/.test(e.text) && !/Skadesskift/.test(e.text) ? (/Hvis-Så/.test(e.text) ? 'rule' : 'fatigue') : /Hvis-Så/.test(e.text) ? 'rule' : 'injury';
+            const k = /træt|erstatter/.test(e.text) && !/Skadesskift|haltende/.test(e.text) ? (/Hvis-Så/.test(e.text) ? 'rule' : 'fatigue') : /Hvis-Så/.test(e.text) ? 'rule' : 'injury';
             why[k]++;
             mins[e.min <= 45 ? '1–45' : e.min <= 60 ? '46–60' : e.min <= 75 ? '61–75' : '76–90']++;
           }
@@ -266,7 +276,8 @@ export function measureSubs(N = ARG_N, rounds = 10, overrides = {}) {
     for (const t of L.teams) { const st = t.squad.filter((p) => t.tactics.lineupSlots.includes(p.id)); fresh.push(st.reduce((a, p) => a + p.freshness, 0) / st.length); }
   }
   const mean = (a) => a.reduce((x, y) => x + y, 0) / a.length;
-  return { subsPerTeam: subs / games, why: Object.fromEntries(Object.entries(why).map(([k, v]) => [k, v / games])), mins: Object.fromEntries(Object.entries(mins).map(([k, v]) => [k, subs ? v / subs : 0])), goalsPerMatch: goals / (games / 2), startFresh: mean(fresh), blockedPerMyGame: blocked.n / (N * rounds) };
+  return { subsPerTeam: subs / games, why: Object.fromEntries(Object.entries(why).map(([k, v]) => [k, v / games])), mins: Object.fromEntries(Object.entries(mins).map(([k, v]) => [k, subs ? v / subs : 0])), goalsPerMatch: goals / (games / 2), startFresh: mean(fresh), blockedPerMyGame: blocked.n / (N * rounds),
+    bot: { earlyShare: bot.fatigue ? bot.early / bot.fatigue : 0, tripleEarlyPerGame: bot.tripleEarly / bot.teamGames, limpingPerGame: bot.limping / bot.teamGames, fatiguePerGame: bot.fatigue / bot.teamGames } };
 }
 // STA's betydning i kampen: samme hold med STA sat lavt (6) eller højt (16) på alle markspillere, mod
 // den samme modstander uden skift (grænse 0): mål for/imod i sidste kvarter (min ≥ 76) og i alt.
@@ -291,6 +302,7 @@ if (import.meta.url === `file://${process.argv[1]}` && process.argv[3] === 'skif
   const r = measureSubs();
   console.log(`Skift pr. hold pr. kamp ${r.subsPerTeam.toFixed(2)} (træthed ${r.why.fatigue.toFixed(2)}, skade ${r.why.injury.toFixed(2)}, Hvis-Så ${r.why.rule.toFixed(2)}) · minut: ${Object.entries(r.mins).map(([k, v]) => `${k} ${(v * 100).toFixed(0)} %`).join(', ')}`);
   console.log(`Mål pr. kamp ${r.goalsPerMatch.toFixed(2)} · startelleverens friskhed efter 10 runder ${r.startFresh.toFixed(1)} % · "kunne ikke skifte" pr. kamp for dit hold ${r.blockedPerMyGame.toFixed(2)}`);
+  console.log(`Botter: træthedsskift pr. kamp ${r.bot.fatiguePerGame.toFixed(2)} · heraf før pausen ${(r.bot.earlyShare * 100).toFixed(1)} % · 3+ før pausen i ${(r.bot.tripleEarlyPerGame * 100).toFixed(2)} % af kampene · haltende uden indskiftning ${r.bot.limpingPerGame.toFixed(3)} pr. kamp`);
   const n = Math.max(400, ARG_N * 20), st = measureStamina(n), st0 = measureStamina(n, false);
   console.log(`STA 6 mod STA 16 (alle markspillere, ingen skift, ${n} kampe): netto i alt ${st[6].net.toFixed(2)} / ${st[16].net.toFixed(2)}, sidste kvarter ${st[6].lateNet.toFixed(2)} / ${st[16].lateNet.toFixed(2)} – uden friskhed i kampen (før v3.13): ${st0[6].net.toFixed(2)} / ${st0[16].net.toFixed(2)}, sidste kvarter ${st0[6].lateNet.toFixed(2)} / ${st0[16].lateNet.toFixed(2)}`);
 }

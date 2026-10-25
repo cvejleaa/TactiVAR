@@ -88,6 +88,7 @@ export const halfPos = (stoppage) => (stoppage ? (45 + stoppage[0].S) / (90 + st
 export const inMinute = (c) => (c?.plus ? 'i tillægstiden' : `i ${c?.m ?? 0}. minut`);
 // Spillernes ind- og udminut efter referatets ur (QC C6): indskiftning og udskiftning fra SUB-linjen ("🔄 X ind for Y"),
 // udvisning og skade fra linjen, der nævner spilleren i hans udminut (e.min = minOut – to ens navne på hvert sit hold skilles).
+// Skadelinjen gælder gamle gem: fra v3.16.6 har en haltende intet udminut (han spiller videre eller pauseskiftes – SUB-linjen).
 export function playerSpan(events, entries) {
   const tagOf = (r) => `#${r.shirtNumber} ${r.shortName}`, span = new Map();
   for (const r of entries) {
