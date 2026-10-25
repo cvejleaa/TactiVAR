@@ -188,6 +188,8 @@ Tick hvert 3. minut (1..90).
 - **Træthedsskift spredes (v3.15**, brugerens valg): højst `FATIGUE_SUBS_AT_ONCE` = 3 ad gangen (også i pausen; flere trætte bruger flere pauser);
   grænsen gælder fortsat uanset minut, og dit hold får besked, når en træt spiller må vente.
 - Chance 30 % (v3.9: Få 26 %, Normal 30 %, Mange 36 %; v3.12.1: Få 28,5 %); xG 0,13–0,35 pr. afslutning.
+  v3.17.0: chancen løftes efter en vundet opbygning og dæmpes uden duel (BUILD_LIFT_P/OPEN_DAMP_P), og halvchancen kommer
+  oven i – se "Balance-gennemgangen (v3.17.0)".
 - **Angrebsfokus afgør chancens type (v3.12**, brugeren: "Jeg har sat mit hold til cutbacks, og
   alligevel er der ikke en eneste reference til cutbacks i referatet … min modstander vinder 11
   luftdueller"). For ALLE hold (brugerens valg); teksten om en modstander navngiver aldrig
@@ -547,7 +549,7 @@ skal styre chancen, alle småfund med. Hvert motortal er målt (`node tools/meas
   kantangriber); bot-profilerne har hver sin Hvis-Så (nye ligaer), og et skift til samme formation sker ikke (bot eller uden
   trukne positioner); botternes FASE-linjer vises kun første gang pr. hold og slags (resten `quiet`); pres-linjen har
   holdmærke; skifte-noten lover ikke "næste skift"; Rundens mål uden dobbelt etiket; klummens skud-regel 12 → 24 og en egen
-  regel på skud på mål (≥ 10) – 95-percentilen som før.
+  regel på skud på mål (≥ 10) – 95-percentilen for ét hold i én kamp som før (`node tools/measure-duels.mjs 800 percentil`: v3.16.7 12 skud / 6 på mål, nu 24 / 10).
 
 ## 6. Karakterer, MotM, avis
 - Start 6,5 (±0,15), klemt 3,5–10,0 – fra v3.15 først til sidst (justeringerne summeres uden loft, så overskud fra mål

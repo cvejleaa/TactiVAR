@@ -75,7 +75,7 @@ export const STYLE_RULES = [
   { key: 'wait', basis: ['poss', 'goals'], test: (s) => s.poss <= 42 && s.goals >= 1,
     say: ['havde under halvdelen af bolden og scorede alligevel', 'klarede sig uden meget af bolden', 'scorede, selv om de havde bolden mindst', 'fik meget ud af lidt', 'var effektive på få muligheder'] },
   // v3.17.0 (≈ 25 skud pr. kamp): tærsklerne er 95-percentilen for ét hold i én kamp som før (12 skud var det i v3.16.7 – nu 24
-  // skud og 10 på mål; tools: se commit). "Testede målmanden" bærer kun skud PÅ mål (Spilfører – halvdelen går forbi).
+  // skud og 10 på mål – `node tools/measure-duels.mjs 800 percentil`). "Testede målmanden" bærer kun skud PÅ mål (Spilfører – halvdelen går forbi).
   { key: 'shots', basis: ['shots'], test: (s) => s.shots >= 24,
     say: ['skød fra alle vinkler', 'havde skudstøvlerne på', 'afsluttede, hver gang muligheden bød sig', 'skød på alt, der bevægede sig', 'prøvede lykken igen og igen'] },
   { key: 'target', basis: ['onTarget'], test: (s) => s.onTarget >= 10,

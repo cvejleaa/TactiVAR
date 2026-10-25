@@ -28,3 +28,15 @@ test('afslutningerne: 22–28 skud (før 12,1), konvertering 0,25–0,38 (før 0
   const kp = measureKeeper(200);
   assert.ok(kp.diff >= 1.5, `målmand 6 mod 16: ${JSON.stringify(kp)}`);
 });
+
+// Klummens tærskler (column.js STYLE_RULES 'shots'/'target') er 95-percentilen for ét hold i én kamp – målt, ikke skønnet
+// (QC: "en fordobling af middel er ikke en fordobling af percentil"). v3.16.7: 12 skud; nu 24 skud og 10 på mål.
+test('klummens skud-tærskler = målt 95-percentil (±1) for ét hold i én kamp', async () => {
+  const { measurePercentiles } = await import('../../tools/measure-duels.mjs');
+  const { STYLE_RULES } = await import('../../public/engine/column.js');
+  const p = measurePercentiles(800);
+  const lowest = (key, field) => { for (let v = 0; v < 100; v++) if (STYLE_RULES.find((r) => r.key === key).test({ [field]: v })) return v; return null; };
+  assert.ok(p.shots[0.5] >= 10, `data: ${JSON.stringify(p)}`);
+  assert.ok(Math.abs(lowest('shots', 'shots') - p.shots[0.95]) <= 1, `skud ${lowest('shots', 'shots')} mod p95 ${p.shots[0.95]}`);
+  assert.ok(Math.abs(lowest('target', 'onTarget') - p.onTarget[0.95]) <= 1, `på mål ${lowest('target', 'onTarget')} mod p95 ${p.onTarget[0.95]}`);
+});

@@ -54,7 +54,7 @@ export const BUILD_LIFT_P = { FEW: 0.298, NORMAL: 0.331, MANY: 0.418 }, OPEN_DAM
 // efter tabt bold eller et mål i samme tick), oftere efter vundet opbygning. Udfaldet er en lodtrækning på xG (HALF_XG) gange
 // målmandens og skyttens faktor – ikke keeper-duellen. Egne p-værdier (unik-vagten i var-check.test.mjs).
 export const HALF_P = { BUILD: 0.761, OPEN: 0.531 };   // efter tabt bold (LOST) ingen
-export const HALF_XG = { GOAL: 0.02, EDGE: 0.055 };
+export const HALF_XG = { GOAL: 0.02, EDGE: 0.055 };   // bevidst: kanten > feltet – feltets løse bolde er klemte og blokeres; kanten er mellemrummets frie skud (holder langskud 6–11 %)
 export const HALF_MISS_P = 0.613, HALF_SAVE_ADJ = 0.1, GK_SLOPE = 0.06;
 // Hjørne efter en blokeret halvchance / en redning, der tippes ud (v3.17.0: færre hovedchancer gav færre hjørner – 2,4 pr. kamp)
 export const HALF_CORNER_P = { BLOCK: 0.147, SAVE: 0.071 };
@@ -790,7 +790,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // skytte (lodtrækning, ikke keeper-duellen); ellers forbi/blokeret (egne tekster uden stolpe – stolpen er et højdepunkt,
   // Spilfører) eller en let redning (easySaves: tæller i 🧤, ikke i fradraget). Ingen hjørne og intet flag. Linjerne er
   // dæmpede (minor), og øjeblikket er mærket half – Højdepunkter viser det kun som mål. Returnerer om der blev scoret.
-  const HALF_MISS_TXT = ['skyder forbi', 'sender bolden over mål', 'skyder et godt stykke forbi', 'får ikke ramt den rent – den går forbi', 'skyder over'];
+  const HALF_MISS_TXT = ['skyder forbi', 'sender bolden over mål', 'skyder et godt stykke forbi', 'rammer den ikke rent – den går forbi', 'skyder højt over mål'];   // "over mål": replay.js tegner den over (shotOver)
   const halfMissUsed = new Set();
   // Botternes FASE-linjer (v3.17.0, Spilfører: ≈ 14 pr. kamp i referaterne mellem to botter): kun den første pr. hold og slags
   // (opbygning igennem / stoppet) vises – de øvrige står i data (quiet; målingerne tæller dem) men ikke i referatet. Pr. halvleg
@@ -811,7 +811,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
     if (rng.next() < xg * gkFactor(gk.skills.goalkeeping * ff(gk)) * finFactor(shooter.skills.finishing * ff(shooter))) {
       return scoreFinish(att, def, dR, min, shooter, null, long ? 'LONGSHOT' : 'SCRAMBLE');
     }
-    const how = long ? 'skuddet fra distancen' : 'skuddet';
+    const how = long ? 'langskuddet' : 'skuddet';   // "… foran langskuddet fra #9" – ikke to gange "fra" (QC)
     if (rng.chance(HALF_MISS_P)) {
       if (rng.chance(MISS_BLOCK_SHARE)) {
         const blocker = rng.pick(dR.defs) ?? gk;
@@ -1070,7 +1070,8 @@ export function simulateMatch(home, away, rng, opts = {}) {
     const tired = onPitch().filter((c) => c.f < limit).sort((a, b) => a.f - b.f);
     if (!tired.length) return;
     side.noted ||= new Set();
-    const note = (p, why) => { if (!own(side) || side.noted.has(p.id + why)) return; side.noted.add(p.id + why); addEv(min, 'INFO', 'TACTIC', side.isHome, false, 'Udskiftning ikke mulig', `📋 [${side.team.name}] ${tag(p)} er under din udskiftningsgrænse (${Math.floor(matchFresh(p))} % – grænse ${limit} %), men ${why}.`); };
+    // key: uden "N skift tilbage" i nøglen (QC v3.17.0 – ellers en ny linje, hver gang N ændrer sig)
+    const note = (p, why, key = why) => { if (!own(side) || side.noted.has(p.id + key)) return; side.noted.add(p.id + key); addEv(min, 'INFO', 'TACTIC', side.isHome, false, 'Udskiftning ikke mulig', `📋 [${side.team.name}] ${tag(p)} er under din udskiftningsgrænse (${Math.floor(matchFresh(p))} % – grænse ${limit} %), men ${why}.`); };
     const swap = (c, near) => {
       const block = subBlock(side, min, !own(side) && min < BOT_SUBS.until ? BOT_SUBS.keep : null);
       if (block) { if (!near) note(c.p, block); return false; }
@@ -1104,7 +1105,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
       const why = min + 3 < 90 ? subBlock(side, min + 3) : 'kampen er snart slut', left = MATCH_RULES.maxSubs - side.subsUsed;
       return why ? `og ${why}` : `han må vente til en senere skifte-pause (${left} skift tilbage)`;
     };
-    for (const c of waiting) note(c.p, `højst ${FATIGUE_SUBS_AT_ONCE} træthedsskift ad gangen – ${after()}`);
+    for (const c of waiting) note(c.p, `højst ${FATIGUE_SUBS_AT_ONCE} træthedsskift ad gangen – ${after()}`, 'loft');
     if (!done) return;
     for (const c of onPitch().filter((x) => x.f >= limit && x.f < limit + SUBS_LIMIT.near).sort((a, b) => a.f - b.f)) { if (done >= cap) break; if (swap(c, true)) done++; }
   }

@@ -242,7 +242,7 @@ export function renderMatchCenter({ mc, myTeamId, on, column = null }) {
   if (m.stoppage) {
     const ht = all.findIndex((e) => e.type === 'HALFTIME');
     [[0, ht], [ht + 1, all.findIndex((e) => e.type === 'END' || e.type === 'FULLTIME')]].forEach(([from, to], h) => {
-      const anchor = all.slice(from, to < 0 ? undefined : to + 1).find((e) => e.clock?.plus) ?? all[to];
+      const anchor = all.slice(from, to < 0 ? undefined : to + 1).find((e) => e.clock?.plus && !e.quiet) ?? all[to];   // en skjult (quiet) linje er intet anker (QC v3.17.0)
       if (anchor && feed.includes(anchor)) stopAt.set(anchor, { h, ...m.stoppage[h] });
     });
   }

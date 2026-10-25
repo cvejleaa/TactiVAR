@@ -157,7 +157,7 @@ const phases = (pass, focus, height) => (t) => {
   Object.assign(t.tactics.phases.phase1_buildUp, { passingStyle: pass, attackFocus: focus });
   Object.assign(t.tactics.phases.phase2_defending, { pressingHeight: height, offsideTrap: 'OFF' });
 };
-if (import.meta.url === `file://${process.argv[1]}` && !['saeson', 'loeb', 'fokus', 'maal', 'formation', 'skift', 'var', 'skud', 'opbygning'].includes(process.argv[3])) {
+if (import.meta.url === `file://${process.argv[1]}` && !['saeson', 'loeb', 'fokus', 'maal', 'formation', 'skift', 'var', 'skud', 'opbygning', 'percentil'].includes(process.argv[3])) {
   const pct = (x) => `${(x * 100).toFixed(1)} %`;
   const liga = measure();
   console.log(`Ligaens egne taktikker: fase 1 vinder ${pct(liga.rate)} (${liga.n} dueller, ${ARG_N} ligaer × 3 runder); ${liga.goalsPerMatch.toFixed(2)} mål pr. kamp, heraf ${liga.headersPerMatch.toFixed(2)} hovedstød.`);
@@ -468,3 +468,16 @@ if (import.meta.url === `file://${process.argv[1]}` && process.argv[3] === 'skud
 if (import.meta.url === `file://${process.argv[1]}` && process.argv[3] === 'opbygning') {
   console.log(JSON.stringify(measureBuild(ARG_N), (k, v) => (typeof v === 'number' ? Math.round(v * 1000) / 1000 : v), 1));
 }
+// Percentiler for ét hold i én kamp (v3.17.0: klummens tærskler for skud og skud på mål ligger på 95-percentilen – v3.16.7:
+// 12 skud). node tools/measure-duels.mjs 800 percentil
+export function measurePercentiles(N = 800, ps = [0.5, 0.75, 0.9, 0.95]) {
+  const shots = [], onTarget = [];
+  for (let s = 1; s <= N; s++) {
+    const L = createLeague(createRng(s));
+    const m = simulateMatch(L.teams[s % 8], L.teams[(s + 3) % 8], createRng(s * 31));
+    shots.push(m.stats.hShots, m.stats.aShots); onTarget.push(m.stats.hOnTarget, m.stats.aOnTarget);
+  }
+  const q = (a) => { const x = a.slice().sort((u, v) => u - v); return Object.fromEntries(ps.map((p) => [p, x[Math.floor(p * x.length)]])); };
+  return { shots: q(shots), onTarget: q(onTarget) };
+}
+if (import.meta.url === `file://${process.argv[1]}` && process.argv[3] === 'percentil') console.log(measurePercentiles(ARG_N));
