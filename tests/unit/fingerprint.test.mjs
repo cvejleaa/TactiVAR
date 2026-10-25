@@ -7,9 +7,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fingerprint } from '../../tools/fingerprint.mjs';
 
-const NOPROSE_400 = 'e45a54981216aa239fe83a3981fcb3a7fc577461e5b295cddff01d3d501b1b0d';
+// v3.16.6 M5 (motor, bevidst): frisparket i samme tick som kortet/skaden er den forseelse – ét rng-træk færre (før e45a5498…)
+const NOPROSE_400 = '3bd4687db7df1fc6558249a4c1ef14289cafa2509055b9cfc3944254fc87ad13';
 
-test('fingeraftryk uden prosa: de 400 seedede kampe er de samme som i v3.16.2 (kun tekst og visning er ændret)', async () => {
+test('fingeraftryk uden prosa: de 400 seedede kampe er de samme som ved sidste bevidste motorændring (v3.16.6 M5)', async () => {
   const r = await fingerprint(400);
   assert.equal(r.noprose, NOPROSE_400);
   assert.notEqual(r.full, r.noprose, 'data: prosaen er faktisk fjernet i noprose');

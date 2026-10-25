@@ -378,7 +378,9 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // banen. opts.liveEnergy = false KUN til de deterministiske test-arenaer (deres tærskler forudsætter
   // fuld friskhed hele kampen) – spillet selv sender aldrig flaget (vagt i tests).
   const live = opts.liveEnergy !== false;
-  let curMin = 1, sentOffThisTick = false, varBehind = null;
+  // tickFoul: tick'ets forseelse ({ side, p }) – et frispark i samme tick er den forseelse, ikke en ny (v3.16.6, Spilfører:
+  // "Gult kort til X" og "Frispark efter Ys forseelse" i samme minut)
+  let curMin = 1, sentOffThisTick = false, varBehind = null, tickFoul = null;
   // Med færre mand (v3.15): ekstra tab af friskhed siden udvisningen (side.shortMins = summen af minutter × manglende mand).
   const sideOf = (p) => (sheet.entries[p.id]?.isHome ? H : A);
   // Kun minutter, hvor spilleren selv var på banen (QC: en indskifter efter udvisningen arvede ellers hele tabet).
@@ -794,8 +796,11 @@ export function simulateMatch(home, away, rng, opts = {}) {
   }
   function freeKick(att, def, cR, dR, min) {
     setPieceNow = true;
-    const fouler = rng.pick(dR.defs.concat(dR.mids)), gk = dR.gk;
-    st[k(def, 'Fouls')]++; st[k(att, 'FreeKicks')]++;
+    // Samme forseelse som tick'ets kort/skade (fortalt og talt én gang); ellers en ny, der tælles her
+    const same = tickFoul?.side === def && dR.defs.concat(dR.mids).includes(tickFoul.p);
+    const fouler = same ? tickFoul.p : rng.pick(dR.defs.concat(dR.mids)), gk = dR.gk;
+    if (!same) st[k(def, 'Fouls')]++;
+    st[k(att, 'FreeKicks')]++;
     if (rng.chance(FK_SHOT_P)) {
       const taker = best(outfield(cR), (p) => p.skills.finishing + p.skills.passing);
       st[k(att, 'Shots')]++; st[k(att, 'Xg')] += 0.07;
@@ -984,7 +989,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
   for (let min = 3; min <= 90; min += 3) {
     // Flaget nulstilles ved hvert tick (QC v3.15.1: et kort for filmning i straffen – efter tjekket herunder – lækkede ellers
     // ind i næste minut og sprang dets dødbolde og chancer over).
-    curMin = min; sentOffThisTick = false; varBehind = null;
+    curMin = min; sentOffThisTick = false; varBehind = null; tickFoul = null;
     seen = {}; momentCheck = null;   // øjebliksbilledet hører til dette tick
     if (min === 45) {
       const hp = Math.round((st.hPoss / (st.hPoss + st.aPoss)) * 100);
@@ -1093,7 +1098,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
       const slots = victimSide.starters.map((p, i) => i).filter((i) => i > 0 && victimSide.starters[i]);
       const slot = slots[rng.int(0, slots.length - 1)];
       const victim = victimSide.starters[slot], fouler = rng.pick(fR.defs.concat(fR.mids));
-      st[k(foulSide, 'Fouls')]++;
+      st[k(foulSide, 'Fouls')]++; tickFoul = { side: foulSide, p: fouler };
       sheet.adjust(fouler.id, -0.35);
       if (rng.chance(0.4)) {
         const matches = rng.int(1, 3);
@@ -1147,7 +1152,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
       // Hvert femte giver gult kort (v3.10, QC: ellers ≈0,5 gule pr. hold – Superligaen ≈2).
       if (rng.chance(QUIET_CARD_P)) {
         const dRq = def === H ? hR : aR, fouler = rng.pick(dRq.defs.concat(dRq.mids));
-        sheet.adjust(fouler.id, -0.2);
+        sheet.adjust(fouler.id, -0.2); tickFoul = { side: def, p: fouler };
         booking(def, fouler, min, 'Gult kort til', ' for et frispark');
       }
     }
