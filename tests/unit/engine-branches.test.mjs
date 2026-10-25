@@ -2643,5 +2643,27 @@ test('forbi mål (v3.16.7): 30 skud forbi i én kamp – hver tekst én gang pr.
   const miss = g.m.events.filter((e) => e.type === 'MISS' && e.text.startsWith('🎯')).map((e) => e.text.replace(/^🎯 \[.+?\] #\d+ \S+ /, ''));
   assert.ok(miss.length >= 18, `data: ${miss.length} forbi`);
   for (let i = 0; i + 6 <= miss.length; i += 6) assert.equal(new Set(miss.slice(i, i + 6)).size, 6, `omgang ${i / 6}: ${miss.slice(i, i + 6).join(' | ')}`);
-  assert.ok(miss.every((t) => t && t !== 'undefined.'), 'aldrig en tom tekst');
+  assert.ok(miss.every((t) => t && !/undefined/.test(t)), 'aldrig en tom tekst');   // TM: "Pedersen undefined." slap før igennem
+});
+// TM v3.16.7: oplægsgiveren tjekkes aldrig for offside – kontra, hovedstød og linjedommerens flag (konstrueret: han står forrest)
+import { VAR_RULES as VR } from '../../public/engine/match-rules.js';
+test('VAR/flag (M1): oplægsgiveren står forrest, men tjekkes ikke – kontraens og afslutningens VAR og linjedommerens flag nævner en anden', () => {
+  const CHECK = { [VR.GOAL_CHECK_P]: true, [VR.GOAL_FOUL_SHARE]: false };
+  // Kontra (som "kontramål: oplægsgiveren …"): udeholdets første midtbane (5) er oplægsgiver – trukket helt frem
+  const a = arena();
+  for (const p of a.A.squad) p.skills.intercepting = 20;
+  slot(a.A, 9).skills.pace = 14;
+  a.A.tactics.customCoords = { 5: { x: 50, y: 6 } };
+  const m = simulateMatch(a.H, a.A, stubRng({ 0.48: shots(2), 0.032: shots(2), ...CHECK }, 0.5));
+  const chk = m.events.filter((e) => e.type === 'VAR_CHECK');
+  assert.ok(chk.length >= 1 && m.events.some((e) => e.type === 'GOAL' && /KONTRA/.test(e.text)), `data: ${chk.length} tjek`);
+  assert.ok(chk.every((e) => !e.text.includes(`stod ${tg(slot(a.A, 5))} offside`)), chk[0]?.text);
+  // Linjedommerens flag ved en almindelig afslutning: oplægsgiveren (første midtbane, 5) trukket forrest – flaget rammer ikke ham
+  const b = arena(); slot(b.A, 0).skills.goalkeeping = 30;
+  for (const p of b.H.squad) p.varProfile.varPulse = 0;
+  b.H.tactics.customCoords = { 5: { x: 50, y: 4 } };
+  const f = simulateMatch(b.H, b.A, stubRng({ 0.3: shots(3), [VR.OFFSIDE_FLAG_P]: true }, 0.5));
+  const flags = f.events.filter((e) => e.type === 'OFFSIDE_FLAG');
+  assert.ok(flags.length >= 1, `data: ${flags.length} flag`);
+  assert.ok(flags.every((e) => !e.text.includes(`${tg(slot(b.H, 5))} (`)), flags[0]?.text);
 });

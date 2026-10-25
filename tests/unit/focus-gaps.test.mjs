@@ -416,3 +416,20 @@ test('almindelig afslutning: en dribletur bruger skyttens PAC og BAL hver for si
   assert.equal(g.spectacle, goalSpectacle('DRIBBLE', { finishing: 8, pace: 28, ballControl: 8, passing: 10 }, g.min, { next: () => 0.5 }));
   assert.notEqual(g.spectacle, goalSpectacle('DRIBBLE', { finishing: 8, pace: 8, ballControl: 8, passing: 10 }, g.min, { next: () => 0.5 }));
 });
+test('cutback-backen (v3.16.7): uden back og kant på siden er det en forsvars-/midtbanespiller – aldrig angriberen, selv når han står nærmest', () => {
+  // Venstre kant (0,4) → forsvarets højre side: RB (4) og RM (8) er væk (ingen bænk), og angriberen (9) står på pletten (88, 72)
+  const setup = (a) => {
+    strongBacks()(a);
+    for (const p of a.A.squad) if (!a.A.tactics.lineupSlots.includes(p.id)) p.injuryMatchesLeft = 5;
+    a.A.tactics.lineupSlots[4] = null; a.A.tactics.lineupSlots[8] = null;
+    a.A.tactics.customCoords = { 9: { x: 88, y: 72 } };
+    for (const i of [5, 8]) Object.assign(slot(a.H, i).skills, { pace: 20, ballControl: 20 });
+  };
+  const r = cb({ next: 0.4, setup });
+  assert.ok(r.blocked.length === 2, `data: ${r.blocked.length}`);
+  const att = [9, 10].map((i) => slot(r.a.A, i)).filter(Boolean);
+  assert.ok(r.blocked.every((e) => att.every((p) => !e.text.includes(`${tg(p)} (`))), r.blocked[0].text);
+  // Kontrol: med RB på banen er det ham
+  const ok = cb({ next: 0.4, setup: (a) => { strongBacks()(a); for (const i of [5, 8]) Object.assign(slot(a.H, i).skills, { pace: 20, ballControl: 20 }); a.A.tactics.customCoords = { 9: { x: 88, y: 72 } }; } });
+  assert.ok(ok.blocked.every((e) => e.text.includes(`${tg(slot(ok.a.A, 4))} (`)), ok.blocked[0].text);
+});

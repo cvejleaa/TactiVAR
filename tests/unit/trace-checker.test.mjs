@@ -120,5 +120,5 @@ test('fund og rapport: målene med billede tælles, linje-fundet tæller kun bil
   assert.ok(rep.bytesPerMatch > 3000 && rep.bytesPerMatch < 25000, `${rep.bytesPerMatch}`);
   // 6 kampe · 30 billeder med bold = 180, heraf dem uden duel-udfald (104 i v3.16.6, 101 efter v3.16.7's rng-forskydning) – formlen
   // er bevist på M ovenfor; her kun, at rapporten summerer (et fast tal flyttede sig med hver motorændring)
-  assert.ok(rep.sum.frontFrames > 60 && rep.sum.frontFrames < 180, `${rep.sum.frontFrames}`);
+  assert.equal(rep.sum.frontFrames, 101);   // TM: fastholdt (et bånd rummede både 104 og 101); flytter sig ved bevidste motorændringer
 });

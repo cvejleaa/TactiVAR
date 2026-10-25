@@ -678,3 +678,14 @@ test('bot: med én skade (51\') må træthedsskiftet i 63\' tage pause 2 af 3 �
   const home = m.events.filter((e) => e.isHome && (e.type === 'SUB' || e.type === 'INJURY')).map((e) => `${e.min}:${e.type}`);
   assert.deepEqual(home, ['51:INJURY', '51:SUB', '63:SUB'], home.join(' '));
 });
+test('samling i 45\' (v3.16.7): "tages med i pausen" – pauserne er brugt af tre Hvis-Så-skift, så de trætte venter til halvlegen', () => {
+  const { H, A } = arena({ homeLimit: 70, homeBot: false });
+  const b = bench(H).filter((p) => p.line === 'DEF' || p.line === 'ATT'); for (const p of bench(H)) p.freshness = 100;   // midtbanens bænk spares til de trætte
+  const R = (i, min, out, inP) => ({ ruleId: i, minuteTrigger: min, condition: 'ANY', margin: 1, newFormation: '4-4-2', newPlan: null, slotRemapping: [...Array(11).keys()], action: 'SUB', subOut: out.id, subIn: inP.id });
+  H.tactics.conditionalRules = [R(1, 3, slot(H, 1), b[0]), R(2, 6, slot(H, 2), b[1]), R(3, 9, slot(H, 3), b[2])];
+  slot(H, 6).freshness = 72; slot(H, 7).freshness = 83;   // under grænsen fra 12' (pauserne er brugt); i 45' er #7 "tæt på" (70–75)
+  const m = simulateMatch(H, A, stubRng({}));
+  const at45 = m.events.filter((e) => e.type === 'SUB' && e.min === 45 && e.isHome).map((e) => e.text);
+  assert.equal(at45.length, 2, at45.join(' | '));
+  assert.match(at45[0], /under din grænse 70 %/); assert.match(at45[1], /tages med i pausen/);
+});

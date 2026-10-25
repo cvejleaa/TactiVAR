@@ -143,7 +143,8 @@ test('skift lige efter hinanden i samme tick står på samme minut; "tages med i
       }
     });
   }
-  assert.ok(pairs >= 20 && near45 + nearOther >= 3, `data: ${pairs} skift i samme tick, ${near45} samlet i pausen, ${nearOther} ellers`);
+  assert.ok(pairs >= 20 && nearOther >= 1,   // 45'-grenen: tvunget i fatigue-gaps ("samling i 45'")
+    `data: ${pairs} skift i samme tick, ${near45} samlet i pausen, ${nearOther} ellers`);
 });
 test('friskheden: "… til næste runde" – i sæsonens sidste runde "… til første runde i næste sæson" (friskheden følger med)', () => {
   let mid = 0, last = 0;
@@ -185,4 +186,54 @@ test('pause- og fuldtidsanalysen: uden opbygningsforsøg ingen "0 af 0 gange" �
     if (/Din opbygning (er kommet|kom) igennem \d+ af [1-9]/.test(e.text)) some++;
   }
   assert.ok(some >= 100, `data: ${some} med opbygning, ${none} kun pres`);
+});
+
+// ---------- Test Manager v3.16.7: huller i grenene ----------
+test('rødt kort – kanterne: 0-0 (intet afgørende mål), modstanderens kort tæller ikke som dit, uafgjort bruger SIDSTE mål, flertal', () => {
+  const st = (hR, aR) => ({ hPoss: 50, aPoss: 50, hReds: hR, aReds: aR });
+  assert.ok(mine(M({ ev: [[30, 'RED', true]], stats: st(1, 0) })).includes('Hjem fik rødt kort undervejs.'), '0-0 med rødt: neutral (ingen crash)');
+  // Kun MODSTANDERENS kort står i referatet før det afgørende mål – dit (uden hændelse) er neutralt
+  const opp = mine(M({ hG: 1, ev: [[10, 'RED', false], [20, 'GOAL', true, 1, 0]], stats: st(1, 1) }));
+  assert.ok(opp.includes('Hjem fik rødt kort undervejs.') && !opp.some((t) => /til trods/.test(t)), opp.join(' | '));
+  // Uafgjort 1-1: kort mellem 1-0 og 1-1 → før det sidste mål → "holdt point"
+  const draw = mine(M({ hG: 1, aG: 1, ev: [[10, 'GOAL', true, 1, 0], [20, 'RED', true], [30, 'GOAL', false, 1, 1]], stats: st(1, 0) }));
+  assert.ok(draw.includes('Hjem holdt point med 10 mand efter udvisningen.'), draw.join(' | '));
+  assert.ok(mine(M({ hG: 2, aG: 1, ev: [[10, 'GOAL', true, 1, 0], [20, 'GOAL', false, 1, 1], [30, 'GOAL', true, 2, 1], [80, 'RED', true], [85, 'RED', true]], stats: st(2, 0) })).includes('Hjem fik 2 røde kort undervejs.'));
+});
+test('"air"-opfølgningen tæller kun MODSTANDERENS dødboldshovedstød; "alle 3 mål"; reglens egen dom uden tilføjelse; "(heraf N offside)"', () => {
+  const H = (rows) => rows.map((f, i) => ({ round: i + 1, facts: { a1: { poss: 50, shots: 5, onTarget: 2, corners: 8, aerialWon: 3, counterGoals: 0, setPieceGoals: 0, headerGoals: 0, yellows: 0, reds: 0, reorganised: 0, goals: 1, against: 1, ...f } } }));
+  const air = STYLE_RULES.find((r) => r.key === 'air'), hist = H([{}, {}, {}, {}]);
+  const fu = (pool, aG, st = { hPoss: 50, aPoss: 50, aCorners: 2 }) => (buildColumn({ matches: [M({ aG, pool, stats: st })], history: hist, viewerTeamId: 'h1', round: 5 }).sections.find((s) => s.id === 'col-next')?.paras ?? []).find((t) => t.startsWith('Før kampen'));
+  const pre = `Før kampen skrev jeg, at Ude ${pickBy(air.say, 4, 'air', 'scout')}`;
+  assert.equal(fu([['CORNER', 'Hjem'], ['CORNER', 'Hjem'], ['COMBINATION', 'Ude']], 1), `${pre} – det gjorde de ikke mod jer.`, 'dit holds hjørnesparksmål tæller ikke');
+  assert.equal(fu([['CORNER', 'Ude'], ['SETPIECE', 'Ude'], ['CORNER', 'Ude']], 3), `${pre} – det holdt også mod jer: alle 3 mål kom på hovedstød efter dødbolde.`);
+  assert.equal(fu([['CORNER', 'Ude']], 1, { hPoss: 50, aPoss: 50, aCorners: 8 }), `${pre} – det holdt også mod jer.`, 'reglen holdt af sig selv (8 hjørnespark): ingen tilføjelse');
+  const R = (o) => ({ build: 8, buildWon: 2, press: 0, pressWon: 0, crosses: 0, crossesWon: 0, cutbacks: 0, cutbacksBlocked: 0, cutbackGoals: 0, runGoals: 0, counterGoalsAgainst: 0, start: { formation: '4-4-2' }, end: { formation: '4-4-2' }, ...o });
+  const v3 = [...Array(40).keys()].map((rd) => buildColumn({ matches: [M({ ownReports: { h1: R({ oppTrapWon: 3 }) } })], viewerTeamId: 'h1', round: rd }).sections[0].paras[1]).find((t) => t?.startsWith('Modstanderens pres'));
+  assert.equal(v3, 'Modstanderens pres lukkede 6 af 8 opbygninger (heraf 3 offside).');
+});
+test('FASE 1 VIRKER for andre hold: tre varianter, vary pr. hold (bot mod bot – dit hold er ikke med)', () => {
+  const FASE1 = (a, d) => [`${a} spiller sig igennem ${d}s pres.`, `${a} kommer forbi ${d}s pres.`, `${d}s pres bliver spillet over.`];
+  const seen = new Set(); let n = 0;
+  for (let s = 1; s <= 40; s++) {
+    const L = createLeague(createRng(s * 97)), bots = L.teams.filter((t) => t.isBot), [h, a] = [bots[s % 7], bots[(s + 3) % 7]];
+    const m = simulateMatch(h, a, createRng(s * 131));
+    const last = new Map();
+    for (const e of m.events.filter((x) => x.text?.startsWith('✅ [FASE 1 VIRKER • '))) {
+      const att = e.text.match(/^✅ \[FASE 1 VIRKER • (.+?)\] /)[1], def = att === h.name ? a.name : h.name;
+      const body = e.text.replace(/^✅ \[FASE 1 VIRKER • .+?\] /, '');
+      const v = FASE1(att, def.replace(/s$/, '')).findIndex((t) => body.startsWith(t) || body.startsWith(t.replace(`${def.replace(/s$/, '')}s`, `${def}'`)));
+      assert.ok(v >= 0, body); seen.add(v); n++;
+      assert.notEqual(last.get(att), v, `samme variant to gange i træk: ${att}`); last.set(att, v);
+    }
+  }
+  assert.ok(n >= 200 && seen.size === 3, `data: ${n} linjer, ${seen.size} varianter`);
+});
+test('ental: "1 høj bold (1 vundet luftduel …)" og "1 cutback (" står, aldrig "1 høje bolde"/"1 cutbacks"', () => {
+  let one = 0;
+  for (const m of [...C, ...seasonMatches]) for (const e of m.events.filter((x) => x.type === 'FULLTIME')) {
+    assert.ok(!/\b1 høje bolde|\b1 cutbacks|\b1 vundne luftdueller|\b1 afslutninger/.test(e.text), e.text);
+    if (/\b1 høj bold|\b1 cutback \(|\b1 vundet luftduel/.test(e.text)) one++;
+  }
+  assert.ok(one >= 3, `data: ${one} entalsformer`);
 });

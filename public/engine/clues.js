@@ -41,10 +41,7 @@ export const HEADER_PROSE = Object.freeze({
   low: ['et kluntet, men effektivt nik', 'et halvklodset nik, der alligevel gik ind', 'et skævt hovedstød, der fandt vej'],
 });
 export const headerBand = (aerialPower) => (aerialPower >= 15 ? HEADER_PROSE.high : aerialPower >= 11 ? HEADER_PROSE.mid : HEADER_PROSE.low);
-export function describeHeader(aerialPower, n = 0) {
-  const b = headerBand(aerialPower);
-  return b[n % b.length];
-}
+export const describeHeader = (aerialPower) => headerBand(aerialPower)[0];   // båndets første variant (scouting-ordet; referatet bruger vary)
 
 export function describeVarTiming(varPulse) {
   if (varPulse >= 14) return 'timede sit løb med iskold præcision';
