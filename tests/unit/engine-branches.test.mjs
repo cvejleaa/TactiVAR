@@ -2668,3 +2668,40 @@ test('VAR/flag (M1): oplægsgiveren står forrest, men tjekkes ikke – kontraen
   assert.ok(flags.length >= 1, `data: ${flags.length} flag`);
   assert.ok(flags.every((e) => !e.text.includes(`${tg(slot(b.H, 5))} (`)), flags[0]?.text);
 });
+
+// ---------- v3.17.0: halvchancen (terning-scriptet: kun HALF_P.OPEN slået til – ingen duel, ingen chance, ingen dødbolde) ----------
+const HM = await import('../../public/engine/match.js');
+test('halvchancen: gkFactor og finFactor – tallene og grænserne', () => {
+  assert.equal(HM.gkFactor(10), 1); assert.ok(Math.abs(HM.gkFactor(6) - 1.24) < 1e-9 && Math.abs(HM.gkFactor(16) - 0.64) < 1e-9);
+  assert.equal(HM.gkFactor(-50), 1.8); assert.equal(HM.gkFactor(50), 0.5);
+  assert.equal(HM.finFactor(12), 1); assert.equal(HM.finFactor(18), 1.5); assert.equal(HM.finFactor(6), 0.5); assert.equal(HM.finFactor(30), 1.5);
+});
+test('halvchancen: målet afgøres af xG · målmand · skytte – ved terningen 0,05 (kanten, xG 0,055): MV 6 scorer imod, MV 16 ikke; FIN 18 scorer, FIN 6 ikke', () => {
+  const play = (gk, fin) => {
+    const a = arena();
+    for (const p of a.H.squad) p.skills.finishing = fin;
+    slot(a.A, 0).skills.goalkeeping = gk;
+    return simulateMatch(a.H, a.A, stubRng({ [HM.HALF_P.OPEN]: true }, 0.05));
+  };
+  // FIN 10 (0,833): MV 6 → 0,055·1,24·0,833 = 0,057 > 0,05 mål; MV 16 → 0,029 redning (med gkFactor = 1: 0,046 – ingen mål)
+  const weak = play(6, 10), strong = play(16, 10);
+  assert.ok(weak.homeGoals >= 20, `MV 6: ${weak.homeGoals}`);
+  assert.equal(strong.homeGoals, 0);
+  // MV 10: FIN 18 → 0,0825 mål; FIN 6 → 0,0275 ingen (med finFactor = 1: 0,055 – mål for begge)
+  assert.ok(play(10, 18).homeGoals >= 20);
+  assert.equal(play(10, 6).homeGoals, 0);
+});
+test('halvchancen: en let redning tæller i 🧤, men ikke i karakterfradraget – 30 lette redninger giver ikke 6,5 i fradrag; efter et mål på halvchancen ingen ny afslutning i minuttet', () => {
+  const a = arena();
+  const m = simulateMatch(a.H, a.A, stubRng({ [HM.HALF_P.OPEN]: true }, 0.5));   // terningen 0,5: aldrig mål, aldrig forbi → redning hver gang
+  const gk = rOf(m, 'away', a.A, 0);
+  assert.equal(gk.saves, 30, 'data: 30 lette redninger');
+  assert.ok(!('easySaves' in gk), 'det midlertidige felt gemmes ikke');
+  assert.ok(gk.rating >= 9, `rating ${gk.rating} (med fradraget: 6,5 + 3 + 0,5 − 0,25·26 = 3,5)`);
+  assert.equal(m.events.filter((e) => e.type === 'SAVE' && e.minor).length, 30);
+  // Mål på halvchancen (terningen 0,001) med chancen også slået til: chancen kommer ikke i samme minut
+  const b = arena();
+  const g = simulateMatch(b.H, b.A, stubRng({ [HM.HALF_P.OPEN]: true, [HM.CHANCE_P.NORMAL]: true }, 0.001));
+  assert.ok(g.homeGoals >= 20, `data: ${g.homeGoals} mål`);
+  assert.equal(g.stats.hShots, g.homeGoals, 'én afslutning pr. minut – halvchancens mål');
+});
