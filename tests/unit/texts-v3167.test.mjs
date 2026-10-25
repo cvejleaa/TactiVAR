@@ -55,9 +55,9 @@ test('opfølgning på "air": hovedstød efter dødbolde tæller med – "det hol
   const hist = H([{}, {}, {}, {}]);
   const fu = (pool, aG) => (buildColumn({ matches: [M({ aG, pool, stats: { hPoss: 50, aPoss: 50, aCorners: 2 } })], history: hist, viewerTeamId: 'h1', round: 5 }).sections.find((s) => s.id === 'col-next')?.paras ?? []).find((t) => t.startsWith('Før kampen'));
   const pre = `Før kampen skrev jeg, at Ude ${pickBy(air.say, 4, 'air', 'scout')}`;
-  assert.equal(fu([['CORNER', 'Ude'], ['SETPIECE', 'Ude']], 2), `${pre} – det holdt også mod jer – begge deres mål kom på hovedstød efter dødbolde.`);
-  assert.equal(fu([['CORNER', 'Ude']], 1), `${pre} – det holdt også mod jer – deres eneste mål kom på hovedstød efter dødbolde.`);
-  assert.equal(fu([['CORNER', 'Ude'], ['COMBINATION', 'Ude']], 2), `${pre} – det holdt også mod jer – 1 af deres mål kom på hovedstød efter dødbolde.`, 'halvdelen af målene');
+  assert.equal(fu([['CORNER', 'Ude'], ['SETPIECE', 'Ude']], 2), `${pre} – det holdt også mod jer: begge deres mål kom på hovedstød efter dødbolde.`);
+  assert.equal(fu([['CORNER', 'Ude']], 1), `${pre} – det holdt også mod jer: deres eneste mål kom på hovedstød efter dødbolde.`);
+  assert.equal(fu([['CORNER', 'Ude'], ['COMBINATION', 'Ude']], 2), `${pre} – det holdt også mod jer: 1 af deres mål kom på hovedstød efter dødbolde.`, 'halvdelen af målene');
   assert.equal(fu([['CORNER', 'Ude'], ['COMBINATION', 'Ude'], ['LONGSHOT', 'Ude']], 3), `${pre} – det gjorde de ikke mod jer.`, '1 af 3 er ikke luft-holdet (QC F3)');
   assert.equal(fu([], 0), `${pre} – det gjorde de ikke mod jer.`);
 });
@@ -76,7 +76,7 @@ const C = corpus(300);
 test('offside: det fulde banner "[DIN OFFSIDE-FÆLDE VIRKER] … dirigerer linjen perfekt" højst én gang pr. halvleg – resten den korte linje', () => {
   let full = 0, short = 0;
   for (const m of C) for (const half of [1, 2]) {
-    const ev = m.events.filter((e) => e.label === 'Offside-fælde virker' && e.text.startsWith('✅ [DIN OFFSIDE-FÆLDE') && (half === 1 ? e.min <= 45 : e.min > 45));
+    const ev = m.events.filter((e) => e.label === 'Offside-fælde virker' && e.text.startsWith('✅ [DIN OFFSIDE-FÆLDE') && (half === 1 ? e.min < 45 : e.min >= 45));
     const f = ev.filter((e) => e.text.includes('dirigerer linjen perfekt'));
     assert.ok(f.length <= 1, `${f.length} fulde i ${half}. halvleg`);
     if (ev.length) assert.ok(ev[0].text.startsWith('✅ [DIN OFFSIDE-FÆLDE VIRKER]'), `første er det fulde: ${ev[0].text}`);
@@ -137,7 +137,7 @@ test('skift lige efter hinanden i samme tick står på samme minut; "tages med i
   for (const m of seasonMatches) {
     m.events.forEach((e, i) => {
       const p = m.events[i - 1];
-      if (e.type === 'SUB' && p?.type === 'SUB' && p.min === e.min) { assert.deepEqual(e.clock, p.clock, `${e.min}: ${JSON.stringify(p.clock)} / ${JSON.stringify(e.clock)}`); pairs++; }
+      if (e.type === 'SUB' && p?.type === 'SUB' && p.min === e.min && p.isHome === e.isHome) { assert.deepEqual(e.clock, p.clock, `${e.min}: ${JSON.stringify(p.clock)} / ${JSON.stringify(e.clock)}`); pairs++; }
       if (e.type === 'SUB' && /tages med i/.test(e.text)) {
         if (e.min === 45) { assert.match(e.text, /tages med i pausen/); near45++; } else { assert.match(e.text, /tages med i samme skifte-pause/); nearOther++; }
       }
@@ -173,7 +173,16 @@ test('pres (M2): trapWon = referatets offside-fælder for holdet; pressWon tæll
   // Klummen: med fælder "stoppede opbygningen … (X erobringer, Z offside)"; uden (eller gammelt gem) "vandt bolden"
   const R = (o) => ({ build: 0, buildWon: 0, press: 6, pressWon: 4, crosses: 0, crossesWon: 0, cutbacks: 0, cutbacksBlocked: 0, cutbackGoals: 0, runGoals: 0, counterGoalsAgainst: 0, start: { formation: '4-4-2' }, end: { formation: '4-4-2' }, ...o });
   const v = (r) => buildColumn({ matches: [M({ ownReports: { h1: r } })], viewerTeamId: 'h1', round: 5 }).sections[0].paras.slice(1);
-  assert.deepEqual(v(R({ trapWon: 3 })), ['Dit pres stoppede opbygningen 4 af 6 gange (1 erobring, 3 offside).']);
+  assert.deepEqual(v(R({ trapWon: 3 })), ['Dit pres stoppede opbygningen 4 af 6 gange (1 erobring, 3 på offside).']);
   assert.deepEqual(v(R({ trapWon: 0 })), ['Dit pres vandt bolden 4 af 6 gange.']);
   assert.deepEqual(v(R({})), ['Dit pres vandt bolden 4 af 6 gange.'], 'gammelt gem uden trapWon');
+});
+test('pause- og fuldtidsanalysen: uden opbygningsforsøg ingen "0 af 0 gange" – kun presset; med forsøg begge dele', () => {
+  let none = 0, some = 0;
+  for (const m of C) for (const e of m.events.filter((x) => x.type === 'HALFTIME' || x.type === 'FULLTIME')) {
+    assert.ok(!/igennem 0 af 0 gange/.test(e.text), e.text);
+    if (/Dit pres (har vundet|vandt|har stoppet|stoppede)/.test(e.text)) none++;
+    if (/Din opbygning (er kommet|kom) igennem \d+ af [1-9]/.test(e.text)) some++;
+  }
+  assert.ok(some >= 100, `data: ${some} med opbygning, ${none} kun pres`);
 });

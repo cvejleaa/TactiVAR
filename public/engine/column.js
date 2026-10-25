@@ -100,7 +100,7 @@ function yourVerdict(r, mine, round) {
   // Årsagen kun med belæg (QC F2); uden den ingen "Det kostede:" – det lovede en årsag (Spilfører v3.16.6, R12)
   if (r.counterGoalsAgainst >= 1) out.push([3, ph.offBallRuns === 'MANY' ? `Det kostede: ${r.counterGoalsAgainst === 1 ? 'et kontramål' : `${r.counterGoalsAgainst} kontramål`} imod, da bolden blev tabt med mange spillere fremme.`
     : r.counterGoalsAgainst === 1 ? 'Ét af målene imod kom på kontra.' : `${r.counterGoalsAgainst} af målene imod kom på kontra.`]);
-  if (r.press >= 4 && r.pressWon / r.press >= 0.5) out.push([2, r.trapWon ? `Dit pres stoppede opbygningen ${r.pressWon} af ${pl(r.press, 'gang', 'gange')} (${pl(r.pressWon - r.trapWon, 'erobring', 'erobringer')}, ${r.trapWon} offside).` : `Dit pres vandt bolden ${r.pressWon} af ${pl(r.press, 'gang', 'gange')}.`]);   // gamle gem uden trapWon: som før
+  if (r.press >= 4 && r.pressWon / r.press >= 0.5) out.push([2, r.trapWon ? `Dit pres stoppede opbygningen ${r.pressWon} af ${pl(r.press, 'gang', 'gange')} (${pl(r.pressWon - r.trapWon, 'erobring', 'erobringer')}, ${r.trapWon} på offside).` : `Dit pres vandt bolden ${r.pressWon} af ${pl(r.press, 'gang', 'gange')}.`]);   // gamle gem uden trapWon: som før
   if (r.runGoals >= 1) out.push([3, `Løbene uden bold gav ${r.runGoals === 1 ? 'et mål' : `${r.runGoals} mål`}.`]);
   if (r.start?.formation && r.end?.formation && r.start.formation !== r.end.formation) out.push([2, pickBy([`Skiftet fra ${r.start.formation} til ${r.end.formation} undervejs.`, `I gik fra ${r.start.formation} til ${r.end.formation} i løbet af kampen.`, `Formationen blev lagt om fra ${r.start.formation} til ${r.end.formation}.`, `Undervejs blev ${r.start.formation} til ${r.end.formation}.`, `Holdet sluttede i ${r.end.formation} efter at have startet i ${r.start.formation}.`], round, 'sw')]);   // neutralt: skiftet alene beviser ikke udfaldet (QC F4)
   return out.sort((a, b) => b[0] - a[0]).slice(0, 2).map(([, t]) => t);   // højst 2 sætninger om dit hold (Spilfører)
@@ -240,8 +240,8 @@ export function buildColumn({ matches = [], gazette = null, history = [], table 
       const spHead = vf.goals.filter((g) => g.teamName === opp.name && (g.kind === 'CORNER' || g.kind === 'SETPIECE')).length;
       const airAll = opp.headerGoals + spHead;
       const held = k === 'wait' ? opp.poss < 50 && opp.goals >= 1 : k === 'air' ? before.rule.test(opp) || (airAll >= 1 && airAll * 2 >= opp.goals) : before.rule.test(opp);
-      const why = k === 'wait' && opp.goals >= 1 && !before.rule.test(opp) ? (held ? ` – de scorede med ${opp.poss} % af bolden` : `, men de havde ${opp.poss} % af bolden mod jer`)
-        : k === 'air' && held && spHead && !before.rule.test(opp) ? ` – ${spHead === opp.goals ? (spHead === 1 ? 'deres eneste mål' : spHead === 2 ? 'begge deres mål' : `alle ${spHead} mål`) : `${spHead} af deres mål`} kom på hovedstød efter dødbolde` : '';
+      const why = k === 'wait' && opp.goals >= 1 && !before.rule.test(opp) ? (held ? `: de scorede med ${opp.poss} % af bolden` : `, men de havde ${opp.poss} % af bolden mod jer`)
+        : k === 'air' && held && spHead && !before.rule.test(opp) ? `: ${spHead === opp.goals ? (spHead === 1 ? 'deres eneste mål' : spHead === 2 ? 'begge deres mål' : `alle ${spHead} mål`) : `${spHead} af deres mål`} kom på hovedstød efter dødbolde` : '';
       preview.push(held ? `${said} – det holdt også mod jer${why}.` : k === 'wait' && opp.goals >= 1 ? `${said} – de scorede igen${why}.` : `${said} – det gjorde de ikke mod jer.`);
     }
   }

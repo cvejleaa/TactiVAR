@@ -242,9 +242,13 @@ const endOf = (s, full) => ({ formation: s.tactics.baseFormation, starters: s.st
 // er med i pressets tal (presset stoppede opbygningen), men står for sig – og din egen opbygnings offsides ligeså.
 function duelText(d, o, half = false) {
   const off = o.trapWon, trap = d.trapWon;
-  return `Din opbygning ${half ? 'er kommet' : 'kom'} igennem ${d.buildWon} af ${pl(d.build, 'gang', 'gange')}${off ? ` (${off} ${off === 1 ? 'gang' : 'gange'} fanget offside)` : ''}; `
-    + (trap ? `dit pres ${half ? 'har stoppet' : 'stoppede'} opbygningen ${d.pressWon} af ${pl(d.press, 'gang', 'gange')} (${pl(d.pressWon - trap, 'erobring', 'erobringer')}, ${trap} offside).`
-      : `dit pres ${half ? 'har vundet' : 'vandt'} bolden ${d.pressWon} af ${pl(d.press, 'gang', 'gange')}.`);
+  const press = trap ? `dit pres ${half ? 'har stoppet' : 'stoppede'} opbygningen ${d.pressWon} af ${pl(d.press, 'gang', 'gange')} (${pl(d.pressWon - trap, 'erobring', 'erobringer')}, ${trap} på offside).`
+    : `dit pres ${half ? 'har vundet' : 'vandt'} bolden ${d.pressWon} af ${pl(d.press, 'gang', 'gange')}.`;
+  const build = `Din opbygning ${half ? 'er kommet' : 'kom'} igennem ${d.buildWon} af ${pl(d.build, 'gang', 'gange')}${off ? ` (af de ${d.build - d.buildWon} stop var ${off} offside)` : ''}`;
+  // Aldrig "0 af 0 gange" (Spilfører v3.16.7): kun de dele, kampen havde
+  if (!d.press) return `${build}.`;
+  if (!d.build) return `${press[0].toUpperCase()}${press.slice(1)}`;
+  return `${build}; ${press}`;
 }
 
 // Fuldtids-analysens angrebsdel (QC v3.12): kun de dele, dine valg (eller kampen) gav – ellers
@@ -1122,7 +1126,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
           // Kun din egen offside-fælde navngives; hos modstandere er det blot en offside.
           // Det fulde banner første gang pr. halvleg, derefter en kort linje (v3.16.7, Spilfører: 399 banner-linjer på en sæson,
           // "dirigerer linjen perfekt" 30 gange) – intet rng
-          const half = min <= 45 ? 1 : 2, shown = (def.trapShown ||= new Set()).has(half);
+          const half = min < 45 ? 1 : 2, shown = (def.trapShown ||= new Set()).has(half);   // 45'-tick'et er 2. halvlegs første (efter pausen – clock.js)
           def.trapShown.add(half);
           const offTxt = own(def) ? (shown ? `✅ [DIN OFFSIDE-FÆLDE] ${vary([`${tag(striker)} (${att.team.name}) fanget offside igen – ${tag(back)} holder linjen.`, `Offside igen: ${tag(striker)} (${att.team.name}) går for tidligt.`, `Linjen holder – ${tag(striker)} (${att.team.name}) står offside.`], 'trap', def.team.id)}`
               : `✅ [DIN OFFSIDE-FÆLDE VIRKER] ${tag(striker)} (${att.team.name}) fanges. ${tag(back)} dirigerer linjen perfekt.`)

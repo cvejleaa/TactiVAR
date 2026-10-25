@@ -55,8 +55,8 @@ export function assignClock(events, minClock = new Map()) {
         const lo = Math.floor((j * w) / n), span = Math.max(1, Math.floor(((j + 1) * w) / n) - lo);
         // Skift lige efter hinanden i tick'et er samme skifte-pause – samme minut (v3.16.7, Spilfører: "tages med i samme pause"
         // stod ved 76', 76' og 77')
-        const samePause = j > 0 && events[i].type === 'SUB' && events[idx[j - 1]].type === 'SUB';
-        let m = samePause ? prev : Math.max(prev, a + lo + (hashOf(`${k}|${i}|${events[i].type}`) % span), minClock.get(i) ?? 0);
+        const pv = j > 0 ? events[idx[j - 1]] : null, samePause = events[i].type === 'SUB' && pv?.type === 'SUB' && pv.isHome === events[i].isHome;   // samme hold
+        let m = samePause ? Math.max(prev, minClock.get(i) ?? 0) : Math.max(prev, a + lo + (hashOf(`${k}|${i}|${events[i].type}`) % span), minClock.get(i) ?? 0);   // aldrig før reglens minut (QC)
         prev = m;
         events[i].clock = asClock(h, m);
       });

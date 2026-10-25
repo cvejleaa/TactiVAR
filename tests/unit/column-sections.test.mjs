@@ -214,7 +214,7 @@ test('afsnit 5: opfølgning på spådommens to dele ("wait") – scorede de, men
   // v3.16.7 (Spilfører: "havde mere af bolden" ved 47 %): procenten står; under 50 % holdt den, fra 50 % ikke
   assert.equal(fu(W, 1, 1, { hPoss: 40, aPoss: 60 }), `${pre}de scorede igen, men de havde 60 % af bolden mod jer.`, '60 % og 1 mål: besiddelsen holdt ikke');
   assert.equal(fu(W, 0, 2, { hPoss: 40, aPoss: 60 }), `${pre}de scorede igen, men de havde 60 % af bolden mod jer.`, '2 mål tæller også');
-  assert.equal(fu(W, 1, 1, { hPoss: 53, aPoss: 47 }), `${pre}det holdt også mod jer – de scorede med 47 % af bolden.`, '47 % er under halvdelen: det holdt (før: "mere af bolden")');
+  assert.equal(fu(W, 1, 1, { hPoss: 53, aPoss: 47 }), `${pre}det holdt også mod jer: de scorede med 47 % af bolden.`, '47 % er under halvdelen: det holdt (før: "mere af bolden")');
   assert.equal(fu(W, 1, 1, { hPoss: 50, aPoss: 50 }), `${pre}de scorede igen, men de havde 50 % af bolden mod jer.`, '50 % er ikke under halvdelen');
   assert.equal(fu(W, 1, 0, { hPoss: 70, aPoss: 30 }), `${pre}det gjorde de ikke mod jer.`, '30 %, men ingen mål: "scorede igen" ville være forkert');
   assert.equal(fu(W, 1, 0, { hPoss: 40, aPoss: 60 }), `${pre}det gjorde de ikke mod jer.`, 'hverken lidt bold eller mål');
