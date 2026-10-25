@@ -47,7 +47,19 @@ const WIDE_ROLES = new Set(['LB', 'RB', 'LWB', 'RWB', 'LM', 'RM', 'LW', 'RW']); 
 // skud. Beslutningen kan også blive påvirket af spillerens evner til skud eller aflevering").
 export const CHANCE_P = { FEW: 0.285, NORMAL: 0.3, MANY: 0.36 };
 // v3.17.0 (opbygningen styrer chancen): løft efter vundet opbygning, dæmpning uden duel – se tick'ets chance
-export const BUILD_LIFT_P = 0.432, OPEN_DAMP_P = 0.498;   // P(chance) ≈ 0,60 efter vundet opbygning, ≈ 0,15 uden duel (før 0,30 begge)
+// Løftet pr. "Løb uden bold" (v3.17.0): Mange/Få bevarer deres forhold til Normal (≈ ×1,2 / ×0,95) også efter en vundet opbygning
+// – med ét løft for alle forsvandt forskellen (balance-testen: Mange +0,04 mål for mod Hold på bolden, skal ≥ 0,06).
+export const BUILD_LIFT_P = { FEW: 0.298, NORMAL: 0.331, MANY: 0.418 }, OPEN_DAMP_P = 0.712;   // P(chance) ≈ 0,66 efter vundet opbygning, ≈ 0,125 uden duel (Normal; før 0,30 begge)
+// Halvchancen (v3.17.0, brugeren: "fuldt realistisk" – ≈ 25 afslutninger pr. kamp): et skud uden stor fare oven i tick'et (ikke
+// efter tabt bold eller et mål i samme tick), oftere efter vundet opbygning. Udfaldet er en lodtrækning på xG (HALF_XG) gange
+// målmandens og skyttens faktor – ikke keeper-duellen. Egne p-værdier (unik-vagten i var-check.test.mjs).
+export const HALF_P = { BUILD: 0.761, OPEN: 0.531 };   // efter tabt bold (LOST) ingen
+export const HALF_XG = { GOAL: 0.02, EDGE: 0.055 };
+export const HALF_MISS_P = 0.613, HALF_SAVE_ADJ = 0.1, GK_SLOPE = 0.06;
+// Hjørne efter en blokeret halvchance / en redning, der tippes ud (v3.17.0: færre hovedchancer gav færre hjørner – 2,4 pr. kamp)
+export const HALF_CORNER_P = { BLOCK: 0.147, SAVE: 0.071 };
+export const gkFactor = (gk) => Math.max(0.5, Math.min(1.8, 1 + GK_SLOPE * (10 - gk)));   // gk = målmandens evne · friskhed
+export const finFactor = (fin) => Math.max(0.5, Math.min(1.5, fin / 12));                // fin = skyttens afslutning · friskhed
 export const RUN_WEIGHT = {
   ST: { FEW: 3, NORMAL: 3, MANY: 3 }, WIDE: { FEW: 2, NORMAL: 2.5, MANY: 3 }, CM: { FEW: 1, NORMAL: 1.5, MANY: 2.5 },
   FB: { FEW: 0.2, NORMAL: 0.8, MANY: 2 }, CB: { FEW: 0.05, NORMAL: 0.1, MANY: 0.3 },
@@ -725,7 +737,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
     const varOk = varGoalCheck(att, def, dR, min, finisher, null, kind === 'CUTBACK', helper);
     if (varOk === null) return false;
     goalFor(att);
-    const kd = typeof kind === 'function' ? kind() : kind, solo = kd === 'LONGSHOT' || kd === 'DRIBBLE';
+    const kd = typeof kind === 'function' ? kind() : kind, solo = kd === 'LONGSHOT' || kd === 'DRIBBLE' || kd === 'SCRAMBLE';   // SCRAMBLE: løs bold i feltet (halvchancen) – intet oplæg
     shotLong = kd === 'LONGSHOT';
     onGoal?.(kd);
     bookKind(att, finisher, kd);
@@ -772,6 +784,49 @@ export function simulateMatch(home, away, rng, opts = {}) {
     // – og så kun "men X redder" (Spilfører v3.16.6: skytten stod ellers to gange i samme linje)
     addEv(min, 'SAVE', 'PLAY', def.isHome, false, 'Redning', lead ? `🧤 [${def.team.name}] ${lead.replace('✅ ', '').replace(/\.$/, '')} – men ${tag(gk)} redder.` : `🧤 [${def.team.name}] Flot redning af ${tag(gk)} på afslutning fra ${tag(finisher)} (${att.team.name}).`);
     if (rng.chance(CORNER_P)) corner(att, def, cR, dR, min);
+    return false;
+  }
+  // Halvchancen (v3.17.0): et skud uden stor fare – fra kanten af feltet eller en løs bold i feltet. Mål efter xG · målmand ·
+  // skytte (lodtrækning, ikke keeper-duellen); ellers forbi/blokeret (egne tekster uden stolpe – stolpen er et højdepunkt,
+  // Spilfører) eller en let redning (easySaves: tæller i 🧤, ikke i fradraget). Ingen hjørne og intet flag. Linjerne er
+  // dæmpede (minor), og øjeblikket er mærket half – Højdepunkter viser det kun som mål. Returnerer om der blev scoret.
+  const HALF_MISS_TXT = ['skyder forbi', 'sender bolden over mål', 'skyder et godt stykke forbi', 'får ikke ramt den rent – den går forbi', 'skyder over'];
+  const halfMissUsed = new Set();
+  function halfChance(att, def, cR, dR, min) {
+    const spot = shotSpotFor(rng.next(), def.tactics.phases.phase2_defending.pressingHeight);
+    const shooter = receiver(att, spot, (p) => p.skills.finishing, null, { attacking: true, ballX: 50 }, SHOT_REACH);
+    const sp = seen[att.team.id]?.[att.starters.indexOf(shooter)], long = !!sp && sp.y >= LONGSHOT_Y;
+    shotSide = att; shotCaught = false; setPieceNow = false; shotBy = shooter; shotLong = long; momentCheck = null;
+    const xg = spot === SPOT.EDGE ? HALF_XG.EDGE : HALF_XG.GOAL, gk = dR.gk;
+    st[k(att, 'Shots')]++; st[k(att, 'Xg')] += xg;
+    const mark = () => { const mo = trace.moments.at(-1); if (mo && mo.ev === events.length - 1) mo.half = true; events.at(-1).minor = true; };
+    if (rng.next() < xg * gkFactor(gk.skills.goalkeeping * ff(gk)) * finFactor(shooter.skills.finishing * ff(shooter))) {
+      return scoreFinish(att, def, dR, min, shooter, null, long ? 'LONGSHOT' : 'SCRAMBLE');
+    }
+    const how = long ? 'skuddet fra distancen' : 'skuddet';
+    if (rng.chance(HALF_MISS_P)) {
+      if (rng.chance(MISS_BLOCK_SHARE)) {
+        const blocker = rng.pick(dR.defs) ?? gk;
+        sheet.adjust(blocker.id, 0.05);
+        addEv(min, 'MISS', 'PLAY', def.isHome, false, 'Blokeret', `🧱 [${def.team.name}] ${tag(blocker)} kaster sig ind foran ${how} fra ${tag(shooter)} (${att.team.name}).`);
+        mark();
+        if (rng.chance(HALF_CORNER_P.BLOCK)) corner(att, def, cR, dR, min);
+        return false;
+      } else {
+        const r = rng.next(), free = HALF_MISS_TXT.filter((t) => !halfMissUsed.has(t)), miss = free[Math.floor(r * free.length)];
+        halfMissUsed.add(miss); if (halfMissUsed.size === HALF_MISS_TXT.length) halfMissUsed.clear();
+        addEv(min, 'MISS', 'PLAY', att.isHome, false, 'Forbi', `🎯 [${att.team.name}] ${tag(shooter)} ${miss}${long ? ' fra distancen' : ''}.`);
+      }
+      mark();
+      return false;
+    }
+    st[k(att, 'OnTarget')]++;
+    sheet.adjust(gk.id, HALF_SAVE_ADJ); sheet.bump(gk.id, 'easySaves');
+    const out = rng.chance(HALF_CORNER_P.SAVE);   // tippet ud til hjørne – ellers griber han
+    addEv(min, 'SAVE', 'PLAY', def.isHome, false, 'Redning', out ? `🧤 [${def.team.name}] ${tag(gk)} tipper ${how} fra ${tag(shooter)} (${att.team.name}) ud til hjørnespark.`
+      : `🧤 [${def.team.name}] ${tag(gk)} ${vary(['griber', 'samler', 'har styr på'], 'easy', gk.id)} ${how} fra ${tag(shooter)} (${att.team.name}).`);
+    mark();
+    if (out) corner(att, def, cR, dR, min);
     return false;
   }
   // Cutback (v3.12): en kantspiller går mod baglinjen (side efter terning) og møder den back, der
@@ -1257,8 +1312,11 @@ export function simulateMatch(home, away, rng, opts = {}) {
     // Et rødt kort stopper spillet (v3.15, QC): resten af minuttet springes over, så den udviste ikke dukker op igen i
     // samme tick fra de lister (hR/aR), der blev lavet før udvisningen. Næste tick bygger dem uden ham.
     if (sentOffThisTick) { sentOffThisTick = false; continue; }
+    // Halvchancen før tick'ets dødbolde og chance (v3.17.0): ikke efter tabt bold; scores der, kommer der ingen ny afslutning
+    const halfGoal = !ballLost && rng.chance(HALF_P[tickDuel] ?? HALF_P.OPEN) && halfChance(att, def, att === H ? hR : aR, def === H ? hR : aR, min);
     // Dødbolde til holdet med bolden (v3.10): straffe, frispark i skudafstand – ikke efter tabt bold.
-    if (!ballLost && rng.chance(PENALTY_P)) penalty(att, def, att === H ? hR : aR, def === H ? hR : aR, min);
+    if (halfGoal) { /* mål på halvchancen – minuttet er brugt */ }
+    else if (!ballLost && rng.chance(PENALTY_P)) penalty(att, def, att === H ? hR : aR, def === H ? hR : aR, min);
     else if (!ballLost && rng.chance(VAR_RULES.PEN_AWARD_P)) penalty(att, def, att === H ? hR : aR, def === H ? hR : aR, min, true);
     else if (!ballLost && rng.chance(FREEKICK_P)) freeKick(att, def, att === H ? hR : aR, def === H ? hR : aR, min);
     // Chance (30 %): angrebsfokus afgør typen (v3.12) – høj bold, cutback – ellers en afslutning (løb uden bold eller
@@ -1267,7 +1325,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
     // (BUILD_LIFT_P oven i), uden duel dæmpes den (OPEN_DAMP_P) – samlet omtrent lige mange chancer. Egne p-værdier, så
     // testenes scriptede terning (CHANCE_P.NORMAL = 0,3) er uændret.
     else if (!ballLost && !(tickDuel === 'OPEN' && rng.chance(OPEN_DAMP_P))
-      && (rng.chance(CHANCE_P[attPh.phase1_buildUp.offBallRuns] ?? CHANCE_P.NORMAL) || (tickDuel === 'BUILD' && rng.chance(BUILD_LIFT_P)))) {
+      && (rng.chance(CHANCE_P[attPh.phase1_buildUp.offBallRuns] ?? CHANCE_P.NORMAL) || (tickDuel === 'BUILD' && rng.chance(BUILD_LIFT_P[attPh.phase1_buildUp.offBallRuns] ?? BUILD_LIFT_P.NORMAL)))) {
       const cR = att === H ? hR : aR, dR = def === H ? hR : aR;
       const ph1 = attPh.phase1_buildUp, focus = ph1.attackFocus;
       const assister = rng.pick(cR.mids), defender = rng.pick(dR.defs), gk = dR.gk;

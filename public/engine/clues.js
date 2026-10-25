@@ -58,6 +58,11 @@ const GOAL_TEXTS = {
     (s, a) => `${s} prøvede lykken fra distancen – og bolden dalede ind under overliggeren.`,
     (s, a) => `Ingen så det komme: ${s} tog et træk og sendte et missil afsted fra langt ude.`,
   ],
+  SCRAMBLE: [   // v3.17.0: halvchancen i feltet – en løs bold, intet oplæg
+    (s, a) => `Bolden faldt løs i feltet, og ${s} var hurtigst og prikkede den ind.`,
+    (s, a) => `Et virvar foran mål – ${s} fik foden til bolden, og den sneg sig ind.`,
+    (s, a) => `${s} snappede en returbold i feltet og bragte den over stregen.`,
+  ],
   DRIBBLE: [
     (s, a) => `En dribletur for historiebøgerne: ${s} snoede sig forbi tre mand og satte bolden roligt ind.`,
     (s, a) => `${s} tog sagen i egen hånd, driblede sig forbi sin mand og afsluttede selv.`,
@@ -132,6 +137,7 @@ export function goalSpectacle(kind, { finishing = 10, pace = 10, ballControl = 1
     COUNTER: 5.5 + pace * 0.2 + r * 4,   // v3.9: rigtige kontraer er hyppigere (før 7 + …)
     CUTBACK: 8 + passing * 0.3 + r * 4,   // v3.9: en flot tværaflevering kan nå avisen (før 6 + PAS·0,15)
     COMBINATION: 5 + passing * 0.2 + r * 4,
+    SCRAMBLE: 3 + finishing * 0.15 + r * 3,   // v3.17.0: et rodet mål er sjældent rundens flotteste
     HEADER: 5 + aerialPower * 0.4 + r * 4,
     PENALTY: 3 + r * 3,                        // v3.10: et straffespark er sjældent rundens flotteste
     FREEKICK: 11 + finishing * 0.3 + r * 4,

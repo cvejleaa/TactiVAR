@@ -103,13 +103,13 @@ test('forbi mål: samme "🎯"-tekst gentages ikke i en kamp, før alle seks er 
   let n = 0, rounds = 0;
   for (const m of C) {
     const used = new Set();
-    for (const e of m.events.filter((x) => x.type === 'MISS' && x.text.startsWith('🎯'))) {
+    for (const e of m.events.filter((x) => x.type === 'MISS' && !x.minor && x.text.startsWith('🎯'))) {   // halvchancens forbi (minor) har sin egen liste (v3.17.0)
       const t = MISS_TXT.find((x) => e.text.endsWith(` ${x}.`)); assert.ok(t, e.text);
       assert.ok(!used.has(t), `gentaget før alle var brugt: ${t}`); used.add(t); n++;
       if (used.size === MISS_TXT.length) { used.clear(); rounds++; }
     }
   }
-  assert.ok(n >= 250, `data: ${n} forbi-linjer`);   // ≈1 pr. kamp – "alle seks brugt" bevises i engine-branches (tvunget)
+  assert.ok(n >= 180, `data: ${n} forbi-linjer`);   // v3.17.0: 250 → 180 (færre hovedchancer; halvchancens forbi har sin egen liste)   // ≈1 pr. kamp – "alle seks brugt" bevises i engine-branches (tvunget)
 });
 test('vary + runden: samme kamp i to forskellige runder giver (for nogle aktører) en anden første variant – og samme kamp', () => {
   const a = corpus(40, 0), b = corpus(40, 1);

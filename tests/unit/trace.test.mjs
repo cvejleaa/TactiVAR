@@ -62,10 +62,10 @@ test('afslutningerne har et billede (mål, redning, forbi, VAR-tjek), dødbolde 
   for (const k of ['GOAL', 'SAVE', 'MISS']) assert.ok((kinds[k] ?? 0) >= 20, `${k}: ${JSON.stringify(kinds)}`);
 });
 
-test('sporet er deterministisk og lille (under 25 KB pr. kamp – fire kampe i seneste runde)', () => {
+test('sporet er deterministisk og lille (under 32 KB pr. kamp – v3.17.0: 25 → 32, halvchancen giver ≈ 12 øjeblikke mere – fire kampe i seneste runde)', () => {
   for (const s of [1, 2, 3]) {
     const a = JSON.stringify(play(s).trace), b = JSON.stringify(play(s).trace);
     assert.equal(a, b);
-    assert.ok(a.length < 25000, `${a.length} tegn`);
+    assert.ok(a.length < 32000, `${a.length} tegn`);
   }
 });

@@ -2364,7 +2364,7 @@ test('goalSpectacle for dødbolde: straffespark sjældent flot, frispark på FIN
 });
 test('avisens etiketter for alle måltyper (også de fire dødbolde)', async () => {
   const { GOAL_KIND_LABEL } = await import('../../public/engine/gazette.js');
-  assert.deepEqual(GOAL_KIND_LABEL, { LONGSHOT: 'Langskud', DRIBBLE: 'Dribletur', COUNTER: 'Kontra', CUTBACK: 'Cutback', COMBINATION: 'Kombination', HEADER: 'Hovedstød', VAR: 'VAR-drama', PENALTY: 'Straffespark', FREEKICK: 'Frispark', CORNER: 'Hjørnespark', SETPIECE: 'Frisparksindlæg' });
+  assert.deepEqual(GOAL_KIND_LABEL, { LONGSHOT: 'Langskud', DRIBBLE: 'Dribletur', COUNTER: 'Kontra', CUTBACK: 'Cutback', COMBINATION: 'Kombination', SCRAMBLE: 'Løs bold i feltet', HEADER: 'Hovedstød', VAR: 'VAR-drama', PENALTY: 'Straffespark', FREEKICK: 'Frispark', CORNER: 'Hjørnespark', SETPIECE: 'Frisparksindlæg' });
 });
 
 test('kampstatistik: gule kort tælles løbende (st.*Yellows) og passer med karakterarkene; højst ét gult pr. spiller', () => {
@@ -2625,7 +2625,7 @@ test('frispark i samme tick som skade-tacklingen (TM v3.16.6): samme tackler i b
 test('modstanderens løbs-cutback (TM v3.16.6): hele linjen er "↩️ [hold] #N løber kommer forbi #M forsvarer (dit hold) og spiller bolden tilbage i feltet." – og aldrig for dit hold', async () => {
   const { createRng: cr } = await import('../../public/engine/rng.js');
   let seen = 0;
-  for (let s = 1; s <= 200; s++) {
+  for (let s = 1; s <= 260; s++) {   // v3.17.0: 200 → 260 (færre hovedchancer)
     const L = createLeague(cr(s * 97)), me = L.teams.find((t) => !t.isBot), opp = L.teams[(s % 7) + 1];
     const m = s % 2 ? simLive(me, opp, cr(s * 131)) : simLive(opp, me, cr(s * 131));
     const mineTags = new Set(me.squad.map(tg)), oppTags = new Set(opp.squad.map(tg));

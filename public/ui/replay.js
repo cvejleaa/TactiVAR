@@ -23,7 +23,8 @@ export function replaySteps(trace, highlights = false, events = null, idOf = nul
   const steps = [];
   for (const f of trace.frames) {
     if (!highlights) steps.push({ kind: 'frame', t: f.t, h: f.h, a: f.a, ball: f.ball, ev: null, poss: f.poss ?? null, duel: f.lost ? 'lost' : f.run ? 'run' : f.offside ? 'offside' : f.poss ? 'ball' : null });
-    for (const m of trace.moments.filter((x) => x.t === f.t)) {
+    // Højdepunkter: halvchancen (v3.17.0, half) kun som mål – ellers blev uddraget en halv afspilning (Spilfører)
+    for (const m of trace.moments.filter((x) => x.t === f.t && !(highlights && x.half && !x.scorer))) {
       const step = { kind: 'moment', t: m.t, h: m.h, a: m.a, ball: m.ball, ev: m.ev, actor: m.scorer ?? m.shooter, assist: m.assist ?? null };
       steps.push(step);
       const end = shotEnd(m, events?.[m.ev], idOf);

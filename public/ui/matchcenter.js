@@ -262,7 +262,7 @@ export function renderMatchCenter({ mc, myTeamId, on, column = null }) {
           const film = !mc.playing && moments.has(all.indexOf(e)) ? h('button', { class: 'mini replay-btn', title: 'Vis i afspilningen', onclick: () => on.replay(m, all.indexOf(e)) }, '🎬') : null;
           // 📍 kun hvor afspilningen ikke har afslutningen (gamle kampe uden spor – QC v3.16.3: ellers to knapper, én handling)
           const pin = e.snapshot && !mc.playing && !film ? h('button', { class: 'mini snap-btn', title: e.snapshot.attacking ? 'Se hvor dit hold stod, da målet faldt' : 'Se hvor dit forsvar stod, da målet faldt', onclick: () => on.snapshot(all.indexOf(e)) }, '📍') : null;
-          const row = h('div', { class: `ev ${e.category.toLowerCase()} ${e.type.toLowerCase()}${focus ? ' focus' : ''}${mc.snap === all.indexOf(e) ? ' snapped' : ''}`, id: focus ? 'goal-focus' : null }, h('span', { class: 'ev-min' }, evMin(e)), e.text, film, pin);
+          const row = h('div', { class: `ev ${e.category.toLowerCase()} ${e.type.toLowerCase()}${e.minor ? ' minor' : ''}${focus ? ' focus' : ''}${mc.snap === all.indexOf(e) ? ' snapped' : ''}`, id: focus ? 'goal-focus' : null }, h('span', { class: 'ev-min' }, evMin(e)), e.text, film, pin);
           // Tillægstid (v3.16.4): én linje før halvlegens tillægstid – i referatet (nyeste øverst) lige under ankeret
           const st = stopAt.get(e);
           return st ? [row, h('div', { class: 'ev info stoppage', id: `stoppage-${st.h}` }, h('span', { class: 'ev-min' }, st.h ? "90'" : "45'"), `⏱️ Tillægstid: ${st.S} min${st.var ? ` (heraf ${st.var} for VAR)` : ''}.`)] : row; }))),

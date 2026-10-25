@@ -23,6 +23,7 @@ globalThis.document = { createElement: (t) => new FakeEl(t), createTextNode: (t)
 const { createRng } = await import('../../public/engine/rng.js');
 const { createLeague } = await import('../../public/engine/generator.js');
 const { simulateMatch } = await import('../../public/engine/match.js');
+const { evMin } = await import('../../public/engine/clock.js');
 const { renderMatchCenter } = await import('../../public/ui/matchcenter.js');
 const { clearReplays } = await import('../../public/ui/replay.js');
 
@@ -85,7 +86,7 @@ test('modstanderens afslutninger som prikker: mål ⚽ på (30 %, 85 %) "4\'", r
   const card = byId(ratingTables(render(base.homeId))[1], 'heat-opp')[0];
   const dots = all(card, (x) => cls(x, 'heat-shot'));
   assert.deepEqual(dots.map((d) => [d.className, d.style.left, d.style.top, d.textContent, d.attrs.title]), [
-    ['heat-shot goal', '30%', '85%', '⚽', "4'"], ['heat-shot save', '60%', '70%', '●', "5'"]]);
+    ['heat-shot goal', '30%', '85%', '⚽', evMin(base.events[1])], ['heat-shot save', '60%', '70%', '●', evMin(base.events[2])]]);   // v3.17.0: hændelsens ur, beregnet
   // v3.16.4: titlen er hændelsens ur (ev 1 → 4', ev 2 → 5'), ikke tick'ets start (t 3, 4 → 7', 10' med S1 = 8) eller t·3 (9', 12')
   assert.equal(byId(card, 'heat-opp-note')[0].textContent, 'Set fra din side: de angriber nedad mod dit mål; venstre = din venstre side. Felterne: hvor holdet stod (groft – ingen enkeltspillere). Prikker: deres 2 afslutninger i åbent spil og på kontra (⚽ mål, ● reddet, forbi eller offside).');
   // tredjedelslinjen står stadig øverst i kortet: egne y 10, 8, 50, 15, 30 → 0 i egen tredjedel, 1 i midten, 4 i angrebstredjedelen

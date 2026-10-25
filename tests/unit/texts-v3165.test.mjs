@@ -18,7 +18,7 @@ const NOTE = '📺 VAR: det røde kort står.';
 
 test('VAR tjekker det røde kort: står det, siger udvisningen det – bliver det gult, eller var der intet tjek, gør den ikke', () => {
   let confirmed = 0, downgraded = 0, upgraded = 0, plain = 0;
-  for (let s = 1; s <= 400; s++) {
+  for (let s = 1; s <= 700; s++) {   // v3.17.0: 400 → 700 (datavagten)
     const ev = play(s).events;
     ev.forEach((e, i) => {
       if (e.type === 'VAR_RED' && e.var?.kind === 'RED') {

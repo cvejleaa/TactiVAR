@@ -86,6 +86,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .feed { max-height: 26rem; overflow-y: auto; font-size: .8rem; }
 .ev { padding: .3rem 0; border-bottom: 1px solid var(--kant); } .ev-min { display: inline-block; width: 2.4rem; color: var(--dæmpet); font-family: ui-monospace, monospace; }
 .ev.highlight { font-weight: 700; } .ev.tactic { color: #cbd5e1; }
+.ev.minor { color: #94a3b8; font-size: .92em; }   /* halvchancen (v3.17.0): skud uden stor fare, nedtonet */
 .mstats td, .mstats th { text-align: center; } .mstats tbody th { color: var(--dæmpet); font-weight: 400; }
 .ratings table td:first-child { text-align: left; } .ratings tr.motm { background: #78350f55; } .rating { font-weight: 800; } .xp { color: #c4b5fd; }
 .gazette { background: #0b1222; }

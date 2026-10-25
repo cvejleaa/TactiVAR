@@ -7,14 +7,14 @@ import { createRng } from '../../public/engine/rng.js';
 import { createLeague } from '../../public/engine/generator.js';
 import { simulateMatch } from '../../public/engine/match.js';
 
-const SOLO = new Set(['LONGSHOT', 'DRIBBLE', 'PENALTY', 'FREEKICK']);
+const SOLO = new Set(['LONGSHOT', 'DRIBBLE', 'PENALTY', 'FREEKICK', 'SCRAMBLE']);   // SCRAMBLE: halvchancens løse bold (v3.17.0) – intet oplæg
 const GOAL_EV = new Set(['GOAL', 'HEADER_GOAL', 'VAR_GOAL']);
 const tag = (p) => `#${p.shirtNumber} ${p.shortName}`;
 
 // 500 kampe: 36 mål med oplæg, 21 kontra; uden vagten rød (seed 48: kontra uden oplæg)
 test('oplæg: med én midtbanespiller har hvert mål med oplæg en ANDEN oplægsgiver – i øjeblikket, i assist-tallet og i teksten', () => {
   let goals = 0, mineCounter = 0;
-  for (let s = 1; s <= 500; s++) {
+  for (let s = 1; s <= 700; s++) {   // v3.17.0: 500 → 700 (færre hovedchancer – datavagten nedenfor)
     const L = createLeague(createRng(s * 97)), me = L.teams.find((t) => !t.isBot), opp = L.teams[(s % 7) + 1];
     const slots = me.tactics.lineupSlots, keep = new Set(slots);
     [6, 7, 8, 9, 10].forEach((i) => { keep.delete(slots[i]); slots[i] = null; });

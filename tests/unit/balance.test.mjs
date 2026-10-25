@@ -111,11 +111,11 @@ test('Rundens mål: bred fordeling – cutback ≥ 8 %, dribletur ≥ 8 %, ingen
 // Før (v3.11, målt med samme værktøj): cutback-hændelser 0, åbne luftdueller vundet af angriberen ≈ 4 %,
 // hovedstødsmål (åbent spil) 0,07 pr. kamp ved DIRECT_LONG – hvert bånd nedenfor er rødt mod det.
 // (Hovedstødsandelen af alle mål var 16 % også før – den domineredes af dødbolde – og bevises ikke her.)
-test('angrebsfokus mærkes: cutbacks ≥ 1 pr. kamp, angriberen vinder 35–55 % af de åbne luftdueller, intet fokus dominerer (netto inden for 0,3), og modgiften virker', async () => {
+test('angrebsfokus mærkes: cutbacks ≥ 0,8 pr. kamp, angriberen vinder 35–55 % af de åbne luftdueller, intet fokus dominerer (netto inden for 0,3), og modgiften virker', async () => {
   const { measureFocus } = await import('../../tools/measure-duels.mjs');
   const N = 150;   // v3.16.7: 60 var for støjende til nettobåndet (spredning 0,33 ved 60, 0,19 ved 200 kampe – tools/measure-duels fokus)
   const cut = measureFocus({ focus: 'LOW_CUTBACKS' }, N), cross = measureFocus({ focus: 'HIGH_CROSSES' }, N), central = measureFocus({ focus: 'CENTRAL' }, N);
-  assert.ok(cut.cutbacks >= 1, `cutbacks ${cut.cutbacks} (før 0)`);
+  assert.ok(cut.cutbacks >= 0.8, `cutbacks ${cut.cutbacks} (før 0)`);   // v3.17.0: 1 → 0,8 – færre chancer uden duel (OPEN_DAMP_P) gav 1,00 → 0,996; uden fokus er det 0
   // v3.15: et forsvar med færre mand taber flere luftdueller – målt over 400 kampe 0,545 → 0,555 (her med 60: 0,535 → 0,570);
   // loftet 0,55 → 0,58. Båndet fanger stadig fejlen, det blev lavet til (≈ 0,04).
   assert.ok(cross.crossWinRate >= 0.35 && cross.crossWinRate <= 0.58, `luftdueller vundet ${cross.crossWinRate} (før ≈ 0,04)`);
@@ -207,7 +207,8 @@ test('VAR og afslutninger som i Superligaen: på mål 30–45 % (før 60 %), ann
   const r = measureVar(1500);
   const band = (k, lo, hi) => assert.ok(r[k] >= lo && r[k] <= hi, `${k} ${r[k].toFixed(3)} (bånd ${lo}–${hi})`);
   band('goals', 2.6, 3.0); band('onTargetShare', 0.3, 0.45); band('disallowed', 0.08, 0.25); band('varChecksStat', 0.3, 0.8);
-  band('miss', 2, 5); band('corners', 2.8, 4.5); band('reds', 0.1, 0.25); band('flags', 0.03, 0.15);
+  band('miss', 8, 14);   // v3.17.0: forbi + blokeret 2,7 → ≈ 11 (halvchancen; ≈ 25 skud, 30 % konvertering)
+  band('corners', 2.8, 4.5); band('reds', 0.1, 0.25); band('flags', 0.03, 0.15);
   band('penOverturnedShare', 0.08, 0.35); band('penAwarded', 0.02, 0.1);
   for (const k of ['goalChecks', 'penChecks', 'redChecks', 'redDown', 'redUp']) assert.ok(r[k] > 0, `${k} ${r[k]}`);
   assert.equal(r.varGoalOld, 0, 'ingen VAR-chancetype');

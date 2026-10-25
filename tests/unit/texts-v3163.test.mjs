@@ -78,7 +78,7 @@ test('ingen gentaget måltekst i en kamp, før typens tre er brugt (Spilfører: 
       groups++; if (js.length >= 2) multi++;
     }
   }
-  assert.ok(groups > 300 && multi > 60, `data: ${groups} typer i kampe, ${multi} med mindst to mål af samme type`);
+  assert.ok(groups > 300 && multi > 45, `data: ${groups} typer i kampe, ${multi} med mindst to mål af samme type`);   // v3.17.0: > 60 → > 45 (53 – færre mål af samme type pr. kamp, da halvchancen giver to nye typer)
 });
 test('hovedstødsmålene (HEADER/CORNER/SETPIECE) får også kampens brugte tekster (fund, rettet: describeGoal blev kaldt uden goalTexts i luftduel-grenen)', () => {
   let multi = 0;
@@ -163,7 +163,7 @@ const REORG5 = Array.from({ length: 12 }, (_, i) => {
   return i % 2 ? simulateMatch(me, bot, createRng(900 + i)) : simulateMatch(bot, me, createRng(900 + i));
 });
 test('variant "omorganiserer sig" (3): vary pr. hold ("reorg"); etiket og tekst er samme variant (etiketten flytter ikke tælleren) – og stadig hverken regel, formation eller minut', () => {
-  varyRule(F.reorg, REORG_TEXT, 'reorg', { min: 100, minRepeat: -1, minFull: -1 });   // 178 forekomster, ingen gentagelse i en kamp
+  varyRule(F.reorg, REORG_TEXT, 'reorg', { min: 60, minRepeat: -1, minFull: -1 });   // 178 → 91 forekomster (v3.17.0: egen Hvis-Så pr. bot-profil), ingen gentagelse i en kamp
   const R5 = families(REORG5).reorg;
   assert.ok(R5.length >= 50, `data: ${R5.length} omorganiseringer i ${REORG5.length} kampe`);
   varyRule(R5, REORG_TEXT, 'reorg', { min: 49, minRepeat: 10, minFull: 10 });   // 60, 12 hold med 5 hver

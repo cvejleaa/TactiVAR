@@ -28,7 +28,7 @@ const stopOf = (m) => Math.min(91, ...m.events.filter((e) => e.type === 'RED' ||
 const forceVar = (r) => ({ ...r, chance: (p) => (p === VAR_RULES.GOAL_CHECK_P ? true : p === VAR_RULES.GOAL_FOUL_SHARE ? false : r.chance(p)) });
 function league(s) { const L = createLeague(createRng(s)); return { L, home: L.teams[s % 8], away: L.teams[(s + 3) % 8] }; }
 const bots = (n) => { const out = []; for (let s = 1; s <= n; s++) { const { home, away } = league(s); out.push({ s, home, away, m: simulateMatch(home, away, createRng(s * 31)) }); } return out; };
-const DATA = bots(80);   // 80 seedede kampe mellem to botter (deles af testene herunder – kun læsning)
+const DATA = bots(140);   // 140 seedede kampe (v3.17.0: 80 → 140 – færre hovedchancer gav for få linjedommerflag til datavagten) mellem to botter (deles af testene herunder – kun læsning)
 
 // Grundbillederne (v3.16.1 – tickFrame, tegnet EFTER duellen; spec §5 "Koblede linjer"): afspark = begge hold i forsvarsform
 // presset sammen ind i egen halvdel (kickoffPositions – positions.js' tal er bogstaveligt bevist i coupled-gaps), bolden på midten.
@@ -186,7 +186,8 @@ test('afslutningens billede: bolden ved skytten, skytten i feltet (y ≤ 12, x 3
       n[c.offside ? 'offside' : 'onside']++;
       continue;
     }
-    const gp = m.goalsPool.find((g) => g.min === e.min && e.text.includes(g.scorer));
+    // kun målets eget øjeblik (v3.17.0: en reddet halvchance tippet til hjørne – samme spiller headede hjørnet ind i samme minut)
+    const gp = mo.scorer && m.goalsPool.find((g) => g.min === e.min && e.text.includes(g.scorer));
     if (gp) assert.equal(!!mo.long, gp.kind === 'LONGSHOT', `${tag}: long ⇔ langskudsmål (${gp.kind})`);
     const fr = mo.scorer && e.text.match(/VAR: målet står – (#\d+ .+?) foran #\d+ .+? stod ikke offside/);
     if (fr) {

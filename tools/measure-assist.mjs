@@ -7,7 +7,7 @@ import { createRng } from '../public/engine/rng.js';
 import { createLeague } from '../public/engine/generator.js';
 import { simulateMatch } from '../public/engine/match.js';
 
-const SOLO = new Set(['LONGSHOT', 'DRIBBLE', 'PENALTY', 'FREEKICK']);
+const SOLO = new Set(['LONGSHOT', 'DRIBBLE', 'PENALTY', 'FREEKICK', 'SCRAMBLE']);   // SCRAMBLE: halvchancens løse bold (v3.17.0) – intet oplæg
 export function measureAssist(N = 400) {
   const out = { goals: 0, withHelper: 0, selfOrNone: 0, byKind: {} };
   for (let s = 1; s <= N; s++) {
