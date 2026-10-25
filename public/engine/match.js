@@ -49,7 +49,7 @@ export const CHANCE_P = { FEW: 0.285, NORMAL: 0.3, MANY: 0.36 };
 // v3.17.0 (opbygningen styrer chancen): løft efter vundet opbygning, dæmpning uden duel – se tick'ets chance
 // Løftet pr. "Løb uden bold" (v3.17.0): Mange/Få bevarer deres forhold til Normal (≈ ×1,2 / ×0,95) også efter en vundet opbygning
 // – med ét løft for alle forsvandt forskellen (balance-testen: Mange +0,04 mål for mod Hold på bolden, skal ≥ 0,06).
-export const BUILD_LIFT_P = { FEW: 0.298, NORMAL: 0.331, MANY: 0.418 }, OPEN_DAMP_P = 0.712;   // P(chance) ≈ 0,66 efter vundet opbygning, ≈ 0,125 uden duel (Normal; før 0,30 begge)
+export const BUILD_LIFT_P = { FEW: 0.298, NORMAL: 0.331, MANY: 0.418 }, OPEN_DAMP_P = 0.712;   // P(chance) ≈ 0,53 efter vundet opbygning, ≈ 0,09 uden duel (Normal; før 0,30 begge)
 // Halvchancen (v3.17.0, brugeren: "fuldt realistisk" – ≈ 25 afslutninger pr. kamp): et skud uden stor fare oven i tick'et (ikke
 // efter tabt bold eller et mål i samme tick), oftere efter vundet opbygning. Udfaldet er en lodtrækning på xG (HALF_XG) gange
 // målmandens og skyttens faktor – ikke keeper-duellen. Egne p-værdier (unik-vagten i var-check.test.mjs).
@@ -782,7 +782,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
     sheet.adjust(gk.id, 0.5); sheet.bump(gk.id, 'saves'); sheet.adjust(finisher.id, 0.1);
     // Dit holds opspil (lead) står FØR redningen – det skete først (Spilfører v3.16.4)
     // – og så kun "men X redder" (Spilfører v3.16.6: skytten stod ellers to gange i samme linje)
-    addEv(min, 'SAVE', 'PLAY', def.isHome, false, 'Redning', lead ? `🧤 [${def.team.name}] ${lead.replace('✅ ', '').replace(/\.$/, '')} – men ${tag(gk)} redder.` : `🧤 [${def.team.name}] Flot redning af ${tag(gk)} på afslutning fra ${tag(finisher)} (${att.team.name}).`);
+    addEv(min, 'SAVE', 'PLAY', def.isHome, false, 'Redning', lead ? `🧤 [${att.team.name}] ${lead.replace('✅ ', '').replace(/\.$/, '')} – men ${tag(gk)} (${def.team.name}) redder.` : `🧤 [${def.team.name}] Flot redning af ${tag(gk)} på afslutning fra ${tag(finisher)} (${att.team.name}).`);
     if (rng.chance(CORNER_P)) corner(att, def, cR, dR, min);
     return false;
   }
@@ -1341,7 +1341,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
     // Chance (30 %): angrebsfokus afgør typen (v3.12) – høj bold, cutback – ellers en afslutning (løb uden bold eller
     // almindeligt skud). Ikke efter tabt bold. VAR er ikke en chancetype (v3.15.1) – det tjekker målet bagefter.
     // Opbygningen styrer chancen (v3.17.0, Spilfører: "0 af 10" og alligevel 3-1): efter en vundet opbygning løftes chancen
-    // (BUILD_LIFT_P oven i), uden duel dæmpes den (OPEN_DAMP_P) – samlet omtrent lige mange chancer. Egne p-værdier, så
+    // (BUILD_LIFT_P oven i), uden duel dæmpes den (OPEN_DAMP_P) – færre hovedchancer i alt; halvchancen fylder resten. Egne p-værdier, så
     // testenes scriptede terning (CHANCE_P.NORMAL = 0,3) er uændret.
     else if (!ballLost && !(tickDuel === 'OPEN' && rng.chance(OPEN_DAMP_P))
       && (rng.chance(CHANCE_P[attPh.phase1_buildUp.offBallRuns] ?? CHANCE_P.NORMAL) || (tickDuel === 'BUILD' && rng.chance(BUILD_LIFT_P[attPh.phase1_buildUp.offBallRuns] ?? BUILD_LIFT_P.NORMAL)))) {
