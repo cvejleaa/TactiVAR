@@ -43,6 +43,7 @@ test('trainingEstimate med tal: 19-årig Afslutning 0,12 · 1,5 = 0,18 pr. runde
   assert.equal(e.key, 'FINISH'); assert.equal(e.lines[0].skill, 'finishing'); assert.equal(e.lines[0].n, 6);   // ceil(1/0,18) = 6
   assert.equal(trainingEstimate(p, true).lines[0].n, 5);   // ceil(1/0,20) = 5
   assert.equal(e.next, 6);
+  p.dev = { finishing: 0.4 }; assert.equal(trainingEstimate(p).lines[0].n, 4); p.dev = {};   // 0,6/0,18 = 3,33 → op til 4 (afrundet ville give 3)
   assert.equal(e.fresh, FOCUS.FINISH.fresh); assert.equal(e.playedFresh, Math.min(0, FOCUS.FINISH.fresh + PLAYED_RELIEF));
   p.skills.finishing = 20;
   const top = trainingEstimate(p);
