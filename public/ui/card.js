@@ -1,5 +1,6 @@
 // Spillerkort: offentlige data for alle, evner og mod-kunnen kun for eget hold, VAR-profilen
 // for ingen. Scouting-indtryk og private noter vises for alle spillere.
+import { publicValue } from '../engine/career.js';
 import { h, dec, LOCK } from './dom.js';
 import { LINE, POSITION_FULL, SKILL_LABELS, kr, starsEl } from './labels.js';
 import { aerialBreakdown } from '../engine/generator.js';
@@ -30,7 +31,7 @@ export function renderCard({ player: p, team, isOwn, scouting, note, onNote }) {
       p.archetype ? h('div', { class: 'archbox' }, h('strong', {}, (p.archetype.isUnlocked ? '🌟 ' : '🔒 ') + p.archetype.name), ' – ', p.archetype.description,
         p.archetype.isUnlocked ? null : h('div', { class: 'muted' }, 'Låses op ved: ' + Object.entries(p.archetype.unlockReq).map(([k, v]) => `${k} ${v}`).join(', '))) : null,
       h('div', { class: 'muted', id: 'run-stats' }, run.km90 != null ? `🏃 ${dec(run.km90, 1)} km pr. 90 min · ${run.hiPct != null ? `${run.hiPct} % højintenst` : 'højintenst: kommer efter næste kamp'} · topfart ${dec(p.topSpeedMax, 1)} km/t (alle kampe)` : '🏃 Løbedata kommer efter første kamp'),
-      h('div', { class: 'muted' }, `Løn ${kr(p.weeklyWage)}/uge · Værdi ${kr(p.marketValue)}`),
+      h('div', { class: 'muted', id: 'card-wage' }, `Løn ${kr(p.weeklyWage)}/uge · Værdi ${kr(publicValue(p))} (offentlig – ud fra stjerner og alder)`),
     ];
   } else {
     body = [h('div', { class: 'lockbox' }, `Evner, spring, luftduel, arketype og kontrakt: ${LOCK}`), h('div', {}, 'Offentlig vurdering: ', starsEl(p.publicStars))];

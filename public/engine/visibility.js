@@ -3,13 +3,13 @@
 // alle denne fil. I trin 1 er beskyttelsen visuel: alt ligger i browseren.
 
 // Offentligt: alle i ligaen må se det (teams_public).
-export const PUBLIC_FIELDS = ['id', 'name', 'shortName', 'shirtNumber', 'line', 'position', 'age', 'heightCm', 'freshness', 'injuryMatchesLeft', 'publicStars', 'roleTier',
+export const PUBLIC_FIELDS = ['id', 'name', 'shortName', 'shirtNumber', 'line', 'position', 'age', 'heightCm', 'freshness', 'injuryMatchesLeft', 'publicStars', 'roleTier', 'careerGames',
   // Sæsonstatistik (v3.10): alt det, der står i referaterne – mål, oplæg, kort, MotM, dødboldmål.
   'sGames', 'sMinutes', 'sGoals', 'sAssists', 'sMotm', 'sYellow', 'sRed', 'sCleanSheets', 'sHeaderGoals', 'sPenaltyGoals', 'sSetPieceGoals'];
 // Kun holdets ejer (teams_private).
-export const OWNER_FIELDS = ['skills', 'jumpingPower', 'aerialPower', 'archetype', 'weeklyWage', 'marketValue', 'lastRating', 'ratingSum', 'ratingGames', 'counterTactics', 'seasonAgeCounter', 'distanceSum', 'minutesSum', 'topSpeedMax', 'hiKmSum', 'hiDistSum', 'freeRunsSum', 'freeRunsWonSum'];
+export const OWNER_FIELDS = ['skills', 'jumpingPower', 'aerialPower', 'archetype', 'weeklyWage', 'trainingFocus', 'dev', 'lastRating', 'ratingSum', 'ratingGames', 'counterTactics', 'seasonAgeCounter', 'distanceSum', 'minutesSum', 'topSpeedMax', 'hiKmSum', 'hiDistSum', 'freeRunsSum', 'freeRunsWonSum'];
 // Ingen spiller – kun motoren (teams_secrets).
-export const SECRET_FIELDS = ['varProfile'];
+export const SECRET_FIELDS = ['varProfile', 'potential'];   // potential (v3.18.0): ejeren ser kun et skøn i ord
 
 // Den visning af en spiller, som en given seer har ret til. Felter seeren ikke må se,
 // er helt fraværende i resultatet (ikke blot skjult i UI).

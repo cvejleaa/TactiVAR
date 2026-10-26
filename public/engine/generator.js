@@ -3,11 +3,12 @@ import { initialCounterTactics } from './counter.js';
 import { TEAM_STAT_DEFAULTS, PLAYER_SEASON_DEFAULTS } from './stats.js';
 import { generateScoutingClues } from './clues.js';
 import { buildSchedule, shuffledIds } from './schedule.js';
+import { initialPotential, publicWage, uniquifyNames, derivedRng } from './career.js';
 
 export const TEAM_NAMES = ['Bibamus United', 'FC Vejleå', 'Ølstykke IF', 'Lyngby Tacticians', 'Nordkysten BK', 'Furesø Boldklub', 'Roskilde Rovers', 'Kronborg United'];
 
-const FIRST_NAMES = ['Mikkel', 'Kasper', 'Lukas', 'Mathias', 'Frederik', 'Christian', 'Andreas', 'Victor', 'Mads', 'Emil', 'Jonas', 'Nikolaj', 'Oliver', 'William', 'Magnus', 'Sebastian', 'Tobias', 'Rasmus', 'Simon', 'Jakob', 'Anders', 'Martin', 'Søren', 'Peter', 'Jens', 'Gustav', 'Carl', 'Alexander', 'Malthe', 'Noah'];
-const LAST_NAMES = ['Jensen', 'Nielsen', 'Hansen', 'Pedersen', 'Andersen', 'Christensen', 'Larsen', 'Sørensen', 'Rasmussen', 'Jørgensen', 'Petersen', 'Madsen', 'Kristensen', 'Olsen', 'Thomsen', 'Poulsen', 'Johansen', 'Møller', 'Mortensen', 'Knudsen', 'Jakobsen', 'Holm', 'Lund', 'Schmidt', 'Eriksen', 'Bach', 'Dahl', 'Kjær', 'Vestergaard', 'Lauridsen'];
+export const FIRST_NAMES = ['Mikkel', 'Kasper', 'Lukas', 'Mathias', 'Frederik', 'Christian', 'Andreas', 'Victor', 'Mads', 'Emil', 'Jonas', 'Nikolaj', 'Oliver', 'William', 'Magnus', 'Sebastian', 'Tobias', 'Rasmus', 'Simon', 'Jakob', 'Anders', 'Martin', 'Søren', 'Peter', 'Jens', 'Gustav', 'Carl', 'Alexander', 'Malthe', 'Noah'];
+export const LAST_NAMES = ['Jensen', 'Nielsen', 'Hansen', 'Pedersen', 'Andersen', 'Christensen', 'Larsen', 'Sørensen', 'Rasmussen', 'Jørgensen', 'Petersen', 'Madsen', 'Kristensen', 'Olsen', 'Thomsen', 'Poulsen', 'Johansen', 'Møller', 'Mortensen', 'Knudsen', 'Jakobsen', 'Holm', 'Lund', 'Schmidt', 'Eriksen', 'Bach', 'Dahl', 'Kjær', 'Vestergaard', 'Lauridsen'];
 
 // Arketyper pr. kæde. Krav-tallene er afskåret i kilden og fastsat her (spec §2).
 export const ARCHETYPES = {
@@ -59,8 +60,9 @@ export function assignPositions(squad) {
   return squad;
 }
 
-const TIERS = {
+export const TIERS = {
   STAR: { age: [24, 28], stat: [11, 15], arch: 0.75 },
+  YOUTH: { age: [16, 18], stat: [4, 8], arch: 0.4 },   // v3.18.0: ungdomsspillere ved sæsonslut
   TALENT: { age: [17, 19], stat: [6, 10], arch: 0.55 },
   ROTATION: { age: [21, 28], stat: [7, 11], arch: 0.25 },
   STARTER: { age: [21, 27], stat: [9, 13], arch: 0.25 },
@@ -140,7 +142,8 @@ export function isArchetypeUnlocked(arch, player) {
   return Object.entries(arch.unlockReq).every(([k, v]) => (stats[k] || 0) >= v);
 }
 
-export function generatePlayer(rng, line, roleTier, shirtNumber, teamIdx, usedShortNames, heightOffset = 0, position = POSITION_OF_LINE[line]) {
+// id: en fast id (v3.18.0 – ungdom og nye spillere får `plr_y<seq>`); ellers holdets plads som før
+export function generatePlayer(rng, line, roleTier, shirtNumber, teamIdx, usedShortNames, heightOffset = 0, position = POSITION_OF_LINE[line], id = null) {
   const t = TIERS[roleTier];
   const [bMin, bMax] = t.stat;
   const age = rng.int(t.age[0], t.age[1]);
@@ -172,15 +175,18 @@ export function generatePlayer(rng, line, roleTier, shirtNumber, teamIdx, usedSh
   const varProfile = { cynicism: r(4, 18), theatre: r(3, 18), varPulse: r(bMin - 1, bMax + 2) };
   const sum = Object.values(skills).reduce((a, b) => a + b, 0);
   const player = {
-    id: `plr_t${teamIdx}_${shirtNumber}`, name: `${firstName} ${lastName}`, shortName,
+    id: id ?? `plr_t${teamIdx}_${shirtNumber}`, name: `${firstName} ${lastName}`, shortName,
     age, seasonAgeCounter: 1, line, position, shirtNumber, roleTier,
     ...PLAYER_SEASON_DEFAULTS,
     freshness: 100, injuryMatchesLeft: 0, lastRating: 0, ratingSum: 0, ratingGames: 0, publicStars: 0, distanceSum: 0, minutesSum: 0, topSpeedMax: 0, hiKmSum: 0, hiDistSum: 0,
     heightCm, jumpingPower, aerialPower: aerialBreakdown(heightCm, jumpingPower, skills.strength, skills.positioning).total,
     skills, varProfile,
     archetype: null,
-    weeklyWage: Math.round(sum * sum * 10), marketValue: Math.round(sum * sum * 150),
+    // v3.18.0: livsløbet (træning, udvikling, kamphistorik). Løn efter offentlige data (career.js) – ikke evnerne (QC B6)
+    trainingFocus: 'GENERAL', dev: {}, matchLog: [], careerGames: 0, potential: 0,
   };
+  player.weeklyWage = publicWage(player);
+  player.potential = initialPotential(player);
   player.counterTactics = initialCounterTactics(rng, age, skills.positioning);
   if (rng.chance(t.arch)) {
     const a = rng.pick(ARCHETYPES[line]);
@@ -223,7 +229,7 @@ export function generateTeam(rng, idx) {
   const tactics = defaultTactics(starters, own);
   return {
     id: `team_div1_${idx + 1}`, name: TEAM_NAMES[idx], isBot, ownerUid: null, cashBalance: 5000000,
-    subsLimit: own.subs, tactics,
+    subsLimit: own.subs, tactics, ...teamCareerDefaults(squad, starters),
     tacticPresets: [
       structuredClone(tactics),
       { ...defaultTactics(starters, own), baseFormation: '4-3-3' },
@@ -233,12 +239,22 @@ export function generateTeam(rng, idx) {
   };
 }
 
+// v3.18.0: holdets livsløbsfelter – bænken (de 7 ikke-startere), økonomi, transferliste og ungdomstilbud
+export function teamCareerDefaults(squad, starters) {
+  const on = new Set(starters);
+  return { matchBench: squad.filter((p) => !on.has(p.id)).slice(0, 7).map((p) => p.id), matchBenchAuto: true, finance: { ledger: [], season: {} }, listed: [], youthOffers: [] };
+}
+
 export function emptyStanding(team) {
   return { teamId: team.id, teamName: team.name, isBot: team.isBot, played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, varNet: 0, points: 0, ...TEAM_STAT_DEFAULTS };
 }
 
 export function createLeague(rng) {
   const teams = TEAM_NAMES.map((_, i) => generateTeam(rng, i));
+  // Programmet seedes af holdenes navne – FØR navnene gøres unikke (v3.18.0, QC F2); intet ligaens rng-træk
+  const schedule = buildSchedule(shuffledIds(teams));
+  // Unikke kortnavne i hele ligaen (v3.18.0, brugeren): afledt rng af truppen, så kampene er de samme
+  uniquifyNames(teams, derivedRng('names', ...teams.flatMap((t) => t.squad.map((p) => p.name))), FIRST_NAMES, LAST_NAMES);
   // Observationer ligger hos observatøren (dig), ikke på spilleren (spec §2 "Rettet").
   // Ligaen starter med de indtryk, man har fra forsæsonen.
   // scouting[observatørens hold-id][spiller-id] – i trin 2 bliver det ét dokument pr. bruger.
@@ -251,7 +267,8 @@ export function createLeague(rng) {
     leagueMetadata: { id: 'league_div_1', name: 'TactiVAR Superligaen', seasonNumber: 1, footballYear: 1, round: 0, standings: teams.map(emptyStanding) },
     statsFromRound: 1, history: [],
     // Kampprogram (v3.11): sæsonen starter i runde 1; seasons er arkivet over afsluttede sæsoner.
-    schedule: buildSchedule(shuffledIds(teams)), seasonStartRound: 1, seasons: [],
+    schedule, seasonStartRound: 1, seasons: [],
+    nextPlayerSeq: 1, transferLog: [], retired: [], offers: [],
     teams,
     scouting,
     lastRound: null,

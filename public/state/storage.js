@@ -3,13 +3,14 @@
 // i en backup-nøgle, FØR der tilbydes en ny liga, og fejlen vises.
 import { normalizeLeague, normalizeRule } from '../engine/sanitize.js';
 import { COUNTER_KEYS, scaleIntoPool, counterFloor } from '../engine/counter.js';
-import { heightAtQuantile, assignPositions } from '../engine/generator.js';
+import { heightAtQuantile, assignPositions, teamCareerDefaults, FIRST_NAMES, LAST_NAMES } from '../engine/generator.js';
+import { initialPotential, publicWage, uniquifyNames, derivedRng } from '../engine/career.js';
 import { buildSchedule } from '../engine/schedule.js';
 import { endSeason } from '../engine/season.js';
 
 export const SAVE_KEY = 'tactivar_save';
 export const BACKUP_PREFIX = 'tactivar_backup_';
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 7;
 
 // Migreringer: MIGRATIONS[n] løfter et gemt objekt fra skema n til n+1. Tilføj en ny,
 // hver gang gemme-formatet ændres – sammen med et fixture fra forrige version i
@@ -93,7 +94,51 @@ export const MIGRATIONS = {
     L.schedule = buildSchedule(L.teams.map((t) => t.id));
     return { ...d, schemaVersion: 6 };
   },
+  // 6 → 7 (v3.18.0, livsløb/økonomi/transfers): additive felter – ingen spiller ældes, ingen forsvinder. Navne-dubletter på
+  // tværs af holdene omdøbes (brugeren), og teksterne rettes med (referat, arkiv, spejder-indtryk). Lønnen sættes efter de
+  // offentlige data (én lønmodel, QC B6); markedsværdien efter evnerne fjernes (den røbede dem).
+  6: (d) => {
+    const L = d.league;
+    if (!L || !Array.isArray(L.teams)) return { ...d, schemaVersion: 7 };
+    for (const t of L.teams) {
+      for (const p of t.squad || []) {
+        p.trainingFocus ??= 'GENERAL'; p.dev ??= {}; p.matchLog ??= []; p.careerGames ??= p.ratingGames ?? 0;
+        if (p.skills && p.line) p.potential ??= initialPotential(p);
+        delete p.marketValue;
+        p.weeklyWage = publicWage(p);
+      }
+      if (Array.isArray(t.squad) && t.tactics?.lineupSlots) Object.assign(t, { ...teamCareerDefaults(t.squad, t.tactics.lineupSlots), ...pick(t, ['matchBench', 'matchBenchAuto', 'finance', 'listed', 'youthOffers']) });
+    }
+    L.nextPlayerSeq ??= 1; L.transferLog ??= []; L.retired ??= []; L.offers ??= [];
+    if (L.teams.every((t) => Array.isArray(t.squad))) {
+      const renamed = uniquifyNames(L.teams, derivedRng('names-v7', L.leagueMetadata?.id ?? 'liga'), FIRST_NAMES, LAST_NAMES);
+      fixNameTexts(L, renamed);
+    }
+    return { ...d, schemaVersion: 7 };
+  },
 };
+const pick = (o, keys) => Object.fromEntries(keys.filter((k) => o[k] !== undefined).map((k) => [k, o[k]]));
+
+// Et omdøbt kortnavn står i tekster (v3.18.0): "#nr Kort Navn" i referat og arkiv, kortnavnet i hans spejder-indtryk og i
+// poster med hans id. Kun "#nr gammelt" erstattes – står to spillere med samme nummer og navn, er teksten tvetydig alligevel.
+function fixNameTexts(L, renamed) {
+  if (!renamed.length) return;
+  const byId = new Map(renamed.map((r) => [r.id, r]));
+  const walk = (v) => {
+    if (typeof v === 'string') { for (const r of renamed) if (v.includes(`#${r.nr} ${r.from}`)) v = v.replaceAll(`#${r.nr} ${r.from}`, `#${r.nr} ${r.to}`); return v; }
+    if (Array.isArray(v)) { for (let i = 0; i < v.length; i++) v[i] = walk(v[i]); return v; }
+    if (v && typeof v === 'object') {
+      const r = byId.get(v.playerId ?? v.id);
+      if (r && v.shortName === r.from) v.shortName = r.to;
+      for (const k of Object.keys(v)) v[k] = walk(v[k]);
+    }
+    return v;
+  };
+  walk(L.lastRound); walk(L.seasons); walk(L.lastSeasonStats); walk(L.history);
+  for (const book of Object.values(L.scouting || {})) for (const r of renamed) {
+    if (Array.isArray(book?.[r.id])) book[r.id] = book[r.id].map((s) => (typeof s === 'string' ? s.replaceAll(r.from, r.to) : s));
+  }
+}
 // v3.7's fordeling pr. kæde – frosset, så migreringen 3 → 4 altid giver de samme højder.
 export const HEIGHT_V37 = {
   GK: { mid: 192, dice: 4, min: 168, max: 201 }, DEF: { mid: 186, dice: 6, min: 168, max: 201 },
@@ -152,7 +197,19 @@ export function loadGame(storage) {
   return { status: 'error', error: r.error, backupKey };
 }
 
+// Højst BACKUP_KEEP backups (v3.18.0, brugeren: et gem på ≈ 750 KB fyldte ellers browserens lager efter 5–6 backups): er den
+// rå tekst lig den nyeste backup, laves ingen ny (fejlsiden genindlæst skubber ikke backuppen fra før migreringen ud); ellers
+// ryddes de ældste FØR der skrives (fuldt lager), og den nye er altid blandt de beholdte.
+export const BACKUP_KEEP = 3;
+export function backupKeys(storage) {
+  const keys = [];
+  try { for (let i = 0; i < storage.length; i++) { const k = storage.key(i); if (k && k.startsWith(BACKUP_PREFIX)) keys.push(k); } } catch { /* ingen liste */ }
+  return keys.sort((a, b) => Number(a.slice(BACKUP_PREFIX.length)) - Number(b.slice(BACKUP_PREFIX.length)));
+}
 export function backupRaw(storage, raw, now = Date.now()) {
+  const old = backupKeys(storage), newest = old.at(-1);
+  try { if (newest && storage.getItem(newest) === raw) return newest; } catch { /* læs fejlede – tag en ny */ }
+  for (const k of old.slice(0, Math.max(0, old.length - (BACKUP_KEEP - 1)))) { try { storage.removeItem(k); } catch { /* lad stå */ } }
   const key = BACKUP_PREFIX + now;
   try { storage.setItem(key, raw); return key; } catch { return null; }
 }

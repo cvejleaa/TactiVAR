@@ -634,7 +634,7 @@ try {
   check('Migrering: beskeden forklarer puljen på 100, Superliga-højderne, friskheden, den naturlige position og kampprogrammet (alle trin fra skema 1 op) – og nævner backuppen', ['100 point', 'Superliga', 'Friskhed', 'Hvis-Så-regler kan nu sættes', 'naturlig position', 'kampprogram', 'Sæson 1 (uden program)', 'backup'].every((x) => migNotice.includes(x)), migNotice);
   await reload(); await reload();
   const mig = await g.evaluate(() => ({ schema: JSON.parse(localStorage.getItem('tactivar_save')).schemaVersion, backups: Object.keys(localStorage).filter((k) => k.startsWith('tactivar_backup_')).length }));
-  check('Migrering: gemmes straks i skema 6, kun én backup trods tre genindlæsninger', mig.schema === 6 && mig.backups === 1, JSON.stringify(mig));
+  check('Migrering: gemmes straks i skema 7, kun én backup trods tre genindlæsninger', mig.schema === 7 && mig.backups === 1, JSON.stringify(mig));
   await tab('liga'); const migHead = await g.textContent('#standings-title');
   await g.click('#past-seasons > summary');
   const past = await g.textContent('#past-seasons');
@@ -665,7 +665,7 @@ try {
   const nat = await g.locator('#matrix tbody tr td:nth-child(4)').allTextContents();
   check('Natur-kolonnen viser en position for alle 18 (MV/CB/Back/CM/Kant/OM/ANG)', nat.length === 18 && nat.every((t) => ['MV', 'CB', 'Back', 'CM', 'Kant', 'OM', 'ANG'].includes(t.trim())), nat.join(','));
   const pos4 = await g.evaluate(() => { const d = JSON.parse(localStorage.getItem('tactivar_save')); const ps = d.league.teams.flatMap((t) => t.squad); const m = (k) => { const x = ps.filter((p) => p.position === k).map((p) => p.heightCm); return x.reduce((a, b) => a + b) / x.length; }; return { schema: d.schemaVersion, cb: m('CB'), fb: m('FB') }; });
-  check('Migrering fra skema 4: gemt som skema 6, stoppere ≈190 og backs ≈176 cm', pos4.schema === 6 && pos4.cb >= 189 && pos4.cb <= 192 && pos4.fb >= 174.5 && pos4.fb <= 177.5, JSON.stringify(pos4));
+  check('Migrering fra skema 4: gemt som skema 7, stoppere ≈190 og backs ≈176 cm', pos4.schema === 7 && pos4.cb >= 189 && pos4.cb <= 192 && pos4.fb >= 174.5 && pos4.fb <= 177.5, JSON.stringify(pos4));
   await tab('kamp');
   const old4 = await g.textContent('#match-center');
   check('Gem fra v3.7.0: karakterark og avis uden "undefined"/"NaN" og uden HI-tal', !/undefined|NaN|% HI/.test(old4) && (await g.locator('.ratings td.run').count()) > 0, old4.slice(0, 120));
@@ -681,7 +681,7 @@ try {
   await g.evaluate((f) => { for (const k of Object.keys(localStorage)) if (k.startsWith('tactivar_')) localStorage.removeItem(k); localStorage.setItem('tactivar_save', f); }, fixtureV3120);
   await reload();
   const v3120note = (await g.locator('#notice').count()) ? await g.textContent('#notice') : '';
-  check('Gem fra v3.12.0: kun nyheden for 3.12.1 (ikke 3.12.0 igen), ingen migrering', v3120note.includes('Spillerne rykker nu med') && !v3120note.includes('"Lave cutbacks"') && !v3120note.includes('Dit spil er opdateret'), v3120note.slice(0, 160));
+  check('Gem fra v3.12.0: kun nyheden for 3.12.1 (ikke 3.12.0 igen) – og kun livsløbs-migreringen (v3.18.0, skema 6 → 7)', v3120note.includes('Spillerne rykker nu med') && !v3120note.includes('"Lave cutbacks"') && v3120note.includes('Ny i v3.18') && !v3120note.includes('kampprogram:'), v3120note.slice(0, 160));
   // Test Manager v3.13: nyheden for 3.13 (udskiftninger) vises efter 3.12.1's, og de gamle hold får deres grænse (dit 70, botternes profil)
   check('Gem fra v3.12.0: nyheden for 3.13 om udskiftninger kommer efter 3.12.1-nyheden', v3120note.includes('Udskiftninger under kampen: friskheden falder') && v3120note.indexOf('Spillerne rykker nu med') >= 0 && v3120note.indexOf('Spillerne rykker nu med') < v3120note.indexOf('Udskiftninger under kampen: friskheden falder'), v3120note.slice(-200));
   check('Gem fra v3.12.0: holdene får udskiftningsgrænse efter deres profil (dit hold 70, botterne 75/65/75/70/70/65/75)', JSON.stringify(await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.teams.map((t) => t.subsLimit))) === JSON.stringify([70, 75, 65, 75, 70, 70, 65, 75]));

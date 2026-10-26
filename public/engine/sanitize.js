@@ -6,9 +6,13 @@ import { MAX_RULES } from './match-rules.js';
 import { TEAM_STAT_DEFAULTS, PLAYER_SEASON_DEFAULTS } from './stats.js';
 import { FORMATIONS } from './formations.js';
 import { buildSchedule, isValidSchedule, SEASON_ROUNDS } from './schedule.js';
-import { defaultTactics, defaultStarterIds, emptyStanding, BOT_PROFILES, aerialBreakdown, assignPositions } from './generator.js';
+import { defaultTactics, defaultStarterIds, emptyStanding, BOT_PROFILES, aerialBreakdown, assignPositions, teamCareerDefaults } from './generator.js';
+import { initialPotential, publicWage, MATCH_LOG_CAP } from './career.js';
 
-const PLAYER_DEFAULTS = { freshness: 100, injuryMatchesLeft: 0, lastRating: 0, ratingSum: 0, ratingGames: 0, publicStars: 0, seasonAgeCounter: 1, archetype: null, distanceSum: 0, minutesSum: 0, topSpeedMax: 0, hiKmSum: 0, hiDistSum: 0 };
+const PLAYER_DEFAULTS = { freshness: 100, injuryMatchesLeft: 0, lastRating: 0, ratingSum: 0, ratingGames: 0, publicStars: 0, seasonAgeCounter: 1, archetype: null, distanceSum: 0, minutesSum: 0, topSpeedMax: 0, hiKmSum: 0, hiDistSum: 0, trainingFocus: 'GENERAL', careerGames: 0 };
+// Truppens størrelse (v3.18.0: 18–25 efter lønbudgettet; før præcis 18)
+export const SQUAD_MIN = 18, SQUAD_MAX = 25;
+const LOG_CAP = 40;
 
 // Hvis-Så-regel i skema 2: { condition: TRAILING|LEADING|DRAW, margin 1–5, newFormation, newPlan }.
 // Skema 1 havde LEADING_BY_1 (præcis 1 foran) og TRAILING (bagud) uden antal mål.
@@ -72,10 +76,17 @@ export function normalizeLeague(league) {
   const next = md.round + 1 - league.seasonStartRound;
   if (!Number.isInteger(league.seasonStartRound) || next < 0 || next >= SEASON_ROUNDS) league.seasonStartRound = md.round + 1;
   if (!Array.isArray(league.seasons)) league.seasons = [];
+  // v3.18.0: transfers, pensioner og bud (lofter – gemmet må ikke vokse uden grænse, QC)
+  if (!Number.isInteger(league.nextPlayerSeq) || league.nextPlayerSeq < 1) league.nextPlayerSeq = 1;
+  for (const k of ['transferLog', 'retired', 'offers']) league[k] = Array.isArray(league[k]) ? league[k].slice(-LOG_CAP) : [];
   league.teams.forEach((team, idx) => {
-    if (!Array.isArray(team.squad) || team.squad.length !== 18) { problems.push(`${team.name || team.id} har ${team.squad?.length ?? 0} spillere (forventet 18)`); return; }
+    if (!Array.isArray(team.squad) || team.squad.length < SQUAD_MIN || team.squad.length > SQUAD_MAX) { problems.push(`${team.name || team.id} har ${team.squad?.length ?? 0} spillere (forventet ${SQUAD_MIN}–${SQUAD_MAX})`); return; }
     for (const p of team.squad) {
       for (const [k, v] of Object.entries({ ...PLAYER_DEFAULTS, ...PLAYER_SEASON_DEFAULTS })) if (p[k] === undefined) p[k] = v;
+      if (!p.dev || typeof p.dev !== 'object') p.dev = {};
+      p.matchLog = Array.isArray(p.matchLog) ? p.matchLog.slice(-MATCH_LOG_CAP) : [];
+      if (!Number.isFinite(p.potential)) p.potential = initialPotential(p);
+      if (!Number.isFinite(p.weeklyWage)) p.weeklyWage = publicWage(p);
       if (!p.counterTactics) p.counterTactics = { vsPress: 15, vsLowBlock: 15, vsTrapLong: 15 };
       p.aerialPower = aerialBreakdown(p.heightCm, p.jumpingPower, p.skills.strength, p.skills.positioning).total;
     }
@@ -88,6 +99,16 @@ export function normalizeLeague(league) {
     if (!Array.isArray(team.tacticPresets) || team.tacticPresets.length < 3) team.tacticPresets = [structuredClone(team.tactics), defaultTactics(starters, profile), defaultTactics(starters, profile)];
     team.tacticPresets = team.tacticPresets.map((t) => fixTactics(t, team.tactics.lineupSlots, profile));
     team.cashBalance ??= 5000000;
+    // v3.18.0: bænken (de 7 udtagne), økonomi, transferliste, ungdomstilbud – en ugyldig bænk udtages igen automatisk
+    const def = teamCareerDefaults(team.squad, team.tactics.lineupSlots), starters11 = new Set(team.tactics.lineupSlots);
+    const bench = Array.isArray(team.matchBench) ? [...new Set(team.matchBench)].filter((id) => ids.has(id) && !starters11.has(id)) : null;
+    team.matchBench = bench && bench.length <= 7 && (bench.length === 7 || bench.length === team.squad.length - 11) ? bench : def.matchBench;
+    team.matchBenchAuto = team.matchBenchAuto !== false;
+    if (!team.finance || typeof team.finance !== 'object') team.finance = def.finance;
+    team.finance.ledger = Array.isArray(team.finance.ledger) ? team.finance.ledger.slice(-30) : [];
+    team.finance.season ||= {};
+    team.listed = Array.isArray(team.listed) ? team.listed.filter((id) => ids.has(id)) : [];
+    team.youthOffers = Array.isArray(team.youthOffers) ? team.youthOffers : [];
     // Udskiftningsgrænsen (v3.13): gemt før v3.13 → holdets profil (dit hold 70 %); 0 = fra bevares.
     team.subsLimit = clampSubsLimit(team.subsLimit ?? profile.subs);
   });
