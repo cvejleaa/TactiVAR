@@ -72,7 +72,7 @@ try {
   const focusRow = await g.locator(`#training-table tr[data-pid="${await g.evaluate((nr) => JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((x) => !x.isBot).squad.find((x) => String(x.shirtNumber) === nr).id, shown)}"] select`).evaluate((el) => el.options[el.selectedIndex].text);
   check('Træning: fokus valgt på kortet står i træningsoversigten og er gemt', focusRow === 'Afslutning' && (await focusSaved()) === 'FINISH' && (await g.textContent('#card-training')).includes('Afslutning') && /næste \+1 om ca\. \d+ runde|går langsomt \(mere end en sæson/.test(await g.textContent('#card-training')), focusRow);
   await g.selectOption('#focus-many', 'REST');
-  check('Træning: massehandlingen i oversigten sætter fokus for alle viste (18)', (await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((x) => !x.isBot).squad.filter((p) => p.trainingFocus === 'REST').length)) === 18);
+  check('Træning: massehandlingen i oversigten sætter fokus for alle viste (18) – bekræftelsen står ved tabellen', (await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((x) => !x.isBot).squad.filter((p) => p.trainingFocus === 'REST').length)) === 18 && (await g.textContent('#train-msg')).includes('18 spillere'));
   await g.selectOption(`#training-table tr[data-pid="${await g.evaluate((nr) => JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((x) => !x.isBot).squad.find((x) => String(x.shirtNumber) === nr).id, shown)}"] select`, 'FINISH');
   check('Spillerkortet viser 9 evne-barer og luftduel-udregningen', (await g.locator('#player-card .bars .bar').count()) === 9 && (await g.textContent('#aerial-breakdown')).includes('× 0,35'));
   // v3.8 (Test Manager): kortets overskrift viser spillerens EGEN naturlige position med fuld betegnelse
@@ -88,6 +88,15 @@ try {
   const benchRow = g.locator('#bench tr.bench-p').first();
   const benchShort = (await benchRow.locator('td:nth-child(2)').textContent()).replace(/^#\d+ /, '').trim();
   await benchRow.click();
+  // Rullepositionen i listen bevares ved et klik (QC): rul ned, klik en bænkspiller, stå samme sted
+  await g.setViewportSize({ width: 1400, height: 600 });
+  const lw = g.locator('#lineup-list .tablewrap');
+  await lw.evaluate((el) => { el.scrollTop = 120; });
+  const st0 = await lw.evaluate((el) => el.scrollTop);
+  // klik via DOM (Playwright ruller ellers selv rækken ind): vælg og fravælg en række, der står synligt
+  for (let i = 0; i < 2; i++) await lw.evaluate((el) => { const box = el.getBoundingClientRect(); [...el.querySelectorAll('tr.bench-p')].find((r) => r.getBoundingClientRect().top > box.top + 30).click(); });
+  check('Taktik: listens rulleposition bevares, når siden tegnes om', st0 > 0 && Math.abs((await g.locator('#lineup-list .tablewrap').evaluate((el) => el.scrollTop)) - st0) < 2, String(st0));
+  await g.setViewportSize({ width: 1400, height: 1000 });
   check('Taktik: valgt bænkspiller markeres i listen og får en besked ved listen', (await g.locator('#bench tr.active').count()) === 1 && (await g.textContent('#pick-msg')).includes(benchShort));
   await g.click('#pitch .token[data-slot="7"]');
   check('Byt startet i listen kan afsluttes på banen', (await tName(7)) === benchShort, `${benchShort} / ${await tName(7)}`);

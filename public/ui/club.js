@@ -5,6 +5,7 @@ import { kr, LINE, POSITION, starsEl } from './labels.js';
 import { weeklyWages, wagesPerRound, wageBudget, wageRoomPerRound, attendance, formOf, TV_PER_ROUND, TICKET_PRICE, GATE_MAX, PRIZE, ROUNDS_PER_WEEK, publicValue, publicWage, starsForValue } from '../engine/career.js';
 import { placesBefore } from '../engine/season.js';
 import { windowOf, marketInfo } from '../engine/transfers.js';
+import { TEAM_PUBLIC_FIELDS } from '../engine/visibility.js';
 import { SEASON_ROUNDS, seasonRoundOf } from '../engine/schedule.js';
 
 const net = (e) => (e.gate ?? 0) + (e.tv ?? 0) + (e.wages ?? 0) + (e.prize ?? 0) + (e.transfers ?? 0);
@@ -116,6 +117,8 @@ export function renderTransferLog({ league }) {
 // Offentlig klubside (v3.19.0, brugeren: et modstanderhold må ikke vise de samme klubinformationer som dit eget). Tegnes KUN fra
 // viewTeam(team, false) – kasse, løn og regnskab findes ikke i det objekt (vagten er visibility.js, ikke denne funktion).
 export function renderPublicClub({ league, pub, me, playing, onBuy, onBack, msg = '' }) {
+  // Vagt på positiv tilstedeværelse: kun en viewTeam-visning tegnes – et råt hold (med kasse og løn) afvises (Test Manager)
+  if (!Object.keys(pub).every((k) => TEAM_PUBLIC_FIELDS.includes(k))) throw new Error('Den offentlige klubside må kun tegnes fra viewTeam(team, false).');
   const name = (id) => league.teams.find((t) => t.id === id)?.name ?? '?';
   const log = (league.transferLog ?? []).filter((e) => e.from === pub.id || e.to === pub.id).slice(-10).reverse();
   const retired = (league.retired ?? []).filter((r) => r.teamId === pub.id).slice(-8).reverse();
@@ -133,6 +136,7 @@ export function renderPublicClub({ league, pub, me, playing, onBuy, onBack, msg 
           h('td', {}, `#${p.shirtNumber} ${p.shortName}`), h('td', {}, `${LINE[p.line]} · ${POSITION[p.position] ?? ''}`), h('td', { class: 'num' }, p.age),
           h('td', {}, starsEl(p.publicStars)), h('td', { class: 'num' }, kr(publicValue(p))), h('td', { class: 'num', title: m.reason ?? '' }, kr(m.price)), h('td', { class: 'num' }, kr(Math.round(publicWage(p) / 3))));
       })))),
-    h('h4', {}, 'Transfers'), log.length ? log.map((e) => h('div', { class: 'tlog-row' }, e.kind === 'release' ? `S${e.s}: ${e.name} fritstillet.` : `S${e.s}: ${e.name} ${name(e.from)} → ${name(e.to)} for ${kr(e.price)}.`)) : h('p', { class: 'muted' }, 'Ingen endnu.'),
-    h('h4', {}, 'Stoppet'), retired.length ? retired.map((r) => h('div', {}, `S${r.season}: ${r.name} (${r.age} år, ${r.games} kampe)`)) : h('p', { class: 'muted' }, 'Ingen endnu.'));
+    // Under afspilningen skjules transfers og pensioner som på Liga (QC: ens)
+    playing ? null : h('h4', {}, 'Transfers'), playing ? null : log.length ? log.map((e) => h('div', { class: 'tlog-row' }, e.kind === 'release' ? `S${e.s}: ${e.name} fritstillet.` : `S${e.s}: ${e.name} ${name(e.from)} → ${name(e.to)} for ${kr(e.price)}.`)) : h('p', { class: 'muted' }, 'Ingen endnu.'),
+    playing ? null : h('h4', {}, 'Stoppet'), playing ? null : retired.length ? retired.map((r) => h('div', {}, `S${r.season}: ${r.name} (${r.age} år, ${r.games} kampe)`)) : h('p', { class: 'muted' }, 'Ingen endnu.'));
 }

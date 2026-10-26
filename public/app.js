@@ -49,7 +49,7 @@ function seasonAndRound(league, r) {
   return s ? [s.seasonNumber, r - s.fromRound + 1] : [league.leagueMetadata.seasonNumber ?? 1, r - league.seasonStartRound + 1];
 }
 function showTeam(idx) {
-  view.viewTeamIdx = idx; clearSwap(); view.notice = ''; view.selectedPlayerId = game.league.teams[idx].squad[0].id;
+  view.viewTeamIdx = idx; clearSwap(); view.notice = ''; view.marketMsg = ''; view.trainMsg = ''; view.selectedPlayerId = game.league.teams[idx].squad[0].id;
   if (game.ui.tab === 'kamp' || game.ui.tab === 'liga' || game.ui.tab === 'admin') { game.ui.tab = 'trup'; persist(); }   // Klub bliver: den viser holdets klubside
   render();
 }
@@ -79,7 +79,7 @@ const NEWS = {
   '3.14.1': 'Rettelser: VAR tjekker nu offside for den forreste – scorer en spiller længere tilbage, er det hans forreste holdkammerat, der tjekkes, og billedet ved målet viser skytten, hvor han skød fra. Statistikken på Liga-fanen gælder sæsonen.',
   '3.14.2': 'Rettelse: Ved et VAR-tjek står den tjekkede nu, hvor han stod (forrest), i billedet ved målet – ikke flyttet bag en holdkammerat.',
   '3.14.3': 'Rettelser: Langskud tages fra skudafstand (ikke fra egen banehalvdel) i billedet ved målet, referatet fortæller et oplæg én gang, og efter sæsonens sidste runde viser tabellen slutstillingen og mesteren, til næste sæson går i gang.',
-  '3.19.0': '🧭 Nyt layout: fanerne står fast i topbaren, og Gem, Eksportér, Importér og Ny liga er flyttet til ⚙ Admin (gem-kvitteringen står stadig øverst). Opstillingen er samlet på 📋 Taktik: banen med en spillerliste ved siden af – klik på en brik, så viser listen hans kæde med de vigtigste evner, og klik på en anden spiller for at bytte. 👥 Trup har nu kolonnerne 💰 Værdi og Løn/rd og en samlet 🏋️ træningsoversigt – træning sættes kun dér. Vælger du et andet hold, viser 💼 Klub hans offentlige klubside med priser og Køb.',
+  '3.19.0': '🧭 Nyt layout: fanerne står fast i topbaren, og Gem, Eksportér, Importér og Ny liga er flyttet til ⚙ Admin (gem-kvitteringen står stadig øverst). Opstillingen er samlet på 📋 Taktik: banen med en spillerliste ved siden af – klik på en brik, så viser listen hans kæde med de vigtigste evner, og klik på en anden spiller for at bytte. 👥 Trup har nu kolonnerne 💰 Værdi og Løn/rd og en samlet 🏋️ træningsoversigt – træning sættes kun dér. Bænken udtages ved listen ("Udtag automatisk"), og regnearkets 🔁-knapper er væk. Står du i 💼 Klub og vælger et andet hold, ser du hans offentlige klubside med priser og Køb.',
   '3.18.1': '💰 Nu kan du købe: de andre klubber sælger også, når de kun har 18 spillere (de henter selv en ungdomsspiller), og 💼 Klub → Transfermarked viser alle spillere, du kan købe lige nu, med pris og Køb-knap.',
   '3.18.0': '🏋️ Livsløb: vælg træning pr. spiller på spillerkortet (den gælder, til du ændrer den). Alle bliver et år ældre ved sæsonslut, de ældste stopper (de varsles fra runde 10), og der kommer ungdomstilbud. 💼 Klub viser økonomien – tilskuere, TV, løn og præmie – og transfermarkedet: køb en anden klubs spiller til den faste pris på kortet, når vinduet er åbent (før runde 8 og ved sæsonslut). Kampe står på kortet under 📜 Kampe. Truppen må være 18–25; bænken er de 7 udtagne.',
   '3.17.0': '⚽ Kampene ligner rigtig fodbold: omkring 25 afslutninger pr. kamp, og knap hvert tredje skud på mål går ind. De mange små skud – fra kanten, en løs bold i feltet, en let redning – står nedtonet i referatet og springes over i ⭐ Højdepunkter, medmindre de går ind; målmanden betyder noget for dem. Din opbygning tæller nu: kommer I igennem presset, får I langt oftere en stor chance – og det samme gælder modstanderens opbygning mod jeres pres. Botterne har hver deres Hvis-Så, og en skadet spiller, der er skiftet ud, nævnes ikke igen. Dødbolde slås af kant- og midtbanespillere, færre FASE-linjer i de andre kampe, og Rundens mål nævner ikke typen to gange. Sæsonens snit og spejderens "seneste 3 kampe" blander gamle og nye kampe den første tid.',
@@ -105,7 +105,7 @@ function persist() {
     const key = backupRaw(storage, pendingRaw);
     if (!key) {
       view.saveError = 'Det gamle spil kunne ikke tages backup af';
-      window.tactivarFejl?.('Spillet er IKKE gemt: det gamle spil kunne ikke tages backup af (er browserens lager fuldt?). Eksportér med ⬇ Eksportér, og ryd plads i browseren.');
+      window.tactivarFejl?.('Spillet er IKKE gemt: det gamle spil kunne ikke tages backup af (er browserens lager fuldt?). Eksportér med ⬇ Eksportér i ⚙ Admin, og ryd plads i browseren.');
       return;
     }
     pendingRaw = null; view.backupKey = key;
@@ -151,7 +151,7 @@ function start() {
       // Gem straks i det nye format (ellers tog hver genindlæsning en ny backup) – men kun
       // når backuppen af det gamle format lykkedes; ellers står det gamle urørt, og der advares.
       if (r.backupKey) persist();
-      else { pendingRaw = storage.getItem(SAVE_KEY); window.tactivarFejl?.('Dit spil er opdateret, men der kunne ikke tages backup af det gamle format (er browserens lager fuldt?). Eksportér spillet med ⬇ Eksportér som sikkerhed.'); }
+      else { pendingRaw = storage.getItem(SAVE_KEY); window.tactivarFejl?.('Dit spil er opdateret, men der kunne ikke tages backup af det gamle format (er browserens lager fuldt?). Eksportér spillet med ⬇ Eksportér i ⚙ Admin som sikkerhed.'); }
     }
   }
   if (game.ui.seenVersion !== VERSION) {
@@ -237,9 +237,9 @@ function renderControls() {
     tiredStarters() ? h('span', { class: 'tired', id: 'tired-warning', title: myTeam().subsLimit
       ? `Markspillere under din udskiftningsgrænse (${myTeam().subsLimit} %) skiftes ud fra 3. minut (højst 3 ad gangen), hvis der er en frisk afløser i samme kæde på bænken – det bruger et skift og en pause. Overvej at rotere på Taktik`
       : 'Startere under 70 % friskhed – trætte spillere yder mindre (50 % ≈ 12,5 % svagere). Overvej at rotere på Taktik' },
-    myTeam().subsLimit ? `⚠ ${tiredStarters()} startere under din grænse (${myTeam().subsLimit} %) – skiftes ud tidligt` : `⚠ ${tiredStarters()} trætte startere`) : null,
+    '⚠ ', h('span', { class: 'tired-txt' }, myTeam().subsLimit ? `${tiredStarters()} startere under din grænse (${myTeam().subsLimit} %) – skiftes ud tidligt` : `${tiredStarters()} trætte startere`)) : null,
     // Gem-kvitteringen står altid synlig (spec §9 – svaret på "nulstiller ved refresh"); et klik åbner ⚙ Admin (gem, eksport, import)
-    h('button', { class: 'savestatus' + (view.saveError ? ' failed' : ''), id: 'save-status', title: 'Gem, eksportér, importér og ny liga står i ⚙ Admin', onclick: () => showTab('admin') }, view.saveError ? '⚠ IKKE gemt' : view.savedAt ? `✔ Gemt kl. ${time(view.savedAt)}` : 'Ikke gemt')].filter(Boolean));
+    h('button', { class: 'savestatus' + (view.saveError ? ' failed' : ''), id: 'save-status', title: 'Gem, eksportér, importér og ny liga står i ⚙ Admin', onclick: () => showTab('admin') }, view.saveError ? '⚠ IKKE gemt' : view.savedAt ? ['✔ ', h('span', { class: 'save-txt' }, 'Gemt kl. '), time(view.savedAt)] : 'Ikke gemt')].filter(Boolean));
 }
 
 // ⚙ Admin (v3.19.0): gem, eksport/import og ny liga – sjældne og farlige handlinger samlet ét sted
@@ -287,7 +287,7 @@ function renderNow() {
     team, isOwn, ui: { ...view, swapId: view.pitchSwapId }, notes: game.notes,
     onSort: (c) => { if (view.sortCol === c.key) view.sortDesc = !view.sortDesc; else { view.sortCol = c.key; view.sortDesc = !!c.num; } clearSwap(); view.notice = ''; render(); },
     onBlocked: (c) => { view.notice = `🔒 Anti-spionage: du kan ikke sortere ${team.name} på "${c.label}" – det er skjult information.`; render(); },
-    onSelect: (p) => { view.selectedPlayerId = p.id; render(); },
+    onSelect: (p) => { view.selectedPlayerId = p.id; render(); if (window.innerWidth < 900) document.getElementById('player-card')?.scrollIntoView({ block: 'start' }); },
     onFilter: (f) => { view.filter = f; render(); },
     onSwap: null,   // v3.19.0: opstillingen sker kun på Taktik (Spilfører: ét sted)
   });
@@ -306,7 +306,7 @@ function renderNow() {
     retiring: !!selected && seasonRoundOf(league, league.leagueMetadata.round) >= RETIRE_WARN_ROUND && willRetire(selected, league.leagueMetadata.seasonNumber ?? 1),
     onOpenMatch: (hi, ai) => { const i = lr.matches.findIndex((m) => m.homeId === league.teams[hi]?.id && m.awayId === league.teams[ai]?.id); if (i >= 0) openReport(i); } });
 
-  const pitch = h('div', { class: 'panel' }, h('h3', {}, `Taktiktavle – ${team.tactics.baseFormation}`),
+  const pitch = h('div', { class: 'panel' }, h('h3', { id: 'pitch-title' }, `${team.name} – ${team.tactics.baseFormation}`), isOwn ? null : h('div', { class: 'muted', id: 'pitch-opp' }, 'Modstanderhold – kun offentlige data'),
     renderPitch({ team, isOwn, ui: view,
       onSelect: (p, own) => { if (own) { view.listLine = p.line; pickForSwap(team, p); } else { view.selectedPlayerId = p.id; view.listLine = p.line; render(); } },
       onTokenSwap: (a, b) => { clearSwap(); view.notice = ''; change(() => act.swapPlayers(team, a, b)); },
@@ -346,9 +346,9 @@ function renderNow() {
       !mc?.playing && mine.youthOffers?.length ? h('div', { class: 'notice', id: 'youth-pending' }, `🧒 ${mine.youthOffers.length} ungdomstilbud venter – `, h('button', { class: 'linklike', onclick: () => showTab('liga') }, 'se sæsonrapporten på Liga')) : null,
       isOwn && !mc?.playing ? trainingSummary(league.trainingReport?.[team.id], team, league.trainingReport?.[team.id] ? seasonAndRound(league, league.trainingReport[team.id].round)[1] : null) : null, matrix,
       h('div', { class: 'tactics-layout' }, h('section', {}, card),
-        h('section', {}, isOwn ? renderTrainingTable({ team, report: !mc?.playing ? league.trainingReport?.[team.id] : null, line: view.trainLine ?? 'all', onLine: (v) => { view.trainLine = v; render(); },
+        h('section', {}, isOwn ? renderTrainingTable({ team, report: !mc?.playing ? league.trainingReport?.[team.id] : null, line: view.trainLine ?? 'all', onLine: (v) => { view.trainLine = v; view.trainMsg = ''; render(); }, msg: view.trainMsg ?? '',
           onFocus: (id, k) => change(() => act.setFocus(team, id, k)),
-          onFocusMany: (ids, k) => { const n = act.setFocusMany(team, ids, k); view.notice = `🏋️ ${n} spiller${n === 1 ? '' : 'e'} træner nu ${FOCUS[k].label}${n < ids.length ? ` (${ids.length - n} kan ikke – Målmand er kun for målmænd)` : ''}.`; change(() => {}); } }) : null))],
+          onFocusMany: (ids, k) => { const n = act.setFocusMany(team, ids, k); view.trainMsg = `🏋️ ${n} spiller${n === 1 ? '' : 'e'} træner nu ${FOCUS[k].label}${n < ids.length ? ` (${ids.length - n} kan ikke – Målmand er kun for målmænd)` : ''}.`; change(() => {}); } }) : null))],
     // Taktik (v3.19.0): banen og spillerlisten side om side – opstillingen ét sted; kortet under listen; faser og Hvis-Så nedenunder
     taktik: () => [h('div', { class: 'tactics-layout' }, h('section', {}, pitch), h('section', {}, lineupList, card)), tactics],
     kamp: () => [shown ? renderMatchCenter({ mc: shown, myTeamId: mine.id, on: mcHandlers, column: !shown.playing && shown.round === league.lastRound?.round ? columnNow() : null }) : h('div', { class: 'panel empty', id: 'no-matches' }, 'Ingen kampe spillet endnu. Tryk ▶ Spil runde i topbaren – modstanderen følger kampprogrammet på Liga-fanen.')],
@@ -378,11 +378,14 @@ function renderNow() {
   // Fanerne i topbaren (v3.19.0): på smal skærm kun ikonet – teksten står stadig i DOM'en (skjult)
   tabbar.replaceChildren(h('nav', { class: 'tabs', id: 'tabs' }, TABS.map(([k, ico, label]) => h('button', { id: `tab-${k}`, class: 'tab' + (k === tab ? ' active' : ''), title: label, onclick: () => showTab(k) },
     h('span', { class: 'tab-ico' }, ico), h('span', { class: 'tab-txt' }, ` ${label}`)))));
+  // Rullepositionen i tabellerne bevares, når siden tegnes om (QC: listen sprang til toppen ved hvert klik)
+  const scrolls = new Map([...app.querySelectorAll('.tablewrap')].map((el) => [el.querySelector('table')?.id, el.scrollTop]).filter(([id]) => id));
   app.replaceChildren(...[
     view.notice ? h('div', { class: 'notice', id: 'notice' }, view.notice,
       view.backupKey && storage.getItem(view.backupKey) ? h('button', { class: 'mini', id: 'download-migration-backup', onclick: () => download(storage.getItem(view.backupKey), `${view.backupKey}.json`) }, ' ⬇ Hent backup som fil') : null) : null,
     h('div', { class: `tabpane tab-${tab}` }, ...content.filter(Boolean)),
   ].filter(Boolean));
+  for (const [id, top] of scrolls) { const el = document.getElementById(id)?.closest('.tablewrap'); if (el) el.scrollTop = top; }
   document.body.dataset.klar = 'ja';
 }
 

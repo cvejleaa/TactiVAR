@@ -37,3 +37,9 @@ test('pickForSwap udfører: bænk → brik skifter ind (den udskiftede går på 
   assert.equal(pickForSwap(t, x, y), 'select');
   assert.deepEqual([t.tactics.lineupSlots, t.matchBench], before, 'reserve → reserve ændrer intet');
 });
+
+test('pickForSwap: bænkspiller først og så en reserve – reserven kommer i kamptruppen, bænkspilleren ud (Test Manager U2)', () => {
+  const t = team(), [b1] = matchBenchOf(t).map((p) => p.id), [r1] = reservesOf(t).map((p) => p.id);
+  assert.equal(pickForSwap(t, b1, r1), 'bench');
+  assert.ok(t.matchBench.includes(r1)); assert.ok(!t.matchBench.includes(b1));
+});

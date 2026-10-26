@@ -241,3 +241,11 @@ button.savestatus.failed { color: var(--rød); font-weight: 700; }
 .lp-table tr.active td { background: rgba(124, 58, 237, .35); }
 .lp-table tr.lp-sec th { text-align: left; color: var(--dæmpet); font-weight: 700; padding-top: .5rem; }
 .lp-table .lp-place { color: var(--grøn); font-weight: 700; }
+@media (max-width: 480px) {
+  .tired-txt, .save-txt { display: none; }          /* advarslen og kvitteringen som ikon – teksten står i title/Admin */
+  .topbar .tabs { margin-bottom: -.5rem; }
+}
+@media (max-width: 480px) {
+  .tired-txt, .save-txt { display: none; }          /* advarslen og kvitteringen som ikon – teksten står i title/Admin */
+  .topbar .tabs { margin-bottom: -.5rem; }
+}

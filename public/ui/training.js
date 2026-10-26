@@ -7,7 +7,7 @@ import { SKILL_NAME, roomWords, nextText } from './card.js';
 
 const SHORT = { pace: 'PAC', stamina: 'STA', strength: 'STR', ballControl: 'BAL', passing: 'PAS', finishing: 'FIN', positioning: 'POS', intercepting: 'INT', goalkeeping: 'GK' };
 
-export function renderTrainingTable({ team, report = null, line = 'all', onLine, onFocus, onFocusMany }) {
+export function renderTrainingTable({ team, report = null, line = 'all', onLine, onFocus, onFocusMany, msg = '' }) {
   const rows = team.squad.filter((p) => line === 'all' || p.line === line);
   const gained = new Map();
   for (const g of report?.gains ?? []) gained.set(g.id, [...(gained.get(g.id) ?? []), g.skill]);
@@ -17,8 +17,9 @@ export function renderTrainingTable({ team, report = null, line = 'all', onLine,
     h('p', { class: 'muted' }, 'Fokus gælder, til du ændrer det. Kampe giver også lidt i kædens nøgle-evner. Prisen er friskhed pr. runde (mindre for den, der har spillet).'),
     h('div', { class: 'toolbar' }, [['all', 'Alle'], ['GK', 'MÅL'], ['DEF', 'FOR'], ['MID', 'MID'], ['ATT', 'ANG']].map(([v, l]) => h('button', { class: 'mini' + (line === v ? ' active' : ''), onclick: () => onLine(v) }, l)),
       select('', [['', `Sæt fokus for de viste (${rows.length}) …`], ...Object.entries(FOCUS).map(([k, f]) => [k, f.label])], (k) => { if (k) onFocusMany(rows.map((p) => p.id), k); }, { id: 'focus-many', class: 'mini' })),
+    msg ? h('div', { class: 'notice', id: 'train-msg' }, msg) : null,
     h('div', { class: 'tablewrap' }, h('table', { class: 'matrix train-table', id: 'training-table' },
-      h('thead', {}, h('tr', {}, ['Spiller', 'Kæde', 'Fokus', 'Friskhed', 'Fremdrift', 'Næste +1', 'Skøn', 'Sidste runde'].map((t) => h('th', {}, t)))),
+      h('thead', {}, h('tr', {}, [['Spiller'], ['Kæde'], ['Fokus'], ['Friskhed', 'Pr. runde – i parentes, når han har spillet'], ['Fremdrift'], ['Næste +1'], ['Skøn'], ['Sidste runde']].map(([t, title]) => h('th', { title: title ?? '' }, t)))),
       h('tbody', {}, rows.map((p) => {
         const e = trainingEstimate(p, on.has(p.id)), g = gained.get(p.id) ?? [];
         return h('tr', { dataset: { pid: p.id } },
