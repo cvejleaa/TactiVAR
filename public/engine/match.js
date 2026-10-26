@@ -26,6 +26,11 @@ export function ruleConditionMet(rule, own, opp) {
 const coordsOf = (tactics) => FORMATIONS[tactics.baseFormation] || FORMATIONS['4-4-2'];
 // Hvor godt spilleren passer på pladsen (v3.20.0, formations.js fitOf) – indskiftere og erstatninger vælges inden for kæden efter den
 const slotFit = (tactics, p, slot) => fitOf(p.position, coordsOf(tactics)[slot]?.r);
+// ÉT valg for alle fem steder (skade før kampen, rotation, udskiftning, træthedsskift, pauseskift): den med størst score × fit
+// på pladsen; ved lighed listens rækkefølge (stabil sortering). score = det, stedet vægter (friskhed, evner …).
+export function pickForSlot(list, tactics, slot, score = () => 1) {
+  return list.slice().sort((a, b) => score(b) * slotFit(tactics, b, slot) - score(a) * slotFit(tactics, a, slot))[0];
+}
 // Formationsskift i kampen: de samme spillere (og tomme pladser efter rødt) fordeles efter position; målmanden bliver i mål
 function refit(side, formation) {
   const next = arrangeByFit(side.starters, formation, side.tactics.baseFormation);
@@ -219,7 +224,8 @@ function prepareSide(team, isHome, notes) {
   starters.forEach((p, slot) => {
     if (p && isAvailable(p)) return;
     const line = p ? p.line : lineOfRole(coordsOf(tactics)[slot].r);
-    const sub = bench().filter((b) => b.line === line).sort((a, b) => (b.freshness ?? 100) * slotFit(tactics, b, slot) - (a.freshness ?? 100) * slotFit(tactics, a, slot) || avgSkill(b) - avgSkill(a))[0] || bench()[0];
+    const inLine = bench().filter((b) => b.line === line).sort((a, b) => avgSkill(b) - avgSkill(a));   // ved lighed: bedste evner
+    const sub = pickForSlot(inLine, tactics, slot, (b) => b.freshness ?? 100) || bench()[0];
     if (!sub) return;
     if (p) notes.push({ isHome, text: `📋 [${team.name}] ${tag(p)} er skadet og erstattes i startopstillingen af ${tag(sub)}.` });
     starters[slot] = sub; used.add(sub.id);
@@ -228,7 +234,7 @@ function prepareSide(team, isHome, notes) {
     if (!p || !isAvailable(p) || (p.freshness ?? 100) >= rest) return;
     const fresh = bench().filter((b) => b.line === p.line && (b.freshness ?? 100) >= freshMin && avgSkill(b) >= avgSkill(p) - ROTATE_SKILL);
     if (!fresh.length) return;
-    const sub = fresh.sort((a, b) => avgSkill(b) * slotFit(tactics, b, slot) - avgSkill(a) * slotFit(tactics, a, slot))[0];
+    const sub = pickForSlot(fresh, tactics, slot, avgSkill);
     notes.push({ isHome, text: `📋 [${team.name}] ${tag(sub)} starter i stedet for en træt ${tag(p)}.` });
     starters[slot] = sub; used.add(sub.id);
   });
@@ -1003,7 +1009,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
     const out = side.starters[slot];
     if (!out) return null;   // en udvist spillers plads – der må ikke skiftes ind (v3.15)
     const bench = side.benchAvailable();
-    const sub = pick ?? (bench.filter((b) => b.line === out.line).sort((a, b) => slotFit(side.tactics, b, slot) - slotFit(side.tactics, a, slot))[0] || bench[0]);
+    const sub = pick ?? (pickForSlot(bench.filter((b) => b.line === out.line), side.tactics, slot) || bench[0]);
     if (!sub) return null;
     side.subsUsed++;
     if (min !== 45 && min !== side.lastSubMin) side.windows++;
@@ -1110,8 +1116,8 @@ export function simulateMatch(home, away, rng, opts = {}) {
     const swap = (c, near) => {
       const block = subBlock(side, min, !own(side) && min < BOT_SUBS.until ? BOT_SUBS.keep : null);
       if (block) { if (!near) note(c.p, block); return false; }
-      const pick = side.benchAvailable().filter((b) => b.line === c.p.line && !reserved.has(b.id) && (b.freshness ?? 100) >= limit + SUBS_LIMIT.near)
-        .sort((a, b) => avgSkill(b) * (b.freshness ?? 100) * slotFit(side.tactics, b, c.i) - avgSkill(a) * (a.freshness ?? 100) * slotFit(side.tactics, a, c.i))[0];
+      const cands = side.benchAvailable().filter((b) => b.line === c.p.line && !reserved.has(b.id) && (b.freshness ?? 100) >= limit + SUBS_LIMIT.near);
+      const pick = pickForSlot(cands, side.tactics, c.i, (b) => avgSkill(b) * (b.freshness ?? 100));
       if (!pick) {
         const held = side.benchAvailable().some((b) => b.line === c.p.line && reserved.has(b.id) && (b.freshness ?? 100) >= limit + SUBS_LIMIT.near);
         if (!near) note(c.p, held ? `den friske ${LINE_WORD[c.p.line] ?? 'spiller'} på bænken er sat til en af dine Hvis-Så-regler` : `der er ingen frisk ${LINE_WORD[c.p.line] ?? 'spiller'} på bænken`);
@@ -1187,7 +1193,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
       // Som træthedsskiftet: den friskeste i kæden, der ikke er sat til en Hvis-Så-regel – ellers en anden markspiller (QC)
       const reserved = new Set(side.tactics.conditionalRules.filter((r) => r.action === 'SUB' && !r.used).map((r) => r.subIn));
       const free = side.benchAvailable().filter((b) => !reserved.has(b.id) && b.line !== 'GK').sort((a, b) => (b.freshness ?? 100) - (a.freshness ?? 100));
-      const pick = free.filter((b) => b.line === p.line).sort((a, b) => (b.freshness ?? 100) * slotFit(side.tactics, b, slot) - (a.freshness ?? 100) * slotFit(side.tactics, a, slot))[0] ?? free[0];
+      const pick = pickForSlot(free.filter((b) => b.line === p.line), side.tactics, slot, (b) => b.freshness ?? 100) ?? free[0];
       if (pick) substitute(side, slot, min, 'Pauseskift for den haltende', pick);
     });
     checkTriggers(H, min); checkTriggers(A, min);
