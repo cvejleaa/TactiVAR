@@ -3,13 +3,13 @@ import { renderStats } from './ui/stats.js';
 import { VERSION } from './version.js';
 import { createRng, randomSeed } from './engine/rng.js';
 import { createLeague } from './engine/generator.js';
-import { matchBenchOf, reservesOf } from './engine/career.js';
+import { matchBenchOf, reservesOf, FOCUS } from './engine/career.js';
 import { loadGame, saveGame, resetGame, exportGame, importGame, backupRaw, SAVE_KEY } from './state/storage.js';
 import * as act from './state/actions.js';
 import { h, select } from './ui/dom.js';
 import { kr } from './ui/labels.js';
 import { renderMatrix } from './ui/matrix.js';
-import { renderCard } from './ui/card.js';
+import { renderCard, trainingSummary } from './ui/card.js';
 import { renderPitch } from './ui/pitch.js';
 import { renderTactics } from './ui/tactics.js';
 import { renderStandings } from './ui/standings.js';
@@ -260,6 +260,7 @@ function renderNow() {
     onSort: (c) => { if (view.sortCol === c.key) view.sortDesc = !view.sortDesc; else { view.sortCol = c.key; view.sortDesc = !!c.num; } clearSwap(); view.notice = ''; render(); },
     onBlocked: (c) => { view.notice = `🔒 Anti-spionage: du kan ikke sortere ${team.name} på "${c.label}" – det er skjult information.`; render(); },
     onSelect: (p) => { view.selectedPlayerId = p.id; render(); },
+    onFocusMany: isOwn ? (ids, k) => { const n = act.setFocusMany(team, ids, k); view.notice = `🏋️ ${n} spiller${n === 1 ? '' : 'e'} træner nu ${FOCUS[k].label}${n < ids.length ? ` (${ids.length - n} kan ikke – Målmand er kun for målmænd)` : ''}.`; change(() => {}); } : null,
     onFilter: (f) => { view.filter = f; render(); },
     onSwap: (p) => {
       if (!view.pitchSwapId) { view.pitchSwapId = p.id; view.notice = `🔁 Vælg den spiller, ${p.shortName} skal byttes med (i regnearket, på banen eller på bænken).`; render(); return; }
@@ -272,6 +273,7 @@ function renderNow() {
   const lr = league.lastRound, latest = lr && !mc?.playing ? lr.matches.map((m) => [league.teams.findIndex((t) => t.id === m.homeId), league.teams.findIndex((t) => t.id === m.awayId), m.homeGoals, m.awayGoals].join('|')) : null;
   const card = renderCard({ player: selected, team, isOwn, scouting: league.scouting[mine.id]?.[selected?.id], note: selected ? game.notes[selected.id] : '',
     onNote: (v) => { game.notes[selected.id] = v; persist(); renderControls(); }, teams: league.teams, latest,
+    onFocus: isOwn ? (k) => change(() => act.setFocus(team, selected.id, k)) : null,
     onOpenMatch: (hi, ai) => { const i = lr.matches.findIndex((m) => m.homeId === league.teams[hi]?.id && m.awayId === league.teams[ai]?.id); if (i >= 0) openReport(i); } });
 
   const pitch = h('div', { class: 'panel' }, h('h3', {}, `Taktiktavle – ${team.tactics.baseFormation}`),
@@ -302,7 +304,7 @@ function renderNow() {
   const content = {
     // Opstilling sker i Trup: tallene og sorteringen over banen (brugeren: "nærmest umuligt at
     // opstille sit hold, da informationerne og sorteringsmulighederne ligger på 2 forskellige faner").
-    trup: () => [header, matrix, h('div', { class: 'tactics-layout lineup-layout' }, h('section', {}, pitch), h('section', {}, card))],
+    trup: () => [header, isOwn && !mc?.playing ? trainingSummary(league.trainingReport?.[team.id], team) : null, matrix, h('div', { class: 'tactics-layout lineup-layout' }, h('section', {}, pitch), h('section', {}, card))],
     // Kortet står også i Taktik, så et klik på en brik viser spilleren uden fanebyt.
     taktik: () => [h('div', { class: 'tactics-layout' }, h('section', {}, pitch), h('section', {}, card, tactics))],
     kamp: () => [shown ? renderMatchCenter({ mc: shown, myTeamId: mine.id, on: mcHandlers, column: !shown.playing && shown.round === league.lastRound?.round ? columnNow() : null }) : h('div', { class: 'panel empty', id: 'no-matches' }, 'Ingen kampe spillet endnu. Tryk ▶ Spil runde i topbaren – modstanderen følger kampprogrammet på Liga-fanen.')],

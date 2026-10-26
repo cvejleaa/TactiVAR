@@ -56,7 +56,7 @@ try {
   check('Ny liga: ingen "Nyt i kampene"-besked (den er til dem, der opdaterer et gammelt gem)', (await g.locator('#notice').count()) === 0);
   check('Holdvælgeren har 8 hold', (await g.locator('#team-select option').count()) === 8);
   const heads = (await g.locator('#matrix thead th').allTextContents()).map((t) => t.replace(/ [▲▼]$/, ''));
-  check('Regnearkets kolonner i rækkefølge (Alder står hvor den skal)', JSON.stringify(heads.slice(0, 21)) === JSON.stringify(['Pos/#', 'Spiller', 'Kæde', 'Natur', 'Alder', 'Frisk/🚑', 'Højde', 'Spring', '✈ Luft', 'PAC', 'STA', 'STR', 'BAL', 'PAS', 'FIN', 'POS', 'INT', 'GK', 'Gns', '⭐ Vurd', '🧠 Mod']), heads.join('|'));
+  check('Regnearkets kolonner i rækkefølge (Alder står hvor den skal)', JSON.stringify(heads.slice(0, 22)) === JSON.stringify(['Pos/#', 'Spiller', 'Kæde', 'Natur', 'Alder', 'Frisk/🚑', 'Højde', 'Spring', '✈ Luft', 'PAC', 'STA', 'STR', 'BAL', 'PAS', 'FIN', 'POS', 'INT', 'GK', 'Gns', '⭐ Vurd', '🏋️ Træning', '🧠 Mod']), heads.join('|'));
   const modCells = await g.locator('#matrix tbody td.modcell').allTextContents();
   check('Mod-kolonnen viser tre egne værdier, ingen % mod en modstander', modCells.length === 18 && modCells.every((t) => /^\d+ · \d+ · \d+$/.test(t)) && !(await g.textContent('body')).match(/mod-kunnen[^.)]*\d+\s*%|mod [A-ZÆØÅ][^:]*: \d+%/i), modCells[0]);
   const used = await g.textContent('#counter-pool #counter-used');
@@ -64,6 +64,11 @@ try {
   const shown = (await g.textContent('#player-card h3')).match(/^#(\d+)/)[1];
   const expectSum = await g.evaluate((nr) => { const t = JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((x) => !x.isBot); const p = t.squad.find((x) => String(x.shirtNumber) === nr); return p.counterTactics.vsPress + p.counterTactics.vsLowBlock + p.counterTactics.vsTrapLong; }, shown);
   check('Spillerkortet viser puljen: erfaring brugt = summen af de tre værdier /100, og hvad der sker, når den er fuld', usedN === expectSum && used.includes('glemmer'), `${used} (forventet ${expectSum})`);
+  // v3.18.0: træningsfokus vælges på kortet, står i regnearket og gemmes (gælder, til det ændres – 0 klik pr. runde)
+  await g.selectOption('#focus-select', 'FINISH');
+  const focusSaved = async () => g.evaluate((nr) => JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((x) => !x.isBot).squad.find((x) => String(x.shirtNumber) === nr).trainingFocus, shown);
+  const focusRow = (await g.locator('#matrix tbody tr.selected td.traincell').textContent());
+  check('Træning: fokus valgt på kortet står i regnearket og er gemt', focusRow === 'Afslutning' && (await focusSaved()) === 'FINISH' && (await g.textContent('#card-training')).includes('Afslutning') && /næste \+1 om ca\. \d+ runde|går meget langsomt/.test(await g.textContent('#card-training')), focusRow);
   check('Spillerkortet viser 9 evne-barer og luftduel-udregningen', (await g.locator('#player-card .bars .bar').count()) === 9 && (await g.textContent('#aerial-breakdown')).includes('× 0,35'));
   // v3.8 (Test Manager): kortets overskrift viser spillerens EGEN naturlige position med fuld betegnelse
   const FULL_POS = { GK: 'Målmand', CB: 'Midtstopper', FB: 'Back/wingback (LB/RB/LWB/RWB)', CM: 'Central/defensiv midtbane (CM/CDM)', WM: 'Kant (LM/RM/LW/RW)', AM: 'Offensiv midtbane (CAM/CF)', ST: 'Angriber (ST)' };
@@ -294,7 +299,7 @@ try {
   await g.selectOption('#team-select', '1');
   const oppText = await g.textContent('#matrix tbody');
   const lockCells = await g.locator('#matrix tbody td.lockcell').count();
-  check('Modstander: 13 skjulte kolonner × 18 spillere vises som 🔒 ??', lockCells === 13 * 18, String(lockCells));
+  check('Modstander: 14 skjulte kolonner × 18 spillere vises som 🔒 ?? (v3.18.0: + træningsfokus)', lockCells === 14 * 18, String(lockCells));
   const hiddenCols = await g.evaluate(() => [...document.querySelectorAll('#matrix tbody tr')].flatMap((tr) => [...tr.children].slice(7, 19).map((td) => td.textContent)));
   check('Modstander: spring, luft, de 9 evner og gennemsnit står som 🔒 ?? (12 × 18 celler)', hiddenCols.length === 12 * 18 && hiddenCols.every((t) => t === '🔒 ??'));
   check('Modstander: vurdering vises som stjerner, ikke tal', (await g.locator('#matrix tbody tr td:nth-child(20)').allTextContents()).every((t) => /^[★☆]{5}$|^–$/.test(t)));
@@ -346,6 +351,7 @@ try {
   await tab('kamp');
   await g.click('#skip');
   check('Runden har 4 kampe', (await g.locator('#match-cards .matchcard').count()) === 4);
+  check('Træning: fokusset gælder stadig efter runden (0 klik pr. runde)', (await focusSaved()) === 'FINISH');
   const mcText = await g.textContent('#match-center');
   // v3.16.3: minuttet står ved linjen ("3'"), ikke i teksten
   check('Din Hvis-Så-udskiftning (uanset stilling, fra minut 3) står i referatet i 3. minut, og indskifteren står i karakterarket', /(?<!\d)3'🔄 \[.+ • Hvis-Så\] #\d+ .+ ud – #\d+ .+ ind \(din Hvis-Så-regel\)\./.test(mcText) && /ind på/.test(mcText), (mcText.match(/🔄[^.]*\./) || ['ingen'])[0]);

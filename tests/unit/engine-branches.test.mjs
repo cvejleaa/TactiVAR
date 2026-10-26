@@ -281,7 +281,8 @@ test('bogføring: friskhed efter løbet distance (v3.7), bænk +15, stjerner af 
   // v3.6 gav 99 og 60 (−max(4, 14 − STA/2) + 8 straks): næsten ingen træthed.
   assert.equal(p.freshness, 92);      // 100 − round(11,2·(1,5 − 0,30) = 13,4) = 87; + round(0,41·13) = 5
   assert.equal(q.freshness, 69);      // 61 − round(10·(1,5 − 0,06) = 14,4) = 47; + round(0,41·53) = 22 (v3.10.1; 0,35 gav 66)
-  assert.equal(bench1.freshness, 100); assert.equal(bench2.freshness, 85);
+  // + træning (v3.18.0): Alsidig koster 2 for den, der ikke spillede (100 → 98, 85 → 83); p og q spillede og betaler 0
+  assert.equal(bench1.freshness, 98); assert.equal(bench2.freshness, 83);
   assert.equal(p.ratingSum, 21); assert.equal(p.ratingGames, 3); assert.equal(p.lastRating, 5);
   assert.equal(p.publicStars, starsFromRating(7)); // snit 21/3 = 7,0 → 3 stjerner (sidste karakter 5 ville give 1)
   assert.equal(p.publicStars, 3);

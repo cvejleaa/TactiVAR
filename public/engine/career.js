@@ -113,3 +113,35 @@ export function stampText(e, teams, own) {
   const name = (i) => teams[i]?.name ?? '?', grade = own && e[LOG.RT] != null ? String(e[LOG.RT]).replace('.', ',') : '★'.repeat(e[LOG.ST] || 0) + '☆'.repeat(5 - (e[LOG.ST] || 0));
   return `[Runde ${e[LOG.R]} • ${name(e[LOG.H])} ${e[LOG.HG]}-${e[LOG.AG]} ${name(e[LOG.A])} • ${e[LOG.MIN]}' • ${grade}]`;
 }
+
+// ---------- Træning pr. spiller (v3.18.0; spec §13 "fredagstræning" – brugerens valg: pr. spiller) ----------
+// Fokus gælder, til det ændres (0 klik pr. runde – Spilfører). Fremgang (xp) pr. runde = rate · alder · plads til loftet;
+// ved 1,0 stiger evnen +1. Prisen: friskhed (gulv 50) og en lille skaderisiko. Hvile giver friskhed. Kamp-xp: de spillede
+// minutter til kædens nøgle-evner. Botterne træner Alsidig (fast pris – fokus kan ikke aflæses af friskheden, QC B7).
+export const FOCUS = {
+  GENERAL: { label: 'Alsidig', skills: null, rate: 0.03, fresh: -2, inj: 0.004 },   // skills null = kædens nøgle-evner
+  STAMINA: { label: 'Kondition', skills: ['stamina'], rate: 0.12, fresh: -5, inj: 0.006 },
+  TECH: { label: 'Teknik', skills: ['ballControl', 'passing'], rate: 0.07, fresh: -3, inj: 0.005 },
+  FINISH: { label: 'Afslutning', skills: ['finishing'], rate: 0.12, fresh: -3, inj: 0.005 },
+  DEFENCE: { label: 'Forsvar', skills: ['intercepting', 'positioning'], rate: 0.07, fresh: -3, inj: 0.005 },
+  PHYSICAL: { label: 'Fysik', skills: ['pace', 'strength'], rate: 0.07, fresh: -4, inj: 0.007 },
+  KEEPER: { label: 'Målmand', skills: ['goalkeeping'], rate: 0.12, fresh: -2, inj: 0.003, gkOnly: true },
+  REST: { label: 'Hvile', skills: [], rate: 0, fresh: 4, inj: 0 },
+};
+export const MATCH_XP = 0.02, TRAIN_FRESH_FLOOR = 50, TRAIN_INJURY_MATCHES = [1, 2], PLAYED_RELIEF = 2;
+export const ageTrain = (age) => (age <= 19 ? 1.5 : age <= 22 ? 1.2 : age <= 25 ? 1 : age <= 29 ? 0.6 : age <= 32 ? 0.35 : 0.2);
+// Plads til loftet: nøgle-evnernes snit mod potentialet (0,1–1 – en spiller ved sit loft udvikler sig næsten ikke)
+export const roomOf = (p) => clamp(((p.potential ?? keyAvg(p)) - keyAvg(p)) / 3, 0.1, 1);
+export const focusSkills = (p, f = FOCUS[p.trainingFocus] ?? FOCUS.GENERAL) => f.skills ?? KEY_SKILLS[p.line];
+export const validFocus = (p, key) => !!FOCUS[key] && (!FOCUS[key].gkOnly || p.line === 'GK');
+// Fremgang i én evne (+xp); returnerer de evner, der steg (+1). onSkill: genberegning (luftduel, arketype – QC B4).
+export function addXp(p, skill, xp, onSkill) {
+  p.dev ||= {};
+  p.dev[skill] = (p.dev[skill] ?? 0) + xp;
+  const up = [];
+  while (p.dev[skill] >= 1 && (p.skills[skill] ?? 0) < 20) { p.dev[skill] -= 1; p.skills[skill] += 1; up.push(skill); }
+  if ((p.skills[skill] ?? 0) >= 20) p.dev[skill] = Math.min(p.dev[skill], 0.99);
+  p.dev[skill] = Math.round(p.dev[skill] * 1000) / 1000;
+  if (up.length) onSkill?.(p);
+  return up;
+}

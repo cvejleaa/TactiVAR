@@ -2,7 +2,8 @@
 // Rettet ift. v2.5b: alt bogføres FØR der gemmes; skader, der fandtes før runden, heles
 // med én kamp (spilleren missede kampen), og nye skader lægges på bagefter – så en
 // 1-kamps skade ikke forsvinder i samme runde.
-import { autoMatchBench, logMatch } from './career.js';
+import { autoMatchBench, logMatch, FOCUS, focusSkills, validFocus, ageTrain, roomOf, addXp, KEY_SKILLS, MATCH_XP, TRAIN_FRESH_FLOOR, TRAIN_INJURY_MATCHES, PLAYED_RELIEF, derivedRng } from './career.js';
+import { aerialBreakdown, isArchetypeUnlocked } from './generator.js';
 import { bookMatchStats, roundHistory, HISTORY_MAX } from './stats.js';
 import { simulateMatch } from './match.js';
 import { starsFromRating, starNoise } from './ratings.js';
@@ -72,6 +73,40 @@ export const SCOUTING_PER_PLAYER = 20;
 // Bogfører en afviklet runde i ligaen (muterer league) – kaldes før der gemmes.
 // Idempotent: en runde, der allerede er bogført (dobbeltklik, genindlæsning midt i
 // afspilning), afvises, så den aldrig tæller to gange.
+const minutesOf = (result) => new Map(result.matches.flatMap((m) => [...m.ratings.home, ...m.ratings.away]).map((r) => [r.playerId, Math.max(0, (r.minOut ?? 90) - ((r.minIn ?? 1) <= 1 ? 0 : r.minIn))]));
+// En evne steg: luftduellen og arketypen regnes straks igen – ikke først ved næste indlæsning (QC B4; en låst-op arketype forbliver)
+export function afterSkillChange(p) {
+  p.aerialPower = aerialBreakdown(p.heightCm, p.jumpingPower, p.skills.strength, p.skills.positioning).total;
+  if (p.archetype && !p.archetype.isUnlocked) p.archetype.isUnlocked = isArchetypeUnlocked(p.archetype, p);
+}
+// Træning efter runden (v3.18.0): hver spillers fokus (botterne: Alsidig) – friskhed, fremgang, en lille skaderisiko –
+// og kamp-xp til nøgle-evnerne for de spillede minutter. Tilfældighed fra en afledt rng pr. spiller (rører ikke rundens).
+// Dit holds rapport (fremgang og træningsskader) står i league.trainingReport (kun ejeren ser den).
+export function trainRound(league, result, minutes) {
+  const report = {};
+  for (const team of league.teams) {
+    const rep = team.isBot ? null : (report[team.id] = { round: result.round, gains: [], injuries: [] });
+    for (const p of team.squad) {
+      const injured = p.injuryMatchesLeft > 0;
+      const f = team.isBot || !validFocus(p, p.trainingFocus) ? FOCUS.GENERAL : FOCUS[p.trainingFocus];
+      const gains = [];
+      const mins = minutes.get(p.id) ?? 0;
+      if (mins > 0) for (const s of KEY_SKILLS[p.line]) gains.push(...addXp(p, s, MATCH_XP * mins / 90, afterSkillChange));
+      if (!injured) {
+        // Den, der spillede, træner restitution: prisen er 2 mindre (Alsidig: ingen) – ellers trak træningen hele ligaens friskhed
+        // ned, og træthedsskiftene før pausen steg fra 19 % til 29 % (measure-duels skift)
+        const cost = f.fresh < 0 && mins > 0 ? Math.min(0, f.fresh + PLAYED_RELIEF) : f.fresh;
+        p.freshness = cost < 0 ? Math.max(Math.min(p.freshness, TRAIN_FRESH_FLOOR), p.freshness + cost) : Math.min(100, p.freshness + cost);
+        if (f.rate > 0) { const skills = focusSkills(p, f); for (const s of skills) gains.push(...addXp(p, s, f.rate * ageTrain(p.age) * roomOf(p), afterSkillChange)); }
+        const r = derivedRng('train', result.round, p.id);
+        if (f.inj > 0 && r.chance(f.inj)) { p.injuryMatchesLeft = TRAIN_INJURY_MATCHES[Math.floor(r.next() * TRAIN_INJURY_MATCHES.length)]; rep?.injuries.push(p.id); }
+      }
+      if (rep) for (const s of gains) rep.gains.push({ id: p.id, skill: s });
+    }
+  }
+  league.trainingReport = report;
+}
+
 export function commitRound(league, result, rng) {
   const expected = (league.leagueMetadata.round || 0) + 1;
   if (result.round !== expected) throw new Error(`Runde ${result.round} kan ikke bogføres – ligaen venter på runde ${expected}.`);
@@ -121,6 +156,8 @@ export function commitRound(league, result, rng) {
     p.injuryMatchesLeft = Math.max(0, p.injuryMatchesLeft - 1);
   }
   for (const m of result.matches) for (const inj of m.injuries) players.get(inj.playerId).injuryMatchesLeft = inj.matches;
+  // Træning (v3.18.0) – efter kampene og skaderne, før næste runde
+  trainRound(league, result, minutesOf(result));
 
   // Sæsonstatistik (v3.10) – fra league.statsFromRound.
   for (const m of result.matches) bookMatchStats(league, m);

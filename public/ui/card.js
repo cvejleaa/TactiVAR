@@ -1,8 +1,8 @@
 // Spillerkort: offentlige data for alle, evner og mod-kunnen kun for eget hold, VAR-profilen
 // for ingen. Scouting-indtryk og private noter vises for alle spillere.
-import { publicValue, LOG, stampText } from '../engine/career.js';
+import { publicValue, LOG, stampText, FOCUS, focusSkills, validFocus, ageTrain, roomOf, MATCH_XP, PLAYED_RELIEF, TRAIN_FRESH_FLOOR } from '../engine/career.js';
 import { viewPlayer } from '../engine/visibility.js';
-import { h, dec, LOCK } from './dom.js';
+import { h, dec, LOCK, select } from './dom.js';
 import { LINE, POSITION_FULL, SKILL_LABELS, kr, starsEl } from './labels.js';
 import { aerialBreakdown } from '../engine/generator.js';
 import { runStats } from '../engine/stats.js';
@@ -12,7 +12,7 @@ const dk = (v) => v.toLocaleString('da-DK', { minimumFractionDigits: 2, maximumF
 const bar = (label, v, max = 20) => h('div', { class: 'bar' }, h('span', { class: 'bar-label' }, label),
   h('span', { class: 'bar-track' }, h('span', { class: 'bar-fill', style: { width: `${Math.round((v / max) * 100)}%` } })), h('span', { class: 'bar-val' }, String(v)));
 
-export function renderCard({ player: p, team, isOwn, scouting, note, onNote, teams = null, latest = null, onOpenMatch = null }) {
+export function renderCard({ player: p, team, isOwn, scouting, note, onNote, teams = null, latest = null, onOpenMatch = null, onFocus = null }) {
   if (!p) return h('div', { class: 'panel muted' }, 'Klik på en spiller for at se spillerkortet.');
   const head = h('div', { class: 'card-head' },
     h('h3', {}, `#${p.shirtNumber} ${p.name}`),
@@ -32,6 +32,7 @@ export function renderCard({ player: p, team, isOwn, scouting, note, onNote, tea
       p.archetype ? h('div', { class: 'archbox' }, h('strong', {}, (p.archetype.isUnlocked ? '🌟 ' : '🔒 ') + p.archetype.name), ' – ', p.archetype.description,
         p.archetype.isUnlocked ? null : h('div', { class: 'muted' }, 'Låses op ved: ' + Object.entries(p.archetype.unlockReq).map(([k, v]) => `${k} ${v}`).join(', '))) : null,
       h('div', { class: 'muted', id: 'run-stats' }, run.km90 != null ? `🏃 ${dec(run.km90, 1)} km pr. 90 min · ${run.hiPct != null ? `${run.hiPct} % højintenst` : 'højintenst: kommer efter næste kamp'} · topfart ${dec(p.topSpeedMax, 1)} km/t (alle kampe)` : '🏃 Løbedata kommer efter første kamp'),
+      onFocus ? renderTraining(p, onFocus) : null,
       h('div', { class: 'muted', id: 'card-wage' }, `Løn ${kr(p.weeklyWage)}/uge · Værdi ${kr(publicValue(p))} (offentlig – ud fra stjerner og alder)`),
     ];
   } else {
@@ -44,6 +45,39 @@ export function renderCard({ player: p, team, isOwn, scouting, note, onNote, tea
     h('div', { class: 'scouting' }, h('h4', {}, '🕵️ Scouting-indtryk'), (scouting?.length ? scouting.slice(0, 8) : ['Ingen indtryk endnu.']).map((s) => h('div', { class: 'clue' }, s))),
     h('label', { class: 'notes' }, h('h4', {}, '📝 Dine private noter'),
       h('textarea', { id: 'note-input', rows: 3, placeholder: 'Skriv hvad du har bemærket …', value: note || '', oninput: (e) => onNote(e.target.value) })));
+}
+
+// 🏋️ Træning (v3.18.0): fokus, hvad det træner, fremdrift pr. evne og ejerens skøn i ord (tallet – potentialet – er skjult)
+const SKILL_NAME = Object.fromEntries(SKILL_LABELS.flatMap(([, list]) => list));
+export const roomWords = (room) => (room >= 0.6 ? 'har meget mere i sig' : room >= 0.3 ? 'har mere i sig' : 'er tæt på sit loft');
+function renderTraining(p, onFocus) {
+  const key = validFocus(p, p.trainingFocus) ? p.trainingFocus : 'GENERAL', f = FOCUS[key];
+  const per = f.rate * ageTrain(p.age) * roomOf(p);
+  const price = f.fresh > 0 ? `+${f.fresh} friskhed pr. runde` : `${f.fresh} friskhed pr. runde (${Math.min(0, f.fresh + PLAYED_RELIEF)} når han har spillet; ikke under ${TRAIN_FRESH_FLOOR} %) · lille skaderisiko`;
+  const lines = focusSkills(p, f).map((s) => {
+    const d = p.dev?.[s] ?? 0;
+    if (p.skills[s] >= 20) return h('div', { class: 'train-line' }, `${SKILL_NAME[s]} 20 – helt i top`);
+    const n = per > 0 ? Math.ceil((1 - d) / per) : null;
+    return h('div', { class: 'train-line' }, h('span', { class: 'bar-track' }, h('span', { class: 'bar-fill', style: { width: `${Math.round(d * 100)}%` } })),
+      ` ${SKILL_NAME[s]} ${dec(d, 1)}/1,0${!n ? '' : n > 14 ? ' – går meget langsomt (over en sæson)' : ` – næste +1 om ca. ${n} runde${n === 1 ? '' : 'r'}`}`);
+  });
+  return h('div', { class: 'trainbox', id: 'card-training' },
+    h('h4', {}, '🏋️ Træning'),
+    select(key, Object.entries(FOCUS).filter(([k]) => validFocus(p, k)).map(([k, x]) => [k, x.label]), onFocus, { id: 'focus-select' }),
+    h('span', { class: 'muted' }, ` ${price}`),
+    lines,
+    h('div', { class: 'muted', id: 'train-estimate' }, `Skøn: ${p.shortName} ${roomWords(roomOf(p))} · ${p.age} år – jo yngre, jo hurtigere. Kampe giver også lidt (${dec(MATCH_XP, 2)} pr. 90 min i kædens nøgle-evner).`));
+}
+
+// Rundens opsamling i Trup (Spilfører): "M. Jensen +1 Afslutning" og træningsskader – kun dit hold (rapporten findes kun for det)
+export function trainingSummary(report, team) {
+  if (!report || !(report.gains.length || report.injuries.length)) return null;
+  const name = (id) => team.squad.find((p) => p.id === id)?.shortName ?? '?';
+  const by = new Map();
+  for (const g of report.gains) { const k = `${g.id}|${g.skill}`; by.set(k, (by.get(k) ?? 0) + 1); }
+  const ups = [...by].map(([k, n]) => { const [id, s] = k.split('|'); return `${name(id)} +${n} ${SKILL_NAME[s]}`; });
+  const inj = report.injuries.map((id) => `🚑 ${name(id)} skadet i træningen`);
+  return h('div', { class: 'panel train-summary', id: 'training-summary' }, h('strong', {}, `🏋️ Træning og kampe efter runde ${report.round}: `), [...ups, ...inj].join(' · '));
 }
 
 // 📜 Kampe (v3.18.0, spec §10.4): de seneste 10 stempler, "Vis alle" og en karrierelinje. Andre hold ser stjerner, ikke karakteren

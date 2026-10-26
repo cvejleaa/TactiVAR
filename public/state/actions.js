@@ -3,7 +3,7 @@
 import { FORMATIONS, clampPos } from '../engine/formations.js';
 import { clampSubsLimit } from '../engine/freshness.js';
 import { MAX_RULES } from '../engine/match-rules.js';
-import { autoMatchBench } from '../engine/career.js';
+import { autoMatchBench, validFocus } from '../engine/career.js';
 
 const IDENTITY = Array.from({ length: 11 }, (_, i) => i);
 
@@ -17,6 +17,14 @@ export function swapBench(team, reserveId, benchId) {
   return true;
 }
 export function setAutoBench(team) { team.matchBenchAuto = true; autoMatchBench(team); return true; }
+
+// Træningsfokus (v3.18.0): gælder, til det ændres. Massehandlingen springer dem over, fokusset ikke passer til (Målmand → kun MV)
+export function setFocus(team, playerId, key) {
+  const p = team.squad.find((x) => x.id === playerId);
+  if (!p || !validFocus(p, key)) return false;
+  p.trainingFocus = key; return true;
+}
+export const setFocusMany = (team, ids, key) => ids.filter((id) => setFocus(team, id, key)).length;
 
 // Bytter to spillere: to startere bytter plads; starter ⇄ bænk lader bænkspilleren overtage
 // pladsen (og dens trukne position). To bænkspillere: intet sker.
