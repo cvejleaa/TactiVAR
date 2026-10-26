@@ -107,6 +107,7 @@ export function normalizeLeague(league) {
     if (!team.finance || typeof team.finance !== 'object') team.finance = def.finance;
     team.finance.ledger = Array.isArray(team.finance.ledger) ? team.finance.ledger.slice(-30) : [];
     team.finance.season ||= {};
+    team.finance.form = Array.isArray(team.finance.form) ? team.finance.form.filter(Number.isFinite).slice(-3) : [];
     team.listed = Array.isArray(team.listed) ? team.listed.filter((id) => ids.has(id)) : [];
     team.youthOffers = Array.isArray(team.youthOffers) ? team.youthOffers : [];
     // Udskiftningsgrænsen (v3.13): gemt før v3.13 → holdets profil (dit hold 70 %); 0 = fra bevares.

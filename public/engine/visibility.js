@@ -58,3 +58,11 @@ export function viewTeamStats(row, viewerOwnsTeam) {
 // Kamprapporten (v3.14, match.ownReports[teamId]): spillet taktik start/slut og duel-tallene bag fuldtids-analysen.
 // Kun holdets ejer – andres rapporter er fraværende i resultatet (klummen og fuldtids-analysen bruger kun seerens).
 export const viewOwnReport = (match, viewerTeamId) => match?.ownReports?.[viewerTeamId] ?? null;
+
+// Holdets egne forhold (v3.18.0): kasse, regnskab, transferliste, ungdomstilbud og bud ser kun ejeren – ÉN vagt (QC)
+export const TEAM_OWNER_FIELDS = ['cashBalance', 'finance', 'listed', 'youthOffers', 'offers'];
+export function viewTeam(team, viewerOwnsTeam) {
+  const out = { ...team };
+  if (!viewerOwnsTeam) for (const k of TEAM_OWNER_FIELDS) delete out[k];
+  return out;
+}

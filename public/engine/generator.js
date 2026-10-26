@@ -242,7 +242,7 @@ export function generateTeam(rng, idx) {
 // v3.18.0: holdets livsløbsfelter – bænken (de 7 ikke-startere), økonomi, transferliste og ungdomstilbud
 export function teamCareerDefaults(squad, starters) {
   const on = new Set(starters);
-  return { matchBench: squad.filter((p) => !on.has(p.id)).slice(0, 7).map((p) => p.id), matchBenchAuto: true, finance: { ledger: [], season: {} }, listed: [], youthOffers: [] };
+  return { matchBench: squad.filter((p) => !on.has(p.id)).slice(0, 7).map((p) => p.id), matchBenchAuto: true, finance: { ledger: [], season: {}, form: [] }, listed: [], youthOffers: [] };
 }
 
 export function emptyStanding(team) {

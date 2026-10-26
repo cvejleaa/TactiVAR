@@ -145,3 +145,28 @@ export function addXp(p, skill, xp, onSkill) {
   if (up.length) onSkill?.(p);
   return up;
 }
+
+// ---------- Økonomi (v3.18.0; brugerens valg: tilskuere + præmie − løn) ----------
+// Pr. runde: TV-penge til alle, billetindtægt kun til hjemmeholdet, løn = ugeløn / 3 (1 uge = 3 runder). Præmie ved sæsonslut.
+// Tilskuere efter de to holds placering FØR runden (runde 1–2: sidste sæsons slutplacering; ny liga 4,5) og hjemmeholdets
+// form (point i de seneste 3 kampe). Alle tal er offentlige undtagen kassen og regnskabet (visibility.js, viewTeam).
+export const ROUNDS_PER_WEEK = 3, TV_PER_ROUND = 120000, TICKET_PRICE = 90, GATE_BASE = 4000, GATE_MAX = 9000, LEDGER_CAP = 30;
+export const PRIZE = [1500000, 1100000, 800000, 600000, 450000, 300000, 200000, 100000];
+export const NEW_LEAGUE_PLACE = 4.5;
+export const attendance = (placeHome, placeAway, form) => Math.min(GATE_MAX, Math.round(GATE_BASE + 300 * (8 - placeHome) + 150 * (8 - placeAway) + 120 * form));
+export const weeklyWages = (team) => team.squad.reduce((a, p) => a + (p.weeklyWage ?? 0), 0);
+export const wagesPerRound = (team) => Math.round(weeklyWages(team) / ROUNDS_PER_WEEK);
+// Lønbudget pr. uge: 1,35 mio. + 2 % af kassen (mindst 1 mio.) – "Du kan bruge X kr. mere pr. runde"
+export const wageBudget = (team) => Math.max(1000000, 1350000 + 0.02 * Math.max(0, team.cashBalance ?? 0));
+export const wageRoomPerRound = (team) => Math.round((wageBudget(team) - weeklyWages(team)) / ROUNDS_PER_WEEK);
+export const formOf = (team) => (team.finance?.form ?? []).reduce((a, b) => a + b, 0);
+// Én linje i regnskabet pr. runde; præmien lægges på sæsonens sidste rundes linje
+export function bookLedger(team, entry) {
+  const f = (team.finance ||= { ledger: [], season: {} });
+  const net = (entry.gate ?? 0) + (entry.tv ?? 0) + (entry.wages ?? 0) + (entry.prize ?? 0) + (entry.transfers ?? 0);
+  team.cashBalance = (team.cashBalance ?? 0) + net;
+  for (const k of ['gate', 'tv', 'wages', 'prize', 'transfers']) if (entry[k]) f.season[k] = (f.season[k] ?? 0) + entry[k];
+  const last = f.ledger.at(-1);
+  if (last && last.r === entry.r) { for (const k of ['gate', 'tv', 'wages', 'prize', 'transfers']) if (entry[k]) last[k] = (last[k] ?? 0) + entry[k]; last.cash = team.cashBalance; }
+  else { f.ledger.push({ ...entry, cash: team.cashBalance }); if (f.ledger.length > LEDGER_CAP) f.ledger.splice(0, f.ledger.length - LEDGER_CAP); }
+}

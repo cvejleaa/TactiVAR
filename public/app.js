@@ -10,6 +10,8 @@ import { h, select } from './ui/dom.js';
 import { kr } from './ui/labels.js';
 import { renderMatrix } from './ui/matrix.js';
 import { renderCard, trainingSummary } from './ui/card.js';
+import { renderClub, shownCash } from './ui/club.js';
+import { viewTeam } from './engine/visibility.js';
 import { renderPitch } from './ui/pitch.js';
 import { renderTactics } from './ui/tactics.js';
 import { renderStandings } from './ui/standings.js';
@@ -23,7 +25,7 @@ import { replayJump, clearReplays } from './ui/replay.js';
 
 export const PLAYBACK_MS = 420;
 let mc = null;            // Match Center: { round, matches, gazette, viewIdx, filter, shownCount, playing }
-const TABS = [['trup', '👥 Trup'], ['taktik', '📋 Taktik'], ['kamp', '📺 Kamp'], ['liga', '🏆 Liga']];
+const TABS = [['trup', '👥 Trup'], ['taktik', '📋 Taktik'], ['kamp', '📺 Kamp'], ['liga', '🏆 Liga'], ['klub', '💼 Klub']];
 // Seneste runde vist færdigspillet (Kamp-fanen uden igangværende afspilning).
 const lastRoundView = (r) => ({ round: r.round, matches: r.matches, gazette: r.gazette, viewIdx: 0, filter: 'all', shownCount: Infinity, playing: false });
 function showTab(k) { game.ui.tab = k; clearSwap(); view.notice = ''; persist(); render(); window.scrollTo(0, 0); }
@@ -253,7 +255,9 @@ function renderNow() {
 
   const header = h('div', { class: 'panel clubhead' },
     h('div', {}, h('h2', { id: 'club-name' }, team.name), h('div', { class: 'muted' }, isOwn ? 'Dit hold – alle egne data er synlige' : 'Modstanderhold – kun offentlige data og stjerner')),
-    h('div', { class: 'right' }, h('div', { class: 'muted' }, 'Klubkasse'), h('strong', {}, isOwn ? kr(team.cashBalance) : '🔒 Skjult')));
+    h('div', { class: 'right' }, h('div', { class: 'muted' }, 'Klubkasse'), viewTeam(team, isOwn).cashBalance != null
+      ? h('button', { class: 'linklike', id: 'club-link', title: 'Økonomi, lønbudget og regnskab', onclick: () => showTab('klub') }, h('strong', {}, kr(shownCash(team, !!mc?.playing))), ' 💼')
+      : h('strong', {}, '🔒 Skjult')));
 
   const matrix = renderMatrix({
     team, isOwn, ui: { ...view, swapId: view.pitchSwapId }, notes: game.notes,
@@ -317,6 +321,7 @@ function renderNow() {
       league.lastRound && !mc?.playing ? renderGazette(league.lastRound.gazette, mine.id, openGoal, league.lastRound.matches, columnNow(), openReport) : null,
       // Statistikken skjules også under afspilningen (den er bogført og ville afsløre runden).
       !mc?.playing ? renderStats({ league, myTeamId: mine.id }) : null],
+    klub: () => [renderClub({ league, team: mine, playing: !!mc?.playing })],
   }[tab]();
   app.replaceChildren(...[
     h('nav', { class: 'tabs', id: 'tabs' }, TABS.map(([k, label]) => h('button', { id: `tab-${k}`, class: 'tab' + (k === tab ? ' active' : ''), onclick: () => showTab(k) }, label))),

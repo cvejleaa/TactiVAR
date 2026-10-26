@@ -2,7 +2,8 @@
 // Rettet ift. v2.5b: alt bogføres FØR der gemmes; skader, der fandtes før runden, heles
 // med én kamp (spilleren missede kampen), og nye skader lægges på bagefter – så en
 // 1-kamps skade ikke forsvinder i samme runde.
-import { autoMatchBench, logMatch, FOCUS, focusSkills, validFocus, ageTrain, roomOf, addXp, KEY_SKILLS, MATCH_XP, TRAIN_FRESH_FLOOR, TRAIN_INJURY_MATCHES, PLAYED_RELIEF, derivedRng } from './career.js';
+import { autoMatchBench, logMatch, FOCUS, focusSkills, validFocus, ageTrain, roomOf, addXp, KEY_SKILLS, MATCH_XP, TRAIN_FRESH_FLOOR, TRAIN_INJURY_MATCHES, PLAYED_RELIEF, derivedRng,
+  attendance, wagesPerRound, formOf, bookLedger, TV_PER_ROUND, TICKET_PRICE, PRIZE, NEW_LEAGUE_PLACE } from './career.js';
 import { aerialBreakdown, isArchetypeUnlocked } from './generator.js';
 import { bookMatchStats, roundHistory, HISTORY_MAX } from './stats.js';
 import { simulateMatch } from './match.js';
@@ -107,6 +108,39 @@ export function trainRound(league, result, minutes) {
   league.trainingReport = report;
 }
 
+// Placering før runden til tilskuertallet: sæsonens runde 1–2 = sidste sæsons slutplacering (ny liga: 4,5 for alle)
+export function placesBefore(league, round) {
+  if (seasonRoundOf(league, round) <= 2) {
+    const t = league.seasons?.at(-1)?.table;
+    return new Map(league.teams.map((x) => { const i = t ? t.findIndex((s) => s.teamId === x.id) : -1; return [x.id, i >= 0 ? i + 1 : NEW_LEAGUE_PLACE]; }));
+  }
+  return new Map(sortStandings(league.leagueMetadata.standings).map((s, i) => [s.teamId, i + 1]));
+}
+// Rundens økonomi (v3.18.0): før tabellen opdateres – tilskuerne kommer efter stillingen og formen, som de var før kampen
+export function bookRoundFinances(league, result) {
+  const places = placesBefore(league, result.round), season = league.leagueMetadata.seasonNumber ?? 1;
+  const byId = new Map(league.teams.map((t) => [t.id, t]));
+  const entry = new Map(league.teams.map((t) => [t.id, { r: result.round, s: season, tv: TV_PER_ROUND, wages: -wagesPerRound(t) }]));
+  for (const m of result.matches) {
+    const att = attendance(places.get(m.homeId), places.get(m.awayId), formOf(byId.get(m.homeId)));
+    Object.assign(entry.get(m.homeId), { att, gate: att * TICKET_PRICE });
+  }
+  for (const t of league.teams) bookLedger(t, entry.get(t.id));
+  // Formen: point i de seneste 3 kampe
+  for (const m of result.matches) {
+    const pts = (a, b) => (a > b ? 3 : a === b ? 1 : 0);
+    for (const [id, p] of [[m.homeId, pts(m.homeGoals, m.awayGoals)], [m.awayId, pts(m.awayGoals, m.homeGoals)]]) {
+      const f = byId.get(id).finance; f.form = [...(f.form ?? []), p].slice(-3);
+    }
+  }
+}
+// Præmien ved sæsonslut efter slutplaceringen – kun fra commitRound (MIGRATIONS[5] kalder endSeason, F1)
+function payPrizes(league, round, table) {
+  const byId = new Map(league.teams.map((t) => [t.id, t]));
+  table.forEach((s, i) => { const t = byId.get(s.teamId); if (t) bookLedger(t, { r: round, s: league.seasons.at(-1)?.seasonNumber ?? 1, prize: PRIZE[i] ?? 0 }); });
+  for (const t of league.teams) { t.finance.lastSeason = t.finance.season; t.finance.season = {}; }
+}
+
 export function commitRound(league, result, rng) {
   const expected = (league.leagueMetadata.round || 0) + 1;
   if (result.round !== expected) throw new Error(`Runde ${result.round} kan ikke bogføres – ligaen venter på runde ${expected}.`);
@@ -114,6 +148,7 @@ export function commitRound(league, result, rng) {
   const teamIdx = new Map(league.teams.map((t, i) => [t.id, i]));
   const players = new Map(league.teams.flatMap((t) => t.squad.map((p) => [p.id, p])));
   const played = new Set();
+  bookRoundFinances(league, result);
 
   for (const m of result.matches) {
     applyStanding(league.leagueMetadata.standings, m);
@@ -167,6 +202,7 @@ export function commitRound(league, result, rng) {
   league.lastRound = { round: result.round, matches: result.matches, gazette: result.gazette };
   if (seasonRoundOf(league, result.round) === SEASON_ROUNDS) {
     const end = endSeason(league, result.round, true);
+    payPrizes(league, result.round, league.seasons.at(-1).table);
     if (result.gazette) result.gazette.seasonEnd = end;
   }
   return league;
