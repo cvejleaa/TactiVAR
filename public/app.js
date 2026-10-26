@@ -30,7 +30,7 @@ let mc = null;            // Match Center: { round, matches, gazette, viewIdx, f
 const TABS = [['trup', '👥 Trup'], ['taktik', '📋 Taktik'], ['kamp', '📺 Kamp'], ['liga', '🏆 Liga'], ['klub', '💼 Klub']];
 // Seneste runde vist færdigspillet (Kamp-fanen uden igangværende afspilning).
 const lastRoundView = (r) => ({ round: r.round, matches: r.matches, gazette: r.gazette, viewIdx: 0, filter: 'all', shownCount: Infinity, playing: false });
-function showTab(k) { game.ui.tab = k; clearSwap(); view.notice = ''; persist(); render(); window.scrollTo(0, 0); }
+function showTab(k) { game.ui.tab = k; clearSwap(); view.notice = ''; view.marketMsg = ''; persist(); render(); window.scrollTo(0, 0); }
 let timer = null;
 
 const storage = window.localStorage;
@@ -348,8 +348,9 @@ function renderNow() {
     klub: () => [renderClub({ league, team: mine, playing: !!mc?.playing }), renderMarket({ league, team: mine, playing: !!mc?.playing,
       onAccept: (id) => { const err = acceptOffer(league, mine, id); view.notice = err ? `🔁 ${err}` : '🔁 Spilleren er solgt.'; change(() => {}); },
       onDecline: (id) => change(() => declineOffer(league, mine, id)), onUnlist: (id) => change(() => setListed(league, mine, id, false)),
-      line: view.marketLine ?? 'all', onLine: (v) => { view.marketLine = v; render(); },
-      onBuy: (id) => { const name = league.teams.flatMap((t) => t.squad).find((p) => p.id === id)?.shortName; const err = buyPlayer(league, mine, id); view.notice = err ? `💰 ${err}` : `💰 ${name} er købt og står nu i din trup.`; change(() => {}); } })],
+      line: view.marketLine ?? 'all', onLine: (v) => { view.marketLine = v; view.marketMsg = ''; render(); }, msg: view.marketMsg ?? '',
+      // Bekræftelsen står ved listen (QC: beskeden øverst var uden for skærmen, når man stod nede i listen)
+      onBuy: (id) => { const name = league.teams.flatMap((t) => t.squad).find((p) => p.id === id)?.shortName; const err = buyPlayer(league, mine, id); view.marketMsg = err ? `💰 ${err}` : `💰 ${name} er købt og står nu i din trup.`; change(() => {}); } })],
   }[tab]();
   app.replaceChildren(...[
     h('nav', { class: 'tabs', id: 'tabs' }, TABS.map(([k, label]) => h('button', { id: `tab-${k}`, class: 'tab' + (k === tab ? ' active' : ''), onclick: () => showTab(k) }, label))),

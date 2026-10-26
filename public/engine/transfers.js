@@ -47,7 +47,7 @@ export function marketInfo(league, buyer, seller, p) {
 function move(league, p, seller, buyer, price, kind = 'buy') {
   const w = windowOf(league), r = league.leagueMetadata.round, s = league.leagueMetadata.seasonNumber ?? 1;
   seller.squad = seller.squad.filter((x) => x.id !== p.id);
-  if (seller.isBot && (seller.squad.length < SQUAD_MIN || lineCount(seller, p.line) < LINE_MIN[p.line])) refillYouth(league, seller, p.line, `${w}-${p.id}`);
+  if (seller.isBot && (seller.squad.length < SQUAD_MIN || lineCount(seller, p.line) < LINE_MIN[p.line])) refillYouth(league, seller, p.line, `${w}-${p.id}`, p.shortName);
   repairLineup(seller, new Map([[p.id, p.line]]));
   if (buyer) {
     if (buyer.squad.some((x) => x.shirtNumber === p.shirtNumber)) p.shirtNumber = freeShirt(buyer);
@@ -64,8 +64,10 @@ function move(league, p, seller, buyer, price, kind = 'buy') {
 }
 
 // En bot, der sælger under 18 eller under minimum i kæden, henter en ungdomsspiller i samme kæde (afledt rng, nyt id, unikt navn)
-function refillYouth(league, team, line, key) {
+// (taken: den solgtes kortnavn – han er hverken hos sælger eller køber lige nu, QC)
+function refillYouth(league, team, line, key, taken = null) {
   const ids = new Set(league.teams.flatMap((t) => t.squad.map((x) => x.id))), used = new Set(league.teams.flatMap((t) => t.squad.map((x) => x.shortName)));
+  if (taken) used.add(taken);
   let id;
   do { id = `plr_y${league.nextPlayerSeq ?? 1}`; league.nextPlayerSeq = (league.nextPlayerSeq ?? 1) + 1; } while (ids.has(id));
   const y = generatePlayer(derivedRng('refill', key), line, 'YOUTH', freeShirt(team), league.teams.indexOf(team), used, 0, undefined, id);
