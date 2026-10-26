@@ -2,6 +2,7 @@
 // skader, observationer og karakterer returneres i resultatet og lægges ind af season.js.
 // Rettet ift. v2.5b: auto-indskiftning sker i en kamplokal kopi (ændrede før lineupSlots
 // permanent), og Hvis-Så-reglerne kører for begge hold og skifter reelt formation.
+import { matchBenchOf } from './career.js';
 import { FORMATIONS, lineOfRole, isOutOfZone, slotPosition } from './formations.js';
 import { livePositions, coupledPositions, kickoffPositions, apartFrom, ONSIDE_GAP, MIN_APART } from './positions.js';
 import { masteryVs, counterXpForMatch } from './counter.js';
@@ -197,7 +198,9 @@ function prepareSide(team, isHome, notes) {
   const byId = new Map(team.squad.map((p) => [p.id, p]));
   const starters = tactics.lineupSlots.map((id) => byId.get(id));
   const used = new Set(starters.filter(Boolean).map((p) => p.id));
-  const bench = () => team.squad.filter((p) => !used.has(p.id) && isAvailable(p));
+  // Bænken er kamptruppens 7 (v3.18.0, matchBenchOf – ét sted); reserverne er ikke med i kampen. Med 18 spillere som før.
+  const squad = new Set(matchBenchOf(team).map((p) => p.id));
+  const bench = () => team.squad.filter((p) => squad.has(p.id) && !used.has(p.id) && isAvailable(p));
   // v3.13 (QC): rotationen følger botens udskiftningsgrænse – ellers stillede en bot med grænse 75 en
   // starter på 72 % og skiftede ham ud i 3. minut. Uden grænse (0) som før: under 70, frisk ≥ 85.
   const rest = team.subsLimit ? team.subsLimit + ROTATE_MARGIN : 70, freshMin = team.subsLimit ? team.subsLimit + ROTATE_MARGIN + 5 : 85;

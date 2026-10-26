@@ -3,6 +3,7 @@ import { renderStats } from './ui/stats.js';
 import { VERSION } from './version.js';
 import { createRng, randomSeed } from './engine/rng.js';
 import { createLeague } from './engine/generator.js';
+import { matchBenchOf, reservesOf } from './engine/career.js';
 import { loadGame, saveGame, resetGame, exportGame, importGame, backupRaw, SAVE_KEY } from './state/storage.js';
 import * as act from './state/actions.js';
 import { h, select } from './ui/dom.js';
@@ -323,17 +324,26 @@ function renderNow() {
 
 // Bænken under banen: klik bænkspiller → klik brik (eller omvendt) = skift ind.
 function renderBench(team) {
-  const bench = team.squad.filter((p) => !team.tactics.lineupSlots.includes(p.id));
-  return h('div', { class: 'bench', id: 'bench' }, h('h4', {}, 'Bænk'), bench.map((p) => h('button', {
+  const bench = matchBenchOf(team), reserves = reservesOf(team);   // v3.18.0: kamptruppens 7 (ét sted, QC B2) + reserverne
+  const benchBtn = (p) => h('button', {
     class: 'mini bench-p' + (view.pitchSwapId === p.id ? ' active' : '') + (p.injuryMatchesLeft > 0 ? ' injured' : ''), dataset: { pid: p.id },
     title: `${p.name} (${p.line})${p.injuryMatchesLeft > 0 ? ` – skadet i ${p.injuryMatchesLeft} kamp(e)` : ''}`,
     onclick: () => {
       const a = view.pitchSwapId;
       if (a && a !== p.id && team.tactics.lineupSlots.includes(a)) { clearSwap(); view.notice = ''; change(() => act.swapPlayers(team, a, p.id)); return; }
+      if (a && reserves.some((r) => r.id === a)) { clearSwap(); view.notice = ''; change(() => act.swapBench(team, a, p.id)); return; }
       view.selectedPlayerId = p.id; view.pitchSwapId = a === p.id ? null : p.id;
       view.notice = view.pitchSwapId ? `🔁 Klik på den brik, ${p.shortName} skal skiftes ind for.` : ''; render();
     },
-  }, `#${p.shirtNumber} ${p.shortName} · ${p.line}`)));
+  }, `#${p.shirtNumber} ${p.shortName} · ${p.line}`);
+  const resBtn = (p) => h('button', {
+    class: 'mini reserve-p' + (view.pitchSwapId === p.id ? ' active' : '') + (p.injuryMatchesLeft > 0 ? ' injured' : ''), dataset: { pid: p.id },
+    title: `${p.name} (${p.line}) – reserve: ikke med i kampen. Klik og så en bænkspiller for at tage ham med.`,
+    onclick: () => { view.selectedPlayerId = p.id; view.pitchSwapId = view.pitchSwapId === p.id ? null : p.id; view.notice = view.pitchSwapId ? `🔁 Klik på den bænkspiller, ${p.shortName} skal tage pladsen fra.` : ''; render(); },
+  }, `#${p.shirtNumber} ${p.shortName} · ${p.line}`);
+  return h('div', { class: 'bench', id: 'bench' }, h('h4', {}, `Bænk (${bench.length} udtaget)`), bench.map(benchBtn),
+    reserves.length ? h('div', { id: 'reserves' }, h('h4', {}, `Reserver (${reserves.length})`), reserves.map(resBtn),
+      h('div', { class: 'row' }, h('button', { class: 'mini', id: 'auto-bench', disabled: team.matchBenchAuto !== false, onclick: () => change(() => act.setAutoBench(team)) }, team.matchBenchAuto !== false ? '✓ Udtages automatisk før hver runde' : '↺ Udtag automatisk'))) : null);
 }
 
 // ---------- Kampe ----------

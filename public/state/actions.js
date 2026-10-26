@@ -3,8 +3,20 @@
 import { FORMATIONS, clampPos } from '../engine/formations.js';
 import { clampSubsLimit } from '../engine/freshness.js';
 import { MAX_RULES } from '../engine/match-rules.js';
+import { autoMatchBench } from '../engine/career.js';
 
 const IDENTITY = Array.from({ length: 11 }, (_, i) => i);
+
+// Kamptruppen (v3.18.0): en reserve byttes med en bænkspiller (din udtagelse – automatikken slås fra), eller "Udtag automatisk"
+export function swapBench(team, reserveId, benchId) {
+  const bench = team.matchBench, on = new Set(team.tactics.lineupSlots);
+  if (!Array.isArray(bench) || on.has(reserveId) || bench.includes(reserveId) || !team.squad.some((p) => p.id === reserveId)) return false;
+  const i = bench.indexOf(benchId);
+  if (i < 0) return false;
+  bench[i] = reserveId; team.matchBenchAuto = false;
+  return true;
+}
+export function setAutoBench(team) { team.matchBenchAuto = true; autoMatchBench(team); return true; }
 
 // Bytter to spillere: to startere bytter plads; starter ⇄ bænk lader bænkspilleren overtage
 // pladsen (og dens trukne position). To bænkspillere: intet sker.
@@ -15,6 +27,11 @@ export function swapPlayers(team, idA, idB) {
   if (a >= 0 && b >= 0) { slots[a] = idB; slots[b] = idA; }
   else if (a >= 0) slots[a] = idB;
   else slots[b] = idA;
+  // Bænken (v3.18.0): den, der går ud, overtager indskifterens plads på bænken – bænk og startere overlapper aldrig (QC B2)
+  if (Array.isArray(team.matchBench) && (a < 0 || b < 0)) {
+    const inId = a < 0 ? idA : idB, outId = a < 0 ? idB : idA, i = team.matchBench.indexOf(inId);
+    if (i >= 0) team.matchBench[i] = outId;
+  }
   return true;
 }
 

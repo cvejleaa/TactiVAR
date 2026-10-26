@@ -117,3 +117,51 @@ test(`backups: højst ${BACKUP_KEEP}, de ældste ryddes før der skrives; samme 
   assert.equal(backupKeys(t).length, 2);
   assert.equal(t.getItem(BACKUP_PREFIX + 1), 'før migreringen');
 });
+
+// ---------- Kamptruppen 11 + 7 (commit 2) ----------
+const { matchBenchOf, reservesOf, autoMatchBench, BENCH_SIZE } = await import('../../public/engine/career.js');
+const { simulateMatch } = await import('../../public/engine/match.js');
+const act = await import('../../public/state/actions.js');
+const { generatePlayer } = await import('../../public/engine/generator.js');
+// En trup på 20: to ekstra (en forsvarer og en angriber) – reserver, når bænken er udtaget
+function bigTeam(seed = 4) {
+  const L = createLeague(createRng(seed)), T = L.teams[0], rng = createRng(99);
+  T.squad.push(generatePlayer(rng, 'DEF', 'ROTATION', 19, 0, new Set(), 0, 'CB', 'plr_x1'), generatePlayer(rng, 'ATT', 'ROTATION', 20, 0, new Set(), 0, 'ST', 'plr_x2'));
+  return { L, T };
+}
+test('kamptruppen: med 18 spillere er bænken de 7 ikke-startere (som før); med 20 udtages 7 – 1 MV og mindst 2 FOR, 2 MID, 1 ANG', () => {
+  const L = createLeague(createRng(4)), t = L.teams[0];
+  assert.deepEqual(matchBenchOf(t).map((p) => p.id), t.squad.filter((p) => !t.tactics.lineupSlots.includes(p.id)).map((p) => p.id));
+  assert.deepEqual(reservesOf(t), []);
+  const { T } = bigTeam();
+  autoMatchBench(T);
+  const b = matchBenchOf(T), lines = (l) => b.filter((p) => p.line === l).length;
+  assert.equal(b.length, BENCH_SIZE); assert.equal(reservesOf(T).length, 2);
+  assert.ok(lines('GK') >= 1 && lines('DEF') >= 2 && lines('MID') >= 2 && lines('ATT') >= 1, b.map((p) => p.line).join(','));
+  assert.ok(b.every((p) => !T.tactics.lineupSlots.includes(p.id)));
+  // En skadet tages ikke med, når en rask kan
+  const inj = b.find((p) => p.line === 'DEF'); inj.injuryMatchesLeft = 3;
+  autoMatchBench(T); assert.ok(!matchBenchOf(T).includes(inj));
+});
+test('kamptruppen i kampen: en reserve kommer aldrig ind – heller ikke ved skader og træthed (30 kampe)', () => {
+  let subs = 0;
+  for (let s = 1; s <= 30; s++) {
+    const { L, T } = bigTeam(s);
+    T.subsLimit = 95; autoMatchBench(T);
+    const res = new Set(reservesOf(T).map((p) => p.id));
+    const m = simulateMatch(T, L.teams[1], createRng(s * 7));
+    for (const e of m.ratings.home) if (e.minIn > 0) { subs++; assert.ok(!res.has(e.playerId), `seed ${s}: reserven ${e.shortName} kom ind`); }
+    assert.ok(m.ratings.home.every((e) => !res.has(e.playerId)), 'reserverne er ikke på karakterarket');
+  }
+  assert.ok(subs >= 30, `data: ${subs} indskiftninger`);
+});
+test('bænken og opstillingen overlapper aldrig: byt starter ⇄ bænk, reserve ⇄ bænk (din udtagelse slår automatikken fra), "Udtag automatisk"', () => {
+  const { T } = bigTeam(); autoMatchBench(T);
+  const st = T.tactics.lineupSlots[5], bn = T.matchBench[0], res = reservesOf(T)[0].id;
+  act.swapPlayers(T, st, bn);
+  assert.ok(T.tactics.lineupSlots.includes(bn) && T.matchBench.includes(st) && !T.matchBench.includes(bn));
+  assert.ok(act.swapBench(T, res, T.matchBench[1])); assert.ok(T.matchBench.includes(res)); assert.equal(T.matchBenchAuto, false);
+  assert.equal(act.swapBench(T, T.tactics.lineupSlots[0], T.matchBench[2]), false, 'en starter er ingen reserve');
+  assert.ok(T.matchBench.every((id) => !T.tactics.lineupSlots.includes(id)));
+  act.setAutoBench(T); assert.equal(T.matchBenchAuto, true); assert.equal(T.matchBench.length, 7);
+});

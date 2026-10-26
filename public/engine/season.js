@@ -2,6 +2,7 @@
 // Rettet ift. v2.5b: alt bogføres FØR der gemmes; skader, der fandtes før runden, heles
 // med én kamp (spilleren missede kampen), og nye skader lægges på bagefter – så en
 // 1-kamps skade ikke forsvinder i samme runde.
+import { autoMatchBench } from './career.js';
 import { bookMatchStats, roundHistory, HISTORY_MAX } from './stats.js';
 import { simulateMatch } from './match.js';
 import { starsFromRating, starNoise } from './ratings.js';
@@ -43,6 +44,8 @@ export function playPairs(league, pairs, rng) {
   const round = (league.leagueMetadata.round || 0) + 1;
   // lastOfSeason: friskheden følger med over sæsonskiftet – referatet siger "til første runde i næste sæson" (v3.16.7)
   const lastOfSeason = seasonRoundOf(league, round) === SEASON_ROUNDS;
+  // Kamptruppen (v3.18.0): botterne – og dit hold med "Udtag automatisk" – udtager bænken før runden (intet rng)
+  for (const t of league.teams) if (t.isBot || t.matchBenchAuto !== false) autoMatchBench(t);
   const matches = pairs.map(([h, a]) => simulateMatch(league.teams[h], league.teams[a], rng, { round, lastOfSeason }));
   // Hvert mål ved, hvilken kamp i runden det faldt i (avisen linker til referatet, v3.7.1).
   matches.forEach((m, i) => m.goalsPool.forEach((g) => { g.matchIdx = i; }));

@@ -77,3 +77,28 @@ export function uniquifyNames(teams, rng, first, last) {
   }
   return renamed;
 }
+
+// ---------- Kamptruppen (v3.18.0): 11 startere + højst 7 på bænken; resten er reserver ----------
+export const BENCH_SIZE = 7;
+// Bænken – ÉT sted (QC B2: bane, regneark, Hvis-Så-vælgeren og motoren skal være enige). I truppens rækkefølge, uden startere.
+// Højst 7 ikke-startere (18 spillere): alle – udtagelsen betyder først noget med en større trup.
+export function matchBenchOf(team) {
+  const on = new Set(team.tactics?.lineupSlots ?? []), cand = team.squad.filter((p) => !on.has(p.id));
+  if (cand.length <= BENCH_SIZE || !Array.isArray(team.matchBench)) return cand.slice(0, BENCH_SIZE);
+  const pickd = new Set(team.matchBench);
+  return cand.filter((p) => pickd.has(p.id)).slice(0, BENCH_SIZE);
+}
+export const reservesOf = (team) => { const b = new Set(matchBenchOf(team).map((p) => p.id)), on = new Set(team.tactics?.lineupSlots ?? []); return team.squad.filter((p) => !on.has(p.id) && !b.has(p.id)); };
+// Automatisk udtagelse uden rng og kun på offentlige data (QC B7 – en bots valg må ikke røbe skjulte evner): raske før skadede,
+// 1 målmand og mindst 2 forsvarere, 2 midtbanespillere og 1 angriber, så de bedste efter stjerner/tier og friskhed.
+// Med 7 eller færre ikke-startere er det dem alle (18 spillere: uændret fra før v3.18.0).
+export function autoMatchBench(team) {
+  const on = new Set(team.tactics.lineupSlots), cand = team.squad.filter((p) => !on.has(p.id));
+  if (cand.length <= BENCH_SIZE) return (team.matchBench = cand.map((p) => p.id));
+  const score = (p) => (p.injuryMatchesLeft > 0 ? -100 : 0) + starsForValue(p) * 10 + (p.freshness ?? 100) / 10;
+  const best = (list) => list.slice().sort((a, b) => score(b) - score(a) || cand.indexOf(a) - cand.indexOf(b));
+  const chosen = new Set();
+  for (const [line, n] of [['GK', 1], ['DEF', 2], ['MID', 2], ['ATT', 1]]) for (const p of best(cand.filter((q) => q.line === line)).slice(0, n)) chosen.add(p.id);
+  for (const p of best(cand)) { if (chosen.size >= BENCH_SIZE) break; chosen.add(p.id); }
+  return (team.matchBench = cand.filter((p) => chosen.has(p.id)).map((p) => p.id));
+}
