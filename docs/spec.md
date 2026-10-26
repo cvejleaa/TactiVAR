@@ -117,6 +117,15 @@ Konstanterne står ét sted: `public/engine/career.js` (og `transfers.js`). Bån
   (holdfelterne bag ÉN vagt: `viewTeam`). Den offentlige værdi og prisen bygger kun på stjerner, tier og alder.
   Kamphistorikken er offentlig uden karakteren. Potentialet er hemmeligt – ejeren ser et skøn i ord. Botternes valg
   (kamptrup, ungdom, køb, salg, bud) bygger kun på offentlige data; botterne træner Alsidig (kanarietest).
+  Kendte, accepterede kanaler (Security Reviewer v3.18.0) – skal håndteres i trin 2:
+  - Botternes kasse og løn er skjult i visningen, men kan regnes præcist ud af offentlige tal (tabel, resultater, stjerner/alder,
+    transferlisten); buddene og botternes handler bruger dem – ingen ny lækage.
+  - Ejeren kan aflæse sit eget potentiale ret præcist af træningsestimatet ("næste +1 om ca. N runder"); i trin 2 er `dev` et ejerfelt.
+  - De afledte tilfældighedstal (`derivedRng`: ungdom, potentiale, træning, pension, bud) bygger på offentlige nøgler – med koden
+    kan en ungdomsspillers skjulte tal regnes ud. Trin 2 skal salte dem med en hemmelighed på serveren.
+  - En menneskestyret managers træningsfokus kan aflæses af en reserves friskhed (træningsprisen); botternes kan ikke (Alsidig).
+  - `viewTeam` er en sortliste (kun kasse, regnskab, salgsliste, ungdom, bud); trin 2 skal gøre den til en tilladelsesliste
+    som `viewPlayer`. En købt spillers karakterer fra botten ses af den nye ejer.
 - Ingen: VAR-profil (kun via clues og VAR-kendelser i referatet – v3.15.1: varPulse, theatre og cynicism afgør VAR's
   kendelser som lodtrækninger, så én kendelse ikke afslører spillerens trin).
 - Modstandere vises med "🔒 ??"; sortering på skjulte kolonner hos et

@@ -120,3 +120,22 @@ test('Spilfører: et kampstempel fra en tidligere sæson har sæsonen med', asyn
   assert.match(stampText(e, teams, true, 2), /^\[Sæson 1, runde 14 • A 2-1 B/);
   assert.match(stampText(e, teams, true, 1), /^\[Runde 14 • /);
 });
+
+test('Security: en delt fil med ødelagte ungdomstilbud, kamplog og transferliste repareres – og kan ikke bricke spillet', async () => {
+  const { serialize, parseSave, loadGame } = await import('../../public/state/storage.js');
+  const L = fresh(), me = L.teams[0], p = me.squad[3];
+  me.youthOffers = [{ id: 'plr_y99' }, { ...structuredClone(me.squad[17]), id: 'plr_y98' }];
+  p.matchLog = [[1, 1, 0, 1, 0, 0, 90, 6, 2, 0, 0], 'x', [1, 2], { a: 1 }];
+  L.transferLog = [{ s: 1, r: 1, id: 'a', name: { toString: 1 }, from: 't', to: 'u', price: 1, kind: 'buy' }, { s: 1, r: 2, id: 'b', name: 'B. B', from: 't', to: 'u', price: 1, kind: 'buy' }];
+  const r = parseSave(serialize({ league: L, notes: {}, ui: {} }));
+  assert.ok(r.ok, r.error);
+  const me2 = r.state.league.teams[0];
+  assert.deepEqual(me2.youthOffers.map((y) => y.id), ['plr_y98']);
+  assert.equal(me2.squad[3].matchLog.length, 1);
+  assert.deepEqual(r.state.league.transferLog.map((e) => e.id), ['b']);
+  // En fil, der får reparationen til at kaste, giver fejlvisningen med backup – ikke en ufanget fejl
+  const store = new Map([['tactivar_save', JSON.stringify({ schemaVersion: 7, league: { teams: [{ squad: Array.from({ length: 18 }, () => null) }] } })]]);
+  const storage = { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, v), removeItem: (k) => store.delete(k), key: (i) => [...store.keys()][i], get length() { return store.size; } };
+  const res = loadGame(storage);
+  assert.equal(res.status, 'error'); assert.ok(res.backupKey);
+});

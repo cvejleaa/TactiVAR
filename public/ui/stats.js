@@ -117,7 +117,7 @@ function myTeam(league, myTeamId) {
       h('tbody', {}, team.squad.map((p) => { const r = runStats(p); return h('tr', {},
         h('td', {}, `#${p.shirtNumber} ${p.shortName}`), h('td', {}, p.sGames), h('td', {}, p.ratingGames ? dec((p.ratingSum / p.ratingGames), 1) : '–'),
         h('td', {}, r.km90 != null ? dec(r.km90, 1) : '–'), h('td', {}, r.hiPct != null ? `${r.hiPct} %` : '–'),
-        h('td', {}, p.freeRunsSum ? `${p.freeRunsWonSum}/${p.freeRunsSum}` : '–'), h('td', {}, `${p.freshness} %`)); })))),
+        h('td', {}, p.freeRunsSum ? `${p.freeRunsWonSum}/${p.freeRunsSum}` : '–'), h('td', {}, p.freshness != null ? `${p.freshness} %` : '–')); })))),
     h('p', { class: 'muted' }, `Kun du ser disse tal – de røber evner og dine taktiske valg. Kampe og frie løb tælles for ${since(league)}; snit, km og HI gælder alle hans kampe (de nulstilles ikke ved sæsonskifte).`));
 }
 

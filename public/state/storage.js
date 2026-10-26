@@ -190,7 +190,9 @@ export function loadGame(storage) {
   let raw;
   try { raw = storage.getItem(SAVE_KEY); } catch (e) { return { status: 'error', error: `Browseren tillader ikke at læse gemte data (${e.message}).`, backupKey: null }; }
   if (raw == null) return { status: 'empty' };
-  const r = parseSave(raw);
+  let r;
+  // En fil, der får reparationen til at fejle, giver fejlvisningen med backup – aldrig en blank side (Security v3.18.0)
+  try { r = parseSave(raw); } catch (e) { r = { ok: false, error: `Det gemte spil kunne ikke læses (${e.message}).` }; }
   // Et ældre skema migreres – de rå data gemmes i backup først, så opdateringen kan fortrydes.
   if (r.ok) return { status: 'ok', state: r.state, migratedFrom: r.migratedFrom, repairs: r.repairs, backupKey: r.migratedFrom != null || r.repairs?.length ? backupRaw(storage, raw) : null };
   const backupKey = backupRaw(storage, raw);
@@ -234,4 +236,4 @@ export function resetGame(storage, newState, now = Date.now()) {
 }
 
 export const exportGame = (state, now = Date.now()) => serialize(state, now);
-export const importGame = (text) => parseSave(text);
+export const importGame = (text) => { try { return parseSave(text); } catch (e) { return { ok: false, error: `Filen kunne ikke læses (${e.message}).` }; } };

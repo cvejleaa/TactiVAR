@@ -78,7 +78,9 @@ export function normalizeLeague(league) {
   if (!Array.isArray(league.seasons)) league.seasons = [];
   // v3.18.0: transfers, pensioner og bud (lofter – gemmet må ikke vokse uden grænse, QC)
   if (!Number.isInteger(league.nextPlayerSeq) || league.nextPlayerSeq < 1) league.nextPlayerSeq = 1;
-  for (const k of ['transferLog', 'retired', 'offers']) league[k] = Array.isArray(league[k]) ? league[k].slice(-LOG_CAP) : [];
+  // v3.18.0 (Security): kun poster af den rigtige form – en delt fil med fx et navn som objekt væltede Liga-fanen
+  const okEntry = (e) => e && typeof e === 'object' && !Array.isArray(e) && Object.values(e).every((v) => v == null || ['string', 'number', 'boolean'].includes(typeof v));
+  for (const k of ['transferLog', 'retired', 'offers']) league[k] = Array.isArray(league[k]) ? league[k].filter(okEntry).slice(-LOG_CAP) : [];
   league.teams.forEach((team, idx) => {
     // v3.18.0 (QC): en trup uden for 18–25 låser aldrig ligaen ude – under 18 fyldes op med ungdom (besked), over 25 får en besked.
     // Kun en trup uden 11 spillere kan ikke repareres.
@@ -96,7 +98,7 @@ export function normalizeLeague(league) {
     for (const p of team.squad) {
       for (const [k, v] of Object.entries({ ...PLAYER_DEFAULTS, ...PLAYER_SEASON_DEFAULTS })) if (p[k] === undefined) p[k] = v;
       if (!p.dev || typeof p.dev !== 'object') p.dev = {};
-      p.matchLog = Array.isArray(p.matchLog) ? p.matchLog.slice(-MATCH_LOG_CAP) : [];
+      p.matchLog = Array.isArray(p.matchLog) ? p.matchLog.filter((e) => Array.isArray(e) && e.length === 11 && e.every((v) => v == null || Number.isFinite(v))).slice(-MATCH_LOG_CAP) : [];
       if (!Number.isFinite(p.potential)) p.potential = initialPotential(p);
       if (!Number.isFinite(p.weeklyWage)) p.weeklyWage = publicWage(p);
       if (!p.counterTactics) p.counterTactics = { vsPress: 15, vsLowBlock: 15, vsTrapLong: 15 };
@@ -121,7 +123,9 @@ export function normalizeLeague(league) {
     team.finance.season ||= {};
     team.finance.form = Array.isArray(team.finance.form) ? team.finance.form.filter(Number.isFinite).slice(-3) : [];
     team.listed = Array.isArray(team.listed) ? team.listed.filter((id) => ids.has(id)) : [];
-    team.youthOffers = Array.isArray(team.youthOffers) ? team.youthOffers : [];
+    // Et ungdomstilbud er en spiller: uden evner, kæde og id kan det ikke tages op (Security: et tomt tilbud i en delt fil brickede spillet)
+    const validYouth = (y) => y && typeof y.id === 'string' && !ids.has(y.id) && ['GK', 'DEF', 'MID', 'ATT'].includes(y.line) && y.skills && Object.values(y.skills).every(Number.isFinite) && typeof y.shortName === 'string' && Number.isFinite(y.age);
+    team.youthOffers = Array.isArray(team.youthOffers) ? team.youthOffers.filter(validYouth).slice(0, 2) : [];
     // Udskiftningsgrænsen (v3.13): gemt før v3.13 → holdets profil (dit hold 70 %); 0 = fra bevares.
     team.subsLimit = clampSubsLimit(team.subsLimit ?? profile.subs);
   });
