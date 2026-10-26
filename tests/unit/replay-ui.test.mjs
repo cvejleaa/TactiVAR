@@ -109,7 +109,7 @@ test('heat map: dit hold og dine spillere fuldt (tæthed + afslutninger); modsta
   clearReplays();
   const { m } = game();
   const grid = heatGrid(m.trace, 'h', null);
-  assert.equal(grid.length, 9); assert.equal(grid[0].length, 6);
+  assert.equal(grid.length, 18); assert.equal(grid[0].length, 12);   // v3.20.2: 12 × 18 (før 6 × 9)
   assert.equal(Math.max(...grid.flat()), 1);
   const scorer = m.trace.moments.find((x) => x.side === 'h' && x.scorer)?.scorer;
   if (scorer) assert.ok(shotsOf(m.trace, 'h', scorer).some((s) => s.outcome === 'goal'));

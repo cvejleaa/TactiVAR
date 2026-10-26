@@ -134,6 +134,7 @@ function snapPitch(rows, { ev, snap }, onSnap) {
 // Minutter på banen – efter referatets ur, når det findes (QC v3.16.4: "46'–90'" i kolonnen men "45 min" i noten)
 const minutesOn = (e, s = null) => Math.max(0, (s?.out ? clockNum(s.out) : e.minOut ?? 90) - (e.minIn <= 1 ? 0 : s?.in ? clockNum(s.in) - 1 : e.minIn));
 const OUT_LABEL = { goal: 'mål', save: 'redning', miss: 'forbi/blokeret', offside: 'offside (flag)', disallowed: 'annulleret af VAR', assist: 'oplæg' };
+const HEAT_MIN = 0.04;   // v3.20.2: de svageste felter efter udglatningen tegnes ikke (ellers en tynd tåge over hele banen)
 function heatPitch(rows, heat, gkId, span = null) {
   const sp = (e) => span?.get(e?.playerId), on = (e) => minutesOn(e, sp(e));
   const pid = heat.mine.playerId, e = rows.find((x) => x.playerId === pid);
@@ -143,9 +144,9 @@ function heatPitch(rows, heat, gkId, span = null) {
     h('div', { class: 'row' }, h('strong', { id: 'heat-title' }, pid != null && e ? `🔥 #${e.shirtNumber} ${e.shortName}` : '🔥 Holdet (uden målmand)'),
       pid != null ? h('button', { class: 'mini', id: 'heat-team', onclick: () => heat.onHeat({ playerId: null }) }, '↩ Holdet') : null),
     h('div', { class: 'minipitch heat' },
-      grid.flatMap((r, y) => r.map((v, x) => v > 0 ? h('div', { class: 'heat-cell', style: { left: `${(x * 100) / COLS}%`, top: `${(y * 100) / ROWS}%`, width: `${100 / COLS}%`, height: `${100 / ROWS}%`, opacity: String(0.15 + v * 0.7) } }) : null)),
+      grid.flatMap((r, y) => r.map((v, x) => v > HEAT_MIN ? h('div', { class: 'heat-cell', style: { left: `${(x * 100) / COLS}%`, top: `${(y * 100) / ROWS}%`, width: `${100 / COLS}%`, height: `${100 / ROWS}%`, opacity: String(0.15 + v * 0.7) } }) : null)),
       shots.map((s) => h('div', { class: `heat-shot ${s.outcome}`, style: { left: s.x + '%', top: s.y + '%' }, title: `${shotMin(s, heat)} ${OUT_LABEL[s.outcome]}` }, s.outcome === 'goal' ? '⚽' : s.outcome === 'assist' ? '🅰' : '●'))),
-    h('div', { class: 'muted', id: 'heat-note' }, `Angriber opad. Farven: hvor ${pid != null ? 'han' : 'holdet'} stod i kampens ${heat.trace.frames.length} øjebliksbilleder og afslutninger${pid != null && e && on(e) < 90 ? ` (han var på banen i ${on(e)} min – kortet er mørkest, hvor han stod oftest)` : ''}. Prikker: ${shots.length ? `${n('goal')} mål, ${n('save')} reddet, ${n('miss')} forbi/blokeret${n('offside') ? `, ${n('offside')} offside` : ''}${n('disallowed') ? `, ${n('disallowed')} annulleret` : ''}${n('assist') ? `, ${n('assist')} oplæg` : ''}` : 'ingen afslutninger'}.${pid == null ? ' Klik på en spiller i listen.' : ''}`));
+    h('div', { class: 'muted', id: 'heat-note' }, `Angriber opad. Farven: hvor ${pid != null ? 'han' : 'holdet'} var og bevægede sig i kampens ${heat.trace.frames.length} øjebliksbilleder (vejen imellem dem talt med) og afslutninger${pid != null && e && on(e) < 90 ? ` (han var på banen i ${on(e)} min – kortet er mørkest, hvor han stod oftest)` : ''}. Prikker: ${shots.length ? `${n('goal')} mål, ${n('save')} reddet, ${n('miss')} forbi/blokeret${n('offside') ? `, ${n('offside')} offside` : ''}${n('disallowed') ? `, ${n('disallowed')} annulleret` : ''}${n('assist') ? `, ${n('assist')} oplæg` : ''}` : 'ingen afslutninger'}.${pid == null ? ' Klik på en spiller i listen.' : ''}`));
 }
 // Modstanderen groft (brugerens valg 2026-10-24; v3.16.1 som kort): 3 × 3 zoner set fra din side – han angriber nedad mod dit
 // mål – med procent i hvert felt og hans afslutninger som prikker. Ingen enkeltspillere (heatmap.js zones).

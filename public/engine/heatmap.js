@@ -4,7 +4,10 @@
 // spor"), i holdets egne koordinater: lille y = ved modstanderens mål (holdet angriber opad på kortet).
 // Dit hold og dine spillere fuldt; modstanderen kun groft i tredjedele (brugerens valg 2026-10-24). Det er et
 // præsentationsvalg, ikke anti-spionage: afspilningen viser begge hold fuldt (spec §3).
-export const COLS = 6, ROWS = 9;
+// v3.20.2 (brugeren: "13,6 km passer ikke med de få markeringer"): 12 × 18 felter, bevægelsen MELLEM billederne tæller med,
+// og en let udglatning – før 6 × 9 felter med kun de 31 øjebliksbilleder (en zonespiller landede i 3–4 felter).
+export const COLS = 12, ROWS = 18;
+export const PATH_STEP = 2, PATH_WEIGHT = 0.5;   // et punkt pr. 2 enheder på vejen mellem to billeder, halv vægt
 
 const own = (side, [id, x, y]) => (side === 'h' ? [id, x, y] : [id, 100 - x, 100 - y]);
 
@@ -20,13 +23,45 @@ export function tracePoints(trace, side, playerId = null) {
 
 // Tæthed i COLS × ROWS felter, 0–1 (det tætteste felt = 1). Målmanden tæller ikke med i holdets kort.
 export function heatGrid(trace, side, playerId = null, gkId = null) {
+  const sm = blur(heatCounts(trace, side, playerId, gkId)), max = Math.max(...sm.flat());
+  return max > 0 ? sm.map((r) => r.map((v) => v / max)) : sm;
+}
+// Den rå optælling pr. felt (før udglatning): billeder og øjeblikke vægt 1, vejen imellem PATH_WEIGHT (paths: false = uden).
+export function heatCounts(trace, side, playerId = null, gkId = null, { paths = true } = {}) {
   const g = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
-  for (const [id, x, y] of tracePoints(trace, side, playerId)) {
-    if (playerId == null && id === gkId) continue;
-    g[Math.min(ROWS - 1, Math.floor(y / (100 / ROWS)))][Math.min(COLS - 1, Math.floor(x / (100 / COLS)))]++;
+  const add = (x, y, w) => { g[Math.min(ROWS - 1, Math.max(0, Math.floor(y / (100 / ROWS))))][Math.min(COLS - 1, Math.max(0, Math.floor(x / (100 / COLS))))] += w; };
+  const skip = (id) => playerId == null && id === gkId;
+  for (const [id, x, y] of tracePoints(trace, side, playerId)) if (!skip(id)) add(x, y, 1);
+  if (paths) for (const [id, x, y] of tracePaths(trace, side, playerId)) if (!skip(id)) add(x, y, PATH_WEIGHT);
+  return g;
+}
+// Vejen mellem to på hinanden følgende billeder (efter t), pr. spiller – kun når han er på banen i BEGGE (en indskifter
+// får ingen streg fra bænken). Punkterne ligger mellem endepunkterne (dem tæller tracePoints), PATH_STEP fra hinanden.
+export function tracePaths(trace, side, playerId = null) {
+  if (!trace) return [];
+  const frames = trace.frames.slice().sort((a, b) => a.t - b.t), out = [];
+  for (let i = 1; i < frames.length; i++) {
+    const prev = new Map((frames[i - 1][side] || []).map((q) => [q[0], own(side, q)]));
+    for (const q of frames[i][side] || []) {
+      if (playerId != null && q[0] !== playerId) continue;
+      const a = prev.get(q[0]); if (!a) continue;
+      const b = own(side, q), n = Math.ceil(Math.hypot(b[1] - a[1], b[2] - a[2]) / PATH_STEP);
+      for (let k = 1; k < n; k++) out.push([q[0], a[1] + ((b[1] - a[1]) * k) / n, a[2] + ((b[2] - a[2]) * k) / n]);
+    }
   }
-  const max = Math.max(1, ...g.flat());
-  return g.map((r) => r.map((v) => v / max));
+  return out;
+}
+// Let udglatning: 3 × 3 med vægtene 1-2-1 (hjørne 1, kant 2, midte 4), kanterne uden for kortet tæller ikke
+export function blur(g) {
+  const W = [1, 2, 1];
+  return g.map((row, r) => row.map((_, c) => {
+    let s = 0, w = 0;
+    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+      const v = g[r + dr]?.[c + dc]; if (v === undefined) continue;
+      const k = W[dr + 1] * W[dc + 1]; s += v * k; w += k;
+    }
+    return s / w;
+  }));
 }
 
 // Afslutningerne (og målene/oplæggene) i sporet for holdet eller én spiller – med udfaldet fra referatet.
