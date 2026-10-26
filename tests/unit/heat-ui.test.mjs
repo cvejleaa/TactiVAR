@@ -23,6 +23,7 @@ globalThis.document = { createElement: (t) => new FakeEl(t), createTextNode: (t)
 const { createRng } = await import('../../public/engine/rng.js');
 const { createLeague } = await import('../../public/engine/generator.js');
 const { simulateMatch } = await import('../../public/engine/match.js');
+const { heatGrid } = await import('../../public/engine/heatmap.js');
 const { renderMatchCenter } = await import('../../public/ui/matchcenter.js');
 const { clearReplays } = await import('../../public/ui/replay.js');
 const { evMin } = await import('../../public/engine/clock.js');
@@ -102,20 +103,21 @@ test('modstanderen kun groft: tredjedelslinjen står i modstanderens ark med han
   assert.equal(byId(o, 'heat-btn').length, 0); assert.equal(byId(o, 'heat-thirds').length, 0);
 });
 
-test('holdets heat map: felterne (6×9) med den rigtige placering og styrke (tætteste = 0,85), uden målmand; prikkerne med udfald, sted og tekst; noten tæller dem', () => {
+test('holdets heat map: felterne (12×18, udglattet) med den rigtige placering og styrke (tætteste = 0,85), uden målmand; prikkerne med udfald, sted og tekst; noten tæller dem', () => {
   const { el } = render(mOf(), base.homeId, { heat: { playerId: null } });
   assert.equal(byId(el, 'heat-pitch').length, 1, 'kun ét kort (dit hold)');
   assert.equal(byId(el, 'heat-title')[0].textContent, '🔥 Holdet (uden målmand)');
   assert.equal(byId(el, 'heat-team').length, 0); assert.equal(byId(el, 'heat-back').length, 0);   // v3.20.0: kortet står altid
-  const cells = all(el, (x) => cls(x, 'heat-cell'));
-  // Felterne (række, søjle): hA(10,10)→(0,0)·1  hA(20,20)×4→(1,1)·4 hA(12,30)+hA(11,31)→(2,0)·2  hB(55,50)→(4,3)·1  hB(60,60)→(5,3)·1  hB(60,80)→(7,3)·1
-  assert.equal(cells.length, 6);
-  const at = (r, c) => cells.find((x) => x.style.left === `${(c * 100) / 6}%` && x.style.top === `${(r * 100) / 9}%`);
-  for (const [r, c] of [[0, 0], [1, 1], [2, 0], [4, 3], [5, 3], [7, 3]]) assert.ok(at(r, c), `felt (${r}, ${c})`);
-  assert.ok(cells.every((x) => x.style.width === `${100 / 6}%` && x.style.height === `${100 / 9}%`));
-  assert.equal(at(1, 1).style.opacity, '0.85', 'tætteste felt: 0,15 + 1 · 0,7');
-  assert.ok(Number(at(0, 0).style.opacity) < Number(at(2, 0).style.opacity) && Number(at(2, 0).style.opacity) < 0.85);
-  assert.equal(all(el, (x) => x.style.left === `${(3 * 100) / 6}%` && x.style.top === `${(8 * 100) / 9}%`).length, 0, 'målmandens felt (række 8, søjle 3) er tomt');
+  // v3.20.2: kortet tegner PRÆCIS heatGrid's felter over tærsklen (12 × 18, udglattet – regnestykket står i heatmap.test.mjs),
+  // med opaciteten 0,15 + v · 0,7: det tætteste felt (hA's (20,20) → række 3, søjle 2) er 0,85
+  const cells = all(el, (x) => cls(x, 'heat-cell')), grid = heatGrid(mOf().trace, 'h', null, id(hGk));
+  const want = grid.flatMap((r, y) => r.map((v, x) => [y, x, v])).filter(([, , v]) => v > 0.04);
+  assert.equal(cells.length, want.length); assert.ok(cells.length >= 20, `data: ${cells.length} felter`);
+  const at = (r, c) => cells.find((x) => x.style.left === `${(c * 100) / 12}%` && x.style.top === `${(r * 100) / 18}%`);
+  for (const [r, c, v] of want) assert.equal(at(r, c)?.style.opacity, String(0.15 + v * 0.7), `felt (${r}, ${c})`);
+  assert.equal(at(3, 2).style.opacity, '0.85', 'tætteste felt: 0,15 + 1 · 0,7');
+  assert.ok(cells.every((x) => x.style.width === `${100 / 12}%` && x.style.height === `${100 / 18}%`));
+  assert.equal(at(16, 6), undefined, 'målmandens felt (50, 90 → række 16, søjle 6) er tomt');
   // Prikkerne: hA's afslutninger i hold-koordinater; 7 øjeblikke → 6 til hjemmeholdet (udeholdets forbi hører ikke med i DIT kort).
   // v3.16.1: modstanderens zone-kort (heat-opp) har sine egne prikker – udeholdets forbi (90, 90) står dér, ikke i dit kort.
   const dots = all(byId(el, 'heat-pitch')[0], (x) => cls(x, 'heat-shot'));
@@ -127,7 +129,7 @@ test('holdets heat map: felterne (6×9) med den rigtige placering og styrke (tæ
   // med S1 = 8) og ikke t·3 som før (3', 6', 9', 12', 15', 21')
   // Titlen er hændelsens ur (evMin af hændelsen), ikke tick'ets – v3.17.0: beregnet fra kampen (faste minutter flyttede sig med motoren)
   assert.ok(C.every((c, i) => /^\d+'$/.test(c) && (i === 0 || parseInt(c) >= parseInt(C[i - 1]))) && new Set(C).size >= 4, `data: kampens ur ${C}`);
-  assert.equal(byId(el, 'heat-note')[0].textContent, 'Angriber opad. Farven: hvor holdet stod i kampens 1 øjebliksbilleder og afslutninger. Prikker: 1 mål, 1 reddet, 2 forbi/blokeret, 1 offside, 1 annulleret. Klik på en spiller i listen.');
+  assert.equal(byId(el, 'heat-note')[0].textContent, 'Angriber opad. Farven: hvor holdet var og bevægede sig i kampens 1 øjebliksbilleder (vejen imellem dem talt med) og afslutninger. Prikker: 1 mål, 1 reddet, 2 forbi/blokeret, 1 offside, 1 annulleret. Klik på en spiller i listen.');
   // Uden valg (mc.heat ikke sat) er det samme holdkort (v3.20.0)
   assert.equal(byId(render(mOf(), base.homeId).el, 'heat-title')[0].textContent, '🔥 Holdet (uden målmand)');
 });
@@ -135,19 +137,20 @@ test('holdets heat map: felterne (6×9) med den rigtige placering og styrke (tæ
 test('en spillers heat map: hans felter og prikker (afslutninger OG oplæg på hans plads), titlen med nummer og navn, "Holdet"-knap og tilbage; noten uden listeklik-opfordring', () => {
   const { el, calls } = render(mOf(), base.homeId, { heat: { playerId: id(hB) } });
   assert.equal(byId(el, 'heat-title')[0].textContent, `🔥 #${hB.shirtNumber} ${hB.shortName}`);
-  const cells = all(el, (x) => cls(x, 'heat-cell'));
-  // hB: (55,50)→(4,3), (60,60)→(5,3), (60,80)→(7,3) – alle lige stærke
-  assert.equal(cells.length, 3); assert.ok(cells.every((x) => x.style.opacity === '0.85'));
+  const cells = all(el, (x) => cls(x, 'heat-cell')), gB = heatGrid(mOf().trace, 'h', id(hB));
+  // hB: (55,50), (60,60), (60,80) – kun hans felter (og deres udglatning), ikke hA's (20,20) → række 3, søjle 2
+  assert.equal(cells.length, gB.flat().filter((v) => v > 0.04).length);
+  assert.ok(!cells.some((x) => x.style.left === `${(2 * 100) / 12}%` && x.style.top === `${(3 * 100) / 18}%`), 'ikke hA');
   const dots = all(byId(el, 'heat-pitch')[0], (x) => cls(x, 'heat-shot'));   // kun dit kort (modstanderens zone-kort har sine egne)
   assert.deepEqual(dots.map((d) => [d.className, d.style.left, d.style.top, d.textContent, d.attrs.title]), [['heat-shot assist', '60%', '60%', '🅰', `${C[0]} oplæg`]]);
-  assert.equal(byId(el, 'heat-note')[0].textContent, 'Angriber opad. Farven: hvor han stod i kampens 1 øjebliksbilleder og afslutninger. Prikker: 0 mål, 0 reddet, 0 forbi/blokeret, 1 oplæg.');
+  assert.equal(byId(el, 'heat-note')[0].textContent, 'Angriber opad. Farven: hvor han var og bevægede sig i kampens 1 øjebliksbilleder (vejen imellem dem talt med) og afslutninger. Prikker: 0 mål, 0 reddet, 0 forbi/blokeret, 1 oplæg. Kortet viser hans område, ikke hver meter – kilometertallet i listen er et skøn ud fra rolle og kondition.');
   assert.equal(byId(el, 'heat-team')[0].textContent, '↩ Holdet'); byId(el, 'heat-team')[0].handlers.click();
   assert.deepEqual(calls.heat, [{ playerId: null }]);
   // Målmanden som "spiller": hans eget kort tæller hans placeringer (række 8, søjle 3)
   const g = render(mOf(), base.homeId, { heat: { playerId: id(hGk) } }).el;
   const gc = all(g, (x) => cls(x, 'heat-cell'));
-  assert.equal(gc.length, 1); assert.equal(gc[0].style.top, `${(8 * 100) / 9}%`);
-  assert.match(byId(g, 'heat-note')[0].textContent, /Prikker: ingen afslutninger\.$/);
+  assert.ok(gc.some((x) => x.style.top === `${(16 * 100) / 18}%` && x.style.opacity === '0.85'), 'hans felt (række 16) er det tætteste');
+  assert.match(byId(g, 'heat-note')[0].textContent, /Prikker: ingen afslutninger\. Kortet viser hans område, ikke hver meter – kilometertallet i listen er et skøn ud fra rolle og kondition\.$/);
   // En spiller uden afslutninger: ingen prikker
   assert.equal(all(byId(render(mOf(), base.homeId, { heat: { playerId: id(aA) } }).el, 'heat-pitch')[0], (x) => cls(x, 'heat-shot')).length, 0, 'modstanderens spiller findes ikke i dit kort');
 });
@@ -173,7 +176,9 @@ test('rækkerne i dit ark: hver spiller kan vælges (klik → hans kort; samme s
 test('målmanden i holdets kort: kendes han ikke (ingen række med rollen GK), tæller hans felt med; kendes han, er han udeladt (se ovenfor)', () => {
   const m = mOf(); m.ratings = { home: base.ratings.home.map((e) => (e === hGk ? { ...e, role: 'DEF' } : e)), away: base.ratings.away };
   const noGk = render(m, base.homeId, { heat: { playerId: null } }).el;
-  assert.equal(all(noGk, (x) => cls(x, 'heat-cell')).length, 7, 'uden at kende målmanden tæller hans felt (række 8, søjle 3) med: 6 + 1');
+  const gkCell = (el) => all(el, (x) => cls(x, 'heat-cell') && x.style.left === `${(6 * 100) / 12}%` && x.style.top === `${(16 * 100) / 18}%`).length;
+  assert.equal(gkCell(noGk), 1, 'uden at kende målmanden tæller hans felt (50, 90 → række 16, søjle 6) med');
+  assert.equal(gkCell(render(mOf(), base.homeId, { heat: { playerId: null } }).el), 0, 'kendes han, er det tomt');
 });
 
 test('🎬 i referatet: en knap ved hver afslutning, og et klik giver (kampen, hændelsens indeks) – og ingen under live', () => {
@@ -240,4 +245,18 @@ test('startopstillingen (miniPitch) vender som zone-kortet: modstanderen nedad, 
       assert.deepEqual(pos(t[1], r), away[r], `${viewer} ude ${r}`);
     }
   }
+});
+
+// v3.20.2 Test Manager – HEAT_MIN: stak i 100 billeder: midten = 4·100/16 = 25; en enlig plads med k billeder = k/4 → k/100 efter normalisering
+test('HEAT_MIN: 3 % og præcis 4 % tegnes ikke, 5 % gør (kanten er >)', () => {
+  const [s, k3, k4, k5] = base.ratings.home.filter((e) => e.role !== 'GK');
+  const frames = Array.from({ length: 100 }, (_, i) => ({ t: i, poss: null, ball: [50, 50], a: [],
+    h: [P(s, 50, 50), ...(i < 3 ? [P(k3, 10, 10)] : []), ...(i < 4 ? [P(k4, 90, 10)] : []), ...(i < 5 ? [P(k5, 10, 90)] : [])] }));
+  const m = { ...base, trace: { v: 1, frames, moments: [] } };
+  const g = heatGrid(m.trace, 'h', null, id(hGk));
+  assert.deepEqual([g[1][1], g[1][10], g[16][1]].map((v) => Math.round(v * 1e6) / 1e6), [0.03, 0.04, 0.05], 'data: præcis 3 / 4 / 5 %');
+  const cells = all(render(m, base.homeId, { heat: { playerId: null } }).el, (x) => cls(x, 'heat-cell'));
+  const at = (r, c) => cells.find((x) => x.style.left === `${(c * 100) / 12}%` && x.style.top === `${(r * 100) / 18}%`);
+  assert.equal(at(1, 1), undefined, '3 %'); assert.equal(at(1, 10), undefined, '4 % (kanten)'); assert.ok(at(16, 1), '5 %');
+  assert.ok(at(9, 6), 'stakken'); assert.equal(at(1, 0), undefined, '1,5 % ved siden af');
 });

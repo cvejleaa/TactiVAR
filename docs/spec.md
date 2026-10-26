@@ -477,8 +477,12 @@ bedre kan kontrollere spil motoren".
   der er tegnet ud fra referatets linje. Et grundbillede viser
   stillingen fra FØR tick'ets hændelser.
 - **Heat map** (karakterarket, dit hold – v3.20.0: står fra start over startopstillingen, som modstanderens zonekort; 📍 erstatter
-  kun opstillingen): viser holdets tæthed (6 × 9 felter, uden målmand) af grundbilleder og
-  øjeblikke, og et klik på en spiller hans – med hans afslutninger efter udfald (⚽ mål, reddet, forbi, offside, annulleret,
+  kun opstillingen): viser holdets tæthed (v3.20.2: 12 × 18 felter, før 6 × 9; uden målmand) af grundbilleder og
+  øjeblikke plus vejen mellem to grundbilleder (punkter hver 2. enhed, vægt 0,5; kun når spilleren er med i begge – ingen streg
+  fra bænken), udglattet med en 1-2-1-kerne og tegnet over 4 % af det tætteste felt (`tools/measure-heat.mjs`: en CM tænder 34
+  felter mod 7, men dækker 16 % af banen mod 13 % – motoren holder ham nær sin plads; km-tallet kommer fra rolle, udholdenhed, pres og løb – ratings.js – ikke sporet: sporets længde er 0,43 km mod 11,9; noten under
+  en spillers kort og kolonnens forklaring siger det. Vejen mellem billederne er en bevidst forskel fra afspilningens "ingen opfundne
+  mellembilleder": den tegnes ikke, men tæller med halv vægt i kortet), og et klik på en spiller hans – med hans afslutninger efter udfald (⚽ mål, reddet, forbi, offside, annulleret,
   🅰 oplæg; Spilfører: positionerne alene er "der hvor du satte ham"). Modstanderen: "Tyngdepunkt (groft)" i tredjedele og (v3.16.1) et 3 × 3 zone-kort
   med "Deres mål" øverst og "Dit mål" nederst (i rundens andre kampe "Modstanderens mål", uden "din side").
   Afspilningens undertekst siger for hvert grundbillede, hvordan duellen gik (har bolden / spiller sig frem til angriberen / erobrer /
