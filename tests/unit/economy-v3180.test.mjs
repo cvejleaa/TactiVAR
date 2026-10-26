@@ -114,3 +114,20 @@ test('sanitize: en ødelagt form bliver tom, og en for lang skæres til de senes
   sanitizeLeague(L);
   assert.deepEqual(L.teams[0].finance.form, []); assert.deepEqual(L.teams[1].finance.form, [1, 0, 3]);
 });
+
+test('sæsonens runde 2 bruger også sidste sæsons slutplacering (runde 3 tabellen nu)', () => {
+  const L = fresh(), rng = createRng(13);
+  for (let r = 0; r < 15; r++) commitRound(L, playRound(L, rng), rng);   // sæson 1 + den nye sæsons runde 1
+  const table = L.seasons.at(-1).table, pl2 = placesBefore(L, L.leagueMetadata.round + 1);
+  table.forEach((s, i) => assert.equal(pl2.get(s.teamId), i + 1, 'runde 2'));
+  commitRound(L, playRound(L, rng), rng);
+  const pl3 = placesBefore(L, L.leagueMetadata.round + 1);
+  assert.notDeepEqual([...pl3], [...pl2], 'runde 3: tabellen efter to runder (her ikke lig sidste sæson)');
+});
+
+test('formen, der tæller, er hjemmeholdets – ikke gæsternes', () => {
+  const L = fresh(), [A, B] = L.teams;
+  A.finance.form = [3, 3, 3]; B.finance.form = [];
+  bookRoundFinances(L, res(1, [[A, B, 0, 0]]));
+  assert.equal(A.finance.ledger.at(-1).att, 5575 + 120 * 9);
+});
