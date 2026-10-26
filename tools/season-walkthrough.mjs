@@ -90,6 +90,10 @@ try {
     await tab('liga'); await box();
     lines.push('## Liga-fanen (klummen og tabellen, som tekst)', '', (await page.textContent('#gazette').catch(() => '(ingen avis)')).trim(), '', (await page.textContent('#standings-title')).trim());
     await shot(`${nn}-liga.png`);
+    // v3.18.0: Klub (økonomi og transfermarked) efter hver runde som tekst, billede efter runde 1, 7 og 14
+    await tab('klub');
+    lines.push('', '## Klub-fanen (som tekst)', '', (await page.textContent('.tabpane').catch(() => '')).trim());
+    if ([1, 7, 14].includes(r)) await shot(`${nn}-klub.png`);
     fs.writeFileSync(path.join(OUT, `${nn}-runde.md`), lines.join('\n'));
     console.log(`runde ${r}: ${L.lastRound.matches.map((m) => `${m.homeName} ${m.homeGoals}-${m.awayGoals} ${m.awayName}`).join(' · ')}`);
   }
@@ -97,6 +101,22 @@ try {
   await shot('15-saesonslut-liga.png');
   await tab('trup'); await shot('15-saesonslut-trup.png');
   await tab('taktik'); await shot('15-saesonslut-taktik.png');
+  // v3.18.0: sæsonrapporten, Klub, eget kort (træning, 📜 Kampe, marked) og en bots kort (💰 pris) – og første runde af sæson 2
+  const extra = ['# Sæsonslut og sæson 2 (v3.18.0)', ''];
+  await tab('liga'); extra.push('## Sæsonrapporten', '', (await page.textContent('#season-report').catch(() => '(ingen)')).trim(), '');
+  await page.locator('#season-report').screenshot({ path: path.join(OUT, '15-saesonrapport.png') }).catch(() => {});
+  extra.push('## Transfers på Liga', '', (await page.textContent('#transfer-log').catch(() => '(ingen)')).trim(), '');
+  await tab('klub'); extra.push('## Klub', '', (await page.textContent('.tabpane')).trim(), ''); await shot('15-saesonslut-klub.png');
+  await tab('trup'); await page.click('#matrix tbody tr:nth-child(9)');
+  extra.push('## Eget spillerkort', '', (await page.textContent('#player-card')).trim(), ''); await page.locator('#player-card').screenshot({ path: path.join(OUT, '15-kort-eget.png') });
+  await page.selectOption('#team-select', '2'); await page.click('#matrix tbody tr:nth-child(14)');
+  extra.push('## En anden klubs spillerkort', '', (await page.textContent('#player-card')).trim(), ''); await page.locator('#player-card').screenshot({ path: path.join(OUT, '15-kort-bot.png') });
+  await page.selectOption('#team-select', '0');
+  await page.click('#play-round'); await page.waitForSelector('#skip'); await page.click('#skip');
+  await tab('trup'); extra.push('## Trup efter sæson 2, runde 1', '', (await page.textContent('.tabpane')).trim().slice(0, 1500), ''); await shot('16-saeson2-trup.png');
+  await tab('klub'); extra.push('## Klub efter sæson 2, runde 1', '', (await page.textContent('.tabpane')).trim(), ''); await shot('16-saeson2-klub.png');
+  await tab('liga'); extra.push('## Liga efter sæson 2, runde 1', '', (await page.textContent('.tabpane')).trim().slice(0, 3000), ''); await shot('16-saeson2-liga.png');
+  fs.writeFileSync(path.join(OUT, '15-saesonslut-og-saeson2.md'), extra.join('\n'));
   fs.writeFileSync(path.join(OUT, 'spor.md'), ['# Kontrolværktøjet (tools/trace-invariants.mjs) pr. kamp', '', ...spor].join('\n'));
 } finally {
   fs.writeFileSync(path.join(OUT, 'fejl.txt'), fejl.length ? fejl.join('\n') : 'Ingen sidefejl, konsolfejl eller fejlboks under hele sæsonen.');
