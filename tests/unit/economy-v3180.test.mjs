@@ -5,7 +5,7 @@ import { createRng } from '../../public/engine/rng.js';
 import { createLeague } from '../../public/engine/generator.js';
 import { playRound, commitRound, bookRoundFinances, placesBefore, endSeason } from '../../public/engine/season.js';
 import { attendance, wagesPerRound, weeklyWages, wageBudget, wageRoomPerRound, bookLedger, TV_PER_ROUND, TICKET_PRICE, PRIZE, LEDGER_CAP } from '../../public/engine/career.js';
-import { viewTeam, TEAM_OWNER_FIELDS } from '../../public/engine/visibility.js';
+import { viewTeam, TEAM_PUBLIC_FIELDS } from '../../public/engine/visibility.js';
 import { normalizeLeague as sanitizeLeague } from '../../public/engine/sanitize.js';
 import { forecast } from '../../public/ui/club.js';
 
@@ -99,14 +99,17 @@ test('prognose: en ny liga har 14 runder tilbage, 7 hjemmekampe, og ender med ka
   assert.ok(f.end > t.cashBalance - 14 * wagesPerRound(t));
 });
 
-test('kassen er ejerens: viewTeam fjerner kasse, regnskab, transferliste, ungdom og bud for andre – ÉN vagt', () => {
+test('kassen er ejerens: viewTeam for andre er en tilladelsesliste – præcis navn, trup (offentlige felter), opstilling og bænk', () => {
   const t = fresh().teams[1];
+  t.finance.ledger.push({ r: 1, s: 1, tv: 1, cash: 1 }); t.listed = [t.squad[17].id]; t.youthOffers = [{ id: 'y' }];
   const other = viewTeam(t, false), own = viewTeam(t, true);
-  for (const k of TEAM_OWNER_FIELDS) { assert.ok(!(k in other), k); }
-  assert.equal(own.cashBalance, t.cashBalance); assert.ok(own.finance);
-  assert.deepEqual(TEAM_OWNER_FIELDS, ['cashBalance', 'finance', 'listed', 'youthOffers', 'offers']);
-  assert.equal(other.name, t.name);
+  assert.deepEqual(Object.keys(other).sort(), [...TEAM_PUBLIC_FIELDS].sort());
+  assert.deepEqual(Object.keys(other.tactics).sort(), ['baseFormation', 'customCoords', 'lineupSlots'], 'ingen faser, Hvis-Så eller planer');
+  assert.ok(other.squad.every((p) => p.skills === undefined && p.weeklyWage === undefined && p.potential === undefined && p.publicStars !== undefined));
+  assert.equal(JSON.stringify(other).includes(String(t.cashBalance)), false, 'kassen står ingen steder');
+  assert.equal(own, t, 'ejeren ser holdet, som det er');
 });
+
 
 test('sanitize: en ødelagt form bliver tom, og en for lang skæres til de seneste 3', () => {
   const L = fresh();

@@ -124,8 +124,11 @@ Konstanterne står ét sted: `public/engine/career.js` (og `transfers.js`). Bån
   - De afledte tilfældighedstal (`derivedRng`: ungdom, potentiale, træning, pension, bud) bygger på offentlige nøgler – med koden
     kan en ungdomsspillers skjulte tal regnes ud. Trin 2 skal salte dem med en hemmelighed på serveren.
   - En menneskestyret managers træningsfokus kan aflæses af en reserves friskhed (træningsprisen); botternes kan ikke (Alsidig).
-  - `viewTeam` er en sortliste (kun kasse, regnskab, salgsliste, ungdom, bud); trin 2 skal gøre den til en tilladelsesliste
-    som `viewPlayer`. En købt spillers karakterer fra botten ses af den nye ejer.
+  - `viewTeam` er en tilladelsesliste (v3.19.0, `TEAM_PUBLIC_FIELDS`): id, navn, isBot, truppen (gennem `viewPlayer`), kamptruppen
+    (`matchBench`) og taktikkens `baseFormation`, `lineupSlots` og `customCoords` – som kopier. Den offentlige klubside tegnes kun
+    fra den. En købt spillers karakterer fra botten ses af den nye ejer.
+  - "Dit hold" afgøres af `isOwn = !team.isBot` (`app.js`): alle ejer-flader (træningsoversigt, Løn/rd, egen klub) hænger på den.
+    Med to menneskestyrede hold ville hver se den andens data – trin 2 skal afgøre ejerskab ud fra brugeren.
 - Ingen: VAR-profil (kun via clues og VAR-kendelser i referatet – v3.15.1: varPulse, theatre og cynicism afgør VAR's
   kendelser som lodtrækninger, så én kendelse ikke afslører spillerens trin).
 - Modstandere vises med "🔒 ??"; sortering på skjulte kolonner hos et
@@ -837,16 +840,16 @@ avisens hovedperson altid målmanden.
 
 ## 10b. Layout (skal bevares, selv uden Tailwind)
 Mørkt tema (#0f172a, paneler slate-900, lilla VAR-accent, smaragd for gode
-tal). Topbar: klubvælger, "▶ Spil runde N af 14 mod X (hjemme/ude)" efter programmet
-og "🔍 X" (åbner modstanderens trup til scouting), gem-status, gem/eksport/import/ny
-liga. Under topbaren fire faner (v3.5, brugerens valg); den valgte fane gemmes i
-`ui.tab` (ukendt værdi → Trup, intet skemaskift):
-- **Trup** (opstilling, v3.6): klubhoved, regnearket i fuld bredde (ingen sidelæns
-  scroll, egen lodret scroll ved 46 %), derunder bane + bænkrække | spillerkort.
-  Ét fælles byt-valg: startes i regnearket, på banen eller på bænken og afsluttes
-  hvor som helst af de tre.
-- **Taktik**: bane + bænkrække (klik bænk → klik brik = skift ind) | spillerkort
-  + formation/planer/faser/Hvis-Så. 2 kolonner, 1 under 900 px.
+tal). Den faste (sticky) topbar (v3.19.0, brugerens valg): klubvælger, "▶ Spil runde N af 14 mod X (hjemme/ude)"
+(under 480 px kun "Spil runde N af 14" – modstanderen står på 🔍), "🔍 X", gem-kvitteringen (åbner Admin) og
+fanerne som anden række (under 480 px kun ikoner). Den valgte fane gemmes i `ui.tab` (ukendt værdi → Trup):
+- **Trup** (v3.19.0): klubhoved, regnearket (med 💰 Værdi og Løn/rd sidst; ingen byt-knapper), derunder
+  spillerkort | 🏋️ træningsoversigt (fokus pr. spiller, pris, fremdrift, næste +1, skøn, +1 sidste runde,
+  massehandling for de viste). Træning sættes kun her.
+- **Taktik** (v3.19.0 – opstillingen ét sted): bane | spillerliste (Start-11, Bænk med "Udtag automatisk",
+  Reserver; klik på en brik filtrerer listen til hans kæde med kædens 3 nøgle-evner; sortering gennem
+  regnearkets kolonner og synlighedsvagt) + spillerkort; formation/planer/faser/Hvis-Så nedenunder. Ét
+  byt-valg (actions.js `swapKind`/`pickForSwap`) på banen og i listen; beskeden står ved listen.
 - **Kamp**: Match Center for igangværende eller seneste runde (tom tilstand før
   runde 1). ▶ skifter hertil. Karakterark side om side: opstillingsorden med
   pladsen efter navnet (naturlig kæde i parentes ved afvigelse, indskiftere
@@ -857,6 +860,9 @@ liga. Under topbaren fire faner (v3.5, brugerens valg); den valgte fane gemmes i
   program" med 14 linjer H/U, modstander og din score først; hele programmet og tidligere
   sæsoner sammenfoldet) og avis; klik på et hold åbner det i Trup. Under afspilning
   skjules resultater, program, statistik og avis, og det siges, at tabellen allerede er opdateret.
+- **Klub**: dit hold = økonomi og transfermarked; et valgt modstanderhold = "Offentlig klubside" tegnet kun fra
+  `viewTeam` (spillere med pris og Køb, transfers, pensioner; kasse/løn/regnskab findes ikke) med "← Til din klub".
+- **⚙ Admin** (v3.19.0): gem nu, eksportér, importér og ny liga.
 Modstanderes stjerner: udfyldte i guld, tomme dæmpet.
 
 ## 11. Udeladt / udskudt

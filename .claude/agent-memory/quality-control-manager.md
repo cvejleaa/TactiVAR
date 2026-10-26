@@ -17,3 +17,8 @@
 - Afledte referattekster, der forgrener sig på modstanderens indstillinger (offside-fælde, omstilling), lækker. Grep på `phases` i match.js ved hver ændring af tekster.
 
 - Faner: en handling må ikke kræve en anden fane end den, dens hjælpetekst står i (v3.5: bænk under banen, kort i Taktik).
+
+## v3.19.0 (Security-runden) – sanitize og fangede fejl
+- En sanitize-reparation må kun fjerne det ugyldige, ikke hele objektet, når UI'et allerede tåler forældreløse id'er (træningsrapporten efter salg).
+- "Endeligt tal" er ikke "gyldigt tal": tjek hvad rendereren gør med værdien (repeat, indeks) og klem til domænet (publicStars 0–5).
+- At fange en fejl flytter den væk fra window.onerror, fejlboksen og e2e's pageerror – spørg, hvor den nu bliver synlig.

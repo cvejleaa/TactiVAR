@@ -41,7 +41,7 @@ export function renderTactics({ team, isOwn, ui, on }) {
     const warn = [r.subOut && !t.lineupSlots.includes(r.subOut) ? `${nameOf(team.squad.find((p) => p.id === r.subOut) ?? { shirtNumber: '?', shortName: 'spilleren' })} står ikke i startopstillingen` : '',
       r.subIn && t.lineupSlots.includes(r.subIn) ? `${nameOf(team.squad.find((p) => p.id === r.subIn))} står ikke på bænken` : '',
       // v3.18.0 (QC): en reserve er ikke i kamptruppen – skiftet kan ikke ske, før han er udtaget til bænken
-      r.subIn && !t.lineupSlots.includes(r.subIn) && !benchPl.some((p) => p.id === r.subIn) && team.squad.some((p) => p.id === r.subIn) ? `${nameOf(team.squad.find((p) => p.id === r.subIn))} er reserve – udtag ham til bænken i Trup` : '',
+      r.subIn && !t.lineupSlots.includes(r.subIn) && !benchPl.some((p) => p.id === r.subIn) && team.squad.some((p) => p.id === r.subIn) ? `${nameOf(team.squad.find((p) => p.id === r.subIn))} er reserve – udtag ham til bænken i spillerlisten` : '',
       !r.subOut || !r.subIn ? 'vælg begge spillere' : ''].filter(Boolean);
     return h('span', { class: 'rule-sub' },
       select(r.subOut ?? '', [['', 'ud: vælg'], ...starters.slice(1).map((p) => [p.id, `ud: ${nameOf(p)}`])], (v) => on.rule(i, { subOut: v || null }), { disabled, class: 'rule-sub-out' }),

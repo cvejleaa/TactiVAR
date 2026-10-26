@@ -59,10 +59,15 @@ export function viewTeamStats(row, viewerOwnsTeam) {
 // Kun holdets ejer – andres rapporter er fraværende i resultatet (klummen og fuldtids-analysen bruger kun seerens).
 export const viewOwnReport = (match, viewerTeamId) => match?.ownReports?.[viewerTeamId] ?? null;
 
-// Holdets egne forhold (v3.18.0): kasse, regnskab, transferliste, ungdomstilbud og bud ser kun ejeren – ÉN vagt (QC)
-export const TEAM_OWNER_FIELDS = ['cashBalance', 'finance', 'listed', 'youthOffers', 'offers'];
+// Et hold set af en anden end ejeren (v3.19.0, Security: tilladelsesliste – ikke sortliste): kun navn, truppen gennem viewPlayer og
+// startformationen med opstillingen (offentlig – den står på banen). Kasse, regnskab, salgsliste, ungdom, bud, faser, Hvis-Så og
+// planer findes slet ikke i visningen. Ejeren ser holdet, som det er.
+export const TEAM_PUBLIC_FIELDS = ['id', 'name', 'isBot', 'squad', 'tactics', 'matchBench'];
 export function viewTeam(team, viewerOwnsTeam) {
-  const out = { ...team };
-  if (!viewerOwnsTeam) for (const k of TEAM_OWNER_FIELDS) delete out[k];
-  return out;
+  if (viewerOwnsTeam) return team;
+  return {
+    id: team.id, name: team.name, isBot: team.isBot, matchBench: [...(team.matchBench ?? [])],
+    squad: team.squad.map((p) => viewPlayer(p, false)),
+    tactics: { baseFormation: team.tactics.baseFormation, lineupSlots: [...team.tactics.lineupSlots], customCoords: { ...(team.tactics.customCoords ?? {}) } },
+  };
 }

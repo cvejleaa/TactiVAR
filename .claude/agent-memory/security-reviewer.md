@@ -18,14 +18,35 @@
   automatisk forgiftet. Bevist v3.16: publicFacts læser m.trace -> rød 'KANARIE: trace'.
 - "Kun efter slutfløjt" (matchcenter.js `mc.playing ? null : replayEl` og 🎬-knappen): begge dræbes af replay-ui.test.mjs.
 - Private karakterfelter: visibility.js RATING_PRIVATE_FIELDS (freeRuns/freeRunsWon, km, topfart, HI, karakter).
+- v3.19: viewTeam er TILLADELSESLISTE (TEAM_PUBLIC_FIELDS; tactics kun baseFormation/lineupSlots/customCoords). Spillerlistens
+  sorteringsvagt = lineup-list.js listRows `sortCol` (dræbes af ui-v3190 test 2 – bevist). renderPublicClub kaster ved nøgler uden
+  for TEAM_PUBLIC_FIELDS – men kun TOPNIVEAU, og funktionen får rå `league` (kan nå league.teams[..].cashBalance uden om vagten).
+- e2e "ingen kasse" på klubsiden (run.mjs ~328: `replace(/\D/g,' ').split(' ').includes(String(cash))`) er TOM: kr() skriver
+  "5.000.000 kr." -> kan aldrig matche. Bevist v3.19: kassen vist på siden -> ✅. Tjek om den er rettet.
+
+## Robusthed (delt/importeret gem)
+- v3.19 (A) flyttede Eksportér/Importér/Ny liga fra topbaren til ⚙ Admin-FANEN. renderNow bygger matrix/kort/bane/liste/taktik/
+  tabel FØR `[tab]()` og tabbaren EFTER -> én render-fejl = hvid side, 0 faner, ingen eksport/import/ny liga (gem-kvitteringen ->
+  showTab('admin') -> samme fejl). Bevist: valueStars {"toString":1} på egen spiller (Værdi-kolonnen) og age-objekt (fandtes før,
+  men main kunne redde sig). Data ligger i localStorage, men kun devtools redder dem. Tjek om render har en fallback.
+- sanitize.js typetjekker IKKE valueStars/publicStars/age/careerGames/roleTier eller league.trainingReport (gains: 5 -> Trup vælter,
+  training.js:13; kan reddes via Admin, da træningstabellen bygges dovent).
 
 ## Kendte accepterede lækager (brugerens valg – skal ikke "lukkes")
 - v3.16 kampens spor + 2D-afspilning: begge holds positioner for alle (§3). Heat map'ets grove modstander = præsentationsvalg.
 - v3.16 UBENÆVNT konsekvens (rapporteret): sporet røber modstanderens VUNDNE løb uden bold pr. spiller (løberen står RUN_STEP
   12 længere fremme i afslutnings-øjeblikket end i samme ticks grundbillede; match.js ~1065 `seen = livePositions(..rctx)`).
   PoC: 43 af 64 private freeRunsWon fundet, 0 falske (12 seeds × 6 runder). Modsiger kommentaren match.js ~1048.
+- Afspilning: tabellen (og regnearkets ⭐ Vurd/alder/Værdi) er allerede opdateret under afspilning – brugerens valg. Klubsiden
+  skjuler transfers/pensioner under afspilning fra 9d2faae (som Liga). Trupstørrelsen ses (som i Trup).
+- Trin 2: `isOwn = !team.isBot` (app.js ~273) – alle ejer-flader (træning, Løn/rd, egen klub) følger den; skal være ownerUid.
 
 ## PoC-mønstre der virker
+- NON-INTERFERENCE (stærkest til hvem-ser-hvad): byg gem A i node (createLeague+playRound/commitRound, serialize), B = A med
+  botternes OWNER/SECRET-felter + kasse/regnskab/faser/listed forvansket; kør SAMME UI-trin i Chromium på A og B (sortér eget
+  hold på skjulte kolonner, skift til bot, Taktik/Trup/Klub, klik) og diff #controls+#app outerHTML. Normalisér gem-tiden.
+  Kontrol: fjern en vagt -> diff skal komme (lineup-list sortCol -> 59 forskelle). (Scratchpad-scripts overlever ikke sessionen – byg dem igen efter denne opskrift, ~80 linjer.)
+- Grenen kan flytte sig under gennemgangen (v3.19: 709a3bf -> 9d2faae midt i) – tjek `git log` før rapporten, og kør igen.
 - Motor-PoC: createLeague(createRng(seed)) + playRound/commitRound; dit hold = `!t.isBot`; modstanderside = 'h'/'a'.
 - Rigtig browser: playwright-core fra node_modules, Chromium /opt/pw-browsers/chromium-1194/chrome-linux/chrome,
   tools/serve.mjs startServer(egen port), addInitScript sætter localStorage én gang (sessionStorage-flag), klik #tab-kamp,

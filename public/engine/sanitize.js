@@ -7,7 +7,7 @@ import { TEAM_STAT_DEFAULTS, PLAYER_SEASON_DEFAULTS } from './stats.js';
 import { FORMATIONS } from './formations.js';
 import { buildSchedule, isValidSchedule, SEASON_ROUNDS } from './schedule.js';
 import { defaultTactics, defaultStarterIds, emptyStanding, BOT_PROFILES, aerialBreakdown, assignPositions, teamCareerDefaults, generatePlayer } from './generator.js';
-import { initialPotential, publicWage, MATCH_LOG_CAP, SQUAD_MIN, SQUAD_MAX, derivedRng, neededLine, freeShirt } from './career.js';
+import { initialPotential, publicWage, TIER_STARS, MATCH_LOG_CAP, SQUAD_MIN, SQUAD_MAX, derivedRng, neededLine, freeShirt } from './career.js';
 
 const PLAYER_DEFAULTS = { freshness: 100, injuryMatchesLeft: 0, lastRating: 0, ratingSum: 0, ratingGames: 0, publicStars: 0, seasonAgeCounter: 1, archetype: null, distanceSum: 0, minutesSum: 0, topSpeedMax: 0, hiKmSum: 0, hiDistSum: 0, trainingFocus: 'GENERAL', careerGames: 0 };
 // Truppens størrelse (v3.18.0: 18–25 efter lønbudgettet; før præcis 18)
@@ -101,6 +101,13 @@ export function normalizeLeague(league) {
       p.matchLog = Array.isArray(p.matchLog) ? p.matchLog.filter((e) => Array.isArray(e) && e.length === 11 && e.every((v) => v == null || Number.isFinite(v))).slice(-MATCH_LOG_CAP) : [];
       if (!Number.isFinite(p.potential)) p.potential = initialPotential(p);
       if (!Number.isFinite(p.weeklyWage)) p.weeklyWage = publicWage(p);
+      // Offentlige tal, som Værdi og listerne regner på (Security v3.19.0: et objekt her væltede hele siden)
+      if (!Number.isFinite(p.age)) p.age = 24;
+      // publicStars klemmes til 0–5: stjernerne tegnes med repeat(5 - n), som kaster over 5 (QC)
+      p.publicStars = Number.isFinite(p.publicStars) ? Math.max(0, Math.min(5, Math.round(p.publicStars))) : 0;
+      if (!Number.isFinite(p.careerGames)) p.careerGames = 0;
+      if (p.valueStars !== undefined && !Number.isFinite(p.valueStars)) delete p.valueStars;
+      if (p.roleTier !== undefined && !Object.hasOwn(TIER_STARS, p.roleTier)) delete p.roleTier;
       if (!p.counterTactics) p.counterTactics = { vsPress: 15, vsLowBlock: 15, vsTrapLong: 15 };
       p.aerialPower = aerialBreakdown(p.heightCm, p.jumpingPower, p.skills.strength, p.skills.positioning).total;
     }
@@ -129,6 +136,16 @@ export function normalizeLeague(league) {
     // Udskiftningsgrænsen (v3.13): gemt før v3.13 → holdets profil (dit hold 70 %); 0 = fra bevares.
     team.subsLimit = clampSubsLimit(team.subsLimit ?? profile.subs);
   });
+  // Træningsrapporten (Security v3.19.0): { holdId: { round, gains: [{ id, skill }], injuries: [id] } }. En rapport med forkert form
+  // slettes (næste runde laver en ny); ukendte spillere og evner fjernes enkeltvis – en solgt spiller er normal (QC)
+  const tr = league.trainingReport;
+  if (tr !== undefined && (!tr || typeof tr !== 'object' || Array.isArray(tr))) delete league.trainingReport;
+  else if (tr) for (const [id, r] of Object.entries(tr)) {
+    if (!r || typeof r !== 'object' || !Number.isInteger(r.round) || !Array.isArray(r.gains) || !Array.isArray(r.injuries)) { delete tr[id]; continue; }
+    const byId = new Map((league.teams.find((t) => t.id === id)?.squad ?? []).map((q) => [q.id, q]));
+    r.gains = r.gains.filter((g) => g && byId.get(g.id)?.skills && typeof g.skill === 'string' && Object.hasOwn(byId.get(g.id).skills, g.skill));
+    r.injuries = r.injuries.filter((pid) => typeof pid === 'string');
+  }
   return { league, problems, notes };
 }
 
