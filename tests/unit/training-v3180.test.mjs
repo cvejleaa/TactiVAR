@@ -141,3 +141,14 @@ test('synlighed: fokus og fremgang ser kun ejeren', () => {
   assert.equal(v.trainingFocus, undefined); assert.equal(v.dev, undefined);
   assert.equal(viewPlayer(p, true).trainingFocus, 'FINISH');
 });
+
+test('træningsskaden rulles på ny hver runde – ikke samme udfald for spilleren hele sæsonen', () => {
+  const save = FOCUS.STAMINA.inj;
+  try {
+    FOCUS.STAMINA.inj = 0.5;
+    const L = fresh(), p = att(own(L)); p.trainingFocus = 'STAMINA';
+    const hits = [];
+    for (let r = 1; r <= 20; r++) { round(L, r); hits.push(p.injuryMatchesLeft > 0); p.freshness = 100; }
+    assert.ok(hits.includes(true) && hits.includes(false), hits.join(','));
+  } finally { FOCUS.STAMINA.inj = save; }
+});
