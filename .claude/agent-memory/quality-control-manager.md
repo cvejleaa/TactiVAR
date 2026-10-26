@@ -22,3 +22,11 @@
 - En sanitize-reparation må kun fjerne det ugyldige, ikke hele objektet, når UI'et allerede tåler forældreløse id'er (træningsrapporten efter salg).
 - "Endeligt tal" er ikke "gyldigt tal": tjek hvad rendereren gør med værdien (repeat, indeks) og klem til domænet (publicStars 0–5).
 - At fange en fejl flytter den væk fra window.onerror, fejlboksen og e2e's pageerror – spørg, hvor den nu bliver synlig.
+
+## v3.20.0 – positionsstraf (plan + kode)
+- Data på botterne (lineupSlots) skrives kun ved ny liga: et generator-fix når aldrig den live liga uden migrering eller runtime-regel. Spørg: "gælder rettelsen brugerens EKSISTERENDE liga?"
+- Leksikografisk sortering (fit først) ignorerer størrelsesordenen – brug en samlet score.
+- En ny straf på en mekanik, brugeren ikke kan styre (remap uden UI), er en skat, ikke et valg.
+- En ny straf i den fælles multiplikator (match.js ff) rammer alle omfordelinger midt i kampen – tjek hvert sted (Hvis-Så samme formation, planskift, bot-remap): ændrer det en bevidst opstilling?
+- Test-arenaer med alignPositions neutraliserer straffen – spørg, hvilken test der faktisk dækker posF.
+- Et ensidigt målebånd ("mindst −X") fanger ikke en for hård straf.
