@@ -843,6 +843,24 @@ try {
     check('Sæsonslut: Tag op – spilleren er i truppen (gemt), og ét tilbud er tilbage', nAfter === nBefore + 1 && (await g.locator('#youth-offers .youth-offer').count()) === 1, `${nBefore} → ${nAfter}`);
     await tab('trup');
     check('Sæsonslut, Trup: "1 ungdomstilbud venter" med link til rapporten', (await g.textContent('#youth-pending')).includes('1 ungdomstilbud'));
+    // v3.18.0 transfers: vinduet er åbent ved sæsonslut – køb en spiller, der kan købes, til den viste faste pris
+    const buyable = await g.evaluate(async () => {
+      const { marketInfo } = await import('/engine/transfers.js');
+      const l = JSON.parse(localStorage.getItem('tactivar_save')).league, me = l.teams.find((t) => !t.isBot);
+      for (const [i, t] of l.teams.entries()) if (t.isBot) for (const p of t.squad) { const m = marketInfo(l, me, t, p); if (!m.reason) return { i, id: p.id, price: m.price, cash: me.cashBalance, n: me.squad.length }; }
+      return null;
+    });
+    if (buyable) {
+      await g.selectOption('#team-select', String(buyable.i));
+      await g.click(`#matrix tbody tr[data-pid="${buyable.id}"]`);
+      const btn = await g.textContent('#buy-player');
+      await g.click('#buy-player');
+      const after = await g.evaluate((id) => { const me = JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((t) => !t.isBot); return { cash: me.cashBalance, n: me.squad.length, has: me.squad.some((p) => p.id === id) }; }, buyable.id);
+      check('Transfer: "Køb for X kr." på kortet køber spilleren til netop den pris (gemt)', btn.replace(/\D/g, '') === String(buyable.price) && after.has && after.n === buyable.n + 1 && after.cash === buyable.cash - buyable.price, `${btn} / ${JSON.stringify(after)}`);
+      await tab('liga');
+      check('Transfer: står i ligaens transferliste', (await g.textContent('#transfer-log')).includes('→'));
+      await g.selectOption('#team-select', '0');
+    } else check('Transfer: en spiller kan købes ved sæsonslut (forudsætning)', false);
     await tab('liga');
     check('Sæsonslut, Liga: sæsonboksen og klummen står sammen', (await g.locator('#gazette #season-end').count()) === 1 && (await g.locator('#gazette #col-title').count()) === 1);
     const colNext = await g.locator('#gazette #col-next p').allTextContents();

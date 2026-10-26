@@ -10,7 +10,8 @@ import { h, select } from './ui/dom.js';
 import { kr } from './ui/labels.js';
 import { renderMatrix } from './ui/matrix.js';
 import { renderCard, trainingSummary } from './ui/card.js';
-import { renderClub, shownCash } from './ui/club.js';
+import { renderClub, shownCash, renderMarket, renderTransferLog } from './ui/club.js';
+import { marketInfo, buyPlayer, setListed, acceptOffer, declineOffer, isStarter } from './engine/transfers.js';
 import { renderSeasonReport } from './ui/season-report.js';
 import { viewTeam } from './engine/visibility.js';
 import { renderPitch } from './ui/pitch.js';
@@ -279,6 +280,8 @@ function renderNow() {
   const card = renderCard({ player: selected, team, isOwn, scouting: league.scouting[mine.id]?.[selected?.id], note: selected ? game.notes[selected.id] : '',
     onNote: (v) => { game.notes[selected.id] = v; persist(); renderControls(); }, teams: league.teams, latest,
     onFocus: isOwn ? (k) => change(() => act.setFocus(team, selected.id, k)) : null,
+    market: !selected || mc?.playing ? null : isOwn ? { own: true, listed: (team.listed ?? []).includes(selected.id), onList: (on) => change(() => setListed(league, team, selected.id, on)) }
+      : { ...marketInfo(league, mine, team, selected), starter: isStarter(team, selected), onBuy: () => { const err = buyPlayer(league, mine, selected.id); view.notice = err ? `💰 ${err}` : `💰 ${selected.shortName} er købt og står nu i din trup.`; change(() => {}); } },
     retiring: !!selected && seasonRoundOf(league, league.leagueMetadata.round) >= RETIRE_WARN_ROUND && willRetire(selected, league.leagueMetadata.seasonNumber ?? 1),
     onOpenMatch: (hi, ai) => { const i = lr.matches.findIndex((m) => m.homeId === league.teams[hi]?.id && m.awayId === league.teams[ai]?.id); if (i >= 0) openReport(i); } });
 
@@ -327,10 +330,13 @@ function renderNow() {
       league.lastRound && !mc?.playing ? renderLastRound({ round: league.lastRound, myTeamId: mine.id, onOpen: openReport }) : null,
       // Programmet skjules også under afspilningen (det viser den bogførte rundes resultat).
       !mc?.playing ? renderSchedule({ league, pairs: pairRound(league), myTeamId: mine.id }) : null,
+      !mc?.playing ? renderTransferLog({ league }) : null,
       league.lastRound && !mc?.playing ? renderGazette(league.lastRound.gazette, mine.id, openGoal, league.lastRound.matches, columnNow(), openReport) : null,
       // Statistikken skjules også under afspilningen (den er bogført og ville afsløre runden).
       !mc?.playing ? renderStats({ league, myTeamId: mine.id }) : null],
-    klub: () => [renderClub({ league, team: mine, playing: !!mc?.playing })],
+    klub: () => [renderClub({ league, team: mine, playing: !!mc?.playing }), renderMarket({ league, team: mine, playing: !!mc?.playing,
+      onAccept: (id) => { const err = acceptOffer(league, mine, id); view.notice = err ? `🔁 ${err}` : '🔁 Spilleren er solgt.'; change(() => {}); },
+      onDecline: (id) => change(() => declineOffer(league, mine, id)), onUnlist: (id) => change(() => setListed(league, mine, id, false)) })],
   }[tab]();
   app.replaceChildren(...[
     h('nav', { class: 'tabs', id: 'tabs' }, TABS.map(([k, label]) => h('button', { id: `tab-${k}`, class: 'tab' + (k === tab ? ' active' : ''), onclick: () => showTab(k) }, label))),

@@ -8,6 +8,7 @@ import { autoMatchBench, logMatch, FOCUS, focusSkills, validFocus, ageTrain, roo
 import { aerialBreakdown, isArchetypeUnlocked, generatePlayer } from './generator.js';
 import { bookMatchStats, roundHistory, HISTORY_MAX } from './stats.js';
 import { simulateMatch } from './match.js';
+import { openWindow } from './transfers.js';
 import { starsFromRating, starNoise } from './ratings.js';
 import { applyCounterXp } from './counter.js';
 import { buildGazette } from './gazette.js';
@@ -151,6 +152,7 @@ export function commitRound(league, result, rng) {
   const played = new Set();
   // Ungdomstilbud, du ikke har taget stilling til, går ved næste runde ("Lad gå" er standard)
   for (const t of league.teams) if (t.youthOffers?.length) t.youthOffers = [];
+  league.offers = [];   // botternes bud gælder kun, mens vinduet er åbent
   bookRoundFinances(league, result);
 
   for (const m of result.matches) {
@@ -207,8 +209,9 @@ export function commitRound(league, result, rng) {
     const end = endSeason(league, result.round, true);
     payPrizes(league, result.round, league.seasons.at(-1).table);
     seasonTurnover(league);
+    openWindow(league);   // transfervinduet ved sæsonslut
     if (result.gazette) result.gazette.seasonEnd = end;
-  }
+  } else if (seasonRoundOf(league, result.round) === 7) openWindow(league);   // vinduet før runde 8
   return league;
 }
 

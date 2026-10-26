@@ -2,8 +2,9 @@
 // Alt vises pr. runde; "1 uge = 3 runder" står én gang (QC B6).
 import { h } from './dom.js';
 import { kr } from './labels.js';
-import { weeklyWages, wagesPerRound, wageBudget, wageRoomPerRound, attendance, formOf, TV_PER_ROUND, TICKET_PRICE, GATE_MAX, PRIZE, ROUNDS_PER_WEEK } from '../engine/career.js';
+import { weeklyWages, wagesPerRound, wageBudget, wageRoomPerRound, attendance, formOf, TV_PER_ROUND, TICKET_PRICE, GATE_MAX, PRIZE, ROUNDS_PER_WEEK, publicValue } from '../engine/career.js';
 import { placesBefore } from '../engine/season.js';
+import { windowOf } from '../engine/transfers.js';
 import { SEASON_ROUNDS, seasonRoundOf } from '../engine/schedule.js';
 
 const net = (e) => (e.gate ?? 0) + (e.tv ?? 0) + (e.wages ?? 0) + (e.prize ?? 0) + (e.transfers ?? 0);
@@ -53,4 +54,34 @@ export function renderClub({ league, team, playing }) {
         h('td', { class: 'num' }, e.gate ? kr(e.gate) : '–'), h('td', { class: 'num' }, kr(e.tv ?? 0)), h('td', { class: 'num' }, kr(-(e.wages ?? 0))),
         h('td', { class: 'num' }, [e.prize ? `🏆 ${kr(e.prize)}` : '', e.transfers ? signed(e.transfers) : ''].filter(Boolean).join(' ') || '–'),
         h('td', { class: 'num' + (e.cash < 0 ? ' neg' : '') }, kr(e.cash))))))) : h('div', { class: 'muted', id: 'ledger-empty' }, 'Regnskabet starter efter første runde.'));
+}
+
+// 🔁 Transfermarked (v3.18.0): vinduet, dine spillere til salg med botternes bud, og hvordan man køber
+export function renderMarket({ league, team, playing, onAccept, onDecline, onUnlist }) {
+  if (playing) return null;
+  const w = windowOf(league), offers = (league.offers ?? []).filter((o) => o.from === team.id);
+  const listed = (team.listed ?? []).map((id) => team.squad.find((p) => p.id === id)).filter(Boolean);
+  const teamName = (id) => league.teams.find((t) => t.id === id)?.name ?? '?';
+  return h('div', { class: 'panel market', id: 'market' },
+    h('h3', {}, '🔁 Transfermarked'),
+    h('p', { id: 'window-state', class: w != null ? 'open' : 'muted' }, w != null
+      ? '🟢 Vinduet er åbent til næste runde. Køb: vælg et andet hold i holdvælgeren og klik på en spiller – prisen står på kortet.'
+      : '🔴 Vinduet er lukket. Det åbner før sæsonens runde 8 og ved sæsonslut. Spillere til salg får bud, når det åbner.'),
+    h('h4', {}, `Dine spillere til salg (${listed.length})`),
+    listed.length ? listed.map((p) => {
+      const o = offers.find((x) => x.playerId === p.id);
+      return h('div', { class: 'market-row', dataset: { pid: p.id } }, `#${p.shirtNumber} ${p.shortName} (${kr(publicValue(p))}) `,
+        o ? [h('strong', {}, `Bud fra ${teamName(o.to)}: ${kr(o.price)} `), h('button', { class: 'mini offer-accept', onclick: () => onAccept(p.id) }, 'Sælg'), h('button', { class: 'mini offer-decline', onclick: () => onDecline(p.id) }, 'Afvis')]
+          : h('span', { class: 'muted' }, w != null ? 'Intet bud – ingen klub har råd og plads lige nu. ' : 'Venter på vinduet. '),
+        h('button', { class: 'mini linklike', onclick: () => onUnlist(p.id) }, 'Fjern fra listen'));
+    }) : h('p', { class: 'muted', id: 'market-empty' }, 'Ingen. Sæt en spiller til salg på hans spillerkort (dit hold).'));
+}
+
+// Ligaens transfers (offentligt): de seneste skifter og fritstillinger
+export function renderTransferLog({ league }) {
+  const log = (league.transferLog ?? []).slice(-12).reverse();
+  if (!log.length) return null;
+  const name = (id) => league.teams.find((t) => t.id === id)?.name ?? '?';
+  return h('div', { class: 'panel', id: 'transfer-log' }, h('h3', {}, '🔁 Transfers'),
+    log.map((e) => h('div', { class: 'tlog-row' }, e.kind === 'release' ? `S${e.s}: ${e.name} er fritstillet af ${name(e.from)}.` : `S${e.s}: ${e.name} ${name(e.from)} → ${name(e.to)} for ${kr(e.price)}.`)));
 }

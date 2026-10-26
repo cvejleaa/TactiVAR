@@ -38,7 +38,7 @@ export function initialPotential(p) {
 
 // ---------- Offentlig værdi og løn (afslører ikke evnerne – kun stjerner, tier og alder, spec §3) ----------
 export const VALUE_BY_STARS = [0, 300000, 600000, 1200000, 2400000, 4500000];   // kr. pr. stjerne (0–5)
-export const TIER_STARS = { STAR: 4, STARTER: 3, ROTATION: 2, TALENT: 2, YOUTH: 2 };
+export const TIER_STARS = { STAR: 4, STARTER: 3, ROTATION: 2, TALENT: 2, YOUTH: 1 };   // ungdom: ubeprøvet (measure-lifecycle)
 export const ageFactor = (age) => (age <= 21 ? 1.3 : age <= 27 ? 1 : age <= 30 ? 0.8 : age <= 32 ? 0.55 : 0.35);
 export const WAGE_SHARE = 0.06;   // ugeløn = 6 % af værdien
 const round = (v, step) => Math.round(v / step) * step;

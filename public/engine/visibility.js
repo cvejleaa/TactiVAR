@@ -3,7 +3,7 @@
 // alle denne fil. I trin 1 er beskyttelsen visuel: alt ligger i browseren.
 
 // Offentligt: alle i ligaen må se det (teams_public).
-export const PUBLIC_FIELDS = ['id', 'name', 'shortName', 'shirtNumber', 'line', 'position', 'age', 'heightCm', 'freshness', 'injuryMatchesLeft', 'publicStars', 'roleTier', 'careerGames',
+export const PUBLIC_FIELDS = ['id', 'name', 'shortName', 'shirtNumber', 'line', 'position', 'age', 'heightCm', 'freshness', 'injuryMatchesLeft', 'publicStars', 'roleTier', 'careerGames', 'lastMove',
   // Sæsonstatistik (v3.10): alt det, der står i referaterne – mål, oplæg, kort, MotM, dødboldmål.
   'sGames', 'sMinutes', 'sGoals', 'sAssists', 'sMotm', 'sYellow', 'sRed', 'sCleanSheets', 'sHeaderGoals', 'sPenaltyGoals', 'sSetPieceGoals'];
 // Kun holdets ejer (teams_private).
