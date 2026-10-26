@@ -5,7 +5,10 @@ import { LINE, POSITION, POSITION_FULL, starsEl } from './labels.js';
 import { canSeeField } from '../engine/visibility.js';
 import { FORMATIONS } from '../engine/formations.js';
 import { COUNTER_KEYS } from '../engine/counter.js';
-import { matchBenchOf, FOCUS } from '../engine/career.js';
+import { matchBenchOf, FOCUS, publicValue } from '../engine/career.js';
+
+// Beløb kort: "1,2 mio." / "850.000" (regnearket er bredt nok i forvejen)
+const money = (v) => (v >= 1e6 ? `${dec(v / 1e6, 1)} mio.` : v.toLocaleString('da-DK'));
 
 // Mod-kunnen vises som spillerens tre egne værdier – ikke som én % mod en bestemt
 // modstander, for den kunne bruges til at regne modstanderens stil ud (brugerens valg).
@@ -32,6 +35,10 @@ export const COLUMNS = [
   { key: 'rating', label: '⭐ Vurd', title: 'Eget hold: gennemsnitlig karakter. Modstandere: stjerner', field: 'publicStars', value: (p, c) => (c.isOwn ? avgRating(p) : p.publicStars), num: true },
   { key: 'train', label: '🏋️ Træning', title: 'Træningsfokus (kun dit hold) – gælder, til du ændrer det. Vælg på spillerkortet, eller sæt det for de viste spillere herover', field: 'trainingFocus', value: (p) => Object.keys(FOCUS).indexOf(p.trainingFocus) },
   { key: 'mod', label: '🧠 Mod', title: 'Mod-kunnen: mod gegenpress / mod lav blok / mod VAR-linje & lange bolde (sorterer på den bedste)', field: 'counterTactics', value: modBest, num: true },
+  // v3.19.0 (brugeren: "Hvor står værdien og lønnen for mine egne spillere?"): sidst, så kolonnernes plads i e2e holder. Værdien er
+  // offentlig (stjerner, tier og alder), lønnen kun ejerens (weeklyWage er OWNER → 🔒 for modstandere)
+  { key: 'value', label: '💰 Værdi', title: 'Offentlig værdi (stjerner og alder) – en anden klub betaler mere (1,3, en starter 1,6)', field: 'publicStars', value: (p) => publicValue(p), num: true, fmt: money },
+  { key: 'wage', label: 'Løn/rd', title: 'Løn pr. runde (kun dit hold) – lønbudgettet står i 💼 Klub', field: 'weeklyWage', value: (p) => Math.round(p.weeklyWage / 3), num: true, fmt: (v) => v.toLocaleString('da-DK') },
 ];
 
 // v3.18.0: truppen er 18–25 – "Alle (N)" sættes ved visningen; Reserver = hverken startere eller på kamptruppens bænk
