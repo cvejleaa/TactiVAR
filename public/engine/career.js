@@ -102,3 +102,14 @@ export function autoMatchBench(team) {
   for (const p of best(cand)) { if (chosen.size >= BENCH_SIZE) break; chosen.add(p.id); }
   return (team.matchBench = cand.filter((p) => chosen.has(p.id)).map((p) => p.id));
 }
+
+// ---------- Kamphistorik (v3.18.0, spec §10.4 "kampstempel") ----------
+// Én tupel pr. kamp: [sæson, sæsonens runde, hjemme-indeks, ude-indeks, hjemmemål, udemål, minutter, karakter, stjerner, mål, oplæg]
+// (hold-indeks i league.teams – kompakt, ≈ 35 B). Karakteren (rt, plads 7) er privat: andre hold ser kun stjernerne (QC).
+export const LOG = { S: 0, R: 1, H: 2, A: 3, HG: 4, AG: 5, MIN: 6, RT: 7, ST: 8, G: 9, AS: 10 };
+export function logMatch(p, entry) { (p.matchLog ||= []).push(entry); if (p.matchLog.length > MATCH_LOG_CAP) p.matchLog.splice(0, p.matchLog.length - MATCH_LOG_CAP); }
+// Stemplet: "[Runde 5 • Hjem 2-1 Ude • 90' • 7,4]" (dit hold) / "… • ★★★☆☆" (andre)
+export function stampText(e, teams, own) {
+  const name = (i) => teams[i]?.name ?? '?', grade = own && e[LOG.RT] != null ? String(e[LOG.RT]).replace('.', ',') : '★'.repeat(e[LOG.ST] || 0) + '☆'.repeat(5 - (e[LOG.ST] || 0));
+  return `[Runde ${e[LOG.R]} • ${name(e[LOG.H])} ${e[LOG.HG]}-${e[LOG.AG]} ${name(e[LOG.A])} • ${e[LOG.MIN]}' • ${grade}]`;
+}

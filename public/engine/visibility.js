@@ -17,6 +17,8 @@ export function viewPlayer(player, viewerOwnsTeam) {
   const out = {};
   for (const k of PUBLIC_FIELDS) if (k in player) out[k] = player[k];
   if (viewerOwnsTeam) for (const k of OWNER_FIELDS) if (k in player) out[k] = player[k];
+  // Kamphistorikken (v3.18.0) er offentlig – men karakteren (plads 7) kun for ejeren; andre ser kampens stjerner
+  if (Array.isArray(player.matchLog)) out.matchLog = viewerOwnsTeam ? player.matchLog.map((e) => e.slice()) : player.matchLog.map((e) => e.map((v, i) => (i === 7 ? null : v)));
   return out;
 }
 

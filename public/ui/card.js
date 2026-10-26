@@ -1,6 +1,7 @@
 // Spillerkort: offentlige data for alle, evner og mod-kunnen kun for eget hold, VAR-profilen
 // for ingen. Scouting-indtryk og private noter vises for alle spillere.
-import { publicValue } from '../engine/career.js';
+import { publicValue, LOG, stampText } from '../engine/career.js';
+import { viewPlayer } from '../engine/visibility.js';
 import { h, dec, LOCK } from './dom.js';
 import { LINE, POSITION_FULL, SKILL_LABELS, kr, starsEl } from './labels.js';
 import { aerialBreakdown } from '../engine/generator.js';
@@ -11,7 +12,7 @@ const dk = (v) => v.toLocaleString('da-DK', { minimumFractionDigits: 2, maximumF
 const bar = (label, v, max = 20) => h('div', { class: 'bar' }, h('span', { class: 'bar-label' }, label),
   h('span', { class: 'bar-track' }, h('span', { class: 'bar-fill', style: { width: `${Math.round((v / max) * 100)}%` } })), h('span', { class: 'bar-val' }, String(v)));
 
-export function renderCard({ player: p, team, isOwn, scouting, note, onNote }) {
+export function renderCard({ player: p, team, isOwn, scouting, note, onNote, teams = null, latest = null, onOpenMatch = null }) {
   if (!p) return h('div', { class: 'panel muted' }, 'Klik på en spiller for at se spillerkortet.');
   const head = h('div', { class: 'card-head' },
     h('h3', {}, `#${p.shirtNumber} ${p.name}`),
@@ -39,7 +40,26 @@ export function renderCard({ player: p, team, isOwn, scouting, note, onNote }) {
 
   return h('div', { class: 'panel card', id: 'player-card' }, head, body,
     h('div', { class: 'varbox' }, h('strong', {}, 'VAR-profil: '), 'Kynisme ?? · Teater ?? · VAR-Puls ?? – tallene er skjulte; spillerens VAR-kendelser og scouting-indtrykkene herunder giver fingerpeg'),
+    teams ? renderMatchLog(p, isOwn, teams, latest, onOpenMatch) : null,
     h('div', { class: 'scouting' }, h('h4', {}, '🕵️ Scouting-indtryk'), (scouting?.length ? scouting.slice(0, 8) : ['Ingen indtryk endnu.']).map((s) => h('div', { class: 'clue' }, s))),
     h('label', { class: 'notes' }, h('h4', {}, '📝 Dine private noter'),
       h('textarea', { id: 'note-input', rows: 3, placeholder: 'Skriv hvad du har bemærket …', value: note || '', oninput: (e) => onNote(e.target.value) })));
+}
+
+// 📜 Kampe (v3.18.0, spec §10.4): de seneste 10 stempler, "Vis alle" og en karrierelinje. Andre hold ser stjerner, ikke karakteren
+// (viewPlayer). Kun seneste rundes kamp linker til referatet – og netop den kamp (QC).
+function renderMatchLog(p, isOwn, teams, latest, onOpenMatch) {
+  const log = viewPlayer(p, isOwn).matchLog ?? [];
+  const goals = log.reduce((a, e) => a + (e[LOG.G] || 0), 0), assists = log.reduce((a, e) => a + (e[LOG.AS] || 0), 0);
+  const row = (e) => {
+    const isLatest = latest && onOpenMatch && e === log.at(-1) && latest.includes([e[LOG.H], e[LOG.A], e[LOG.HG], e[LOG.AG]].join('|'));
+    const extra = [e[LOG.G] ? `⚽${e[LOG.G] > 1 ? e[LOG.G] : ''}` : '', e[LOG.AS] ? `🅰${e[LOG.AS] > 1 ? e[LOG.AS] : ''}` : ''].filter(Boolean).join(' ');
+    return h('div', { class: 'log-row' }, stampText(e, teams, isOwn), extra ? ` ${extra}` : '',
+      isLatest ? h('button', { class: 'linklike log-open', title: 'Åbn referatet af kampen', onclick: () => onOpenMatch(e[LOG.H], e[LOG.A]) }, ' 📺') : null);
+  };
+  const recent = log.slice(-10).reverse(), older = log.slice(0, -10).reverse();
+  return h('div', { class: 'matchlog', id: 'match-log' }, h('h4', {}, '📜 Kampe'),
+    h('div', { class: 'muted', id: 'career-line' }, `${p.careerGames ?? 0} ${(p.careerGames ?? 0) === 1 ? 'kamp' : 'kampe'} i karrieren${log.length ? ` · ${goals} mål og ${assists} oplæg i de seneste ${log.length}` : ''}`),
+    recent.length ? recent.map(row) : h('div', { class: 'muted' }, 'Ingen kampe endnu.'),
+    older.length ? h('details', {}, h('summary', {}, `Vis alle (${log.length})`), older.map(row)) : null);
 }

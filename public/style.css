@@ -196,3 +196,4 @@ tr.heat-sel td { background: #f9731633; } .ratings tr[title] { cursor: pointer; 
 .minipitch.heat.zones .zone-goal.bottom { bottom: 2px; }
 .minipitch.heat.zones .zone-cell { position: absolute; display: flex; align-items: center; justify-content: center; border: 1px solid #ffffff22; }
 .zone-pc { font-size: .7rem; color: #fff; text-shadow: 0 1px 2px #000; opacity: 1; }
+.matchlog .log-row { font-size: .9em; padding: .1rem 0; } .matchlog details summary { cursor: pointer; color: #93c5fd; }   /* v3.18.0 📜 Kampe */

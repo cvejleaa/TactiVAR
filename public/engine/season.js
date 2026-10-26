@@ -2,7 +2,7 @@
 // Rettet ift. v2.5b: alt bogføres FØR der gemmes; skader, der fandtes før runden, heles
 // med én kamp (spilleren missede kampen), og nye skader lægges på bagefter – så en
 // 1-kamps skade ikke forsvinder i samme runde.
-import { autoMatchBench } from './career.js';
+import { autoMatchBench, logMatch } from './career.js';
 import { bookMatchStats, roundHistory, HISTORY_MAX } from './stats.js';
 import { simulateMatch } from './match.js';
 import { starsFromRating, starNoise } from './ratings.js';
@@ -76,6 +76,7 @@ export function commitRound(league, result, rng) {
   const expected = (league.leagueMetadata.round || 0) + 1;
   if (result.round !== expected) throw new Error(`Runde ${result.round} kan ikke bogføres – ligaen venter på runde ${expected}.`);
   const byId = new Map(league.teams.map((t) => [t.id, t]));
+  const teamIdx = new Map(league.teams.map((t, i) => [t.id, i]));
   const players = new Map(league.teams.flatMap((t) => t.squad.map((p) => [p.id, p])));
   const played = new Set();
 
@@ -89,6 +90,10 @@ export function commitRound(league, result, rng) {
         p.lastRating = r.rating;
         p.ratingSum += r.rating; p.ratingGames += 1;
         p.publicStars = starsFromRating(p.ratingSum / p.ratingGames, starNoise(rng));
+        // Kamphistorik (v3.18.0): stemplet pr. kamp – karakteren privat, stjernerne (kampens egne) offentlige
+        p.careerGames = (p.careerGames ?? 0) + 1;
+        logMatch(p, [league.leagueMetadata.seasonNumber ?? 1, seasonRoundOf(league, result.round), teamIdx.get(m.homeId), teamIdx.get(m.awayId), m.homeGoals, m.awayGoals,
+          Math.max(0, (r.minOut ?? 90) - ((r.minIn ?? 1) <= 1 ? 0 : r.minIn)), r.rating, r.stars ?? 0, r.goals ?? 0, r.assists ?? 0]);
         p.counterTactics = applyCounterXp(p.counterTactics, p.age, opp, r.gainedCounterXp);
         // Støj ±2 på prisen, så udholdenheden ikke kan regnes baglæns af den offentlige friskhed.
         p.freshness = afterMatchFreshness(p.freshness, r.distanceKm ?? 0, p.skills.stamina, Math.round(rng.next() * 4 - 2));
