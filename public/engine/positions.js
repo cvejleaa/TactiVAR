@@ -24,13 +24,14 @@ const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 // tilfældig fase og periode (DRIFT_PERIODS tick), en ren funktion af (kampens seed, hold, plads, tick) – samme sted i alle
 // kald i samme tick, så modtagervalget, VAR-forreste, øjeblikket og grundbilledet ser det samme (QC: ingen rng pr. kald).
 // Udslaget pr. akse følger rollen (DRIFT_AXES: backen langs linjen, CM i en boks, stopperen lidt) × rollens løb (runBase km,
-// samme tabel som km-tallet) × holdets pres og løb. Ingen udholdenhed (brugeren: modstanderens kort må ikke røbe den).
+// samme tabel som km-tallet) × holdets pres. Ingen udholdenhed (brugeren: modstanderens kort må ikke røbe den).
 export const DRIFT_AXES = {
   CB: [5, 5], LB: [5, 16], RB: [5, 16], LWB: [6, 18], RWB: [6, 18], CDM: [11, 10], CM: [14, 13], CAM: [12, 11],
   LM: [8, 17], RM: [8, 17], LW: [8, 16], RW: [8, 16], CF: [10, 8], ST: [8, 6],
 };
 export const DRIFT_PERIODS = [[6, 11], [2.5, 4]], DRIFT_MIX = [0.65, 0.35], DRIFT_KM = 10.6;
-export const DRIFT_PRESS = { LOW_BLOCK: 0.85, MID_BLOCK: 1, HIGH_GEGENPRESS: 1.2 }, DRIFT_RUNS = { FEW: 0.9, NORMAL: 1, MANY: 1.15 };
+// Ingen faktor for løb uden bold: den udvandede løbenes effekt (målt: "Mange" +0,10 mål for på v3.20.2, +0,05 med faktoren, +0,12 uden)
+export const DRIFT_PRESS = { LOW_BLOCK: 0.85, MID_BLOCK: 1, HIGH_GEGENPRESS: 1.2 };
 const hash01 = (...k) => {
   let h = 2166136261;
   for (const v of k) { h ^= v | 0; h = Math.imul(h, 16777619); h ^= h >>> 13; h = Math.imul(h, 0x5bd1e995); h ^= h >>> 15; }
@@ -40,7 +41,7 @@ const hash01 = (...k) => {
 export function driftAt(drift, role, slot, phases = {}) {
   const ax = DRIFT_AXES[role];
   if (!drift || !ax) return [0, 0];
-  const f = (runBase(role).km / DRIFT_KM) * (DRIFT_PRESS[phases.phase2_defending?.pressingHeight] ?? 1) * (DRIFT_RUNS[phases.phase1_buildUp?.offBallRuns] ?? 1);
+  const f = (runBase(role).km / DRIFT_KM) * (DRIFT_PRESS[phases.phase2_defending?.pressingHeight] ?? 1);
   return [0, 1].map((a) => ax[a] * f * DRIFT_PERIODS.reduce((sum, [lo, hi], w) => {
     const per = lo + (hi - lo) * hash01(drift.seed, drift.team, slot, a, w, 1), ph = 2 * Math.PI * hash01(drift.seed, drift.team, slot, a, w, 2);
     return sum + DRIFT_MIX[w] * Math.sin((2 * Math.PI * drift.t) / per + ph);

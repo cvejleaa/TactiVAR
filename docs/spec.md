@@ -427,7 +427,8 @@ bedre kan kontrollere spil motoren".
   så må spillet også blive mere præcist"; valgt: billedet = motoren OG afstand i duellerne, spredningen kun af rolle og taktik):
   - `driftAt` (positions.js): hver markspiller bevæger sig glidende om sin levende plads – to bølger pr. akse (perioder 6–11 og
     2,5–4 tick), en ren funktion af (kampens seed, hold, plads, tick). Udslaget pr. akse efter rollen (`DRIFT_AXES`: backen langs
-    linjen, CM i en boks, stopperen lidt) × rollens løb (`runBase` km, samme tabel som km-tallet) × pres og løb uden bold.
+    linjen, CM i en boks, stopperen lidt) × rollens løb (`runBase` km, samme tabel som km-tallet) × pres (ikke løb uden bold: det
+    udvandede løbenes effekt – "Mange" +0,10 mål for på v3.20.2, +0,05 med, +0,12 uden).
     INGEN udholdenhed eller friskhed: modstanderens kort viser begge hold fuldt (§3) og må ikke røbe hans STA.
   - Bredden lægges på i `livePositions`, dybden EFTER sammenpresningen (`applyDepth`): boldholdet kommer ikke forbi offside-linjen
     (udslaget dæmpes inden for `DEPTH_FADE` af linjen – et spejl ville sende angriberne bagud og give flere langskud), modstanderens

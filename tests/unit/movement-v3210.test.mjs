@@ -28,16 +28,17 @@ test('driftAt: en ren funktion af (seed, hold, plads, tick) – samme svar hver 
   assert.ok(half < whole * 0.75, `halvt ${half.toFixed(1)} mod helt ${whole.toFixed(1)}`);
 });
 
-test('driftAt: udslaget følger rollen (CM > CB, backen mest i dybden) og holdets pres og løb – ikke spilleren (ingen udholdenhed: modstanderens kort må ikke røbe den)', () => {
+test('driftAt: udslaget følger rollen (CM > CB, backen mest i dybden) og holdets pres – ikke spilleren (ingen udholdenhed: modstanderens kort må ikke røbe den)', () => {
   const amp = (role, slot, phases = {}) => { let x = 0, y = 0; for (let s = 1; s <= 200; s++) for (let t = 0; t < 30; t += 3) { const [a, b] = driftAt({ seed: s, team: 1, t }, role, slot, phases); x = Math.max(x, Math.abs(a)); y = Math.max(y, Math.abs(b)); } return [x, y]; };
   const cm = amp('CM', 6), cb = amp('CB', 2), lb = amp('LB', 1);
   assert.ok(cm[0] > cb[0] * 2 && cm[1] > cb[1] * 2, `CM ${cm} mod CB ${cb}`);
   assert.ok(lb[1] > lb[0] * 2, `backen langs linjen: ${lb}`);
-  // Aldrig mere end rollens akse × løb × pres × løb uden bold (summen af bølgerne er højst 1)
-  const max = DRIFT_AXES.CM.map((a) => a * (11.8 / 10.6) * 1.2 * 1.15);
+  // Aldrig mere end rollens akse × løb × pres (summen af bølgerne er højst 1); løb uden bold ændrer intet (udvandede løbene)
+  const max = DRIFT_AXES.CM.map((a) => a * (11.8 / 10.6) * 1.2);
   const hi = amp('CM', 6, { phase2_defending: { pressingHeight: 'HIGH_GEGENPRESS' }, phase1_buildUp: { offBallRuns: 'MANY' } }), lo = amp('CM', 6, { phase2_defending: { pressingHeight: 'LOW_BLOCK' }, phase1_buildUp: { offBallRuns: 'FEW' } });
   assert.ok(hi[0] <= max[0] + 1e-9 && hi[1] <= max[1] + 1e-9, `${hi} ≤ ${max}`);
-  assert.ok(hi[0] > lo[0] * 1.5 && hi[1] > lo[1] * 1.5, `gegenpres + mange løb ${hi} mod lav blok + få ${lo}`);
+  assert.ok(hi[0] > lo[0] * 1.3 && hi[1] > lo[1] * 1.3, `gegenpres ${hi} mod lav blok ${lo}`);   // 1,2 / 0,85 = 1,41
+  assert.deepEqual(amp('CM', 6, { phase1_buildUp: { offBallRuns: 'MANY' } }), amp('CM', 6, { phase1_buildUp: { offBallRuns: 'FEW' } }), 'løb uden bold: samme udslag');
   assert.equal(driftAt.length, 3, 'driftAt kender kun (drift, rolle, plads[, faser]) – ingen spiller');
   assert.doesNotMatch(driftAt.toString(), /stamina|skills|freshness/);
 });
