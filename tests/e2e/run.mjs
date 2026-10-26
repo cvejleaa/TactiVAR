@@ -490,7 +490,7 @@ try {
   check('Ikonerne i karakterarket har mouse-over-tekst', iconTitles.length > 0 && iconTitles.every(([t, ti]) => ti.length > 3 && !ti.includes('undefined')), JSON.stringify(iconTitles.slice(0, 3)));
   const legendTxt = await g.textContent('#icon-legend');
   check('Ikon-forklaring under karakterarket (til touch)', ['⚽ Mål', '🅰 Oplæg', '🧤 Redninger', '👑 Kampens spiller'].every((x) => legendTxt.includes(x)), legendTxt);
-  check('Forklaring af "fri" og HI (rigtig vej rundt: 2/3 = kom fri 2 af 3 gange)', legendTxt.includes('"2/3 fri" = løb uden bold: kom fri 2 af 3 gange') && legendTxt.includes('HI = andel højintenst løb') && legendTxt.endsWith('begge kun dit hold'), legendTxt);
+  check('Forklaring af "fri", 🤼 og HI (rigtig vej rundt: 2/3 = kom fri 2 af 3 gange)', legendTxt.includes('"2/3 fri" = løb uden bold: kom fri 2 af 3 gange') && legendTxt.includes('HI = andel højintenst løb') && legendTxt.includes('"2/3 🤼" = dueller vundet') && legendTxt.endsWith('alle tre kun dit hold'), legendTxt);
   const por = await g.textContent('#player-of-round');
   const porIsMine = (await g.locator('.ratings').nth(own).textContent()).includes(por.match(/#\d+ [^ ]+ [^ (]+/)[0]);
   check('Avisen kårer rundens spiller – med karakter kun hvis det er din spiller, ellers "rundens bedste karakter" (v3.16.3, ingen stjerner)', porIsMine ? /karakter \d+,\d/.test(por) : (por.includes('rundens bedste karakter') && !/[★☆]/.test(por) && !/karakter \d/.test(por)), por);
