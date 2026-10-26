@@ -98,6 +98,7 @@ function ratingsTable(list, isOwn, title, formation, snap = null, onSnap = null,
       h('td', { class: 'rating' }, isOwn ? dec(e.rating, 1) : starsEl(e.stars)),
       isOwn ? h('td', { class: 'run', title: 'Løbet distance (et skøn ud fra rolle, kondition og holdets taktik – ikke målt på heat map\'et) · andel højintenst løb (over ca. 20 km/t) · topfart – kun dit hold (det røber udholdenhed og fart)' }, e.distanceKm > 0 ? `${dec(e.distanceKm, 1)} km${e.hiShare != null ? ` · ${Math.round(e.hiShare)} % HI` : ''}${e.topSpeed ? ` · ${dec(e.topSpeed, 1)} km/t` : ''}` : '–') : null,
       isOwn ? h('td', { class: 'fri', title: 'Løb uden bold: kom fri / forsøg – kun dit hold (det røber positionering og fart)' }, e.freeRuns ? `${e.freeRunsWon ?? 0}/${e.freeRuns} fri` : '') : null,
+      isOwn ? h('td', { class: 'duel', title: 'Dueller som nærmeste mand: pres mod opspilleren og dækning af løberen – vundet / i alt. Den, der står nærmest, tager duellen – din opstilling afgør, hvem det er. Kun dit hold' }, e.duels ? `${e.duelsWon ?? 0}/${e.duels} 🤼` : '') : null,
       isOwn ? h('td', { class: 'xp', title: `${TIP['🧠']} – ved fuld pulje glemmer han lidt af de andre stilarter` }, `+${e.gainedCounterXp} 🧠`) : null)))));
 }
 

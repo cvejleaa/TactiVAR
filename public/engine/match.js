@@ -118,6 +118,8 @@ export const FLANK_BONUS = { LOW_BLOCK: -2, MID_BLOCK: 0, HIGH_GEGENPRESS: 3 }; 
 // (RECEIVE_BASE + evne), så den nærmeste oftest, men ikke altid, når bolden.
 // Pladserne er i holdets egne koordinater (lille y = fremme ved modstanderens mål).
 export const RECEIVE_SPREAD = 16, RECEIVE_BASE = 10;
+// Duellens mand (v3.21.0, nearPick): de NEAR_POOL nærmeste, vægt friskhed / afstand² med afstanden mindst NEAR_MIN
+export const NEAR_POOL = 3, NEAR_MIN = 6;
 // Rækkevidde (v3.13, brugerens eksempel: en CB på egen halvdel "når baglinjen" og lægger tilbage): den, der
 // slår bolden fra kanten (cutback, indlæg), skal stå højst RECEIVE_REACH derfra – ellers fik de fjerne en hale på
 // ≈ 25 %. Er ingen så tæt, alle. Afsluttere vælges uden grænse (andenbolde falder også til en stopper).
@@ -509,6 +511,18 @@ export function simulateMatch(home, away, rng, opts = {}) {
     const chosen = (cand[w.findIndex((x) => (r -= x) < 0)] ?? cand.at(-1)).p;
     if (shot) shotPicks.set(chosen.id, (shotPicks.get(chosen.id) ?? 0) + 1);
     return chosen;
+  }
+  // Duellens mand efter afstand (v3.21.0, brugeren: "så må spillet også blive mere præcist"; Spilfører: vægtet blandt de
+  // nærmeste, ikke altid den nærmeste – ellers samles duellerne på én): blandt de NEAR_POOL nærmeste af cands (holdet side's
+  // pladser i pos) vægter hver friskhed / afstand² (afstanden mindst NEAR_MIN). Ét rng-træk som rng.pick; skriver ikke i seen.
+  const mirrorPt = (q) => (q ? { x: 100 - q.x, y: 100 - q.y } : { x: 50, y: 50 });
+  function nearPick(side, cands, pt, pos) {
+    const l = cands.map((p) => ({ p, i: side.starters.indexOf(p) })).filter(({ i }) => i > 0 && pos[i])
+      .map((c) => ({ ...c, d: Math.max(NEAR_MIN, Math.hypot(pos[c.i].x - pt.x, pos[c.i].y - pt.y)) })).sort((a, b) => a.d - b.d || a.i - b.i).slice(0, NEAR_POOL);
+    if (!l.length) return rng.pick(cands);
+    const w = l.map(({ p, d }) => Math.max(0.05, ff(p)) / d ** 2);
+    let r = rng.next() * w.reduce((a, b) => a + b, 0);
+    return (l[w.findIndex((x) => (r -= x) < 0)] ?? l.at(-1)).p;
   }
   // Cutbackens afslutter (v3.18.0): ikke en midtstopper, når en anden er inden for SHOT_REACH (Spilfører: "#3 lagde den tilbage
   // til midtstopperen")
@@ -1216,7 +1230,10 @@ export function simulateMatch(home, away, rng, opts = {}) {
     const frame = tickFrame(min / 3, att);
     const attR = homeHasBall ? hR : aR, defR = homeHasBall ? aR : hR;
     const attPh = att.tactics.phases, defPh = def.tactics.phases;
-    const playmaker = rng.pick(attR.mids), presser = rng.pick(defR.mids), back = rng.pick(defR.defs), striker = rng.pick(attR.atts);
+    // Presseren er den, der står nærmest opspilleren i tick'ets billede (v3.21.0 – nearPick); før en tilfældig midtbanespiller
+    const playmaker = rng.pick(attR.mids), back = rng.pick(defR.defs), striker = rng.pick(attR.atts);
+    const tickPos = coupledPositions(att.tactics, def.tactics, { ballX: livePositions(att.tactics, { attacking: true, ballX: 50 })[att.starters.indexOf(playmaker)]?.x ?? 50, ...onOf(att, def) });
+    const presser = nearPick(def, defR.mids, mirrorPt(tickPos.ball[att.starters.indexOf(playmaker)]), tickPos.opp);
     const who = { playmaker, presser, striker, defs: attR.defs };
 
     // Trukne positioner vurderes (25 %): uden for zonen straffes, inden for belønnes.
@@ -1250,6 +1267,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
       if (height === 'HIGH_GEGENPRESS' && pass === 'SHORT') press += STYLE_BONUS;
       if (height === 'LOW_BLOCK' && focus === 'CENTRAL') press += STYLE_BONUS;
       duelLog[att.team.id].build++; duelLog[def.team.id].press++;
+      sheet.bump(presser.id, 'duels'); if (build < press) sheet.bump(presser.id, 'duelsWon');
       tickDuel = build >= press ? 'BUILD' : 'LOST';
       if (build >= press) {
         duelLog[att.team.id].buildWon++;
@@ -1261,7 +1279,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
         // Kun dit eget holds valg navngives; modstanderens stil beskrives ikke.
         // Teksten er den samme, uanset om en stilbonus afgjorde duellen (ellers røbede ordvalget modstanderens stil).
         const text = own(att) ? `✅ [DIN OPBYGNING VIRKER] ${YOUR_PASS[pass]} bryder igennem ${gen(def.team.name)} pres.${note}`
-          : own(def) ? `❌ [DIT PRES BRYDES] ${att.team.name} spiller sig igennem ${YOUR_PRESS[height]}.${note}`
+          : own(def) ? `❌ [DIT PRES BRYDES] ${att.team.name} spiller sig igennem ${YOUR_PRESS[height]}.${note} ${vary([`${tag(presser)} var nærmest, men kom for sent.`, `${tag(presser)} gik i pres som den nærmeste, men blev spillet forbi.`], 'near', presser.id)}`
           : `✅ [FASE 1 VIRKER • ${att.team.name}] ${vary([`${att.team.name} spiller sig igennem ${gen(def.team.name)} pres.`, `${att.team.name} kommer forbi ${gen(def.team.name)} pres.`, `${gen(def.team.name)} pres bliver spillet over.`], 'fase1', att.team.id)}${note}`;
         addEv(min, 'TACTIC_WIN', 'TACTIC', att.isHome, false, 'Fase 1 virker', text);
         if (!own(att) && !own(def)) faseQuiet(att.team, 'win');
@@ -1293,7 +1311,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
           if (!goesCounter && won === 'KEEP_POSSESSION') def.calm = true;
           const counter = !own(def) ? '' : won === 'FAST_COUNTER' ? (goesCounter ? ' Din lynkontra sættes straks i gang.' : ' ' + vary(['Din lynkontra løber ind i et organiseret forsvar.', 'Modstanderen når hjem, før lynkontraen kommer i gang.', 'Lynkontraen bremses – de er hurtigt tilbage i position.'], 'lyn', presser.id))
             : (goesCounter ? ' Dit hold ser hullet og går direkte.' : ' Dit hold falder til ro på bolden.');
-          const text = own(def) ? `✅ [DIT PRES VIRKER] ${cap(YOUR_PRESS[height])} lukker af: ${tag(presser)} erobrer bolden fra ${tag(playmaker)} (${att.team.name}).${counter}`
+          const text = own(def) ? `✅ [DIT PRES VIRKER] ${cap(YOUR_PRESS[height])} lukker af: ${tag(presser)} står nærmest og erobrer bolden fra ${tag(playmaker)} (${att.team.name}).${counter}`
             : own(att) ? `❌ [DIN OPBYGNING STOPPES] ${YOUR_PASS[pass]} kommer ikke igennem: ${tag(presser)} (${def.team.name}) erobrer bolden fra ${tag(playmaker)} (${att.team.name}).`
             : `🛑 [FASE 2 VIRKER • ${def.team.name}] ${tag(presser)} erobrer bolden fra ${tag(playmaker)} (${att.team.name}).`;   // holdmærke som de andre (v3.17.0)
           addEv(min, 'TACTIC_FAIL', 'TACTIC', def.isHome, false, 'Fase 2 pres virker', text);
@@ -1430,10 +1448,13 @@ export function simulateMatch(home, away, rng, opts = {}) {
         const runner = pick.p, rs = runner.skills, zone = runZone(slotPosition(att.tactics, pick.i));
         // En kantløber møder backen på sin kant (v3.17.0, Spilfører: løbs-cutbacken nævnte en tilfældig forsvarer) – samme
         // forsvarer i løbet, driblingen og teksten
-        const marker = zone === 'WIDE' ? flankBack(def, slotPosition(att.tactics, pick.i).x < 50 ? 12 : 88) : defender;
+        // I midten dækker den forsvarer, der står nærmest løberen (v3.21.0 – nearPick); på kanten backen på hans side
+        const runPos = zone === 'WIDE' ? null : coupledPositions(att.tactics, def.tactics, { ballX: 50, ...onOf(att, def) });
+        const marker = zone === 'WIDE' ? flankBack(def, slotPosition(att.tactics, pick.i).x < 50 ? 12 : 88) : nearPick(def, dR.defs, mirrorPt(runPos.ball[pick.i]), runPos.opp);
         sheet.bump(runner.id, 'freeRuns'); duelLog[att.team.id].runs++;
         const runWon = (rs.positioning + rs.pace * 0.5) * ff(runner) + rng.next() * 8 + (RUN_DUEL_BONUS[runs] ?? 0)
           > (marker.skills.positioning + marker.skills.intercepting * 0.5) * ff(marker) + rng.next() * 8 + (RUN_COVER[defPh.phase1_buildUp.offBallRuns] ?? 0);
+        sheet.bump(marker.id, 'duels'); if (!runWon) sheet.bump(marker.id, 'duelsWon');
         if (runWon) {
           sheet.bump(runner.id, 'freeRunsWon'); duelLog[att.team.id].runsWon++; sheet.adjust(runner.id, 0.15);
           // Løberen står nu længere fremme end sin levende position (positions.js) – det er dét
@@ -1540,6 +1561,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
     endState: { home: endOf(H, own(H)), away: endOf(A, own(A)) },
     ownReports,
     homeGoals: hG, awayGoals: aG, homeVarNet,
+    driftSeed: driftOn ? driftSeed : null,   // v3.21.0: bevægelsens seed (positions.js driftAt) – til test-oraklerne; gemmes ikke
     events, stats: st, ratings, goalsPool, injuries, observations, trace, stoppage,
   };
   // Holdenes private tællere pr. hold-id – kun til måleværktøjet; ikke-optællelig, så de

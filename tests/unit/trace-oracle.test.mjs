@@ -46,24 +46,26 @@ const DATA = bots(140);   // 140 seedede kampe (v3.17.0: 80 → 140 – færre h
 // laveste plads; formen er den samme. Oraklet kræver det begge veje: et 'none'-billede magen til det forrige er en fejl ('back' skal
 // være brugt), og 'back' kun når det forrige billede er præcis samme form med bolden hos opspilleren.
 const kickoff = (team, side) => kickoffPositions(team.tactics).map((p) => cm(side, [p.x, p.y]));
-const coupled = (T, att, ctx) => { const r = coupledPositions(T[att].tactics, T[otherSide(att)].tactics, ctx); return { line: r.line, [att]: r.ball.map((p) => cm(att, [p.x, p.y])), [otherSide(att)]: r.opp.map((p) => cm(otherSide(att), [p.x, p.y])) }; };
-const xOf = (team, i) => livePositions(team.tactics, { attacking: true, ballX: 50 })[i].x;
+// v3.21.0: med kampens bevægelse (m.driftSeed, positions.js driftAt) i tick'et T.t – samme kald som motoren
+const drOf = (T, side) => (T.seed == null ? null : { seed: T.seed, team: side === 'h' ? 1 : 2, t: T.t });
+const coupled = (T, att, ctx) => { const r = coupledPositions(T[att].tactics, T[otherSide(att)].tactics, { ...ctx, ballDrift: drOf(T, att), oppDrift: drOf(T, otherSide(att)) }); return { line: r.line, [att]: r.ball.map((p) => cm(att, [p.x, p.y])), [otherSide(att)]: r.opp.map((p) => cm(otherSide(att), [p.x, p.y])) }; };
+const xOf = (T, side, i) => livePositions(T[side].tactics, { attacking: true, ballX: 50, drift: drOf(T, side) })[i].x;
 const key = (q) => JSON.stringify([q.h, q.a, q.ball]);
 // Forsvareren, der får bolden, når billedet ellers ville gentage sig: DEF-pladsen nærmest opspillerens levende x, ved lige afstand laveste plads
-function backOf(team, pm) {
-  const live = livePositions(team.tactics, { attacking: true, ballX: xOf(team, pm) }), roles = FORMATIONS[team.tactics.baseFormation] || FORMATIONS['4-4-2'];
+function backOf(T, side, pm) {
+  const team = T[side], live = livePositions(team.tactics, { attacking: true, ballX: xOf(T, side, pm), drift: drOf(T, side) }), roles = FORMATIONS[team.tactics.baseFormation] || FORMATIONS['4-4-2'];
   return roles.map((c, i) => i).filter((i) => i > 0 && lineOfRole(roles[i].r) === 'DEF').sort((a, b) => Math.abs(live[a].x - live[pm].x) - Math.abs(live[b].x - live[pm].x) || a - b)[0];
 }
 function frameKind(T, f, prev = null) {
   const att = f.poss, def = otherSide(att), fits = (exp, own, i, skip = []) => same(f[att], exp[att], skip) && same(f[def], exp[def], skip) && f.ball[0] === exp[own][i][0] && f.ball[1] === exp[own][i][1];
   for (let pm = 1; pm < 11; pm++) {
-    const bx = xOf(T[att], pm);
+    const bx = xOf(T, att, pm);
     if (!f.run && !f.lost && !f.offside) {
       const exp = coupled(T, att, { ballX: bx });
       if (fits(exp, att, pm)) return prev && key(prev) === key(f) ? 'repeat' : 'none';
       // samme form som forrige tick, som havde bolden hos opspilleren → nu hos den nærmeste forsvarer
       if (prev && !prev.run && !prev.lost && !prev.offside && prev.poss === att && same(prev[att], exp[att]) && same(prev[def], exp[def])
-        && key(prev) === key({ ...f, ball: exp[att][pm] }) && fits(exp, att, backOf(T[att], pm))) return 'back';
+        && key(prev) === key({ ...f, ball: exp[att][pm] }) && fits(exp, att, backOf(T, att, pm))) return 'back';
     }
     for (let r = 1; r < 11; r++) {
       if (f.run && fits(coupled(T, att, { ballX: bx }), att, r)) return 'run';   // v3.16.1 (Spilfører): bolden frem til angriberen på linjen, intet løb
@@ -78,10 +80,11 @@ function frameKind(T, f, prev = null) {
   }
   return null;
 }
+// v3.21.0: 'back' (samme billede to tick i træk → bolden bagud) kan ikke ske med bevægelsen – den er bevist i tick-frame-gaps (uden)
 test('grundbillederne er holdenes form efter duellen: afspark begge sammenpresset i egen halvdel; ellers koblede linjer med bolden hos opspilleren, løberen, presseren eller den offside-fangede', () => {
   let ok = 0, kick = 0; const poss = { h: 0, a: 0 }, kinds = { none: 0, back: 0, run: 0, lost: 0, offside: 0 };
   for (const { s, home, away, m } of DATA) {
-    const T = { h: home, a: away }, stop = stopOf(m);
+    const T = { h: home, a: away, seed: m.driftSeed, t: 0 }, stop = stopOf(m);
     for (const [fi, f] of m.trace.frames.entries()) {
       if (f.t * 3 >= stop) continue;
       if (!f.poss) {
@@ -90,13 +93,13 @@ test('grundbillederne er holdenes form efter duellen: afspark begge sammenpresse
         assert.ok(f.h.slice(1).every((q) => q[2] >= 53) && f.a.slice(1).every((q) => q[2] <= 47), `seed ${s} afspark: egen halvdel (KICKOFF_Y 53)`);
         ok++; kick++; continue;
       }
-      const k = frameKind(T, f, m.trace.frames[fi - 1] ?? null);
+      T.t = f.t; const k = frameKind(T, f, m.trace.frames[fi - 1] ?? null);
       assert.ok(k, `seed ${s} t ${f.t}: ${f.poss} har bolden (${JSON.stringify({ run: f.run, lost: f.lost, offside: f.offside, ball: f.ball })}) – ikke holdenes form`);
       assert.notEqual(k, 'repeat', `seed ${s} t ${f.t}: samme billede som forrige tick uden duel – bolden skulle til forsvareren`);
       ok++; poss[f.poss]++; kinds[k]++;
     }
   }
-  assert.ok(ok > 1500 && kick >= 80 && poss.h > 400 && poss.a > 400 && kinds.none > 500 && kinds.back > 20 && kinds.run > 100 && kinds.lost > 100 && kinds.offside > 5,
+  assert.ok(ok > 1500 && kick >= 80 && poss.h > 400 && poss.a > 400 && kinds.none > 500 && kinds.run > 100 && kinds.lost > 100 && kinds.offside > 5,
     `data: ${ok} billeder, afspark ${kick}, bolden ${JSON.stringify(poss)}, ${JSON.stringify(kinds)}`);
 });
 
@@ -128,9 +131,9 @@ function variantOf(T, m, mo) {
 test('afslutningens øjeblik: holdenes form fra den rigtige side – en kontra tegner det tabende hold i angrebsform (og kun en kontra)', () => {
   const n = { open: 0, caught: 0, sure: 0, counterSure: 0 };
   for (const { s, home, away, m } of DATA) {
-    const T = { h: home, a: away }, stop = stopOf(m);
+    const T = { h: home, a: away, seed: m.driftSeed, t: 0 }, stop = stopOf(m);
     for (const mo of m.trace.moments.filter((x) => x.t * 3 < stop)) {
-      const v = variantOf(T, m, mo), e = m.events[mo.ev];
+      T.t = mo.t; const v = variantOf(T, m, mo), e = m.events[mo.ev];
       assert.ok(v, `seed ${s}: ${mo.kind} t ${mo.t} (${mo.side}) er ikke holdenes form`);
       const gp = m.goalsPool.find((g) => g.min === e.min && e.text.includes(g.scorer));
       const counter = /kontra/i.test(e.label) || /kontraens/.test(e.text) || gp?.kind === 'COUNTER';
@@ -310,7 +313,7 @@ function shotAt(cx, cy, awayShooter, { varOn = true, saved = false } = {}) {
   for (let i = 1; i <= 10; i++) { slotOf(X, i).counterTactics.vsTrapLong = 40; slotOf(X, i).varProfile.varPulse = 30; }
   // Holdet med skytten har bolden (udeholdet skal have et stærkere midtfelt, ellers får hjemmeholdet den ved lige styrke)
   for (let i = 1; i <= 10; i++) for (const k of ['passing', 'ballControl']) slotOf(Y, i).skills[k] = 1;
-  const m = simulateMatch(a.H, a.A, stubRng({ 0.3: (n) => n < 1, [VAR_RULES.GOAL_CHECK_P]: varOn, [VAR_RULES.GOAL_FOUL_SHARE]: false }, 0.5));
+  const m = simulateMatch(a.H, a.A, stubRng({ 0.3: (n) => n < 1, [VAR_RULES.GOAL_CHECK_P]: varOn, [VAR_RULES.GOAL_FOUL_SHARE]: false }, 0.5), { drift: false });   // pinnede koordinater
   const gi = m.events.findIndex((e) => e.type === 'GOAL'), id = slotOf(X, 5).id;
   return { a, X, m, gi, mo: m.trace.moments.find((x) => x.ev === gi), first: m.trace.moments.find((x) => x.shooter === id), id };
 }

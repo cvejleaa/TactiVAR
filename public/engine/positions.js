@@ -138,12 +138,15 @@ export function apartFrom(pts, idx, other, oidx) {
 // Bevægelsen i dybden (v3.21.0) EFTER sammenpresningen: ellers presser squeeze de bevægede ind i samme bånd ved linjen (7 på en
 // række). Grænserne holder billedet ærligt: boldholdet kommer ikke forbi offside-linjen (lo), og modstanderens dybeste bliver,
 // hvor han stod (linjen er hans) – de andre kommer ikke bag ham (hi).
-function applyDepth(pts, tactics, drift, idx, lo, hi, rowIdx = idx) {
+function applyDepth(pts, tactics, drift, idx, lo, hi, rowIdx = idx, fade = 0) {
   if (!drift) return;
   const coords = FORMATIONS[tactics.baseFormation] || FORMATIONS['4-4-2'], ph = tactics.phases || {};
   const a = Math.max(FRONT_LIMIT, lo), z = Math.min(95, hi);
   const at = (y0, dy) => { let y = y0 + dy; y = y < a ? a + (a - y) : y > z ? z - (y - z) : y; return Math.round(clamp(y, a, z)); };   // spejlet ved grænsen, ikke klemt: ellers står de på linjen i én række
-  const y0 = new Map(idx.map((i) => [i, pts[i].y])), dys = new Map(idx.map((i) => [i, driftAt(drift, coords[i].r, i, ph)[1]]));
+  // fade: tæt på grænsen dæmpes udslaget i BEGGE retninger (boldholdets angribere holder linjen) – et spejl alene ville kun
+  // sende dem bagud og give flere langskud (målt: langskud 8 → 14 % af målene)
+  const damp = (i) => (fade ? clamp((pts[i].y - a) / fade, 0, 1) : 1);
+  const y0 = new Map(idx.map((i) => [i, pts[i].y])), dys = new Map(idx.map((i) => [i, driftAt(drift, coords[i].r, i, ph)[1] * damp(i)]));
   for (const i of idx) pts[i] = { x: pts[i].x, y: at(y0.get(i), dys.get(i)) };
   // Ingen række på mere end ROW_MAX (v3.16.1-vagten): lander han i en fuld række, prøves den anden vej, det halve og dobbelte
   const row = (i, y) => rowIdx.filter((k) => k !== i && Math.abs(pts[k].y - y) <= 3).length + 1;
@@ -152,10 +155,13 @@ function applyDepth(pts, tactics, drift, idx, lo, hi, rowIdx = idx) {
     const d = dys.get(i), best = [-d, d / 2, -d / 2, 0, 2 * d, -2 * d].map((k) => at(y0.get(i), k)).reduce((m, y) => (row(i, y) < row(i, m) ? y : m), pts[i].y);
     pts[i] = { x: pts[i].x, y: best };
     if (row(i, best) > ROW_MAX) for (let k = 1; k <= 15; k++) {   // stadig fuld: den nærmeste dybde med plads
-      const y = [best + k, best - k].find((v) => v >= a && v <= z && row(i, v) <= ROW_MAX);
+      const toward = y0.get(i) < best ? -1 : 1, y = [best + toward * k, best - toward * k].find((v) => v >= a && v <= z && row(i, v) <= ROW_MAX);   // først mod hans plads – ikke altid bagud
       if (y != null) { pts[i] = { x: pts[i].x, y }; break; }
     }
   }
+  // Holdet beholder sin dybde (MIN_DEPTH): ellers ingen bevægelse i dybden i dette billede
+  const ys = rowIdx.map((i) => pts[i].y);
+  if (Math.max(...ys) - Math.min(...ys) < MIN_DEPTH) for (const i of idx) pts[i] = { x: pts[i].x, y: y0.get(i) };
 }
 // ballOn/oppOn: hvilke pladser er besat (en udvist spillers plads er tom og tæller ikke som linjen) – standard alle.
 export function coupledPositions(ballTactics, oppTactics, { ballX = 50, caught = false, runner = -1, step = RUN_STEP, ballOn = null, oppOn = null, ballDrift = null, oppDrift = null } = {}) {
@@ -167,15 +173,16 @@ export function coupledPositions(ballTactics, oppTactics, { ballX = 50, caught =
   if (runner > 0) ball[runner] = { x: ball[runner].x, y: Math.round(clamp(ball[runner].y - step, FRONT_LIMIT, 95)) };
   const rest = outB.filter((i) => i !== runner);
   squeeze(ball, rest, line + ONSIDE_GAP);
-  applyDepth(ball, ballTactics, ballDrift, rest, line + ONSIDE_GAP, 95, outB);
+  applyDepth(ball, ballTactics, ballDrift, rest, line + ONSIDE_GAP, 95, outB, SQUEEZE_SPAN);
   spread(ball, rest);
   if (!caught) {
     const deepest = Math.max(...rest.map((i) => ball[i].y));
     const want = 100 - deepest + (PRESS_GAP[oppTactics.phases?.phase2_defending?.pressingHeight] ?? PRESS_GAP.MID_BLOCK);
     squeeze(opp, outO, want, MIN_DEPTH);
   }
-  const lastO = Math.max(...outO.map((i) => opp[i].y)), keep = outO.find((i) => opp[i].y === lastO);
-  applyDepth(opp, oppTactics, oppDrift, outO.filter((i) => i !== keep), FRONT_LIMIT, lastO, outO);
+  // Modstanderens forreste kommer ikke forbi boldholdets bageste (trace-lines-vagten)
+  const lastO = Math.max(...outO.map((i) => opp[i].y)), keep = outO.find((i) => opp[i].y === lastO), deepB = Math.max(...rest.map((i) => ball[i].y));
+  applyDepth(opp, oppTactics, oppDrift, outO.filter((i) => i !== keep), 100 - deepB, lastO, outO);
   spread(opp, outO);
   // v3.21.0: skubbet fra en modspiller kan lande på en holdkammerat – gentaget, til begge dele holder
   for (let r = 0; r < SEPARATE_ROUNDS; r++) { apartFrom(ball, outB, opp, [0, ...outO]); spread(ball, outB); }

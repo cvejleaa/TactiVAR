@@ -31,7 +31,7 @@ export function createSheet() {
         teamId: team.id, teamName: team.name, isUserTeam: !team.isBot, isHome, role, line: player.line, slot,
         minIn, minOut: 90, rating: START_RATING + (rng.next() * 0.3 - 0.15), stars: 0,
         startCounterMastery: oppMastery, gainedCounterXp: 0,
-        goals: 0, assists: 0, saves: 0, easySaves: 0, aerialWins: 0, tacticWins: 0, freeRuns: 0, freeRunsWon: 0, headerGoals: 0, penaltyGoals: 0, setPieceGoals: 0, yellowCard: false, yellows: 0, red: null, injured: false, isMotM: false,
+        goals: 0, assists: 0, saves: 0, easySaves: 0, aerialWins: 0, tacticWins: 0, freeRuns: 0, freeRunsWon: 0, duels: 0, duelsWon: 0, headerGoals: 0, penaltyGoals: 0, setPieceGoals: 0, yellowCard: false, yellows: 0, red: null, injured: false, isMotM: false,
         km90: run.km90, drain90: run.drain90, topSpeed: run.topSpeed, hiShare: run.hiShare, distanceKm: 0, hiKm: 0,
       };
       return entries[player.id];
