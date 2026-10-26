@@ -66,7 +66,7 @@ test('spillerlister: titel/nøgle pr. liste, top 5 efter værdi (lighed: flest k
   setG(mine[9], 9, 4); setG(theirs[9], 7, 3); setG(theirs[10], 7, 5); setG(mine[10], 5, 2); setG(theirs[8], 3, 2); setG(mine[8], 2, 2); setG(theirs[7], 1, 1);
   mine[5].sAssists = 4; theirs[5].sMotm = 2; theirs[6].sHeaderGoals = 3; mine[6].sPenaltyGoals = 1; mine[7].sSetPieceGoals = 6; theirs[3].sCleanSheets = 5; mine[3].sYellow = 8;
   const root = render(L, me);
-  const lists = all(root, (e) => e.dataset.key && e.dataset.key !== 'publicStars');
+  const lists = all(root, (e) => e.dataset.key && !['seasonStars', 'roundStars'].includes(e.dataset.key));
   assert.deepEqual(lists.map((l) => [l.dataset.key, l.children[0].textContent]), [
     ['sGoals', '⚽ Topscorere'], ['sAssists', '🅰 Flest oplæg'], ['sMotm', '👑 Kampens spiller'], ['sHeaderGoals', '🗣 Hovedstødsmål'],
     ['sPenaltyGoals', '🎯 Straffemål'], ['sSetPieceGoals', '🧱 Dødboldmål'], ['sCleanSheets', '🧤 Clean sheets'], ['sYellow', '🟨 Gule kort'], ['sRed', '🟥 Røde kort']]);
@@ -87,16 +87,33 @@ test('spillerlister: titel/nøgle pr. liste, top 5 efter værdi (lighed: flest k
   assert.equal(items(list(empty, 'sGoals')).length, 0);
 });
 
-test('bedste vurdering: kun spillere med stjerner OG kampe, flest stjerner først (lighed: flest kampe)', () => {
+// v3.20.1 (brugeren: "Bedste vurdering på ligasiden har ikke rundens kampe med" – den var karrierens snit, publicStars)
+const LOGE = (season, st, rt = 7) => [season, 1, 0, 1, 1, 0, 90, rt, st, 0, 0];   // career.js LOG: S, R, H, A, HG, AG, MIN, RT, ST, G, AS
+test('bedste snit: sæsonens snit af kampenes offentlige stjerner (mindst 3 kampe) – ikke karrieren; højeste snit først, lighed: flest kampe', () => {
+  const { L, me, other } = world(), season = L.leagueMetadata.seasonNumber;
+  const a = other.squad[1], b = me.squad[1], c = other.squad[2], d = me.squad[2], e = other.squad[3];
+  a.publicStars = 2; a.matchLog = [LOGE(season, 5), LOGE(season, 5), LOGE(season, 4)];              // 4,67 – karrieren siger 2
+  b.publicStars = 5; b.matchLog = [LOGE(season - 1, 5), LOGE(season - 1, 5), LOGE(season, 3), LOGE(season, 3), LOGE(season, 3)];   // 3,0 denne sæson
+  c.matchLog = [LOGE(season, 4), LOGE(season, 4), LOGE(season, 4), LOGE(season, 4)];                // 4,0 · 4 kampe
+  d.matchLog = [LOGE(season, 4), LOGE(season, 4), LOGE(season, 4)];                                 // 4,0 · 3 kampe
+  e.matchLog = [LOGE(season, 5), LOGE(season, 5)];                                                  // kun 2 kampe: ikke med
+  const root = render(L, me), l = list(root, 'seasonStars'), rows = items(l), nm = (p) => `#${p.shirtNumber} ${p.shortName}`;
+  assert.equal(l.children[0].textContent, `⭐ Bedste snit (sæson ${season}, mindst 3 kampe)`);
+  assert.deepEqual(rows.map((r) => r.children[1].textContent), [nm(a), nm(c), nm(d), nm(b)]);
+  assert.deepEqual(rows.map((r) => r.children.at(-1).textContent.split(' ')[0]), ['4,7', '4,0', '4,0', '3,0']);
+  assert.deepEqual(rows.map((r) => r.className), ['', '', 'mine', 'mine']);
+  assert.equal(list(root, 'publicStars'), undefined, 'karriere-listen er væk');
+});
+test('rundens bedste: rundens kampe efter offentlige stjerner (lighed: mål+oplæg, så kampens spiller), aldrig karakteren; ingen runde → ingen liste', () => {
   const { L, me, other } = world();
-  const set = (p, stars, games) => { p.publicStars = stars; p.sGames = games; };
-  set(me.squad[1], 3, 5); set(other.squad[1], 5, 1); set(other.squad[2], 5, 4); set(me.squad[2], 4, 0);   // sidste har ingen kampe i statistikken
-  const root = render(L, me);
-  const rows = items(list(root, 'publicStars'));
-  assert.deepEqual(rows.map((li) => li.children[1].textContent), [`#${other.squad[2].shirtNumber} ${other.squad[2].shortName}`, `#${other.squad[1].shirtNumber} ${other.squad[1].shortName}`, `#${me.squad[1].shirtNumber} ${me.squad[1].shortName}`]);
-  assert.deepEqual(rows.map((li) => li.className), ['', '', 'mine']);
-  const starsCell = rows[0].children.at(-1).children[0];   // stjernerne står i værdicellen på samme række
-  assert.equal(starsCell.attrs.title ?? starsCell.title, '5 af 5 stjerner');
+  assert.equal(list(render(L, me), 'roundStars'), undefined, 'ingen runde spillet');
+  const E = (p, t, o) => ({ playerId: p.id, shirtNumber: p.shirtNumber, shortName: p.shortName, teamId: t.id, teamName: t.name, rating: 9.87, stars: 3, goals: 0, assists: 0, isMotM: false, ...o });
+  const [p1, p2, p3, p4] = [other.squad[1], me.squad[1], other.squad[2], me.squad[2]];
+  L.lastRound = { round: 3, matches: [{ ratings: { home: [E(p1, other, { stars: 4 }), E(p2, me, { stars: 5 })], away: [E(p3, other, { stars: 4, goals: 1 }), E(p4, me, { stars: 4, isMotM: true, rating: 6.12 })] } }] };
+  const root = render(L, me), rows = items(list(root, 'roundStars')), nm = (p) => `#${p.shirtNumber} ${p.shortName}`;
+  assert.equal(list(root, 'roundStars').children[0].textContent, '🏅 Rundens bedste');
+  assert.deepEqual(rows.map((r) => r.children[1].textContent), [nm(p2), nm(p3), nm(p4), nm(p1)]);
+  assert.ok(!list(root, 'roundStars').textContent.includes('9,87') && !list(root, 'roundStars').textContent.includes('9.87') && !list(root, 'roundStars').textContent.includes('6,1'), 'ingen karakter');
 });
 
 test('holdtal: ni kolonner uden taktik-afslørende tal, alle hold, bold % = snit pr. kamp, straffe (mål), dit hold markeret', () => {

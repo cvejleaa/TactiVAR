@@ -121,12 +121,12 @@ test('roundsLeftOf (app.js → klummen): 14 − sæsonrunden; 0 efter sæsonslut
   assert.equal(roundsLeftOf(L, 20, true), 0, 'sæsonslut vinder altid');
 });
 
-test('klummen: rundens spiller – "kampens spiller" står først, når han var det; ellers som før', () => {
+test('klummen: rundens spiller – "kåret til kampens spiller" er et tillæg efter det, han gjorde (v3.20.1; før stod det først/alene)', () => {
   const RT = (o) => ({ playerId: 'p1', shirtNumber: 9, shortName: 'H', teamId: 'a1', teamName: 'Ude', goals: 0, assists: 0, saves: 0, aerialWins: 0, stars: 3, isMotM: false, ...o });
   const why = (o) => buildColumn({ matches: [{ ...M, ratings: { home: [RT({ playerId: 'mate', goals: 2, isMotM: false })], away: [RT(o)] } }], gazette: { playerOfTheRound: { playerId: 'p1', teamId: 'a1' }, goalOfTheRound: null, defensiveAction: null }, viewerTeamId: 'nobody', round: 3 })
     .sections.find((s) => s.id === 'col-stars').player.why;
-  assert.equal(why({ goals: 1, isMotM: true }), 'Begrundelse: kampens spiller, 1 mål.');
-  assert.equal(why({ isMotM: true }), 'Begrundelse: kampens spiller.');
+  assert.equal(why({ goals: 1, isMotM: true }), 'Begrundelse: 1 mål – kåret til kampens spiller.');
+  assert.equal(why({ isMotM: true }), 'Begrundelse: stabil hele kampen – kåret til kampens spiller.');
   assert.equal(why({ goals: 1 }), 'Begrundelse: 1 mål.');
   assert.equal(why({ goals: 2 }), 'Begrundelse: 2 mål.');
 });

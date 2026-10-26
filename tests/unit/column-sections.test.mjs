@@ -33,6 +33,17 @@ test('afsnit 3: begrundelsen bygges af spillerens offentlige handlinger, i rækk
   // Begrundelsen læser kun de offentlige felter (ingen karakter): selv med en rating på linjen står den ikke i teksten
   assert.doesNotMatch(why({ goals: 1, rating: 9.9, distanceKm: 12.3 }), /9\.9|12/);
 });
+test('afsnit 3 (v3.20.1, brugeren: "en dårlig begrundelse – kampens spiller"): taktiske dueller (fra 3), holdt nullet (MV/forsvar) – kampens spiller kun som tillæg', () => {
+  const R = (o) => ({ home: [], away: [RT({ playerId: 'p1', ...o })] });
+  const why = (o, m = {}) => sec(buildColumn(inp({ matches: [M({ ratings: R(o), ...m })], gazette: GZ() })), 'col-stars').player.why;
+  // Rundens spiller fra v3.20.0-skærmbilledet: DM uden mål, kåret – før stod der kun "kampens spiller"
+  assert.equal(why({ line: 'MID', tacticWins: 9, isMotM: true }, { hG: 0, aG: 2 }), 'Begrundelse: vandt 9 taktiske dueller – kåret til kampens spiller.');
+  assert.equal(why({ line: 'MID', tacticWins: 2, isMotM: true }), 'Begrundelse: stabil hele kampen – kåret til kampens spiller.', '2 taktiske dueller er ikke nok; aldrig "kampens spiller" alene');
+  assert.equal(why({ line: 'DEF', aerialWins: 4 }, { hG: 0 }), 'Begrundelse: 4 vundne luftdueller, holdt nullet.', 'udeholdet (a1) lukkede 0 ind');
+  assert.equal(why({ line: 'GK', saves: 3 }, { hG: 1 }), 'Begrundelse: 3 redninger.', 'et mål imod: intet nul');
+  assert.equal(why({ line: 'MID' }, { hG: 0 }), 'Begrundelse: stabil hele kampen.', 'kun MV og forsvar holder nullet');
+  assert.equal(why({ goals: 1, tacticWins: 5, isMotM: true }), 'Begrundelse: 1 mål, vandt 5 taktiske dueller – kåret til kampens spiller.');
+});
 test('afsnit 3: formen på afsnittet – spiller (hold-id fra gazetten), mål og defensiv aktion udelukker hinanden', () => {
   const rt = { home: [], away: [RT({ playerId: 'p1', goals: 1 })] };
   assert.deepEqual(stars(GZ(), rt), { id: 'col-stars', title: 'Rundens spiller og mål', player: { playerId: 'p1', teamId: 'a1', why: 'Begrundelse: 1 mål.' }, goal: null, defensive: null });

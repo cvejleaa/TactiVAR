@@ -90,12 +90,13 @@ try {
   await benchRow.click();
   // Rullepositionen i listen bevares ved et klik (QC): rul ned, klik en bænkspiller, stå samme sted
   await g.setViewportSize({ width: 1400, height: 600 });
-  const lw = g.locator('#lineup-list .tablewrap');
-  await lw.evaluate((el) => { el.scrollTop = 120; });
-  const st0 = await lw.evaluate((el) => el.scrollTop);
+  // v3.20.1: listen har ingen egen rulning (brugeren: "ingen grund til en indlejret scroll") – SIDEN står samme sted efter et klik
+  const inner = await g.evaluate(() => [...document.querySelectorAll('.tablewrap')].map((el) => el.scrollHeight - el.clientHeight));
+  await g.evaluate(() => window.scrollTo(0, document.querySelector('#bench').getBoundingClientRect().top + window.scrollY - 100));
+  const st0 = await g.evaluate(() => window.scrollY);
   // klik via DOM (Playwright ruller ellers selv rækken ind): vælg og fravælg en række, der står synligt
-  for (let i = 0; i < 2; i++) await lw.evaluate((el) => { const box = el.getBoundingClientRect(); [...el.querySelectorAll('tr.bench-p')].find((r) => r.getBoundingClientRect().top > box.top + 30).click(); });
-  check('Taktik: listens rulleposition bevares, når siden tegnes om', st0 > 0 && Math.abs((await g.locator('#lineup-list .tablewrap').evaluate((el) => el.scrollTop)) - st0) < 2, String(st0));
+  for (let i = 0; i < 2; i++) await g.evaluate(() => [...document.querySelectorAll('#bench tr.bench-p')].find((r) => r.getBoundingClientRect().top > 60).click());
+  check('Taktik: ingen indlejret scroll i tabellerne, og siden står samme sted, når den tegnes om', inner.every((d) => d <= 1) && st0 > 0 && Math.abs((await g.evaluate(() => window.scrollY)) - st0) < 2, `${inner} · ${st0}`);
   await g.setViewportSize({ width: 1400, height: 1000 });
   check('Taktik: valgt bænkspiller markeres i listen og får en besked ved listen', (await g.locator('#bench tr.active').count()) === 1 && (await g.textContent('#pick-msg')).includes(benchShort));
   await g.click('#pitch .token[data-slot="7"]');
@@ -374,6 +375,10 @@ try {
   await tab('taktik');
   const colsAt = async (w) => { await g.setViewportSize({ width: w, height: 900 }); return g.evaluate(() => getComputedStyle(document.querySelector('.tactics-layout')).gridTemplateColumns.split(' ').length); };
   check('Layout: Taktik har 2 kolonner ved 1400 px og 1 ved 700 px', (await colsAt(1400)) === 2 && (await colsAt(700)) === 1);
+  // v3.20.1 (brugeren: "langt ned til taktikindstillingerne"): indstillingerne står lige under banen i venstre kolonne – over spillerkortets bund
+  await g.setViewportSize({ width: 1400, height: 900 });
+  { const r = await g.evaluate(() => { const b = (s) => document.querySelector(s).getBoundingClientRect(); return { pitch: b('#pitch'), tac: b('#tactics'), card: b('#player-card'), list: b('#lineup-list') }; });
+    check('Layout: Taktik-indstillingerne står under banen (venstre), listen og kortet til højre', r.tac.top - r.pitch.bottom < 60 && Math.abs(r.tac.left - r.pitch.left) < 80 && r.list.left > r.tac.right - 1 && r.tac.top < r.card.bottom, JSON.stringify({ gap: Math.round(r.tac.top - r.pitch.bottom), tacL: Math.round(r.tac.left), listL: Math.round(r.list.left) })); }
   await g.setViewportSize({ width: 1400, height: 1000 });
   await tab('trup');
   const sideScroll = await g.evaluate(() => { const w = document.querySelector('.tablewrap'); return w.scrollWidth - w.clientWidth; });

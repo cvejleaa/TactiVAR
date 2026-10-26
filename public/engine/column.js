@@ -14,7 +14,7 @@ import { pickBy, gen, pl } from './clues.js';
 import { inMinute } from './clock.js';
 
 // De felter på en karakterlinje, klummen må læse (ingen af RATING_PRIVATE_FIELDS – testet).
-export const RATING_PUBLIC = ['playerId', 'shirtNumber', 'shortName', 'teamId', 'teamName', 'goals', 'assists', 'saves', 'aerialWins', 'stars', 'isMotM'];
+export const RATING_PUBLIC = ['playerId', 'shirtNumber', 'shortName', 'teamId', 'teamName', 'line', 'goals', 'assists', 'saves', 'aerialWins', 'tacticWins', 'stars', 'isMotM'];
 if (RATING_PUBLIC.some((k) => RATING_PRIVATE_FIELDS.includes(k))) throw new Error('RATING_PUBLIC indeholder et privat felt');
 
 export { pickBy } from './clues.js';   // bor i clues.js (v3.16.3 – også referatets varianter)
@@ -199,8 +199,13 @@ export function buildColumn({ matches = [], gazette = null, history = [], table 
     const p = gazette.playerOfTheRound, star = p && facts.flatMap((f) => f.ratings).find((e) => e.playerId === p.playerId);
     // Kriteriet er karakteren (UI'et siger "rundens bedste karakter"); kampens spiller nævnes først, så "1 mål" ikke står
     // alene, når en holdkammerat scorede to (Spilfører v3.16.4)
-    const why = star ? [star.isMotM && 'kampens spiller', star.goals && `${star.goals} mål`, star.assists && `${star.assists} oplæg`, star.saves && `${star.saves} redninger`, star.aerialWins >= 3 && `${star.aerialWins} vundne luftdueller`].filter(Boolean) : [];
-    sections.push({ id: 'col-stars', title: 'Rundens spiller og mål', player: p ? { playerId: p.playerId, teamId: p.teamId, why: why.length ? `Begrundelse: ${why.join(', ')}.` : 'Begrundelse: stabil hele kampen.' } : null,
+    // v3.20.1 (brugeren: "en dårlig begrundelse – kampens spiller"): hvad han GJORDE, af kampens offentlige tal – vundne taktiske
+    // dueller og et holdt nul tæller med; "kampens spiller" er kun et tillæg, aldrig hele begrundelsen
+    const f = star && facts.find((x) => x.ratings.some((e) => e.playerId === star.playerId)), side = f && (f.home.id === star.teamId ? f.home : f.away);
+    const why = star ? [star.goals && `${star.goals} mål`, star.assists && `${star.assists} oplæg`, star.saves && `${star.saves} redninger`, star.aerialWins >= 3 && `${star.aerialWins} vundne luftdueller`,
+      star.tacticWins >= 3 && `vandt ${star.tacticWins} taktiske dueller`, ['GK', 'DEF'].includes(star.line) && side?.against === 0 && 'holdt nullet'].filter(Boolean) : [];
+    const motm = star?.isMotM ? ' – kåret til kampens spiller' : '';
+    sections.push({ id: 'col-stars', title: 'Rundens spiller og mål', player: p ? { playerId: p.playerId, teamId: p.teamId, why: `Begrundelse: ${why.length ? why.join(', ') : 'stabil hele kampen'}${motm}.` } : null,
       goal: gazette.goalOfTheRound ? true : null, defensive: !gazette.goalOfTheRound && gazette.defensiveAction ? true : null });
   }
 
