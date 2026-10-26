@@ -27,7 +27,8 @@ import { replayJump, clearReplays } from './ui/replay.js';
 
 export const PLAYBACK_MS = 420;
 let mc = null;            // Match Center: { round, matches, gazette, viewIdx, filter, shownCount, playing }
-const TABS = [['trup', '👥 Trup'], ['taktik', '📋 Taktik'], ['kamp', '📺 Kamp'], ['liga', '🏆 Liga'], ['klub', '💼 Klub']];
+// v3.19.0: fanerne står i den faste topbar (brugeren); Gem/Eksportér/Importér/Ny liga i ⚙ Admin. [nøgle, ikon, tekst]
+const TABS = [['trup', '👥', 'Trup'], ['taktik', '📋', 'Taktik'], ['kamp', '📺', 'Kamp'], ['liga', '🏆', 'Liga'], ['klub', '💼', 'Klub'], ['admin', '⚙', 'Admin']];
 // Seneste runde vist færdigspillet (Kamp-fanen uden igangværende afspilning).
 const lastRoundView = (r) => ({ round: r.round, matches: r.matches, gazette: r.gazette, viewIdx: 0, filter: 'all', shownCount: Infinity, playing: false });
 function showTab(k) { game.ui.tab = k; clearSwap(); view.notice = ''; view.marketMsg = ''; persist(); render(); window.scrollTo(0, 0); }
@@ -56,6 +57,7 @@ function dropMatchView() { clearInterval(timer); timer = null; mc = null; pendin
 
 const app = document.getElementById('app');
 const controls = document.getElementById('controls');
+const tabbar = document.getElementById('tabbar');
 document.getElementById('version').textContent = 'v' + VERSION;
 
 const myIdx = () => game.league.teams.findIndex((t) => !t.isBot);
@@ -203,7 +205,7 @@ function importButton() {
     if (!r.ok) { window.tactivarFejl?.(`Import mislykkedes: ${r.error}`); return; }
     const res = resetGame(storage, r.state);
     if (!res.ok) { window.tactivarFejl?.(res.error); return; }
-    dropMatchView(); game = r.state; view.viewTeamIdx = myIdx(); view.notice = `Spillet er importeret fra ${file.name}.${res.backupKey ? ` Det tidligere spil ligger som backup (${res.backupKey}).` : ''} ${migrationNotice(r.migratedFrom)}`.trim(); view.savedAt = res.savedAt; render();
+    dropMatchView(); game = r.state; game.ui.tab = 'trup'; view.viewTeamIdx = myIdx(); view.notice = `Spillet er importeret fra ${file.name}.${res.backupKey ? ` Det tidligere spil ligger som backup (${res.backupKey}).` : ''} ${migrationNotice(r.migratedFrom)}`.trim(); view.savedAt = res.savedAt; render();
   } });
   return h('span', {}, input, h('button', { onclick: () => input.click() }, '⬆ Importér'));
 }
@@ -228,22 +230,30 @@ function renderControls() {
     select(String(view.viewTeamIdx), teams.map((t, i) => [String(i), (t.isBot ? '' : '★ ') + t.name]), (v) => showTeam(Number(v)), { id: 'team-select', title: 'Vælg hold at se' }),
     // Kampknapperne står i topbaren, så de findes i alle visninger (også når man scouter).
     // Modstanderen følger programmet (v3.11); navnet ved siden af åbner hans trup til scouting.
-    h('button', { id: 'play-round', class: 'primary', disabled: !!mc?.playing, onclick: playNextRound }, `▶ Spil runde ${next.k} af ${game.league.schedule.length} mod ${next.opp.name} (${next.home ? 'hjemme' : 'ude'})`),
+    h('button', { id: 'play-round', class: 'primary', disabled: !!mc?.playing, onclick: playNextRound }, `▶ Spil runde ${next.k} af ${game.league.schedule.length}`, h('span', { class: 'play-opp' }, ` mod ${next.opp.name} (${next.home ? 'hjemme' : 'ude'})`)),
     h('button', { id: 'next-opponent', class: 'mini', title: `Scout ${next.opp.name}`, onclick: () => { game.ui.tab = 'trup'; persist(); showTeam(teams.indexOf(next.opp)); } }, `🔍 ${next.opp.name}`),
     tiredStarters() ? h('span', { class: 'tired', id: 'tired-warning', title: myTeam().subsLimit
       ? `Markspillere under din udskiftningsgrænse (${myTeam().subsLimit} %) skiftes ud fra 3. minut (højst 3 ad gangen), hvis der er en frisk afløser i samme kæde på bænken – det bruger et skift og en pause. Overvej at rotere i Trup`
       : 'Startere under 70 % friskhed – trætte spillere yder mindre (50 % ≈ 12,5 % svagere). Overvej at rotere i Trup' },
     myTeam().subsLimit ? `⚠ ${tiredStarters()} startere under din grænse (${myTeam().subsLimit} %) – skiftes ud tidligt` : `⚠ ${tiredStarters()} trætte startere`) : null,
-    h('span', { class: 'savestatus' + (view.saveError ? ' failed' : ''), id: 'save-status' }, view.saveError ? '⚠ IKKE gemt' : view.savedAt ? `✔ Gemt kl. ${time(view.savedAt)}` : 'Ikke gemt'),
-    h('button', { id: 'save-now', onclick: () => { persist(); render(); } }, '💾 Gem nu'),
-    h('button', { id: 'export', onclick: exportFile }, '⬇ Eksportér'),
-    importButton(),
-    h('button', { id: 'new-league', onclick: () => {
-      if (!confirm('Start en helt ny liga? Det nuværende spil gemmes som backup i browseren.')) return;
-      const g = newGame(); const r = resetGame(storage, g);
-      if (!r.ok) { window.tactivarFejl?.(r.error); return; }
-      dropMatchView(); game = g; view = { ...view, viewTeamIdx: myIdx(), selectedPlayerId: null, notice: r.backupKey ? `Ny liga startet. Det gamle spil ligger som backup (${r.backupKey}).` : 'Ny liga startet.' }; view.savedAt = r.savedAt; render();
-    } }, '🎲 Ny liga')].filter(Boolean));
+    // Gem-kvitteringen står altid synlig (spec §9 – svaret på "nulstiller ved refresh"); et klik åbner ⚙ Admin (gem, eksport, import)
+    h('button', { class: 'savestatus' + (view.saveError ? ' failed' : ''), id: 'save-status', title: 'Gem, eksportér, importér og ny liga står i ⚙ Admin', onclick: () => showTab('admin') }, view.saveError ? '⚠ IKKE gemt' : view.savedAt ? `✔ Gemt kl. ${time(view.savedAt)}` : 'Ikke gemt')].filter(Boolean));
+}
+
+// ⚙ Admin (v3.19.0): gem, eksport/import og ny liga – sjældne og farlige handlinger samlet ét sted
+function renderAdmin() {
+  return h('div', { class: 'panel admin', id: 'admin' },
+    h('h3', {}, '⚙ Admin'),
+    h('p', { id: 'admin-save' }, view.saveError ? '⚠ Spillet er IKKE gemt – eksportér det som fil, så intet går tabt. ' : view.savedAt ? `✔ Spillet gemmes automatisk i browseren – senest kl. ${time(view.savedAt)}. ` : 'Spillet er ikke gemt endnu. ',
+      h('button', { id: 'save-now', onclick: () => { persist(); render(); } }, '💾 Gem nu')),
+    h('p', {}, 'Flyt spillet til en anden browser eller tag en sikkerhedskopi: ', h('button', { id: 'export', onclick: exportFile }, '⬇ Eksportér'), ' ', importButton()),
+    h('p', {}, 'Start forfra – det nuværende spil gemmes som backup i browseren: ',
+      h('button', { id: 'new-league', onclick: () => {
+        if (!confirm('Start en helt ny liga? Det nuværende spil gemmes som backup i browseren.')) return;
+        const g = newGame(); const r = resetGame(storage, g);
+        if (!r.ok) { window.tactivarFejl?.(r.error); return; }
+        dropMatchView(); game = g; view = { ...view, viewTeamIdx: myIdx(), selectedPlayerId: null, notice: r.backupKey ? `Ny liga startet. Det gamle spil ligger som backup (${r.backupKey}).` : 'Ny liga startet.' }; view.savedAt = r.savedAt; game.ui.tab = 'trup'; persist(); render();
+      } }, '🎲 Ny liga')));
 }
 
 // Én tegning ad gangen (v3.13, fundet af e2e): replaceChildren fjerner et fokuseret felt, dets change-hændelse
@@ -345,6 +355,7 @@ function renderNow() {
       league.lastRound && !mc?.playing ? renderGazette(league.lastRound.gazette, mine.id, openGoal, league.lastRound.matches, columnNow(), openReport) : null,
       // Statistikken skjules også under afspilningen (den er bogført og ville afsløre runden).
       !mc?.playing ? renderStats({ league, myTeamId: mine.id }) : null],
+    admin: () => [renderAdmin()],
     klub: () => [renderClub({ league, team: mine, playing: !!mc?.playing }), renderMarket({ league, team: mine, playing: !!mc?.playing,
       onAccept: (id) => { const err = acceptOffer(league, mine, id); view.notice = err ? `🔁 ${err}` : '🔁 Spilleren er solgt.'; change(() => {}); },
       onDecline: (id) => change(() => declineOffer(league, mine, id)), onUnlist: (id) => change(() => setListed(league, mine, id, false)),
@@ -352,8 +363,10 @@ function renderNow() {
       // Bekræftelsen står ved listen (QC: beskeden øverst var uden for skærmen, når man stod nede i listen)
       onBuy: (id) => { const name = league.teams.flatMap((t) => t.squad).find((p) => p.id === id)?.shortName; const err = buyPlayer(league, mine, id); view.marketMsg = err ? `💰 ${err}` : `💰 ${name} er købt og står nu i din trup.`; change(() => {}); } })],
   }[tab]();
+  // Fanerne i topbaren (v3.19.0): på smal skærm kun ikonet – teksten står stadig i DOM'en (skjult)
+  tabbar.replaceChildren(h('nav', { class: 'tabs', id: 'tabs' }, TABS.map(([k, ico, label]) => h('button', { id: `tab-${k}`, class: 'tab' + (k === tab ? ' active' : ''), title: label, onclick: () => showTab(k) },
+    h('span', { class: 'tab-ico' }, ico), h('span', { class: 'tab-txt' }, ` ${label}`)))));
   app.replaceChildren(...[
-    h('nav', { class: 'tabs', id: 'tabs' }, TABS.map(([k, label]) => h('button', { id: `tab-${k}`, class: 'tab' + (k === tab ? ' active' : ''), onclick: () => showTab(k) }, label))),
     view.notice ? h('div', { class: 'notice', id: 'notice' }, view.notice,
       view.backupKey && storage.getItem(view.backupKey) ? h('button', { class: 'mini', id: 'download-migration-backup', onclick: () => download(storage.getItem(view.backupKey), `${view.backupKey}.json`) }, ' ⬇ Hent backup som fil') : null) : null,
     h('div', { class: `tabpane tab-${tab}` }, ...content.filter(Boolean)),

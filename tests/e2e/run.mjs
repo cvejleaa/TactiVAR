@@ -51,7 +51,7 @@ try {
   let g = await fresh();
   const rows = () => g.locator('#matrix tbody tr').count();
   const tab = async (k) => { await g.click(`#tab-${k}`); await g.waitForSelector(`.tabpane.tab-${k}`); };
-  check('Fem faner (v3.18.0: + 💼 Klub), Trup er åben fra start', (await g.locator('#tabs .tab').count()) === 5 && (await g.textContent('#tabs .tab.active')).includes('Trup'));
+  check('Seks faner i topbaren (v3.19.0: + ⚙ Admin), Trup er åben fra start', (await g.locator('.topbar #tabs .tab').count()) === 6 && (await g.textContent('#tabs .tab.active')).includes('Trup'));
   check('Ny liga: dit hold vises med 18 spillere', (await rows()) === 18);
   check('Ny liga: ingen "Nyt i kampene"-besked (den er til dem, der opdaterer et gammelt gem)', (await g.locator('#notice').count()) === 0);
   check('Holdvælgeren har 8 hold', (await g.locator('#team-select option').count()) === 8);
@@ -284,7 +284,7 @@ try {
   await g.selectOption('#tactics select[data-field="onBallWon"]', 'FAST_COUNTER');
   check('Gem-fejl vises i fejlboksen og som "IKKE gemt"', (await g.isVisible('#fejlboks')) && (await g.textContent('#save-status')).includes('IKKE gemt'));
   await g.evaluate(() => { Storage.prototype.setItem = window.__set; document.getElementById('fejlboks').hidden = true; document.getElementById('fejlboks').replaceChildren(); });
-  await g.click('#save-now');
+  await tab('admin'); await g.click('#save-now');
   check('"Gem nu" gemmer igen efter fejlen', (await g.textContent('#save-status')).includes('Gemt kl.'));
 
   // Sorteringsvagten: sortér eget hold på FIN, skift til en modstander – rækkefølgen må ikke røbe FIN
@@ -640,13 +640,14 @@ try {
   // Mislykkes backuppen ved "Ny liga" (fuldt lager), står det gamle spil urørt – også efter næste gem
   await g.selectOption('#team-select', '0');
   await tab('trup');
-  const keep = await g.evaluate(() => localStorage.getItem('tactivar_save'));
   const clubBefore = await g.textContent('#club-name');
+  await tab('admin');   // v3.19.0: knapperne står i Admin – fanevalget gemmes, så referencen tages efter skiftet
+  const keep = await g.evaluate(() => localStorage.getItem('tactivar_save'));
   await g.evaluate(() => { window.__set2 = Storage.prototype.setItem; Storage.prototype.setItem = function (k, v) { if (k.startsWith('tactivar_backup_')) throw new Error('QuotaExceededError'); return window.__set2.call(this, k, v); }; });
   g.once('dialog', (d) => d.accept());
   await g.click('#new-league');
   check('Ny liga uden mulig backup: fejl vises og spillet er uændret', (await g.textContent('#fejlboks')).includes('sikkerhedskopieres') && (await g.evaluate(() => localStorage.getItem('tactivar_save'))) === keep);
-  await g.click('#save-now');
+  await g.click('#save-now'); await tab('trup');
   check('…og det næste gem gemmer stadig det gamle spil', JSON.parse(await g.evaluate(() => localStorage.getItem('tactivar_save'))).league.leagueMetadata.round === JSON.parse(keep).league.leagueMetadata.round && (await g.textContent('#club-name')) === clubBefore);
   await g.evaluate(() => { Storage.prototype.setItem = window.__set2; document.getElementById('fejlboks').hidden = true; document.getElementById('fejlboks').replaceChildren(); });
 
@@ -773,7 +774,7 @@ try {
   const noBackup = await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).schemaVersion);
   check('Migrering uden mulig backup: det gamle format står urørt, og der advares', noBackup === 1 && (await g.textContent('#fejlboks')).includes('kunne ikke tages backup'));
   // …også efter et gem og en ændring (Release Manager v3.11: før overskrev første klik den gamle fil uden backup)
-  await g.click('#save-now');
+  await tab('admin'); await g.click('#save-now');
   await g.click('#tab-taktik'); await g.selectOption('#tactics select[data-field="pressingHeight"]', 'LOW_BLOCK');
   const stillOld = await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).schemaVersion);
   check('Migrering uden mulig backup: gem og ændringer overskriver ikke den gamle fil – gem-status siger IKKE gemt', stillOld === 1 && (await g.textContent('#save-status')).includes('IKKE gemt') && (await g.textContent('#fejlboks')).includes('IKKE gemt'), String(stillOld));
@@ -785,7 +786,7 @@ try {
   // Ny liga og import tager backup af det nuværende spil
   await g.selectOption('#team-select', '0');
   await g.click('#play-round'); await g.click('#skip'); // en runde i Kamp-fanen, som Ny liga skal fjerne
-  await tab('trup');
+  await tab('admin');   // knapperne står i Admin (v3.19.0); fanevalget gemmes, så referencen tages efter skiftet
   const savedBefore = await g.evaluate(() => localStorage.getItem('tactivar_save'));
   g.once('dialog', (d) => d.accept());
   await g.click('#new-league');
@@ -793,6 +794,7 @@ try {
   check('Ny liga: det gamle spil ligger i backup', (await backups()).includes(savedBefore));
   await tab('kamp');
   check('Ny liga: Kamp-fanen viser ikke den gamle ligas runde', (await g.locator('#match-center').count()) === 0 && (await g.isVisible('#no-matches')));
+  await tab('admin');
   const exported = await g.evaluate(() => localStorage.getItem('tactivar_save'));
   await g.setInputFiles('#import-file', { name: 'gammel.json', mimeType: 'application/json', buffer: Buffer.from(savedBefore) });
   await g.waitForFunction(() => document.getElementById('notice')?.textContent.includes('importeret'));
