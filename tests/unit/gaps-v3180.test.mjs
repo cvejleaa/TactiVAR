@@ -139,3 +139,14 @@ test('Security: en delt fil med ødelagte ungdomstilbud, kamplog og transferlist
   const res = loadGame(storage);
   assert.equal(res.status, 'error'); assert.ok(res.backupKey);
 });
+
+test('v3.18.1: en bot med 19 spillere, der sælger sin ene af to målmænd, henter en ungdomsmålmand (kæde-minimum, ikke kun 18)', async () => {
+  const { buyPlayer } = await import('../../public/engine/transfers.js');
+  const L = fresh(), me = L.teams[0], b = L.teams[2];
+  b.squad.push({ ...structuredClone(b.squad.find((p) => p.line === 'ATT' && !b.tactics.lineupSlots.includes(p.id))), id: 'att19', shortName: 'A. Nitten', shirtNumber: 44 });
+  me.cashBalance = 50000000;
+  const gk = b.squad.find((p) => p.line === 'GK' && !b.tactics.lineupSlots.includes(p.id));
+  assert.equal(buyPlayer(L, me, gk.id), null);
+  assert.equal(b.squad.length, 19, 'stadig 19: én solgt, én hentet');
+  assert.equal(b.squad.filter((p) => p.line === 'GK').length, 2);
+});
