@@ -1,6 +1,6 @@
 // Spillerkort: offentlige data for alle, evner og mod-kunnen kun for eget hold, VAR-profilen
 // for ingen. Scouting-indtryk og private noter vises for alle spillere.
-import { publicValue, LOG, stampText, KEY_SKILLS, FOCUS, focusSkills, validFocus, ageTrain, roomOf, MATCH_XP, PLAYED_RELIEF, TRAIN_FRESH_FLOOR } from '../engine/career.js';
+import { publicValue, LOG, stampText, KEY_SKILLS, trainingEstimate, FOCUS, focusSkills, validFocus, ageTrain, roomOf, MATCH_XP, PLAYED_RELIEF, TRAIN_FRESH_FLOOR } from '../engine/career.js';
 import { viewPlayer } from '../engine/visibility.js';
 import { h, dec, LOCK, select } from './dom.js';
 import { LINE, POSITION_FULL, SKILL_LABELS, kr, starsEl } from './labels.js';
@@ -12,7 +12,7 @@ const dk = (v) => v.toLocaleString('da-DK', { minimumFractionDigits: 2, maximumF
 const bar = (label, v, max = 20) => h('div', { class: 'bar' }, h('span', { class: 'bar-label' }, label),
   h('span', { class: 'bar-track' }, h('span', { class: 'bar-fill', style: { width: `${Math.round((v / max) * 100)}%` } })), h('span', { class: 'bar-val' }, String(v)));
 
-export function renderCard({ player: p, team, isOwn, scouting, note, onNote, teams = null, latest = null, onOpenMatch = null, onFocus = null, retiring = false, market = null, hideLog = null, season = null, starter = false }) {
+export function renderCard({ player: p, team, isOwn, scouting, note, onNote, teams = null, latest = null, onOpenMatch = null, onFocus = null, retiring = false, market = null, hideLog = null, season = null, starter = false, trainNote = false }) {
   if (!p) return h('div', { class: 'panel muted' }, 'Klik på en spiller for at se spillerkortet.');
   const head = h('div', { class: 'card-head' },
     h('h3', {}, `#${p.shirtNumber} ${p.name}`),
@@ -33,7 +33,7 @@ export function renderCard({ player: p, team, isOwn, scouting, note, onNote, tea
       p.archetype ? h('div', { class: 'archbox' }, h('strong', {}, (p.archetype.isUnlocked ? '🌟 ' : '🔒 ') + p.archetype.name), ' – ', p.archetype.description,
         p.archetype.isUnlocked ? null : h('div', { class: 'muted' }, 'Låses op ved: ' + Object.entries(p.archetype.unlockReq).map(([k, v]) => `${k} ${v}`).join(', '))) : null,
       h('div', { class: 'muted', id: 'run-stats' }, run.km90 != null ? `🏃 ${dec(run.km90, 1)} km pr. 90 min · ${run.hiPct != null ? `${run.hiPct} % højintenst` : 'højintenst: kommer efter næste kamp'} · topfart ${dec(p.topSpeedMax, 1)} km/t (alle kampe)` : '🏃 Løbedata kommer efter første kamp'),
-      onFocus ? renderTraining(p, onFocus, starter) : null,
+      onFocus ? renderTraining(p, onFocus, starter) : trainNote ? h('div', { class: 'muted', id: 'card-train-note' }, `🏋️ Træner: ${FOCUS[trainingEstimate(p).key].label} – ændr i Trup`) : null,
       h('div', { class: 'muted', id: 'card-wage' }, `Løn ${kr(Math.round(p.weeklyWage / 3))} pr. runde · Værdi ${kr(publicValue(p))} (offentlig – ud fra stjerner og alder)`),
     ];
   } else {
@@ -50,21 +50,17 @@ export function renderCard({ player: p, team, isOwn, scouting, note, onNote, tea
 }
 
 // 🏋️ Træning (v3.18.0): fokus, hvad det træner, fremdrift pr. evne og ejerens skøn i ord (tallet – potentialet – er skjult)
-const SKILL_NAME = Object.fromEntries(SKILL_LABELS.flatMap(([, list]) => list));
+export const SKILL_NAME = Object.fromEntries(SKILL_LABELS.flatMap(([, list]) => list));
 export const roomWords = (room) => (room >= 0.6 ? 'har meget mere i sig' : room >= 0.3 ? 'har mere i sig' : 'er tæt på sit loft');
+// Næste +1 i ord – samme tekst på kortet og i træningsoversigten
+export const nextText = (n, why) => (!n || n === Infinity ? '' : n > 14 ? `går langsomt (mere end en sæson: ${why})` : `næste +1 om ca. ${n} runde${n === 1 ? '' : 'r'}`);
+export const priceText = (e) => (e.fresh > 0 ? `+${e.fresh} friskhed pr. runde` : `${e.fresh} friskhed pr. runde (${e.playedFresh} når han har spillet; ikke under ${TRAIN_FRESH_FLOOR} %) · lille skaderisiko`);
 function renderTraining(p, onFocus, starter = false) {
-  const key = validFocus(p, p.trainingFocus) ? p.trainingFocus : 'GENERAL', f = FOCUS[key];
-  const train = f.rate * ageTrain(p.age) * roomOf(p);
-  // Estimatet tæller kampene med for en starter (QC: ellers stod "går langsomt" hos en, der spiller hver uge)
-  const perOf = (s) => train + (starter && KEY_SKILLS[p.line].includes(s) ? MATCH_XP : 0);
-  const why = roomOf(p) <= 0.15 ? 'han er tæt på sit loft' : p.age >= 30 ? 'alderen' : 'fokus og alder';
-  const price = f.fresh > 0 ? `+${f.fresh} friskhed pr. runde` : `${f.fresh} friskhed pr. runde (${Math.min(0, f.fresh + PLAYED_RELIEF)} når han har spillet; ikke under ${TRAIN_FRESH_FLOOR} %) · lille skaderisiko`;
-  const lines = focusSkills(p, f).map((s) => {
-    const d = p.dev?.[s] ?? 0;
-    if (p.skills[s] >= 20) return h('div', { class: 'train-line' }, `${SKILL_NAME[s]} 20 – helt i top`);
-    const per = perOf(s), n = per > 0 ? Math.ceil((1 - d) / per) : null;
+  const e = trainingEstimate(p, starter), key = e.key, price = priceText(e);
+  const lines = e.lines.map(({ skill: s, dev: d, top, n }) => {
+    if (top) return h('div', { class: 'train-line' }, `${SKILL_NAME[s]} 20 – helt i top`);
     return h('div', { class: 'train-line' }, h('span', { class: 'bar-track' }, h('span', { class: 'bar-fill', style: { width: `${Math.round(d * 100)}%` } })),
-      ` ${SKILL_NAME[s]} ${dec(d, 1)}/1,0${!n ? '' : n > 14 ? ` – går langsomt (mere end en sæson: ${why})` : ` – næste +1 om ca. ${n} runde${n === 1 ? '' : 'r'}`}`);
+      ` ${SKILL_NAME[s]} ${dec(d, 1)}/1,0${n ? ` – ${nextText(n, e.why)}` : ''}`);
   });
   return h('div', { class: 'trainbox', id: 'card-training' },
     h('h4', {}, '🏋️ Træning'),

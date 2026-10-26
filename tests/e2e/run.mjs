@@ -56,7 +56,7 @@ try {
   check('Ny liga: ingen "Nyt i kampene"-besked (den er til dem, der opdaterer et gammelt gem)', (await g.locator('#notice').count()) === 0);
   check('Holdvælgeren har 8 hold', (await g.locator('#team-select option').count()) === 8);
   const heads = (await g.locator('#matrix thead th').allTextContents()).map((t) => t.replace(/ [▲▼]$/, ''));
-  check('Regnearkets kolonner i rækkefølge (Alder står hvor den skal)', JSON.stringify(heads.slice(0, 22)) === JSON.stringify(['Pos/#', 'Spiller', 'Kæde', 'Natur', 'Alder', 'Frisk/🚑', 'Højde', 'Spring', '✈ Luft', 'PAC', 'STA', 'STR', 'BAL', 'PAS', 'FIN', 'POS', 'INT', 'GK', 'Gns', '⭐ Vurd', '🏋️ Træning', '🧠 Mod']), heads.join('|'));
+  check('Regnearkets kolonner i rækkefølge (Alder står hvor den skal)', JSON.stringify(heads.slice(0, 21)) === JSON.stringify(['Pos/#', 'Spiller', 'Kæde', 'Natur', 'Alder', 'Frisk/🚑', 'Højde', 'Spring', '✈ Luft', 'PAC', 'STA', 'STR', 'BAL', 'PAS', 'FIN', 'POS', 'INT', 'GK', 'Gns', '⭐ Vurd', '🧠 Mod']), heads.join('|'));
   const ownMoney = await g.evaluate(() => { const hs = [...document.querySelectorAll('#matrix thead th')].map((t) => t.textContent.replace(/ [▲▼]$/, '')); const i = hs.indexOf('💰 Værdi'); return { last: hs.slice(i, i + 2), cells: [...document.querySelectorAll('#matrix tbody tr')].map((tr) => [tr.children[i].textContent, tr.children[i + 1].textContent]) }; });
   check('Trup: værdi og løn pr. runde for dine spillere står i regnearket (v3.19.0)', JSON.stringify(ownMoney.last) === JSON.stringify(['💰 Værdi', 'Løn/rd']) && ownMoney.cells.length === 18 && ownMoney.cells.every(([v, w]) => /\d/.test(v) && /^\d{1,3}(\.\d{3})*$/.test(w)), JSON.stringify(ownMoney));
   const modCells = await g.locator('#matrix tbody td.modcell').allTextContents();
@@ -69,8 +69,11 @@ try {
   // v3.18.0: træningsfokus vælges på kortet, står i regnearket og gemmes (gælder, til det ændres – 0 klik pr. runde)
   await g.selectOption('#focus-select', 'FINISH');
   const focusSaved = async () => g.evaluate((nr) => JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((x) => !x.isBot).squad.find((x) => String(x.shirtNumber) === nr).trainingFocus, shown);
-  const focusRow = (await g.locator('#matrix tbody tr.selected td.traincell').textContent());
-  check('Træning: fokus valgt på kortet står i regnearket og er gemt', focusRow === 'Afslutning' && (await focusSaved()) === 'FINISH' && (await g.textContent('#card-training')).includes('Afslutning') && /næste \+1 om ca\. \d+ runde|går langsomt \(mere end en sæson/.test(await g.textContent('#card-training')), focusRow);
+  const focusRow = await g.locator(`#training-table tr[data-pid="${await g.evaluate((nr) => JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((x) => !x.isBot).squad.find((x) => String(x.shirtNumber) === nr).id, shown)}"] select`).evaluate((el) => el.options[el.selectedIndex].text);
+  check('Træning: fokus valgt på kortet står i træningsoversigten og er gemt', focusRow === 'Afslutning' && (await focusSaved()) === 'FINISH' && (await g.textContent('#card-training')).includes('Afslutning') && /næste \+1 om ca\. \d+ runde|går langsomt \(mere end en sæson/.test(await g.textContent('#card-training')), focusRow);
+  await g.selectOption('#focus-many', 'REST');
+  check('Træning: massehandlingen i oversigten sætter fokus for alle viste (18)', (await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((x) => !x.isBot).squad.filter((p) => p.trainingFocus === 'REST').length)) === 18);
+  await g.selectOption(`#training-table tr[data-pid="${await g.evaluate((nr) => JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((x) => !x.isBot).squad.find((x) => String(x.shirtNumber) === nr).id, shown)}"] select`, 'FINISH');
   check('Spillerkortet viser 9 evne-barer og luftduel-udregningen', (await g.locator('#player-card .bars .bar').count()) === 9 && (await g.textContent('#aerial-breakdown')).includes('× 0,35'));
   // v3.8 (Test Manager): kortets overskrift viser spillerens EGEN naturlige position med fuld betegnelse
   const FULL_POS = { GK: 'Målmand', CB: 'Midtstopper', FB: 'Back/wingback (LB/RB/LWB/RWB)', CM: 'Central/defensiv midtbane (CM/CDM)', WM: 'Kant (LM/RM/LW/RW)', AM: 'Offensiv midtbane (CAM/CF)', ST: 'Angriber (ST)' };
@@ -110,6 +113,7 @@ try {
   const ratio = await g.evaluate(() => { const r = document.getElementById('pitch').getBoundingClientRect(); return r.width / r.height; });
   check('Banen bevarer sit forhold 68:80 (ikke strakt)', Math.abs(ratio - 68 / 80) < 0.02, ratio.toFixed(3));
   await tab('taktik');
+  check('Taktik: træning kan ikke sættes her – kortet siger, hvad han træner, og henviser til Trup', (await g.locator('#focus-select').count()) === 0 && (await g.textContent('#card-train-note')).includes('ændr i Trup'));
   check('Taktik-fanen: bane, spillerliste, spillerkort og taktik – men ikke regnearket', (await g.isVisible('#pitch')) && (await g.isVisible('#lineup-list')) && (await g.isVisible('#player-card')) && (await g.locator('#matrix').count()) === 0);
   check('Tre fase-paneler og Hvis-Så-regler', (await g.locator('#tactics fieldset[data-phase]').count()) === 3 && (await g.locator('#rules .rule').count()) === 1);
   const bodyText = await g.textContent('body');
@@ -307,7 +311,7 @@ try {
   await g.selectOption('#team-select', '1');
   const oppText = await g.textContent('#matrix tbody');
   const lockCells = await g.locator('#matrix tbody td.lockcell').count();
-  check('Modstander: 15 skjulte kolonner × 18 spillere vises som 🔒 ?? (v3.18.0: + træningsfokus; v3.19.0: + løn)', lockCells === 15 * 18, String(lockCells));
+  check('Modstander: 14 skjulte kolonner × 18 spillere vises som 🔒 ?? (v3.19.0: + løn; træningen står i sin egen oversigt)', lockCells === 14 * 18, String(lockCells));
   const oppMoney = await g.evaluate(() => { const hs = [...document.querySelectorAll('#matrix thead th')].map((t) => t.textContent); const i = hs.findIndex((t) => t.startsWith('💰 Værdi')); return [...document.querySelectorAll('#matrix tbody tr')].map((tr) => [tr.children[i].textContent, tr.children[i + 1].textContent]); });
   check('Modstander: værdien er offentlig, lønnen låst (v3.19.0)', oppMoney.every(([v, w]) => /\d/.test(v) && w === '🔒 ??'), JSON.stringify(oppMoney[0]));
   const hiddenCols = await g.evaluate(() => [...document.querySelectorAll('#matrix tbody tr')].flatMap((tr) => [...tr.children].slice(7, 19).map((td) => td.textContent)));

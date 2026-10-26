@@ -10,6 +10,7 @@ import { h, select } from './ui/dom.js';
 import { kr } from './ui/labels.js';
 import { renderMatrix } from './ui/matrix.js';
 import { renderLineupList } from './ui/lineup-list.js';
+import { renderTrainingTable } from './ui/training.js';
 import { renderCard, trainingSummary } from './ui/card.js';
 import { renderClub, shownCash, renderMarket, renderTransferLog } from './ui/club.js';
 import { marketInfo, buyPlayer, setListed, acceptOffer, declineOffer, isStarter } from './engine/transfers.js';
@@ -279,12 +280,13 @@ function renderNow() {
       ? h('button', { class: 'linklike', id: 'club-link', title: 'Økonomi, lønbudget og regnskab', onclick: () => showTab('klub') }, h('strong', {}, kr(shownCash(team, !!mc?.playing))), ' 💼')
       : h('strong', {}, '🔒 Skjult')));
 
+  // Fanen afgøres før kortet: træning sættes kun i Trup (v3.19.0)
+  const tab = TABS.some(([k]) => k === game.ui.tab) ? game.ui.tab : 'trup';
   const matrix = renderMatrix({
     team, isOwn, ui: { ...view, swapId: view.pitchSwapId }, notes: game.notes,
     onSort: (c) => { if (view.sortCol === c.key) view.sortDesc = !view.sortDesc; else { view.sortCol = c.key; view.sortDesc = !!c.num; } clearSwap(); view.notice = ''; render(); },
     onBlocked: (c) => { view.notice = `🔒 Anti-spionage: du kan ikke sortere ${team.name} på "${c.label}" – det er skjult information.`; render(); },
     onSelect: (p) => { view.selectedPlayerId = p.id; render(); },
-    onFocusMany: isOwn ? (ids, k) => { const n = act.setFocusMany(team, ids, k); view.notice = `🏋️ ${n} spiller${n === 1 ? '' : 'e'} træner nu ${FOCUS[k].label}${n < ids.length ? ` (${ids.length - n} kan ikke – Målmand er kun for målmænd)` : ''}.`; change(() => {}); } : null,
     onFilter: (f) => { view.filter = f; render(); },
     onSwap: null,   // v3.19.0: opstillingen sker kun på Taktik (Spilfører: ét sted)
   });
@@ -293,7 +295,8 @@ function renderNow() {
   const lr = league.lastRound, latest = lr && !mc?.playing ? lr.matches.map((m) => [league.teams.findIndex((t) => t.id === m.homeId), league.teams.findIndex((t) => t.id === m.awayId), m.homeGoals, m.awayGoals].join('|')) : null;
   const card = renderCard({ player: selected, team, isOwn, scouting: league.scouting[mine.id]?.[selected?.id], note: selected ? game.notes[selected.id] : '',
     onNote: (v) => { game.notes[selected.id] = v; persist(); renderControls(); }, teams: league.teams, latest,
-    onFocus: isOwn ? (k) => change(() => act.setFocus(team, selected.id, k)) : null,
+    onFocus: isOwn && tab === 'trup' ? (k) => change(() => act.setFocus(team, selected.id, k)) : null,
+    trainNote: isOwn && tab !== 'trup',
     market: !selected || mc?.playing ? null : isOwn ? { own: true, listed: (team.listed ?? []).includes(selected.id), onList: (on) => change(() => setListed(league, team, selected.id, on)) }
       : { ...marketInfo(league, mine, team, selected), starter: isStarter(team, selected), wage: Math.round(publicWage(selected) / 3), room: wageRoomPerRound(mine), cashAfter: mine.cashBalance - marketInfo(league, mine, team, selected).price, onBuy: () => { const err = buyPlayer(league, mine, selected.id); view.notice = err ? `💰 ${err}` : `💰 ${selected.shortName} er købt og står nu i din trup.`; change(() => {}); } },
     hideLog: mc?.playing && league.lastRound ? seasonAndRound(league, league.lastRound.round) : null,
@@ -331,7 +334,6 @@ function renderNow() {
   const standings = renderStandings({ league, playing: !!mc?.playing, viewTeamId: team.id, onPick: (id) => showTeam(league.teams.findIndex((t) => t.id === id)) });
 
   // Faner: ét emne ad gangen (brugerens ønske: "et noget rodet layout").
-  const tab = TABS.some(([k]) => k === game.ui.tab) ? game.ui.tab : 'trup';
   const shown = mc || (league.lastRound ? lastRoundView(league.lastRound) : null);
   // Hver fane bygges kun, når den vises: banen og kortet er ét DOM-element og kan kun stå ét sted.
   const content = {
@@ -341,7 +343,11 @@ function renderNow() {
       // Sæsonslut under afspilning (som bogført-før-afspilning): runden er bogført, og sæsonskiftet er sket
       mc?.playing && seasonJustEnded(league) ? h('div', { class: 'notice', id: 'turnover-booked' }, '🗓 Sæsonen sluttede med denne runde: alle er blevet et år ældre, og sæsonrapporten med ungdomstilbuddene står på Liga, når kampene er spillet.') : null,
       !mc?.playing && mine.youthOffers?.length ? h('div', { class: 'notice', id: 'youth-pending' }, `🧒 ${mine.youthOffers.length} ungdomstilbud venter – `, h('button', { class: 'linklike', onclick: () => showTab('liga') }, 'se sæsonrapporten på Liga')) : null,
-      isOwn && !mc?.playing ? trainingSummary(league.trainingReport?.[team.id], team, league.trainingReport?.[team.id] ? seasonAndRound(league, league.trainingReport[team.id].round)[1] : null) : null, matrix, card],
+      isOwn && !mc?.playing ? trainingSummary(league.trainingReport?.[team.id], team, league.trainingReport?.[team.id] ? seasonAndRound(league, league.trainingReport[team.id].round)[1] : null) : null, matrix,
+      h('div', { class: 'tactics-layout' }, h('section', {}, card),
+        h('section', {}, isOwn ? renderTrainingTable({ team, report: !mc?.playing ? league.trainingReport?.[team.id] : null, line: view.trainLine ?? 'all', onLine: (v) => { view.trainLine = v; render(); },
+          onFocus: (id, k) => change(() => act.setFocus(team, id, k)),
+          onFocusMany: (ids, k) => { const n = act.setFocusMany(team, ids, k); view.notice = `🏋️ ${n} spiller${n === 1 ? '' : 'e'} træner nu ${FOCUS[k].label}${n < ids.length ? ` (${ids.length - n} kan ikke – Målmand er kun for målmænd)` : ''}.`; change(() => {}); } }) : null))],
     // Taktik (v3.19.0): banen og spillerlisten side om side – opstillingen ét sted; kortet under listen; faser og Hvis-Så nedenunder
     taktik: () => [h('div', { class: 'tactics-layout' }, h('section', {}, pitch), h('section', {}, lineupList, card)), tactics],
     kamp: () => [shown ? renderMatchCenter({ mc: shown, myTeamId: mine.id, on: mcHandlers, column: !shown.playing && shown.round === league.lastRound?.round ? columnNow() : null }) : h('div', { class: 'panel empty', id: 'no-matches' }, 'Ingen kampe spillet endnu. Tryk ▶ Spil runde i topbaren – modstanderen følger kampprogrammet på Liga-fanen.')],

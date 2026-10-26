@@ -263,3 +263,18 @@ export function repairLineup(team, goneLine = new Map()) {
   team.listed = (team.listed ?? []).filter((id) => ids.has(id));
   return changed;
 }
+
+// Træningsestimatet (v3.19.0) – ÉN kilde for kortet og træningsoversigten i Trup: fokus, pris, fremdrift og runder til næste +1
+// pr. trænet evne (kampene tæller med for en starter), og hvorfor det går langsomt.
+export function trainingEstimate(p, starter = false) {
+  const key = validFocus(p, p.trainingFocus) ? p.trainingFocus : 'GENERAL', f = FOCUS[key], room = roomOf(p);
+  const train = f.rate * ageTrain(p.age) * room;
+  const lines = focusSkills(p, f).map((skill) => {
+    const dev = p.dev?.[skill] ?? 0, top = (p.skills[skill] ?? 0) >= 20;
+    const per = train + (starter && KEY_SKILLS[p.line].includes(skill) ? MATCH_XP : 0);
+    return { skill, dev, top, n: top || per <= 0 ? null : Math.ceil((1 - dev) / per) };
+  });
+  const why = room <= 0.15 ? 'han er tæt på sit loft' : p.age >= 30 ? 'alderen' : 'fokus og alder';
+  const playedFresh = f.fresh < 0 ? Math.min(0, f.fresh + PLAYED_RELIEF) : f.fresh;
+  return { key, focus: f, room, lines, why, fresh: f.fresh, playedFresh, next: Math.min(...lines.map((l) => l.n ?? Infinity)) };
+}
