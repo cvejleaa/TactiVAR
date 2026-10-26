@@ -335,7 +335,7 @@ try {
   const oppCash = await g.evaluate(() => { const d = JSON.parse(localStorage.getItem('tactivar_save')); return d.league.teams[Number(document.getElementById('team-select').value)].cashBalance; });
   const pubText = await g.textContent('#public-club');
   check('Modstander i Klub: offentlig klubside med spillere og pris – ingen kasse, løn eller regnskab', (await g.isVisible('#public-club')) && (await g.locator('#public-squad tbody tr').count()) === 18
-    && (await g.locator('#club-cash').count()) === 0 && (await g.locator('#ledger').count()) === 0 && !pubText.replace(/\D/g, ' ').split(' ').includes(String(oppCash)) && pubText.includes('Til din klub'), pubText.slice(0, 120));
+    && (await g.locator('#club-cash').count()) === 0 && (await g.locator('#ledger').count()) === 0 && !pubText.includes(oppCash.toLocaleString('da-DK')) && pubText.includes('Til din klub'), pubText.slice(0, 120));
   await g.click('#back-to-club');
   check('"← Til din klub" viser din egen klub (kasse og regnskab)', (await g.isVisible('#club')) && (await g.textContent('#team-select option:checked')).startsWith('★'));
   await g.selectOption('#team-select', '1'); await tab('trup');
@@ -950,6 +950,16 @@ try {
   await g.click('#start-new');
   await g.waitForSelector('#matrix');
   check('Ny liga fra fejlsiden giver 18 spillere', (await rows()) === 18);
+  // Security v3.19.0: en fejl i tegningen (her: regnearket kaster) giver faner og ⚙ Admin med Eksportér – ikke en hvid side
+  {
+    const c = await browser.newContext({ viewport: { width: 1400, height: 1000 } }), pg = await c.newPage(), egne = [];
+    pg.on('pageerror', (e) => egne.push(e.message));
+    await pg.route('**/ui/matrix.js', async (route) => { const r = await route.fetch(); route.fulfill({ response: r, body: (await r.text()).replace('export function renderMatrix({ team, isOwn, ui, notes, onSort, onSelect, onSwap, onFilter, onBlocked }) {', '$&\n  throw new Error(\'testfejl i regnearket\');') }); });
+    await pg.goto(BASE + '/'); await pg.waitForSelector('body[data-klar="ja"]');
+    check('Fejl i tegningen: fejlbesked, faner og ⚙ Admin med Eksportér, Importér og Ny liga', (await pg.textContent('#render-error')).includes('testfejl i regnearket')
+      && (await pg.locator('#tabs .tab').count()) >= 5 && (await pg.isVisible('#export')) && (await pg.isVisible('#new-league')) && (await pg.locator('#matrix').count()) === 0, egne.join(' | '));
+    await c.close();
+  }
   check('Ingen sidefejl under hele forløbet', fejl.length === 0, fejl.join(' | '));
 } finally {
   await browser.close();

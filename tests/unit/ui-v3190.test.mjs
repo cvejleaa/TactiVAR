@@ -71,3 +71,16 @@ test('viewTeam: visningen deler ingen lister med holdet – den kan ikke ændre 
   v.matchBench.length = 0; v.tactics.lineupSlots[0] = 'x';
   assert.equal(t.matchBench.length, 7); assert.notEqual(t.tactics.lineupSlots[0], 'x');
 });
+
+test('sanitize: offentlige tal og træningsrapporten repareres, så en ødelagt fil ikke vælter siden (Security v3.19.0)', async () => {
+  const { normalizeLeague } = await import('../../public/engine/sanitize.js');
+  const L = createLeague(createRng(5)), me = L.teams[0], p = me.squad[0], q = me.squad[1];
+  p.valueStars = { toString: 1 }; p.publicStars = 'x'; p.careerGames = {}; p.age = {}; p.roleTier = 'KONGE';
+  q.valueStars = 3.4; q.roleTier = 'STAR';
+  L.trainingReport = { [me.id]: { round: 3, gains: 5, injuries: [] }, [L.teams[1].id]: { round: 3, gains: [{ id: L.teams[1].squad[0].id, skill: 'passing' }], injuries: [] } };
+  normalizeLeague(L);
+  assert.equal(p.valueStars, undefined); assert.equal(p.publicStars, 0); assert.equal(p.careerGames, 0); assert.equal(p.age, 24); assert.equal(p.roleTier, undefined);
+  assert.equal(q.valueStars, 3.4); assert.equal(q.roleTier, 'STAR');   // gyldige værdier røres ikke
+  assert.equal(L.trainingReport[me.id], undefined); assert.equal(L.trainingReport[L.teams[1].id].gains.length, 1);
+  L.trainingReport = 7; normalizeLeague(L); assert.equal(L.trainingReport, undefined);
+});

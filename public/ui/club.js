@@ -111,7 +111,7 @@ export function renderTransferLog({ league }) {
   if (!log.length) return null;
   const name = (id) => league.teams.find((t) => t.id === id)?.name ?? '?';
   return h('div', { class: 'panel', id: 'transfer-log' }, h('h3', {}, '🔁 Transfers'),
-    log.map((e) => h('div', { class: 'tlog-row' }, e.kind === 'release' ? `S${e.s}: ${e.name} er fritstillet af ${name(e.from)}.` : `S${e.s}: ${e.name} ${name(e.from)} → ${name(e.to)} for ${kr(e.price)}.`)));
+    log.map((e) => h('div', { class: 'tlog-row' }, e.kind === 'release' ? `S${e.s}: ${e.name} er fritstillet af ${name(e.from)}.` : `S${e.s}: ${e.name} ${name(e.from)} → ${name(e.to)} for ${kr(e.price)}`)));
 }
 
 // Offentlig klubside (v3.19.0, brugeren: et modstanderhold må ikke vise de samme klubinformationer som dit eget). Tegnes KUN fra
@@ -137,6 +137,6 @@ export function renderPublicClub({ league, pub, me, playing, onBuy, onBack, msg 
           h('td', {}, starsEl(p.publicStars)), h('td', { class: 'num' }, kr(publicValue(p))), h('td', { class: 'num', title: m.reason ?? '' }, kr(m.price)), h('td', { class: 'num' }, kr(Math.round(publicWage(p) / 3))));
       })))),
     // Under afspilningen skjules transfers og pensioner som på Liga (QC: ens)
-    playing ? null : h('h4', {}, 'Transfers'), playing ? null : log.length ? log.map((e) => h('div', { class: 'tlog-row' }, e.kind === 'release' ? `S${e.s}: ${e.name} fritstillet.` : `S${e.s}: ${e.name} ${name(e.from)} → ${name(e.to)} for ${kr(e.price)}.`)) : h('p', { class: 'muted' }, 'Ingen endnu.'),
+    playing ? null : h('h4', {}, 'Transfers'), playing ? null : log.length ? log.map((e) => h('div', { class: 'tlog-row' }, e.kind === 'release' ? `S${e.s}: ${e.name} fritstillet.` : `S${e.s}: ${e.name} ${name(e.from)} → ${name(e.to)} for ${kr(e.price)}`)) : h('p', { class: 'muted' }, 'Ingen endnu.'),
     playing ? null : h('h4', {}, 'Stoppet'), playing ? null : retired.length ? retired.map((r) => h('div', {}, `S${r.season}: ${r.name} (${r.age} år, ${r.games} kampe)`)) : h('p', { class: 'muted' }, 'Ingen endnu.'));
 }

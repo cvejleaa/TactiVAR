@@ -264,8 +264,21 @@ let rendering = false, renderAgain = false;
 function render() {
   if (rendering) { renderAgain = true; return; }
   rendering = true;
-  try { renderNow(); } finally { rendering = false; }
+  try { renderNow(); } catch (e) { renderFailed(e); } finally { rendering = false; }
   if (renderAgain) { renderAgain = false; render(); }
+}
+// En fejl i tegningen må ikke give en hvid side uden udvej (Security v3.19.0: Eksportér/Importér/Ny liga står kun i Admin):
+// fanerne og ⚙ Admin tegnes alligevel, med fejlen øverst. Data i browseren røres ikke.
+function renderFailed(e) {
+  console.error(e);
+  drawTabs('admin');
+  app.replaceChildren(h('div', { class: 'notice', id: 'render-error' }, `⚠ Siden kunne ikke tegnes (${e.message}). Dit spil er urørt i browseren – eksportér det som fil herunder, før du prøver andet.`), h('div', { class: 'tabpane tab-admin' }, renderAdmin()));
+  document.body.dataset.klar = 'ja';
+}
+// Fanerne i topbaren (v3.19.0): på smal skærm kun ikonet – teksten står stadig i DOM'en (skjult)
+function drawTabs(tab) {
+  tabbar.replaceChildren(h('nav', { class: 'tabs', id: 'tabs' }, TABS.map(([k, ico, label]) => h('button', { id: `tab-${k}`, class: 'tab' + (k === tab ? ' active' : ''), title: label, onclick: () => showTab(k) },
+    h('span', { class: 'tab-ico' }, ico), h('span', { class: 'tab-txt' }, ` ${label}`)))));
 }
 function renderNow() {
   const league = game.league;
@@ -283,6 +296,7 @@ function renderNow() {
 
   // Fanen afgøres før kortet: træning sættes kun i Trup (v3.19.0)
   const tab = TABS.some(([k]) => k === game.ui.tab) ? game.ui.tab : 'trup';
+  drawTabs(tab);
   const matrix = renderMatrix({
     team, isOwn, ui: { ...view, swapId: view.pitchSwapId }, notes: game.notes,
     onSort: (c) => { if (view.sortCol === c.key) view.sortDesc = !view.sortDesc; else { view.sortCol = c.key; view.sortDesc = !!c.num; } clearSwap(); view.notice = ''; render(); },
@@ -375,9 +389,6 @@ function renderNow() {
       // Bekræftelsen står ved listen (QC: beskeden øverst var uden for skærmen, når man stod nede i listen)
       onBuy: (id) => { const name = league.teams.flatMap((t) => t.squad).find((p) => p.id === id)?.shortName; const err = buyPlayer(league, mine, id); view.marketMsg = err ? `💰 ${err}` : `💰 ${name} er købt og står nu i din trup.`; change(() => {}); } })],
   }[tab]();
-  // Fanerne i topbaren (v3.19.0): på smal skærm kun ikonet – teksten står stadig i DOM'en (skjult)
-  tabbar.replaceChildren(h('nav', { class: 'tabs', id: 'tabs' }, TABS.map(([k, ico, label]) => h('button', { id: `tab-${k}`, class: 'tab' + (k === tab ? ' active' : ''), title: label, onclick: () => showTab(k) },
-    h('span', { class: 'tab-ico' }, ico), h('span', { class: 'tab-txt' }, ` ${label}`)))));
   // Rullepositionen i tabellerne bevares, når siden tegnes om (QC: listen sprang til toppen ved hvert klik)
   const scrolls = new Map([...app.querySelectorAll('.tablewrap')].map((el) => [el.querySelector('table')?.id, el.scrollTop]).filter(([id]) => id));
   app.replaceChildren(...[

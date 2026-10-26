@@ -124,8 +124,11 @@ Konstanterne står ét sted: `public/engine/career.js` (og `transfers.js`). Bån
   - De afledte tilfældighedstal (`derivedRng`: ungdom, potentiale, træning, pension, bud) bygger på offentlige nøgler – med koden
     kan en ungdomsspillers skjulte tal regnes ud. Trin 2 skal salte dem med en hemmelighed på serveren.
   - En menneskestyret managers træningsfokus kan aflæses af en reserves friskhed (træningsprisen); botternes kan ikke (Alsidig).
-  - `viewTeam` er en sortliste (kun kasse, regnskab, salgsliste, ungdom, bud); trin 2 skal gøre den til en tilladelsesliste
-    som `viewPlayer`. En købt spillers karakterer fra botten ses af den nye ejer.
+  - `viewTeam` er en tilladelsesliste (v3.19.0, `TEAM_PUBLIC_FIELDS`): id, navn, isBot, truppen (gennem `viewPlayer`), kamptruppen
+    (`matchBench`) og taktikkens `baseFormation`, `lineupSlots` og `customCoords` – som kopier. Den offentlige klubside tegnes kun
+    fra den. En købt spillers karakterer fra botten ses af den nye ejer.
+  - "Dit hold" afgøres af `isOwn = !team.isBot` (`app.js`): alle ejer-flader (træningsoversigt, Løn/rd, egen klub) hænger på den.
+    Med to menneskestyrede hold ville hver se den andens data – trin 2 skal afgøre ejerskab ud fra brugeren.
 - Ingen: VAR-profil (kun via clues og VAR-kendelser i referatet – v3.15.1: varPulse, theatre og cynicism afgør VAR's
   kendelser som lodtrækninger, så én kendelse ikke afslører spillerens trin).
 - Modstandere vises med "🔒 ??"; sortering på skjulte kolonner hos et

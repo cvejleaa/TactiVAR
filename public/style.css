@@ -245,7 +245,3 @@ button.savestatus.failed { color: var(--rød); font-weight: 700; }
   .tired-txt, .save-txt { display: none; }          /* advarslen og kvitteringen som ikon – teksten står i title/Admin */
   .topbar .tabs { margin-bottom: -.5rem; }
 }
-@media (max-width: 480px) {
-  .tired-txt, .save-txt { display: none; }          /* advarslen og kvitteringen som ikon – teksten står i title/Admin */
-  .topbar .tabs { margin-bottom: -.5rem; }
-}
