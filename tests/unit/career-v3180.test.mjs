@@ -165,3 +165,16 @@ test('bænken og opstillingen overlapper aldrig: byt starter ⇄ bænk, reserve 
   assert.ok(T.matchBench.every((id) => !T.tactics.lineupSlots.includes(id)));
   act.setAutoBench(T); assert.equal(T.matchBenchAuto, true); assert.equal(T.matchBench.length, 7);
 });
+test('udtagelsen: minimum pr. kæde slår stjernerne (MV med 1★ tages med frem for en 4★ ekstra); med 18 tæller en forældet matchBench ikke', () => {
+  const { T } = bigTeam(); const on = new Set(T.tactics.lineupSlots), cand = T.squad.filter((p) => !on.has(p.id));
+  for (const p of cand) Object.assign(p, { careerGames: 10, publicStars: 4 });
+  const gk = cand.find((p) => p.line === 'GK'), mid = cand.filter((p) => p.line === 'MID');
+  gk.publicStars = 1; mid.forEach((p) => { p.publicStars = 1; });
+  autoMatchBench(T);
+  const b = matchBenchOf(T);
+  assert.ok(b.includes(gk), 'MV med'); assert.ok(b.filter((p) => p.line === 'MID').length >= Math.min(2, mid.length), 'to MID med');
+  // 18 spillere og en bænk-liste, der peger på en starter (fx efter en direkte ændring af opstillingen): alle 7 ikke-startere
+  const L = createLeague(createRng(5)), t = L.teams[0];
+  t.matchBench = [t.tactics.lineupSlots[3], ...t.matchBench.slice(1)];
+  assert.deepEqual(matchBenchOf(t).map((p) => p.id), t.squad.filter((p) => !t.tactics.lineupSlots.includes(p.id)).map((p) => p.id));
+});
