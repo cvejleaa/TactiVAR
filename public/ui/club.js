@@ -112,3 +112,27 @@ export function renderTransferLog({ league }) {
   return h('div', { class: 'panel', id: 'transfer-log' }, h('h3', {}, '🔁 Transfers'),
     log.map((e) => h('div', { class: 'tlog-row' }, e.kind === 'release' ? `S${e.s}: ${e.name} er fritstillet af ${name(e.from)}.` : `S${e.s}: ${e.name} ${name(e.from)} → ${name(e.to)} for ${kr(e.price)}.`)));
 }
+
+// Offentlig klubside (v3.19.0, brugeren: et modstanderhold må ikke vise de samme klubinformationer som dit eget). Tegnes KUN fra
+// viewTeam(team, false) – kasse, løn og regnskab findes ikke i det objekt (vagten er visibility.js, ikke denne funktion).
+export function renderPublicClub({ league, pub, me, playing, onBuy, onBack, msg = '' }) {
+  const name = (id) => league.teams.find((t) => t.id === id)?.name ?? '?';
+  const log = (league.transferLog ?? []).filter((e) => e.from === pub.id || e.to === pub.id).slice(-10).reverse();
+  const retired = (league.retired ?? []).filter((r) => r.teamId === pub.id).slice(-8).reverse();
+  const players = pub.squad.slice().sort((a, b) => ['GK', 'DEF', 'MID', 'ATT'].indexOf(a.line) - ['GK', 'DEF', 'MID', 'ATT'].indexOf(b.line) || a.shirtNumber - b.shirtNumber);
+  return h('div', { class: 'panel club public-club', id: 'public-club' },
+    h('h3', {}, `💼 Offentlig klubside – ${pub.name}`),
+    h('p', {}, h('button', { id: 'back-to-club', onclick: onBack }, '← Til din klub'), h('span', { class: 'muted' }, `  ${pub.squad.length} spillere · 🔒 kasse, løn og regnskab er klubbens egne`)),
+    msg ? h('div', { class: 'notice', id: 'public-club-msg' }, msg) : null,
+    playing ? h('p', { class: 'muted' }, '📺 Runden spilles – handel venter til kampene er spillet.') : h('div', { class: 'tablewrap' }, h('table', { class: 'ledger', id: 'public-squad' },
+      h('thead', {}, h('tr', {}, ['', 'Spiller', 'Pos', 'Alder', 'Vurd', 'Værdi', 'Pris', 'Løn hos dig/rd'].map((x) => h('th', {}, x)))),
+      h('tbody', {}, players.map((p) => {
+        const m = marketInfo(league, me, pub, p);
+        return h('tr', { dataset: { pid: p.id } },
+          h('td', {}, m.reason ? h('span', { class: 'muted', title: m.reason }, '–') : h('button', { class: 'mini buy-row', onclick: () => onBuy(p.id) }, '💰 Køb')),
+          h('td', {}, `#${p.shirtNumber} ${p.shortName}`), h('td', {}, `${LINE[p.line]} · ${POSITION[p.position] ?? ''}`), h('td', { class: 'num' }, p.age),
+          h('td', {}, starsEl(p.publicStars)), h('td', { class: 'num' }, kr(publicValue(p))), h('td', { class: 'num', title: m.reason ?? '' }, kr(m.price)), h('td', { class: 'num' }, kr(Math.round(publicWage(p) / 3))));
+      })))),
+    h('h4', {}, 'Transfers'), log.length ? log.map((e) => h('div', { class: 'tlog-row' }, e.kind === 'release' ? `S${e.s}: ${e.name} fritstillet.` : `S${e.s}: ${e.name} ${name(e.from)} → ${name(e.to)} for ${kr(e.price)}.`)) : h('p', { class: 'muted' }, 'Ingen endnu.'),
+    h('h4', {}, 'Stoppet'), retired.length ? retired.map((r) => h('div', {}, `S${r.season}: ${r.name} (${r.age} år, ${r.games} kampe)`)) : h('p', { class: 'muted' }, 'Ingen endnu.'));
+}

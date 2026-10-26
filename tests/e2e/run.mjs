@@ -321,6 +321,15 @@ try {
   await g.click('#matrix thead th:nth-child(15)');
   check('Modstander: sortering på FIN afvises med anti-spionage-besked', (await g.textContent('#notice')).includes('Anti-spionage'));
   check('Modstander: klubkassen er skjult og linker ikke til Klub (v3.18.0)', (await g.textContent('.clubhead .right')).includes('🔒 Skjult') && (await g.locator('#club-link').count()) === 0);
+  // v3.19.0: offentlig klubside – modstanderens spillere med pris, transfers og pensioner; kasse, løn og regnskab findes ikke
+  await g.click('#public-club-link');
+  const oppCash = await g.evaluate(() => { const d = JSON.parse(localStorage.getItem('tactivar_save')); return d.league.teams[Number(document.getElementById('team-select').value)].cashBalance; });
+  const pubText = await g.textContent('#public-club');
+  check('Modstander i Klub: offentlig klubside med spillere og pris – ingen kasse, løn eller regnskab', (await g.isVisible('#public-club')) && (await g.locator('#public-squad tbody tr').count()) === 18
+    && (await g.locator('#club-cash').count()) === 0 && (await g.locator('#ledger').count()) === 0 && !pubText.replace(/\D/g, ' ').split(' ').includes(String(oppCash)) && pubText.includes('Til din klub'), pubText.slice(0, 120));
+  await g.click('#back-to-club');
+  check('"← Til din klub" viser din egen klub (kasse og regnskab)', (await g.isVisible('#club')) && (await g.textContent('#team-select option:checked')).startsWith('★'));
+  await g.selectOption('#team-select', '1'); await tab('trup');
   check('Modstander: spillerkortet skjuler evner og kontrakt', (await g.locator('#player-card .bars').count()) === 0 && (await g.textContent('#player-card')).includes('🔒 ??'));
   await tab('taktik');
   check('Modstander: faser, Hvis-Så-regler og udskiftningsgrænse er skjulte', (await g.locator('#tactics fieldset').count()) === 0 && (await g.locator('#subs-limit').count()) === 0 && (await g.textContent('#tactics .lockbox')).includes('udskiftningsgrænse'));
@@ -360,9 +369,9 @@ try {
   await g.waitForSelector('#match-center');
   check('▶ Spil runde åbner Kamp-fanen', (await g.textContent('#tabs .tab.active')).includes('Kamp'));
   check('Under afspilning kan runden ikke startes igen', await g.isDisabled('#play-round'));
-  await tab('klub');
+  await g.selectOption('#team-select', '0'); await tab('klub');   // v3.19.0: et valgt modstanderhold viser hans offentlige klubside
   check('Under afspilning: Klub viser ikke regnskabet (præmien ville afsløre slutstillingen)', (await g.isVisible('#club-booked')) && (await g.locator('#ledger').count()) === 0);
-  await tab('kamp');
+  await g.selectOption('#team-select', '3'); await tab('kamp');
   const played = await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.lastRound.matches.map((m) => `${m.homeName}–${m.awayName}`));
   check('Det spillede er præcis de kampe, Liga-fanen viste før ▶ – samme retning og rækkefølge', JSON.stringify(played) === JSON.stringify(nextFx), played.join(' | '));
   check('Under afspilning: besked om at runden er bogført, og de andre resultater er skjulte', (await g.isVisible('#booked-note')) && !/\d-\d/.test(await g.locator('#match-cards .matchcard:nth-child(2)').textContent()));
@@ -373,7 +382,7 @@ try {
   check('Runden har 4 kampe', (await g.locator('#match-cards .matchcard').count()) === 4);
   check('Træning: fokusset gælder stadig efter runden (0 klik pr. runde)', (await focusSaved()) === 'FINISH');
   // v3.18.0 Klub: regnskabets første linje er runden; kassen i klubhovedet er den samme og linker til Klub
-  await tab('klub');
+  await g.selectOption('#team-select', '0'); await tab('klub');
   const led = await g.evaluate(() => { const t = JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((x) => !x.isBot); return { cash: t.cashBalance, n: t.finance.ledger.length }; });
   const cashTxt = await g.textContent('#club-cash');
   check('Klub: kasse, løn pr. runde, lønbudget og prognose – og regnskabet har rundens linje', led.n === 1 && (await g.locator('#ledger tbody tr').count()) === 1

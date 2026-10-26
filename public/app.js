@@ -12,7 +12,7 @@ import { renderMatrix } from './ui/matrix.js';
 import { renderLineupList } from './ui/lineup-list.js';
 import { renderTrainingTable } from './ui/training.js';
 import { renderCard, trainingSummary } from './ui/card.js';
-import { renderClub, shownCash, renderMarket, renderTransferLog } from './ui/club.js';
+import { renderClub, shownCash, renderMarket, renderTransferLog, renderPublicClub } from './ui/club.js';
 import { marketInfo, buyPlayer, setListed, acceptOffer, declineOffer, isStarter } from './engine/transfers.js';
 import { renderSeasonReport } from './ui/season-report.js';
 import { viewTeam } from './engine/visibility.js';
@@ -42,7 +42,7 @@ let view = { viewTeamIdx: 0, sortCol: 'pos', sortDesc: false, filter: 'all', sel
 
 // Skift af hold/visning afbryder et påbegyndt byt, så et senere klik aldrig bytter uden varsel.
 const clearSwap = () => { view.pitchSwapId = null; view.pickMsg = ''; };
-// Holdvælgeren viser holdet i Trup, hvis man står i Kamp/Liga/Klub (der ville valget ellers ikke ses).
+// Holdvælgeren viser holdet i Trup, hvis man står i Kamp/Liga/Admin (der ville valget ellers ikke ses).
 // Sæson og sæsonens runde for ligaens løbende runde r (efter sæsonslut hører r til den afsluttede sæson)
 function seasonAndRound(league, r) {
   const s = (league.seasons ?? []).find((x) => x.programmed !== false && r >= x.fromRound && r <= x.toRound);
@@ -50,7 +50,7 @@ function seasonAndRound(league, r) {
 }
 function showTeam(idx) {
   view.viewTeamIdx = idx; clearSwap(); view.notice = ''; view.selectedPlayerId = game.league.teams[idx].squad[0].id;
-  if (game.ui.tab === 'kamp' || game.ui.tab === 'liga' || game.ui.tab === 'klub') { game.ui.tab = 'trup'; persist(); }
+  if (game.ui.tab === 'kamp' || game.ui.tab === 'liga' || game.ui.tab === 'admin') { game.ui.tab = 'trup'; persist(); }   // Klub bliver: den viser holdets klubside
   render();
 }
 // Et nyt spil (ny liga/import) må ikke vise den gamle ligas runde i Kamp-fanen.
@@ -278,7 +278,7 @@ function renderNow() {
     h('div', {}, h('h2', { id: 'club-name' }, team.name), h('div', { class: 'muted' }, isOwn ? 'Dit hold – alle egne data er synlige' : 'Modstanderhold – kun offentlige data og stjerner')),
     h('div', { class: 'right' }, h('div', { class: 'muted' }, 'Klubkasse'), viewTeam(team, isOwn).cashBalance != null
       ? h('button', { class: 'linklike', id: 'club-link', title: 'Økonomi, lønbudget og regnskab', onclick: () => showTab('klub') }, h('strong', {}, kr(shownCash(team, !!mc?.playing))), ' 💼')
-      : h('strong', {}, '🔒 Skjult')));
+      : h('div', {}, h('strong', {}, '🔒 Skjult'), ' ', h('button', { class: 'linklike', id: 'public-club-link', title: 'Offentlig klubside: spillere med pris, transfers og pensioner', onclick: () => showTab('klub') }, '💼 Klubside'))));
 
   // Fanen afgøres før kortet: træning sættes kun i Trup (v3.19.0)
   const tab = TABS.some(([k]) => k === game.ui.tab) ? game.ui.tab : 'trup';
@@ -365,7 +365,9 @@ function renderNow() {
       // Statistikken skjules også under afspilningen (den er bogført og ville afsløre runden).
       !mc?.playing ? renderStats({ league, myTeamId: mine.id }) : null],
     admin: () => [renderAdmin()],
-    klub: () => [renderClub({ league, team: mine, playing: !!mc?.playing }), renderMarket({ league, team: mine, playing: !!mc?.playing,
+    klub: () => (!isOwn ? [renderPublicClub({ league, pub: viewTeam(team, false), me: mine, playing: !!mc?.playing, msg: view.marketMsg ?? '',
+      onBack: () => showTeam(myIdx()),
+      onBuy: (id) => { const name = team.squad.find((p) => p.id === id)?.shortName; const err = buyPlayer(league, mine, id); view.marketMsg = err ? `💰 ${err}` : `💰 ${name} er købt og står nu i din trup.`; change(() => {}); } })] : null) ?? [renderClub({ league, team: mine, playing: !!mc?.playing }), renderMarket({ league, team: mine, playing: !!mc?.playing,
       onAccept: (id) => { const err = acceptOffer(league, mine, id); view.notice = err ? `🔁 ${err}` : '🔁 Spilleren er solgt.'; change(() => {}); },
       onDecline: (id) => change(() => declineOffer(league, mine, id)), onUnlist: (id) => change(() => setListed(league, mine, id, false)),
       line: view.marketLine ?? 'all', onLine: (v) => { view.marketLine = v; view.marketMsg = ''; render(); }, msg: view.marketMsg ?? '',
