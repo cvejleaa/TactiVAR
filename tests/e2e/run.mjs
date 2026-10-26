@@ -76,7 +76,7 @@ try {
   await g.selectOption(`#training-table tr[data-pid="${await g.evaluate((nr) => JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((x) => !x.isBot).squad.find((x) => String(x.shirtNumber) === nr).id, shown)}"] select`, 'FINISH');
   check('Spillerkortet viser 9 evne-barer og luftduel-udregningen', (await g.locator('#player-card .bars .bar').count()) === 9 && (await g.textContent('#aerial-breakdown')).includes('× 0,35'));
   // v3.8 (Test Manager): kortets overskrift viser spillerens EGEN naturlige position med fuld betegnelse
-  const FULL_POS = { GK: 'Målmand', CB: 'Midtstopper', FB: 'Back/wingback (LB/RB/LWB/RWB)', CM: 'Central/defensiv midtbane (CM/CDM)', WM: 'Kant (LM/RM/LW/RW)', AM: 'Offensiv midtbane (CAM/CF)', ST: 'Angriber (ST)' };
+  const FULL_POS = { GK: 'Målmand', CB: 'Midtstopper', FB: 'Back/wingback (LB/RB/LWB/RWB)', DM: 'Defensiv midtbane (CDM)', CM: 'Central midtbane (CM)', WM: 'Kant (LM/RM/LW/RW)', AM: 'Offensiv midtbane (CAM/CF)', ST: 'Angriber (ST)' };
   const shownPos = await g.evaluate((nr) => JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((x) => !x.isBot).squad.find((x) => String(x.shirtNumber) === nr).position, shown);
   const cardHead = await g.textContent('#player-card .card-head');
   check('Spillerkortet: kæde og naturlig position med fuld betegnelse (kun den ene)', cardHead.includes(` • ${FULL_POS[shownPos]} • `) && Object.values(FULL_POS).filter((t) => cardHead.includes(` • ${t} • `)).length === 1 && !cardHead.includes('(('), `${shownPos}: ${cardHead}`);
@@ -151,13 +151,13 @@ try {
   const fins = (await g.locator('#matrix tbody tr td:nth-child(15)').allTextContents()).map(Number);
   check('Sortering på FIN giver højeste først', fins.length === 18 && fins.every((v, i) => i === 0 || fins[i - 1] >= v), fins.join(','));
   // Natur-kolonnen (v3.8): hver rækkes etiket og forklaring stemmer med spillerens gemte position, og sorteringen følger rækkefølgen
-  const LABEL_POS = { GK: 'MV', CB: 'CB', FB: 'Back', CM: 'CM', AM: 'OM', WM: 'Kant', ST: 'ANG' };
+  const LABEL_POS = { GK: 'MV', CB: 'CB', FB: 'Back', DM: 'DM', CM: 'CM', AM: 'OM', WM: 'Kant', ST: 'ANG' };
   const savedPos = await g.evaluate(() => Object.fromEntries(JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((x) => !x.isBot).squad.map((p) => [p.shortName, p.position])));
   await g.click('#matrix thead th:nth-child(4)');
   const natRows = await g.evaluate(() => [...document.querySelectorAll('#matrix tbody tr')].map((tr) => ({ name: tr.children[1].textContent, label: tr.children[3].textContent.trim(), title: tr.children[3].title })));
   check('Natur: hver spillers etiket og forklaring (title) er hans gemte position', natRows.length === 18 && natRows.every((r) => r.label === LABEL_POS[savedPos[r.name]] && r.title === FULL_POS[savedPos[r.name]]), JSON.stringify(natRows.slice(0, 3)));
-  const natIdx = natRows.map((r) => ['GK', 'CB', 'FB', 'CM', 'AM', 'WM', 'ST'].indexOf(savedPos[r.name]));
-  check('Natur: sortering stigende MV, CB, Back, CM, OM, Kant, ANG (alle syv forekommer)', natIdx.every((v, i) => i === 0 || natIdx[i - 1] <= v) && new Set(natIdx).size === 7, natIdx.join(','));
+  const natIdx = natRows.map((r) => ['GK', 'CB', 'FB', 'DM', 'CM', 'AM', 'WM', 'ST'].indexOf(savedPos[r.name]));
+  check('Natur: sortering stigende MV, CB, Back, DM, CM, OM, Kant, ANG (alle otte forekommer – v3.20.0: DM)', natIdx.every((v, i) => i === 0 || natIdx[i - 1] <= v) && new Set(natIdx).size === 8, natIdx.join(','));
 
   // Træk en spiller ud af zonen
   await tab('taktik');

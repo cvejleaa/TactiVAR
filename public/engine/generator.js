@@ -32,18 +32,20 @@ export const ARCHETYPES = {
 
 // Truppens opbygning: #1–11 starter, #12–18 bænk (spec §2; #10–11 og #16–18 fastsat).
 // Naturlig position (v3.8) passer til standardopstillingen 4-4-2 (LB CB CB RB / LM CM CM RM / ST ST):
-// 2 MV; forsvar 3 CB + 3 FB; midtbane 3 CM + 2 WM + 1 AM; angreb 3 ST + 1 WM.
+// 2 MV; forsvar 3 CB + 3 FB; midtbane 2 CM + 1 DM + 2 WM + 1 AM; angreb 3 ST + 1 WM.
+// v3.20.0: #15 er defensiv midtbane (DM) – én pr. trup, så 4-4-2 stadig har to CM (QC: med to DM kunne 6 af 8 hold ikke stille rent op).
 const POSITION_OF_LINE = { GK: 'GK', DEF: 'CB', MID: 'CM', ATT: 'ST' };
 const BLUEPRINT = [
   ['GK', 'STARTER', 'GK'], ['DEF', 'STARTER', 'FB'], ['DEF', 'STARTER', 'CB'], ['DEF', 'STAR', 'CB'], ['DEF', 'STARTER', 'FB'],
   ['MID', 'STARTER', 'WM'], ['MID', 'STARTER', 'CM'], ['MID', 'STAR', 'CM'], ['ATT', 'STARTER', 'ST'], ['MID', 'STARTER', 'WM'], ['ATT', 'STARTER', 'ST'],
-  ['GK', 'ROTATION', 'GK'], ['DEF', 'ROTATION', 'CB'], ['DEF', 'TALENT', 'FB'], ['MID', 'ROTATION', 'CM'], ['MID', 'TALENT', 'AM'], ['ATT', 'ROTATION', 'ST'], ['ATT', 'TALENT', 'WM'],
+  ['GK', 'ROTATION', 'GK'], ['DEF', 'ROTATION', 'CB'], ['DEF', 'TALENT', 'FB'], ['MID', 'ROTATION', 'DM'], ['MID', 'TALENT', 'AM'], ['ATT', 'ROTATION', 'ST'], ['ATT', 'TALENT', 'WM'],
 ];
-export const POSITIONS = ['GK', 'CB', 'FB', 'CM', 'WM', 'AM', 'ST'];
+// Rækkefølgen er visningens (Natur-kolonnens sortering): bagfra og frem.
+export const POSITIONS = ['GK', 'CB', 'FB', 'DM', 'CM', 'AM', 'WM', 'ST'];
 
 // Naturlig position til spillere uden en (ligaer fra før v3.8): pr. kæde efter højde – de
 // højeste bliver stoppere og angribere, de laveste backs og kanter (dokumentets mønster),
-// i samme forhold som BLUEPRINT. Kun spillere uden position røres.
+// i samme forhold som BLUEPRINT (før v3.20 – frosset: migrering 4→5 bygger på den; DM kommer med 7→8). Kun spillere uden position røres.
 export function assignPositions(squad) {
   const byLine = {};
   for (const p of squad) if (!POSITIONS.includes(p.position)) (byLine[p.line] ||= []).push(p);
@@ -105,6 +107,7 @@ export const HEIGHT_BY_POS = {
   CB: { mid: 190, dice: 3, min: 184, max: 198 },
   ST: { mid: 186.5, dice: 4, min: 178, max: 196 },
   CM: { mid: 183.5, dice: 4, min: 175, max: 192 },
+  DM: { mid: 183.5, dice: 4, min: 175, max: 192 },   // v3.20.0: som CM – samme terninger, så rng-forløbet (og alle kampe) er uændret
   AM: { mid: 183.5, dice: 4, min: 175, max: 192 },
   FB: { mid: 175.5, dice: 3, min: 169, max: 183 },
   WM: { mid: 175.5, dice: 3, min: 169, max: 183 },

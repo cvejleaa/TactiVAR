@@ -516,10 +516,10 @@ test('højde pr. naturlig position efter dokumentets tabel (v3.8): snit, spænd 
   assert.ok(league.min >= 169 && league.max <= 201 && league.max >= 198, `spænd ${league.min}–${league.max}`);
   assert.ok(league.sd >= 6, `hele truppen spreder sig stadig (brugeren: ikke alle tæt på snittet) – ${league.sd}`);
 });
-test('naturlig position: truppen er 2 GK / 3 CB / 3 FB / 3 CM / 2+1 WM / 1 AM / 3 ST, og standard-11 passer til 4-4-2', () => {
+test('naturlig position: truppen er 2 GK / 3 CB / 3 FB / 2 CM / 1 DM / 2+1 WM / 1 AM / 3 ST, og standard-11 passer til 4-4-2 (v3.20.0: #15 DM – før 3 CM, 0 DM)', () => {
   const t = createLeague(createRng(3)).teams[0];
   const count = (line, pos) => t.squad.filter((p) => p.line === line && p.position === pos).length;
-  assert.deepEqual([count('GK', 'GK'), count('DEF', 'CB'), count('DEF', 'FB'), count('MID', 'CM'), count('MID', 'WM'), count('MID', 'AM'), count('ATT', 'ST'), count('ATT', 'WM')], [2, 3, 3, 3, 2, 1, 3, 1]);
+  assert.deepEqual([count('GK', 'GK'), count('DEF', 'CB'), count('DEF', 'FB'), count('MID', 'CM'), count('MID', 'DM'), count('MID', 'WM'), count('MID', 'AM'), count('ATT', 'ST'), count('ATT', 'WM')], [2, 3, 3, 2, 1, 2, 1, 3, 1]);
   const start = t.tactics.lineupSlots.map((id) => t.squad.find((p) => p.id === id).position);
   assert.deepEqual(start, ['GK', 'FB', 'CB', 'CB', 'FB', 'WM', 'CM', 'CM', 'WM', 'ST', 'ST']); // LB CB CB RB / LM CM CM RM / ST ST
 });
@@ -565,6 +565,7 @@ test('HEIGHT_BY_POS er dokumentets tabel (bogstavelig): midte, terninger og spæ
     CB: { mid: 190, dice: 3, min: 184, max: 198 },
     ST: { mid: 186.5, dice: 4, min: 178, max: 196 },
     CM: { mid: 183.5, dice: 4, min: 175, max: 192 },
+    DM: { mid: 183.5, dice: 4, min: 175, max: 192 },
     AM: { mid: 183.5, dice: 4, min: 175, max: 192 },
     FB: { mid: 175.5, dice: 3, min: 169, max: 183 },
     WM: { mid: 175.5, dice: 3, min: 169, max: 183 },
@@ -609,7 +610,7 @@ test('generatePlayer: position gemmes på spilleren, og uden position vælges k�
   assert.equal(mk('DEF').heightCm, 184, 'uden position er en DEF en stopper (bund 184), ikke en back (169)');
 });
 test('truppens bænk og start: positionen pr. trøjenummer står fast i ALLE hold (rækkefølgen i BLUEPRINT)', () => {
-  const want = ['GK', 'FB', 'CB', 'CB', 'FB', 'WM', 'CM', 'CM', 'ST', 'WM', 'ST', 'GK', 'CB', 'FB', 'CM', 'AM', 'ST', 'WM'];
+  const want = ['GK', 'FB', 'CB', 'CB', 'FB', 'WM', 'CM', 'CM', 'ST', 'WM', 'ST', 'GK', 'CB', 'FB', 'DM', 'AM', 'ST', 'WM'];
   for (const seed of [3, 9]) for (const t of createLeague(createRng(seed)).teams) assert.deepEqual(t.squad.map((p) => p.position), want, `${t.name}`);
 });
 
