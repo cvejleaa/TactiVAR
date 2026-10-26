@@ -6,9 +6,13 @@ import { MAX_RULES } from './match-rules.js';
 import { TEAM_STAT_DEFAULTS, PLAYER_SEASON_DEFAULTS } from './stats.js';
 import { FORMATIONS } from './formations.js';
 import { buildSchedule, isValidSchedule, SEASON_ROUNDS } from './schedule.js';
-import { defaultTactics, defaultStarterIds, emptyStanding, BOT_PROFILES, aerialBreakdown, assignPositions } from './generator.js';
+import { defaultTactics, defaultStarterIds, emptyStanding, BOT_PROFILES, aerialBreakdown, assignPositions, teamCareerDefaults, generatePlayer } from './generator.js';
+import { initialPotential, publicWage, MATCH_LOG_CAP, SQUAD_MIN, SQUAD_MAX, derivedRng, neededLine, freeShirt } from './career.js';
 
-const PLAYER_DEFAULTS = { freshness: 100, injuryMatchesLeft: 0, lastRating: 0, ratingSum: 0, ratingGames: 0, publicStars: 0, seasonAgeCounter: 1, archetype: null, distanceSum: 0, minutesSum: 0, topSpeedMax: 0, hiKmSum: 0, hiDistSum: 0 };
+const PLAYER_DEFAULTS = { freshness: 100, injuryMatchesLeft: 0, lastRating: 0, ratingSum: 0, ratingGames: 0, publicStars: 0, seasonAgeCounter: 1, archetype: null, distanceSum: 0, minutesSum: 0, topSpeedMax: 0, hiKmSum: 0, hiDistSum: 0, trainingFocus: 'GENERAL', careerGames: 0 };
+// Truppens størrelse (v3.18.0: 18–25 efter lønbudgettet; før præcis 18)
+export { SQUAD_MIN, SQUAD_MAX };   // ét sted: career.js
+const LOG_CAP = 40;
 
 // Hvis-Så-regel i skema 2: { condition: TRAILING|LEADING|DRAW, margin 1–5, newFormation, newPlan }.
 // Skema 1 havde LEADING_BY_1 (præcis 1 foran) og TRAILING (bagud) uden antal mål.
@@ -44,8 +48,8 @@ function fixTactics(t, starterIds, profile) {
 
 // Returnerer { league, problems } – problems er en liste af ting, der IKKE kunne repareres.
 export function normalizeLeague(league) {
-  const problems = [];
-  if (!league || !Array.isArray(league.teams)) return { league: null, problems: ['Ligaen mangler hold'] };
+  const problems = [], notes = [];
+  if (!league || !Array.isArray(league.teams)) return { league: null, problems: ['Ligaen mangler hold'], notes };
   if (league.teams.length !== 8) problems.push(`Ligaen har ${league.teams.length} hold (forventet 8)`);
   league.leagueMetadata ||= { id: 'league_div_1', name: 'TactiVAR Superligaen', seasonNumber: 1, footballYear: 1 };
   const md = league.leagueMetadata;
@@ -72,10 +76,31 @@ export function normalizeLeague(league) {
   const next = md.round + 1 - league.seasonStartRound;
   if (!Number.isInteger(league.seasonStartRound) || next < 0 || next >= SEASON_ROUNDS) league.seasonStartRound = md.round + 1;
   if (!Array.isArray(league.seasons)) league.seasons = [];
+  // v3.18.0: transfers, pensioner og bud (lofter – gemmet må ikke vokse uden grænse, QC)
+  if (!Number.isInteger(league.nextPlayerSeq) || league.nextPlayerSeq < 1) league.nextPlayerSeq = 1;
+  // v3.18.0 (Security): kun poster af den rigtige form – en delt fil med fx et navn som objekt væltede Liga-fanen
+  const okEntry = (e) => e && typeof e === 'object' && !Array.isArray(e) && Object.values(e).every((v) => v == null || ['string', 'number', 'boolean'].includes(typeof v));
+  for (const k of ['transferLog', 'retired', 'offers']) league[k] = Array.isArray(league[k]) ? league[k].filter(okEntry).slice(-LOG_CAP) : [];
   league.teams.forEach((team, idx) => {
-    if (!Array.isArray(team.squad) || team.squad.length !== 18) { problems.push(`${team.name || team.id} har ${team.squad?.length ?? 0} spillere (forventet 18)`); return; }
+    // v3.18.0 (QC): en trup uden for 18–25 låser aldrig ligaen ude – under 18 fyldes op med ungdom (besked), over 25 får en besked.
+    // Kun en trup uden 11 spillere kan ikke repareres.
+    if (!Array.isArray(team.squad) || team.squad.length < 11) { problems.push(`${team.name || team.id} har ${team.squad?.length ?? 0} spillere (forventet ${SQUAD_MIN}–${SQUAD_MAX})`); return; }
+    if (team.squad.length < SQUAD_MIN) {
+      const rng = derivedRng('sanitize-fill', team.id, team.squad.length), used = new Set(league.teams.flatMap((t) => (t.squad || []).map((p) => p.shortName)));
+      const n0 = team.squad.length;
+      while (team.squad.length < SQUAD_MIN) {
+        league.nextPlayerSeq = Number.isInteger(league.nextPlayerSeq) && league.nextPlayerSeq > 0 ? league.nextPlayerSeq : 1;
+        team.squad.push(generatePlayer(rng, neededLine(team), 'YOUTH', freeShirt(team), idx, used, 0, undefined, `plr_y${league.nextPlayerSeq++}`));
+      }
+      notes.push(`${team.name} havde ${n0} spillere – truppen er fyldt op med ${SQUAD_MIN - n0} ungdomsspillere.`);
+    }
+    if (team.squad.length > SQUAD_MAX) notes.push(`${team.name} har ${team.squad.length} spillere – over ${SQUAD_MAX}. Sælg eller lad spillere gå.`);
     for (const p of team.squad) {
       for (const [k, v] of Object.entries({ ...PLAYER_DEFAULTS, ...PLAYER_SEASON_DEFAULTS })) if (p[k] === undefined) p[k] = v;
+      if (!p.dev || typeof p.dev !== 'object') p.dev = {};
+      p.matchLog = Array.isArray(p.matchLog) ? p.matchLog.filter((e) => Array.isArray(e) && e.length === 11 && e.every((v) => v == null || Number.isFinite(v))).slice(-MATCH_LOG_CAP) : [];
+      if (!Number.isFinite(p.potential)) p.potential = initialPotential(p);
+      if (!Number.isFinite(p.weeklyWage)) p.weeklyWage = publicWage(p);
       if (!p.counterTactics) p.counterTactics = { vsPress: 15, vsLowBlock: 15, vsTrapLong: 15 };
       p.aerialPower = aerialBreakdown(p.heightCm, p.jumpingPower, p.skills.strength, p.skills.positioning).total;
     }
@@ -88,10 +113,23 @@ export function normalizeLeague(league) {
     if (!Array.isArray(team.tacticPresets) || team.tacticPresets.length < 3) team.tacticPresets = [structuredClone(team.tactics), defaultTactics(starters, profile), defaultTactics(starters, profile)];
     team.tacticPresets = team.tacticPresets.map((t) => fixTactics(t, team.tactics.lineupSlots, profile));
     team.cashBalance ??= 5000000;
+    // v3.18.0: bænken (de 7 udtagne), økonomi, transferliste, ungdomstilbud – en ugyldig bænk udtages igen automatisk
+    const def = teamCareerDefaults(team.squad, team.tactics.lineupSlots), starters11 = new Set(team.tactics.lineupSlots);
+    const bench = Array.isArray(team.matchBench) ? [...new Set(team.matchBench)].filter((id) => ids.has(id) && !starters11.has(id)) : null;
+    team.matchBench = bench && bench.length <= 7 && (bench.length === 7 || bench.length === team.squad.length - 11) ? bench : def.matchBench;
+    team.matchBenchAuto = team.matchBenchAuto !== false;
+    if (!team.finance || typeof team.finance !== 'object') team.finance = def.finance;
+    team.finance.ledger = Array.isArray(team.finance.ledger) ? team.finance.ledger.slice(-30) : [];
+    team.finance.season ||= {};
+    team.finance.form = Array.isArray(team.finance.form) ? team.finance.form.filter(Number.isFinite).slice(-3) : [];
+    team.listed = Array.isArray(team.listed) ? team.listed.filter((id) => ids.has(id)) : [];
+    // Et ungdomstilbud er en spiller: uden evner, kæde og id kan det ikke tages op (Security: et tomt tilbud i en delt fil brickede spillet)
+    const validYouth = (y) => y && typeof y.id === 'string' && !ids.has(y.id) && ['GK', 'DEF', 'MID', 'ATT'].includes(y.line) && y.skills && Object.values(y.skills).every(Number.isFinite) && typeof y.shortName === 'string' && Number.isFinite(y.age);
+    team.youthOffers = Array.isArray(team.youthOffers) ? team.youthOffers.filter(validYouth).slice(0, 2) : [];
     // Udskiftningsgrænsen (v3.13): gemt før v3.13 → holdets profil (dit hold 70 %); 0 = fra bevares.
     team.subsLimit = clampSubsLimit(team.subsLimit ?? profile.subs);
   });
-  return { league, problems };
+  return { league, problems, notes };
 }
 
 // Sporets form (v3.16, match.js "Kampens spor"): v 1, højst 31 grundbilleder, højst 11 spillere pr. side, id'er som tal eller

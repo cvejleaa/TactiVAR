@@ -22,13 +22,13 @@ begrundelse).
 | Runde | 4 kampe pr. runde, alle simuleres med fuld motor | med |
 | Stilling | sejr 3, uafgjort 1; sortering point → målforskel; kolonner K/V/U/T/Mål/VAR(±)/Point; klik på hold = scout | med |
 | Kampprogram | 14 runder Berger-program hjemme/ude (`public/engine/schedule.js`, v3.11): alle møder alle én gang hjemme og én gang ude, runde 8–14 er runde 1–7 spejlet, højst 2 hjemme/ude i træk. Holdrækkefølgen blandes pr. liga (seedet af spillerne, ikke ligaens rng). Ingen modstandervælger; din kamp står først i runden. Ingen hjemmebanefordel – hjemme/ude er kun, hvor kampen spilles | med |
-| Sæson | Efter sæsonens runde 14 arkiveres tabel, mester, din placering, topscorer og din bedste (flest kåringer, så mål) i `league.seasons`; tabel og sæsonstatistik nulstilles, `seasonNumber` +1, `seasonStartRound`/`statsFromRound` = næste runde. Spillere, friskhed og ligaens forløb bevares. Aldring kommer med træningen. Mesterregel og den seneste sæsons fulde tal: §8 "Sæsonslut og mester" (v3.16.3) | med (v3.11) |
-| Kalender | 3 kampe/uge tir/tor/søn, fredag træning+økonomi, sæson = 5 uger, fodboldår = 2 sæsoner, +1 år alder pr. fodboldår | udskudt |
-| Klubkasse | 5.000.000 kr. | med (vises; ingen økonomi endnu) |
+| Sæson | Efter sæsonens runde 14 arkiveres tabel, mester, din placering, topscorer og din bedste (flest kåringer, så mål) i `league.seasons`; tabel og sæsonstatistik nulstilles, `seasonNumber` +1, `seasonStartRound`/`statsFromRound` = næste runde. Spillere, friskhed og ligaens forløb bevares. Derefter sæsonskiftet: pension, +1 år, ungdom og præmie (§2 "Livsløb, økonomi og transfers", v3.18.0). Mesterregel og den seneste sæsons fulde tal: §8 "Sæsonslut og mester" (v3.16.3) | med (v3.11) |
+| Kalender | Kilden: 3 kampe/uge tir/tor/søn, fredag træning+økonomi, fodboldår = 2 sæsoner. v3.18.0 (brugerens valg): +1 år pr. sæson (`footballYear` +1 pr. sæson), træning og økonomi efter hver runde, 1 uge = 3 runder i lønnen; ingen ugedage | delvis (v3.18.0) |
+| Klubkasse | 5.000.000 kr. ved start; tilskuere, TV, løn, præmie og transfers (§2 "Livsløb, økonomi og transfers") | med (v3.18.0) |
 
 ## 2. Spillere
 
-- Trup 18: #1–11 start (`lineupSlots`), #12–18 bænk.
+- Trup 18 ved start, 18–25 fra v3.18.0: 11 startere (`lineupSlots`), en kamptrup-bænk på højst 7 (`matchBench`, "Udtag automatisk" – ét sted: `career.js` `matchBenchOf`), resten reserver.
 - Blueprint: #1 GK STARTER, #2–3 DEF STARTER, #4 DEF STAR, #5 DEF, #6–7 MID
   STARTER, #8 MID STAR, #9 ATT STARTER, #10–11; bænk #12 GK ROTATION, #13 DEF
   ROTATION, #14 DEF TALENT, #15 MID ROTATION, #16–18 (afskåret: fordel MID/ATT
@@ -86,6 +86,15 @@ højde ≥190 og spring ≥13 → hjørnespark-clue · theatre ≥14 → "teatra
 Clues opstår i kampe. **Rettet:** v2.5b gemmer clues på modstanderens
 spillerobjekt; de skal ligge hos den der observerer.
 
+### Livsløb, økonomi og transfers (v3.18.0)
+Konstanterne står ét sted: `public/engine/career.js` (og `transfers.js`). Bånd: `tools/measure-lifecycle.mjs`, `tests/unit/lifecycle-v3180.test.mjs`.
+- **Kamphistorik (§10.4):** én tupel pr. kamp (`matchLog`, højst 28): sæson, runde, hold, resultat, minutter, karakter (kun ejeren), stjerner, mål, oplæg. Kortet: "📜 Kampe", karrierelinje, 📺 kun på seneste rundes kamp.
+- **Unikke kortnavne** i hele ligaen (`uniquifyNames`, egen afledt rng – kampene uændrede); en gemt liga omdøbes ved migreringen, også i tekster.
+- **Træning pr. spiller** (gælder, til det ændres): Alsidig, Kondition, Teknik, Afslutning, Forsvar, Fysik, Målmand (kun MV), Hvile. Fremgang = rate · alder (1,5 … 0,2) · plads til loftet (0,1–1); +1 ved 1,0. Kampe: 0,02 pr. 90 min i kædens nøgle-evner. Pris: −2 … −5 friskhed (gulv 50; den, der spillede, betaler 2 mindre), 0,3–0,7 % træningsskade; Hvile +4. Botterne træner Alsidig (friskheden røber ikke fokus).
+- **Sæsonskiftet** (kun `commitRound`, aldrig en migrering): pension fra 31 (MV 33) med ¼ ½ ¾, sikker ved 34 (MV 36), varslet på kortet fra runde 10; alle +1 år; fald fra 30 (MV 32) – fart/kondition først, positionering/pasning sidst, træning halverer; vækst for unge til 23 efter alder, loft og spilletid; værdi-stjerner = snit af seneste 5 kampe; lønnen genforhandles; 2 ungdomstilbud pr. hold (16–18 år, potentiale snit + 4 ± 2,5; botterne tager op efter truppens størrelse; dit hold vælger i sæsonrapporten, frist næste runde; under 18 fyldes op); opstillingerne repareres (samme kæde); statistikken for den afsluttede sæson bygger på et øjebliksbillede.
+- **Økonomi** pr. runde: TV 120.000 kr., billetter kun hjemme (min(9000, 4000 + 300·(8 − plads hjemme) + 150·(8 − plads ude) + 120·form) à 90 kr.; runde 1–2: sidste sæsons placering), løn = ugeløn / 3. Præmie 1,5 / 1,1 / 0,8 / 0,6 / 0,45 / 0,3 / 0,2 / 0,1 mio. Lønbudget 1,7 mio. + 2 % af kassen pr. uge (begrænser køb, ikke økonomien). Offentlig værdi = stjerner (eller tier; ungdom 1★) · alder; løn = 6 % af værdien. 💼 Klub viser kasse, løn, budget, prognose og regnskab.
+- **Transfers:** vinduer før runde 1 og 8; fast pris = værdi · 1,3 (starter 1,6); sælgeren beholder MV 2 / FOR 6 / MID 6 / ANG 3 og 18, højst 2 salg pr. vindue, karantæne et vindue. Dine spillere til salg får bud 0,9–1,0 · værdien. Botterne i minus sælger/fritstiller (dine spillere aldrig automatisk); botter under minimum eller med over 2 mio. kr. køber. Transferlisten er offentlig. Afviger fra kilden: ingen ugentlig pulje og ingen forhandling (brugerens valg: vinduer + fast pris).
+
 ## 3. Hvem ser hvad (anti-spionage)
 - Kampstatistikken i Match Center (v3.10.1: også frispark i skudafstand, hjørnespark, straffe (mål)
   og gule kort) er tal fra én kamp, hvor hver hændelse står i referatet – offentlig for begge hold.
@@ -103,8 +112,20 @@ spillerobjekt; de skal ligge hos den der observerer.
   (andel i tredjedele) – et PRÆSENTATIONSVALG (brugerens), ikke anti-spionage: en senere gennemgang skal ikke "lukke" det.
   Klummen læser ikke sporet (`publicFacts`). Øjebliksbilledet 📍 er uændret (dit hold); dets mål-imod-tekst henviser til
   afspilningen for begge hold – samme formel, så de to billeder ikke modsiger hinanden.
-- Kun ejer: 9 evner, spring, luftduel, arketype, løn/værdi, kasse, de præcise fasevalg og Hvis-Så-regler,
-  eksakt karakter, mod-kunnen.
+- Kun ejer: 9 evner, spring, luftduel, arketype, løn, kasse og regnskab, de præcise fasevalg og Hvis-Så-regler,
+  eksakt karakter, mod-kunnen; fra v3.18.0 også træningsfokus og -fremdrift, transferliste, ungdomstilbud og bud
+  (holdfelterne bag ÉN vagt: `viewTeam`). Den offentlige værdi og prisen bygger kun på stjerner, tier og alder.
+  Kamphistorikken er offentlig uden karakteren. Potentialet er hemmeligt – ejeren ser et skøn i ord. Botternes valg
+  (kamptrup, ungdom, køb, salg, bud) bygger kun på offentlige data; botterne træner Alsidig (kanarietest).
+  Kendte, accepterede kanaler (Security Reviewer v3.18.0) – skal håndteres i trin 2:
+  - Botternes kasse og løn er skjult i visningen, men kan regnes præcist ud af offentlige tal (tabel, resultater, stjerner/alder,
+    transferlisten); buddene og botternes handler bruger dem – ingen ny lækage.
+  - Ejeren kan aflæse sit eget potentiale ret præcist af træningsestimatet ("næste +1 om ca. N runder"); i trin 2 er `dev` et ejerfelt.
+  - De afledte tilfældighedstal (`derivedRng`: ungdom, potentiale, træning, pension, bud) bygger på offentlige nøgler – med koden
+    kan en ungdomsspillers skjulte tal regnes ud. Trin 2 skal salte dem med en hemmelighed på serveren.
+  - En menneskestyret managers træningsfokus kan aflæses af en reserves friskhed (træningsprisen); botternes kan ikke (Alsidig).
+  - `viewTeam` er en sortliste (kun kasse, regnskab, salgsliste, ungdom, bud); trin 2 skal gøre den til en tilladelsesliste
+    som `viewPlayer`. En købt spillers karakterer fra botten ses af den nye ejer.
 - Ingen: VAR-profil (kun via clues og VAR-kendelser i referatet – v3.15.1: varPulse, theatre og cynicism afgør VAR's
   kendelser som lodtrækninger, så én kendelse ikke afslører spillerens trin).
 - Modstandere vises med "🔒 ??"; sortering på skjulte kolonner hos et
@@ -760,7 +781,8 @@ referaterne).
   ændrer skemaet, tilføjer et fixture gemt af den forrige version og en
   test, der indlæser det med truppen intakt. Skema 1 → 2 (v3.4, Hvis-Så) og
   2 → 3 (v3.6, mod-kunnen-pulje og højde), 3 → 4 (v3.7, Superliga-højder), 4 → 5 (v3.8,
-  naturlig position og højde pr. position), 5 → 6 (v3.11, kampprogram: den hidtidige tabel
+  naturlig position og højde pr. position), 6 → 7 (v3.18.0, livsløbet: nye felter med standardværdier, løn efter
+  offentlige data, unikke navne – ingen ældes; fixtures `save-v3.17.0.json` og `save-v3.17.0-r13.json`), 5 → 6 (v3.11, kampprogram: den hidtidige tabel
   arkiveres som "Sæson 1 (uden program)", sæson 2 starter med program og nulstillet
   sæsonstatistik; programmet bygges deterministisk af holdenes rækkefølge) – fixtures
   `tests/fixtures/save-schema1.json` … `save-schema5.json`, `save-v3.9.json`, `save-v3.10.1.json`
@@ -768,6 +790,7 @@ referaterne).
   version: `save-v3.16.2.json` (v3.16.2-koden, ny liga + 14 runder = lige efter sæsonslut, uden
   `varNet`/holdtal i arkivet, `champion.runnerUp` og `lastSeasonStats`; indlæses i
   `tests/unit/season-end.test.mjs`).
+- Backups i browseren (v3.18.0): kun de 3 nyeste beholdes; ingen ny, hvis den er lig den nyeste.
 - Eksport/import af hele spillet som JSON-fil (backup og flytning mellem
   browsere/domæner).
 - Gamle data fra vejleaa.dk kan ikke flyttes (localStorage er bundet til
@@ -802,7 +825,7 @@ avisens hovedperson altid målmanden.
    de øvrige kampe, rundens spiller/mål med begrundelse). Klummen vurderer
    hvert holds taktik og drysser de samme beskrivende hints som referatet —
    aldrig tal.
-4. Kampstempel `[Runde X • A x-y B • min • karakter]` + kamphistorik pr. spiller + rundetæller.
+4. ~~Kampstempel `[Runde X • A x-y B • min • karakter]` + kamphistorik pr. spiller + rundetæller.~~ Med i v3.18.0 (§2 "Livsløb", 📜 Kampe på kortet).
 5. 🔬 Motor-Røntgen: pause/trin-afspilning, hver hændelse viser sin
    beregning — **kun med egne spilleres tal**; modstanderens side vises som
    beskrivelse. Anti-spionage-test kræves.
@@ -845,8 +868,8 @@ Modstanderes stjerner: udfyldte i guld, tomme dæmpet.
   teams_secrets` + `manager_notes/{uid}` er udgangspunktet.
 - **Server-motor** (udskudt): reel hemmeligholdelse kræver Cloud Functions
   (Blaze-plan) — besluttes i trin 2.
-- **Uge-hjul, træning, økonomi, transfermarked, aldring, arketype-unlock over
-  tid** (udskudt — aldrig bygget i kilden).
+- **Uge-hjul** (ugedage) udskudt. Træning, økonomi, transfermarked, aldring og arketype-unlock over tid er med i
+  v3.18.0 (§2 "Livsløb, økonomi og transfers").
 - **Tailwind via CDN** (udeladt): erstattes af egen `style.css`.
 - **"0 backslashes / 0 backticks"-reglen** (udeladt): den fandtes kun pga.
   one.com-editoren. Erstattes af DOM-API/`textContent` i stedet for HTML-strenge.
@@ -858,7 +881,7 @@ mod v2.5b-koden:
 | Påstand | Virkelighed i v2.5b | Status her |
 |---|---|---|
 | 3-lags anti-spionage (public/private/secrets) | kun visning i klienten; Firestore åben i test mode | med (visning), reel beskyttelse udskudt |
-| Arketyper "låses op når evne-kravet er trænet op" | ingen træning findes; låsning afgøres kun ved fødsel | udskudt (Fredagstræning) |
+| Arketyper "låses op når evne-kravet er trænet op" | ingen træning findes; låsning afgøres kun ved fødsel | med (v3.18.0: træning løfter evnerne, og arketypen låses op) |
 | "Kun bedste spiller på banen tæller ved hold-bonus" | arketyper påvirker ikke motoren | udskudt (Fredagstræning-PR) |
 | Mod-kunnen +4–16 %, −3 % rust | afviger (v3.6, brugerens valg: 1–5, −1) | med, langsommere |
 | 1 sæson = 5 uger (14 runder), 3 kampe/uge | 14-runders program og sæsonslut (v3.11); ingen ugedage | delvis (v3.11) |
@@ -870,8 +893,8 @@ mod v2.5b-koden:
    14-runders Berger-program ("Runde 1 af 14 (Tirsdag): Bibamus United vs. FC
    Vejleå"), fredagstræning af valgt evne pr. kæde, talenters udvikling,
    arketype-unlock med rapport, tilskuerindtægt minus ugeløn, sæsonskift og
-   aldring (+1 år pr. 2 sæsoner).
+   aldring (+1 år pr. 2 sæsoner). **Med i v3.18.0** – aldring +1 år pr. sæson og træning pr. spiller (brugerens valg).
 2. **Transfermarked & talent-akademi**: ugentlig pulje, kun offentlige data +
-   clues, bud fra dig og bots, salg fra bænken.
+   clues, bud fra dig og bots, salg fra bænken. **Med i v3.18.0** som vinduer med fast pris (brugerens valg) og ungdomstilbud.
 3. **Login & bot-overtagelse** (trin 2): Firebase Auth, "Fair-Start", kamp-
    simulering i Cloud Function kl. 20:00 (kræver Blaze-planen).

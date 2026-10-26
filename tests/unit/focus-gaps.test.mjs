@@ -284,11 +284,12 @@ test('cutback-afslutteren står nær (50,28) og er ikke kantspilleren selv; PAS 
     for (const p of a.H.squad) Object.assign(p.skills, { finishing: 1, passing: 10, pace: 0, ballControl: 0 });
     setup(a);
   } });
-  const text = (r) => r.m.events.filter((e) => e.type === 'GOAL').map((e) => e.text);
-  // Afstand: P (50,34) og Q (50,14), lige gode: (50,28) → P, (50,10) eller (50,12) → Q. RM (8) er kantspiller.
+  // v3.18.0: kun det FØRSTE mål – derefter dæmpes den valgte (SHOT_REPEAT_DAMP), så det andet kan gå til en anden
+  const text = (r) => r.m.events.filter((e) => e.type === 'GOAL').map((e) => e.text).slice(0, 1);
+  // Afstand: P (50,34) nær pletten (50,28); Q uden for rækkevidden. RM (8) er kantspiller.
   const near = run((a) => {
     Object.assign(slot(a.H, 8).skills, { pace: 15, ballControl: 15 }); Object.assign(slot(a.H, 9).skills, { finishing: 10 }); Object.assign(slot(a.H, 10).skills, { finishing: 10 });
-    layout(a.H, { 8: { x: 85, y: 45 }, 9: { x: 50, y: 34 }, 10: { x: 50, y: 14 } });
+    layout(a.H, { 8: { x: 85, y: 45 }, 9: { x: 50, y: 34 }, 10: { x: 80, y: 10 } });   // v3.18.0: Q uden for SHOT_REACH (35 fra pletten)
   });
   assert.equal(near.m.homeGoals, 2);
   for (const t of text(near)) assert.ok(t.includes(`MÅÅÅL! ${tg(slot(near.a.H, 8))} når baglinjen og lægger den lavt tilbage til ${tg(slot(near.a.H, 9))}.`) && !t.includes('✅'), t);   // v3.16.3: uden ✅

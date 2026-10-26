@@ -3,13 +3,13 @@
 // alle denne fil. I trin 1 er beskyttelsen visuel: alt ligger i browseren.
 
 // Offentligt: alle i ligaen må se det (teams_public).
-export const PUBLIC_FIELDS = ['id', 'name', 'shortName', 'shirtNumber', 'line', 'position', 'age', 'heightCm', 'freshness', 'injuryMatchesLeft', 'publicStars', 'roleTier',
+export const PUBLIC_FIELDS = ['id', 'name', 'shortName', 'shirtNumber', 'line', 'position', 'age', 'heightCm', 'freshness', 'injuryMatchesLeft', 'publicStars', 'roleTier', 'careerGames', 'lastMove', 'valueStars',
   // Sæsonstatistik (v3.10): alt det, der står i referaterne – mål, oplæg, kort, MotM, dødboldmål.
   'sGames', 'sMinutes', 'sGoals', 'sAssists', 'sMotm', 'sYellow', 'sRed', 'sCleanSheets', 'sHeaderGoals', 'sPenaltyGoals', 'sSetPieceGoals'];
 // Kun holdets ejer (teams_private).
-export const OWNER_FIELDS = ['skills', 'jumpingPower', 'aerialPower', 'archetype', 'weeklyWage', 'marketValue', 'lastRating', 'ratingSum', 'ratingGames', 'counterTactics', 'seasonAgeCounter', 'distanceSum', 'minutesSum', 'topSpeedMax', 'hiKmSum', 'hiDistSum', 'freeRunsSum', 'freeRunsWonSum'];
+export const OWNER_FIELDS = ['skills', 'jumpingPower', 'aerialPower', 'archetype', 'weeklyWage', 'trainingFocus', 'dev', 'lastRating', 'ratingSum', 'ratingGames', 'counterTactics', 'seasonAgeCounter', 'distanceSum', 'minutesSum', 'topSpeedMax', 'hiKmSum', 'hiDistSum', 'freeRunsSum', 'freeRunsWonSum'];
 // Ingen spiller – kun motoren (teams_secrets).
-export const SECRET_FIELDS = ['varProfile'];
+export const SECRET_FIELDS = ['varProfile', 'potential'];   // potential (v3.18.0): ejeren ser kun et skøn i ord
 
 // Den visning af en spiller, som en given seer har ret til. Felter seeren ikke må se,
 // er helt fraværende i resultatet (ikke blot skjult i UI).
@@ -17,6 +17,8 @@ export function viewPlayer(player, viewerOwnsTeam) {
   const out = {};
   for (const k of PUBLIC_FIELDS) if (k in player) out[k] = player[k];
   if (viewerOwnsTeam) for (const k of OWNER_FIELDS) if (k in player) out[k] = player[k];
+  // Kamphistorikken (v3.18.0) er offentlig – men karakteren (plads 7) kun for ejeren; andre ser kampens stjerner
+  if (Array.isArray(player.matchLog)) out.matchLog = viewerOwnsTeam ? player.matchLog.map((e) => e.slice()) : player.matchLog.map((e) => e.map((v, i) => (i === 7 ? null : v)));
   return out;
 }
 
@@ -56,3 +58,11 @@ export function viewTeamStats(row, viewerOwnsTeam) {
 // Kamprapporten (v3.14, match.ownReports[teamId]): spillet taktik start/slut og duel-tallene bag fuldtids-analysen.
 // Kun holdets ejer – andres rapporter er fraværende i resultatet (klummen og fuldtids-analysen bruger kun seerens).
 export const viewOwnReport = (match, viewerTeamId) => match?.ownReports?.[viewerTeamId] ?? null;
+
+// Holdets egne forhold (v3.18.0): kasse, regnskab, transferliste, ungdomstilbud og bud ser kun ejeren – ÉN vagt (QC)
+export const TEAM_OWNER_FIELDS = ['cashBalance', 'finance', 'listed', 'youthOffers', 'offers'];
+export function viewTeam(team, viewerOwnsTeam) {
+  const out = { ...team };
+  if (!viewerOwnsTeam) for (const k of TEAM_OWNER_FIELDS) delete out[k];
+  return out;
+}

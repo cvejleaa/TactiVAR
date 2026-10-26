@@ -22,7 +22,8 @@ import { fingerprint } from '../../tools/fingerprint.mjs';
 // v3.17.0: opbygningen styrer chancen (BUILD_LIFT_P/OPEN_DAMP_P) (før e2b30f35…)
 // v3.17.0: halvchancen (≈ 25 skud), KEEPER_EDGE 1,9, løft pr. løbe-indstilling (før df778b60…)
 // v3.17.0: halvchancen (≈ 25 skud, 27 % konvertering), opbygningens løft pr. løbe-indstilling (før 5aab5417…)
-const NOPROSE_400 = '47d94e7a7e4eb985fa92a7057b05f60e1a354210395c239d6451c38358a1e6ba';
+// v3.18.0: afslutterne spredes (pulje ≥ 4, gentagelser × 0,65), cutback uden midtstopper (før 47d94e7a…)
+const NOPROSE_400 = '498ff7252c00702a925e4c2463838ef745781c9a75f536e5577b0502c079de87';
 
 test('fingeraftryk uden prosa: de 400 seedede kampe er de samme som ved sidste bevidste motorændring (v3.16.6 M5)', async () => {
   const r = await fingerprint(400);

@@ -203,7 +203,7 @@ test('gem fra v3.13.0: klummen bygges uden "undefined", og runden efter har "Din
   const { parseSave } = await import('../../public/state/storage.js');
   const raw = fs.readFileSync(new URL('../fixtures/save-v3.13.0.json', import.meta.url), 'utf8');
   const r = parseSave(raw);
-  assert.ok(r.ok, r.error); assert.ok(!r.migratedFrom, 'ingen migrering');
+  assert.ok(r.ok, r.error); assert.equal(r.migratedFrom, 6, 'kun livsløbs-migreringen 6 → 7 (v3.18.0)');
   assert.equal(JSON.parse(raw).ui.seenVersion, '3.13.0');
   const L = r.state.league, me = L.teams.find((t) => !t.isBot);
   const input = () => ({ matches: L.lastRound.matches, gazette: L.lastRound.gazette, history: L.history.filter((x) => x.round >= L.seasonStartRound && x.round <= L.lastRound.round),

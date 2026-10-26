@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { publicWage } from '../../public/engine/career.js';
 import { createRng } from '../../public/engine/rng.js';
 import { FORMATIONS, FORMATION_NAMES, MAX_ANCHOR_RADIUS, isOutOfZone, clampPos, lineOfRole } from '../../public/engine/formations.js';
 import { createLeague, aerialBreakdown, rollStat, TEAM_NAMES, HEIGHT_BY_POS, assignPositions, generatePlayer } from '../../public/engine/generator.js';
@@ -63,9 +64,9 @@ test('spillernes værdier ligger i kildens intervaller', () => {
     assert.ok(p.heightCm >= (p.line === 'GK' ? 180 : 168) && p.heightCm <= 201, `${p.line} ${p.heightCm}`);
     for (const v of Object.values(p.skills)) assert.ok(v >= 1 && v <= 20);
     assert.ok(p.varProfile.cynicism >= 4 && p.varProfile.theatre >= 3);
-    const sum = Object.values(p.skills).reduce((a, b) => a + b, 0);
-    assert.equal(p.weeklyWage, sum * sum * 10);
-    assert.equal(p.marketValue, sum * sum * 150);
+    // v3.18.0: lønnen efter offentlige data (career.js publicWage) – ikke evnesummen², og ingen markedsværdi (den røbede evnerne)
+    assert.equal(p.weeklyWage, publicWage(p));
+    assert.ok(!('marketValue' in p));
     if (p.line !== 'GK') assert.ok(p.skills.goalkeeping <= 2);
   }
   // Truppens opbygning: #1 og #12 er målmænd, #4 og #8 er stjerner

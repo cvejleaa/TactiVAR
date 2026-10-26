@@ -24,7 +24,15 @@ export function endedSeasonView(league) {
   return { ...league, endedSeason: last,
     leagueMetadata: { ...league.leagueMetadata, seasonNumber: last.seasonNumber, standings: last.table },
     seasonStartRound: last.fromRound, statsFromRound: last.statsFrom ?? last.fromRound,
-    teams: league.teams.map((t) => ({ ...t, squad: t.squad.map((p) => ({ ...p, ...PLAYER_SEASON_DEFAULTS, ...saved.players[p.id] })) })) };
+    teams: league.teams.map((t) => ({ ...t, squad: endedSquad(league, t, saved.players) })) };
+}
+// v3.18.0 (QC B1): truppen, som den var ved sæsonslut – fra øjebliksbilledet (hold, navn, nummer), så en spiller, der er stoppet
+// eller har skiftet klub, står under det hold, han spillede for. Arkiver fra før v3.18.0 (uden t) bruger truppen nu.
+function endedSquad(league, team, players) {
+  const snap = Object.entries(players);
+  if (!snap.some(([, v]) => v.t)) return team.squad.map((p) => ({ ...p, ...PLAYER_SEASON_DEFAULTS, ...players[p.id] }));
+  const now = new Map(league.teams.flatMap((t) => t.squad.map((p) => [p.id, p])));
+  return snap.filter(([, v]) => v.t === team.id).map(([id, { t, n, nr, ...stats }]) => ({ ...(now.get(id) ?? { id, publicStars: 0 }), shortName: n, shirtNumber: nr, ...PLAYER_SEASON_DEFAULTS, ...stats }));
 }
 // Lige efter sæsonslut uden den afsluttede sæsons tal (arkiv fra før v3.16.3) er den nye sæsons tal tomme –
 // sig hvor den afsluttede sæson står (QC v3.14.3).
@@ -109,7 +117,7 @@ function myTeam(league, myTeamId) {
       h('tbody', {}, team.squad.map((p) => { const r = runStats(p); return h('tr', {},
         h('td', {}, `#${p.shirtNumber} ${p.shortName}`), h('td', {}, p.sGames), h('td', {}, p.ratingGames ? dec((p.ratingSum / p.ratingGames), 1) : '–'),
         h('td', {}, r.km90 != null ? dec(r.km90, 1) : '–'), h('td', {}, r.hiPct != null ? `${r.hiPct} %` : '–'),
-        h('td', {}, p.freeRunsSum ? `${p.freeRunsWonSum}/${p.freeRunsSum}` : '–'), h('td', {}, `${p.freshness} %`)); })))),
+        h('td', {}, p.freeRunsSum ? `${p.freeRunsWonSum}/${p.freeRunsSum}` : '–'), h('td', {}, p.freshness != null ? `${p.freshness} %` : '–')); })))),
     h('p', { class: 'muted' }, `Kun du ser disse tal – de røber evner og dine taktiske valg. Kampe og frie løb tælles for ${since(league)}; snit, km og HI gælder alle hans kampe (de nulstilles ikke ved sæsonskifte).`));
 }
 

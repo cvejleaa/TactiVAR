@@ -103,7 +103,7 @@ test('gem fra v3.16.2 efter en hel sæson: indlæses uden migrering; slutstillin
   assert.ok(!('varNet' in raw.league.seasons[0].table[0]) && !('runnerUp' in raw.league.seasons[0].champion) && !('lastSeasonStats' in raw.league), 'gemt før v3.16.3');
   assert.ok(raw.league.lastRound.matches.every((m) => m.trace), 'seneste runde har trace');
   const r = parseSave(FIXTURE);
-  assert.ok(r.ok, r.error); assert.equal(r.migratedFrom, null);
+  assert.ok(r.ok, r.error); assert.equal(r.migratedFrom, 6);   // v3.18.0: kun livsløbs-migreringen (additiv)
   const L = r.state.league, last = L.seasons[0], me = L.teams.find((t) => !t.isBot);
   assert.equal(L.leagueMetadata.round, 14); assert.equal(L.seasonStartRound, 15);
   const el = renderStandings({ league: L, onPick: () => {}, viewTeamId: null });

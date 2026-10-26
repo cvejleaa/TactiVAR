@@ -40,3 +40,16 @@ test('klummens skud-tærskler = målt 95-percentil (±1) for ét hold i én kamp
   assert.ok(Math.abs(lowest('shots', 'shots') - p.shots[0.95]) <= 1, `skud ${lowest('shots', 'shots')} mod p95 ${p.shots[0.95]}`);
   assert.ok(Math.abs(lowest('target', 'onTarget') - p.onTarget[0.95]) <= 1, `på mål ${lowest('target', 'onTarget')} mod p95 ${p.onTarget[0.95]}`);
 });
+
+// v3.18.0 (C) – hvem afslutter (receiver shot på halvchancen og cutbacken: pulje ≥ 4, gentagelser × 0,65; cutback uden midtstopper).
+// node tools/measure-shooters.mjs 400, v3.17.0 → nu: topskyttens andel 47,6 % → 40,1 %; hold-kampe med en spiller > 8 afslutninger
+// 8,3 % → 2,4 %; 5-4-1's ST 51,7 % → 40,4 %; midtstopper som cutback-afslutter 9,1 % → 0.
+test('afslutterne spredes: topskytte ≤ 42 % (før 47,6), > 8 afslutninger ≤ 3 % (før 8,3), 5-4-1-ST ≤ 42 % (før 51,7), ingen midtstopper afslutter en cutback (før 9,1 %)', async () => {
+  const { measureShooters } = await import('../../tools/measure-shooters.mjs');
+  const r = measureShooters(400);
+  assert.ok(r.cutbacks >= 200, `data: ${JSON.stringify(r)}`);
+  assert.ok(r.topShare <= 0.42, `topskytte ${r.topShare}`);
+  assert.ok(r.over8Share <= 0.03, `> 8: ${r.over8Share}`);
+  assert.ok(r.st541 <= 0.42, `5-4-1-ST ${r.st541}`);
+  assert.equal(r.cbCutback, 0);
+});

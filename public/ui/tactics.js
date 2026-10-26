@@ -2,6 +2,7 @@
 import { h, select } from './dom.js';
 import { PHASE_OPTIONS, CONDITIONS, MARGINS } from './labels.js';
 import { FORMATION_NAMES } from '../engine/formations.js';
+import { matchBenchOf } from '../engine/career.js';
 import { MAX_RULES } from '../state/actions.js';
 import { MATCH_RULES } from '../engine/match-rules.js';
 import { SUBS_LIMIT } from '../engine/freshness.js';
@@ -35,10 +36,12 @@ export function renderTactics({ team, isOwn, ui, on }) {
   // spilleren, ikke pladsen. En advarsel står straks, hvis reglen ikke længere passer til opstillingen (Spilfører).
   const nameOf = (p) => `#${p.shirtNumber} ${p.shortName}`;
   const starters = t.lineupSlots.map((id) => team.squad.find((p) => p.id === id)).filter(Boolean);
-  const benchPl = team.squad.filter((p) => !t.lineupSlots.includes(p.id));
+  const benchPl = matchBenchOf(team);   // v3.18.0: kun kamptruppens bænk kan skiftes ind
   const subPicker = (r, i) => {
     const warn = [r.subOut && !t.lineupSlots.includes(r.subOut) ? `${nameOf(team.squad.find((p) => p.id === r.subOut) ?? { shirtNumber: '?', shortName: 'spilleren' })} står ikke i startopstillingen` : '',
       r.subIn && t.lineupSlots.includes(r.subIn) ? `${nameOf(team.squad.find((p) => p.id === r.subIn))} står ikke på bænken` : '',
+      // v3.18.0 (QC): en reserve er ikke i kamptruppen – skiftet kan ikke ske, før han er udtaget til bænken
+      r.subIn && !t.lineupSlots.includes(r.subIn) && !benchPl.some((p) => p.id === r.subIn) && team.squad.some((p) => p.id === r.subIn) ? `${nameOf(team.squad.find((p) => p.id === r.subIn))} er reserve – udtag ham til bænken i Trup` : '',
       !r.subOut || !r.subIn ? 'vælg begge spillere' : ''].filter(Boolean);
     return h('span', { class: 'rule-sub' },
       select(r.subOut ?? '', [['', 'ud: vælg'], ...starters.slice(1).map((p) => [p.id, `ud: ${nameOf(p)}`])], (v) => on.rule(i, { subOut: v || null }), { disabled, class: 'rule-sub-out' }),

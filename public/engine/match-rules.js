@@ -5,7 +5,8 @@
 // bruger i turneringer: 5 udskiftninger pr. hold i højst 3 pauser i spillet – halvlegen tæller ikke
 // som en pause. Skadesskift tæller med i begge. Bevidst udeladt: ekstra hjernerystelses-skift og
 // ekstra skift i forlænget spilletid (motoren har hverken diagnose eller forlængelse). Bænken er
-// truppen minus de 11 (18 − 11 = 7). Ændres tallene, gælder de fra næste kamp.
+// kamptruppens bænk: højst 7 af de ikke-startende (v3.18.0, truppen er 18–25 – career.js matchBenchOf). Ændres tallene,
+// gælder de fra næste kamp.
 export const MATCH_RULES = Object.freeze({ maxSubs: 5, maxWindows: 3 });
 
 // Højst så mange Hvis-Så-regler pr. plan (v3.13: 8, før 5 – udskiftninger deler pladserne med planskift).

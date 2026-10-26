@@ -3,16 +3,21 @@ import { renderStats } from './ui/stats.js';
 import { VERSION } from './version.js';
 import { createRng, randomSeed } from './engine/rng.js';
 import { createLeague } from './engine/generator.js';
+import { matchBenchOf, reservesOf, FOCUS, willRetire, RETIRE_WARN_ROUND, publicWage, wageRoomPerRound } from './engine/career.js';
 import { loadGame, saveGame, resetGame, exportGame, importGame, backupRaw, SAVE_KEY } from './state/storage.js';
 import * as act from './state/actions.js';
 import { h, select } from './ui/dom.js';
 import { kr } from './ui/labels.js';
 import { renderMatrix } from './ui/matrix.js';
-import { renderCard } from './ui/card.js';
+import { renderCard, trainingSummary } from './ui/card.js';
+import { renderClub, shownCash, renderMarket, renderTransferLog } from './ui/club.js';
+import { marketInfo, buyPlayer, setListed, acceptOffer, declineOffer, isStarter } from './engine/transfers.js';
+import { renderSeasonReport } from './ui/season-report.js';
+import { viewTeam } from './engine/visibility.js';
 import { renderPitch } from './ui/pitch.js';
 import { renderTactics } from './ui/tactics.js';
 import { renderStandings } from './ui/standings.js';
-import { playRound, commitRound, pairRound, sortStandings } from './engine/season.js';
+import { playRound, commitRound, pairRound, sortStandings, seasonJustEnded } from './engine/season.js';
 import { buildColumn } from './engine/column.js';
 import { gen } from './engine/clues.js';
 import { seasonRoundOf, roundsLeftOf } from './engine/schedule.js';
@@ -22,7 +27,7 @@ import { replayJump, clearReplays } from './ui/replay.js';
 
 export const PLAYBACK_MS = 420;
 let mc = null;            // Match Center: { round, matches, gazette, viewIdx, filter, shownCount, playing }
-const TABS = [['trup', '👥 Trup'], ['taktik', '📋 Taktik'], ['kamp', '📺 Kamp'], ['liga', '🏆 Liga']];
+const TABS = [['trup', '👥 Trup'], ['taktik', '📋 Taktik'], ['kamp', '📺 Kamp'], ['liga', '🏆 Liga'], ['klub', '💼 Klub']];
 // Seneste runde vist færdigspillet (Kamp-fanen uden igangværende afspilning).
 const lastRoundView = (r) => ({ round: r.round, matches: r.matches, gazette: r.gazette, viewIdx: 0, filter: 'all', shownCount: Infinity, playing: false });
 function showTab(k) { game.ui.tab = k; clearSwap(); view.notice = ''; persist(); render(); window.scrollTo(0, 0); }
@@ -35,10 +40,15 @@ let view = { viewTeamIdx: 0, sortCol: 'pos', sortDesc: false, filter: 'all', sel
 
 // Skift af hold/visning afbryder et påbegyndt byt, så et senere klik aldrig bytter uden varsel.
 const clearSwap = () => { view.pitchSwapId = null; };
-// Holdvælgeren viser holdet i Trup, hvis man står i Kamp/Liga (der ville valget ellers ikke ses).
+// Holdvælgeren viser holdet i Trup, hvis man står i Kamp/Liga/Klub (der ville valget ellers ikke ses).
+// Sæson og sæsonens runde for ligaens løbende runde r (efter sæsonslut hører r til den afsluttede sæson)
+function seasonAndRound(league, r) {
+  const s = (league.seasons ?? []).find((x) => x.programmed !== false && r >= x.fromRound && r <= x.toRound);
+  return s ? [s.seasonNumber, r - s.fromRound + 1] : [league.leagueMetadata.seasonNumber ?? 1, r - league.seasonStartRound + 1];
+}
 function showTeam(idx) {
   view.viewTeamIdx = idx; clearSwap(); view.notice = ''; view.selectedPlayerId = game.league.teams[idx].squad[0].id;
-  if (game.ui.tab === 'kamp' || game.ui.tab === 'liga') { game.ui.tab = 'trup'; persist(); }
+  if (game.ui.tab === 'kamp' || game.ui.tab === 'liga' || game.ui.tab === 'klub') { game.ui.tab = 'trup'; persist(); }
   render();
 }
 // Et nyt spil (ny liga/import) må ikke vise den gamle ligas runde i Kamp-fanen.
@@ -66,6 +76,7 @@ const NEWS = {
   '3.14.1': 'Rettelser: VAR tjekker nu offside for den forreste – scorer en spiller længere tilbage, er det hans forreste holdkammerat, der tjekkes, og billedet ved målet viser skytten, hvor han skød fra. Statistikken på Liga-fanen gælder sæsonen.',
   '3.14.2': 'Rettelse: Ved et VAR-tjek står den tjekkede nu, hvor han stod (forrest), i billedet ved målet – ikke flyttet bag en holdkammerat.',
   '3.14.3': 'Rettelser: Langskud tages fra skudafstand (ikke fra egen banehalvdel) i billedet ved målet, referatet fortæller et oplæg én gang, og efter sæsonens sidste runde viser tabellen slutstillingen og mesteren, til næste sæson går i gang.',
+  '3.18.0': '🏋️ Livsløb: vælg træning pr. spiller på spillerkortet (den gælder, til du ændrer den). Alle bliver et år ældre ved sæsonslut, de ældste stopper (de varsles fra runde 10), og der kommer ungdomstilbud. 💼 Klub viser økonomien – tilskuere, TV, løn og præmie – og transfermarkedet: køb en anden klubs spiller til den faste pris på kortet, når vinduet er åbent (før runde 8 og ved sæsonslut). Kampe står på kortet under 📜 Kampe. Truppen må være 18–25; bænken er de 7 udtagne.',
   '3.17.0': '⚽ Kampene ligner rigtig fodbold: omkring 25 afslutninger pr. kamp, og knap hvert tredje skud på mål går ind. De mange små skud – fra kanten, en løs bold i feltet, en let redning – står nedtonet i referatet og springes over i ⭐ Højdepunkter, medmindre de går ind; målmanden betyder noget for dem. Din opbygning tæller nu: kommer I igennem presset, får I langt oftere en stor chance – og det samme gælder modstanderens opbygning mod jeres pres. Botterne har hver deres Hvis-Så, og en skadet spiller, der er skiftet ud, nævnes ikke igen. Dødbolde slås af kant- og midtbanespillere, færre FASE-linjer i de andre kampe, og Rundens mål nævner ikke typen to gange. Sæsonens snit og spejderens "seneste 3 kampe" blander gamle og nye kampe den første tid.',
   '3.16.7': '🗞️ Klummen og referatet siger kun det, kampen viser: rigtige procenter, "Det kostede" kun med en årsag, et rødt kort "til trods" kun når det kom før det afgørende mål, og mesteren ikke tre gange på samme side. VAR tjekker ikke offside på hjørnespark eller på den, der selv spillede bolden, og linjedommeren vinker ikke efter en cutback. Dit pres og din offside-fælde tælles hver for sig. Cutbacks laves af kant og back, og færre gentagelser i referatet (offside-fælden, hovedstød, skud forbi). Decimalkomma og ental/flertal.',
   '3.16.6': '🔧 Rettede fejl i kampene: en haltende spiller bliver på banen, men tager ikke straffe og dødbolde ("#9 halter – #10 tager straffen") og skiftes automatisk ud i pausen, hvis der er et skift tilbage (det bruger et af dine skift). Botterne skifter for træthed først fra pausen og gemmer et skift til skader. En hvilet spiller kommer ikke ind for en skadet. Oplægget går aldrig til skytten selv, frisparket kommer fra samme forseelse som kortet, og modstanderens cutbacks står alle i referatet.',
@@ -128,6 +139,7 @@ function start() {
   if (r.status === 'empty') { game = newGame(); persist(); }
   else {
     game = r.state; view.savedAt = r.state.savedAt;
+    if (r.repairs?.length) view.notice = `🛠 ${r.repairs.join(' ')}`;
     if (r.migratedFrom != null) {
       view.notice = migrationNotice(r.migratedFrom) + (r.backupKey ? ' Det gamle spil ligger som backup i browseren.' : '');
       view.backupKey = r.backupKey || null; // knap i beskeden: hent den gamle version som fil
@@ -165,6 +177,7 @@ function migrationNotice(from) {
     from <= 2 ? 'Mod-kunnen er sat ca. 45 % ned (alle hold): hver spiller har nu højst 100 point fordelt på de tre stilarter – lærer han noget nyt, glemmer han lidt af det gamle.' : '',
     from <= 3 ? 'Spillerhøjderne er rettet efter Superliga-målinger (ligasnit ca. 184 cm, 168–201 cm) – hver spiller beholder sin plads i højde-rækkefølgen i sin kæde, og luftduellerne er regnet om. Friskhed betyder nu noget: en kamp koster efter løbet distance, og en træt spiller yder mindre (50 % friskhed ≈ 12,5 % svagere).' : '',
     from <= 5 ? 'Nu spilles der efter et fast kampprogram: 14 runder, hvor alle møder alle hjemme og ude – se det på Liga-fanen. Modstandervælgeren er væk; ▶ spiller altid programmets næste runde. Tabellen indtil nu er arkiveret som "Sæson 1 (uden program)" under Tidligere sæsoner, og en ny sæson starter med nulstillet tabel og sæsonstatistik (spillere og friskhed er uændrede). Clean sheets tælles kun for målmænd.' : '',
+    from <= 6 ? 'Ny i v3.18: træning, aldring, økonomi og transfers – se 💼 Klub. Alle spillere bliver et år ældre ved sæsonslut, lønnen følger nu de offentlige stjerner og alderen, og spillere med samme kortnavn på tværs af holdene har fået et nyt navn.' : '',
     from <= 4 ? 'Hver spiller har nu en naturlig position (kolonnen "Natur"), og højden følger Superliga-dokumentets tabel pr. position: midtstoppere og målmænd højere, backs og kanter lavere. Den højeste i hver position er stadig den højeste – i hver kæde blev de højeste til stoppere/angribere og de laveste til backs/kanter. Luftduellerne er regnet om. Løbene i kampen følger nu den plads, spilleren står på (CM løber længst, kanter og wingbacks har flest højintense løb) – sæsonens km og andel højintenst på spillerkortet blander indtil videre den gamle og den nye beregning.' : '',
   ].filter(Boolean).join(' ');
 }
@@ -251,13 +264,16 @@ function renderNow() {
 
   const header = h('div', { class: 'panel clubhead' },
     h('div', {}, h('h2', { id: 'club-name' }, team.name), h('div', { class: 'muted' }, isOwn ? 'Dit hold – alle egne data er synlige' : 'Modstanderhold – kun offentlige data og stjerner')),
-    h('div', { class: 'right' }, h('div', { class: 'muted' }, 'Klubkasse'), h('strong', {}, isOwn ? kr(team.cashBalance) : '🔒 Skjult')));
+    h('div', { class: 'right' }, h('div', { class: 'muted' }, 'Klubkasse'), viewTeam(team, isOwn).cashBalance != null
+      ? h('button', { class: 'linklike', id: 'club-link', title: 'Økonomi, lønbudget og regnskab', onclick: () => showTab('klub') }, h('strong', {}, kr(shownCash(team, !!mc?.playing))), ' 💼')
+      : h('strong', {}, '🔒 Skjult')));
 
   const matrix = renderMatrix({
     team, isOwn, ui: { ...view, swapId: view.pitchSwapId }, notes: game.notes,
     onSort: (c) => { if (view.sortCol === c.key) view.sortDesc = !view.sortDesc; else { view.sortCol = c.key; view.sortDesc = !!c.num; } clearSwap(); view.notice = ''; render(); },
     onBlocked: (c) => { view.notice = `🔒 Anti-spionage: du kan ikke sortere ${team.name} på "${c.label}" – det er skjult information.`; render(); },
     onSelect: (p) => { view.selectedPlayerId = p.id; render(); },
+    onFocusMany: isOwn ? (ids, k) => { const n = act.setFocusMany(team, ids, k); view.notice = `🏋️ ${n} spiller${n === 1 ? '' : 'e'} træner nu ${FOCUS[k].label}${n < ids.length ? ` (${ids.length - n} kan ikke – Målmand er kun for målmænd)` : ''}.`; change(() => {}); } : null,
     onFilter: (f) => { view.filter = f; render(); },
     onSwap: (p) => {
       if (!view.pitchSwapId) { view.pitchSwapId = p.id; view.notice = `🔁 Vælg den spiller, ${p.shortName} skal byttes med (i regnearket, på banen eller på bænken).`; render(); return; }
@@ -266,8 +282,18 @@ function renderNow() {
     },
   });
 
+  // Seneste rundes kampe (kun efter afspilningen): kortets 📺 åbner netop den kamp (hold-indeks og stilling)
+  const lr = league.lastRound, latest = lr && !mc?.playing ? lr.matches.map((m) => [league.teams.findIndex((t) => t.id === m.homeId), league.teams.findIndex((t) => t.id === m.awayId), m.homeGoals, m.awayGoals].join('|')) : null;
   const card = renderCard({ player: selected, team, isOwn, scouting: league.scouting[mine.id]?.[selected?.id], note: selected ? game.notes[selected.id] : '',
-    onNote: (v) => { game.notes[selected.id] = v; persist(); renderControls(); } });
+    onNote: (v) => { game.notes[selected.id] = v; persist(); renderControls(); }, teams: league.teams, latest,
+    onFocus: isOwn ? (k) => change(() => act.setFocus(team, selected.id, k)) : null,
+    market: !selected || mc?.playing ? null : isOwn ? { own: true, listed: (team.listed ?? []).includes(selected.id), onList: (on) => change(() => setListed(league, team, selected.id, on)) }
+      : { ...marketInfo(league, mine, team, selected), starter: isStarter(team, selected), wage: Math.round(publicWage(selected) / 3), room: wageRoomPerRound(mine), cashAfter: mine.cashBalance - marketInfo(league, mine, team, selected).price, onBuy: () => { const err = buyPlayer(league, mine, selected.id); view.notice = err ? `💰 ${err}` : `💰 ${selected.shortName} er købt og står nu i din trup.`; change(() => {}); } },
+    hideLog: mc?.playing && league.lastRound ? seasonAndRound(league, league.lastRound.round) : null,
+    // Under afspilningen af sæsonens sidste runde er det stadig den afsluttede sæson, der vises
+    season: mc?.playing && league.lastRound ? seasonAndRound(league, league.lastRound.round)[0] : league.leagueMetadata.seasonNumber ?? 1, starter: !!selected && team.tactics.lineupSlots.includes(selected.id),
+    retiring: !!selected && seasonRoundOf(league, league.leagueMetadata.round) >= RETIRE_WARN_ROUND && willRetire(selected, league.leagueMetadata.seasonNumber ?? 1),
+    onOpenMatch: (hi, ai) => { const i = lr.matches.findIndex((m) => m.homeId === league.teams[hi]?.id && m.awayId === league.teams[ai]?.id); if (i >= 0) openReport(i); } });
 
   const pitch = h('div', { class: 'panel' }, h('h3', {}, `Taktiktavle – ${team.tactics.baseFormation}`),
     renderPitch({ team, isOwn, ui: view,
@@ -297,19 +323,30 @@ function renderNow() {
   const content = {
     // Opstilling sker i Trup: tallene og sorteringen over banen (brugeren: "nærmest umuligt at
     // opstille sit hold, da informationerne og sorteringsmulighederne ligger på 2 forskellige faner").
-    trup: () => [header, matrix, h('div', { class: 'tactics-layout lineup-layout' }, h('section', {}, pitch), h('section', {}, card))],
+    trup: () => [header,
+      // Sæsonslut under afspilning (som bogført-før-afspilning): runden er bogført, og sæsonskiftet er sket
+      mc?.playing && seasonJustEnded(league) ? h('div', { class: 'notice', id: 'turnover-booked' }, '🗓 Sæsonen sluttede med denne runde: alle er blevet et år ældre, og sæsonrapporten med ungdomstilbuddene står på Liga, når kampene er spillet.') : null,
+      !mc?.playing && mine.youthOffers?.length ? h('div', { class: 'notice', id: 'youth-pending' }, `🧒 ${mine.youthOffers.length} ungdomstilbud venter – `, h('button', { class: 'linklike', onclick: () => showTab('liga') }, 'se sæsonrapporten på Liga')) : null,
+      isOwn && !mc?.playing ? trainingSummary(league.trainingReport?.[team.id], team, league.trainingReport?.[team.id] ? seasonAndRound(league, league.trainingReport[team.id].round)[1] : null) : null, matrix, h('div', { class: 'tactics-layout lineup-layout' }, h('section', {}, pitch), h('section', {}, card))],
     // Kortet står også i Taktik, så et klik på en brik viser spilleren uden fanebyt.
     taktik: () => [h('div', { class: 'tactics-layout' }, h('section', {}, pitch), h('section', {}, card, tactics))],
     kamp: () => [shown ? renderMatchCenter({ mc: shown, myTeamId: mine.id, on: mcHandlers, column: !shown.playing && shown.round === league.lastRound?.round ? columnNow() : null }) : h('div', { class: 'panel empty', id: 'no-matches' }, 'Ingen kampe spillet endnu. Tryk ▶ Spil runde i topbaren – modstanderen følger kampprogrammet på Liga-fanen.')],
     liga: () => [mc?.playing ? h('div', { class: 'notice', id: 'booked-league' }, '📺 Runden spilles i Kamp-fanen – tabellen herunder er allerede opdateret med den.') : null,
+      !mc?.playing ? renderSeasonReport({ league, mine,
+        onTake: (id) => { const err = act.takeYouth(mine, id); view.notice = err ? `🧒 ${err}` : '🧒 Ungdomsspilleren er rykket op i truppen.'; change(() => {}); },
+        onDrop: (id) => change(() => act.dropYouth(mine, id)) }) : null,
       standings,
       // Resultaterne skjules under afspilningen, ligesom avisen (ellers afsløres de).
-      league.lastRound && !mc?.playing ? renderLastRound({ round: league.lastRound, myTeamId: mine.id, onOpen: openReport }) : null,
+      league.lastRound && !mc?.playing ? renderLastRound({ round: league.lastRound, myTeamId: mine.id, onOpen: openReport, seasonRound: seasonAndRound(league, league.lastRound.round)[1] }) : null,
       // Programmet skjules også under afspilningen (det viser den bogførte rundes resultat).
       !mc?.playing ? renderSchedule({ league, pairs: pairRound(league), myTeamId: mine.id }) : null,
+      !mc?.playing ? renderTransferLog({ league }) : null,
       league.lastRound && !mc?.playing ? renderGazette(league.lastRound.gazette, mine.id, openGoal, league.lastRound.matches, columnNow(), openReport) : null,
       // Statistikken skjules også under afspilningen (den er bogført og ville afsløre runden).
       !mc?.playing ? renderStats({ league, myTeamId: mine.id }) : null],
+    klub: () => [renderClub({ league, team: mine, playing: !!mc?.playing }), renderMarket({ league, team: mine, playing: !!mc?.playing,
+      onAccept: (id) => { const err = acceptOffer(league, mine, id); view.notice = err ? `🔁 ${err}` : '🔁 Spilleren er solgt.'; change(() => {}); },
+      onDecline: (id) => change(() => declineOffer(league, mine, id)), onUnlist: (id) => change(() => setListed(league, mine, id, false)) })],
   }[tab]();
   app.replaceChildren(...[
     h('nav', { class: 'tabs', id: 'tabs' }, TABS.map(([k, label]) => h('button', { id: `tab-${k}`, class: 'tab' + (k === tab ? ' active' : ''), onclick: () => showTab(k) }, label))),
@@ -322,17 +359,26 @@ function renderNow() {
 
 // Bænken under banen: klik bænkspiller → klik brik (eller omvendt) = skift ind.
 function renderBench(team) {
-  const bench = team.squad.filter((p) => !team.tactics.lineupSlots.includes(p.id));
-  return h('div', { class: 'bench', id: 'bench' }, h('h4', {}, 'Bænk'), bench.map((p) => h('button', {
+  const bench = matchBenchOf(team), reserves = reservesOf(team);   // v3.18.0: kamptruppens 7 (ét sted, QC B2) + reserverne
+  const benchBtn = (p) => h('button', {
     class: 'mini bench-p' + (view.pitchSwapId === p.id ? ' active' : '') + (p.injuryMatchesLeft > 0 ? ' injured' : ''), dataset: { pid: p.id },
-    title: `${p.name} (${p.line})${p.injuryMatchesLeft > 0 ? ` – skadet i ${p.injuryMatchesLeft} kamp(e)` : ''}`,
+    title: `${p.name} (${p.line})${p.injuryMatchesLeft > 0 ? ` – skadet i ${p.injuryMatchesLeft} kamp${p.injuryMatchesLeft === 1 ? '' : 'e'}` : ''}`,
     onclick: () => {
       const a = view.pitchSwapId;
       if (a && a !== p.id && team.tactics.lineupSlots.includes(a)) { clearSwap(); view.notice = ''; change(() => act.swapPlayers(team, a, p.id)); return; }
+      if (a && reserves.some((r) => r.id === a)) { clearSwap(); view.notice = ''; change(() => act.swapBench(team, a, p.id)); return; }
       view.selectedPlayerId = p.id; view.pitchSwapId = a === p.id ? null : p.id;
       view.notice = view.pitchSwapId ? `🔁 Klik på den brik, ${p.shortName} skal skiftes ind for.` : ''; render();
     },
-  }, `#${p.shirtNumber} ${p.shortName} · ${p.line}`)));
+  }, `#${p.shirtNumber} ${p.shortName} · ${p.line}`);
+  const resBtn = (p) => h('button', {
+    class: 'mini reserve-p' + (view.pitchSwapId === p.id ? ' active' : '') + (p.injuryMatchesLeft > 0 ? ' injured' : ''), dataset: { pid: p.id },
+    title: `${p.name} (${p.line}) – reserve: ikke med i kampen. Klik og så en bænkspiller for at tage ham med.`,
+    onclick: () => { view.selectedPlayerId = p.id; view.pitchSwapId = view.pitchSwapId === p.id ? null : p.id; view.notice = view.pitchSwapId ? `🔁 Klik på den bænkspiller, ${p.shortName} skal tage pladsen fra.` : ''; render(); },
+  }, `#${p.shirtNumber} ${p.shortName} · ${p.line}`);
+  return h('div', { class: 'bench', id: 'bench' }, h('h4', {}, `Bænk (${bench.length} udtaget)`), bench.map(benchBtn),
+    reserves.length ? h('div', { id: 'reserves' }, h('h4', {}, `Reserver (${reserves.length})`), reserves.map(resBtn),
+      h('div', { class: 'row' }, h('button', { class: 'mini', id: 'auto-bench', disabled: team.matchBenchAuto !== false, onclick: () => change(() => act.setAutoBench(team)) }, team.matchBenchAuto !== false ? '✓ Udtages automatisk før hver runde' : '↺ Udtag automatisk'))) : null);
 }
 
 // ---------- Kampe ----------

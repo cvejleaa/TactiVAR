@@ -281,7 +281,8 @@ test('bogføring: friskhed efter løbet distance (v3.7), bænk +15, stjerner af 
   // v3.6 gav 99 og 60 (−max(4, 14 − STA/2) + 8 straks): næsten ingen træthed.
   assert.equal(p.freshness, 92);      // 100 − round(11,2·(1,5 − 0,30) = 13,4) = 87; + round(0,41·13) = 5
   assert.equal(q.freshness, 69);      // 61 − round(10·(1,5 − 0,06) = 14,4) = 47; + round(0,41·53) = 22 (v3.10.1; 0,35 gav 66)
-  assert.equal(bench1.freshness, 100); assert.equal(bench2.freshness, 85);
+  // + træning (v3.18.0): Alsidig koster 2 for den, der ikke spillede (100 → 98, 85 → 83); p og q spillede og betaler 0
+  assert.equal(bench1.freshness, 98); assert.equal(bench2.freshness, 83);
   assert.equal(p.ratingSum, 21); assert.equal(p.ratingGames, 3); assert.equal(p.lastRating, 5);
   assert.equal(p.publicStars, starsFromRating(7)); // snit 21/3 = 7,0 → 3 stjerner (sidste karakter 5 ville give 1)
   assert.equal(p.publicStars, 3);
@@ -904,8 +905,9 @@ test('løb: kanten med god pasning løber sig fri og lægger den tværs → CUTB
   const r = decide({ rm: { passing: 20, finishing: 1 } });  // skud 0,5 · aflevering 14·3 · dribling 4·2
   assert.equal(r.kinds.length, 30); assert.ok(r.kinds.every((k) => k === 'CUTBACK'), r.kinds.join());
   assert.equal(r.rmE.freeRuns, 30); assert.equal(r.rmE.freeRunsWon, 30); assert.equal(r.rmE.assists, 30); assert.equal(r.rmE.goals, 0);
-  const sc = r.m.ratings.home.find((e) => e.goals === 30);   // modtageren står nær straffesparkspletten (v3.12.1)
-  assert.ok(sc && sc.playerId !== slot(r.a.H, 8).id);
+  // modtageren står nær straffesparkspletten (v3.12.1); v3.18.0: de 30 mål fordeles (gentagelser dæmpes ×0,65) – aldrig løberen
+  const sc = r.m.ratings.home.filter((e) => e.goals > 0);
+  assert.equal(sc.reduce((a, e) => a + e.goals, 0), 30); assert.ok(sc.length >= 3 && sc.every((e) => e.playerId !== slot(r.a.H, 8).id), sc.map((e) => e.goals).join());
   // v3.16.3 (Spilfører: "MÅÅÅL! ✅ …"): målets linje genfortæller løbet uden ✅
   assert.match(r.goals[0], /MÅÅÅL! #\d+ .+ løber sig fri på kanten og lægger den tværs til #\d+/); assert.doesNotMatch(r.goals[0], /✅/);
 });
@@ -1658,13 +1660,14 @@ function fx({ rm = {}, def = {}, gk = 1, n = 2, runs = 'NORMAL', rslot = 8, form
 test('løber → aflevering fra kanten: CUTBACK, oplæg til løberen (+0,15 +0,5 pr. mål), mål, observation og tekst hos modtageren', () => {
   const { a, m, runner, goals, summary } = fx({ rm: { passing: 20, finishing: 1 } });
   // v3.12.1: modtageren er den, der står nær straffesparkspletten i øjeblikket (ikke længere altid plads 9)
-  const fin = a.H.squad.find((p) => m.ratings.home.some((e) => e.playerId === p.id && e.goals === 2));
-  assert.ok(fin && fin !== runner);
+  // v3.18.0: to mål – den første modtager dæmpes (×0,65), så det andet mål kan gå til en anden; ingen af dem løberen
+  const scorers = m.ratings.home.filter((e) => e.goals > 0), fin = a.H.squad.find((p) => p.id === m.goalsPool[0].scorerId) ?? a.H.squad.find((p) => tg(p) === m.goalsPool[0].scorer);
+  assert.ok(fin && fin !== runner && scorers.every((e) => e.playerId !== runner.id));
   const finE = m.ratings.home.find((e) => e.playerId === fin.id);
   assert.equal(m.homeGoals, 2); assert.deepEqual(m.goalsPool.map((g) => g.kind), ['CUTBACK', 'CUTBACK']);
   assert.equal(rOf(m, 'home', a.H, 8).rating, 8.2);        // 6,5 + 2·(0,15 løb + 0,5 oplæg) + 0,4 sejr (v3.15)
   assert.equal(rOf(m, 'home', a.H, 8).assists, 2); assert.equal(rOf(m, 'home', a.H, 8).goals, 0);
-  assert.equal(finE.rating, 9.4);        // 6,5 + 2·1,25 + 0,4 sejr – målscoreren er modtageren, ikke løberen
+  assert.equal(finE.rating, Math.round((6.5 + finE.goals * 1.25 + 0.4) * 10) / 10);        // 6,5 + mål·1,25 + 0,4 sejr – målscoreren er modtageren, ikke løberen
   assert.equal(rOf(m, 'away', a.A, 0).rating, 5.5);   // − 0,4 nederlag (v3.15)
   assert.equal(m.goalsPool[0].scorer, tg(fin));
   assert.equal(m.goalsPool[0].spectacle, goalSpectacle('CUTBACK', { passing: 20 }, m.goalsPool[0].min, { next: () => 0.5 }));   // oplæggets PAS (20), ikke modtagerens (10)
@@ -2412,7 +2415,7 @@ test('cutback: kantspilleren (PAC+BAL 20 + 4) mod backen (PAC+POS + 4 − 2): 21
   assert.ok(won.m.events.filter((e) => e.type === 'GOAL').every((e) => /MÅÅÅL! #\d+ .+ når baglinjen og lægger den lavt tilbage til #\d+ /.test(e.text) && !e.text.includes('✅')));   // v3.16.3: uden ✅
   // Kantspilleren får oplægget (+0,15 + 0,5 pr. mål); scoreren +1,25
   const wE = won.m.ratings.home.find((e) => e.assists > 0), sE = won.m.ratings.home.find((e) => e.goals > 0);
-  assert.equal(wE.assists, 2); assert.equal(wE.rating, 8.2); assert.equal(sE.rating, 9.4);   // + 0,4 sejr (v3.15)
+  assert.equal(wE.assists, 2); assert.equal(wE.rating, 8.2); assert.equal(sE.rating, Math.round((6.5 + sE.goals * 1.25 + 0.4) * 10) / 10);   // + 0,4 sejr (v3.15); v3.18.0: målene kan fordeles
   assert.notEqual(wE.playerId, sE.playerId);   // stod før bag kommentartegnet og blev aldrig kørt
   assert.deepEqual([shut.d.cutbacks, shut.d.cutbacksBlocked, shut.m.homeGoals, shut.m.stats.hShots], [2, 2, 0, 0]);
   assert.ok(Math.abs(shut.m.stats.hXg) < 1e-9, String(shut.m.stats.hXg));

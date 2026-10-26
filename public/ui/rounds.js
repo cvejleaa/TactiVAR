@@ -2,8 +2,9 @@
 import { h } from './dom.js';
 import { championText } from '../engine/season.js';
 
-export function renderLastRound({ round, myTeamId, onOpen }) {
-  return h('div', { class: 'panel', id: 'last-round' }, h('h3', {}, `Resultater – runde ${round.round}`),
+// Overskriften bruger sæsonens runde (Spilfører v3.18.0: "Resultater – runde 15" i sæson 2) – seasonRound fra app.js
+export function renderLastRound({ round, myTeamId, onOpen, seasonRound = round.round }) {
+  return h('div', { class: 'panel', id: 'last-round' }, h('h3', {}, `Resultater – runde ${seasonRound}`),
     h('div', { class: 'fixtures' }, round.matches.map((m, i) => h('button', {
       class: 'fixture' + (m.homeId === myTeamId || m.awayId === myTeamId ? ' mine' : ''), title: 'Åbn referatet i Kamp-fanen', onclick: () => onOpen(i),
     }, h('span', { class: 'fx-team' }, m.homeName), h('strong', { class: 'fx-score' }, `${m.homeGoals}-${m.awayGoals}`), h('span', { class: 'fx-team right' }, m.awayName), h('span', { class: 'fx-link' }, '📺 Referat')))));

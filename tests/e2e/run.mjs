@@ -51,12 +51,12 @@ try {
   let g = await fresh();
   const rows = () => g.locator('#matrix tbody tr').count();
   const tab = async (k) => { await g.click(`#tab-${k}`); await g.waitForSelector(`.tabpane.tab-${k}`); };
-  check('Fire faner, Trup er åben fra start', (await g.locator('#tabs .tab').count()) === 4 && (await g.textContent('#tabs .tab.active')).includes('Trup'));
+  check('Fem faner (v3.18.0: + 💼 Klub), Trup er åben fra start', (await g.locator('#tabs .tab').count()) === 5 && (await g.textContent('#tabs .tab.active')).includes('Trup'));
   check('Ny liga: dit hold vises med 18 spillere', (await rows()) === 18);
   check('Ny liga: ingen "Nyt i kampene"-besked (den er til dem, der opdaterer et gammelt gem)', (await g.locator('#notice').count()) === 0);
   check('Holdvælgeren har 8 hold', (await g.locator('#team-select option').count()) === 8);
   const heads = (await g.locator('#matrix thead th').allTextContents()).map((t) => t.replace(/ [▲▼]$/, ''));
-  check('Regnearkets kolonner i rækkefølge (Alder står hvor den skal)', JSON.stringify(heads.slice(0, 21)) === JSON.stringify(['Pos/#', 'Spiller', 'Kæde', 'Natur', 'Alder', 'Frisk/🚑', 'Højde', 'Spring', '✈ Luft', 'PAC', 'STA', 'STR', 'BAL', 'PAS', 'FIN', 'POS', 'INT', 'GK', 'Gns', '⭐ Vurd', '🧠 Mod']), heads.join('|'));
+  check('Regnearkets kolonner i rækkefølge (Alder står hvor den skal)', JSON.stringify(heads.slice(0, 22)) === JSON.stringify(['Pos/#', 'Spiller', 'Kæde', 'Natur', 'Alder', 'Frisk/🚑', 'Højde', 'Spring', '✈ Luft', 'PAC', 'STA', 'STR', 'BAL', 'PAS', 'FIN', 'POS', 'INT', 'GK', 'Gns', '⭐ Vurd', '🏋️ Træning', '🧠 Mod']), heads.join('|'));
   const modCells = await g.locator('#matrix tbody td.modcell').allTextContents();
   check('Mod-kolonnen viser tre egne værdier, ingen % mod en modstander', modCells.length === 18 && modCells.every((t) => /^\d+ · \d+ · \d+$/.test(t)) && !(await g.textContent('body')).match(/mod-kunnen[^.)]*\d+\s*%|mod [A-ZÆØÅ][^:]*: \d+%/i), modCells[0]);
   const used = await g.textContent('#counter-pool #counter-used');
@@ -64,6 +64,11 @@ try {
   const shown = (await g.textContent('#player-card h3')).match(/^#(\d+)/)[1];
   const expectSum = await g.evaluate((nr) => { const t = JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((x) => !x.isBot); const p = t.squad.find((x) => String(x.shirtNumber) === nr); return p.counterTactics.vsPress + p.counterTactics.vsLowBlock + p.counterTactics.vsTrapLong; }, shown);
   check('Spillerkortet viser puljen: erfaring brugt = summen af de tre værdier /100, og hvad der sker, når den er fuld', usedN === expectSum && used.includes('glemmer'), `${used} (forventet ${expectSum})`);
+  // v3.18.0: træningsfokus vælges på kortet, står i regnearket og gemmes (gælder, til det ændres – 0 klik pr. runde)
+  await g.selectOption('#focus-select', 'FINISH');
+  const focusSaved = async () => g.evaluate((nr) => JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((x) => !x.isBot).squad.find((x) => String(x.shirtNumber) === nr).trainingFocus, shown);
+  const focusRow = (await g.locator('#matrix tbody tr.selected td.traincell').textContent());
+  check('Træning: fokus valgt på kortet står i regnearket og er gemt', focusRow === 'Afslutning' && (await focusSaved()) === 'FINISH' && (await g.textContent('#card-training')).includes('Afslutning') && /næste \+1 om ca\. \d+ runde|går langsomt \(mere end en sæson/.test(await g.textContent('#card-training')), focusRow);
   check('Spillerkortet viser 9 evne-barer og luftduel-udregningen', (await g.locator('#player-card .bars .bar').count()) === 9 && (await g.textContent('#aerial-breakdown')).includes('× 0,35'));
   // v3.8 (Test Manager): kortets overskrift viser spillerens EGEN naturlige position med fuld betegnelse
   const FULL_POS = { GK: 'Målmand', CB: 'Midtstopper', FB: 'Back/wingback (LB/RB/LWB/RWB)', CM: 'Central/defensiv midtbane (CM/CDM)', WM: 'Kant (LM/RM/LW/RW)', AM: 'Offensiv midtbane (CAM/CF)', ST: 'Angriber (ST)' };
@@ -294,13 +299,14 @@ try {
   await g.selectOption('#team-select', '1');
   const oppText = await g.textContent('#matrix tbody');
   const lockCells = await g.locator('#matrix tbody td.lockcell').count();
-  check('Modstander: 13 skjulte kolonner × 18 spillere vises som 🔒 ??', lockCells === 13 * 18, String(lockCells));
+  check('Modstander: 14 skjulte kolonner × 18 spillere vises som 🔒 ?? (v3.18.0: + træningsfokus)', lockCells === 14 * 18, String(lockCells));
   const hiddenCols = await g.evaluate(() => [...document.querySelectorAll('#matrix tbody tr')].flatMap((tr) => [...tr.children].slice(7, 19).map((td) => td.textContent)));
   check('Modstander: spring, luft, de 9 evner og gennemsnit står som 🔒 ?? (12 × 18 celler)', hiddenCols.length === 12 * 18 && hiddenCols.every((t) => t === '🔒 ??'));
   check('Modstander: vurdering vises som stjerner, ikke tal', (await g.locator('#matrix tbody tr td:nth-child(20)').allTextContents()).every((t) => /^[★☆]{5}$|^–$/.test(t)));
   void oppText;
   await g.click('#matrix thead th:nth-child(15)');
   check('Modstander: sortering på FIN afvises med anti-spionage-besked', (await g.textContent('#notice')).includes('Anti-spionage'));
+  check('Modstander: klubkassen er skjult og linker ikke til Klub (v3.18.0)', (await g.textContent('.clubhead .right')).includes('🔒 Skjult') && (await g.locator('#club-link').count()) === 0);
   check('Modstander: spillerkortet skjuler evner og kontrakt', (await g.locator('#player-card .bars').count()) === 0 && (await g.textContent('#player-card')).includes('🔒 ??'));
   await tab('taktik');
   check('Modstander: faser, Hvis-Så-regler og udskiftningsgrænse er skjulte', (await g.locator('#tactics fieldset').count()) === 0 && (await g.locator('#subs-limit').count()) === 0 && (await g.textContent('#tactics .lockbox')).includes('udskiftningsgrænse'));
@@ -338,6 +344,9 @@ try {
   await g.waitForSelector('#match-center');
   check('▶ Spil runde åbner Kamp-fanen', (await g.textContent('#tabs .tab.active')).includes('Kamp'));
   check('Under afspilning kan runden ikke startes igen', await g.isDisabled('#play-round'));
+  await tab('klub');
+  check('Under afspilning: Klub viser ikke regnskabet (præmien ville afsløre slutstillingen)', (await g.isVisible('#club-booked')) && (await g.locator('#ledger').count()) === 0);
+  await tab('kamp');
   const played = await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.lastRound.matches.map((m) => `${m.homeName}–${m.awayName}`));
   check('Det spillede er præcis de kampe, Liga-fanen viste før ▶ – samme retning og rækkefølge', JSON.stringify(played) === JSON.stringify(nextFx), played.join(' | '));
   check('Under afspilning: besked om at runden er bogført, og de andre resultater er skjulte', (await g.isVisible('#booked-note')) && !/\d-\d/.test(await g.locator('#match-cards .matchcard:nth-child(2)').textContent()));
@@ -346,6 +355,17 @@ try {
   await tab('kamp');
   await g.click('#skip');
   check('Runden har 4 kampe', (await g.locator('#match-cards .matchcard').count()) === 4);
+  check('Træning: fokusset gælder stadig efter runden (0 klik pr. runde)', (await focusSaved()) === 'FINISH');
+  // v3.18.0 Klub: regnskabets første linje er runden; kassen i klubhovedet er den samme og linker til Klub
+  await tab('klub');
+  const led = await g.evaluate(() => { const t = JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((x) => !x.isBot); return { cash: t.cashBalance, n: t.finance.ledger.length }; });
+  const cashTxt = await g.textContent('#club-cash');
+  check('Klub: kasse, løn pr. runde, lønbudget og prognose – og regnskabet har rundens linje', led.n === 1 && (await g.locator('#ledger tbody tr').count()) === 1
+    && cashTxt.replace(/\D/g, '') === String(led.cash) && (await g.textContent('#club-wages')).includes('pr. runde') && /Du kan bruge|over budgettet/.test(await g.textContent('#club-room')) && (await g.isVisible('#club-forecast')), cashTxt);
+  await tab('trup'); await g.selectOption('#team-select', '0');
+  await g.click('#club-link');
+  check('Klubkassen i klubhovedet åbner Klub', (await g.textContent('#tabs .tab.active')).includes('Klub'));
+  await g.selectOption('#team-select', '3'); await tab('kamp');
   const mcText = await g.textContent('#match-center');
   // v3.16.3: minuttet står ved linjen ("3'"), ikke i teksten
   check('Din Hvis-Så-udskiftning (uanset stilling, fra minut 3) står i referatet i 3. minut, og indskifteren står i karakterarket', /(?<!\d)3'🔄 \[.+ • Hvis-Så\] #\d+ .+ ud – #\d+ .+ ind \(din Hvis-Så-regel\)\./.test(mcText) && /ind på/.test(mcText), (mcText.match(/🔄[^.]*\./) || ['ingen'])[0]);
@@ -634,7 +654,7 @@ try {
   check('Migrering: beskeden forklarer puljen på 100, Superliga-højderne, friskheden, den naturlige position og kampprogrammet (alle trin fra skema 1 op) – og nævner backuppen', ['100 point', 'Superliga', 'Friskhed', 'Hvis-Så-regler kan nu sættes', 'naturlig position', 'kampprogram', 'Sæson 1 (uden program)', 'backup'].every((x) => migNotice.includes(x)), migNotice);
   await reload(); await reload();
   const mig = await g.evaluate(() => ({ schema: JSON.parse(localStorage.getItem('tactivar_save')).schemaVersion, backups: Object.keys(localStorage).filter((k) => k.startsWith('tactivar_backup_')).length }));
-  check('Migrering: gemmes straks i skema 6, kun én backup trods tre genindlæsninger', mig.schema === 6 && mig.backups === 1, JSON.stringify(mig));
+  check('Migrering: gemmes straks i skema 7, kun én backup trods tre genindlæsninger', mig.schema === 7 && mig.backups === 1, JSON.stringify(mig));
   await tab('liga'); const migHead = await g.textContent('#standings-title');
   await g.click('#past-seasons > summary');
   const past = await g.textContent('#past-seasons');
@@ -665,7 +685,7 @@ try {
   const nat = await g.locator('#matrix tbody tr td:nth-child(4)').allTextContents();
   check('Natur-kolonnen viser en position for alle 18 (MV/CB/Back/CM/Kant/OM/ANG)', nat.length === 18 && nat.every((t) => ['MV', 'CB', 'Back', 'CM', 'Kant', 'OM', 'ANG'].includes(t.trim())), nat.join(','));
   const pos4 = await g.evaluate(() => { const d = JSON.parse(localStorage.getItem('tactivar_save')); const ps = d.league.teams.flatMap((t) => t.squad); const m = (k) => { const x = ps.filter((p) => p.position === k).map((p) => p.heightCm); return x.reduce((a, b) => a + b) / x.length; }; return { schema: d.schemaVersion, cb: m('CB'), fb: m('FB') }; });
-  check('Migrering fra skema 4: gemt som skema 6, stoppere ≈190 og backs ≈176 cm', pos4.schema === 6 && pos4.cb >= 189 && pos4.cb <= 192 && pos4.fb >= 174.5 && pos4.fb <= 177.5, JSON.stringify(pos4));
+  check('Migrering fra skema 4: gemt som skema 7, stoppere ≈190 og backs ≈176 cm', pos4.schema === 7 && pos4.cb >= 189 && pos4.cb <= 192 && pos4.fb >= 174.5 && pos4.fb <= 177.5, JSON.stringify(pos4));
   await tab('kamp');
   const old4 = await g.textContent('#match-center');
   check('Gem fra v3.7.0: karakterark og avis uden "undefined"/"NaN" og uden HI-tal', !/undefined|NaN|% HI/.test(old4) && (await g.locator('.ratings td.run').count()) > 0, old4.slice(0, 120));
@@ -681,7 +701,7 @@ try {
   await g.evaluate((f) => { for (const k of Object.keys(localStorage)) if (k.startsWith('tactivar_')) localStorage.removeItem(k); localStorage.setItem('tactivar_save', f); }, fixtureV3120);
   await reload();
   const v3120note = (await g.locator('#notice').count()) ? await g.textContent('#notice') : '';
-  check('Gem fra v3.12.0: kun nyheden for 3.12.1 (ikke 3.12.0 igen), ingen migrering', v3120note.includes('Spillerne rykker nu med') && !v3120note.includes('"Lave cutbacks"') && !v3120note.includes('Dit spil er opdateret'), v3120note.slice(0, 160));
+  check('Gem fra v3.12.0: kun nyheden for 3.12.1 (ikke 3.12.0 igen) – og kun livsløbs-migreringen (v3.18.0, skema 6 → 7)', v3120note.includes('Spillerne rykker nu med') && !v3120note.includes('"Lave cutbacks"') && v3120note.includes('Ny i v3.18') && !v3120note.includes('kampprogram:'), v3120note.slice(0, 160));
   // Test Manager v3.13: nyheden for 3.13 (udskiftninger) vises efter 3.12.1's, og de gamle hold får deres grænse (dit 70, botternes profil)
   check('Gem fra v3.12.0: nyheden for 3.13 om udskiftninger kommer efter 3.12.1-nyheden', v3120note.includes('Udskiftninger under kampen: friskheden falder') && v3120note.indexOf('Spillerne rykker nu med') >= 0 && v3120note.indexOf('Spillerne rykker nu med') < v3120note.indexOf('Udskiftninger under kampen: friskheden falder'), v3120note.slice(-200));
   check('Gem fra v3.12.0: holdene får udskiftningsgrænse efter deres profil (dit hold 70, botterne 75/65/75/70/70/65/75)', JSON.stringify(await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.teams.map((t) => t.subsLimit))) === JSON.stringify([70, 75, 65, 75, 70, 70, 65, 75]));
@@ -814,6 +834,34 @@ try {
       return { end: !!l.lastRound.gazette.seasonEnd, round: l.lastRound.round, opp: (home ? l.teams[a] : l.teams[h]).name, home, top: [t[0].teamName, t[0].points, t[1].teamName, t[1].points], myName: me.name };
     });
     check('Sæsonslut: runde 14 afslutter sæsonen (forudsætning)', sv.end && sv.round === 14, JSON.stringify(sv));
+    // v3.18.0: sæsonrapporten med ungdomstilbuddene; Tag op flytter spilleren ind i truppen
+    const nBefore = await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((t) => !t.isBot).squad.length);
+    check('Sæsonslut, Liga: sæsonrapporten – ældre, ny løn og 2 ungdomstilbud med Tag op / Lad gå', (await g.isVisible('#season-report')) && (await g.textContent('#sr-aged')).includes('et år ældre')
+      && (await g.textContent('#sr-wages')).includes('pr. runde') && (await g.locator('#youth-offers .youth-offer').count()) === 2 && !/undefined|NaN/.test(await g.textContent('#season-report')));
+    await g.locator('#youth-offers .youth-take').first().click();
+    const nAfter = await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((t) => !t.isBot).squad.length);
+    check('Sæsonslut: Tag op – spilleren er i truppen (gemt), og ét tilbud er tilbage', nAfter === nBefore + 1 && (await g.locator('#youth-offers .youth-offer').count()) === 1, `${nBefore} → ${nAfter}`);
+    await tab('trup');
+    check('Sæsonslut, Trup: "1 ungdomstilbud venter" med link til rapporten', (await g.textContent('#youth-pending')).includes('1 ungdomstilbud'));
+    // v3.18.0 transfers: vinduet er åbent ved sæsonslut – køb en spiller, der kan købes, til den viste faste pris
+    const buyable = await g.evaluate(async () => {
+      const { marketInfo } = await import('/engine/transfers.js');
+      const l = JSON.parse(localStorage.getItem('tactivar_save')).league, me = l.teams.find((t) => !t.isBot);
+      for (const [i, t] of l.teams.entries()) if (t.isBot) for (const p of t.squad) { const m = marketInfo(l, me, t, p); if (!m.reason) return { i, id: p.id, price: m.price, cash: me.cashBalance, n: me.squad.length }; }
+      return null;
+    });
+    if (buyable) {
+      await g.selectOption('#team-select', String(buyable.i));
+      await g.click(`#matrix tbody tr[data-pid="${buyable.id}"]`);
+      const btn = await g.textContent('#buy-player');
+      await g.click('#buy-player');
+      const after = await g.evaluate((id) => { const me = JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((t) => !t.isBot); return { cash: me.cashBalance, n: me.squad.length, has: me.squad.some((p) => p.id === id) }; }, buyable.id);
+      check('Transfer: "Køb for X kr." på kortet køber spilleren til netop den pris (gemt)', btn.replace(/\D/g, '') === String(buyable.price) && after.has && after.n === buyable.n + 1 && after.cash === buyable.cash - buyable.price, `${btn} / ${JSON.stringify(after)}`);
+      await tab('liga');
+      check('Transfer: står i ligaens transferliste', (await g.textContent('#transfer-log')).includes('→'));
+      await g.selectOption('#team-select', '0');
+    } else check('Transfer: en spiller kan købes ved sæsonslut (forudsætning)', false);
+    await tab('liga');
     check('Sæsonslut, Liga: sæsonboksen og klummen står sammen', (await g.locator('#gazette #season-end').count()) === 1 && (await g.locator('#gazette #col-title').count()) === 1);
     const colNext = await g.locator('#gazette #col-next p').allTextContents();
     const ny = colNext.filter((t) => t.startsWith('Ny sæson: '));   // opfølgningen på sidste gæt ("Før kampen …") står før, og må gerne være der

@@ -630,7 +630,7 @@ test('gem fra v3.12.0 (skema 6): indlæses uden migrering, gamle runder har inge
   assert.equal(raw.schemaVersion, 6); assert.equal(raw.ui.seenVersion, '3.12.0');
   assert.ok(!FIXTURE_V3120.includes('"snapshot"'), 'gemt før v3.12.1');
   const r = parseSave(FIXTURE_V3120);
-  assert.ok(r.ok, r.error); assert.ok(!r.migratedFrom, 'ingen migrering');
+  assert.ok(r.ok, r.error); assert.equal(r.migratedFrom, 6, 'kun livsløbs-migreringen 6 → 7 (v3.18.0)');
   const L = r.state.league;
   assert.equal(L.leagueMetadata.round, 3);
   assert.deepEqual(L.lastRound.matches.map((m) => m.homeGoals + m.awayGoals), raw.league.lastRound.matches.map((m) => m.homeGoals + m.awayGoals));
