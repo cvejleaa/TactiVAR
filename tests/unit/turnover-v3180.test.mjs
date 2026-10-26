@@ -187,3 +187,28 @@ test('en låst-op arketype forbliver låst op, selv om evnen falder med alderen'
   assert.ok(arch.every((p) => p.archetype.isUnlocked));
 });
 
+
+test('sæsonskiftet bruger dit træningsfokus mod aldersfaldet (den samme beregning som declineSkills med de trænede evner)', () => {
+  let expected;
+  const L = toSeasonEnd(4, (L) => {
+    const me = own(L);
+    for (const p of me.squad) { p.age = 30; p.trainingFocus = 'PHYSICAL'; }
+    expected = new Map(me.squad.map((p) => { const c = structuredClone(p); c.age = 31; declineSkills(c, 1, trainedSkills(c, false)); return [p.id, c.skills]; }));
+  });
+  // Rundens træning og kamp-xp kan have løftet en evne – sammenlign kun de evner, kampen og træningen ikke rører (PHYSICAL: fart, styrke)
+  for (const p of own(L).squad) if (expected.has(p.id)) for (const s of ['pace', 'strength']) assert.ok(p.skills[s] <= expected.get(p.id)[s] + 1 && p.skills[s] >= expected.get(p.id)[s], `${p.id} ${s}`);
+  const fell = own(L).squad.filter((p) => expected.has(p.id)).map((p) => ['pace', 'strength'].map((s) => expected.get(p.id)[s]).join());
+  assert.ok(fell.length > 10);
+});
+
+test('freeShirt starter ved 19, selv om lavere numre er ledige', () => {
+  assert.equal(freeShirt({ squad: [{ shirtNumber: 5 }] }), 19);
+});
+
+test('en bot med 22 spillere tager ingen ungdom op (offentlig regel – ikke alle tilbud)', () => {
+  let bot;
+  const L = toSeasonEnd(6, (L) => { bot = L.teams[4]; while (bot.squad.length < 22) bot.squad.push({ ...structuredClone(bot.squad[17]), id: `fill${bot.squad.length}`, shortName: `X. Fill${bot.squad.length}`, shirtNumber: 40 + bot.squad.length, age: 20 }); });
+  const retired = L.turnoverReport.retired.filter((r) => r.teamId === bot.id).length;
+  assert.equal(bot.squad.length, 22 - retired + botYouthTake(22 - retired, [1, 2]).length);
+  assert.ok(!L.turnoverReport.youthTaken.some((y) => y.teamId === bot.id) || 22 - retired < 22);
+});
