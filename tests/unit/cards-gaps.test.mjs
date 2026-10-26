@@ -5,7 +5,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRng } from '../../public/engine/rng.js';
 import { createLeague } from '../../public/engine/generator.js';
-import { simulateMatch } from '../../public/engine/match.js';
+import { simulateMatch as sim0 } from '../../public/engine/match.js';
+// v3.21.0: pinnede koordinater og scriptede rng-træk – uden bevægelsen (opts.drift = false, kun test-arenaer)
+const simulateMatch = (h, a, r, o = {}) => sim0(h, a, r, { drift: false, ...o });
+
 import { runProfile, createSheet, finalizeSheet, motmOrder, RATING_MIN, RATING_MAX } from '../../public/engine/ratings.js';
 import { buildGazette } from '../../public/engine/gazette.js';
 import { FORMATIONS } from '../../public/engine/formations.js';

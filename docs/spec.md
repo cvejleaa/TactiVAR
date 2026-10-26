@@ -418,6 +418,28 @@ bedre kan kontrollere spil motoren".
 - **Kontrolværktøjet** `node tools/trace-invariants.mjs [N]`: regler (31 billeder, 7–11 spillere, på banen = arkets skift og
   udvisninger, scoreren og spillerne i øjeblikkene, bolden ved skytten) og motor-viden: hvor målscorerne stod pr. måltype
   og hvor ofte holdets forreste stod bag modstanderens sidste forsvarer (før de koblede linjer ≈100 %, nu 0 %).
+- **Bevægelse (v3.21.0**, brugeren: "skal kortet passe til kilometerne, skal motoren flytte spillerne mere rundt i kampen …
+  så må spillet også blive mere præcist"; valgt: billedet = motoren OG afstand i duellerne, spredningen kun af rolle og taktik):
+  - `driftAt` (positions.js): hver markspiller bevæger sig glidende om sin levende plads – to bølger pr. akse (perioder 6–11 og
+    2,5–4 tick), en ren funktion af (kampens seed, hold, plads, tick). Udslaget pr. akse efter rollen (`DRIFT_AXES`: backen langs
+    linjen, CM i en boks, stopperen lidt) × rollens løb (`runBase` km, samme tabel som km-tallet) × pres og løb uden bold.
+    INGEN udholdenhed eller friskhed: modstanderens kort viser begge hold fuldt (§3) og må ikke røbe hans STA.
+  - Bredden lægges på i `livePositions`, dybden EFTER sammenpresningen (`applyDepth`): boldholdet kommer ikke forbi offside-linjen
+    (udslaget dæmpes inden for `DEPTH_FADE` af linjen – et spejl ville sende angriberne bagud og give flere langskud), modstanderens
+    dybeste bliver (linjen er hans), og hans forreste ikke forbi boldholdets bageste; ingen række over `ROW_MAX` 5, dybden
+    mindst `MIN_DEPTH`, og står nogen stadig for tæt, flyttes han til den nærmeste ledige plads på tværs (`apartFrom` resolve).
+  - Ét sæt positioner pr. tick: kampens seed trækkes én gang (`driftSeed`, i resultatet til test-oraklerne), og ALLE kald i
+    tick'et (modtagervalget, VAR-forreste, langskud, øjeblikkene, grundbilledet) får samme bevægelse – det, du ser, er det,
+    motoren regnede på.
+  - Afstand vælger duellens mand (`nearPick`, match.js): presseren mod opspilleren og (i midten) forsvareren mod løberen er
+    vægtet blandt de `NEAR_POOL` 3 nærmeste med friskhed / afstand² (afstanden mindst `NEAR_MIN` 6) – ét rng-træk; på kanten
+    stadig backen på hans side. Dit referat: "… erobrer bolden fra … – han stod nærmest." / "– din nærmeste mand når ikke frem."
+    Karakterarket (kun dit hold): `duelsWon/duels` 🤼 – private felter (`RATING_PRIVATE_FIELDS`, røber positionering).
+  - `opts.drift = false` kun i test-arenaerne (pinnede koordinater og trukne aktører – uden bevægelsen og uden nearPick); spillet
+    sender det aldrig (vagt i movement-v3210.test.mjs).
+  - Målt (`tools/measure-movement.mjs`, 40 kampe, samme kampe uden → med): CM-dækning 16 % → 28 %, rollernes rækkefølge i dækning
+    mod km 0,26 → 0,71, egen andel af flytningen 0,20 → 0,49, spring grundbillede → øjeblik 4 → 6. Balance (`measure-duels 300
+    maal`, `measure-shooters 400`): mål pr. kamp 2,87 → 2,83, langskud 8 → 9 %, midtbanen 21 → 20 %, 5-4-1's ST 41,9 → 42,2 %.
 - **Koblede linjer (v3.16**, Spilførerens sæsongennemgang i afspilningen: angriberne stod altid langt offside, forsvarende
   angribere ved modstanderens mål, kontramål fra midterlinjen, "langskud" fra hjørneflaget; brugeren valgte "ret linjerne
   først"). `coupledPositions` (positions.js) oven på holdenes egen form (`livePositions`, uændret) – ét sted, som

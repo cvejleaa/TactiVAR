@@ -7,7 +7,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRng } from '../../public/engine/rng.js';
 import { createLeague } from '../../public/engine/generator.js';
-import { simulateMatch } from '../../public/engine/match.js';
+import { simulateMatch as sim0 } from '../../public/engine/match.js';
+// v3.21.0: pinnede koordinater og scriptede rng-træk – uden bevægelsen (opts.drift = false, kun test-arenaer)
+const simulateMatch = (h, a, r, o = {}) => sim0(h, a, r, { drift: false, ...o });
+
 
 function stubRng(script = {}, nextValue = 0.5) {
   const calls = {};

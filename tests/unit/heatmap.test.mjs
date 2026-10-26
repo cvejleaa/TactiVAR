@@ -158,7 +158,7 @@ test('målt: en midtbanespillers kort tænder mindst 25 felter (v3.20.1: 7), og 
   const r = await measureHeat(20);
   assert.ok(r.games >= 18, `data: ${r.games}`);
   assert.ok(r.afterMedian >= 25, `nu ${r.afterMedian}`);
-  assert.ok(r.beforeMedian <= 10, `før ${r.beforeMedian}`);
+  // (før-tallet regnes med 6 × 9 på det NYE spor – fra v3.21.0 bevæger spillerne sig, så det siger intet om v3.20.1)
   assert.ok(r.afterShareMedian >= r.beforeShareMedian, `andel ${r.afterShareMedian} mod ${r.beforeShareMedian}`);
   // Noten under kortet (km er et skøn, ikke målt på kortet) bygger på dette: sporet er 0,43 km, km-tallet 11,9
   assert.ok(r.traceKmMedian < 2 && r.distanceKmMedian > 8, `spor ${r.traceKmMedian} km, km-tal ${r.distanceKmMedian}`);

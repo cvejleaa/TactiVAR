@@ -81,8 +81,10 @@ export function livePositions(tactics, { attacking = true, ballX = 50, runner = 
 // caught: holdet med bolden har lige vundet den (kontra) – det står i forsvarsform, modstanderen i angrebsform.
 // Returnerer { ball, opp, line } – begge i hvert holds egne koordinater (lille y = ved modstanderens mål); line i boldholdets.
 export const ONSIDE_GAP = 1, MIN_APART = 6;
-// v3.21.0: med bevægelsen står flere tæt – skubbet gentages, til ingen står oven i hinanden (før 3 gennemløb)
-export const SEPARATE_PASSES = 3, SEPARATE_ROUNDS = 4, ROW_MAX = 5;
+// v3.21.0: højst ROW_MAX fra et hold på samme række i dybden (applyDepth)
+export const SEPARATE_PASSES = 3, ROW_MAX = 5;
+// Boldholdets udslag i dybden dæmpes inden for DEPTH_FADE af offside-linjen (applyDepth fade)
+export const DEPTH_FADE = 6;
 export const PRESS_GAP = { LOW_BLOCK: 20, MID_BLOCK: 10, HIGH_GEGENPRESS: 2 };
 // Presser holdets markspillere (pladserne i idx) sammen foran 'to': de, der står inden for SQUEEZE_SPAN af linjen eller foran
 // den, mappes lineært fra [forreste, to + SQUEEZE_SPAN] til [to, to + SQUEEZE_SPAN]; resten står, hvor de stod. Ingen foran
@@ -115,7 +117,7 @@ function spread(pts, idx) {
 // Og ikke oven i en modspiller (QC v3.16.1: angriberen på linjen stod ofte på samme x som stopperen, han står ved): boldholdets
 // spiller skubbes på tværs – kun x, så linjen og offside-billedet er uændrede.
 // Ved sidelinjen skubbes han den anden vej; tre gennemløb, så et skub ikke lander oven i den næste modspiller.
-export function apartFrom(pts, idx, other, oidx) {
+export function apartFrom(pts, idx, other, oidx, resolve = false) {
   for (let pass = 0; pass < SEPARATE_PASSES; pass++) for (const i of idx) for (const j of oidx) {
     const p = pts[i], q = { x: 100 - other[j].x, y: 100 - other[j].y };   // modspillerens plads i dette holds koordinater
     if (Math.hypot(p.x - q.x, p.y - q.y) >= MIN_APART) continue;
@@ -124,7 +126,8 @@ export function apartFrom(pts, idx, other, oidx) {
     pts[i] = { x: Math.round(x), y: p.y };
   }
   // v3.21.0: står han stadig for tæt (mange i bevægelse – skubbet ovenfor landede på den næste), flyttes han til den nærmeste
-  // ledige plads på tværs – fri af modspillerne OG holdkammeraterne. Rører ikke billeder, hvor skubbet ovenfor slog til.
+  // ledige plads på tværs – fri af modspillerne OG holdkammeraterne. Kun med bevægelsen (resolve) – uden er billederne som før.
+  if (!resolve) return;
   const opps = oidx.map((j) => ({ x: 100 - other[j].x, y: 100 - other[j].y }));
   const clash = (i, x) => opps.some((q) => Math.hypot(x - q.x, pts[i].y - q.y) < MIN_APART) || [0, ...idx].some((k) => k !== i && Math.hypot(x - pts[k].x, pts[i].y - pts[k].y) < MIN_APART);
   for (const i of idx) {
@@ -173,7 +176,7 @@ export function coupledPositions(ballTactics, oppTactics, { ballX = 50, caught =
   if (runner > 0) ball[runner] = { x: ball[runner].x, y: Math.round(clamp(ball[runner].y - step, FRONT_LIMIT, 95)) };
   const rest = outB.filter((i) => i !== runner);
   squeeze(ball, rest, line + ONSIDE_GAP);
-  applyDepth(ball, ballTactics, ballDrift, rest, line + ONSIDE_GAP, 95, outB, SQUEEZE_SPAN);
+  applyDepth(ball, ballTactics, ballDrift, rest, line + ONSIDE_GAP, 95, outB, DEPTH_FADE);
   spread(ball, rest);
   if (!caught) {
     const deepest = Math.max(...rest.map((i) => ball[i].y));
@@ -184,12 +187,11 @@ export function coupledPositions(ballTactics, oppTactics, { ballX = 50, caught =
   const lastO = Math.max(...outO.map((i) => opp[i].y)), keep = outO.find((i) => opp[i].y === lastO), deepB = Math.max(...rest.map((i) => ball[i].y));
   applyDepth(opp, oppTactics, oppDrift, outO.filter((i) => i !== keep), 100 - deepB, lastO, outO);
   spread(opp, outO);
-  // v3.21.0: skubbet fra en modspiller kan lande på en holdkammerat – gentaget, til begge dele holder
-  for (let r = 0; r < SEPARATE_ROUNDS; r++) { apartFrom(ball, outB, opp, [0, ...outO]); spread(ball, outB); }
-  apartFrom(ball, outB, opp, [0, ...outO]);   // også løberen og ved målmanden
+  const moving = !!(ballDrift || oppDrift);
+  apartFrom(ball, outB, opp, [0, ...outO], moving);   // også løberen og ved målmanden
   // Ved en erobring står det fangede hold i angrebsform: dets enlige angriber kan stå på boldholdets målmand (TM v3.16.1)
   // – og skubbet væk fra målmanden må han ikke lande på en forsvarer (v3.17.0: 5-3-2 → 4-4-2 gav to brikker oven i hinanden)
-  if (caught) apartFrom(opp, outO, ball, [0, ...outB]);
+  if (caught) apartFrom(opp, outO, ball, [0, ...outB], moving);
   return { ball, opp, line };
 }
 // Afspark (v3.16.1, brugeren: "7 spillere stående på midterlinjen ved start"): holdet i sin forsvarsform, presset sammen

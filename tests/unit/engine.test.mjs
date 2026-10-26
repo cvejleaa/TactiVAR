@@ -8,7 +8,10 @@ import { viewPlayer, canSeeField, viewRatingEntry } from '../../public/engine/vi
 import { initialCounterTactics, opponentTacticKeys, masteryVs, counterXpForMatch, applyCounterXp, COUNTER_POOL } from '../../public/engine/counter.js';
 import { starsFromRating, createSheet, finalizeSheet } from '../../public/engine/ratings.js';
 import { describeFinish, describeHeader, describeVarTiming, generateScoutingClues } from '../../public/engine/clues.js';
-import { simulateMatch } from '../../public/engine/match.js';
+import { simulateMatch as sim0 } from '../../public/engine/match.js';
+// v3.21.0: pinnede koordinater og scriptede rng-træk – uden bevægelsen (opts.drift = false, kun test-arenaer)
+const simulateMatch = (h, a, r, o = {}) => sim0(h, a, r, { drift: false, ...o });
+
 import { MATCH_RULES } from '../../public/engine/match-rules.js';
 import { playPairs, fixedPairs, commitRound, SCOUTING_PER_PLAYER } from '../../public/engine/season.js';
 import { normalizeLeague } from '../../public/engine/sanitize.js';

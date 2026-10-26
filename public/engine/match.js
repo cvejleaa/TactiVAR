@@ -303,7 +303,8 @@ export function simulateMatch(home, away, rng, opts = {}) {
   const H = prepareSide(home, true, lineupNotes), A = prepareSide(away, false, lineupNotes);
   // Bevægelsen (v3.21.0, positions.js driftAt): kampens seed trækkes én gang; tick'et (curMin / 3) og holdet giver hver spiller
   // samme plads i alle kald i samme tick – modtagervalget, VAR-forreste, øjeblikkene og sporet læser de samme positioner.
-  // opts.drift = false KUN til de deterministiske test-arenaer med pinnede koordinater (som liveEnergy) – spillet sender det aldrig.
+  // opts.drift = false KUN til de deterministiske test-arenaer med pinnede koordinater og trukne aktører (som liveEnergy): uden
+  // bevægelsen og uden afstandsvalget (nearPick) – spillet sender det aldrig.
   const driftOn = opts.drift !== false, driftSeed = driftOn ? Math.floor(rng.next() * 2 ** 31) : 0;
   const driftOf = (tac) => (!driftOn ? null : tac === H.tactics ? { seed: driftSeed, team: 1, t: curMin / 3 } : tac === A.tactics ? { seed: driftSeed, team: 2, t: curMin / 3 } : null);
   const livePositions = (tac, o = {}) => livePos0(tac, { ...o, drift: driftOf(tac) });
@@ -517,6 +518,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // pladser i pos) vægter hver friskhed / afstand² (afstanden mindst NEAR_MIN). Ét rng-træk som rng.pick; skriver ikke i seen.
   const mirrorPt = (q) => (q ? { x: 100 - q.x, y: 100 - q.y } : { x: 50, y: 50 });
   function nearPick(side, cands, pt, pos) {
+    if (!driftOn) return rng.pick(cands);   // test-arenaerne (opts.drift = false): motoren fra før v3.21 – også valget
     const l = cands.map((p) => ({ p, i: side.starters.indexOf(p) })).filter(({ i }) => i > 0 && pos[i])
       .map((c) => ({ ...c, d: Math.max(NEAR_MIN, Math.hypot(pos[c.i].x - pt.x, pos[c.i].y - pt.y)) })).sort((a, b) => a.d - b.d || a.i - b.i).slice(0, NEAR_POOL);
     if (!l.length) return rng.pick(cands);
@@ -1279,7 +1281,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
         // Kun dit eget holds valg navngives; modstanderens stil beskrives ikke.
         // Teksten er den samme, uanset om en stilbonus afgjorde duellen (ellers røbede ordvalget modstanderens stil).
         const text = own(att) ? `✅ [DIN OPBYGNING VIRKER] ${YOUR_PASS[pass]} bryder igennem ${gen(def.team.name)} pres.${note}`
-          : own(def) ? `❌ [DIT PRES BRYDES] ${att.team.name} spiller sig igennem ${YOUR_PRESS[height]}.${note} ${vary([`${tag(presser)} var nærmest, men kom for sent.`, `${tag(presser)} gik i pres som den nærmeste, men blev spillet forbi.`], 'near', presser.id)}`
+          : own(def) ? `❌ [DIT PRES BRYDES] ${att.team.name} spiller sig igennem ${YOUR_PRESS[height]} – din nærmeste mand når ikke frem.${note}`
           : `✅ [FASE 1 VIRKER • ${att.team.name}] ${vary([`${att.team.name} spiller sig igennem ${gen(def.team.name)} pres.`, `${att.team.name} kommer forbi ${gen(def.team.name)} pres.`, `${gen(def.team.name)} pres bliver spillet over.`], 'fase1', att.team.id)}${note}`;
         addEv(min, 'TACTIC_WIN', 'TACTIC', att.isHome, false, 'Fase 1 virker', text);
         if (!own(att) && !own(def)) faseQuiet(att.team, 'win');
@@ -1311,7 +1313,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
           if (!goesCounter && won === 'KEEP_POSSESSION') def.calm = true;
           const counter = !own(def) ? '' : won === 'FAST_COUNTER' ? (goesCounter ? ' Din lynkontra sættes straks i gang.' : ' ' + vary(['Din lynkontra løber ind i et organiseret forsvar.', 'Modstanderen når hjem, før lynkontraen kommer i gang.', 'Lynkontraen bremses – de er hurtigt tilbage i position.'], 'lyn', presser.id))
             : (goesCounter ? ' Dit hold ser hullet og går direkte.' : ' Dit hold falder til ro på bolden.');
-          const text = own(def) ? `✅ [DIT PRES VIRKER] ${cap(YOUR_PRESS[height])} lukker af: ${tag(presser)} står nærmest og erobrer bolden fra ${tag(playmaker)} (${att.team.name}).${counter}`
+          const text = own(def) ? `✅ [DIT PRES VIRKER] ${cap(YOUR_PRESS[height])} lukker af: ${tag(presser)} erobrer bolden fra ${tag(playmaker)} (${att.team.name}) – han stod nærmest.${counter}`
             : own(att) ? `❌ [DIN OPBYGNING STOPPES] ${YOUR_PASS[pass]} kommer ikke igennem: ${tag(presser)} (${def.team.name}) erobrer bolden fra ${tag(playmaker)} (${att.team.name}).`
             : `🛑 [FASE 2 VIRKER • ${def.team.name}] ${tag(presser)} erobrer bolden fra ${tag(playmaker)} (${att.team.name}).`;   // holdmærke som de andre (v3.17.0)
           addEv(min, 'TACTIC_FAIL', 'TACTIC', def.isHome, false, 'Fase 2 pres virker', text);

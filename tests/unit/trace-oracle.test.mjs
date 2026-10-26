@@ -164,7 +164,7 @@ test('skytten: han står i teksten, hører til det hold, øjeblikket tilhører, 
       }
     }
   }
-  assert.ok(kinds.SAVE > 80 && kinds.MISS > 100 && kinds.GOAL > 80 && kinds.HEADER_GOAL > 15 && kinds.VAR_CHECK > 10 && kinds.OFFSIDE_FLAG >= 3 && kinds.VAR_NO_GOAL >= 4, JSON.stringify(kinds));
+  assert.ok(kinds.SAVE > 80 && kinds.MISS > 100 && kinds.GOAL > 80 && kinds.HEADER_GOAL > 15 && kinds.VAR_CHECK > 10 && kinds.OFFSIDE_FLAG >= 2 && kinds.VAR_NO_GOAL >= 4, JSON.stringify(kinds));   // v3.21.0: flag 3,7 → 3,2 pr. 100 kampe (600 kampe – støj), her 2
 });
 
 // Bolden ved skytten (v3.16, Spilfører: bolden stod på en fast plet, mens skytten stod ved hjørneflaget). Skytten i
