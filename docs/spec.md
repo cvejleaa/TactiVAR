@@ -782,7 +782,8 @@ med grøn kant:
    sheets (kun målmanden – plads 0, så også en MV skiftet ind ved skade; v3.11, brugeren: "Det er
    kun målmanden der får Clean sheet" – 0 imod, mindst 59 spilleminutter, en starter har 89), gule kort, bedste snit (v3.20.1: sæsonens snit af kampenes offentlige stjerner i kamphistorikken, mindst 3 kampe –
    før karrierens publicStars, som én runde næsten ikke flyttede) og 🏅 rundens bedste (seneste rundes kampe efter
-   offentlige stjerner; lighed: mål+oplæg, så kampens spiller; aldrig karakteren).
+   offentlige stjerner – avisens rundens spiller først, så listen ikke modsiger avisen; lighed: mål+oplæg, så kampens
+   spiller; aldrig karakteren).
 2. **Holdtal**: bold %, frispark begået/tilkendt, gule kort, straffe (mål), dødboldmål, clean sheets.
 3. **Ligaens forløb** (indeværende sæson, v3.11): mål pr. runde (søjler), måltyper, største sejr, målrigeste kamp.
 4. **Dit hold (privat)**: afslutninger, xG, hjørnespark, frispark i skudafstand, hovedstødsmål,

@@ -43,6 +43,9 @@ test('afsnit 3 (v3.20.1, brugeren: "en dårlig begrundelse – kampens spiller")
   assert.equal(why({ line: 'GK', saves: 3 }, { hG: 1 }), 'Begrundelse: 3 redninger.', 'et mål imod: intet nul');
   assert.equal(why({ line: 'MID' }, { hG: 0 }), 'Begrundelse: stabil hele kampen.', 'kun MV og forsvar holder nullet');
   assert.equal(why({ goals: 1, tacticWins: 5, isMotM: true }), 'Begrundelse: 1 mål, vandt 5 taktiske dueller – kåret til kampens spiller.');
+  // QC v3.20.1: en MODSTANDERS forsvarsspillers taktiske dueller rummer hans holds offside-fælde – nævnes ikke (seeren er h1, han spiller for a1)
+  assert.equal(why({ line: 'DEF', tacticWins: 6 }, { hG: 1 }), 'Begrundelse: stabil hele kampen.');
+  assert.equal(sec(buildColumn(inp({ viewerTeamId: 'a1', matches: [M({ ratings: R({ line: 'DEF', tacticWins: 6 }), hG: 1 })], gazette: GZ() })), 'col-stars').player.why, 'Begrundelse: vandt 6 taktiske dueller.', 'dit eget hold: gerne');
 });
 test('afsnit 3: formen på afsnittet – spiller (hold-id fra gazetten), mål og defensiv aktion udelukker hinanden', () => {
   const rt = { home: [], away: [RT({ playerId: 'p1', goals: 1 })] };

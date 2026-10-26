@@ -203,7 +203,8 @@ export function buildColumn({ matches = [], gazette = null, history = [], table 
     // dueller og et holdt nul tæller med; "kampens spiller" er kun et tillæg, aldrig hele begrundelsen
     const f = star && facts.find((x) => x.ratings.some((e) => e.playerId === star.playerId)), side = f && (f.home.id === star.teamId ? f.home : f.away);
     const why = star ? [star.goals && `${star.goals} mål`, star.assists && `${star.assists} oplæg`, star.saves && `${star.saves} redninger`, star.aerialWins >= 3 && `${star.aerialWins} vundne luftdueller`,
-      star.tacticWins >= 3 && `vandt ${star.tacticWins} taktiske dueller`, ['GK', 'DEF'].includes(star.line) && side?.against === 0 && 'holdt nullet'].filter(Boolean) : [];
+      // QC v3.20.1: en modstanders forsvarsspillers taktiske dueller rummer hans holds offside-fælde (match.js) – kun dit hold
+      star.tacticWins >= 3 && (star.line !== 'DEF' || star.teamId === viewerTeamId) && `vandt ${star.tacticWins} taktiske dueller`, ['GK', 'DEF'].includes(star.line) && side?.against === 0 && 'holdt nullet'].filter(Boolean) : [];
     const motm = star?.isMotM ? ' – kåret til kampens spiller' : '';
     sections.push({ id: 'col-stars', title: 'Rundens spiller og mål', player: p ? { playerId: p.playerId, teamId: p.teamId, why: `Begrundelse: ${why.length ? why.join(', ') : 'stabil hele kampen'}${motm}.` } : null,
       goal: gazette.goalOfTheRound ? true : null, defensive: !gazette.goalOfTheRound && gazette.defensiveAction ? true : null });

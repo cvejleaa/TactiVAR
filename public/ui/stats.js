@@ -72,10 +72,11 @@ function playerLists(league, myTeamId) {
   const starRows = all.map((x) => { const st = (x.v.matchLog ?? []).filter((e) => e[LOG.S] === season && e[LOG.ST] > 0).map((e) => e[LOG.ST]);
     return { ...x, n: st.length, avg: st.length ? st.reduce((a, b) => a + b, 0) / st.length : 0 }; })
     .filter((x) => x.n >= MIN_GAMES).sort((a, b) => b.avg - a.avg || b.n - a.n).slice(0, TOP);
-  const teamOf = new Map(league.teams.map((t) => [t.id, t]));
+  const teamOf = new Map(league.teams.map((t) => [t.id, t])), potr = league.lastRound?.gazette?.playerOfTheRound?.playerId ?? null;
   const roundRows = (league.lastRound?.matches ?? []).flatMap((m) => [...(m.ratings?.home ?? []), ...(m.ratings?.away ?? [])])
     .filter((e) => e.stars > 0 && teamOf.has(e.teamId))
-    .sort((a, b) => b.stars - a.stars || (b.goals + b.assists) - (a.goals + a.assists) || b.isMotM - a.isMotM).slice(0, TOP)
+    // Rundens spiller (avisen, efter karakter) først – stjernerne har støj og må ikke modsige avisen lige over (QC)
+    .sort((a, b) => (b.playerId === potr) - (a.playerId === potr) || b.stars - a.stars || (b.goals + b.assists) - (a.goals + a.assists) || b.isMotM - a.isMotM).slice(0, TOP)
     .map((e) => ({ v: { shirtNumber: e.shirtNumber, shortName: e.shortName, stars: e.stars }, team: teamOf.get(e.teamId) }));
   return h('div', { class: 'stat-grid' },
     list('⚽ Topscorere', 'sGoals'), list('🅰 Flest oplæg', 'sAssists'), list('👑 Kampens spiller', 'sMotm'),

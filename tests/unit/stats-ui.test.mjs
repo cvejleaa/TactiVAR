@@ -113,6 +113,10 @@ test('rundens bedste: rundens kampe efter offentlige stjerner (lighed: mål+opl�
   const root = render(L, me), rows = items(list(root, 'roundStars')), nm = (p) => `#${p.shirtNumber} ${p.shortName}`;
   assert.equal(list(root, 'roundStars').children[0].textContent, '🏅 Rundens bedste');
   assert.deepEqual(rows.map((r) => r.children[1].textContent), [nm(p2), nm(p3), nm(p4), nm(p1)]);
+  // Avisens rundens spiller (efter karakteren) står først, også med færre stjerner – listen må ikke modsige avisen (QC v3.20.1)
+  L.lastRound.gazette = { playerOfTheRound: { playerId: p1.id, teamId: other.id } };
+  assert.equal(items(list(render(L, me), 'roundStars'))[0].children[1].textContent, nm(p1));
+  delete L.lastRound.gazette;
   assert.ok(!list(root, 'roundStars').textContent.includes('9,87') && !list(root, 'roundStars').textContent.includes('9.87') && !list(root, 'roundStars').textContent.includes('6,1'), 'ingen karakter');
 });
 

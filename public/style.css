@@ -26,6 +26,10 @@ select:disabled, input:disabled { opacity: .55; }
 .tactics-layout { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
 
 @media (max-width: 900px) { .tactics-layout { grid-template-columns: 1fr; } }
+/* v3.20.1: Taktik – bane | liste øverst, indstillinger | kort under; på smal skærm bane, liste, indstillinger, kort (byt-listen tæt på banen) */
+.taktik-layout { grid-template-areas: "pitch list" "tactics card"; } .tk-pitch { grid-area: pitch; } .tk-list { grid-area: list; } .tk-tactics { grid-area: tactics; } .tk-card { grid-area: card; }
+@media (max-width: 900px) { .taktik-layout { grid-template-areas: "pitch" "list" "tactics" "card"; } }
+.trup-layout { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); } @media (max-width: 900px) { .trup-layout { grid-template-columns: 1fr; } }
 .bench { margin-top: .5rem; display: flex; flex-wrap: wrap; gap: .3rem; align-items: center; } .bench h4 { margin: 0 .3rem 0 0; }
 .bench-p.injured { color: #fda4af; }
 .empty { text-align: center; padding: 2rem; color: var(--dæmpet); }
@@ -86,7 +90,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .mc-grid { display: grid; grid-template-columns: 3fr 2fr; gap: 1rem; } @media (max-width: 900px) { .mc-grid { grid-template-columns: 1fr; } }
 .mc-grid.after { grid-template-columns: minmax(18rem, 26rem) minmax(0, 1fr); grid-template-areas: "replay stats" "replay feed"; align-items: start; }
 .mc-grid.after .mc-replay { grid-area: replay; } .mc-grid.after .mc-stats { grid-area: stats; } .mc-grid.after .mc-feed { grid-area: feed; }
-.mc-grid.after .replay { margin-top: 0; }
+.mc-grid.after .replay { margin-top: 0; } .mc-grid.after > * { min-width: 0; } .mc-grid .mc-stats { overflow-x: auto; }   /* mobil: afspilningens tekst må bryde (390 px: 394 px for bred) */
 @media (max-width: 900px) { .mc-grid.after { grid-template-columns: 1fr; grid-template-areas: "replay" "stats" "feed"; } }
 .feed { max-height: 26rem; overflow-y: auto; font-size: .8rem; }
 .ev { padding: .3rem 0; border-bottom: 1px solid var(--kant); } .ev-min { display: inline-block; width: 2.4rem; color: var(--dæmpet); font-family: ui-monospace, monospace; }
