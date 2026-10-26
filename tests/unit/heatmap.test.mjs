@@ -85,13 +85,12 @@ test('tracePaths: vejen mellem to billeder tælles – (10, 10) → (90, 10) tæ
   assert.ok(lit >= 10, `${lit} af 12 søjler`);
   assert.equal(heatCounts(run, 'h', null, null, { paths: false })[1].filter((v) => v > 0).length, 2, 'uden veje: kun de to billeder');
   // (10, 10) → række 1, søjle 1: billedet (1) + vejens punkter i samme felt (x < 16,67) à PATH_WEIGHT
-  assert.equal(g[1][1], 1 + PATH_WEIGHT * pts.filter(([, x]) => x < 200 / 12).length, 'vejen vejer PATH_WEIGHT pr. punkt');
+  assert.equal(g[1][1], 1 + 0.5 * pts.filter(([, x]) => x < 200 / 12).length, 'vejen vejer 0,5 pr. punkt');
   // Kun i det ene billede (indskiftet / udskiftet): ingen streg ind fra bænken
   const one = { frames: [{ t: 0, h: [[2, 10, 10]], a: [] }, { t: 1, h: [[3, 90, 10]], a: [] }], moments: [] };
   assert.deepEqual(tracePaths(one, 'h'), []);
   // Billederne i omvendt rækkefølge i sporet: vejen går stadig 0 → 1 → 2, ikke direkte 0 → 2
   const back = { frames: [{ t: 2, h: [[2, 10, 90]], a: [] }, { t: 0, h: [[2, 10, 10]], a: [] }, { t: 1, h: [[2, 90, 10]], a: [] }], moments: [] };
-  assert.ok(tracePaths(back, 'h').some(([, x]) => x > 80), 'via (90, 10)');
   // Udeholdet spejlet: fælles (90, 90) → (10, 90) er eget (10, 10) → (90, 10)
   const away = { frames: [{ t: 0, h: [], a: [[12, 90, 90]] }, { t: 1, h: [], a: [[12, 10, 90]] }], moments: [] };
   assert.ok(tracePaths(away, 'a').every(([, , y]) => y === 10));
@@ -161,4 +160,41 @@ test('målt: en midtbanespillers kort tænder mindst 25 felter (v3.20.1: 7), og 
   assert.ok(r.afterMedian >= 25, `nu ${r.afterMedian}`);
   assert.ok(r.beforeMedian <= 10, `før ${r.beforeMedian}`);
   assert.ok(r.afterShareMedian >= r.beforeShareMedian, `andel ${r.afterShareMedian} mod ${r.beforeShareMedian}`);
+  // Noten under kortet (km er et skøn, ikke målt på kortet) bygger på dette: sporet er 0,43 km, km-tallet 11,9
+  assert.ok(r.traceKmMedian < 2 && r.distanceKmMedian > 8, `spor ${r.traceKmMedian} km, km-tal ${r.distanceKmMedian}`);
+});
+
+// v3.20.2 Test Manager: skrå veje, huller, sortering, spejling, vægt og målmandens vej (overlevede ellers med grøn suite)
+const fr = (t, h, a = []) => ({ t, h, a });
+const r3 = (pts) => pts.map(([id, x, y]) => [id, Math.round(x * 1000) / 1000, Math.round(y * 1000) / 1000]);
+const sum = (g) => g.flat().reduce((s, v) => s + v, 0);
+
+test('tracePaths: skrå vej og afrunding opad (afstand 5 → 3 stykker → 2 punkter; floor ville give 1)', () => {
+  assert.deepEqual(r3(tracePaths({ frames: [fr(0, [[2, 10, 10]]), fr(1, [[2, 13, 14]])], moments: [] }, 'h')), [[2, 11, 11.333], [2, 12, 12.667]]);
+  const d = tracePaths({ frames: [fr(0, [[2, 10, 10]]), fr(1, [[2, 34, 42]])], moments: [] }, 'h');
+  assert.equal(d.length, 19, 'afstand 40 / 2 = 20 stykker');
+  assert.deepEqual(r3([d[9]]), [[2, 22, 26]], 'midtpunkt på den skrå linje (ikke kun x-afstand, ikke y konstant)');
+});
+
+test('tracePaths: en spiller, der mangler i billedet imellem, får ingen streg hen over hullet', () => {
+  assert.deepEqual(tracePaths({ frames: [fr(0, [[2, 10, 10]]), fr(1, [[3, 50, 50]]), fr(2, [[2, 90, 10]])], moments: [] }, 'h'), []);
+});
+
+test('tracePaths: billeder i blandet rækkefølge (t 2, 0, 1) giver vejen 0 → 1 → 2: 39 + 56 punkter', () => {
+  const back = { frames: [fr(2, [[2, 10, 90]]), fr(0, [[2, 10, 10]]), fr(1, [[2, 90, 10]])], moments: [] };
+  // sorteret: 39 + 56 = 95 (afstand 113,1 → 57 stykker). Usorteret (2 → 0, 0 → 1): 39 + 39 = 78
+  assert.equal(tracePaths(back, 'h').length, 95);
+});
+
+test('tracePaths: udeholdet spejlet – fælles (90, 90) → (10, 90) er eget (10, 10) → (90, 10): 39 punkter, y = 10, x fra 12 til 88', () => {
+  const p = tracePaths({ frames: [fr(0, [], [[12, 90, 90]]), fr(1, [], [[12, 10, 90]])], moments: [] }, 'a');
+  assert.equal(p.length, 39); assert.ok(p.every(([, , y]) => y === 10)); assert.deepEqual([p[0][1], p[38][1]], [12, 88]);
+});
+
+test('heatCounts: vægten for vejen er 0,5 og målmandens vej tælles ikke i holdets kort', () => {
+  const run = { frames: [fr(0, [[2, 10, 10]]), fr(1, [[2, 90, 10]])], moments: [] };
+  assert.equal(sum(heatCounts(run, 'h')), 2 + 39 * 0.5);   // 21,5; vægt 1 ville give 41
+  const gk = { frames: [fr(0, [[1, 50, 90]]), fr(1, [[1, 50, 60]])], moments: [] };
+  assert.equal(sum(heatCounts(gk, 'h', null, 1)), 0, 'målmanden: hverken billeder eller vej');
+  assert.ok(sum(heatCounts(gk, 'h', null, null)) > 2, 'uden gkId tæller hans vej');
 });

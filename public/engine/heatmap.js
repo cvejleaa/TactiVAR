@@ -7,7 +7,8 @@
 // v3.20.2 (brugeren: "13,6 km passer ikke med de få markeringer"): 12 × 18 felter, bevægelsen MELLEM billederne tæller med,
 // og en let udglatning – før 6 × 9 felter med kun de 31 øjebliksbilleder (en zonespiller landede i 3–4 felter).
 export const COLS = 12, ROWS = 18;
-export const PATH_STEP = 2, PATH_WEIGHT = 0.5;   // et punkt pr. 2 enheder på vejen mellem to billeder, halv vægt
+export const PATH_STEP = 2, PATH_WEIGHT = 0.5;
+export const HEAT_MIN = 0.04;   // v3.20.2: de svageste felter efter udglatningen tegnes ikke (ellers en tynd tåge over hele banen)   // et punkt pr. 2 enheder på vejen mellem to billeder, halv vægt
 
 const own = (side, [id, x, y]) => (side === 'h' ? [id, x, y] : [id, 100 - x, 100 - y]);
 
