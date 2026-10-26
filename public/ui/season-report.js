@@ -3,6 +3,7 @@
 import { h } from './dom.js';
 import { kr, LINE, POSITION_FULL } from './labels.js';
 import { roomOf, wagesPerRound } from '../engine/career.js';
+import { forecast } from './club.js';
 import { roomWords } from './card.js';
 
 export function renderSeasonReport({ league, mine, onTake, onDrop }) {
@@ -19,7 +20,8 @@ export function renderSeasonReport({ league, mine, onTake, onDrop }) {
     h('ul', {},
       prize ? h('li', { id: 'sr-prize' }, `🏆 Præmie for ${last.myPos}. pladsen: ${kr(prize)}`) : null,
       h('li', { id: 'sr-aged' }, `🎂 Alle spillere er blevet et år ældre. Fra 30 år falder evnerne lidt hver sæson – mindre i de evner, de træner.`),
-      h('li', { id: 'sr-wages' }, `💼 Lønnen er genforhandlet efter stjerner og alder: ${kr(wagesPerRound(mine))} pr. runde nu.`),
+      h('li', { id: 'sr-wages' }, rep.wages ? `💼 Lønnen er genforhandlet efter stjerner og alder: ${kr(rep.wages.before)} → ${kr(rep.wages.after)} pr. runde (${rep.wages.after >= rep.wages.before ? '+' : '−'}${Math.round(Math.abs(rep.wages.after / Math.max(1, rep.wages.before) - 1) * 100)} %).` : `💼 Lønnen er genforhandlet efter stjerner og alder: ${kr(wagesPerRound(mine))} pr. runde nu.`),
+      h('li', { id: 'sr-forecast' }, (() => { const d = Math.round((forecast(league, mine).end - mine.cashBalance) / 1000) * 1000; return `📊 Med samme placering ${d >= 0 ? 'vokser' : 'falder'} kassen ca. ${kr(Math.abs(d))} i sæson ${rep.season + 1} (se 💼 Klub).`; })()),
       rep.best.length ? h('li', { id: 'sr-best' }, `📈 Mest udviklet: ${rep.best.map((b) => `${name(b.id)} +${b.n} evne${b.n === 1 ? '' : 'r'}`).join(' · ')}`) : null,
       ...myRetired.map((r) => h('li', { class: 'sr-retired' }, `👋 #${r.nr} ${r.name} stopper karrieren efter ${r.games} kampe (${r.age} år).`)),
       others.length ? h('li', { id: 'sr-others' }, `I resten af ligaen stoppede ${others.length}: ${others.slice(0, 5).map((r) => `${r.shortName} (${teamName(r.teamId)})`).join(', ')}${others.length > 5 ? ' …' : ''}`) : null,

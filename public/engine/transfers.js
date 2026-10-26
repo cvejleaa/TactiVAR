@@ -96,6 +96,7 @@ export function acceptOffer(league, team, playerId) {
   const bot = o && league.teams.find((t) => t.id === o.to), p = team.squad.find((x) => x.id === playerId);
   if (!o || !bot || !p || o.w !== windowOf(league)) return 'Buddet er udløbet.';
   if (team.squad.length <= SQUAD_MIN) return `Du har kun ${SQUAD_MIN} spillere.`;
+  if (lineCount(team, p.line) <= LINE_MIN[p.line]) return `Du har kun ${lineCount(team, p.line)} i kæden – du skal beholde mindst ${LINE_MIN[p.line]}.`;
   if (buyBlock(bot, o.price, publicWage(p))) return `${bot.name} kan ikke længere betale.`;
   move(league, p, team, bot, o.price);
   team.listed = (team.listed ?? []).filter((id) => id !== playerId);

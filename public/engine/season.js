@@ -4,7 +4,7 @@
 // 1-kamps skade ikke forsvinder i samme runde.
 import { autoMatchBench, logMatch, FOCUS, focusSkills, validFocus, ageTrain, roomOf, addXp, KEY_SKILLS, MATCH_XP, TRAIN_FRESH_FLOOR, TRAIN_INJURY_MATCHES, PLAYED_RELIEF, derivedRng,
   attendance, wagesPerRound, formOf, bookLedger, TV_PER_ROUND, TICKET_PRICE, PRIZE, NEW_LEAGUE_PLACE,
-  willRetire, declineSkills, seasonGrowth, trainedSkills, refreshValue, publicWage, freeShirt, neededLine, botYouthTake, repairLineup, YOUTH_OFFERS, SQUAD_MIN, RETIRED_CAP } from './career.js';
+  willRetire, declineSkills, seasonGrowth, trainedSkills, refreshValue, publicWage, freeShirt, neededLine, botYouthTake, repairLineup, YOUTH_OFFERS, SQUAD_MIN, RETIRED_CAP, LINE_MIN } from './career.js';
 import { aerialBreakdown, isArchetypeUnlocked, generatePlayer } from './generator.js';
 import { bookMatchStats, roundHistory, HISTORY_MAX } from './stats.js';
 import { simulateMatch } from './match.js';
@@ -232,6 +232,7 @@ export function seasonTurnover(league) {
       return false;
     });
   }
+  const wagesBefore = mine ? wagesPerRound(mine) : 0;
   for (const team of league.teams) for (const p of team.squad) {
     const grew = seasonGrowth(p, season, afterSkillChange);
     if (grew.length && !team.isBot) { league.devTally ||= {}; league.devTally[p.id] = (league.devTally[p.id] ?? 0) + grew.length; }
@@ -251,6 +252,8 @@ export function seasonTurnover(league) {
     for (let k = 0; k < YOUTH_OFFERS; k++) make();
     while (team.squad.length + offers.length < SQUAD_MIN) make();   // aldrig under 18 (sanitize-grænsen)
     const take = team.isBot ? botYouthTake(team.squad.length, offers) : offers.slice(0, Math.max(0, SQUAD_MIN - team.squad.length));
+    // En bot tager altid et tilbud i en kæde under minimum (QC K5: ellers en markspiller i mål)
+    if (team.isBot) for (const y of offers) if (!take.includes(y) && team.squad.filter((p) => p.line === y.line).length + take.filter((x) => x.line === y.line).length < LINE_MIN[y.line]) take.push(y);
     for (const y of take) { team.squad.push(y); report.youthTaken.push({ id: y.id, teamId: team.id }); }
     team.youthOffers = team.isBot ? [] : offers.filter((y) => !take.includes(y));
   });
@@ -260,6 +263,7 @@ export function seasonTurnover(league) {
   const tally = league.devTally ?? {};
   report.best = (mine?.squad ?? []).filter((p) => tally[p.id] > 0).sort((a, b) => tally[b.id] - tally[a.id]).slice(0, 3).map((p) => ({ id: p.id, n: tally[p.id] }));
   league.devTally = {};
+  report.wages = mine ? { before: wagesBefore, after: wagesPerRound(mine) } : null;   // efter pension og ny løn – før ungdom
   league.turnoverReport = report;
   return report;
 }

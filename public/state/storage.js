@@ -179,10 +179,10 @@ export function parseSave(text) {
     if (!MIGRATIONS[v]) return { ok: false, error: `Der findes ingen migrering fra skema ${v}.` };
     data = MIGRATIONS[v](data);
   }
-  const { league, problems } = normalizeLeague(data.league);
+  const { league, problems, notes } = normalizeLeague(data.league);
   if (!league || problems.length) return { ok: false, error: `Ligaen kunne ikke repareres: ${problems.join('; ')}` };
   const { opponentIdx, ...ui } = { activePresetIndex: 0, ...data.ui }; // modstandervælgeren findes ikke længere (v3.11)
-  return { ok: true, state: { league, notes: data.notes && typeof data.notes === 'object' ? data.notes : {}, ui, savedAt: data.savedAt ?? null }, migratedFrom: from < SCHEMA_VERSION ? from : null };
+  return { ok: true, state: { league, notes: data.notes && typeof data.notes === 'object' ? data.notes : {}, ui, savedAt: data.savedAt ?? null }, migratedFrom: from < SCHEMA_VERSION ? from : null, repairs: notes ?? [] };
 }
 
 // storage er window.localStorage (eller en erstatning i tests).
@@ -192,7 +192,7 @@ export function loadGame(storage) {
   if (raw == null) return { status: 'empty' };
   const r = parseSave(raw);
   // Et ældre skema migreres – de rå data gemmes i backup først, så opdateringen kan fortrydes.
-  if (r.ok) return { status: 'ok', state: r.state, migratedFrom: r.migratedFrom, backupKey: r.migratedFrom != null ? backupRaw(storage, raw) : null };
+  if (r.ok) return { status: 'ok', state: r.state, migratedFrom: r.migratedFrom, repairs: r.repairs, backupKey: r.migratedFrom != null || r.repairs?.length ? backupRaw(storage, raw) : null };
   const backupKey = backupRaw(storage, raw);
   return { status: 'error', error: r.error, backupKey };
 }

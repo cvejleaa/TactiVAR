@@ -6,8 +6,8 @@ import { MAX_RULES } from './match-rules.js';
 import { TEAM_STAT_DEFAULTS, PLAYER_SEASON_DEFAULTS } from './stats.js';
 import { FORMATIONS } from './formations.js';
 import { buildSchedule, isValidSchedule, SEASON_ROUNDS } from './schedule.js';
-import { defaultTactics, defaultStarterIds, emptyStanding, BOT_PROFILES, aerialBreakdown, assignPositions, teamCareerDefaults } from './generator.js';
-import { initialPotential, publicWage, MATCH_LOG_CAP, SQUAD_MIN, SQUAD_MAX } from './career.js';
+import { defaultTactics, defaultStarterIds, emptyStanding, BOT_PROFILES, aerialBreakdown, assignPositions, teamCareerDefaults, generatePlayer } from './generator.js';
+import { initialPotential, publicWage, MATCH_LOG_CAP, SQUAD_MIN, SQUAD_MAX, derivedRng, neededLine, freeShirt } from './career.js';
 
 const PLAYER_DEFAULTS = { freshness: 100, injuryMatchesLeft: 0, lastRating: 0, ratingSum: 0, ratingGames: 0, publicStars: 0, seasonAgeCounter: 1, archetype: null, distanceSum: 0, minutesSum: 0, topSpeedMax: 0, hiKmSum: 0, hiDistSum: 0, trainingFocus: 'GENERAL', careerGames: 0 };
 // Truppens størrelse (v3.18.0: 18–25 efter lønbudgettet; før præcis 18)
@@ -48,8 +48,8 @@ function fixTactics(t, starterIds, profile) {
 
 // Returnerer { league, problems } – problems er en liste af ting, der IKKE kunne repareres.
 export function normalizeLeague(league) {
-  const problems = [];
-  if (!league || !Array.isArray(league.teams)) return { league: null, problems: ['Ligaen mangler hold'] };
+  const problems = [], notes = [];
+  if (!league || !Array.isArray(league.teams)) return { league: null, problems: ['Ligaen mangler hold'], notes };
   if (league.teams.length !== 8) problems.push(`Ligaen har ${league.teams.length} hold (forventet 8)`);
   league.leagueMetadata ||= { id: 'league_div_1', name: 'TactiVAR Superligaen', seasonNumber: 1, footballYear: 1 };
   const md = league.leagueMetadata;
@@ -80,7 +80,19 @@ export function normalizeLeague(league) {
   if (!Number.isInteger(league.nextPlayerSeq) || league.nextPlayerSeq < 1) league.nextPlayerSeq = 1;
   for (const k of ['transferLog', 'retired', 'offers']) league[k] = Array.isArray(league[k]) ? league[k].slice(-LOG_CAP) : [];
   league.teams.forEach((team, idx) => {
-    if (!Array.isArray(team.squad) || team.squad.length < SQUAD_MIN || team.squad.length > SQUAD_MAX) { problems.push(`${team.name || team.id} har ${team.squad?.length ?? 0} spillere (forventet ${SQUAD_MIN}–${SQUAD_MAX})`); return; }
+    // v3.18.0 (QC): en trup uden for 18–25 låser aldrig ligaen ude – under 18 fyldes op med ungdom (besked), over 25 får en besked.
+    // Kun en trup uden 11 spillere kan ikke repareres.
+    if (!Array.isArray(team.squad) || team.squad.length < 11) { problems.push(`${team.name || team.id} har ${team.squad?.length ?? 0} spillere (forventet ${SQUAD_MIN}–${SQUAD_MAX})`); return; }
+    if (team.squad.length < SQUAD_MIN) {
+      const rng = derivedRng('sanitize-fill', team.id, team.squad.length), used = new Set(league.teams.flatMap((t) => (t.squad || []).map((p) => p.shortName)));
+      const n0 = team.squad.length;
+      while (team.squad.length < SQUAD_MIN) {
+        league.nextPlayerSeq = Number.isInteger(league.nextPlayerSeq) && league.nextPlayerSeq > 0 ? league.nextPlayerSeq : 1;
+        team.squad.push(generatePlayer(rng, neededLine(team), 'YOUTH', freeShirt(team), idx, used, 0, undefined, `plr_y${league.nextPlayerSeq++}`));
+      }
+      notes.push(`${team.name} havde ${n0} spillere – truppen er fyldt op med ${SQUAD_MIN - n0} ungdomsspillere.`);
+    }
+    if (team.squad.length > SQUAD_MAX) notes.push(`${team.name} har ${team.squad.length} spillere – over ${SQUAD_MAX}. Sælg eller lad spillere gå.`);
     for (const p of team.squad) {
       for (const [k, v] of Object.entries({ ...PLAYER_DEFAULTS, ...PLAYER_SEASON_DEFAULTS })) if (p[k] === undefined) p[k] = v;
       if (!p.dev || typeof p.dev !== 'object') p.dev = {};
@@ -113,7 +125,7 @@ export function normalizeLeague(league) {
     // Udskiftningsgrænsen (v3.13): gemt før v3.13 → holdets profil (dit hold 70 %); 0 = fra bevares.
     team.subsLimit = clampSubsLimit(team.subsLimit ?? profile.subs);
   });
-  return { league, problems };
+  return { league, problems, notes };
 }
 
 // Sporets form (v3.16, match.js "Kampens spor"): v 1, højst 31 grundbilleder, højst 11 spillere pr. side, id'er som tal eller

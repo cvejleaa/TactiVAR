@@ -78,3 +78,45 @@ test('vinduet, trin 2: en bot under minimum i en kæde køber den billigste ikke
   assert.equal(buyer.squad.filter((p) => p.line === 'GK').length, 2);
   assert.ok(L.transferLog.some((e) => e.to === buyer.id && e.from === seller.id));
 });
+
+test('QC: du kan ikke sælge under minimum i kæden (aldrig uden målmand)', async () => {
+  const { acceptOffer } = await import('../../public/engine/transfers.js');
+  const L = fresh(), me = L.teams[0];
+  me.squad.push(...[1, 2].map((i) => ({ ...structuredClone(me.squad.find((p) => p.line === 'MID')), id: `m${i}`, shortName: `M. Q${i}`, shirtNumber: 70 + i })));
+  const gk = me.squad.find((p) => p.line === 'GK' && !me.tactics.lineupSlots.includes(p.id));
+  for (const t of L.teams.filter((x) => x.isBot)) t.cashBalance = 20000000;
+  setListed(L, me, gk.id, true);
+  assert.ok(L.offers.some((o) => o.playerId === gk.id), 'data: der er et bud');
+  assert.match(acceptOffer(L, me, gk.id), /kun 2 i kæden/);
+  assert.equal(me.squad.filter((p) => p.line === 'GK').length, 2);
+});
+
+test('QC: sanitize fylder en trup under 18 op med ungdom (med besked) – og en trup over 25 låser ikke ligaen ude', () => {
+  const L = fresh(), t = L.teams[3];
+  t.squad = t.squad.filter((p) => t.tactics.lineupSlots.includes(p.id) || p.line === 'GK');
+  const n0 = t.squad.length; assert.ok(n0 >= 11 && n0 < 18, 'data');
+  const big = L.teams[4]; while (big.squad.length < 27) big.squad.push({ ...structuredClone(big.squad[17]), id: `b${big.squad.length}`, shortName: `B. B${big.squad.length}`, shirtNumber: 50 + big.squad.length });
+  const r = normalizeLeague(L);
+  assert.deepEqual(r.problems, []);
+  assert.equal(t.squad.length, 18); assert.ok(t.squad.slice(n0).every((p) => p.roleTier === 'YOUTH' && /^plr_y/.test(p.id)));
+  assert.ok(r.notes.some((n) => n.includes(`fyldt op med ${18 - n0}`)));
+  assert.ok(r.notes.some((n) => n.includes('27 spillere')));
+});
+
+test('QC K5: en bot med 22 spillere tager alligevel en ungdomsmålmand, når den kun har 1 MV', async () => {
+  const { playRound, commitRound } = await import('../../public/engine/season.js');
+  const L = fresh(), bot = L.teams[5], rng = createRng(3);
+  for (let r = 0; r < 13; r++) commitRound(L, playRound(L, rng), rng);
+  const gk2 = bot.squad.find((p) => p.line === 'GK' && !bot.tactics.lineupSlots.includes(p.id));
+  bot.squad = bot.squad.filter((p) => p !== gk2);
+  while (bot.squad.length < 22) bot.squad.push({ ...structuredClone(bot.squad.find((p) => p.line === 'ATT')), id: `a${bot.squad.length}`, shortName: `A. A${bot.squad.length}`, shirtNumber: 50 + bot.squad.length, age: 20 });
+  commitRound(L, playRound(L, rng), rng);
+  assert.ok(bot.squad.filter((p) => p.line === 'GK').length >= 2);
+});
+
+test('Spilfører: et kampstempel fra en tidligere sæson har sæsonen med', async () => {
+  const { stampText } = await import('../../public/engine/career.js');
+  const teams = [{ name: 'A' }, { name: 'B' }], e = [1, 14, 0, 1, 2, 1, 90, 7.1, 3, 1, 0];
+  assert.match(stampText(e, teams, true, 2), /^\[Sæson 1, runde 14 • A 2-1 B/);
+  assert.match(stampText(e, teams, true, 1), /^\[Runde 14 • /);
+});

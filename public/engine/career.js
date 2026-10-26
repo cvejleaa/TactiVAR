@@ -48,7 +48,8 @@ export function starsForValue(p) {
   return TIER_STARS[p.roleTier] ?? 2;
 }
 export const publicValue = (p) => Math.max(25000, round(VALUE_BY_STARS[starsForValue(p)] * ageFactor(p.age), 25000));
-export const publicWage = (p) => Math.max(1000, round(publicValue(p) * WAGE_SHARE, 1000));
+// Ugelønnen i hele 3.000 kr., så lønnen pr. runde (÷ 3) går op – ingen afrundingsstøj i regnskabet (Spilfører: "1.256.001 kr.")
+export const publicWage = (p) => Math.max(3000, round(publicValue(p) * WAGE_SHARE, 3000));
 
 // ---------- Navne (v3.18.0: unikke kortnavne i hele ligaen) ----------
 export const FIRST_NAMES_EXTRA = ['Bastian', 'Daniel', 'Elias', 'Felix', 'Hjalte', 'Isak', 'Johan', 'Kristoffer', 'Laurits', 'Nicklas', 'Philip', 'Rune', 'Theo', 'Ulrik', 'Valdemar', 'Yusuf', 'Zakarias', 'Benjamin', 'Dennis', 'Hugo', 'Ida', 'Otto', 'Ruben', 'Tristan', 'Esben', 'Gabriel', 'Henrik', 'Lasse', 'Oskar', 'Vilhelm'];
@@ -110,9 +111,10 @@ export function autoMatchBench(team) {
 export const LOG = { S: 0, R: 1, H: 2, A: 3, HG: 4, AG: 5, MIN: 6, RT: 7, ST: 8, G: 9, AS: 10 };
 export function logMatch(p, entry) { (p.matchLog ||= []).push(entry); if (p.matchLog.length > MATCH_LOG_CAP) p.matchLog.splice(0, p.matchLog.length - MATCH_LOG_CAP); }
 // Stemplet: "[Runde 5 • Hjem 2-1 Ude • 90' • 7,4]" (dit hold) / "… • ★★★☆☆" (andre)
-export function stampText(e, teams, own) {
+// En kamp fra en tidligere sæson får sæsonen med: "[Sæson 1, runde 14 • …]" (Spilfører: runde 1 og 14 stod uden sæson)
+export function stampText(e, teams, own, season = e[LOG.S]) {
   const name = (i) => teams[i]?.name ?? '?', grade = own && e[LOG.RT] != null ? String(e[LOG.RT]).replace('.', ',') : '★'.repeat(e[LOG.ST] || 0) + '☆'.repeat(5 - (e[LOG.ST] || 0));
-  return `[Runde ${e[LOG.R]} • ${name(e[LOG.H])} ${e[LOG.HG]}-${e[LOG.AG]} ${name(e[LOG.A])} • ${e[LOG.MIN]}' • ${grade}]`;
+  return `[${e[LOG.S] !== season ? `Sæson ${e[LOG.S]}, runde` : 'Runde'} ${e[LOG.R]} • ${name(e[LOG.H])} ${e[LOG.HG]}-${e[LOG.AG]} ${name(e[LOG.A])} • ${e[LOG.MIN]}' • ${grade}]`;
 }
 
 // ---------- Træning pr. spiller (v3.18.0; spec §13 "fredagstræning" – brugerens valg: pr. spiller) ----------

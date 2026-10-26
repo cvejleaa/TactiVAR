@@ -98,7 +98,7 @@ export function renderMatrix({ team, isOwn, ui, notes, onSort, onSelect, onSwap,
   });
 
   return h('div', { class: 'panel' },
-    h('div', { class: 'toolbar' }, FILTERS.filter(([v]) => v !== 'reserve' || team.squad.length > 18).map(([v, label]) => h('button', { class: 'mini' + (ui.filter === v ? ' active' : ''), onclick: () => onFilter(v) }, v === 'all' ? `${label} (${team.squad.length})` : label)),
+    h('div', { class: 'toolbar' }, FILTERS.filter(([v]) => v !== 'reserve' || team.squad.length > 18 || ui.filter === 'reserve').map(([v, label]) => h('button', { class: 'mini' + (ui.filter === v ? ' active' : ''), onclick: () => onFilter(v) }, v === 'all' ? `${label} (${team.squad.length})` : label)),
       // Massehandling (Spilfører): fokus for de spillere, filteret viser – fx Reserver eller MID
       isOwn && onFocusMany ? select('', [['', `🏋️ Sæt træning for de viste (${rows.length}) …`], ...Object.entries(FOCUS).map(([k, f]) => [k, f.label])],
         (k) => { if (k) onFocusMany(rows.map((r) => r.p.id), k); }, { id: 'focus-many', class: 'mini' }) : null),
