@@ -55,7 +55,7 @@ export function fitOf(position, role) {
 const sideOf = (r) => (r?.[0] === 'L' ? 'L' : r?.[0] === 'R' ? 'R' : 'C');
 export function arrangeByFit(players, formation, from = formation) {
   const before = (FORMATIONS[from] || FORMATIONS['4-4-2']).map((s) => s.r), after = (FORMATIONS[formation] || FORMATIONS['4-4-2']).map((s) => s.r);
-  return pickByFit(players, formation, () => 1, (i, slot) => (sideOf(before[i]) === sideOf(after[slot]) ? 2 : 0) + (i === slot ? 1 : 0));
+  return pickByFit(players, formation, () => 1, (i, slot) => (sideOf(before[i]) === sideOf(after[slot]) ? 4 : 0) + (i === slot ? 1 : 0));   // siden vejer mere end pladsnummeret (5-3-2: LM blev RWB)
 }
 // Vælg og fordel: de bedste 11 af kandidaterne efter score(p) × fit × kæde (en spiller kan sidde over). Målmand uden for mål og
 // markspiller i mål kun, hvis der ikke er andre (−10). stays(i, slot) × 0,001 afgør ved lighed (side og plads).

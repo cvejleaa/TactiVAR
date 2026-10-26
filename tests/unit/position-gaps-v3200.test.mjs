@@ -51,13 +51,15 @@ test('P3 repairLineup: den tomme kantplads fyldes af den, der passer (OM, nabo),
   assert.equal(t.squad.find((p) => p.id === t.tactics.lineupSlots[5]).shirtNumber, 16);
 });
 
-test('P4 formationsskift bevarer siden: LB bliver på venstre og RB på højre (4-4-2 → 3-4-3 og → 4-2-3-1)', () => {
-  for (const form of ['3-4-3', '4-2-3-1']) {
-    const t = league().teams[0], lb = t.tactics.lineupSlots[1], rb = t.tactics.lineupSlots[4];
+test('P4 formationsskift bevarer siden i ALLE formationer: LB og LM aldrig til højre, RB og RM aldrig til venstre; 3-4-3: RB → RW', () => {
+  for (const form of Object.keys(FORMATIONS)) {
+    const t = league().teams[0], [lb, rb, lm, rm] = [1, 4, 5, 8].map((k) => t.tactics.lineupSlots[k]);
     act.setFormation(t, form);
     const roles = FORMATIONS[form].map((s) => s.r), at = (id) => roles[t.tactics.lineupSlots.indexOf(id)];
-    assert.ok(!at(lb).startsWith('R') && !at(rb).startsWith('L'), `${form}: LB → ${at(lb)}, RB → ${at(rb)}`);
-    assert.ok(at(rb).startsWith('R') || at(rb) === 'CB', `${form}: RB → ${at(rb)}`);
+    for (const id of [lb, lm]) assert.ok(!at(id).startsWith('R'), `${form}: venstre → ${at(id)}`);
+    for (const id of [rb, rm]) assert.ok(!at(id).startsWith('L'), `${form}: højre → ${at(id)}`);
+    if (form === '3-4-3') assert.equal(at(rb), 'RW');
+    if (form === '5-3-2') assert.equal(at(rm), 'RWB', '5-3-2: RM → RWB (før blev LM det)');
   }
 });
 
