@@ -3,8 +3,9 @@
 // med én kamp (spilleren missede kampen), og nye skader lægges på bagefter – så en
 // 1-kamps skade ikke forsvinder i samme runde.
 import { autoMatchBench, logMatch, FOCUS, focusSkills, validFocus, ageTrain, roomOf, addXp, KEY_SKILLS, MATCH_XP, TRAIN_FRESH_FLOOR, TRAIN_INJURY_MATCHES, PLAYED_RELIEF, derivedRng,
-  attendance, wagesPerRound, formOf, bookLedger, TV_PER_ROUND, TICKET_PRICE, PRIZE, NEW_LEAGUE_PLACE } from './career.js';
-import { aerialBreakdown, isArchetypeUnlocked } from './generator.js';
+  attendance, wagesPerRound, formOf, bookLedger, TV_PER_ROUND, TICKET_PRICE, PRIZE, NEW_LEAGUE_PLACE,
+  willRetire, declineSkills, seasonGrowth, trainedSkills, refreshValue, publicWage, freeShirt, neededLine, botYouthTake, repairLineup, YOUTH_OFFERS, SQUAD_MIN, RETIRED_CAP } from './career.js';
+import { aerialBreakdown, isArchetypeUnlocked, generatePlayer } from './generator.js';
 import { bookMatchStats, roundHistory, HISTORY_MAX } from './stats.js';
 import { simulateMatch } from './match.js';
 import { starsFromRating, starNoise } from './ratings.js';
@@ -102,7 +103,7 @@ export function trainRound(league, result, minutes) {
         const r = derivedRng('train', result.round, p.id);
         if (f.inj > 0 && r.chance(f.inj)) { p.injuryMatchesLeft = TRAIN_INJURY_MATCHES[Math.floor(r.next() * TRAIN_INJURY_MATCHES.length)]; rep?.injuries.push(p.id); }
       }
-      if (rep) for (const s of gains) rep.gains.push({ id: p.id, skill: s });
+      if (rep) for (const s of gains) { rep.gains.push({ id: p.id, skill: s }); league.devTally ||= {}; league.devTally[p.id] = (league.devTally[p.id] ?? 0) + 1; }
     }
   }
   league.trainingReport = report;
@@ -148,6 +149,8 @@ export function commitRound(league, result, rng) {
   const teamIdx = new Map(league.teams.map((t, i) => [t.id, i]));
   const players = new Map(league.teams.flatMap((t) => t.squad.map((p) => [p.id, p])));
   const played = new Set();
+  // Ungdomstilbud, du ikke har taget stilling til, går ved næste runde ("Lad gå" er standard)
+  for (const t of league.teams) if (t.youthOffers?.length) t.youthOffers = [];
   bookRoundFinances(league, result);
 
   for (const m of result.matches) {
@@ -203,9 +206,59 @@ export function commitRound(league, result, rng) {
   if (seasonRoundOf(league, result.round) === SEASON_ROUNDS) {
     const end = endSeason(league, result.round, true);
     payPrizes(league, result.round, league.seasons.at(-1).table);
+    seasonTurnover(league);
     if (result.gazette) result.gazette.seasonEnd = end;
   }
   return league;
+}
+
+// Sæsonskiftet (v3.18.0) – kun fra commitRound, efter endSeason (MIGRATIONS[5] kalder endSeason; ingen ældes ved en migrering, F1).
+// Pension → alle +1 år, aldersfald, ny værdi og genforhandlet løn → ungdomstilbud (botterne tager selv op) → opstillingerne repareres.
+// Alt tilfældigt med afledt rng pr. spiller/hold og sæson. league.turnoverReport er grundlaget for sæsonrapporten.
+export function seasonTurnover(league) {
+  const md = league.leagueMetadata, season = (md.seasonNumber ?? 2) - 1;
+  md.footballYear = (md.footballYear ?? 1) + 1;
+  const mine = league.teams.find((t) => !t.isBot);
+  const report = { season, retired: [], youthTaken: [], best: [], aged: true };
+  const goneLine = new Map(), gone = new Set();
+  for (const team of league.teams) {
+    team.squad = team.squad.filter((p) => {
+      if (!willRetire(p, season)) return true;
+      goneLine.set(p.id, p.line); gone.add(p.id);
+      report.retired.push({ id: p.id, name: p.name, shortName: p.shortName, nr: p.shirtNumber, teamId: team.id, age: p.age, games: p.careerGames ?? 0, line: p.line });
+      return false;
+    });
+  }
+  for (const team of league.teams) for (const p of team.squad) {
+    const grew = seasonGrowth(p, season, afterSkillChange);
+    if (grew.length && !team.isBot) { league.devTally ||= {}; league.devTally[p.id] = (league.devTally[p.id] ?? 0) + grew.length; }
+    p.age += 1; p.seasonAgeCounter = (p.seasonAgeCounter ?? 1) + 1;
+    if (declineSkills(p, season, trainedSkills(p, team.isBot)).length) afterSkillChange(p);
+    refreshValue(p); p.weeklyWage = publicWage(p);   // lønnen genforhandles ved hvert sæsonslut (QC B6, Spilfører)
+  }
+  league.retired = [...(league.retired ?? []), ...report.retired.map(({ id, name, teamId, age, games }) => ({ id, name, teamId, age, games, season }))].slice(-RETIRED_CAP);
+  // Ungdom
+  const used = new Set(league.teams.flatMap((t) => t.squad.map((p) => p.shortName)));
+  const ids = new Set(league.teams.flatMap((t) => t.squad.map((p) => p.id)));
+  const nextId = () => { let id; do id = `plr_y${league.nextPlayerSeq++}`; while (ids.has(id)); ids.add(id); return id; };
+  league.teams.forEach((team, ti) => {
+    const rng = derivedRng('youth', season, team.id), offers = [];
+    const prefer = report.retired.filter((r) => r.teamId === team.id).map((r) => r.line);
+    const make = () => { const line = neededLine(team, offers, prefer); const y = generatePlayer(rng, line, 'YOUTH', freeShirt(team, offers), ti, used, 0, undefined, nextId()); offers.push(y); return y; };
+    for (let k = 0; k < YOUTH_OFFERS; k++) make();
+    while (team.squad.length + offers.length < SQUAD_MIN) make();   // aldrig under 18 (sanitize-grænsen)
+    const take = team.isBot ? botYouthTake(team.squad.length, offers) : offers.slice(0, Math.max(0, SQUAD_MIN - team.squad.length));
+    for (const y of take) { team.squad.push(y); report.youthTaken.push({ id: y.id, teamId: team.id }); }
+    team.youthOffers = team.isBot ? [] : offers.filter((y) => !take.includes(y));
+  });
+  for (const team of league.teams) repairLineup(team, goneLine);
+  for (const book of Object.values(league.scouting ?? {})) for (const id of Object.keys(book)) if (gone.has(id)) delete book[id];
+  // Mest udviklet på dit hold (træning og kampe i sæsonen)
+  const tally = league.devTally ?? {};
+  report.best = (mine?.squad ?? []).filter((p) => tally[p.id] > 0).sort((a, b) => tally[b.id] - tally[a.id]).slice(0, 3).map((p) => ({ id: p.id, n: tally[p.id] }));
+  league.devTally = {};
+  league.turnoverReport = report;
+  return report;
 }
 
 // Sæsonslut (v3.11): tabellen og sæsonopgørelsen arkiveres, og tabel og sæsonstatistik starter
@@ -234,7 +287,10 @@ export function endSeason(league, toRound, programmed) {
   };
   (league.seasons ||= []).push(summary);
   // Spillernes sæsontal for netop denne sæson (kun den seneste – overskrives ved næste sæsonslut). Kun felter ≠ 0.
-  league.lastSeasonStats = { seasonNumber: md.seasonNumber, players: Object.fromEntries(all.map((p) => [p.id, Object.fromEntries(PLAYER_SEASON_FIELDS.filter((k) => p[k]).map((k) => [k, p[k]]))]).filter(([, v]) => Object.keys(v).length)) };
+  // v3.18.0 (QC B1): med et øjebliksbillede af holdet, navnet og nummeret – statistikken for den afsluttede sæson står,
+  // selv om spilleren stopper eller skifter klub ved sæsonskiftet
+  league.lastSeasonStats = { seasonNumber: md.seasonNumber, players: Object.fromEntries(all.map((p) => [p.id, Object.fromEntries(PLAYER_SEASON_FIELDS.filter((k) => p[k]).map((k) => [k, p[k]]))])
+    .filter(([, v]) => Object.keys(v).length).map(([id, v]) => { const p = all.find((x) => x.id === id); return [id, { ...v, t: teamOf.get(id).id, n: p.shortName, nr: p.shirtNumber }]; })) };
   md.standings = league.teams.map(emptyStanding);
   for (const t of league.teams) for (const p of t.squad) Object.assign(p, PLAYER_SEASON_DEFAULTS);
   md.seasonNumber = (md.seasonNumber || 1) + 1;

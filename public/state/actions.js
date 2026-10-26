@@ -3,7 +3,7 @@
 import { FORMATIONS, clampPos } from '../engine/formations.js';
 import { clampSubsLimit } from '../engine/freshness.js';
 import { MAX_RULES } from '../engine/match-rules.js';
-import { autoMatchBench, validFocus } from '../engine/career.js';
+import { autoMatchBench, validFocus, SQUAD_MAX } from '../engine/career.js';
 
 const IDENTITY = Array.from({ length: 11 }, (_, i) => i);
 
@@ -24,6 +24,17 @@ export function setFocus(team, playerId, key) {
   if (!p || !validFocus(p, key)) return false;
   p.trainingFocus = key; return true;
 }
+// Ungdomstilbud (v3.18.0): tag op (højst 25 i truppen; i minus intet optag – QC B5) eller lad gå. Svar: null = ok, ellers årsagen.
+export function takeYouth(team, id) {
+  const i = (team.youthOffers ?? []).findIndex((y) => y.id === id);
+  if (i < 0) return 'Tilbuddet er udløbet.';
+  if (team.squad.length >= SQUAD_MAX) return `Truppen er fuld (${SQUAD_MAX} spillere).`;
+  if ((team.cashBalance ?? 0) < 0) return 'Klubkassen er i minus – ingen optag, før den er i plus.';
+  team.squad.push(team.youthOffers.splice(i, 1)[0]);
+  if (team.matchBenchAuto !== false) autoMatchBench(team);
+  return null;
+}
+export const dropYouth = (team, id) => { team.youthOffers = (team.youthOffers ?? []).filter((y) => y.id !== id); };
 export const setFocusMany = (team, ids, key) => ids.filter((id) => setFocus(team, id, key)).length;
 
 // Bytter to spillere: to startere bytter plads; starter ⇄ bænk lader bænkspilleren overtage

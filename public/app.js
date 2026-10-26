@@ -3,7 +3,7 @@ import { renderStats } from './ui/stats.js';
 import { VERSION } from './version.js';
 import { createRng, randomSeed } from './engine/rng.js';
 import { createLeague } from './engine/generator.js';
-import { matchBenchOf, reservesOf, FOCUS } from './engine/career.js';
+import { matchBenchOf, reservesOf, FOCUS, willRetire, RETIRE_WARN_ROUND } from './engine/career.js';
 import { loadGame, saveGame, resetGame, exportGame, importGame, backupRaw, SAVE_KEY } from './state/storage.js';
 import * as act from './state/actions.js';
 import { h, select } from './ui/dom.js';
@@ -11,11 +11,12 @@ import { kr } from './ui/labels.js';
 import { renderMatrix } from './ui/matrix.js';
 import { renderCard, trainingSummary } from './ui/card.js';
 import { renderClub, shownCash } from './ui/club.js';
+import { renderSeasonReport } from './ui/season-report.js';
 import { viewTeam } from './engine/visibility.js';
 import { renderPitch } from './ui/pitch.js';
 import { renderTactics } from './ui/tactics.js';
 import { renderStandings } from './ui/standings.js';
-import { playRound, commitRound, pairRound, sortStandings } from './engine/season.js';
+import { playRound, commitRound, pairRound, sortStandings, seasonJustEnded } from './engine/season.js';
 import { buildColumn } from './engine/column.js';
 import { gen } from './engine/clues.js';
 import { seasonRoundOf, roundsLeftOf } from './engine/schedule.js';
@@ -278,6 +279,7 @@ function renderNow() {
   const card = renderCard({ player: selected, team, isOwn, scouting: league.scouting[mine.id]?.[selected?.id], note: selected ? game.notes[selected.id] : '',
     onNote: (v) => { game.notes[selected.id] = v; persist(); renderControls(); }, teams: league.teams, latest,
     onFocus: isOwn ? (k) => change(() => act.setFocus(team, selected.id, k)) : null,
+    retiring: !!selected && seasonRoundOf(league, league.leagueMetadata.round) >= RETIRE_WARN_ROUND && willRetire(selected, league.leagueMetadata.seasonNumber ?? 1),
     onOpenMatch: (hi, ai) => { const i = lr.matches.findIndex((m) => m.homeId === league.teams[hi]?.id && m.awayId === league.teams[ai]?.id); if (i >= 0) openReport(i); } });
 
   const pitch = h('div', { class: 'panel' }, h('h3', {}, `Taktiktavle – ${team.tactics.baseFormation}`),
@@ -308,11 +310,18 @@ function renderNow() {
   const content = {
     // Opstilling sker i Trup: tallene og sorteringen over banen (brugeren: "nærmest umuligt at
     // opstille sit hold, da informationerne og sorteringsmulighederne ligger på 2 forskellige faner").
-    trup: () => [header, isOwn && !mc?.playing ? trainingSummary(league.trainingReport?.[team.id], team) : null, matrix, h('div', { class: 'tactics-layout lineup-layout' }, h('section', {}, pitch), h('section', {}, card))],
+    trup: () => [header,
+      // Sæsonslut under afspilning (som bogført-før-afspilning): runden er bogført, og sæsonskiftet er sket
+      mc?.playing && seasonJustEnded(league) ? h('div', { class: 'notice', id: 'turnover-booked' }, '🗓 Sæsonen sluttede med denne runde: alle er blevet et år ældre, og sæsonrapporten med ungdomstilbuddene står på Liga, når kampene er spillet.') : null,
+      !mc?.playing && mine.youthOffers?.length ? h('div', { class: 'notice', id: 'youth-pending' }, `🧒 ${mine.youthOffers.length} ungdomstilbud venter – `, h('button', { class: 'linklike', onclick: () => showTab('liga') }, 'se sæsonrapporten på Liga')) : null,
+      isOwn && !mc?.playing ? trainingSummary(league.trainingReport?.[team.id], team) : null, matrix, h('div', { class: 'tactics-layout lineup-layout' }, h('section', {}, pitch), h('section', {}, card))],
     // Kortet står også i Taktik, så et klik på en brik viser spilleren uden fanebyt.
     taktik: () => [h('div', { class: 'tactics-layout' }, h('section', {}, pitch), h('section', {}, card, tactics))],
     kamp: () => [shown ? renderMatchCenter({ mc: shown, myTeamId: mine.id, on: mcHandlers, column: !shown.playing && shown.round === league.lastRound?.round ? columnNow() : null }) : h('div', { class: 'panel empty', id: 'no-matches' }, 'Ingen kampe spillet endnu. Tryk ▶ Spil runde i topbaren – modstanderen følger kampprogrammet på Liga-fanen.')],
     liga: () => [mc?.playing ? h('div', { class: 'notice', id: 'booked-league' }, '📺 Runden spilles i Kamp-fanen – tabellen herunder er allerede opdateret med den.') : null,
+      !mc?.playing ? renderSeasonReport({ league, mine,
+        onTake: (id) => { const err = act.takeYouth(mine, id); view.notice = err ? `🧒 ${err}` : '🧒 Ungdomsspilleren er rykket op i truppen.'; change(() => {}); },
+        onDrop: (id) => change(() => act.dropYouth(mine, id)) }) : null,
       standings,
       // Resultaterne skjules under afspilningen, ligesom avisen (ellers afsløres de).
       league.lastRound && !mc?.playing ? renderLastRound({ round: league.lastRound, myTeamId: mine.id, onOpen: openReport }) : null,

@@ -834,6 +834,16 @@ try {
       return { end: !!l.lastRound.gazette.seasonEnd, round: l.lastRound.round, opp: (home ? l.teams[a] : l.teams[h]).name, home, top: [t[0].teamName, t[0].points, t[1].teamName, t[1].points], myName: me.name };
     });
     check('Sæsonslut: runde 14 afslutter sæsonen (forudsætning)', sv.end && sv.round === 14, JSON.stringify(sv));
+    // v3.18.0: sæsonrapporten med ungdomstilbuddene; Tag op flytter spilleren ind i truppen
+    const nBefore = await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((t) => !t.isBot).squad.length);
+    check('Sæsonslut, Liga: sæsonrapporten – ældre, ny løn og 2 ungdomstilbud med Tag op / Lad gå', (await g.isVisible('#season-report')) && (await g.textContent('#sr-aged')).includes('et år ældre')
+      && (await g.textContent('#sr-wages')).includes('pr. runde') && (await g.locator('#youth-offers .youth-offer').count()) === 2 && !/undefined|NaN/.test(await g.textContent('#season-report')));
+    await g.locator('#youth-offers .youth-take').first().click();
+    const nAfter = await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((t) => !t.isBot).squad.length);
+    check('Sæsonslut: Tag op – spilleren er i truppen (gemt), og ét tilbud er tilbage', nAfter === nBefore + 1 && (await g.locator('#youth-offers .youth-offer').count()) === 1, `${nBefore} → ${nAfter}`);
+    await tab('trup');
+    check('Sæsonslut, Trup: "1 ungdomstilbud venter" med link til rapporten', (await g.textContent('#youth-pending')).includes('1 ungdomstilbud'));
+    await tab('liga');
     check('Sæsonslut, Liga: sæsonboksen og klummen står sammen', (await g.locator('#gazette #season-end').count()) === 1 && (await g.locator('#gazette #col-title').count()) === 1);
     const colNext = await g.locator('#gazette #col-next p').allTextContents();
     const ny = colNext.filter((t) => t.startsWith('Ny sæson: '));   // opfølgningen på sidste gæt ("Før kampen …") står før, og må gerne være der

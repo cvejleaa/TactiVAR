@@ -31,7 +31,8 @@ const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 // 20–23 år + 2 ± 1, ældre ingen plads; klemt til 4–19 og aldrig under det nuværende snit.
 export function initialPotential(p) {
   const r = derivedRng('potential', p.id), avg = keyAvg(p);
-  const room = p.age <= 19 ? 4 + (r.next() * 4 - 2) : p.age <= 23 ? 2 + (r.next() * 2 - 1) : 0;
+  // Ungdomsspillere (v3.18.0) + 5 ± 2,5: de starter lavt (4–8), og en del skal kunne blive startere (measure-lifecycle)
+  const room = p.roleTier === 'YOUTH' ? 5 + (r.next() * 5 - 2.5) : p.age <= 19 ? 4 + (r.next() * 4 - 2) : p.age <= 23 ? 2 + (r.next() * 2 - 1) : 0;
   return Math.round(clamp(Math.max(avg, avg + room), 4, 19) * 10) / 10;
 }
 
@@ -169,4 +170,92 @@ export function bookLedger(team, entry) {
   const last = f.ledger.at(-1);
   if (last && last.r === entry.r) { for (const k of ['gate', 'tv', 'wages', 'prize', 'transfers']) if (entry[k]) last[k] = (last[k] ?? 0) + entry[k]; last.cash = team.cashBalance; }
   else { f.ledger.push({ ...entry, cash: team.cashBalance }); if (f.ledger.length > LEDGER_CAP) f.ledger.splice(0, f.ledger.length - LEDGER_CAP); }
+}
+
+// ---------- Sæsonskiftet (v3.18.0; brugerens valg: +1 år pr. sæson) ----------
+// Pension: fra 31 år (MV 33) med stigende sandsynlighed (¼, ½, ¾), sikker ved 34 (MV 36) – measure-lifecycle: snitalder 23–26. Afgjort af en afledt rng pr. spiller og sæson,
+// så varslet fra runde 10 ("overvejer at stoppe") og udfaldet ved sæsonslut er det samme.
+export const RETIRE_FROM = { field: 31, GK: 33 }, RETIRE_SURE = { field: 34, GK: 36 }, RETIRE_WARN_ROUND = 10, RETIRED_CAP = 40;
+export function retireChance(p) {
+  const k = p.line === 'GK' ? 'GK' : 'field';
+  return p.age >= RETIRE_SURE[k] ? 1 : p.age >= RETIRE_FROM[k] ? (p.age - RETIRE_FROM[k] + 1) / (RETIRE_SURE[k] - RETIRE_FROM[k] + 1) : 0;
+}
+export const willRetire = (p, season) => { const c = retireChance(p); return c >= 1 || (c > 0 && derivedRng('retire', season, p.id).next() < c); };
+// Aldersfald fra 30 år (MV 32): fart og kondition først, positionering og pasning sidst. Træning halverer faldet i de trænede evner.
+export const DECLINE_FROM = { field: 30, GK: 32 };
+export const DECLINE = [[['pace', 'stamina'], 0.35, 0.15], [['strength', 'ballControl', 'finishing', 'intercepting', 'goalkeeping'], 0.2, 0.1], [['positioning', 'passing'], 0.08, 0.07]];
+export function declineSkills(p, season, trained = new Set()) {
+  const from = DECLINE_FROM[p.line === 'GK' ? 'GK' : 'field'];
+  if (p.age < from) return [];
+  const r = derivedRng('decline', season, p.id), y = p.age - from, fell = [];
+  for (const [skills, base, step] of DECLINE) for (const s of skills) {
+    const c = Math.min(0.9, base + step * y) * (trained.has(s) ? 0.5 : 1);
+    if (r.next() < c && p.skills[s] > 1) { p.skills[s] -= 1; fell.push(s); }
+  }
+  return fell;
+}
+// Vækst ved sæsonslut for de unge (til og med 23 år): alder · plads til loftet · brug (60 % + 40 % efter sæsonens kampe)
+export const GROW_BY_AGE = (age) => (age <= 19 ? 1.2 : age <= 21 ? 0.9 : age <= 23 ? 0.5 : 0);
+export function seasonGrowth(p, season, onSkill) {
+  const g = GROW_BY_AGE(p.age);
+  if (!g) return [];
+  const use = Math.min(1, (p.matchLog ?? []).filter((e) => e[LOG.S] === season).length / 14), room = roomOf(p);
+  return KEY_SKILLS[p.line].flatMap((s) => addXp(p, s, g * room * (0.6 + 0.4 * use), onSkill));
+}
+// De evner, spilleren har trænet (Hvile: ingen; botterne: Alsidig)
+export const trainedSkills = (p, isBot) => {
+  const key = isBot || !validFocus(p, p.trainingFocus) ? 'GENERAL' : p.trainingFocus;
+  return new Set(key === 'REST' ? [] : focusSkills(p, FOCUS[key]));
+};
+// Værdien ved vinduerne: stjernerne glattes som snit af de seneste 5 kampe med stjerner (mindst 3) – ellers uændret
+export function refreshValue(p) {
+  const st = (p.matchLog ?? []).map((e) => e[LOG.ST]).filter((s) => s > 0).slice(-5);
+  if (st.length >= 3) p.valueStars = Math.round((st.reduce((a, b) => a + b, 0) / st.length) * 10) / 10;
+}
+// Ungdom: 2 tilbud pr. hold. Rygnummer: laveste ledige fra 19.
+export const YOUTH_OFFERS = 2, SQUAD_MIN = 18, SQUAD_MAX = 25, LINE_MIN = { GK: 2, DEF: 6, MID: 6, ATT: 3 };
+export function freeShirt(team, extra = []) {
+  const used = new Set([...team.squad, ...extra].map((p) => p.shirtNumber));
+  for (let n = 19; n < 100; n++) if (!used.has(n)) return n;
+  for (let n = 1; n < 19; n++) if (!used.has(n)) return n;
+  return 99;
+}
+// Den kæde, der mangler mest i forhold til minimum (de stoppede kæder først)
+export function neededLine(team, extra = [], prefer = []) {
+  const count = (l) => [...team.squad, ...extra].filter((p) => p.line === l).length;
+  for (const l of prefer) if (count(l) < LINE_MIN[l]) return l;
+  return Object.keys(LINE_MIN).sort((a, b) => count(a) / LINE_MIN[a] - count(b) / LINE_MIN[b])[0];
+}
+// Botternes optag – kun offentlige data (QC B7): under 20 begge (under 18 fyldes op), under 22 ét tilbud, ellers intet
+export const botYouthTake = (squadSize, offers) => (squadSize < 20 ? offers : squadSize < 22 ? offers.slice(0, 1) : []);
+
+// Reparér opstillingen efter afgange (QC B3): den tomme plads får en fra samme kæde (raske, stjerner, friskhed – offentligt),
+// Hvis-Så-skift med en spiller, der er væk, ryddes (alle planer), og bænk og transferliste følger truppen.
+const pubScore = (p) => (p.injuryMatchesLeft > 0 ? -100 : 0) + starsForValue(p) * 10 + (p.freshness ?? 100) / 10;
+export function repairLineup(team, goneLine = new Map()) {
+  const ids = new Set(team.squad.map((p) => p.id)), slots = team.tactics.lineupSlots;
+  let changed = false;
+  slots.forEach((id, i) => {
+    if (ids.has(id)) return;
+    const on = new Set(slots), free = team.squad.filter((p) => !on.has(p.id));
+    const line = i === 0 ? 'GK' : goneLine.get(id) ?? null;
+    const pool = free.filter((p) => (line ? p.line === line : p.line !== 'GK'));
+    const best = [pool, free.filter((p) => (i === 0) === (p.line === 'GK')), free].find((l) => l.length) ?? [];
+    const pick = best.sort((a, b) => pubScore(b) - pubScore(a))[0];
+    if (pick) { slots[i] = pick.id; changed = true; }
+  });
+  for (const t of [team.tactics, ...(team.tacticPresets ?? [])]) for (const r of t.conditionalRules ?? []) {
+    if (r.subOut != null && !ids.has(r.subOut)) r.subOut = null;
+    if (r.subIn != null && !ids.has(r.subIn)) r.subIn = null;
+  }
+  for (const t of team.tacticPresets ?? []) t.lineupSlots = slots.slice();
+  const on = new Set(slots);
+  team.matchBench = (team.matchBench ?? []).filter((id) => ids.has(id) && !on.has(id));
+  if (team.matchBenchAuto !== false || team.isBot) autoMatchBench(team);
+  else {
+    const cand = team.squad.filter((p) => !on.has(p.id) && !team.matchBench.includes(p.id)).sort((a, b) => pubScore(b) - pubScore(a));
+    while (team.matchBench.length < BENCH_SIZE && cand.length) team.matchBench.push(cand.shift().id);
+  }
+  team.listed = (team.listed ?? []).filter((id) => ids.has(id));
+  return changed;
 }

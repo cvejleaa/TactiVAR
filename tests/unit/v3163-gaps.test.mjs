@@ -58,14 +58,16 @@ test('endSeason: lastSeasonStats rummer netop de spillere og felter, der er ≠ 
   Object.assign(p0, { sGoals: 3, sGames: 5, sAssists: 0 }); Object.assign(p2, { sMotm: 1, sMinutes: 270 });
   assert.equal(p1.sGoals, 0);
   endSeason(L, 14, true);
-  assert.deepEqual(L.lastSeasonStats, { seasonNumber: 1, players: { [p0.id]: { sGames: 5, sGoals: 3 }, [p2.id]: { sMinutes: 270, sMotm: 1 } } });
+  // + øjebliksbilledet (v3.18.0, QC B1): hold, kortnavn og nummer
+  const snap = (p) => ({ t: L.teams[1].id, n: p.shortName, nr: p.shirtNumber });
+  assert.deepEqual(L.lastSeasonStats, { seasonNumber: 1, players: { [p0.id]: { sGames: 5, sGoals: 3, ...snap(p0) }, [p2.id]: { sMinutes: 270, sMotm: 1, ...snap(p2) } } });
   assert.equal(L.leagueMetadata.seasonNumber, 2);
   assert.ok(L.teams.flatMap((t) => t.squad).every((p) => PLAYER_SEASON_FIELDS.every((k) => p[k] === 0)), 'spillerne er nulstillet til sæson 2');
   // Næste sæsonslut overskriver (kun den seneste sæson gemmes)
   L.leagueMetadata.round = 28; L.seasonStartRound = 15;
   p1.sRed = 2;
   endSeason(L, 28, true);
-  assert.deepEqual(L.lastSeasonStats, { seasonNumber: 2, players: { [p1.id]: { sRed: 2 } } });
+  assert.deepEqual(L.lastSeasonStats, { seasonNumber: 2, players: { [p1.id]: { sRed: 2, ...snap(p1) } } });
 });
 
 // ---------- endedSeasonView: vagter og sæsonstart ----------

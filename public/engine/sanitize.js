@@ -7,11 +7,11 @@ import { TEAM_STAT_DEFAULTS, PLAYER_SEASON_DEFAULTS } from './stats.js';
 import { FORMATIONS } from './formations.js';
 import { buildSchedule, isValidSchedule, SEASON_ROUNDS } from './schedule.js';
 import { defaultTactics, defaultStarterIds, emptyStanding, BOT_PROFILES, aerialBreakdown, assignPositions, teamCareerDefaults } from './generator.js';
-import { initialPotential, publicWage, MATCH_LOG_CAP } from './career.js';
+import { initialPotential, publicWage, MATCH_LOG_CAP, SQUAD_MIN, SQUAD_MAX } from './career.js';
 
 const PLAYER_DEFAULTS = { freshness: 100, injuryMatchesLeft: 0, lastRating: 0, ratingSum: 0, ratingGames: 0, publicStars: 0, seasonAgeCounter: 1, archetype: null, distanceSum: 0, minutesSum: 0, topSpeedMax: 0, hiKmSum: 0, hiDistSum: 0, trainingFocus: 'GENERAL', careerGames: 0 };
 // Truppens størrelse (v3.18.0: 18–25 efter lønbudgettet; før præcis 18)
-export const SQUAD_MIN = 18, SQUAD_MAX = 25;
+export { SQUAD_MIN, SQUAD_MAX };   // ét sted: career.js
 const LOG_CAP = 40;
 
 // Hvis-Så-regel i skema 2: { condition: TRAILING|LEADING|DRAW, margin 1–5, newFormation, newPlan }.
