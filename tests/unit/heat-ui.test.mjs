@@ -143,14 +143,14 @@ test('en spillers heat map: hans felter og prikker (afslutninger OG oplæg på h
   assert.ok(!cells.some((x) => x.style.left === `${(2 * 100) / 12}%` && x.style.top === `${(3 * 100) / 18}%`), 'ikke hA');
   const dots = all(byId(el, 'heat-pitch')[0], (x) => cls(x, 'heat-shot'));   // kun dit kort (modstanderens zone-kort har sine egne)
   assert.deepEqual(dots.map((d) => [d.className, d.style.left, d.style.top, d.textContent, d.attrs.title]), [['heat-shot assist', '60%', '60%', '🅰', `${C[0]} oplæg`]]);
-  assert.equal(byId(el, 'heat-note')[0].textContent, 'Angriber opad. Farven: hvor han var og bevægede sig i kampens 1 øjebliksbilleder (vejen imellem dem talt med) og afslutninger. Prikker: 0 mål, 0 reddet, 0 forbi/blokeret, 1 oplæg. Kortet viser hans område, ikke hver meter: spredningen følger hans rolle og holdets pres og løb ligesom kilometertallet, og kilometerne tæller også løbet mellem billederne.');
+  assert.equal(byId(el, 'heat-note')[0].textContent, 'Angriber opad. Farven: hvor han var og bevægede sig i kampens 1 øjebliksbilleder (vejen imellem dem talt med) og afslutninger. Prikker: 0 mål, 0 reddet, 0 forbi/blokeret, 1 oplæg. Kortet viser hans område, ikke hver meter: spredningen følger hans rolle og holdets pres og løb – kilometertallet i listen er et skøn ud fra de samme ting og hans kondition, ikke målt på kortet.');
   assert.equal(byId(el, 'heat-team')[0].textContent, '↩ Holdet'); byId(el, 'heat-team')[0].handlers.click();
   assert.deepEqual(calls.heat, [{ playerId: null }]);
   // Målmanden som "spiller": hans eget kort tæller hans placeringer (række 8, søjle 3)
   const g = render(mOf(), base.homeId, { heat: { playerId: id(hGk) } }).el;
   const gc = all(g, (x) => cls(x, 'heat-cell'));
   assert.ok(gc.some((x) => x.style.top === `${(16 * 100) / 18}%` && x.style.opacity === '0.85'), 'hans felt (række 16) er det tætteste');
-  assert.match(byId(g, 'heat-note')[0].textContent, /Prikker: ingen afslutninger\. Kortet viser hans område, ikke hver meter: spredningen følger hans rolle og holdets pres og løb ligesom kilometertallet, og kilometerne tæller også løbet mellem billederne\.$/);
+  assert.match(byId(g, 'heat-note')[0].textContent, /Prikker: ingen afslutninger\. Kortet viser hans område, ikke hver meter: spredningen følger hans rolle og holdets pres og løb – kilometertallet i listen er et skøn ud fra de samme ting og hans kondition, ikke målt på kortet\.$/);
   // En spiller uden afslutninger: ingen prikker
   assert.equal(all(byId(render(mOf(), base.homeId, { heat: { playerId: id(aA) } }).el, 'heat-pitch')[0], (x) => cls(x, 'heat-shot')).length, 0, 'modstanderens spiller findes ikke i dit kort');
 });

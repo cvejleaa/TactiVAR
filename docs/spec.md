@@ -428,12 +428,13 @@ bedre kan kontrollere spil motoren".
     (udslaget dæmpes inden for `DEPTH_FADE` af linjen – et spejl ville sende angriberne bagud og give flere langskud), modstanderens
     dybeste bliver (linjen er hans), og hans forreste ikke forbi boldholdets bageste; ingen række over `ROW_MAX` 5, dybden
     mindst `MIN_DEPTH`, og står nogen stadig for tæt, flyttes han til den nærmeste ledige plads på tværs (`apartFrom` resolve).
-  - Ét sæt positioner pr. tick: kampens seed trækkes én gang (`driftSeed`, i resultatet til test-oraklerne), og ALLE kald i
-    tick'et (modtagervalget, VAR-forreste, langskud, øjeblikkene, grundbilledet) får samme bevægelse – det, du ser, er det,
-    motoren regnede på.
+  - Ét sæt positioner pr. tick: kampens seed trækkes én gang (`driftSeed`, i resultatet til test-oraklerne – følger med i gemmet, et tal), og ALLE kald i
+    tick'et (modtagervalget, VAR-forreste, langskud, øjeblikkene, grundbilledet) får samme bevægelse – billedet viser de
+    pladser, motoren regnede på (øjeblikket er afleveringens; grundbilledet tick'ets udfald – median 6 imellem).
   - Afstand vælger duellens mand (`nearPick`, match.js): presseren mod opspilleren og (i midten) forsvareren mod løberen er
     vægtet blandt de `NEAR_POOL` 3 nærmeste med friskhed / afstand² (afstanden mindst `NEAR_MIN` 6) – ét rng-træk; på kanten
-    stadig backen på hans side. Dit referat: "… erobrer bolden fra … – han stod nærmest." / "– din nærmeste mand når ikke frem."
+    stadig backen på hans side. Dit referat: "… erobrer bolden fra … – han stod nærmest" (kun når den valgte var nr. 1, ellers "tæt på" –
+    QC) / "– presset når ikke frem". 🤼 tæller presserens dueller (ikke offside-fælden – den er bagkædens) og markørens i midten.
     Karakterarket (kun dit hold): `duelsWon/duels` 🤼 – private felter (`RATING_PRIVATE_FIELDS`, røber positionering).
   - `opts.drift = false` kun i test-arenaerne (pinnede koordinater og trukne aktører – uden bevægelsen og uden nearPick); spillet
     sender det aldrig (vagt i movement-v3210.test.mjs).
@@ -501,8 +502,8 @@ bedre kan kontrollere spil motoren".
 - **Heat map** (karakterarket, dit hold – v3.20.0: står fra start over startopstillingen, som modstanderens zonekort; 📍 erstatter
   kun opstillingen): viser holdets tæthed (v3.20.2: 12 × 18 felter, før 6 × 9; uden målmand) af grundbilleder og
   øjeblikke plus vejen mellem to grundbilleder (punkter hver 2. enhed, vægt 0,5; kun når spilleren er med i begge – ingen streg
-  fra bænken), udglattet med en 1-2-1-kerne og tegnet over 4 % af det tætteste felt (`tools/measure-heat.mjs`: en CM tænder 34
-  felter mod 7, men dækker 16 % af banen mod 13 % – motoren holder ham nær sin plads; km-tallet kommer fra rolle, udholdenhed, pres og løb – ratings.js – ikke sporet: sporets længde er 0,43 km mod 11,9; noten under
+  fra bænken), udglattet med en 1-2-1-kerne og tegnet over 4 % af det tætteste felt (`tools/measure-heat.mjs`: v3.20.2 en CM tænder 34
+  felter mod 7, men dækker 16 % af banen mod 13 % – motoren holdt ham nær sin plads; fra v3.21.0 bevæger han sig (Bevægelse ovenfor): 28 %; km-tallet kommer fra rolle, udholdenhed, pres og løb – ratings.js – ikke sporet: sporets længde er 0,43 km mod 11,9; noten under
   en spillers kort og kolonnens forklaring siger det. Vejen mellem billederne er en bevidst forskel fra afspilningens "ingen opfundne
   mellembilleder": den tegnes ikke, men tæller med halv vægt i kortet), og et klik på en spiller hans – med hans afslutninger efter udfald (⚽ mål, reddet, forbi, offside, annulleret,
   🅰 oplæg; Spilfører: positionerne alene er "der hvor du satte ham"). Modstanderen: "Tyngdepunkt (groft)" i tredjedele og (v3.16.1) et 3 × 3 zone-kort
