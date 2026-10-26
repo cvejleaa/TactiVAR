@@ -262,10 +262,12 @@ export function renderMatchCenter({ mc, myTeamId, on, column = null }) {
       h('div', { class: 'score' }, h('div', { id: 'score' }, `${last.hG} - ${last.aG}`), h('div', { class: 'muted', id: 'minute' }, mc.playing ? evMin(last) : 'Slut')),
       h('div', { class: 'right' }, h('strong', {}, m.awayName), h('div', { class: 'muted' }, m.awayTacticStr))),
     timeline(shown, m.stoppage),
-    mc.playing ? null : replayEl(m, isOwnSide('home') ? 'h' : isOwnSide('away') ? 'a' : null),
     last.varMsg && mc.playing ? h('div', { class: 'varbanner' }, `📺 VAR: ${last.varMsg}`) : null,
-    h('div', { class: 'mc-grid' },
-      h('div', {}, h('div', { class: 'toolbar' }, REPORT_FILTERS.map(([v, l]) => h('button', { class: 'mini' + (mc.filter === v ? ' active' : ''), onclick: () => on.filter(v) }, l))),
+    // v3.20.1 (brugeren: "udnyttelsen af pladsen lige efter en kamp"): efter slutfløjt står afspilningen til venstre og
+    // statistik + referat til højre – før stod banen alene midt på siden med tomme sider
+    h('div', { class: 'mc-grid' + (mc.playing ? '' : ' after'), id: 'mc-main' },
+      mc.playing ? null : h('div', { class: 'mc-replay' }, replayEl(m, isOwnSide('home') ? 'h' : isOwnSide('away') ? 'a' : null)),
+      h('div', { class: 'mc-feed' }, h('div', { class: 'toolbar' }, REPORT_FILTERS.map(([v, l]) => h('button', { class: 'mini' + (mc.filter === v ? ' active' : ''), onclick: () => on.filter(v) }, l))),
         // Et mål åbnet fra avisen markeres i referatet (samme minut, samme målscorer).
         h('div', { class: 'feed', id: 'feed' }, feed.map((e) => { const focus = mc.focus && /GOAL/.test(e.type) && e.min === mc.focus.min && e.text.includes(mc.focus.scorer);
           // Mål med øjebliksbillede (kun efter slutfløjt): 📍 viser, hvor dit hold stod.
@@ -276,7 +278,7 @@ export function renderMatchCenter({ mc, myTeamId, on, column = null }) {
           // Tillægstid (v3.16.4): én linje før halvlegens tillægstid – i referatet (nyeste øverst) lige under ankeret
           const st = stopAt.get(e);
           return st ? [row, h('div', { class: 'ev info stoppage', id: `stoppage-${st.h}` }, h('span', { class: 'ev-min' }, st.h ? "90'" : "45'"), `⏱️ Tillægstid: ${st.S} min${st.var ? ` (heraf ${st.var} for VAR)` : ''}.`)] : row; }))),
-      h('div', {}, statsRows(m, last.stats))),
+      h('div', { class: 'mc-stats' }, statsRows(m, last.stats))),
     // Karakterarkene side om side under referatet (stablet på smal skærm).
     mc.playing ? null : h('div', { class: 'ratings-grid' },
       ratingsTable(m.ratings.home, isOwnSide('home'), `${m.homeName} – karakterer`, m.startFormations?.home, snapOf(m, mc), on.snapshot, heatFor('h'), isOwnSide('away'), playerSpan(m.events, m.ratings.home)),

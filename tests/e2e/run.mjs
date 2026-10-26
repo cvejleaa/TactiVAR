@@ -531,6 +531,12 @@ try {
     const vis = await g.evaluate(() => ['home', 'away'].map((c) => [...document.querySelectorAll(`#rp-pitch .rp-token.${c}`)].filter((t) => getComputedStyle(t).display !== 'none').length));
     const totalTok = await g.evaluate(() => document.querySelectorAll('#rp-pitch .rp-token').length);
     check('Afspilning: højst 11 viste brikker pr. hold i sidste trin (udskiftede skjult – målt som tegnet)', vis.every((n) => n >= 7 && n <= 11) && (totalTok <= 22 || vis[0] + vis[1] < totalTok), `${vis} af ${totalTok} brikker`);
+    // v3.20.1 (brugeren: "udnyttelsen af pladsen lige efter en kamp"): afspilningen til venstre, statistik og referat ved siden af
+    { const r = await g.evaluate(() => { const b = (s) => document.querySelector(s).getBoundingClientRect(); return { rp: b('#replay'), st: b('#match-stats'), feed: b('#feed') }; });
+      check('Efter kampen: afspilningen til venstre, statistik og referat til højre ved siden af den', r.st.left >= r.rp.right - 1 && r.feed.left >= r.rp.right - 1 && r.st.top < r.rp.bottom && r.feed.top < r.rp.bottom, JSON.stringify({ rpR: Math.round(r.rp.right), stL: Math.round(r.st.left), feedT: Math.round(r.feed.top), rpB: Math.round(r.rp.bottom) }));
+      await g.setViewportSize({ width: 390, height: 844 });
+      check('Efter kampen på mobil (390 px): siden ruller ikke sidelæns (karakterarkene ruller selv)', await g.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), String(await g.evaluate(() => document.documentElement.scrollWidth)));
+      await g.setViewportSize({ width: 1400, height: 1000 }); }
     // v3.20.0 (brugeren): dit ark viser fra start holdets heat map OG startopstillingen – som modstanderens (zoner + opstilling)
     await g.waitForSelector('#heat-pitch');
     const heat = await g.evaluate(() => ({ cells: document.querySelectorAll('#heat-pitch .heat-cell').length, title: document.querySelector('#heat-title').textContent, thirds: document.querySelector('#heat-thirds')?.textContent ?? '', btn: document.querySelectorAll('#heat-btn').length,
