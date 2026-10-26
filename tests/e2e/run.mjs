@@ -860,6 +860,9 @@ try {
       await tab('liga');
       check('Transfer: står i ligaens transferliste', (await g.textContent('#transfer-log')).includes('→'));
       // v3.18.1: listen "Til salg i ligaen" i Klub – Køb i listen køber den første spiller til den viste pris
+      // Kassen fyldes op først: købet på kortet kan have tømt den, og så er listen (med rette) tom – CI v3.18.1 ventede forgæves
+      await g.evaluate(() => { const d = JSON.parse(localStorage.getItem('tactivar_save')); d.league.teams.find((t) => !t.isBot).cashBalance += 20000000; localStorage.setItem('tactivar_save', JSON.stringify(d)); });
+      await g.reload(); await g.waitForSelector('body[data-klar="ja"]');
       await tab('klub');
       const row = g.locator('#for-sale-table tbody tr').first();
       const sale = { id: await row.getAttribute('data-pid'), price: Number((await row.locator('td').nth(2).textContent()).replace(/\D/g, '')) };
