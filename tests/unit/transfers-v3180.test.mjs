@@ -35,6 +35,7 @@ test('køb: spilleren flytter, kasserne følger prisen, lønnen genforhandles, n
   const p = reserve(b, 'MID'), price = askPrice(b, p);
   const cash = [me.cashBalance, b.cashBalance];
   assert.ok(me.squad.some((x) => x.shirtNumber === p.shirtNumber), 'data: nummeret er optaget hos dig');
+  p.weeklyWage = 1;   // den gamle kontrakt – genforhandles ved skiftet
   assert.equal(buyPlayer(L, me, p.id), null);
   assert.ok(me.squad.includes(p)); assert.ok(!b.squad.includes(p));
   assert.equal(me.cashBalance, cash[0] - price); assert.equal(b.cashBalance, cash[1] + price);
@@ -144,9 +145,9 @@ test('B7 kanarie: skjulte data (evner, potentiale, løn) ændrer hverken pris, s
 test('commitRound åbner vinduet efter runde 7 og ved sæsonslut (værdierne opdateres der)', () => {
   const L = fresh();
   play(L, 7); assert.equal(L.windowSales?.w, 3);
-  play(L, 7); assert.equal(L.windowSales?.w, 4);
   const p = L.teams[1].squad.find((x) => x.careerGames >= 3);
-  assert.ok(p.valueStars > 0);
+  assert.ok(p.valueStars > 0, 'værdien opdateret ved vinduet efter runde 7');
+  play(L, 7); assert.equal(L.windowSales?.w, 4);
 });
 
 test('lønbudgettet tæller den nye løn med: weeklyWages + løn ≤ budget', () => {
