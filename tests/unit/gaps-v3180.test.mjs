@@ -76,7 +76,7 @@ test('vinduet, trin 2: en bot under minimum i en kæde køber den billigste ikke
   for (const t of L.teams.filter((x) => x.isBot && x !== seller && x !== buyer)) t.cashBalance = 0;   // ingen andre køber i trin 3
   openWindow(L);
   assert.equal(buyer.squad.filter((p) => p.line === 'GK').length, 2);
-  assert.ok(L.transferLog.some((e) => e.to === buyer.id && e.from === seller.id));
+  assert.ok(L.transferLog.some((e) => e.to === buyer.id), 'købt fra en anden bot (v3.18.1: alle botter kan sælge – de henter selv ungdom)');
 });
 
 test('QC: du kan ikke sælge under minimum i kæden (aldrig uden målmand)', async () => {
@@ -138,4 +138,15 @@ test('Security: en delt fil med ødelagte ungdomstilbud, kamplog og transferlist
   const storage = { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, v), removeItem: (k) => store.delete(k), key: (i) => [...store.keys()][i], get length() { return store.size; } };
   const res = loadGame(storage);
   assert.equal(res.status, 'error'); assert.ok(res.backupKey);
+});
+
+test('v3.18.1: en bot med 19 spillere, der sælger sin ene af to målmænd, henter en ungdomsmålmand (kæde-minimum, ikke kun 18)', async () => {
+  const { buyPlayer } = await import('../../public/engine/transfers.js');
+  const L = fresh(), me = L.teams[0], b = L.teams[2];
+  b.squad.push({ ...structuredClone(b.squad.find((p) => p.line === 'ATT' && !b.tactics.lineupSlots.includes(p.id))), id: 'att19', shortName: 'A. Nitten', shirtNumber: 44 });
+  me.cashBalance = 50000000;
+  const gk = b.squad.find((p) => p.line === 'GK' && !b.tactics.lineupSlots.includes(p.id));
+  assert.equal(buyPlayer(L, me, gk.id), null);
+  assert.equal(b.squad.length, 19, 'stadig 19: én solgt, én hentet');
+  assert.equal(b.squad.filter((p) => p.line === 'GK').length, 2);
 });

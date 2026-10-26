@@ -58,16 +58,20 @@ test('grænser: lukket vindue, karantæne, sælger på 18, minimum i kæden, 2 s
   const L = fresh(), me = own(L), b = L.teams[4];
   me.cashBalance = 50000000;
   const p = reserve(b, 'MID');
-  // sælger på 18 (frisk liga): ingen salg
-  assert.match(marketInfo(L, me, b, p).reason, /kun 18/);
-  b.squad.push(...[1, 2, 3].map((i) => ({ ...structuredClone(reserve(b, 'MID')), id: `x${i}`, shortName: `X. X${i}`, shirtNumber: 60 + i })));
+  // v3.18.1: en bot på 18 sælger alligevel – og henter selv en ungdomsspiller i samme kæde (v3.18.0: "har kun 18" i hele sæson 1)
+  assert.equal(b.squad.length, 18);
   assert.equal(marketInfo(L, me, b, p).reason, null);
-  // minimum i kæden: MV 2
   const gk = reserve(b, 'GK');
-  assert.match(marketInfo(L, me, b, gk).reason, /for få i kæden/);
+  assert.equal(marketInfo(L, me, b, gk).reason, null, 'også ved minimum i kæden');
+  assert.equal(buyPlayer(L, me, gk.id), null);
+  assert.equal(b.squad.length, 18); assert.equal(b.squad.filter((x) => x.line === 'GK').length, 2);
+  const y = b.squad.find((x) => x.roleTier === 'YOUTH' && x.line === 'GK');
+  assert.ok(y && /^plr_y\d+$/.test(y.id), 'ungdomsmålmand hentet');
+  assert.equal(new Set(L.teams.flatMap((t) => t.squad.map((x) => x.shortName))).size, L.teams.reduce((a, t) => a + t.squad.length, 0), 'navne unikke');
+  b.squad.push(...[1, 2, 3].map((i) => ({ ...structuredClone(reserve(b, 'MID')), id: `x${i}`, shortName: `X. X${i}`, shirtNumber: 60 + i })));
   // 2 salg pr. vindue
-  assert.equal(buyPlayer(L, me, 'x1'), null); assert.equal(buyPlayer(L, me, 'x2'), null);
-  assert.match(buyPlayer(L, me, 'x3'), /solgt 2/);
+  assert.equal(buyPlayer(L, me, 'x1'), null);
+  assert.match(buyPlayer(L, me, 'x2'), /solgt 2/);
   // karantæne: den købte kan ikke sælges videre i dette eller næste vindue
   const x1 = me.squad.find((x) => x.id === 'x1');
   assert.ok(quarantined(x1, 2) && quarantined(x1, 3) && !quarantined(x1, 4));

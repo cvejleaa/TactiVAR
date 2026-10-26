@@ -859,6 +859,14 @@ try {
       check('Transfer: "Køb for X kr." på kortet køber spilleren til netop den pris (gemt)', btn.replace(/\D/g, '') === String(buyable.price) && after.has && after.n === buyable.n + 1 && after.cash === buyable.cash - buyable.price, `${btn} / ${JSON.stringify(after)}`);
       await tab('liga');
       check('Transfer: står i ligaens transferliste', (await g.textContent('#transfer-log')).includes('→'));
+      // v3.18.1: listen "Til salg i ligaen" i Klub – Køb i listen køber den første spiller til den viste pris
+      await tab('klub');
+      const row = g.locator('#for-sale-table tbody tr').first();
+      const sale = { id: await row.getAttribute('data-pid'), price: Number((await row.locator('td').nth(2).textContent()).replace(/\D/g, '')) };
+      const before = await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((t) => !t.isBot).cashBalance);
+      await row.locator('.buy-row').click();
+      const after2 = await g.evaluate((id) => { const me = JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((t) => !t.isBot); return { cash: me.cashBalance, has: me.squad.some((p) => p.id === id) }; }, sale.id);
+      check('Transfer: "💰 Køb" i listen Til salg i ligaen køber til den viste pris – bekræftelsen står ved listen', after2.has && after2.cash === before - sale.price && (await g.textContent('#for-sale-msg')).includes('er købt'), JSON.stringify({ sale, before, after2 }));
       await g.selectOption('#team-select', '0');
     } else check('Transfer: en spiller kan købes ved sæsonslut (forudsætning)', false);
     await tab('liga');
