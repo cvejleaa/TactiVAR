@@ -1,5 +1,6 @@
 // v3.13 – Test Manager: huller, som mutationstest af friskhed i kampen, træthedsskift og Hvis-Så-udskiftninger
 // afslørede (se tests/unit/fatigue.test.mjs for forfatterens egne tests). Friskheden i kampen er TIL her.
+import { alignPositions } from './helpers/positions.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRng } from '../../public/engine/rng.js';
@@ -25,7 +26,7 @@ function arena({ homeLimit = 70, awayLimit = 0, homeBot = false, awayBot = true 
   for (const t of [H, A]) {
     for (const p of t.squad) { p.skills = SK(10); p.freshness = 100; p.injuryMatchesLeft = 0; p.counterTactics = { vsPress: 25, vsLowBlock: 25, vsTrapLong: 25 }; }
     t.tactics.baseFormation = '4-4-2'; t.tactics.customCoords = {}; t.tactics.conditionalRules = [];
-    t.tactics.lineupSlots = t.squad.slice(0, 11).map((p) => p.id);
+    t.tactics.lineupSlots = t.squad.slice(0, 11).map((p) => p.id); alignPositions(t);
     Object.assign(t.tactics.phases.phase1_buildUp, { offBallRuns: 'NORMAL' });
     Object.assign(t.tactics.phases.phase2_defending, { pressingHeight: 'MID_BLOCK' });
     Object.assign(t.tactics.phases.phase3_transition, { onBallLost: 'DROP_BACK' });

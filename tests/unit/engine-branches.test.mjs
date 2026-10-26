@@ -1,6 +1,7 @@
 // Deterministiske tests af motorens enkelte beslutninger. En styret rng (stub) afgør hver
 // sandsynlighed for sig, så en ændret bonus, tærskel eller sandsynlighed bliver rød –
 // statistiske invarianter (summer, rækkefølge) kan ikke se den slags (Test Managers fund).
+import { alignPositions } from './helpers/positions.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRng } from '../../public/engine/rng.js';
@@ -40,7 +41,7 @@ function arena({ home = {}, away = {} } = {}) {
       p.varProfile = { cynicism: 10, theatre: 10, varPulse: 10 }; p.injuryMatchesLeft = 0;
     }
     t.tactics.baseFormation = '4-4-2'; t.tactics.customCoords = {}; t.tactics.conditionalRules = []; t.subsLimit = 0; /* v3.13: ingen træthedsskift i test-arenaen */
-    t.tactics.lineupSlots = t.squad.slice(0, 11).map((p) => p.id);
+    t.tactics.lineupSlots = t.squad.slice(0, 11).map((p) => p.id); alignPositions(t);
   }
   const setPhases = (t, o) => {
     const ph = t.tactics.phases;
@@ -340,8 +341,8 @@ test('normalizeLeague: ugyldigt indhold repareres, gyldige data og standardværd
   const p = L.teams[1].squad[4]; p.freshness = 70; p.aerialPower = 1;
   L.leagueMetadata.round = 6; L.teams[1].cashBalance = 123;
   const { league: N } = normalizeLeague(L);
-  assert.deepEqual(N.teams[3].tactics.lineupSlots, defaultStarterIds(t3.squad));
-  assert.deepEqual(N.teams[4].tactics.lineupSlots, defaultStarterIds(t4.squad));
+  assert.deepEqual(N.teams[3].tactics.lineupSlots, defaultStarterIds(t3.squad, N.teams[3].tactics.baseFormation));
+  assert.deepEqual(N.teams[4].tactics.lineupSlots, defaultStarterIds(t4.squad, N.teams[4].tactics.baseFormation));
   assert.equal(N.teams[2].tactics.baseFormation, BOT_PROFILES[2].form); // holdets egen profil, ikke profil 0
   assert.equal(N.teams[2].tacticPresets.length, 3);
   assert.equal(N.teams[5].tactics.baseFormation, BOT_PROFILES[5].form);
@@ -422,7 +423,8 @@ test('Hvis-Så-betingelse: "mindst N" bagud/foran, uafgjort præcis lige', () =>
   assert.equal(ruleConditionMet(R('UKENDT', 1), 0, 5), false);
 });
 
-test('Hvis-Så til egen plan: formation, trukne positioner og faser skifter; spillerne beholder pladserne', () => {
+test('Hvis-Så til egen plan: formation, trukne positioner og faser skifter; de 11 fordeles efter position (v3.20.0 – før: beholdt pladserne)', async () => {
+  const { arrangeByFit } = await import('../../public/engine/formations.js');
   const { H, A } = arena();
   const planB = structuredClone(H.tactics);
   Object.assign(planB, { baseFormation: '3-5-2', customCoords: { 6: { x: 40, y: 40 } } });
@@ -440,7 +442,9 @@ test('Hvis-Så til egen plan: formation, trukne positioner og faser skifter; spi
   m.endState.home.customCoords[6].x = 1; m.endState.home.phases.phase1_buildUp.passingStyle = 'SHORT';
   assert.equal(H.tacticPresets[1].customCoords[6].x, 40, 'kopi – planen deles ikke med kampen');
   assert.equal(H.tacticPresets[1].phases.phase1_buildUp.passingStyle, 'DIRECT_LONG');
-  assert.deepEqual(m.endState.home.starters, lineup);
+  const byId = new Map(H.squad.map((p) => [p.id, p])), want = arrangeByFit(lineup.map((id) => byId.get(id)), '3-5-2', '4-4-2').map((p) => p.id);
+  assert.notDeepEqual(want, lineup, 'data: 4-4-2 → 3-5-2 flytter nogen');
+  assert.deepEqual(m.endState.home.starters, want);
   // Planens fase 1 virker fra skiftet: DIRECT_LONG giver høje bolde fremover (BALANCED/CENTRAL gav ingen)
   const m2 = simulateMatch(H, A, stubRng({ 0.3: true, 0.15: true }));
   assert.ok(m2.duelLog[H.id].crosses > 0);
@@ -809,7 +813,7 @@ function goals({ home = {}, away = {}, script = {}, shooterSkills = null, bots =
   let [H, A] = [a.H, a.A];
   if (bots) {
     [H, A] = [a.L.teams[2], a.L.teams[3]];
-    for (const t of [H, A]) { for (const p of t.squad) { p.skills = SK(10); p.counterTactics = { vsPress: 25, vsLowBlock: 25, vsTrapLong: 25 }; p.injuryMatchesLeft = 0; } t.tactics.baseFormation = '4-4-2'; t.tactics.customCoords = {}; t.tactics.conditionalRules = []; t.subsLimit = 0; /* v3.13: ingen træthedsskift i test-arenaen */ t.tactics.lineupSlots = t.squad.slice(0, 11).map((p) => p.id); }
+    for (const t of [H, A]) { for (const p of t.squad) { p.skills = SK(10); p.counterTactics = { vsPress: 25, vsLowBlock: 25, vsTrapLong: 25 }; p.injuryMatchesLeft = 0; } t.tactics.baseFormation = '4-4-2'; t.tactics.customCoords = {}; t.tactics.conditionalRules = []; t.subsLimit = 0; /* v3.13: ingen træthedsskift i test-arenaen */ t.tactics.lineupSlots = t.squad.slice(0, 11).map((p) => p.id); alignPositions(t); }
     for (const t of [H, A]) t.tactics.phases.phase1_buildUp.offBallRuns = 'NORMAL';
     Object.assign(H.tactics.phases.phase1_buildUp, { passingStyle: 'BALANCED', attackFocus: 'CENTRAL' }, home.p1);
     Object.assign(H.tactics.phases.phase3_transition, { onBallWon: 'KEEP_POSSESSION' }, home.p3);

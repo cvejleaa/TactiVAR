@@ -3,6 +3,7 @@
 // tre grene kunne fjernes/ændres med grøn suite: (1) "ude af zone"-grenen (continue springer det almindelige billede over – fjernes
 // frame('press') dér, mangler hele tick'et i sporet), (2) offside-billedet skubbes fra målmanden (apartFrom med plads 0) og (3) IKKE
 // fra en tom plads (on(def)), (4) afsparket med en tom plads (kickoffPositions får on). Hver test nævner, hvad den dræber.
+import { alignPositions } from './helpers/positions.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRng } from '../../public/engine/rng.js';
@@ -23,7 +24,7 @@ function arena(fH = '4-4-2', fA = '4-4-2') {
   for (const t of [H, A]) {
     for (const p of t.squad) { p.skills = SK(10); p.aerialPower = 10; p.counterTactics = { vsPress: 25, vsLowBlock: 25, vsTrapLong: 25 }; p.varProfile = { cynicism: 10, theatre: 10, varPulse: 10 }; p.injuryMatchesLeft = 0; p.freshness = 100; }
     t.tactics.customCoords = {}; t.tactics.conditionalRules = []; t.subsLimit = 0;
-    t.tactics.lineupSlots = t.squad.slice(0, 11).map((p) => p.id);
+    t.tactics.lineupSlots = t.squad.slice(0, 11).map((p) => p.id); alignPositions(t);
     Object.assign(t.tactics.phases.phase1_buildUp, { passingStyle: 'BALANCED', attackFocus: 'CENTRAL', offBallRuns: 'NORMAL' });
     Object.assign(t.tactics.phases.phase2_defending, { pressingHeight: 'MID_BLOCK', offsideTrap: 'OFF', tacklingIntensity: 'NORMAL' });
     Object.assign(t.tactics.phases.phase3_transition, { onBallWon: 'KEEP_POSSESSION', onBallLost: 'DROP_BACK' });

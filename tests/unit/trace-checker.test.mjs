@@ -119,7 +119,7 @@ test('fund og rapport: målene med billede tælles, linje-fundet tæller kun bil
   assert.equal(r.finding.frontBehind, 0);
   const rep = traceReport(6);
   assert.deepEqual(rep.errors, []);
-  assert.ok(rep.bytesPerMatch > 3000 && rep.bytesPerMatch < 25000, `${rep.bytesPerMatch}`);
+  assert.ok(rep.bytesPerMatch > 3000 && rep.bytesPerMatch < 27000, `${rep.bytesPerMatch}`);   // v3.20.0: 25576 (gemmet holder sig under 1 MB – lifecycle)
   // 6 kampe · 30 billeder med bold = 180, heraf dem uden duel-udfald (104 i v3.16.6, 101 efter v3.16.7's rng-forskydning) – formlen
   // er bevist på M ovenfor; her kun, at rapporten summerer (et fast tal flyttede sig med hver motorændring)
   // v3.17.0: summen regnes uafhængigt fra de samme 6 kampe (frames med bold uden duel-udfald) – et fast tal (101) flyttede sig

@@ -3,6 +3,7 @@
 // Forventede positioner står som BOGSTAVER (ikke kun livePositions() mod sig selv): ST trukket til
 // (40, 28) står med bolden på (40, 22) = 28 − ADVANCE.ATT 6; en markspiller trukket til (50, 95)
 // står med bolden på (50, 75) = 95 − 20 (back) og uden bolden/lav blok på (50, 95) (klemt ved 95).
+import { alignPositions } from './helpers/positions.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRng } from '../../public/engine/rng.js';
@@ -30,7 +31,7 @@ const prep = (t) => {
     p.varProfile = { cynicism: 10, theatre: 10, varPulse: 10 }; p.injuryMatchesLeft = 0;
   }
   t.tactics.baseFormation = '4-4-2'; t.tactics.customCoords = {}; t.tactics.conditionalRules = []; t.subsLimit = 0; /* v3.13: ingen træthedsskift i test-arenaen */
-  t.tactics.lineupSlots = t.squad.slice(0, 11).map((p) => p.id);
+  t.tactics.lineupSlots = t.squad.slice(0, 11).map((p) => p.id); alignPositions(t);
 };
 function arena({ home = {}, away = {} } = {}) {
   const L = createLeague(createRng(1));

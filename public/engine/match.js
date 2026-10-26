@@ -3,7 +3,7 @@
 // Rettet ift. v2.5b: auto-indskiftning sker i en kamplokal kopi (ændrede før lineupSlots
 // permanent), og Hvis-Så-reglerne kører for begge hold og skifter reelt formation.
 import { matchBenchOf } from './career.js';
-import { FORMATIONS, lineOfRole, isOutOfZone, slotPosition } from './formations.js';
+import { FORMATIONS, lineOfRole, isOutOfZone, slotPosition, fitOf, arrangeByFit } from './formations.js';
 import { livePositions, coupledPositions, kickoffPositions, apartFrom, ONSIDE_GAP, MIN_APART } from './positions.js';
 import { masteryVs, counterXpForMatch } from './counter.js';
 import { createSheet, finalizeSheet } from './ratings.js';
@@ -24,6 +24,13 @@ export function ruleConditionMet(rule, own, opp) {
   return false;
 }
 const coordsOf = (tactics) => FORMATIONS[tactics.baseFormation] || FORMATIONS['4-4-2'];
+// Hvor godt spilleren passer på pladsen (v3.20.0, formations.js fitOf) – indskiftere og erstatninger vælges inden for kæden efter den
+const slotFit = (tactics, p, slot) => fitOf(p.position, coordsOf(tactics)[slot]?.r);
+// Formationsskift i kampen: de samme spillere (og tomme pladser efter rødt) fordeles efter position; målmanden bliver i mål
+function refit(side, formation) {
+  const next = arrangeByFit(side.starters, formation, side.tactics.baseFormation);
+  if (next[0] === side.starters[0]) side.starters = next;
+}
 const tag = (p) => `#${p.shirtNumber} ${p.shortName}`;
 // Danske navne på taktikvalg i referatet.
 // Fase-duellen (v3.6, målt med tools/measure-duels.mjs): pres = INT + POS·0,85 + STA·0,35, så
@@ -209,11 +216,10 @@ function prepareSide(team, isHome, notes) {
   // v3.16.6 (Spilfører: "#16 starter for en træt #10" og straks "skadet, erstattes af #10"): skadede erstattes FØR rotationen
   // – af den friskeste i kæden, så rotationen aldrig hviler ham (den kræver en friskere i kæden) – og en hvilet spiller
   // forbliver brugt (kommer ikke ind i kampen, heller ikke ved skade).
-  const freshest = (list) => list.slice().sort((a, b) => (b.freshness ?? 100) - (a.freshness ?? 100) || avgSkill(b) - avgSkill(a))[0];
   starters.forEach((p, slot) => {
     if (p && isAvailable(p)) return;
     const line = p ? p.line : lineOfRole(coordsOf(tactics)[slot].r);
-    const sub = freshest(bench().filter((b) => b.line === line)) || bench()[0];
+    const sub = bench().filter((b) => b.line === line).sort((a, b) => (b.freshness ?? 100) * slotFit(tactics, b, slot) - (a.freshness ?? 100) * slotFit(tactics, a, slot) || avgSkill(b) - avgSkill(a))[0] || bench()[0];
     if (!sub) return;
     if (p) notes.push({ isHome, text: `📋 [${team.name}] ${tag(p)} er skadet og erstattes i startopstillingen af ${tag(sub)}.` });
     starters[slot] = sub; used.add(sub.id);
@@ -222,7 +228,7 @@ function prepareSide(team, isHome, notes) {
     if (!p || !isAvailable(p) || (p.freshness ?? 100) >= rest) return;
     const fresh = bench().filter((b) => b.line === p.line && (b.freshness ?? 100) >= freshMin && avgSkill(b) >= avgSkill(p) - ROTATE_SKILL);
     if (!fresh.length) return;
-    const sub = fresh.sort((a, b) => avgSkill(b) - avgSkill(a))[0];
+    const sub = fresh.sort((a, b) => avgSkill(b) * slotFit(tactics, b, slot) - avgSkill(a) * slotFit(tactics, a, slot))[0];
     notes.push({ isHome, text: `📋 [${team.name}] ${tag(sub)} starter i stedet for en træt ${tag(p)}.` });
     starters[slot] = sub; used.add(sub.id);
   });
@@ -433,7 +439,9 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // Haltende: skadet i kampen uden indskiftning (sheet.entries.injured – en udskiftet skadet står ikke på banen)
   const limping = (p) => !!(p && sheet.entries[p.id]?.injured);
   const fit = (list) => { const f = list.filter((p) => p && !limping(p)); return f.length ? f : list; };
-  const ff = (p) => freshFactor(p) * (1 - TIRED_PER_POINT * lostAt(p)) * shortF(sideOf(p)) * (limping(p) ? LIMP.factor : 1);
+  // Uden for position (v3.20.0): pladsens fit (formations.js FIT) – den plads, han står på NU (skift og Hvis-Så tæller med)
+  const posF = (p) => { const side = sideOf(p), slot = side ? side.starters.indexOf(p) : -1; return slot >= 0 ? slotFit(side.tactics, p, slot) : 1; };
+  const ff = (p) => freshFactor(p) * (1 - TIRED_PER_POINT * lostAt(p)) * shortF(sideOf(p)) * (limping(p) ? LIMP.factor : 1) * posF(p);
   const register = (side, p, role, minIn, slot) => sheet.register(p, side.team, side.isHome, role, minIn, rng, masteryVs(p, other(side).team), slot, slot != null ? coordsOf(side.tactics)[slot].r : role);
 
   for (const side of [H, A]) side.starters.forEach((p, i) => p && register(side, p, coordsOf(side.tactics)[i].r, 1, i));
@@ -995,7 +1003,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
     const out = side.starters[slot];
     if (!out) return null;   // en udvist spillers plads – der må ikke skiftes ind (v3.15)
     const bench = side.benchAvailable();
-    const sub = pick ?? (bench.find((b) => b.line === out.line) || bench[0]);
+    const sub = pick ?? (bench.filter((b) => b.line === out.line).sort((a, b) => slotFit(side.tactics, b, slot) - slotFit(side.tactics, a, slot))[0] || bench[0]);
     if (!sub) return null;
     side.subsUsed++;
     if (min !== 45 && min !== side.lastSubMin) side.windows++;
@@ -1046,14 +1054,15 @@ export function simulateMatch(home, away, rng, opts = {}) {
       if (!ruleConditionMet(rule, own, opp)) return;
       if (rule.action === 'SUB') { rule.used = true; ruleSub(side, rule, min); return; }
       const from = side.tactics.baseFormation;
-      // Skift til en af holdets egne planer: formation, trukne positioner og faser følger
-      // med; spillerne beholder deres pladser, og Hvis-Så-reglerne kører videre.
+      // Skift til en af holdets egne planer: formation, trukne positioner og faser følger med, og Hvis-Så-reglerne kører
+      // videre. v3.20.0: med en ny formation fordeles de 11 efter position (refit) – før beholdt de pladsnumrene.
       const plan = Number.isInteger(rule.newPlan) ? side.team.tacticPresets?.[rule.newPlan] : null;
       if (plan && FORMATIONS[plan.baseFormation]) {
         rule.used = true;
         // Spiller holdet allerede præcis den plan, er skiftet en tom handling – intet logges.
         const same = plan.baseFormation === side.tactics.baseFormation && JSON.stringify(plan.phases) === JSON.stringify(side.tactics.phases) && JSON.stringify(plan.customCoords || {}) === JSON.stringify(side.tactics.customCoords || {});
         if (same) return;
+        if (plan.baseFormation !== side.tactics.baseFormation) refit(side, plan.baseFormation);
         side.tactics.baseFormation = plan.baseFormation;
         // Kampens taktik ændres kun ved genanvisning (aldrig i stedet), så planens objekter
         // kan bruges direkte; resultatets endState er en kopi.
@@ -1069,10 +1078,11 @@ export function simulateMatch(home, away, rng, opts = {}) {
       // for en bot eller uden trukne positioner; ellers nulstiller dit skift dine positioner, og det er din regel (QC)
       if (rule.newFormation === from && (side.team.isBot || !Object.keys(side.tactics.customCoords || {}).length)) return;
       const remap = rule.slotRemapping;
-      if (Array.isArray(remap) && remap.length === 11 && new Set(remap).size === 11 && remap.every((i) => i >= 0 && i < 11)) {
-        const old = side.starters.slice();
-        side.starters = remap.map((i) => old[i]);
-      }
+      const validRemap = Array.isArray(remap) && remap.length === 11 && new Set(remap).size === 11 && remap.every((i) => i >= 0 && i < 11);
+      // v3.20.0: dit hold (ombytningen kan ikke redigeres i UI'et) og en bot uden ombytning fordeles efter position;
+      // en bots bevidste ombytning (generator.js BOT_PROFILES) bevares
+      if (!side.team.isBot || !validRemap || remap.every((v, i) => v === i)) refit(side, rule.newFormation);
+      else { const old = side.starters.slice(); side.starters = remap.map((i) => old[i]); }
       side.tactics.baseFormation = rule.newFormation;
       side.tactics.customCoords = {};
       announceShift(side, min, `${side.team.name} skifter til ${rule.newFormation}`, `📋 [${side.team.name} • Hvis-Så] Holdet skifter fra ${from} til ${rule.newFormation}${withMen(side)}.`);
@@ -1100,7 +1110,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
       const block = subBlock(side, min, !own(side) && min < BOT_SUBS.until ? BOT_SUBS.keep : null);
       if (block) { if (!near) note(c.p, block); return false; }
       const pick = side.benchAvailable().filter((b) => b.line === c.p.line && !reserved.has(b.id) && (b.freshness ?? 100) >= limit + SUBS_LIMIT.near)
-        .sort((a, b) => avgSkill(b) * (b.freshness ?? 100) - avgSkill(a) * (a.freshness ?? 100))[0];
+        .sort((a, b) => avgSkill(b) * (b.freshness ?? 100) * slotFit(side.tactics, b, c.i) - avgSkill(a) * (a.freshness ?? 100) * slotFit(side.tactics, a, c.i))[0];
       if (!pick) {
         const held = side.benchAvailable().some((b) => b.line === c.p.line && reserved.has(b.id) && (b.freshness ?? 100) >= limit + SUBS_LIMIT.near);
         if (!near) note(c.p, held ? `den friske ${LINE_WORD[c.p.line] ?? 'spiller'} på bænken er sat til en af dine Hvis-Så-regler` : `der er ingen frisk ${LINE_WORD[c.p.line] ?? 'spiller'} på bænken`);
@@ -1176,7 +1186,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
       // Som træthedsskiftet: den friskeste i kæden, der ikke er sat til en Hvis-Så-regel – ellers en anden markspiller (QC)
       const reserved = new Set(side.tactics.conditionalRules.filter((r) => r.action === 'SUB' && !r.used).map((r) => r.subIn));
       const free = side.benchAvailable().filter((b) => !reserved.has(b.id) && b.line !== 'GK').sort((a, b) => (b.freshness ?? 100) - (a.freshness ?? 100));
-      const pick = free.find((b) => b.line === p.line) ?? free[0];
+      const pick = free.filter((b) => b.line === p.line).sort((a, b) => (b.freshness ?? 100) * slotFit(side.tactics, b, slot) - (a.freshness ?? 100) * slotFit(side.tactics, a, slot))[0] ?? free[0];
       if (pick) substitute(side, slot, min, 'Pauseskift for den haltende', pick);
     });
     checkTriggers(H, min); checkTriggers(A, min);

@@ -113,8 +113,8 @@ export function normalizeLeague(league) {
     }
     assignPositions(team.squad); // kun spillere uden (gyldig) naturlig position
     const ids = new Set(team.squad.map((p) => p.id));
-    const starters = defaultStarterIds(team.squad);
     const profile = BOT_PROFILES[idx] || BOT_PROFILES[0];
+    const starters = defaultStarterIds(team.squad, FORMATIONS[team.tactics?.baseFormation] ? team.tactics.baseFormation : profile.form);
     team.tactics = fixTactics(team.tactics, starters, profile);
     if (!team.tactics.lineupSlots.every((id) => ids.has(id)) || new Set(team.tactics.lineupSlots).size !== 11) team.tactics.lineupSlots = starters;
     if (!Array.isArray(team.tacticPresets) || team.tacticPresets.length < 3) team.tacticPresets = [structuredClone(team.tactics), defaultTactics(starters, profile), defaultTactics(starters, profile)];

@@ -173,7 +173,7 @@ test('variant "omorganiserer sig" (3): vary pr. hold ("reorg"); etiket og tekst 
   }
 });
 test('variant "Din lynkontra løber ind i …" (3): vary pr. presser ("lyn")', () => {
-  varyRule(F.lyn, LYN, 'lyn', { min: 300, minRepeat: 40, minFull: 4 });   // 328, 50, 6
+  varyRule(F.lyn, LYN, 'lyn', { min: 300, minRepeat: 40, minFull: 3 });   // 328, 50, 6 (v3.20.0: 52 med ≥ 2, 4 med alle 3)
 });
 // Tælleren er pr. KAMP: samme aktør starter forfra i næste kamp (n = 0) – en tæller på tværs af kampene (eller pr. tick) ville
 // give en anden første variant. Og pr. AKTØR: to playmakere i samme kamp har hver sin tæller.

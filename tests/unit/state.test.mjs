@@ -120,13 +120,16 @@ test('træk: målmanden kan ikke trækkes, positioner klemmes til banen', () => 
   assert.deepEqual(t.tactics.customCoords[4], { x: 92, y: 8 });
 });
 
-test('Plan A/B/C: den aktive gemmes, den valgte hentes, opstillingen følger holdet', () => {
+test('Plan A/B/C: den aktive gemmes, den valgte hentes, de samme 11 følger holdet – fordelt efter position i planens formation (v3.20.0)', async () => {
+  const { arrangeByFit } = await import('../../public/engine/formations.js');
   const t = createLeague(createRng(3)).teams[0];
   t.tactics.phases.phase2_defending.pressingHeight = 'HIGH_GEGENPRESS';
-  const lineup = t.tactics.lineupSlots.slice();
+  const lineup = t.tactics.lineupSlots.slice(), byId = new Map(t.squad.map((p) => [p.id, p]));
   act.switchPreset(t, 0, 1);
   assert.equal(t.tactics.baseFormation, '4-3-3');
-  assert.deepEqual(t.tactics.lineupSlots, lineup);
+  assert.deepEqual(t.tactics.lineupSlots, arrangeByFit(lineup.map((id) => byId.get(id)), '4-3-3', '4-4-2').map((p) => p.id));
+  assert.notDeepEqual(t.tactics.lineupSlots, lineup, 'data: 4-4-2 → 4-3-3 flytter nogen');
+  assert.deepEqual([...t.tactics.lineupSlots].sort(), [...lineup].sort(), 'de samme 11');
   assert.equal(t.tacticPresets[0].phases.phase2_defending.pressingHeight, 'HIGH_GEGENPRESS');
   act.switchPreset(t, 1, 0);
   assert.equal(t.tactics.phases.phase2_defending.pressingHeight, 'HIGH_GEGENPRESS');
@@ -194,7 +197,7 @@ test('handlinger: plan-skift bevarer den aktuelle opstilling; updateRule, remove
   act.swapPlayers(t, t.tactics.lineupSlots[1], t.squad[12].id);
   const lineup = t.tactics.lineupSlots.slice();
   act.switchPreset(t, 0, 2);
-  assert.deepEqual(t.tactics.lineupSlots, lineup, 'opstillingen følger holdet, ikke planen');
+  assert.deepEqual([...t.tactics.lineupSlots].sort(), [...lineup].sort(), 'de samme 11 følger holdet, ikke planen (v3.20.0: fordelt efter position)');
   act.addRule(t); act.addRule(t);
   const ids = t.tactics.conditionalRules.map((r) => r.ruleId);
   act.updateRule(t, 1, { minuteTrigger: 80, condition: 'DRAW' });

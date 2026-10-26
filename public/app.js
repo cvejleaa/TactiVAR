@@ -342,6 +342,7 @@ function renderNow() {
     formation: (f) => change(() => act.setFormation(team, f)),
     preset: (i) => change(() => { act.switchPreset(team, game.ui.activePresetIndex, i); game.ui.activePresetIndex = i; }),
     resetDrag: () => change(() => act.resetDrag(team)),
+    arrange: () => { const moved = act.arrangeLineup(team); view.notice = moved ? '⇄ De 11 er flyttet, så flest står på deres naturlige position.' : '⇄ De 11 står allerede bedst muligt efter position.'; change(() => {}); },
     phase: (ph, f, v) => change(() => act.setPhase(team, ph, f, v)),
     rule: (i, patch) => change(() => act.updateRule(team, i, patch)),
     addRule: () => change(() => act.addRule(team)),

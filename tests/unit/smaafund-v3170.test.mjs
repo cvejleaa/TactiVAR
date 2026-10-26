@@ -15,7 +15,7 @@ test('skadesskift: den udskiftede nævnes ikke i resten af minuttet (1500 kampe;
 // midtstopper som tager 212 af 1066 (19,9 %) → 0 af 1169. Tageren header aldrig selv sit eget indlæg (headerTarget).
 test('dødboldtageren: aldrig en midtstopper, når kant/midtbane findes (3000 kampe; før 19,9 %) – og aldrig sin egen header', async () => {
   const { measureSetPieceTakers } = await import('../../tools/measure-setpiece-takers.mjs');
-  const r = measureSetPieceTakers(3000);
+  const r = measureSetPieceTakers(3300);   // v3.20.0: 3300 (3000 gav 783 dødboldsmål – færre mål med positionsstraffen)
   assert.ok(r.lines >= 800, `data: ${r.lines} dødboldsmål`);
   // Rollen er STARTrollen: en femmerkædes stopper, der efter Hvis-Så (5-3-2/5-4-1 → 4-4-2) er rykket op på midtbanen, må gerne
   assert.ok((r.roles.CB ?? 0) / r.lines <= 0.01, JSON.stringify(r.roles));
