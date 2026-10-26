@@ -158,7 +158,7 @@ test('gemt spil fra før v3.14 (uden facts i historikken og uden rapporter): klu
   const me = raw.teams.find((t) => !t.isBot);
   const c = buildColumn({ matches: raw.lastRound.matches, gazette: raw.lastRound.gazette, history: raw.history, table: [], next: [], viewerTeamId: me.id, round: raw.lastRound.round });
   assert.equal(c.sections[0].id, 'col-mine');
-  assert.doesNotMatch(text(c), /undefined|NaN|null/);
+  assert.doesNotMatch(text(c), /undefined|NaN|\bnull\b/);
 });
 
 // ---------- Sandhedsregler (QC v3.14 F1–F3, F16) – håndlavede kampe, så udfaldet er kendt ----------
@@ -211,9 +211,9 @@ test('gem fra v3.13.0: klummen bygges uden "undefined", og runden efter har "Din
     next: pairRound(L).map(([h, a]) => ({ homeId: L.teams[h].id, homeName: L.teams[h].name, awayId: L.teams[a].id, awayName: L.teams[a].name })), viewerTeamId: me.id, round: L.lastRound.round });
   assert.ok(!L.lastRound.matches.some((m) => m.ownReports) && !L.history.some((h) => h.facts), 'gemt før v3.14');
   const old = buildColumn(input());
-  assert.equal(old.sections[0].id, 'col-mine'); assert.doesNotMatch(text(old), /undefined|NaN|null/);
+  assert.equal(old.sections[0].id, 'col-mine'); assert.doesNotMatch(text(old), /undefined|NaN|\bnull\b/);
   const rng = createRng(77); commitRound(L, playRound(L, rng), rng);
   assert.ok(L.lastRound.matches.find((m) => m.homeId === me.id || m.awayId === me.id).ownReports[me.id], 'ny runde har din rapport');
   assert.ok(L.history.at(-1).facts?.[me.id], 'ny runde har offentlige tal til scouting');
-  assert.doesNotMatch(text(buildColumn(input())), /undefined|NaN|null/);
+  assert.doesNotMatch(text(buildColumn(input())), /undefined|NaN|\bnull\b/);
 });

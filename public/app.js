@@ -79,6 +79,7 @@ const NEWS = {
   '3.14.1': 'Rettelser: VAR tjekker nu offside for den forreste – scorer en spiller længere tilbage, er det hans forreste holdkammerat, der tjekkes, og billedet ved målet viser skytten, hvor han skød fra. Statistikken på Liga-fanen gælder sæsonen.',
   '3.14.2': 'Rettelse: Ved et VAR-tjek står den tjekkede nu, hvor han stod (forrest), i billedet ved målet – ikke flyttet bag en holdkammerat.',
   '3.14.3': 'Rettelser: Langskud tages fra skudafstand (ikke fra egen banehalvdel) i billedet ved målet, referatet fortæller et oplæg én gang, og efter sæsonens sidste runde viser tabellen slutstillingen og mesteren, til næste sæson går i gang.',
+  '3.20.1': 'Rettelser: 📋 Taktik har formation, faser og Hvis-Så lige under banen, og tabellerne har ikke længere deres egen rulning (kun referatet i kampen ruller). Efter kampen står afspilningen til venstre med statistik og referat ved siden af. 🏆 Liga viser "Bedste snit" for sæsonen (stjernerne fra hver kamp, mindst 3 kampe) og "Rundens bedste", og rundens spiller får en rigtig begrundelse (taktiske dueller, holdt nullet).',
   '3.20.0': 'Det koster nu at spille uden for sin position (naboplads −2,5 %, andet −6 %, målmand ⇄ markspiller −15 % i dueller): ⚠ på brikken og i listen på 📋 Taktik viser hvem, og forklaringen står under listen. Skifter du formation (også med Hvis-Så eller Plan B/C), flyttes de 11 selv, så flest står rigtigt – knappen "⇄ Stil op efter position" gør det samme. Botterne stiller op efter position, og ungdomsspillere får den position, holdet mangler.',
   '3.19.0': '🧭 Nyt layout: fanerne står fast i topbaren, og Gem, Eksportér, Importér og Ny liga er flyttet til ⚙ Admin (gem-kvitteringen står stadig øverst). Opstillingen er samlet på 📋 Taktik: banen med en spillerliste ved siden af – klik på en brik, så viser listen hans kæde med de vigtigste evner, og klik på en anden spiller for at bytte. 👥 Trup har nu kolonnerne 💰 Værdi og Løn/rd og en samlet 🏋️ træningsoversigt – træning sættes kun dér. Bænken udtages ved listen ("Udtag automatisk"), og regnearkets 🔁-knapper er væk. Står du i 💼 Klub og vælger et andet hold, ser du hans offentlige klubside med priser og Køb.',
   '3.18.1': '💰 Nu kan du købe: de andre klubber sælger også, når de kun har 18 spillere (de henter selv en ungdomsspiller), og 💼 Klub → Transfermarked viser alle spillere, du kan købe lige nu, med pris og Køb-knap.',
@@ -376,12 +377,14 @@ function renderNow() {
       mc?.playing && seasonJustEnded(league) ? h('div', { class: 'notice', id: 'turnover-booked' }, '🗓 Sæsonen sluttede med denne runde: alle er blevet et år ældre, og sæsonrapporten med ungdomstilbuddene står på Liga, når kampene er spillet.') : null,
       !mc?.playing && mine.youthOffers?.length ? h('div', { class: 'notice', id: 'youth-pending' }, `🧒 ${mine.youthOffers.length} ungdomstilbud venter – `, h('button', { class: 'linklike', onclick: () => showTab('liga') }, 'se sæsonrapporten på Liga')) : null,
       isOwn && !mc?.playing ? trainingSummary(league.trainingReport?.[team.id], team, league.trainingReport?.[team.id] ? seasonAndRound(league, league.trainingReport[team.id].round)[1] : null) : null, matrix,
-      h('div', { class: 'tactics-layout' }, h('section', {}, card),
+      // v3.20.1 (QC): kortet | træningsoversigten 2:3 – træningstabellen skal bruge ≈ 760 px (1366 px: 625 → vandret rulning)
+      h('div', { class: 'tactics-layout trup-layout' }, h('section', {}, card),
         h('section', {}, isOwn ? renderTrainingTable({ team, report: !mc?.playing ? league.trainingReport?.[team.id] : null, line: view.trainLine ?? 'all', onLine: (v) => { view.trainLine = v; view.trainMsg = ''; render(); }, msg: view.trainMsg ?? '',
           onFocus: (id, k) => change(() => act.setFocus(team, id, k)),
           onFocusMany: (ids, k) => { const n = act.setFocusMany(team, ids, k); view.trainMsg = `🏋️ ${n} spiller${n === 1 ? '' : 'e'} træner nu ${FOCUS[k].label}${n < ids.length ? ` (${ids.length - n} kan ikke – Målmand er kun for målmænd)` : ''}.`; change(() => {}); } }) : null))],
     // Taktik (v3.19.0): banen og spillerlisten side om side – opstillingen ét sted; kortet under listen; faser og Hvis-Så nedenunder
-    taktik: () => [h('div', { class: 'tactics-layout' }, h('section', {}, pitch), h('section', {}, lineupList, card)), tactics],
+    // v3.20.1 (brugeren: "langt ned til taktikindstillingerne"): indstillingerne under banen, listen og kortet ved siden af
+    taktik: () => [h('div', { class: 'tactics-layout taktik-layout' }, h('section', { class: 'tk-pitch' }, pitch), h('section', { class: 'tk-list' }, lineupList), h('section', { class: 'tk-tactics' }, tactics), h('section', { class: 'tk-card' }, card))],
     kamp: () => [shown ? renderMatchCenter({ mc: shown, myTeamId: mine.id, on: mcHandlers, column: !shown.playing && shown.round === league.lastRound?.round ? columnNow() : null }) : h('div', { class: 'panel empty', id: 'no-matches' }, 'Ingen kampe spillet endnu. Tryk ▶ Spil runde i topbaren – modstanderen følger kampprogrammet på Liga-fanen.')],
     liga: () => [mc?.playing ? h('div', { class: 'notice', id: 'booked-league' }, '📺 Runden spilles i Kamp-fanen – tabellen herunder er allerede opdateret med den.') : null,
       !mc?.playing ? renderSeasonReport({ league, mine,
@@ -406,14 +409,13 @@ function renderNow() {
       // Bekræftelsen står ved listen (QC: beskeden øverst var uden for skærmen, når man stod nede i listen)
       onBuy: (id) => { const name = league.teams.flatMap((t) => t.squad).find((p) => p.id === id)?.shortName; const err = buyPlayer(league, mine, id); view.marketMsg = err ? `💰 ${err}` : `💰 ${name} er købt og står nu i din trup.`; change(() => {}); } })],
   }[tab]();
-  // Rullepositionen i tabellerne bevares, når siden tegnes om (QC: listen sprang til toppen ved hvert klik)
-  const scrolls = new Map([...app.querySelectorAll('.tablewrap')].map((el) => [el.querySelector('table')?.id, el.scrollTop]).filter(([id]) => id));
+  // v3.20.1: tabellerne ruller ikke selv længere. Sidens position bevares af browseren (replaceChildren er ét skridt, højden
+  // er den samme) – Test Manager: en genskabelse her var død kode (mutationen overlevede); e2e måler, at siden står stille.
   app.replaceChildren(...[
     view.notice ? h('div', { class: 'notice', id: 'notice' }, view.notice,
       view.backupKey && storage.getItem(view.backupKey) ? h('button', { class: 'mini', id: 'download-migration-backup', onclick: () => download(storage.getItem(view.backupKey), `${view.backupKey}.json`) }, ' ⬇ Hent backup som fil') : null) : null,
     h('div', { class: `tabpane tab-${tab}` }, ...content.filter(Boolean)),
   ].filter(Boolean));
-  for (const [id, top] of scrolls) { const el = document.getElementById(id)?.closest('.tablewrap'); if (el) el.scrollTop = top; }
   document.body.dataset.klar = 'ja';
 }
 

@@ -7,8 +7,9 @@ import { viewPlayer, viewTeamStats } from '../engine/visibility.js';
 import { runStats, PLAYER_SEASON_DEFAULTS, TEAM_STAT_FIELDS } from '../engine/stats.js';
 import { seasonJustEnded } from '../engine/season.js';
 import { GOAL_KIND_LABEL } from '../engine/gazette.js';
+import { LOG } from '../engine/career.js';
 
-const TOP = 5;
+const TOP = 5, MIN_GAMES = 3;
 // Statistikken gælder sæsonen (brugeren v3.14.1: "skal tælle for sæsonen og ikke siden en eller anden runde").
 // Kun et gem, der var midt i en sæson, da statistikken kom (v3.10, sanitize.js), mangler sæsonens første runder –
 // dem er der ingen spillertal for. Runden vises sæson-relativt (som "Spil runde 10 af 14").
@@ -52,11 +53,11 @@ export const shortTeam = (name) => name.split(' ').filter((w) => !SHORT_DROP.has
 // Én liste = én lille tabel: placering · #nr Navn · hold · værdi (højrestillet).
 function listTable(title, key, rows, value, myTeamId) {
   return h('div', { class: 'stat-list', dataset: { key } }, h('h4', {}, title),
-    rows.length ? h('table', { class: 'stat-table' }, h('tbody', {}, rows.map(({ v, team }, i) => h('tr', { class: team.id === myTeamId ? 'mine' : '' },
+    rows.length ? h('table', { class: 'stat-table' }, h('tbody', {}, rows.map((row, i) => { const { v, team } = row; return h('tr', { class: team.id === myTeamId ? 'mine' : '' },
       h('td', { class: 'st-rank' }, `${i + 1}.`),
       h('td', { class: 'st-name', title: `#${v.shirtNumber} ${v.shortName}` }, `#${v.shirtNumber} ${v.shortName}`),
       h('td', { class: 'st-team', title: team.name }, shortTeam(team.name)),
-      h('td', { class: 'st-val' }, value(v))))))
+      h('td', { class: 'st-val' }, value(v, row))); })))
       : h('p', { class: 'muted' }, 'Ingen endnu.'));
 }
 
@@ -65,13 +66,24 @@ function playerLists(league, myTeamId) {
   const all = league.teams.flatMap((t) => t.squad.map((p) => ({ v: viewPlayer(p, t.id === myTeamId), team: t })));
   const top = (key) => all.filter(({ v }) => (v[key] ?? 0) > 0).sort((a, b) => b.v[key] - a.v[key] || b.v.sGames - a.v.sGames).slice(0, TOP);
   const list = (title, key) => listTable(title, key, top(key), (v) => String(v[key]), myTeamId);
-  // "Bedste vurdering": offentlige stjerner for alle (eksakte karakterer ville røbe andre hold).
-  const starRows = all.filter(({ v }) => v.publicStars > 0 && (v.sGames ?? 0) > 0).sort((a, b) => b.v.publicStars - a.v.publicStars || b.v.sGames - a.v.sGames).slice(0, TOP);
+  // v3.20.1 (brugeren: "Bedste vurdering har ikke rundens kampe med" – den var et karrieresnit): sæsonens snit af kampenes
+  // OFFENTLIGE stjerner (kamphistorikken, LOG.ST – karakteren er privat), mindst 3 kampe, og rundens bedste kampe.
+  const season = league.leagueMetadata.seasonNumber;
+  const starRows = all.map((x) => { const st = (x.v.matchLog ?? []).filter((e) => e[LOG.S] === season && e[LOG.ST] > 0).map((e) => e[LOG.ST]);
+    return { ...x, n: st.length, avg: st.length ? st.reduce((a, b) => a + b, 0) / st.length : 0 }; })
+    .filter((x) => x.n >= MIN_GAMES).sort((a, b) => b.avg - a.avg || b.n - a.n).slice(0, TOP);
+  const teamOf = new Map(league.teams.map((t) => [t.id, t])), potr = league.lastRound?.gazette?.playerOfTheRound?.playerId ?? null;
+  const roundRows = (league.lastRound?.matches ?? []).flatMap((m) => [...(m.ratings?.home ?? []), ...(m.ratings?.away ?? [])])
+    .filter((e) => e.stars > 0 && teamOf.has(e.teamId))
+    // Rundens spiller (avisen, efter karakter) først – stjernerne har støj og må ikke modsige avisen lige over (QC)
+    .sort((a, b) => (b.playerId === potr) - (a.playerId === potr) || b.stars - a.stars || (b.goals + b.assists) - (a.goals + a.assists) || b.isMotM - a.isMotM).slice(0, TOP)
+    .map((e) => ({ v: { shirtNumber: e.shirtNumber, shortName: e.shortName, stars: e.stars }, team: teamOf.get(e.teamId) }));
   return h('div', { class: 'stat-grid' },
     list('⚽ Topscorere', 'sGoals'), list('🅰 Flest oplæg', 'sAssists'), list('👑 Kampens spiller', 'sMotm'),
     list('🗣 Hovedstødsmål', 'sHeaderGoals'), list('🎯 Straffemål', 'sPenaltyGoals'), list('🧱 Dødboldmål', 'sSetPieceGoals'),
     list('🧤 Clean sheets', 'sCleanSheets'), list('🟨 Gule kort', 'sYellow'), list('🟥 Røde kort', 'sRed'),
-    listTable('⭐ Bedste vurdering (alle kampe)', 'publicStars', starRows, (v) => starsEl(v.publicStars), myTeamId));
+    listTable(`⭐ Bedste snit (sæson ${season}, mindst ${MIN_GAMES} kampe)`, 'seasonStars', starRows, (v, x) => h('span', {}, `${dec(x.avg, 1)} `, starsEl(Math.round(x.avg))), myTeamId),
+    league.lastRound ? listTable('🏅 Rundens bedste', 'roundStars', roundRows, (v) => starsEl(v.stars), myTeamId) : null);
 }
 
 function teamTable(league, myTeamId) {

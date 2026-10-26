@@ -26,6 +26,10 @@ select:disabled, input:disabled { opacity: .55; }
 .tactics-layout { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
 
 @media (max-width: 900px) { .tactics-layout { grid-template-columns: 1fr; } }
+/* v3.20.1: Taktik – bane | liste øverst, indstillinger | kort under; på smal skærm bane, liste, indstillinger, kort (byt-listen tæt på banen) */
+.taktik-layout { grid-template-areas: "pitch list" "tactics card"; } .tk-pitch { grid-area: pitch; } .tk-list { grid-area: list; } .tk-tactics { grid-area: tactics; } .tk-card { grid-area: card; }
+@media (max-width: 900px) { .taktik-layout { grid-template-areas: "pitch" "list" "tactics" "card"; } }
+.trup-layout { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); } @media (max-width: 900px) { .trup-layout { grid-template-columns: 1fr; } }
 .bench { margin-top: .5rem; display: flex; flex-wrap: wrap; gap: .3rem; align-items: center; } .bench h4 { margin: 0 .3rem 0 0; }
 .bench-p.injured { color: #fda4af; }
 .empty { text-align: center; padding: 2rem; color: var(--dæmpet); }
@@ -36,7 +40,7 @@ section { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
 .clubhead { display: flex; justify-content: space-between; } .clubhead .right { text-align: right; }
 .notice { background: #2e1065; border: 1px solid var(--lilla); padding: .5rem 1rem; border-radius: .5rem; margin-bottom: 1rem; font-size: .85rem; }
 .toolbar { display: flex; flex-wrap: wrap; gap: .3rem; margin-bottom: .5rem; }
-.tablewrap { overflow: auto; max-height: 55vh; }
+.tablewrap { overflow-x: auto; }   /* v3.20.1 (brugeren): ingen indlejret scroll – siden har pladsen; kun vandret på smal skærm */
 .matrix thead th { position: sticky; top: 0; background: var(--panel); z-index: 1; }
 table { border-collapse: collapse; width: 100%; font-size: .74rem; }
 th, td { padding: .25rem .3rem; border-bottom: 1px solid var(--kant); white-space: nowrap; text-align: center; }
@@ -84,6 +88,10 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .tl-mark { position: absolute; transform: translateX(-50%); font-size: .9rem; } .tl-mark.home { top: 0; } .tl-mark.away { bottom: 0; }
 .varbanner { background: #4c1d95; border: 1px solid var(--lilla); padding: .4rem .8rem; border-radius: .3rem; font-weight: 700; }
 .mc-grid { display: grid; grid-template-columns: 3fr 2fr; gap: 1rem; } @media (max-width: 900px) { .mc-grid { grid-template-columns: 1fr; } }
+.mc-grid.after { grid-template-columns: minmax(18rem, 26rem) minmax(0, 1fr); grid-template-areas: "replay stats" "replay feed"; align-items: start; }
+.mc-grid.after .mc-replay { grid-area: replay; } .mc-grid.after .mc-stats { grid-area: stats; } .mc-grid.after .mc-feed { grid-area: feed; }
+.mc-grid.after .replay { margin-top: 0; } .mc-grid.after > * { min-width: 0; } .mc-grid .mc-stats { overflow-x: auto; }   /* mobil: afspilningens tekst må bryde (390 px: 394 px for bred) */
+@media (max-width: 900px) { .mc-grid.after { grid-template-columns: 1fr; grid-template-areas: "replay" "stats" "feed"; } }
 .feed { max-height: 26rem; overflow-y: auto; font-size: .8rem; }
 .ev { padding: .3rem 0; border-bottom: 1px solid var(--kant); } .ev-min { display: inline-block; width: 2.4rem; color: var(--dæmpet); font-family: ui-monospace, monospace; }
 .ev.highlight { font-weight: 700; } .ev.tactic { color: #cbd5e1; }
@@ -104,15 +112,14 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .mp-val { background: var(--bg); border: 1px solid #fff; border-radius: .3rem; padding: 0 .25rem; font-weight: 800; font-size: .72rem; }
 .mp-val .stars { font-size: .62rem; } .mp-token.motm .mp-val { border-color: #fbbf24; box-shadow: 0 0 0 2px #fbbf2488; }
 .ratings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-top: 1rem; } @media (max-width: 900px) { .ratings-grid { grid-template-columns: 1fr; } }
+.ratings-grid > .ratings { min-width: 0; overflow-x: auto; }   /* v3.20.1: et bredt ark ruller selv vandret – siden gør ikke (390 px: 200 px for bred) */
 .fixtures { display: grid; grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr)); gap: .4rem; }
 .fixture { display: grid; grid-template-columns: 1fr auto 1fr auto; gap: .6rem; align-items: center; text-align: left; padding: .45rem .7rem; }
 .fixture.static { background: #1e293b; border: 1px solid #334155; border-radius: .35rem; grid-template-columns: 1fr auto 1fr; }
 .fixture.mine { border-color: var(--grøn); } .fx-team.right { text-align: right; } .fx-score { min-width: 2.6rem; text-align: center; } .fx-link { font-size: .72rem; color: var(--blå); }
 .lineup-layout .pitch, .tab-taktik .pitch { width: min(100%, calc(72vh * 68 / 80)); margin: 0 auto; }
-.tab-trup .tablewrap { max-height: 46vh; }
 /* Lav skærm (laptop): kompakt klubhoved og lavere regneark, så banen kan ses under det. */
 @media (max-height: 850px) {
-  .tab-trup .tablewrap { max-height: 30vh; }
   .tab-trup .clubhead { padding: .35rem 1rem; align-items: center; } .tab-trup .clubhead h2 { font-size: 1.1rem; margin: 0; }
   .tab-trup .clubhead .muted { display: inline; margin-left: .5rem; } .tab-trup .clubhead > div:first-child { display: flex; align-items: baseline; flex-wrap: wrap; }
   .tabs { margin-bottom: .5rem; } .tabpane { gap: .6rem; }

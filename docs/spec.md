@@ -780,7 +780,10 @@ navn · kort holdnavn (fuldt i title) · værdi – i højst tre kolonner, uden 
 med grøn kant:
 1. **Spillere** (top 5): mål, oplæg, Kampens spiller, hovedstøds-, straffe- og dødboldmål, clean
    sheets (kun målmanden – plads 0, så også en MV skiftet ind ved skade; v3.11, brugeren: "Det er
-   kun målmanden der får Clean sheet" – 0 imod, mindst 59 spilleminutter, en starter har 89), gule kort, bedste vurdering (offentlige stjerner for alle).
+   kun målmanden der får Clean sheet" – 0 imod, mindst 59 spilleminutter, en starter har 89), gule kort, bedste snit (v3.20.1: sæsonens snit af kampenes offentlige stjerner i kamphistorikken, mindst 3 kampe –
+   før karrierens publicStars, som én runde næsten ikke flyttede) og 🏅 rundens bedste (seneste rundes kampe efter
+   offentlige stjerner – avisens rundens spiller først, så listen ikke modsiger avisen; lighed: mål+oplæg, så kampens
+   spiller; aldrig karakteren).
 2. **Holdtal**: bold %, frispark begået/tilkendt, gule kort, straffe (mål), dødboldmål, clean sheets.
 3. **Ligaens forløb** (indeværende sæson, v3.11): mål pr. runde (søjler), måltyper, største sejr, målrigeste kamp.
 4. **Dit hold (privat)**: afslutninger, xG, hjørnespark, frispark i skudafstand, hovedstødsmål,
@@ -872,7 +875,9 @@ fanerne som anden række (under 480 px kun ikoner). Den valgte fane gemmes i `ui
   massehandling for de viste). Træning sættes kun her.
 - **Taktik** (v3.19.0 – opstillingen ét sted): bane | spillerliste (Start-11, Bænk med "Udtag automatisk",
   Reserver; klik på en brik filtrerer listen til hans kæde med kædens 3 nøgle-evner; sortering gennem
-  regnearkets kolonner og synlighedsvagt) + spillerkort; formation/planer/faser/Hvis-Så nedenunder. Ét
+  regnearkets kolonner og synlighedsvagt) + spillerkort; formation/planer/faser/Hvis-Så lige under banen i venstre
+  kolonne (v3.20.1, brugeren: "langt ned til taktikindstillingerne"). Ingen tabel har egen lodret rulning (v3.20.1) –
+  siden ruller, og dens position bevares, når den tegnes om. Ét
   byt-valg (actions.js `swapKind`/`pickForSwap`) på banen og i listen; beskeden står ved listen.
 - **Kamp**: Match Center for igangværende eller seneste runde (tom tilstand før
   runde 1). ▶ skifter hertil. Karakterark side om side: opstillingsorden med

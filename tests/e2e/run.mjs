@@ -90,12 +90,13 @@ try {
   await benchRow.click();
   // Rullepositionen i listen bevares ved et klik (QC): rul ned, klik en bænkspiller, stå samme sted
   await g.setViewportSize({ width: 1400, height: 600 });
-  const lw = g.locator('#lineup-list .tablewrap');
-  await lw.evaluate((el) => { el.scrollTop = 120; });
-  const st0 = await lw.evaluate((el) => el.scrollTop);
+  // v3.20.1: listen har ingen egen rulning (brugeren: "ingen grund til en indlejret scroll") – SIDEN står samme sted efter et klik
+  const inner = await g.evaluate(() => [...document.querySelectorAll('.tablewrap')].map((el) => el.scrollHeight - el.clientHeight));
+  await g.evaluate(() => window.scrollTo(0, document.querySelector('#bench').getBoundingClientRect().top + window.scrollY - 100));
+  const st0 = await g.evaluate(() => window.scrollY);
   // klik via DOM (Playwright ruller ellers selv rækken ind): vælg og fravælg en række, der står synligt
-  for (let i = 0; i < 2; i++) await lw.evaluate((el) => { const box = el.getBoundingClientRect(); [...el.querySelectorAll('tr.bench-p')].find((r) => r.getBoundingClientRect().top > box.top + 30).click(); });
-  check('Taktik: listens rulleposition bevares, når siden tegnes om', st0 > 0 && Math.abs((await g.locator('#lineup-list .tablewrap').evaluate((el) => el.scrollTop)) - st0) < 2, String(st0));
+  for (let i = 0; i < 2; i++) await g.evaluate(() => [...document.querySelectorAll('#bench tr.bench-p')].find((r) => r.getBoundingClientRect().top > 60).click());
+  check('Taktik: ingen indlejret scroll i tabellerne, og siden står samme sted, når den tegnes om', inner.every((d) => d <= 1) && st0 > 0 && Math.abs((await g.evaluate(() => window.scrollY)) - st0) < 2, `${inner} · ${st0}`);
   await g.setViewportSize({ width: 1400, height: 1000 });
   check('Taktik: valgt bænkspiller markeres i listen og får en besked ved listen', (await g.locator('#bench tr.active').count()) === 1 && (await g.textContent('#pick-msg')).includes(benchShort));
   await g.click('#pitch .token[data-slot="7"]');
@@ -374,10 +375,27 @@ try {
   await tab('taktik');
   const colsAt = async (w) => { await g.setViewportSize({ width: w, height: 900 }); return g.evaluate(() => getComputedStyle(document.querySelector('.tactics-layout')).gridTemplateColumns.split(' ').length); };
   check('Layout: Taktik har 2 kolonner ved 1400 px og 1 ved 700 px', (await colsAt(1400)) === 2 && (await colsAt(700)) === 1);
+  // v3.20.1 (brugeren: "langt ned til taktikindstillingerne"): indstillingerne står lige under banen i venstre kolonne – over spillerkortets bund
+  await g.setViewportSize({ width: 1400, height: 900 });
+  { const r = await g.evaluate(() => { const b = (s) => document.querySelector(s).getBoundingClientRect(); return { pitch: b('#pitch'), tac: b('#tactics'), card: b('#player-card'), list: b('#lineup-list') }; });
+    check('Layout: Taktik-indstillingerne står under banen (venstre), listen og kortet til højre', r.tac.top - r.pitch.bottom < 60 && Math.abs(r.tac.left - r.pitch.left) < 80 && r.list.left > r.tac.right - 1 && r.card.left >= r.tac.right - 1 && r.tac.top < r.card.bottom, JSON.stringify({ gap: Math.round(r.tac.top - r.pitch.bottom), tacL: Math.round(r.tac.left), listL: Math.round(r.list.left) })); }
+  await g.setViewportSize({ width: 390, height: 844 });
+  { const y = await g.evaluate(() => ['#pitch', '#lineup-list', '#tactics', '#player-card'].map((s) => document.querySelector(s).getBoundingClientRect().top));
+    check('Layout på mobil (390 px): bane, spillerliste, indstillinger, kort – byt-listen lige under banen', y.every((v, i) => i === 0 || v > y[i - 1]), y.map(Math.round).join(' < ')); }
+  await g.setViewportSize({ width: 1400, height: 900 });
   await g.setViewportSize({ width: 1400, height: 1000 });
   await tab('trup');
   const sideScroll = await g.evaluate(() => { const w = document.querySelector('.tablewrap'); return w.scrollWidth - w.clientWidth; });
   check('Layout: regnearket kræver ikke sidelæns scroll ved 1400 px', sideScroll <= 1, `${sideScroll}px`);
+  { await g.selectOption('#team-select', '0'); await tab('trup'); await g.setViewportSize({ width: 1366, height: 768 });
+    const tw = await g.evaluate(() => ['matrix', 'training-table'].map((id) => { const w = document.getElementById(id)?.closest('.tablewrap'); return w ? w.scrollWidth - w.clientWidth : 'mangler'; }));
+    check('Layout (1366 px): ingen tabel i Trup ruller sidelæns – heller ikke træningsoversigten (QC v3.20.1: 758 px i 625)', tw.every((d) => d !== 'mangler' && d <= 1), tw.join(','));
+    // Ingen indlejret LODRET scroll på nogen fane (brugeren v3.20.1; TM: målingen stod kun på Taktik)
+    const vert = {};
+    for (const k of ['trup', 'liga', 'klub']) { await tab(k); vert[k] = await g.evaluate(() => [...document.querySelectorAll('.tablewrap')].map((w) => w.scrollHeight - w.clientHeight)); }
+    check('Layout: ingen tabel på Trup, Liga eller Klub har egen lodret rulning', Object.values(vert).every((l) => l.every((d) => d <= 1)) && vert.trup.length >= 2, JSON.stringify(vert));
+    await tab('trup');
+    await g.setViewportSize({ width: 1400, height: 1000 }); }
   check('Layout: siden selv scroller ikke sidelæns', await g.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
 
   // ---------- Kampe: Match Center ----------
@@ -395,6 +413,7 @@ try {
   await g.waitForSelector('#match-center');
   check('▶ Spil runde åbner Kamp-fanen', (await g.textContent('#tabs .tab.active')).includes('Kamp'));
   check('Under afspilning kan runden ikke startes igen', await g.isDisabled('#play-round'));
+  check('Under afspilning: kampsiden som før (referat | statistik) – afspilningen kommer først efter slutfløjt', (await g.getAttribute('#mc-main', 'class')) === 'mc-grid' && (await g.locator('#mc-main .mc-replay').count()) === 0);
   await g.selectOption('#team-select', '0'); await tab('klub');   // v3.19.0: et valgt modstanderhold viser hans offentlige klubside
   check('Under afspilning: Klub viser ikke regnskabet (præmien ville afsløre slutstillingen)', (await g.isVisible('#club-booked')) && (await g.locator('#ledger').count()) === 0);
   await g.selectOption('#team-select', '3'); await tab('kamp');
@@ -449,7 +468,8 @@ try {
   const runs = await g.locator('.ratings').nth(own).locator('td.run').allTextContents();
   const runExpect = await g.evaluate(() => { const m = JSON.parse(localStorage.getItem('tactivar_save')).league.lastRound.matches[0]; const own = [m.ratings.home, m.ratings.away].find((l) => l[0].isUserTeam); const e = own.find((x) => x.hiShare != null && x.distanceKm > 0); return `${e.distanceKm.toFixed(1).replace('.', ',')} km · ${Math.round(e.hiShare)} % HI`; });
   check('Karakterark: HI-andelen er spillerens afrundede tal', runs.some((t) => t.startsWith(runExpect)), runExpect);
-  check('Karakterark: dit hold har løbet distance og topfart, modstanderen ikke', runs.length >= 11 && runs.filter((t) => /^\d+,\d km · \d+ % HI · \d+,\d km\/t$/.test(t)).length >= 11 && (await g.locator('.ratings').nth(1 - own).locator('td.run').count()) === 0, runs.slice(0, 2).join(' | '));
+  // Alle dine viser distancen; mindst 9 også HI og topfart (en, der kun var på banen kort, har ingen topfart – tilfældigt i e2e)
+  check('Karakterark: dit hold har løbet distance og topfart, modstanderen ikke', runs.length >= 11 && runs.filter((t) => /^\d+,\d km/.test(t)).length >= 11 && runs.filter((t) => /^\d+,\d km · \d+ % HI · \d+,\d km\/t$/.test(t)).length >= 9 && (await g.locator('.ratings').nth(1 - own).locator('td.run').count()) === 0, runs.join(' | '));
   // v3.9: "fri" (løb uden bold) kun for dit hold – og opsummeringen kun i din kamp
   const fri = await g.locator('.ratings').nth(own).locator('td.fri').allTextContents();
   const friExpect = await g.evaluate(() => { const m = JSON.parse(localStorage.getItem('tactivar_save')).league.lastRound.matches[0]; const own = [m.ratings.home, m.ratings.away].find((l) => l[0].isUserTeam); return own.filter((e) => e.freeRuns > 0).map((e) => `${e.freeRunsWon}/${e.freeRuns} fri`); });
@@ -526,6 +546,13 @@ try {
     const vis = await g.evaluate(() => ['home', 'away'].map((c) => [...document.querySelectorAll(`#rp-pitch .rp-token.${c}`)].filter((t) => getComputedStyle(t).display !== 'none').length));
     const totalTok = await g.evaluate(() => document.querySelectorAll('#rp-pitch .rp-token').length);
     check('Afspilning: højst 11 viste brikker pr. hold i sidste trin (udskiftede skjult – målt som tegnet)', vis.every((n) => n >= 7 && n <= 11) && (totalTok <= 22 || vis[0] + vis[1] < totalTok), `${vis} af ${totalTok} brikker`);
+    // v3.20.1 (brugeren: "udnyttelsen af pladsen lige efter en kamp"): afspilningen til venstre, statistik og referat ved siden af
+    { const r = await g.evaluate(() => { const b = (s) => document.querySelector(s).getBoundingClientRect(); return { rp: b('#replay'), st: b('#match-stats'), feed: b('#feed') }; });
+      check('Efter kampen: statistikken ligger i sin grid-plads (klassen mc-stats)', (await g.evaluate(() => getComputedStyle(document.querySelector('.mc-stats')).gridRowStart)) === 'stats');
+      check('Efter kampen: afspilningen til venstre, statistik og referat til højre ved siden af den', r.st.left >= r.rp.right - 1 && r.feed.left >= r.rp.right - 1 && r.st.top < r.rp.bottom && r.feed.top < r.rp.bottom, JSON.stringify({ rpR: Math.round(r.rp.right), stL: Math.round(r.st.left), feedT: Math.round(r.feed.top), rpB: Math.round(r.rp.bottom) }));
+      await g.setViewportSize({ width: 390, height: 844 }); await g.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));   // vent på layout (TM: race)
+      check('Efter kampen på mobil (390 px): siden ruller ikke sidelæns (karakterarkene ruller selv)', await g.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), String(await g.evaluate(() => { const W = window.innerWidth; return document.documentElement.scrollWidth + ' · ' + [...document.querySelectorAll('#app *')].filter((e) => e.getBoundingClientRect().right > W + 2 && !e.closest('.ratings, .tablewrap')).slice(0, 5).map((e) => e.tagName + '#' + e.id + '.' + e.className).join(' | '); })));
+      await g.setViewportSize({ width: 1400, height: 1000 }); }
     // v3.20.0 (brugeren): dit ark viser fra start holdets heat map OG startopstillingen – som modstanderens (zoner + opstilling)
     await g.waitForSelector('#heat-pitch');
     const heat = await g.evaluate(() => ({ cells: document.querySelectorAll('#heat-pitch .heat-cell').length, title: document.querySelector('#heat-title').textContent, thirds: document.querySelector('#heat-thirds')?.textContent ?? '', btn: document.querySelectorAll('#heat-btn').length,

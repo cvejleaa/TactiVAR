@@ -50,8 +50,8 @@ test('publicFacts: hvert tal står på den rigtige side, og kun de offentlige ta
   assert.deepEqual(f.goals[0], { kind: 'COUNTER', min: 10, scorer: 'S0', teamName: 'Hjem' }, 'målene uden desc/spectacle');
   // Karakterlinjer: hjemme først, så ude; PRÆCIS de offentlige felter (positiv liste), aldrig rating/km/topfart/minIn/slot
   assert.deepEqual(f.ratings, [
-    { playerId: 'p1', shirtNumber: 1, shortName: 'A', teamId: 'h1', teamName: 'Hjem', goals: 1, assists: 2, saves: 3, aerialWins: 4, stars: 5, isMotM: false },
-    { playerId: 'p2', shirtNumber: 2, shortName: 'B', teamId: 'a1', teamName: 'Ude', goals: 0, assists: 1, saves: 0, aerialWins: 1, stars: 3, isMotM: true }]);
+    { playerId: 'p1', shirtNumber: 1, shortName: 'A', teamId: 'h1', teamName: 'Hjem', line: undefined, goals: 1, assists: 2, saves: 3, aerialWins: 4, tacticWins: undefined, stars: 5, isMotM: false },
+    { playerId: 'p2', shirtNumber: 2, shortName: 'B', teamId: 'a1', teamName: 'Ude', line: undefined, goals: 0, assists: 1, saves: 0, aerialWins: 1, tacticWins: undefined, stars: 3, isMotM: true }]);   // v3.20.1: + line, tacticWins (offentlige; fixturet har dem ikke)
   assert.ok(Object.isFrozen(f) && Object.isFrozen(f.home) && Object.isFrozen(f.away), 'fakta-laget er frosset');
 });
 test('publicFacts: tomme/gamle kampe giver nuller og null (ikke NaN/undefined), og idx er 0 uden argument', () => {
@@ -63,7 +63,7 @@ test('publicFacts: tomme/gamle kampe giver nuller og null (ikke NaN/undefined), 
 });
 test('de lukkede lister er bogstavelige: PUBLIC_FACT_KEYS og RATING_PUBLIC (ingen nøgle kan fjernes eller tilføjes uden at en test ser det)', () => {
   assert.deepEqual(PUBLIC_FACT_KEYS, ['poss', 'shots', 'onTarget', 'corners', 'aerialWon', 'counterGoals', 'setPieceGoals', 'headerGoals', 'yellows', 'reds', 'reorganised', 'goals', 'against']);   // 'reds' ny i v3.16.3 (13 nøgler)
-  assert.deepEqual(RATING_PUBLIC, ['playerId', 'shirtNumber', 'shortName', 'teamId', 'teamName', 'goals', 'assists', 'saves', 'aerialWins', 'stars', 'isMotM']);
+  assert.deepEqual(RATING_PUBLIC, ['playerId', 'shirtNumber', 'shortName', 'teamId', 'teamName', 'line', 'goals', 'assists', 'saves', 'aerialWins', 'tacticWins', 'stars', 'isMotM']);
   assert.ok(RATING_PUBLIC.every((k) => !RATING_PRIVATE_FIELDS.includes(k)));
 });
 test('compactFacts og runde-historikkens facts: begge hold, nøglet på hold-id, præcis de 13 tal (v3.16.3: + reds) – for hver kamp i runden', () => {
