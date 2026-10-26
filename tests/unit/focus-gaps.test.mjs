@@ -11,7 +11,7 @@ import { simulateMatch as simLive } from '../../public/engine/match.js';
 import { goalSpectacle } from '../../public/engine/clues.js';
 // v3.13: friskheden falder i kampen (freshness.js). Denne fils tærskler forudsætter fuld friskhed hele
 // kampen, så friskhed i kampen slås fra her – de nye tests i fatigue.test.mjs prøver den slået TIL.
-const simulateMatch = (h, a, r, o = {}) => simLive(h, a, r, { liveEnergy: false, ...o });
+const simulateMatch = (h, a, r, o = {}) => simLive(h, a, r, { liveEnergy: false, drift: false, ...o });
 
 // chance(p) afgøres af script[p] (true/false eller (n) => bool med nummeret på kaldet); next() er konstant.
 function stubRng(script = {}, nextValue = 0.5) {

@@ -4,7 +4,7 @@
 // permanent), og Hvis-Så-reglerne kører for begge hold og skifter reelt formation.
 import { matchBenchOf } from './career.js';
 import { FORMATIONS, lineOfRole, isOutOfZone, slotPosition, fitOf, arrangeByFit } from './formations.js';
-import { livePositions, coupledPositions, kickoffPositions, apartFrom, ONSIDE_GAP, MIN_APART } from './positions.js';
+import { livePositions as livePos0, coupledPositions as coupled0, kickoffPositions, apartFrom, ONSIDE_GAP, MIN_APART } from './positions.js';
 import { masteryVs, counterXpForMatch } from './counter.js';
 import { createSheet, finalizeSheet } from './ratings.js';
 import { assignClock } from './clock.js';
@@ -299,6 +299,13 @@ export function simulateMatch(home, away, rng, opts = {}) {
   const events = [];
   const lineupNotes = [];
   const H = prepareSide(home, true, lineupNotes), A = prepareSide(away, false, lineupNotes);
+  // Bevægelsen (v3.21.0, positions.js driftAt): kampens seed trækkes én gang; tick'et (curMin / 3) og holdet giver hver spiller
+  // samme plads i alle kald i samme tick – modtagervalget, VAR-forreste, øjeblikkene og sporet læser de samme positioner.
+  // opts.drift = false KUN til de deterministiske test-arenaer med pinnede koordinater (som liveEnergy) – spillet sender det aldrig.
+  const driftOn = opts.drift !== false, driftSeed = driftOn ? Math.floor(rng.next() * 2 ** 31) : 0;
+  const driftOf = (tac) => (!driftOn ? null : tac === H.tactics ? { seed: driftSeed, team: 1, t: curMin / 3 } : tac === A.tactics ? { seed: driftSeed, team: 2, t: curMin / 3 } : null);
+  const livePositions = (tac, o = {}) => livePos0(tac, { ...o, drift: driftOf(tac) });
+  const coupledPositions = (b, o, opt = {}) => coupled0(b, o, { ...opt, ballDrift: driftOf(b), oppDrift: driftOf(o) });
   const sheet = createSheet();
   const goalsPool = [], injuries = [], observations = [];
   const st = { hPoss: 10, aPoss: 10, hShots: 0, aShots: 0, hOnTarget: 0, aOnTarget: 0, hXg: 0, aXg: 0, hAerialWon: 0, aAerialWon: 0, hVarChecks: 0, aVarChecks: 0, hTacticSuccess: 0, aTacticSuccess: 0, hFouls: 0, aFouls: 0, hInjuries: 0, aInjuries: 0, hCorners: 0, aCorners: 0, hFreeKicks: 0, aFreeKicks: 0, hPenalties: 0, aPenalties: 0, hPenaltyGoals: 0, aPenaltyGoals: 0, hSetPieceGoals: 0, aSetPieceGoals: 0, hHeaderGoals: 0, aHeaderGoals: 0, hCounterGoals: 0, aCounterGoals: 0, hYellows: 0, aYellows: 0, hReds: 0, aReds: 0 };
