@@ -3,6 +3,7 @@
 // 0,9–1,0 · værdien. Alt, botterne vælger, bygger på offentlige data (stjerner, alder, kæde, truppens størrelse – QC B7).
 import { publicValue, publicWage, repairLineup, freeShirt, refreshValue, autoMatchBench, bookLedger, weeklyWages, wageBudget, derivedRng, LINE_MIN, SQUAD_MIN, SQUAD_MAX } from './career.js';
 import { seasonRoundOf } from './schedule.js';
+import { generatePlayer } from './generator.js';
 
 export const BUY_MARKUP = 1.3, STARTER_MARKUP = 1.6, SALES_PER_WINDOW = 2, WINDOW_ROUNDS = [1, 8], TRANSFER_LOG_CAP = 40, BOT_BUY_CASH = 2000000;
 const round25k = (v) => Math.round(v / 25000) * 25000;
@@ -19,12 +20,12 @@ export const quarantined = (p, w) => p.lastMove != null && w - p.lastMove <= 1;
 const salesOf = (league, teamId, w) => (league.windowSales?.w === w ? league.windowSales.n[teamId] ?? 0 : 0);
 const lineCount = (team, line) => team.squad.filter((p) => p.line === line).length;
 
-// Hvorfor dette salg ikke kan ske (null = det kan). Sælgerens grænser: minimum pr. kæde, 18 i truppen, højst 2 salg pr. vindue.
+// Hvorfor dette salg ikke kan ske (null = det kan): lukket vindue, karantæne, højst 2 salg pr. vindue. En bot sælger også ved 18 i
+// truppen eller minimum i kæden – den henter selv en ungdomsspiller i samme kæde (v3.18.1: i v3.18.0 havde alle botter 18 i hele
+// sæson 1, så intet kunne købes).
 function sellBlock(league, seller, p, w) {
   if (w == null) return 'Transfervinduet er lukket – det åbner før sæsonens runde 8 og ved sæsonslut.';
   if (quarantined(p, w)) return `${p.shortName} skiftede klub i sidste vindue og kan ikke handles igen endnu.`;
-  if (seller.squad.length <= SQUAD_MIN) return `${seller.name} har kun ${SQUAD_MIN} spillere.`;
-  if (lineCount(seller, p.line) <= LINE_MIN[p.line]) return `Ikke til salg – ${seller.name} har for få i kæden.`;
   if (salesOf(league, seller.id, w) >= SALES_PER_WINDOW) return `${seller.name} har solgt ${SALES_PER_WINDOW} spillere i dette vindue.`;
   return null;
 }
@@ -46,6 +47,7 @@ export function marketInfo(league, buyer, seller, p) {
 function move(league, p, seller, buyer, price, kind = 'buy') {
   const w = windowOf(league), r = league.leagueMetadata.round, s = league.leagueMetadata.seasonNumber ?? 1;
   seller.squad = seller.squad.filter((x) => x.id !== p.id);
+  if (seller.isBot && (seller.squad.length < SQUAD_MIN || lineCount(seller, p.line) < LINE_MIN[p.line])) refillYouth(league, seller, p.line, `${w}-${p.id}`);
   repairLineup(seller, new Map([[p.id, p.line]]));
   if (buyer) {
     if (buyer.squad.some((x) => x.shirtNumber === p.shirtNumber)) p.shirtNumber = freeShirt(buyer);
@@ -59,6 +61,16 @@ function move(league, p, seller, buyer, price, kind = 'buy') {
   league.windowSales.n[seller.id] = (league.windowSales.n[seller.id] ?? 0) + 1;
   league.transferLog = [...(league.transferLog ?? []), { s, r, id: p.id, name: p.shortName, from: seller.id, to: buyer?.id ?? null, price, kind }].slice(-TRANSFER_LOG_CAP);
   league.offers = (league.offers ?? []).filter((o) => o.playerId !== p.id);
+}
+
+// En bot, der sælger under 18 eller under minimum i kæden, henter en ungdomsspiller i samme kæde (afledt rng, nyt id, unikt navn)
+function refillYouth(league, team, line, key) {
+  const ids = new Set(league.teams.flatMap((t) => t.squad.map((x) => x.id))), used = new Set(league.teams.flatMap((t) => t.squad.map((x) => x.shortName)));
+  let id;
+  do { id = `plr_y${league.nextPlayerSeq ?? 1}`; league.nextPlayerSeq = (league.nextPlayerSeq ?? 1) + 1; } while (ids.has(id));
+  const y = generatePlayer(derivedRng('refill', key), line, 'YOUTH', freeShirt(team), league.teams.indexOf(team), used, 0, undefined, id);
+  team.squad.push(y);
+  return y;
 }
 
 // Dit køb af en bots spiller. Svar: null = købt, ellers årsagen.

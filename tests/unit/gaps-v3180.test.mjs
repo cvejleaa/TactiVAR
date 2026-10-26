@@ -76,7 +76,7 @@ test('vinduet, trin 2: en bot under minimum i en kæde køber den billigste ikke
   for (const t of L.teams.filter((x) => x.isBot && x !== seller && x !== buyer)) t.cashBalance = 0;   // ingen andre køber i trin 3
   openWindow(L);
   assert.equal(buyer.squad.filter((p) => p.line === 'GK').length, 2);
-  assert.ok(L.transferLog.some((e) => e.to === buyer.id && e.from === seller.id));
+  assert.ok(L.transferLog.some((e) => e.to === buyer.id), 'købt fra en anden bot (v3.18.1: alle botter kan sælge – de henter selv ungdom)');
 });
 
 test('QC: du kan ikke sælge under minimum i kæden (aldrig uden målmand)', async () => {

@@ -1,10 +1,10 @@
 // 💼 Klub (v3.18.0): dit holds økonomi – kasse, lønbudget, prognose og regnskab. Kun dit hold (kassen er ejerens, viewTeam).
 // Alt vises pr. runde; "1 uge = 3 runder" står én gang (QC B6).
 import { h } from './dom.js';
-import { kr } from './labels.js';
-import { weeklyWages, wagesPerRound, wageBudget, wageRoomPerRound, attendance, formOf, TV_PER_ROUND, TICKET_PRICE, GATE_MAX, PRIZE, ROUNDS_PER_WEEK, publicValue } from '../engine/career.js';
+import { kr, LINE, POSITION, starsEl } from './labels.js';
+import { weeklyWages, wagesPerRound, wageBudget, wageRoomPerRound, attendance, formOf, TV_PER_ROUND, TICKET_PRICE, GATE_MAX, PRIZE, ROUNDS_PER_WEEK, publicValue, publicWage } from '../engine/career.js';
 import { placesBefore } from '../engine/season.js';
-import { windowOf } from '../engine/transfers.js';
+import { windowOf, marketInfo } from '../engine/transfers.js';
 import { SEASON_ROUNDS, seasonRoundOf } from '../engine/schedule.js';
 
 const net = (e) => (e.gate ?? 0) + (e.tv ?? 0) + (e.wages ?? 0) + (e.prize ?? 0) + (e.transfers ?? 0);
@@ -62,7 +62,7 @@ export function renderClub({ league, team, playing }) {
 }
 
 // 🔁 Transfermarked (v3.18.0): vinduet, dine spillere til salg med botternes bud, og hvordan man køber
-export function renderMarket({ league, team, playing, onAccept, onDecline, onUnlist }) {
+export function renderMarket({ league, team, playing, onAccept, onDecline, onUnlist, onBuy = null, onLine = null, line = 'all' }) {
   if (playing) return null;
   const w = windowOf(league), offers = (league.offers ?? []).filter((o) => o.from === team.id);
   const listed = (team.listed ?? []).map((id) => team.squad.find((p) => p.id === id)).filter(Boolean);
@@ -70,7 +70,7 @@ export function renderMarket({ league, team, playing, onAccept, onDecline, onUnl
   return h('div', { class: 'panel market', id: 'market' },
     h('h3', {}, '🔁 Transfermarked'),
     h('p', { id: 'window-state', class: w != null ? 'open' : 'muted' }, w != null
-      ? '🟢 Vinduet er åbent til næste runde. Køb: vælg et andet hold i holdvælgeren og klik på en spiller – prisen står på kortet.'
+      ? '🟢 Vinduet er åbent til næste runde. Køb i listen herunder (eller på en spillers kort) – prisen er fast.'
       : '🔴 Vinduet er lukket. Det åbner før sæsonens runde 8 og ved sæsonslut. Spillere til salg får bud, når det åbner.'),
     h('h4', {}, `Dine spillere til salg (${listed.length})`),
     listed.length ? listed.map((p) => {
@@ -79,7 +79,25 @@ export function renderMarket({ league, team, playing, onAccept, onDecline, onUnl
         o ? [h('strong', {}, `Bud fra ${teamName(o.to)}: ${kr(o.price)} `), h('button', { class: 'mini offer-accept', onclick: () => onAccept(p.id) }, 'Sælg'), h('button', { class: 'mini offer-decline', onclick: () => onDecline(p.id) }, 'Afvis')]
           : h('span', { class: 'muted' }, w != null ? 'Intet bud – ingen klub har råd og plads lige nu. ' : 'Venter på vinduet. '),
         h('button', { class: 'mini linklike', onclick: () => onUnlist(p.id) }, 'Fjern fra listen'));
-    }) : h('p', { class: 'muted', id: 'market-empty' }, 'Ingen. Sæt en spiller til salg på hans spillerkort (dit hold).'));
+    }) : h('p', { class: 'muted', id: 'market-empty' }, 'Ingen. Sæt en spiller til salg på hans spillerkort (dit hold).'),
+    w != null && onBuy ? renderForSale(league, team, onBuy, onLine, line) : null);
+}
+
+// Til salg i ligaen (v3.18.1): de andre klubbers spillere med fast pris og Køb – kun dem, du faktisk kan købe nu (årsagen står ellers
+// på kortet). Filter pr. kæde; sorteret efter stjerner, så pris.
+function renderForSale(league, me, onBuy, onLine, line) {
+  const rows = league.teams.filter((t) => t.isBot).flatMap((t) => t.squad.map((p) => ({ t, p, m: marketInfo(league, me, t, p) })))
+    .filter((o) => !o.m.reason && (line === 'all' || o.p.line === line))
+    .sort((a, b) => (b.p.publicStars ?? 0) - (a.p.publicStars ?? 0) || a.m.price - b.m.price);
+  return h('div', { id: 'for-sale' },
+    h('h4', {}, `Til salg i ligaen – du kan købe ${rows.length}`),
+    h('div', { class: 'toolbar' }, [['all', 'Alle'], ['GK', 'MÅL'], ['DEF', 'FOR'], ['MID', 'MID'], ['ATT', 'ANG']].map(([v, l]) => h('button', { class: 'mini' + (line === v ? ' active' : ''), onclick: () => onLine?.(v) }, l))),
+    rows.length ? h('div', { class: 'tablewrap' }, h('table', { class: 'ledger', id: 'for-sale-table' },
+      h('thead', {}, h('tr', {}, ['Spiller', 'Klub', 'Pos', 'Alder', 'Vurd', 'Pris', 'Løn/runde', ''].map((x) => h('th', {}, x)))),
+      h('tbody', {}, rows.slice(0, 40).map(({ t, p, m }) => h('tr', { dataset: { pid: p.id } },
+        h('td', {}, `#${p.shirtNumber} ${p.shortName}`), h('td', {}, t.name), h('td', {}, `${LINE[p.line]} · ${POSITION[p.position] ?? ''}`), h('td', { class: 'num' }, p.age),
+        h('td', {}, starsEl(p.publicStars)), h('td', { class: 'num' }, kr(m.price)), h('td', { class: 'num' }, kr(Math.round(publicWage(p) / 3))),
+        h('td', {}, h('button', { class: 'mini buy-row', onclick: () => onBuy(p.id) }, '💰 Køb'))))))) : h('p', { class: 'muted', id: 'for-sale-empty' }, 'Ingen lige nu – se om lønbudgettet eller kassen er for lille (💼 Klub øverst).'));
 }
 
 // Ligaens transfers (offentligt): de seneste skifter og fritstillinger
