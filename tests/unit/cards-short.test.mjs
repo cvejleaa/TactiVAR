@@ -2,6 +2,7 @@
 // og i duellerne (ff), og at tiden med færre mand huskes, når der kommer endnu en udvisning (shortMins).
 // Hver test styrer kampen med en scriptet rng (som fatigue.test.mjs): første frispark i 3. minut er en skade-tackling,
 // der giver direkte rødt til forsvarsspilleren på pladsen efter målmanden (tackler = rækkens første forsvarer).
+import { alignPositions } from './helpers/positions.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRng } from '../../public/engine/rng.js';
@@ -20,7 +21,7 @@ function arena({ homeLimit = 70 } = {}) {
   for (const t of [H, A]) {
     for (const p of t.squad) { p.skills = SK(10); p.freshness = 100; p.injuryMatchesLeft = 0; p.counterTactics = { vsPress: 25, vsLowBlock: 25, vsTrapLong: 25 }; }
     t.tactics.baseFormation = '4-4-2'; t.tactics.customCoords = {}; t.tactics.conditionalRules = [];
-    t.tactics.lineupSlots = t.squad.slice(0, 11).map((p) => p.id);
+    t.tactics.lineupSlots = t.squad.slice(0, 11).map((p) => p.id); alignPositions(t);
     Object.assign(t.tactics.phases.phase1_buildUp, { offBallRuns: 'NORMAL' });
     Object.assign(t.tactics.phases.phase2_defending, { pressingHeight: 'MID_BLOCK' });
     Object.assign(t.tactics.phases.phase3_transition, { onBallLost: 'DROP_BACK' });

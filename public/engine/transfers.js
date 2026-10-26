@@ -3,7 +3,7 @@
 // 0,9–1,0 · værdien. Alt, botterne vælger, bygger på offentlige data (stjerner, alder, kæde, truppens størrelse – QC B7).
 import { publicValue, publicWage, repairLineup, freeShirt, refreshValue, autoMatchBench, bookLedger, weeklyWages, wageBudget, derivedRng, LINE_MIN, SQUAD_MIN, SQUAD_MAX } from './career.js';
 import { seasonRoundOf } from './schedule.js';
-import { generatePlayer } from './generator.js';
+import { generatePlayer, neededPosition } from './generator.js';
 
 export const BUY_MARKUP = 1.3, STARTER_MARKUP = 1.6, SALES_PER_WINDOW = 2, WINDOW_ROUNDS = [1, 8], TRANSFER_LOG_CAP = 40, BOT_BUY_CASH = 2000000;
 const round25k = (v) => Math.round(v / 25000) * 25000;
@@ -70,7 +70,7 @@ function refillYouth(league, team, line, key, taken = null) {
   if (taken) used.add(taken);
   let id;
   do { id = `plr_y${league.nextPlayerSeq ?? 1}`; league.nextPlayerSeq = (league.nextPlayerSeq ?? 1) + 1; } while (ids.has(id));
-  const y = generatePlayer(derivedRng('refill', key), line, 'YOUTH', freeShirt(team), league.teams.indexOf(team), used, 0, undefined, id);
+  const y = generatePlayer(derivedRng('refill', key), line, 'YOUTH', freeShirt(team), league.teams.indexOf(team), used, 0, neededPosition(team, line), id);
   team.squad.push(y);
   return y;
 }

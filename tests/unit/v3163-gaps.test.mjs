@@ -2,6 +2,7 @@
 // Forfatterens tests pinder mesterteksten ved målforskel +8/−2 (aldrig 0), vælger alt i endedSeasonView ved et komplet arkiv
 // (ingen af vagterne rammes) og et sæson-1-arkiv, der starter i runde 1 (statsFrom = fromRound), og tæller aldrig, hvad
 // lastSeasonStats RUMMER – kun at det findes.
+import { alignPositions } from './helpers/positions.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -265,7 +266,7 @@ test('direkte frisparksmål: kampens brugte måltekster gælder også frisparken
   for (const t of [H, A]) {
     for (const p of t.squad) { p.skills = SK(10); p.aerialPower = 10; p.varProfile = { cynicism: 10, theatre: 10, varPulse: 10 }; p.injuryMatchesLeft = 0; }
     t.tactics.baseFormation = '4-4-2'; t.tactics.customCoords = {}; t.tactics.conditionalRules = []; t.subsLimit = 0;
-    t.tactics.lineupSlots = t.squad.slice(0, 11).map((p) => p.id);
+    t.tactics.lineupSlots = t.squad.slice(0, 11).map((p) => p.id); alignPositions(t);
   }
   H.squad.find((p) => p.id === H.tactics.lineupSlots[10]).skills.finishing = 15;
   A.squad.find((p) => p.id === A.tactics.lineupSlots[0]).skills.goalkeeping = 5;
@@ -333,7 +334,7 @@ test('Hvis-Så til egen plan: teksten er "Holdet skifter fra … til Plan B (…
   for (const t of [H, A]) {
     for (const p of t.squad) { p.skills = SK(10); p.aerialPower = 10; p.varProfile = { cynicism: 10, theatre: 10, varPulse: 10 }; p.injuryMatchesLeft = 0; }
     t.tactics.baseFormation = '4-4-2'; t.tactics.customCoords = {}; t.tactics.conditionalRules = []; t.subsLimit = 0;
-    t.tactics.lineupSlots = t.squad.slice(0, 11).map((p) => p.id);
+    t.tactics.lineupSlots = t.squad.slice(0, 11).map((p) => p.id); alignPositions(t);
   }
   const planB = structuredClone(H.tactics);
   Object.assign(planB, { baseFormation: '3-5-2' }); planB.phases.phase1_buildUp.passingStyle = 'DIRECT_LONG';

@@ -76,7 +76,7 @@ try {
   await g.selectOption(`#training-table tr[data-pid="${await g.evaluate((nr) => JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((x) => !x.isBot).squad.find((x) => String(x.shirtNumber) === nr).id, shown)}"] select`, 'FINISH');
   check('Spillerkortet viser 9 evne-barer og luftduel-udregningen', (await g.locator('#player-card .bars .bar').count()) === 9 && (await g.textContent('#aerial-breakdown')).includes('× 0,35'));
   // v3.8 (Test Manager): kortets overskrift viser spillerens EGEN naturlige position med fuld betegnelse
-  const FULL_POS = { GK: 'Målmand', CB: 'Midtstopper', FB: 'Back/wingback (LB/RB/LWB/RWB)', CM: 'Central/defensiv midtbane (CM/CDM)', WM: 'Kant (LM/RM/LW/RW)', AM: 'Offensiv midtbane (CAM/CF)', ST: 'Angriber (ST)' };
+  const FULL_POS = { GK: 'Målmand', CB: 'Midtstopper', FB: 'Back/wingback (LB/RB/LWB/RWB)', DM: 'Defensiv midtbane (CDM)', CM: 'Central midtbane (CM)', WM: 'Kant (LM/RM/LW/RW)', AM: 'Offensiv midtbane (CAM/CF)', ST: 'Angriber (ST)' };
   const shownPos = await g.evaluate((nr) => JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((x) => !x.isBot).squad.find((x) => String(x.shirtNumber) === nr).position, shown);
   const cardHead = await g.textContent('#player-card .card-head');
   check('Spillerkortet: kæde og naturlig position med fuld betegnelse (kun den ene)', cardHead.includes(` • ${FULL_POS[shownPos]} • `) && Object.values(FULL_POS).filter((t) => cardHead.includes(` • ${t} • `)).length === 1 && !cardHead.includes('(('), `${shownPos}: ${cardHead}`);
@@ -151,13 +151,13 @@ try {
   const fins = (await g.locator('#matrix tbody tr td:nth-child(15)').allTextContents()).map(Number);
   check('Sortering på FIN giver højeste først', fins.length === 18 && fins.every((v, i) => i === 0 || fins[i - 1] >= v), fins.join(','));
   // Natur-kolonnen (v3.8): hver rækkes etiket og forklaring stemmer med spillerens gemte position, og sorteringen følger rækkefølgen
-  const LABEL_POS = { GK: 'MV', CB: 'CB', FB: 'Back', CM: 'CM', AM: 'OM', WM: 'Kant', ST: 'ANG' };
+  const LABEL_POS = { GK: 'MV', CB: 'CB', FB: 'Back', DM: 'DM', CM: 'CM', AM: 'OM', WM: 'Kant', ST: 'ANG' };
   const savedPos = await g.evaluate(() => Object.fromEntries(JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((x) => !x.isBot).squad.map((p) => [p.shortName, p.position])));
   await g.click('#matrix thead th:nth-child(4)');
   const natRows = await g.evaluate(() => [...document.querySelectorAll('#matrix tbody tr')].map((tr) => ({ name: tr.children[1].textContent, label: tr.children[3].textContent.trim(), title: tr.children[3].title })));
   check('Natur: hver spillers etiket og forklaring (title) er hans gemte position', natRows.length === 18 && natRows.every((r) => r.label === LABEL_POS[savedPos[r.name]] && r.title === FULL_POS[savedPos[r.name]]), JSON.stringify(natRows.slice(0, 3)));
-  const natIdx = natRows.map((r) => ['GK', 'CB', 'FB', 'CM', 'AM', 'WM', 'ST'].indexOf(savedPos[r.name]));
-  check('Natur: sortering stigende MV, CB, Back, CM, OM, Kant, ANG (alle syv forekommer)', natIdx.every((v, i) => i === 0 || natIdx[i - 1] <= v) && new Set(natIdx).size === 7, natIdx.join(','));
+  const natIdx = natRows.map((r) => ['GK', 'CB', 'FB', 'DM', 'CM', 'AM', 'WM', 'ST'].indexOf(savedPos[r.name]));
+  check('Natur: sortering stigende MV, CB, Back, DM, CM, OM, Kant, ANG (alle otte forekommer – v3.20.0: DM)', natIdx.every((v, i) => i === 0 || natIdx[i - 1] <= v) && new Set(natIdx).size === 8, natIdx.join(','));
 
   // Træk en spiller ud af zonen
   await tab('taktik');
@@ -231,6 +231,23 @@ try {
   await g.click('#pitch .token[data-slot="5"]'); await g.locator('#lineup-list .toolbar button', { hasText: 'Alle' }).click(); await g.locator('#bench .bench-p').first().click();
   check('Bænken: klik brik og så bænkspiller skifter også ind', (await nameAt(5)) !== n5);
   await tab('trup'); await g.click('#matrix thead th:nth-child(1)'); await tab('taktik');
+
+  // v3.20.0: uden for position – ny liga i 4-4-2 har intet flag; et bytte LB ⇄ ANG giver ⚠ (−6 %) på begge brikker og i listen;
+  // "⇄ Stil op efter position" sætter dem tilbage og siger det
+  { const g0 = await fresh(); await g0.click('#tab-taktik');
+    check('Ny liga: ingen af dine brikker er uden for position, og forklaringen står ved listen', (await g0.locator('#pitch .token').count()) === 11 && (await g0.locator('#pitch .token-flag.pos').count()) === 0 && (await g0.textContent('#fit-help')).includes('naboplads (fx DM på CM, back på kant) −2,5 %'));
+    const name = async (s) => (await g0.locator(`#pitch .token[data-slot="${s}"] .token-name`).textContent()).trim();
+    const n1 = await name(1), n9 = await name(9);
+    await g0.click('#pitch .token[data-slot="1"]'); await g0.click('#pitch .token[data-slot="9"]');
+    await g0.locator('#lineup-list .toolbar button', { hasText: 'Alle' }).click();   // et klik på en brik filtrerer listen til kæden
+    const flag = async (s) => (await g0.locator(`#pitch .token[data-slot="${s}"] .token-flag.pos`).textContent().catch(() => '')).trim();
+    check('Byt LB ⇄ ANG: begge brikker viser "⚠ Uden for position (−6 %)", de andre intet, og listen markerer pladserne', (await name(1)) === n9 && (await flag(1)) === '⚠ Uden for position (−6 %)' && (await flag(9)) === '⚠ Uden for position (−6 %)'
+      && (await g0.locator('#pitch .token-flag.pos').count()) === 2 && (await g0.locator('#lineup-table td.lp-place.off-pos').count()) === 2 && (await g0.textContent('#lineup-table td.lp-place.off-pos')).includes('−6 %'));
+    await g0.click('#arrange-lineup');
+    check('"⇄ Stil op efter position" flytter dem tilbage, fjerner flagene og siger det', (await name(1)) === n1 && (await name(9)) === n9 && (await g0.locator('#pitch .token-flag.pos').count()) === 0 && (await g0.textContent('#notice')).includes('naturlige position'));
+    await g0.selectOption('#formation', '4-2-3-1');
+    check('Formationsskift i Taktik: de 11 fordeles, og beskeden siger hvor mange der flyttede', (await g0.textContent('#notice')).startsWith('4-2-3-1: ') && (await g0.textContent('#notice')).includes('flyttet'), await g0.textContent('#notice'));
+    await g0.context().close(); }
 
   // Hver ændring gemmes STRAKS: genindlæs efter hver enkelt handling
   const reload = async () => { await g.reload(); await g.waitForSelector('body[data-klar="ja"]'); };
@@ -509,20 +526,18 @@ try {
     const vis = await g.evaluate(() => ['home', 'away'].map((c) => [...document.querySelectorAll(`#rp-pitch .rp-token.${c}`)].filter((t) => getComputedStyle(t).display !== 'none').length));
     const totalTok = await g.evaluate(() => document.querySelectorAll('#rp-pitch .rp-token').length);
     check('Afspilning: højst 11 viste brikker pr. hold i sidste trin (udskiftede skjult – målt som tegnet)', vis.every((n) => n >= 7 && n <= 11) && (totalTok <= 22 || vis[0] + vis[1] < totalTok), `${vis} af ${totalTok} brikker`);
-    await g.click('#heat-btn'); await g.waitForSelector('#heat-pitch');
-    const heat = await g.evaluate(() => ({ cells: document.querySelectorAll('#heat-pitch .heat-cell').length, title: document.querySelector('#heat-title').textContent, thirds: document.querySelector('#heat-thirds')?.textContent ?? '' }));
-    check('Heat map: dit hold som felter, modstanderen kun groft i tredjedele', heat.cells >= 6 && /Holdet/.test(heat.title) && /Tyngdepunkt \(groft\)/.test(heat.thirds), JSON.stringify(heat));
-    // Test Manager v3.16: heat map og 📍 udelukker hinanden (app.js heat/snapshot-handlerne nulstiller hinandens valg) – ellers
-    // åbner ↩ det GAMLE øjebliksbillede, eller 📍 gør intet, mens heat map'et står. Kun hvis dit hold har et mål i åbent spil at klikke på.
+    // v3.20.0 (brugeren): dit ark viser fra start holdets heat map OG startopstillingen – som modstanderens (zoner + opstilling)
+    await g.waitForSelector('#heat-pitch');
+    const heat = await g.evaluate(() => ({ cells: document.querySelectorAll('#heat-pitch .heat-cell').length, title: document.querySelector('#heat-title').textContent, thirds: document.querySelector('#heat-thirds')?.textContent ?? '', btn: document.querySelectorAll('#heat-btn').length,
+      lineups: [...document.querySelectorAll('.ratings .minipitch-wrap')].filter((w) => w.firstElementChild?.textContent.startsWith('Startopstilling')).length }));
+    check('Heat map: dit hold som felter fra start (uden knap), modstanderen kun groft i tredjedele – og begge ark har startopstillingen', heat.cells >= 6 && /Holdet/.test(heat.title) && /Tyngdepunkt \(groft\)/.test(heat.thirds) && heat.btn === 0 && heat.lineups === 2, JSON.stringify(heat));
+    // 📍 erstatter kun startopstillingen; heat map'et bliver stående, og ↩ giver startopstillingen tilbage
     if (await g.locator('#feed .snap-btn').count()) {
       const view = async () => ({ snap: await g.locator('#snap-pitch').count(), heat: await g.locator('#heat-pitch').count() });
       await g.locator('#feed .snap-btn').first().click(); const afterPin = await view();
-      await g.click('#heat-btn'); const afterHeat = await view();
-      if (await g.locator('#heat-back').count()) await g.click('#heat-back');   // (uden knappen er heat map'et allerede lukket – checken melder det)
-      const afterBack = await view();
-      check('Heat map og 📍 udelukker hinanden: 📍 lukker heat map, heat map lukker 📍, og ↩ giver startopstillingen (ikke det gamle billede)',
-        afterPin.snap === 1 && afterPin.heat === 0 && afterHeat.snap === 0 && afterHeat.heat === 1 && afterBack.snap === 0 && afterBack.heat === 0, JSON.stringify([afterPin, afterHeat, afterBack]));
-    } else await g.click('#heat-back');
+      await g.click('#snap-back'); const afterBack = await view();
+      check('📍 viser øjebliksbilledet i stedet for startopstillingen, heat map\'et står stadig; ↩ giver startopstillingen', afterPin.snap === 1 && afterPin.heat === 1 && afterBack.snap === 0 && afterBack.heat === 1, JSON.stringify([afterPin, afterBack]));
+    }
   } else check('Afspilning findes efter en spillet runde', false, (await g.locator('#replay').textContent().catch(() => 'intet #replay')) + ' | mc ' + (await g.locator('#match-center').count()));
   // v3.16.3: 📍 i et gem fra før afspilningen (v3.12.1–v3.15: øjebliksbilleder, intet spor) – sporet fjernes fra det gemte spil,
   // siden genindlæses, og 📍-flowet køres i den rigtige app; bagefter lægges det oprindelige gem tilbage.
@@ -689,7 +704,7 @@ try {
   check('Migrering: beskeden forklarer puljen på 100, Superliga-højderne, friskheden, den naturlige position og kampprogrammet (alle trin fra skema 1 op) – og nævner backuppen', ['100 point', 'Superliga', 'Friskhed', 'Hvis-Så-regler kan nu sættes', 'naturlig position', 'kampprogram', 'Sæson 1 (uden program)', 'backup'].every((x) => migNotice.includes(x)), migNotice);
   await reload(); await reload();
   const mig = await g.evaluate(() => ({ schema: JSON.parse(localStorage.getItem('tactivar_save')).schemaVersion, backups: Object.keys(localStorage).filter((k) => k.startsWith('tactivar_backup_')).length }));
-  check('Migrering: gemmes straks i skema 7, kun én backup trods tre genindlæsninger', mig.schema === 7 && mig.backups === 1, JSON.stringify(mig));
+  check('Migrering: gemmes straks i skema 8, kun én backup trods tre genindlæsninger', mig.schema === 8 && mig.backups === 1, JSON.stringify(mig));
   await tab('liga'); const migHead = await g.textContent('#standings-title');
   await g.click('#past-seasons > summary');
   const past = await g.textContent('#past-seasons');
@@ -718,9 +733,9 @@ try {
   check('Migrering fra skema 4 (v3.8): beskeden forklarer naturlig position og højde pr. position – ikke friskheden eller puljen igen', note4.includes('naturlig position') && note4.includes('backs og kanter lavere') && !note4.includes('Friskhed betyder') && !note4.includes('100 point'), note4);
   await tab('trup');
   const nat = await g.locator('#matrix tbody tr td:nth-child(4)').allTextContents();
-  check('Natur-kolonnen viser en position for alle 18 (MV/CB/Back/CM/Kant/OM/ANG)', nat.length === 18 && nat.every((t) => ['MV', 'CB', 'Back', 'CM', 'Kant', 'OM', 'ANG'].includes(t.trim())), nat.join(','));
-  const pos4 = await g.evaluate(() => { const d = JSON.parse(localStorage.getItem('tactivar_save')); const ps = d.league.teams.flatMap((t) => t.squad); const m = (k) => { const x = ps.filter((p) => p.position === k).map((p) => p.heightCm); return x.reduce((a, b) => a + b) / x.length; }; return { schema: d.schemaVersion, cb: m('CB'), fb: m('FB') }; });
-  check('Migrering fra skema 4: gemt som skema 7, stoppere ≈190 og backs ≈176 cm', pos4.schema === 7 && pos4.cb >= 189 && pos4.cb <= 192 && pos4.fb >= 174.5 && pos4.fb <= 177.5, JSON.stringify(pos4));
+  check('Natur-kolonnen viser en position for alle 18 (MV/CB/Back/DM/CM/Kant/OM/ANG) – og én DM efter migreringen (v3.20.0)', nat.length === 18 && nat.every((t) => ['MV', 'CB', 'Back', 'DM', 'CM', 'Kant', 'OM', 'ANG'].includes(t.trim())) && nat.filter((t) => t.trim() === 'DM').length === 1, nat.join(','));
+  const pos4 = await g.evaluate(() => { const d = JSON.parse(localStorage.getItem('tactivar_save')); const ps = d.league.teams.flatMap((t) => (t.isBot ? t.squad.filter((p) => !t.tactics.lineupSlots.includes(p.id)) : t.squad)); const m = (k) => { const x = ps.filter((p) => p.position === k).map((p) => p.heightCm); return x.reduce((a, b) => a + b) / x.length; }; return { schema: d.schemaVersion, cb: m('CB'), fb: m('FB') }; });
+  check('Migrering fra skema 4: gemt som skema 8, stoppere ≈190 og backs ≈176 cm (botternes startere fik i 7 → 8 den rolle, de spillede – uden for målingen)', pos4.schema === 8 && pos4.cb >= 189 && pos4.cb <= 192 && pos4.fb >= 174.5 && pos4.fb <= 177.5, JSON.stringify(pos4));
   await tab('kamp');
   const old4 = await g.textContent('#match-center');
   check('Gem fra v3.7.0: karakterark og avis uden "undefined"/"NaN" og uden HI-tal', !/undefined|NaN|% HI/.test(old4) && (await g.locator('.ratings td.run').count()) > 0, old4.slice(0, 120));
@@ -752,6 +767,13 @@ try {
   await g.evaluate(() => { const b = document.getElementById('fejlboks'); b.hidden = true; b.textContent = ''; });
 
   // v3.10: et gem fra v3.9 (runde 2) – kun v3.11's kampprogram-besked, statistikken starter tom fra runde 3
+  // v3.20.0 (QC): et gem fra v3.19.0 med dit hold i 4-3-3 – beskeden navngiver din DM og tæller dine uden for position = flagene på Taktik
+  const fixtureV319 = fs.readFileSync(new URL('../fixtures/save-v3.19.0.json', import.meta.url), 'utf8');
+  await g.evaluate((f) => { for (const k of Object.keys(localStorage)) if (k.startsWith('tactivar_')) localStorage.removeItem(k); localStorage.setItem('tactivar_save', f); }, fixtureV319);
+  await reload();
+  { const note = await g.textContent('#notice'), dm = await g.evaluate(() => { const t = JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((x) => !x.isBot); const p = t.squad.find((x) => x.position === 'DM'); return `#${p.shirtNumber} ${p.shortName}`; });
+    await tab('taktik'); const flags = await g.locator('#pitch .token-flag.pos').count(), n = Number((note.match(/: (\d+) af dine står uden for position/) ?? [])[1]);
+    check('Gem fra v3.19.0: beskeden navngiver din DM, siger at din opstilling er urørt, og antallet uden for position = flagene på Taktik', note.includes(`${dm} nu DM`) && note.includes('Din egen opstilling er ikke ændret') && flags >= 1 && n === flags && (await g.locator('#arrange-lineup').isVisible()), `${flags} flag · ${note.slice(0, 400)}`); }
   const fixtureV39 = fs.readFileSync(new URL('../fixtures/save-v3.9.json', import.meta.url), 'utf8');
   await g.evaluate((f) => { for (const k of Object.keys(localStorage)) if (k.startsWith('tactivar_')) localStorage.removeItem(k); localStorage.setItem('tactivar_save', f); }, fixtureV39);
   await reload();

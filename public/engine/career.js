@@ -2,6 +2,7 @@
 // en påstand"). Intet her trækker på ligaens rng: tilfældighed kommer fra afledte, seedede rng'er (hash af id og sæson), så en
 // sæsonovergang er reproducerbar og flytter ikke kampene.
 import { createRng } from './rng.js';
+import { pickByFit, fitOf, FORMATIONS } from './formations.js';
 
 // ---------- Afledt tilfældighed ----------
 // FNV-1a over en tekst → et 32-bit seed. Samme tekst giver altid samme tal (to indlæsninger giver samme potentiale).
@@ -94,10 +95,12 @@ export const reservesOf = (team) => { const b = new Set(matchBenchOf(team).map((
 // Automatisk udtagelse uden rng og kun på offentlige data (QC B7 – en bots valg må ikke røbe skjulte evner): raske før skadede,
 // 1 målmand og mindst 2 forsvarere, 2 midtbanespillere og 1 angriber, så de bedste efter stjerner/tier og friskhed.
 // Med 7 eller færre ikke-startere er det dem alle (18 spillere: uændret fra før v3.18.0).
+// Offentlig styrke til udtagelse (QC B7: kun stjerner, friskhed og skade) – ÉT sted for bænk, reparation og opstilling
+function pubScore(p) { return (p.injuryMatchesLeft > 0 ? -100 : 0) + starsForValue(p) * 10 + (p.freshness ?? 100) / 10; }
 export function autoMatchBench(team) {
   const on = new Set(team.tactics.lineupSlots), cand = team.squad.filter((p) => !on.has(p.id));
   if (cand.length <= BENCH_SIZE) return (team.matchBench = cand.map((p) => p.id));
-  const score = (p) => (p.injuryMatchesLeft > 0 ? -100 : 0) + starsForValue(p) * 10 + (p.freshness ?? 100) / 10;
+  const score = pubScore;
   const best = (list) => list.slice().sort((a, b) => score(b) - score(a) || cand.indexOf(a) - cand.indexOf(b));
   const chosen = new Set();
   for (const [line, n] of [['GK', 1], ['DEF', 2], ['MID', 2], ['ATT', 1]]) for (const p of best(cand.filter((q) => q.line === line)).slice(0, n)) chosen.add(p.id);
@@ -235,7 +238,11 @@ export const botYouthTake = (squadSize, offers) => (squadSize < 20 ? offers : sq
 
 // Reparér opstillingen efter afgange (QC B3): den tomme plads får en fra samme kæde (raske, stjerner, friskhed – offentligt),
 // Hvis-Så-skift med en spiller, der er væk, ryddes (alle planer), og bænk og transferliste følger truppen.
-const pubScore = (p) => (p.injuryMatchesLeft > 0 ? -100 : 0) + starsForValue(p) * 10 + (p.freshness ?? 100) / 10;
+// Den bedste startopstilling efter offentlige data (v3.20.0): stjerner og friskhed × fit på pladsen – samme regel for ny liga
+// og botternes opstilling ved migreringen. En skadet spiller vælges kun, hvis der ikke er andre (score ≥ 1).
+export function bestEleven(squad, formation) {
+  return pickByFit(squad, formation, (p) => Math.max(1, pubScore(p))).map((p) => p.id);
+}
 export function repairLineup(team, goneLine = new Map()) {
   const ids = new Set(team.squad.map((p) => p.id)), slots = team.tactics.lineupSlots;
   let changed = false;
@@ -245,7 +252,8 @@ export function repairLineup(team, goneLine = new Map()) {
     const line = i === 0 ? 'GK' : goneLine.get(id) ?? null;
     const pool = free.filter((p) => (line ? p.line === line : p.line !== 'GK'));
     const best = [pool, free.filter((p) => (i === 0) === (p.line === 'GK')), free].find((l) => l.length) ?? [];
-    const pick = best.sort((a, b) => pubScore(b) - pubScore(a))[0];
+    const role = (FORMATIONS[team.tactics.baseFormation] || FORMATIONS['4-4-2'])[i]?.r, fit = (p) => fitOf(p.position, role);   // v3.20.0: passer bedst på pladsen
+    const pick = best.sort((a, b) => Math.max(1, pubScore(b)) * fit(b) - Math.max(1, pubScore(a)) * fit(a))[0];   // gulv 1: skadet × fit vender ellers om (QC K4)
     if (pick) { slots[i] = pick.id; changed = true; }
   });
   for (const t of [team.tactics, ...(team.tacticPresets ?? [])]) for (const r of t.conditionalRules ?? []) {

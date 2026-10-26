@@ -1,6 +1,7 @@
 // v3.13: friskhed i kampen og udskiftninger (brugeren: "Friskhed skal ændre sig i løbet af kampen, ellers
 // en stamina ikke så vigtig en evne"; grænsen gælder "uanset hvor langt man er kommet i kampen";
 // antallet "som udgangspunkt følge FIFA/UEFAs regler"). Her er friskheden i kampen slået TIL.
+import { alignPositions } from './helpers/positions.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -26,7 +27,7 @@ function arena({ homeLimit = 70, awayLimit = 0, homeBot = false } = {}) {
   for (const t of [H, A]) {
     for (const p of t.squad) { p.skills = SK(10); p.freshness = 100; p.injuryMatchesLeft = 0; p.counterTactics = { vsPress: 25, vsLowBlock: 25, vsTrapLong: 25 }; }
     t.tactics.baseFormation = '4-4-2'; t.tactics.customCoords = {}; t.tactics.conditionalRules = [];
-    t.tactics.lineupSlots = t.squad.slice(0, 11).map((p) => p.id);
+    t.tactics.lineupSlots = t.squad.slice(0, 11).map((p) => p.id); alignPositions(t);
     Object.assign(t.tactics.phases.phase1_buildUp, { offBallRuns: 'NORMAL' });
     Object.assign(t.tactics.phases.phase2_defending, { pressingHeight: 'MID_BLOCK' });
     Object.assign(t.tactics.phases.phase3_transition, { onBallLost: 'DROP_BACK' });

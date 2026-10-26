@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { publicWage } from '../../public/engine/career.js';
 import { createRng } from '../../public/engine/rng.js';
 import { FORMATIONS, FORMATION_NAMES, MAX_ANCHOR_RADIUS, isOutOfZone, clampPos, lineOfRole } from '../../public/engine/formations.js';
-import { createLeague, aerialBreakdown, rollStat, TEAM_NAMES, HEIGHT_BY_POS, assignPositions, generatePlayer } from '../../public/engine/generator.js';
+import { createLeague, aerialBreakdown, rollStat, TEAM_NAMES, HEIGHT_BY_POS, assignPositions, generatePlayer, BOT_PROFILES } from '../../public/engine/generator.js';
 import { viewPlayer, canSeeField, viewRatingEntry } from '../../public/engine/visibility.js';
 import { initialCounterTactics, opponentTacticKeys, masteryVs, counterXpForMatch, applyCounterXp, COUNTER_POOL } from '../../public/engine/counter.js';
 import { starsFromRating, createSheet, finalizeSheet } from '../../public/engine/ratings.js';
@@ -280,8 +280,10 @@ test('skadet starter spiller ikke – erstattes i den kamplokale opstilling', ()
   assert.equal(L.teams[0].tactics.lineupSlots[3], star.id, 'lineupSlots må ikke ændres');
 });
 
-test('Hvis-Så: slotRemapping flytter spillerne til nye pladser', () => {
+test('Hvis-Så: en bots slotRemapping flytter spillerne til nye pladser – dit hold fordeles efter position (v3.20.0)', async () => {
+  const { arrangeByFit } = await import('../../public/engine/formations.js');
   const L = league(9);
+  L.teams[0].isBot = true;   // ombytningen er botternes (dit hold kan ikke redigere den i UI'et)
   const ids = L.teams[0].tactics.lineupSlots.slice();
   L.teams[0].tactics.conditionalRules = [{ ruleId: 1, minuteTrigger: 3, condition: 'DRAW', newFormation: '3-4-3', slotRemapping: [0, 1, 2, 3, 5, 6, 7, 4, 8, 9, 10] }];
   const L2 = league(9);
@@ -291,6 +293,13 @@ test('Hvis-Så: slotRemapping flytter spillerne til nye pladser', () => {
   const m = simulateMatch(L.teams[0], L2.teams[1], noInj);
   assert.deepEqual(m.endState.home.starters, [0, 1, 2, 3, 5, 6, 7, 4, 8, 9, 10].map((i) => ids[i]));
   assert.equal(m.endState.home.formation, '3-4-3');
+  // Dit hold: samme regel → de 11 fordeles efter position i 3-4-3 (ikke efter ombytningen)
+  const M = league(9), me = M.teams[0], byId = new Map(me.squad.map((p) => [p.id, p]));
+  me.tactics.conditionalRules = [{ ruleId: 1, minuteTrigger: 3, condition: 'DRAW', newFormation: '3-4-3', slotRemapping: [0, 1, 2, 3, 5, 6, 7, 4, 8, 9, 10] }];
+  const want = arrangeByFit(me.tactics.lineupSlots.map((id) => byId.get(id)), '3-4-3', '4-4-2').map((p) => p.id);
+  const m2 = simulateMatch(me, league(9).teams[1], { ...createRng(2), chance: (p) => (p === 0.06 ? false : createRng(2).chance(p)) });
+  assert.notDeepEqual(want, [0, 1, 2, 3, 5, 6, 7, 4, 8, 9, 10].map((i) => me.tactics.lineupSlots[i]));
+  assert.deepEqual(m2.endState.home.starters, want);
 });
 
 test('Hvis-Så: reglen udløses én gang, for begge hold, og skifter formation', () => {
@@ -466,11 +475,12 @@ test('referatet viser ingen mod-kunnen-procent mod modstanderen (kan bruges til 
   assert.ok(duels > 20, `for få vundne dueller for dit hold (${duels})`);
 });
 
-test('højde som i Superligaen: ligasnit 183,5–185 (v3.6 gav ≈181), laveste 168–170, højeste 199–201', () => {
+test('højde som i Superligaen: ligasnit 183,5–185,5 (v3.6 gav ≈181), laveste 168–170, højeste 199–201', () => {
   const hs = [], teams = [];
   for (let seed = 1; seed <= 40; seed++) for (const t of createLeague(createRng(seed)).teams) { const x = t.squad.map((p) => p.heightCm); hs.push(...x); teams.push(x.reduce((a, b) => a + b) / 18); }
   const mean = hs.reduce((a, b) => a + b) / hs.length;
-  assert.ok(mean >= 183.5 && mean <= 185, String(mean));
+  // v3.19.0 184,53 – v3.20.0 185,05: botternes trupper er bygget til formationen (flere stoppere med 3/5 bagved); Superligaen 182,9–187,5 pr. hold
+  assert.ok(mean >= 183.5 && mean <= 185.5, String(mean));
   assert.ok(Math.min(...hs) >= 168 && Math.min(...hs) <= 170 && Math.max(...hs) >= 199 && Math.max(...hs) <= 201, `${Math.min(...hs)}–${Math.max(...hs)}`);
   // Hele ligaen spredes som en rigtig liga (ikke alle tæt på positionens snit): spredning 6,5–8 cm
   const sdAll = Math.sqrt(hs.reduce((a, h) => a + (h - mean) ** 2, 0) / hs.length);
@@ -512,14 +522,14 @@ test('højde pr. naturlig position efter dokumentets tabel (v3.8): snit, spænd 
   assert.ok(stats(by.WM).mean >= 174 && stats(by.WM).mean <= 177, 'WM');
   assert.ok(stats(by.GK).mean >= 193 && stats(by.GK).mean <= 196, 'GK');
   const league = stats(all);
-  assert.ok(league.mean >= 183.5 && league.mean <= 185, `ligasnit ${league.mean}`); // Superligaen ≈184
+  assert.ok(league.mean >= 183.5 && league.mean <= 185.5, `ligasnit ${league.mean}`); // Superligaen ≈184 (v3.20.0: 185,05 – se ovenfor)
   assert.ok(league.min >= 169 && league.max <= 201 && league.max >= 198, `spænd ${league.min}–${league.max}`);
   assert.ok(league.sd >= 6, `hele truppen spreder sig stadig (brugeren: ikke alle tæt på snittet) – ${league.sd}`);
 });
-test('naturlig position: truppen er 2 GK / 3 CB / 3 FB / 3 CM / 2+1 WM / 1 AM / 3 ST, og standard-11 passer til 4-4-2', () => {
+test('naturlig position: truppen er 2 GK / 3 CB / 3 FB / 2 CM / 1 DM / 2+1 WM / 1 AM / 3 ST, og standard-11 passer til 4-4-2 (v3.20.0: #15 DM – før 3 CM, 0 DM)', () => {
   const t = createLeague(createRng(3)).teams[0];
   const count = (line, pos) => t.squad.filter((p) => p.line === line && p.position === pos).length;
-  assert.deepEqual([count('GK', 'GK'), count('DEF', 'CB'), count('DEF', 'FB'), count('MID', 'CM'), count('MID', 'WM'), count('MID', 'AM'), count('ATT', 'ST'), count('ATT', 'WM')], [2, 3, 3, 3, 2, 1, 3, 1]);
+  assert.deepEqual([count('GK', 'GK'), count('DEF', 'CB'), count('DEF', 'FB'), count('MID', 'CM'), count('MID', 'DM'), count('MID', 'WM'), count('MID', 'AM'), count('ATT', 'ST'), count('ATT', 'WM')], [2, 3, 3, 2, 1, 2, 1, 3, 1]);
   const start = t.tactics.lineupSlots.map((id) => t.squad.find((p) => p.id === id).position);
   assert.deepEqual(start, ['GK', 'FB', 'CB', 'CB', 'FB', 'WM', 'CM', 'CM', 'WM', 'ST', 'ST']); // LB CB CB RB / LM CM CM RM / ST ST
 });
@@ -565,6 +575,7 @@ test('HEIGHT_BY_POS er dokumentets tabel (bogstavelig): midte, terninger og spæ
     CB: { mid: 190, dice: 3, min: 184, max: 198 },
     ST: { mid: 186.5, dice: 4, min: 178, max: 196 },
     CM: { mid: 183.5, dice: 4, min: 175, max: 192 },
+    DM: { mid: 183.5, dice: 4, min: 175, max: 192 },
     AM: { mid: 183.5, dice: 4, min: 175, max: 192 },
     FB: { mid: 175.5, dice: 3, min: 169, max: 183 },
     WM: { mid: 175.5, dice: 3, min: 169, max: 183 },
@@ -608,9 +619,21 @@ test('generatePlayer: position gemmes på spilleren, og uden position vælges k�
   assert.equal(mk('MID', 'AM').position, 'AM');
   assert.equal(mk('DEF').heightCm, 184, 'uden position er en DEF en stopper (bund 184), ikke en back (169)');
 });
-test('truppens bænk og start: positionen pr. trøjenummer står fast i ALLE hold (rækkefølgen i BLUEPRINT)', () => {
-  const want = ['GK', 'FB', 'CB', 'CB', 'FB', 'WM', 'CM', 'CM', 'ST', 'WM', 'ST', 'GK', 'CB', 'FB', 'CM', 'AM', 'ST', 'WM'];
-  for (const seed of [3, 9]) for (const t of createLeague(createRng(seed)).teams) assert.deepEqual(t.squad.map((p) => p.position), want, `${t.name}`);
+test('truppens bænk og start: positionen pr. trøjenummer følger BLUEPRINT i 4-4-2 – en bots startere er bygget til formationen (v3.20.0)', async () => {
+  const { FORMATIONS, positionOfRole, lineOfRole } = await import('../../public/engine/formations.js');
+  const want = ['GK', 'FB', 'CB', 'CB', 'FB', 'WM', 'CM', 'CM', 'ST', 'WM', 'ST', 'GK', 'CB', 'FB', 'DM', 'AM', 'ST', 'WM'];
+  const ORDER = { GK: 0, DEF: 1, MID: 2, ATT: 3 };
+  for (const seed of [3, 9]) for (const t of createLeague(createRng(seed)).teams) {
+    const form = BOT_PROFILES[createLeague(createRng(seed)).teams.findIndex((x) => x.id === t.id)].form, roles = FORMATIONS[form].map((s) => s.r);
+    // De 11 første efter kæde på formationens pladser: samme kæde → pladsens position, ellers BLUEPRINT; bænken altid BLUEPRINT
+    const exp = want.slice();
+    t.squad.slice(0, 11).map((p, i) => [p, i]).sort((a, b) => ORDER[a[0].line] - ORDER[b[0].line] || a[1] - b[1]).forEach(([p, i], slot) => { if (lineOfRole(roles[slot]) === p.line) exp[i] = positionOfRole(roles[slot]); });
+    assert.deepEqual(t.squad.map((p) => p.position), exp, `${t.name} (${form})`);
+    if (form === '4-4-2') assert.deepEqual(exp, want);
+  }
+  // Positivt: en 4-2-3-1-bot har DM'er på CDM-pladserne fra start
+  const b = createLeague(createRng(3)).teams[1]; assert.equal(b.tactics.baseFormation, '4-2-3-1');
+  assert.ok(b.squad.filter((p) => p.position === 'DM').length >= 2);
 });
 
 test('assignPositions: ulige/små kæder, ugyldig position, lige høje (id afgør), manglende højde, ukendt kæde', () => {
@@ -661,4 +684,16 @@ test('normalizeLeague: spillere uden (gyldig) position får en – gyldige røre
   assert.equal(out[0].position, 'GK');
   assert.equal(out.find((p) => p.id === keep.id).position, 'AM');
   assert.equal(out.filter((p) => p.line === 'DEF' && p.position === 'CB').length, 3);
+});
+
+test('neededPosition (v3.20.0): den position i kæden, holdet har færrest af i forhold til opbygningen – ved lighed opbygningens rækkefølge', async () => {
+  const { neededPosition } = await import('../../public/engine/generator.js');
+  const t = createLeague(createRng(3)).teams[0];
+  assert.equal(neededPosition(t, 'MID'), 'WM');                     // fuld trup: alle 1,0 – første i BLUEPRINT's MID-rækkefølge
+  t.squad = t.squad.filter((p) => p.position !== 'DM');
+  assert.equal(neededPosition(t, 'MID'), 'DM');                     // DM'en er solgt → næste MID-ungdom er DM
+  t.squad = t.squad.filter((p) => !(p.line === 'DEF' && p.position === 'FB'));
+  assert.equal(neededPosition(t, 'DEF'), 'FB');
+  assert.equal(neededPosition(t, 'ATT', [{ line: 'ATT', position: 'ST' }]), 'WM');   // 4 ST / 3 > 1 WM / 1 – extra tæller med
+  assert.equal(neededPosition(t, 'GK'), 'GK');
 });

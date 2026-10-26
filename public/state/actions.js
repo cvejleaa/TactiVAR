@@ -1,6 +1,6 @@
 // Ændringer af eget holds taktik og opstilling – rene funktioner over holdobjektet, så de
 // kan testes uden browser. UI'et kalder dem og gemmer bagefter.
-import { FORMATIONS, clampPos } from '../engine/formations.js';
+import { FORMATIONS, clampPos, arrangeByFit, fitOf } from '../engine/formations.js';
 import { clampSubsLimit } from '../engine/freshness.js';
 import { MAX_RULES } from '../engine/match-rules.js';
 import { autoMatchBench, validFocus, SQUAD_MAX, matchBenchOf } from '../engine/career.js';
@@ -69,11 +69,27 @@ export function swapPlayers(team, idA, idB) {
   return true;
 }
 
+// Formationsskift (v3.20.0, brugerens valg): de samme 11 fordeles på de nye pladser efter position (formations.js arrangeByFit)
 export function setFormation(team, formation) {
   if (!FORMATIONS[formation]) return false;
+  const from = team.tactics.baseFormation;
   team.tactics.baseFormation = formation;
   team.tactics.customCoords = {};
+  arrangeLineup(team, from);
   return true;
+}
+export function outOfPositionCount(team) {
+  const roles = (FORMATIONS[team.tactics.baseFormation] || FORMATIONS['4-4-2']).map((s) => s.r);
+  return team.tactics.lineupSlots.filter((id, i) => { const p = team.squad.find((x) => x.id === id); return p && fitOf(p.position, roles[i]) < 1; }).length;
+}
+// "Stil op efter position": de 11 på banen flyttes rundt, så flest står på deres naturlige position – ingen ind eller ud
+export function arrangeLineup(team, from = team.tactics.baseFormation) {
+  const byId = new Map(team.squad.map((p) => [p.id, p])), slots = team.tactics.lineupSlots;
+  const next = arrangeByFit(slots.map((id) => byId.get(id) ?? null), team.tactics.baseFormation, from).map((p, i) => p?.id ?? slots[i]);
+  if (new Set(next).size !== slots.length) return false;
+  const changed = next.some((id, i) => id !== slots[i]);
+  team.tactics.lineupSlots = next;
+  return changed;
 }
 
 // Målmanden (plads 0) kan ikke trækkes.
@@ -96,7 +112,9 @@ export function switchPreset(team, fromIdx, toIdx) {
   team.tacticPresets[fromIdx] = structuredClone(team.tactics);
   const next = structuredClone(team.tacticPresets[toIdx]);
   next.lineupSlots = team.tactics.lineupSlots.slice();
+  const from = team.tactics.baseFormation, refit = next.baseFormation !== from;
   team.tactics = next;
+  if (refit) arrangeLineup(team, from);   // v3.20.0: en plan med en anden formation fordeler spillerne efter position
   return true;
 }
 

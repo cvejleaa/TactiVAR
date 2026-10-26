@@ -6,7 +6,7 @@ import { MAX_RULES } from './match-rules.js';
 import { TEAM_STAT_DEFAULTS, PLAYER_SEASON_DEFAULTS } from './stats.js';
 import { FORMATIONS } from './formations.js';
 import { buildSchedule, isValidSchedule, SEASON_ROUNDS } from './schedule.js';
-import { defaultTactics, defaultStarterIds, emptyStanding, BOT_PROFILES, aerialBreakdown, assignPositions, teamCareerDefaults, generatePlayer } from './generator.js';
+import { defaultTactics, defaultStarterIds, emptyStanding, BOT_PROFILES, aerialBreakdown, assignPositions, teamCareerDefaults, generatePlayer, neededPosition } from './generator.js';
 import { initialPotential, publicWage, TIER_STARS, MATCH_LOG_CAP, SQUAD_MIN, SQUAD_MAX, derivedRng, neededLine, freeShirt } from './career.js';
 
 const PLAYER_DEFAULTS = { freshness: 100, injuryMatchesLeft: 0, lastRating: 0, ratingSum: 0, ratingGames: 0, publicStars: 0, seasonAgeCounter: 1, archetype: null, distanceSum: 0, minutesSum: 0, topSpeedMax: 0, hiKmSum: 0, hiDistSum: 0, trainingFocus: 'GENERAL', careerGames: 0 };
@@ -90,7 +90,7 @@ export function normalizeLeague(league) {
       const n0 = team.squad.length;
       while (team.squad.length < SQUAD_MIN) {
         league.nextPlayerSeq = Number.isInteger(league.nextPlayerSeq) && league.nextPlayerSeq > 0 ? league.nextPlayerSeq : 1;
-        team.squad.push(generatePlayer(rng, neededLine(team), 'YOUTH', freeShirt(team), idx, used, 0, undefined, `plr_y${league.nextPlayerSeq++}`));
+        { const line = neededLine(team); team.squad.push(generatePlayer(rng, line, 'YOUTH', freeShirt(team), idx, used, 0, neededPosition(team, line), `plr_y${league.nextPlayerSeq++}`)); }
       }
       notes.push(`${team.name} havde ${n0} spillere – truppen er fyldt op med ${SQUAD_MIN - n0} ungdomsspillere.`);
     }
@@ -113,8 +113,8 @@ export function normalizeLeague(league) {
     }
     assignPositions(team.squad); // kun spillere uden (gyldig) naturlig position
     const ids = new Set(team.squad.map((p) => p.id));
-    const starters = defaultStarterIds(team.squad);
     const profile = BOT_PROFILES[idx] || BOT_PROFILES[0];
+    const starters = defaultStarterIds(team.squad, FORMATIONS[team.tactics?.baseFormation] ? team.tactics.baseFormation : profile.form);
     team.tactics = fixTactics(team.tactics, starters, profile);
     if (!team.tactics.lineupSlots.every((id) => ids.has(id)) || new Set(team.tactics.lineupSlots).size !== 11) team.tactics.lineupSlots = starters;
     if (!Array.isArray(team.tacticPresets) || team.tacticPresets.length < 3) team.tacticPresets = [structuredClone(team.tactics), defaultTactics(starters, profile), defaultTactics(starters, profile)];

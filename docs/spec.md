@@ -40,12 +40,15 @@ begrundelse).
   positioning, intercepting, goalkeeping`, vægtet efter kæde (GK goalkeeping
   base+2, andre 1–2; finishing for ikke-ATT 2–9). `rollStat` er
   trekantsfordelt og klemt til 1–20.
-- **Naturlig position (v3.8)**, offentlig: MV (GK), CB, Back (FB), CM, Kant (WM), OM (AM),
-  ANG (ST). Truppen: 2 MV; forsvar 3 CB + 3 Back; midtbane 3 CM + 2 Kant + 1 OM; angreb 3 ANG
+- **Naturlig position (v3.8; DM fra v3.20.0)**, offentlig: MV (GK), CB, Back (FB), DM (CDM), CM, Kant (WM),
+  OM (AM), ANG (ST). Truppen: 2 MV; forsvar 3 CB + 3 Back; midtbane 2 CM + 1 DM + 2 Kant + 1 OM; angreb 3 ANG
   + 1 Kant – fordelt pr. trøjenummer, så standard-11'eren passer til 4-4-2 (#2/#5 Back,
-  #3/#4 CB, #6/#10 Kant, #7/#8 CM, #9/#11 ANG; bænk #13 CB, #14 Back, #15 CM, #16 OM, #17 ANG,
-  #18 Kant). Positionen afgør kun højden; løbet i kampen følger PLADSEN (§6), og motoren
-  vælger stadig spillere efter kæde. Tildeles aldrig ud fra evner (de er private).
+  #3/#4 CB, #6/#10 Kant, #7/#8 CM, #9/#11 ANG; bænk #13 CB, #14 Back, #15 DM, #16 OM, #17 ANG,
+  #18 Kant). En bot i en anden formation får sine 11 første (efter kæde på formationens pladser) pladsens position,
+  når kæden passer (v3.20.0, generator.js formationPositions). Positionen afgør højden og – fra v3.20.0 – hvad det
+  koster at spille på en anden plads (§5 "Uden for position"); løbet følger PLADSEN (§6), og motoren vælger
+  inden for kæden efter fit. Ungdom og nye spillere får den position, holdet mangler i forhold til en ny trup i
+  holdets formation (neededPosition). Tildeles aldrig ud fra evner (de er private).
 - Højde (brugerens dokument "Spillerhøjde i Superligaen": ligasnit ≈184 cm, trupper
   182,9–187,5, 169–201). Fra v3.8 pr. naturlig position efter dokumentets tabel: midte MV 194
   (spænd 188–201), CB 190 (184–198), ANG 186,5 (178–196), CM/OM 183,5 (175–192), Back/Kant 175,5
@@ -169,6 +172,23 @@ Konstanterne står ét sted: `public/engine/career.js` (og `transfers.js`). Bån
 
 ## 5. Kampmotor (v2.5b)
 Tick hvert 3. minut (1..90).
+- **Uden for position (v3.20.0).** Hver spillers duel-faktor (match.js `ff`: friskhed, træthed, ti mand, haltende)
+  ganges med pladsens fit (formations.js `FIT`/`fitOf`, ÉN tabel for motor og visning): egen plads 1, naboplads
+  0,975 (CB–Back, CB–DM, Back–Kant, DM–CM, CM–OM, CM–Kant, OM–ANG, OM–Kant, Kant–ANG), anden markplads 0,94,
+  målmand ⇄ markspiller 0,85. Rolle → position: LB/RB/LWB/RWB Back, CDM DM, LM/RM/LW/RW Kant, CAM/CF OM. Det er
+  den plads, han står på NU (indskiftere og Hvis-Så tæller med). Boldbesiddelsen bruger rå evner og rammes ikke.
+  Kalibreret med `tools/measure-position.mjs` (4200 kampe): planens 0,95/0,88/0,75 kostede 0,58 mål pr. kamp for
+  8 mand på naboplads – brugerens "mildt" (≈ 0,15 for 4-5 forkerte) gav 0,975/0,94/0,85. Bånd i
+  `tests/unit/position-v3200.test.mjs` (ombytning −0,68…−1,2 mål pr. kamp; v3.19.0 −0,51).
+  Opstilling: en ny liga vælger efter offentlige data × fit (career.js `bestEleven`, formations.js `pickByFit`,
+  optimal tildeling) – en STAR bænkes ikke for en naboplads; migreringen 7 → 8 fordeler botternes SAMME 11 efter
+  position (`arrangeByFit`, §9 – bestEleven midt i en sæson bænkede trætte stjerner). Højden følger positionen ved
+  oprettelsen; en migreret bots starter kan have en anden position end sin højde (den rolle, han spillede).
+  Formationsskift (Taktik, plan, Hvis-Så) fordeler de samme 11 efter position – ved lighed samme side og plads;
+  "⇄ Stil op efter position" i Taktik gør det samme. Hvis-Så til den formation, man spiller, rokerer ikke.
+  **Kendt følge:** botternes egne Hvis-Så-ombytninger (generator.js BOT_PROFILES – 5-3-2/5-4-1 → 4-4-2, 5-4-1-
+  remappet med en CM på ANG, og standardreglens 4-bagkæde-remap brugt af 3-5-2-botten) bevares og koster nu lidt
+  (få spillere på 0,94/0,975 efter skiftet). Dit hold bruger altid fordelingen (ombytningen kan ikke redigeres).
 - Boldbesiddelse: midtbanens (PAS+BAL) + Mod·0,03 + rnd·8 (mod rnd·7,5).
 - Fase-duel 48 %: opbygning PAS+BAL+rnd·7 mod pres INT+POS·0,85+STA·0,35+rnd·7,
   + Mod·0,05, sten-saks-papir: SHORT slår LOW_BLOCK, DIRECT_LONG slår HIGH_GEGENPRESS,
@@ -456,7 +476,8 @@ bedre kan kontrollere spil motoren".
   (Spilfører). Bolden flytter først, spillerne glider efter; ingen opfundne mellembilleder – undtagen afslutningens udfald (v3.16.2),
   der er tegnet ud fra referatets linje. Et grundbillede viser
   stillingen fra FØR tick'ets hændelser.
-- **Heat map** (karakterarket, dit hold): 🔥 viser holdets tæthed (6 × 9 felter, uden målmand) af grundbilleder og
+- **Heat map** (karakterarket, dit hold – v3.20.0: står fra start over startopstillingen, som modstanderens zonekort; 📍 erstatter
+  kun opstillingen): viser holdets tæthed (6 × 9 felter, uden målmand) af grundbilleder og
   øjeblikke, og et klik på en spiller hans – med hans afslutninger efter udfald (⚽ mål, reddet, forbi, offside, annulleret,
   🅰 oplæg; Spilfører: positionerne alene er "der hvor du satte ham"). Modstanderen: "Tyngdepunkt (groft)" i tredjedele og (v3.16.1) et 3 × 3 zone-kort
   med "Deres mål" øverst og "Dit mål" nederst (i rundens andre kampe "Modstanderens mål", uden "din side").
@@ -784,7 +805,10 @@ referaterne).
   ændrer skemaet, tilføjer et fixture gemt af den forrige version og en
   test, der indlæser det med truppen intakt. Skema 1 → 2 (v3.4, Hvis-Så) og
   2 → 3 (v3.6, mod-kunnen-pulje og højde), 3 → 4 (v3.7, Superliga-højder), 4 → 5 (v3.8,
-  naturlig position og højde pr. position), 6 → 7 (v3.18.0, livsløbet: nye felter med standardværdier, løn efter
+  naturlig position og højde pr. position), 7 → 8 (v3.20.0, DM: pr. hold én CM → DM – CM på CDM-plads, ellers en
+  ikke-starter uden STAR, ellers en uden STAR, laveste rygnummer; botternes startere får den rolle, de har spillet
+  (samme kæde – højden røres ikke), og de 11 fordeles efter position; dit hold røres ellers ikke; fixtures
+  `save-v3.19.0.json` (runde 9, dit hold i 4-3-3) og `save-v3.19.0-r15.json`), 6 → 7 (v3.18.0, livsløbet: nye felter med standardværdier, løn efter
   offentlige data, unikke navne – ingen ældes; fixtures `save-v3.17.0.json` og `save-v3.17.0-r13.json`), 5 → 6 (v3.11, kampprogram: den hidtidige tabel
   arkiveres som "Sæson 1 (uden program)", sæson 2 starter med program og nulstillet
   sæsonstatistik; programmet bygges deterministisk af holdenes rækkefølge) – fixtures

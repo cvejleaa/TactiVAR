@@ -389,3 +389,16 @@ test('afspilningen: hvert trin, der viser en hændelse (afslutning/øjeblik), st
   }
   assert.ok(checked > 50 && differ > 10, `data: ${checked} trin, ${differ} hvor urets minut ≠ tick-minuttet`);
 });
+
+test('playerSpan: skiftet ind i tillægstiden og spillede kampen ud → udminuttet er slutfløjtets ur (v3.20.0: før "90+2\'–90\'")', async () => {
+  const { playerSpan } = await import('../../public/engine/clock.js');
+  const r = { playerId: 'p', shirtNumber: 7, shortName: 'N. Madsen', minIn: 90, minOut: 90 }, early = { ...r, playerId: 'q', shortName: 'A. B', minIn: 60 };
+  const events = [
+    { type: 'SUB', min: 90, label: '🔄 #7 N. Madsen ind for #9 X. Y', clock: { m: 90, plus: 2 } },
+    { type: 'SUB', min: 60, label: '🔄 #7 A. B ind for #8 Z. W', clock: { m: 61 } },
+    { type: 'END', min: 90, clock: { m: 90, plus: 4 } },
+  ];
+  const s = playerSpan(events, [r, early]);
+  assert.deepEqual(s.get('p'), { in: { m: 90, plus: 2 }, out: { m: 90, plus: 4 } });
+  assert.deepEqual(s.get('q'), { in: { m: 61 } });   // ind i ordinær tid: uændret (90' som før)
+});

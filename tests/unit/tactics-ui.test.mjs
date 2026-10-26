@@ -20,6 +20,7 @@ globalThis.document = { createElement: (t) => new FakeEl(t), createTextNode: (t)
 const { createRng } = await import('../../public/engine/rng.js');
 const { createLeague } = await import('../../public/engine/generator.js');
 const { renderTactics } = await import('../../public/ui/tactics.js');
+const { POSITION } = await import('../../public/ui/labels.js');
 
 const all = (el, pred, out = []) => { if (el instanceof FakeEl) { if (pred(el)) out.push(el); el.children.forEach((c) => all(c, pred, out)); } return out; };
 const cls = (el, c) => all(el, (e) => e.className.split(' ').includes(c));
@@ -97,12 +98,12 @@ test('udskiftnings-vælgerne: ud = startere undtagen målmanden, ind = hele bæn
   out.listeners.change({ target: { value: ids[5] } }); out.listeners.change({ target: { value: '' } });
   inn.listeners.change({ target: { value: benchIds[2] } }); inn.listeners.change({ target: { value: '' } });
   assert.deepEqual(m.calls, [['rule', 0, { subOut: ids[5] }], ['rule', 0, { subOut: null }], ['rule', 0, { subIn: benchIds[2] }], ['rule', 0, { subIn: null }]]);
-  assert.equal(opts(out)[1].textContent, `ud: #${team.squad.find((p) => p.id === ids[1]).shirtNumber} ${team.squad.find((p) => p.id === ids[1]).shortName}`);
+  { const p = team.squad.find((x) => x.id === ids[1]); assert.equal(opts(out)[1].textContent, `ud: #${p.shirtNumber} ${p.shortName} (${POSITION[p.position]})`); }   // v3.20.0: positionen står med
 });
 test('advarsler: mangler en spiller, eller opstillingen er ændret siden reglen blev lavet – hver med sin egen tekst', () => {
   const { team } = setup();
   const ids = team.tactics.lineupSlots, benchIds = team.squad.filter((p) => !ids.includes(p.id)).map((p) => p.id);
-  const nm = (id) => { const p = team.squad.find((x) => x.id === id); return `#${p.shirtNumber} ${p.shortName}`; };
+  const nm = (id) => { const p = team.squad.find((x) => x.id === id); return `#${p.shirtNumber} ${p.shortName} (${POSITION[p.position]})`; };
   const warn = (o) => cls(setup({ rules: [rule(team, o)] }).root, 'rule-warn').map((e) => e.textContent);
   assert.deepEqual(warn({}), [' ⚠ vælg begge spillere']);
   assert.deepEqual(warn({ subOut: ids[2] }), [' ⚠ vælg begge spillere'], 'kun én valgt');

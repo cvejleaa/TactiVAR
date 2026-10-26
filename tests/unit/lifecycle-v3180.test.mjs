@@ -41,3 +41,10 @@ test('gemmet: under 1 MB efter 10 sæsoner (gem + 3 backups under 4 MB), og sani
   assert.ok(r.saveBytes < 1000000, `seed ${s}: ${r.saveBytes}`);
   assert.deepEqual(r.sanitizeProblems, [], `seed ${s}`);
 }));
+
+// v3.20.0 (F2): ungdom og nye spillere får den position, holdet mangler. Andel efter 10 sæsoner / ved start (3 seeds):
+// v3.19.0: FB 0,50–0,54 · WM 0,46–0,50 (ungdom fik altid CB/CM/ST) – v3.20.0 (ungdom efter holdets formation): FB 1,17–1,20 ·
+// WM 1,01–1,07 · OM 0,92–0,94 · DM 0,94–1,08.
+test('positioner: backs, kanter, OM og DM holder 0,8–1,4 af startandelen efter 10 sæsoner (v3.19.0: backs og kanter ≈ 0,5)', () => each((r, s) => {
+  for (const [k, v] of Object.entries(r.posRatio)) assert.ok(v >= 0.8 && v <= 1.4, `seed ${s} ${k}: ${v}`);
+}));

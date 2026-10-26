@@ -33,6 +33,69 @@ export function lineOfRole(r) {
   return 'ATT';
 }
 
+// Uden for position (v3.20.0) – ÉN tabel for motor, opstilling og visning (spec §5). Formationens rolle → naturlig position;
+// egen plads 100 %, naboplads 97,5 %, anden markplads 94 %, målmand ⇄ markspiller 85 % (ganges på duellerne i match.js ff).
+// Kalibreret med tools/measure-position.mjs (4200 kampe): 8 mand på naboplads koster ud over ombytningen selv 0,58 mål pr. kamp
+// med 95/88/75 (planens tal), 0,29 med 97,5/94/85 og 0,16 med 98,5/96/90 – brugerens "mildt" = ≈ 0,15 for 4-5 forkerte.
+const ROLE_POSITION = { GK: 'GK', CB: 'CB', LB: 'FB', RB: 'FB', LWB: 'FB', RWB: 'FB', CDM: 'DM', CM: 'CM', LM: 'WM', RM: 'WM', LW: 'WM', RW: 'WM', CAM: 'AM', CF: 'AM', ST: 'ST' };
+export const positionOfRole = (r) => ROLE_POSITION[r] ?? null;
+export const FIT = { own: 1, near: 0.975, other: 0.94, keeper: 0.85 };
+const NEAR = new Set(['CB-FB', 'CB-DM', 'FB-WM', 'DM-CM', 'CM-AM', 'CM-WM', 'AM-ST', 'AM-WM', 'WM-ST'].flatMap((k) => [k, k.split('-').reverse().join('-')]));
+export function fitOf(position, role) {
+  const want = positionOfRole(role);
+  if (!position || !want || position === want) return FIT.own;
+  if ((position === 'GK') !== (want === 'GK')) return FIT.keeper;
+  return NEAR.has(`${position}-${want}`) ? FIT.near : FIT.other;
+}
+// De SAMME spillere fordelt på formationens pladser efter position (v3.20.0): den fordeling, der giver størst samlet fit
+// (ungarsk metode – optimal og deterministisk; en grådig fordeling gav 4-2-3-1 7 i stedet for 2 uden for position). Ved lighed
+// bliver en spiller stående. Målmanden står i mål, hvis der er en. players[i] = spilleren på plads i (null = tom plads).
+// Bruges ved ny liga, migrering, formationsskift og "Stil op efter position".
+// from = formationen før skiftet: ved lighed bliver en spiller på sin side (LB → LM, ikke RM) og helst på sin plads.
+const sideOf = (r) => (r?.[0] === 'L' ? 'L' : r?.[0] === 'R' ? 'R' : 'C');
+export function arrangeByFit(players, formation, from = formation) {
+  const before = (FORMATIONS[from] || FORMATIONS['4-4-2']).map((s) => s.r), after = (FORMATIONS[formation] || FORMATIONS['4-4-2']).map((s) => s.r);
+  return pickByFit(players, formation, () => 1, (i, slot) => (sideOf(before[i]) === sideOf(after[slot]) ? 4 : 0) + (i === slot ? 1 : 0));   // siden vejer mere end pladsnummeret (5-3-2: LM blev RWB)
+}
+// Vælg og fordel: de bedste 11 af kandidaterne efter score(p) × fit × kæde (en spiller kan sidde over). Målmand uden for mål og
+// markspiller i mål kun, hvis der ikke er andre (−10). stays(i, slot) × 0,001 afgør ved lighed (side og plads).
+const CHAIN_MISS = 0.85;
+export function pickByFit(candidates, formation, score, stays = () => false) {
+  const roles = (FORMATIONS[formation] || FORMATIONS['4-4-2']).map((s) => s.r), n = Math.max(candidates.length, roles.length);
+  const value = (i, slot) => {
+    const p = candidates[i]; if (!p || slot >= roles.length) return 0;
+    const keeperMiss = (p.position === 'GK') !== (roles[slot] === 'GK');
+    // Kæden først (motoren vælger efter kæde – en angriber på en stopperplads har angriberens evner): × 0,85 uden for kæden
+    const chain = p.line && p.line !== lineOfRole(roles[slot]) ? CHAIN_MISS : 1;
+    return (keeperMiss ? -10 : score(p) * fitOf(p.position, roles[slot]) * chain) + stays(i, slot) * 0.001;
+  };
+  const cost = Array.from({ length: n }, (_, i) => Array.from({ length: n }, (_, slot) => -value(i, slot)));
+  const slotOf = hungarian(cost, n), out = new Array(roles.length).fill(null);
+  slotOf.forEach((slot, i) => { if (slot < roles.length) out[slot] = candidates[i] ?? null; });
+  return out;
+}
+// Mindste samlede pris for en n×n-tildeling (rækker → kolonner). Klassisk O(n³) med potentialer.
+function hungarian(c, n) {
+  const u = new Array(n + 1).fill(0), v = new Array(n + 1).fill(0), p = new Array(n + 1).fill(0), way = new Array(n + 1).fill(0);
+  for (let i = 1; i <= n; i++) {
+    p[0] = i; let j0 = 0; const minv = new Array(n + 1).fill(Infinity), used = new Array(n + 1).fill(false);
+    do {
+      used[j0] = true; const i0 = p[j0]; let delta = Infinity, j1 = 0;
+      for (let j = 1; j <= n; j++) if (!used[j]) {
+        const cur = c[i0 - 1][j - 1] - u[i0] - v[j];
+        if (cur < minv[j]) { minv[j] = cur; way[j] = j0; }
+        if (minv[j] < delta) { delta = minv[j]; j1 = j; }
+      }
+      for (let j = 0; j <= n; j++) if (used[j]) { u[p[j]] += delta; v[j] -= delta; } else minv[j] -= delta;
+      j0 = j1;
+    } while (p[j0] !== 0);
+    do { const j1 = way[j0]; p[j0] = p[j1]; j0 = j1; } while (j0);
+  }
+  const slotOf = new Array(n);
+  for (let j = 1; j <= n; j++) slotOf[p[j] - 1] = j - 1;
+  return slotOf;
+}
+
 export function clampPos({ x, y }) {
   const b = PITCH_BOUNDS;
   return { x: Math.max(b.minX, Math.min(b.maxX, x)), y: Math.max(b.minY, Math.min(b.maxY, y)) };

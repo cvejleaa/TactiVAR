@@ -61,7 +61,8 @@ tbody tr { cursor: pointer; } tbody tr:hover { background: #1e293b; } tr.selecte
 .token { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; font-size: .65rem; text-shadow: 0 1px 2px #000; }
 .token-num { width: 1.8rem; height: 1.8rem; border-radius: 50%; display: grid; place-items: center; background: var(--bg); border: 2px solid #fff; font-weight: 800; font-size: .8rem; }
 .token.custom .token-num { border-color: var(--grøn); } .token.out .token-num { border-color: var(--rød); background: #450a0a; } .token.selected .token-num { box-shadow: 0 0 0 3px var(--lilla); }
-.token.injured .token-num { background: #881337; } .token.draggable { cursor: grab; } .token-flag { font-size: .6rem; color: #fecaca; } .token-flag.ok { color: #bbf7d0; }
+.token.injured .token-num { background: #881337; } .token.draggable { cursor: grab; } .token-flag { font-size: .6rem; color: #fecaca; } .token-flag.ok { color: #bbf7d0; } .token-flag.pos { color: #fde68a; display: block; }
+.lp-table .lp-place.off-pos { color: #f59e0b; }
 .anchor-ring { position: absolute; transform: translate(-50%, -50%); border: 2px dashed #e9d5ff; border-radius: 50%; pointer-events: none; }
 fieldset.phase { border: 1px solid var(--kant); border-radius: .4rem; margin: .5rem 0; display: flex; flex-wrap: wrap; gap: .5rem; font-size: .8rem; }
 fieldset.phase legend { color: var(--dæmpet); padding: 0 .3rem; }

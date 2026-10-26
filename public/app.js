@@ -79,6 +79,7 @@ const NEWS = {
   '3.14.1': 'Rettelser: VAR tjekker nu offside for den forreste – scorer en spiller længere tilbage, er det hans forreste holdkammerat, der tjekkes, og billedet ved målet viser skytten, hvor han skød fra. Statistikken på Liga-fanen gælder sæsonen.',
   '3.14.2': 'Rettelse: Ved et VAR-tjek står den tjekkede nu, hvor han stod (forrest), i billedet ved målet – ikke flyttet bag en holdkammerat.',
   '3.14.3': 'Rettelser: Langskud tages fra skudafstand (ikke fra egen banehalvdel) i billedet ved målet, referatet fortæller et oplæg én gang, og efter sæsonens sidste runde viser tabellen slutstillingen og mesteren, til næste sæson går i gang.',
+  '3.20.0': 'Det koster nu at spille uden for sin position (naboplads −2,5 %, andet −6 %, målmand ⇄ markspiller −15 % i dueller): ⚠ på brikken og i listen på 📋 Taktik viser hvem, og forklaringen står under listen. Skifter du formation (også med Hvis-Så eller Plan B/C), flyttes de 11 selv, så flest står rigtigt – knappen "⇄ Stil op efter position" gør det samme. Botterne stiller op efter position, og ungdomsspillere får den position, holdet mangler.',
   '3.19.0': '🧭 Nyt layout: fanerne står fast i topbaren, og Gem, Eksportér, Importér og Ny liga er flyttet til ⚙ Admin (gem-kvitteringen står stadig øverst). Opstillingen er samlet på 📋 Taktik: banen med en spillerliste ved siden af – klik på en brik, så viser listen hans kæde med de vigtigste evner, og klik på en anden spiller for at bytte. 👥 Trup har nu kolonnerne 💰 Værdi og Løn/rd og en samlet 🏋️ træningsoversigt – træning sættes kun dér. Bænken udtages ved listen ("Udtag automatisk"), og regnearkets 🔁-knapper er væk. Står du i 💼 Klub og vælger et andet hold, ser du hans offentlige klubside med priser og Køb.',
   '3.18.1': '💰 Nu kan du købe: de andre klubber sælger også, når de kun har 18 spillere (de henter selv en ungdomsspiller), og 💼 Klub → Transfermarked viser alle spillere, du kan købe lige nu, med pris og Køb-knap.',
   '3.18.0': '🏋️ Livsløb: vælg træning pr. spiller på spillerkortet (den gælder, til du ændrer den). Alle bliver et år ældre ved sæsonslut, de ældste stopper (de varsles fra runde 10), og der kommer ungdomstilbud. 💼 Klub viser økonomien – tilskuere, TV, løn og præmie – og transfermarkedet: køb en anden klubs spiller til den faste pris på kortet, når vinduet er åbent (før runde 8 og ved sæsonslut). Kampe står på kortet under 📜 Kampe. Truppen må være 18–25; bænken er de 7 udtagne.',
@@ -184,7 +185,13 @@ function migrationNotice(from) {
     from <= 5 ? 'Nu spilles der efter et fast kampprogram: 14 runder, hvor alle møder alle hjemme og ude – se det på Liga-fanen. Modstandervælgeren er væk; ▶ spiller altid programmets næste runde. Tabellen indtil nu er arkiveret som "Sæson 1 (uden program)" under Tidligere sæsoner, og en ny sæson starter med nulstillet tabel og sæsonstatistik (spillere og friskhed er uændrede). Clean sheets tælles kun for målmænd.' : '',
     from <= 6 ? 'Ny i v3.18: træning, aldring, økonomi og transfers – se 💼 Klub. Alle spillere bliver et år ældre ved sæsonslut, lønnen følger nu de offentlige stjerner og alderen, og spillere med samme kortnavn på tværs af holdene har fået et nyt navn.' : '',
     from <= 4 ? 'Hver spiller har nu en naturlig position (kolonnen "Natur"), og højden følger Superliga-dokumentets tabel pr. position: midtstoppere og målmænd højere, backs og kanter lavere. Den højeste i hver position er stadig den højeste – i hver kæde blev de højeste til stoppere/angribere og de laveste til backs/kanter. Luftduellerne er regnet om. Løbene i kampen følger nu den plads, spilleren står på (CM løber længst, kanter og wingbacks har flest højintense løb) – sæsonens km og andel højintenst på spillerkortet blander indtil videre den gamle og den nye beregning.' : '',
+    from <= 7 ? dmNotice() : '',
   ].filter(Boolean).join(' ');
+}
+// 7 → 8 (v3.20.0, QC): hvem der blev DM på dit hold, og hvor mange af dine der nu står uden for position – din opstilling er urørt
+function dmNotice() {
+  const t = myTeam(), dm = t.squad.find((p) => p.position === 'DM'), out = act.outOfPositionCount(t);
+  return `🛡️ Defensiv midtbane (DM) er en ny position${dm ? ` – på dit hold er #${dm.shirtNumber} ${dm.shortName} nu DM` : ''}. Din egen opstilling er ikke ændret${out ? `: ${out} af dine står uden for position (⚠ på 📋 Taktik) – tryk "⇄ Stil op efter position", eller lad dem stå, hvis det er bevidst` : ', og alle står på deres position'}.`;
 }
 
 function renderLoadError(r) {
@@ -339,9 +346,16 @@ function renderNow() {
     onAutoBench: () => change(() => act.setAutoBench(team)) });
 
   const tactics = renderTactics({ team, isOwn, ui: game.ui, on: {
-    formation: (f) => change(() => act.setFormation(team, f)),
+    formation: (f) => {   // QC K3: sig, hvad der skete, når brikkerne flytter sig
+      const before = team.tactics.lineupSlots.slice();
+      change(() => act.setFormation(team, f));
+      const moved = team.tactics.lineupSlots.filter((id, i) => id !== before[i]).length, out = act.outOfPositionCount(team);
+      view.notice = `${f}: ${moved ? `${moved} spillere er flyttet, så flest står på deres naturlige position` : 'ingen behøvede at flytte'}${out ? ` – ${out} står uden for position (se ⚠ på banen)` : ''}.`;
+      render();
+    },
     preset: (i) => change(() => { act.switchPreset(team, game.ui.activePresetIndex, i); game.ui.activePresetIndex = i; }),
     resetDrag: () => change(() => act.resetDrag(team)),
+    arrange: () => { const moved = act.arrangeLineup(team); view.notice = moved ? '⇄ De 11 er flyttet, så flest står på deres naturlige position.' : '⇄ De 11 står allerede bedst muligt efter position.'; change(() => {}); },
     phase: (ph, f, v) => change(() => act.setPhase(team, ph, f, v)),
     rule: (i, patch) => change(() => act.updateRule(team, i, patch)),
     addRule: () => change(() => act.addRule(team)),
@@ -465,10 +479,11 @@ const mcHandlers = {
   view: (i) => { mc ||= lastRoundView(game.league.lastRound); mc.viewIdx = i; mc.focus = null; mc.snap = null; renderMc(); },
   // Øjebliksbillede ved et mål (v3.12.1): vis på dit holds minibane og rul derhen; null = startopstillingen.
   // Heat map (v3.16): null = af; { playerId: null } = holdet; { playerId } = én spiller.
-  heat: (v) => { mc ||= lastRoundView(game.league.lastRound); mc.heat = v; if (v) mc.snap = null; renderMc(); },
+  // v3.20.0: heat map'et står altid over opstillingen – det og 📍 (der erstatter opstillingen) udelukker ikke længere hinanden
+  heat: (v) => { mc ||= lastRoundView(game.league.lastRound); mc.heat = v; renderMc(); },
   // 2D-afspilningen springer til hændelsen (referatets 🎬).
   replay: (m, i) => replayJump(m, i),
-  snapshot: (i) => { mc ||= lastRoundView(game.league.lastRound); mc.snap = i; if (i != null) mc.heat = null; renderMc(); if (i != null) document.getElementById('snap-pitch')?.scrollIntoView({ block: 'center' }); },
+  snapshot: (i) => { mc ||= lastRoundView(game.league.lastRound); mc.snap = i; renderMc(); if (i != null) document.getElementById('snap-pitch')?.scrollIntoView({ block: 'center' }); },
   openGoal: (i, goal) => openGoal(i, goal),
   filter: (f) => { mc ||= lastRoundView(game.league.lastRound); mc.filter = f; renderMc(); },
 };

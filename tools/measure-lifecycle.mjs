@@ -31,6 +31,8 @@ export function measureLifecycle(seed, seasons = 10, profile = 'passiv') {
   const L = createLeague(createRng(seed)), rng = createRng(seed * 7);
   const all = () => L.teams.flatMap((t) => t.squad);
   const mean = (xs) => xs.reduce((a, b) => a + b, 0) / Math.max(1, xs.length);
+  // v3.20.0 (F2): andelen af backs, kanter, OM og DM – ungdom fik før altid CB/CM/ST, så de tørrede ud
+  const share = (pos) => all().filter((p) => p.position === pos).length / all().length, POS = ['FB', 'WM', 'AM', 'DM'], share0 = Object.fromEntries(POS.map((k) => [k, share(k)]));
   const key0 = mean(all().map(keyAvg)), cash0 = L.teams.reduce((a, t) => a + t.cashBalance, 0);
   let transfers = 0, myMinusRounds = 0, lastLog = null;
   const youthSeen = new Map();   // ungdomsspillere: bedste nøglesnit til og med 23 år
@@ -47,6 +49,7 @@ export function measureLifecycle(seed, seasons = 10, profile = 'passiv') {
   const youthAged = [...youthSeen.entries()].filter(([id]) => { const p = ps.find((x) => x.id === id); return !p || p.age >= 23; });
   return {
     keyRatio: mean(ps.map(keyAvg)) / key0,
+    posRatio: Object.fromEntries(POS.map((k) => [k, share0[k] ? share(k) / share0[k] : null])),
     avgAge: mean(ps.map((p) => p.age)),
     old33: ps.filter((p) => p.age >= 33).length / ps.length,
     cashRatio: L.teams.reduce((a, t) => a + t.cashBalance, 0) / cash0,

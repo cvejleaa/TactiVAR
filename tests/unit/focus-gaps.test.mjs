@@ -2,6 +2,7 @@
 // modtager efter position og fuldtids-analysen. Hver test nævner, hvilken mutation den dræber.
 // Tomme/ens fixtures er undgået: hvor to udfald skal kunne skelnes, har spillerne forskellige tal
 // (PAC ≠ BAL, FIN ≠ PAS, ulige pladser), og modtager-tests bruger trukne pladser (customCoords).
+import { alignPositions } from './helpers/positions.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRng } from '../../public/engine/rng.js';
@@ -32,7 +33,7 @@ function arena({ home = {}, away = {} } = {}) {
       p.varProfile = { cynicism: 10, theatre: 10, varPulse: 10 }; p.injuryMatchesLeft = 0;
     }
     t.tactics.baseFormation = '4-4-2'; t.tactics.customCoords = {}; t.tactics.conditionalRules = []; t.subsLimit = 0; /* v3.13: ingen træthedsskift i test-arenaen */
-    t.tactics.lineupSlots = t.squad.slice(0, 11).map((p) => p.id);
+    t.tactics.lineupSlots = t.squad.slice(0, 11).map((p) => p.id); alignPositions(t);
   }
   const setPhases = (t, o) => {
     const ph = t.tactics.phases;

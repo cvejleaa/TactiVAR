@@ -81,15 +81,17 @@ function ratingsTable(list, isOwn, title, formation, snap = null, onSnap = null,
   const rows = lineupSort(list).map((e) => ({ ...viewRatingEntry(e, isOwn), place: placeLabel(e, formation) }));
   const gkId = list.find((e) => e.role === 'GK')?.playerId ?? null;
   const canHeat = heat?.trace && isOwn;
-  return h('div', { class: 'ratings' }, h('h4', {}, title,
-      canHeat ? h('button', { class: 'mini' + (heat.mine ? ' active' : ''), id: 'heat-btn', title: 'Hvor holdet stod og afsluttede i kampen – klik derefter på en spiller', onclick: () => heat.onHeat(heat.mine ? null : { playerId: null }) }, '🔥 Heat map') : null),
+  // v3.20.0 (brugeren: "det bør fra starten være tilsvarende som det, der vises for min modstander"): begge ark har kortet
+  // øverst og startopstillingen under – dit hold med holdets heat map (klik en spiller for hans), modstanderen groft i zoner.
+  const mine = canHeat ? heat.mine ?? { playerId: null } : null;
+  return h('div', { class: 'ratings' }, h('h4', {}, title),
     heat?.trace && !isOwn ? thirdsLine(heat.trace, heat.side, gkId, heat.vsMe, down, heat.stoppage, heat.events) : null,
-    // Heat map (v3.16) – øjebliksbillede ved et mål (kun dit hold, v3.12.1) – ellers startopstillingen.
-    canHeat && heat.mine ? heatPitch(rows, heat, gkId, span)
-    : isOwn && snap ? snapPitch(rows, snap, onSnap)
+    canHeat ? heatPitch(rows, { ...heat, mine }, gkId, span) : null,
+    // Øjebliksbillede ved et mål (kun dit hold, v3.12.1) – ellers startopstillingen
+    isOwn && snap ? snapPitch(rows, snap, onSnap)
       : formation && rows.some((e) => isStarter(e) && e.slot != null) ? miniPitch(rows.filter(isStarter), formation, isOwn, down) : null,
-    h('table', {}, h('tbody', {}, rows.map((e) => h('tr', { class: (e.isMotM ? 'motm' : '') + (canHeat && heat.mine?.playerId === e.playerId ? ' heat-sel' : ''),
-        onclick: canHeat && heat.mine ? () => heat.onHeat({ playerId: heat.mine.playerId === e.playerId ? null : e.playerId }) : null, title: canHeat && heat.mine ? 'Vis hans heat map' : null },
+    h('table', {}, h('tbody', {}, rows.map((e) => h('tr', { class: (e.isMotM ? 'motm' : '') + (mine?.playerId === e.playerId ? ' heat-sel' : ''),
+        onclick: canHeat ? () => heat.onHeat({ playerId: mine.playerId === e.playerId ? null : e.playerId }) : null, title: canHeat ? 'Vis hans heat map (klik igen: holdet)' : null },
       h('td', {}, `#${e.shirtNumber} ${e.shortName}`, h('span', { class: 'place' }, ` · ${e.place}`)), h('td', { class: 'muted' }, minutes(e, span?.get(e.playerId))),
       h('td', { class: 'icons' }, e.goals ? icon('⚽', e.goals) : null, e.assists ? icon('🅰', e.assists) : null, e.saves ? icon('🧤', e.saves) : null, e.aerialWins ? icon('✈', e.aerialWins) : null,
         e.yellowCard ? icon('🟨') : null, e.red ? icon('🟥') : null, e.injured ? icon('🚑') : null, e.isMotM ? icon('👑') : null),
@@ -139,8 +141,7 @@ function heatPitch(rows, heat, gkId, span = null) {
   const n = (k) => shots.filter((s) => s.outcome === k).length;
   return h('div', { class: 'minipitch-wrap', id: 'heat-pitch' },
     h('div', { class: 'row' }, h('strong', { id: 'heat-title' }, pid != null && e ? `🔥 #${e.shirtNumber} ${e.shortName}` : '🔥 Holdet (uden målmand)'),
-      pid != null ? h('button', { class: 'mini', id: 'heat-team', onclick: () => heat.onHeat({ playerId: null }) }, 'Holdet') : null,
-      h('button', { class: 'mini', id: 'heat-back', onclick: () => heat.onHeat(null) }, '↩ Startopstilling')),
+      pid != null ? h('button', { class: 'mini', id: 'heat-team', onclick: () => heat.onHeat({ playerId: null }) }, '↩ Holdet') : null),
     h('div', { class: 'minipitch heat' },
       grid.flatMap((r, y) => r.map((v, x) => v > 0 ? h('div', { class: 'heat-cell', style: { left: `${(x * 100) / COLS}%`, top: `${(y * 100) / ROWS}%`, width: `${100 / COLS}%`, height: `${100 / ROWS}%`, opacity: String(0.15 + v * 0.7) } }) : null)),
       shots.map((s) => h('div', { class: `heat-shot ${s.outcome}`, style: { left: s.x + '%', top: s.y + '%' }, title: `${shotMin(s, heat)} ${OUT_LABEL[s.outcome]}` }, s.outcome === 'goal' ? '⚽' : s.outcome === 'assist' ? '🅰' : '●'))),

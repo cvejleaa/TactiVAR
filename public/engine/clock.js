@@ -104,6 +104,8 @@ export function playerSpan(events, entries) {
       if ((e.type === 'RED' || e.type === 'VAR_RED') && e.min === r.minOut && e.text?.includes(t)) s.out = e.clock;
       if (!s.out && e.type === 'INJURY' && e.min === r.minOut && e.text?.includes(t)) s.out = e.clock;
     }
+    // Skiftet ind i tillægstiden og spillede kampen ud: udminuttet er slutfløjtet (før "90+2'–90'" og −1 minut på banen)
+    if (s.in?.plus && s.in.m >= 90 && !s.out && r.minOut === 90) s.out = events.findLast((e) => e.type === 'END' && e.clock)?.clock ?? s.in;
     span.set(r.playerId, s);
   }
   return span;

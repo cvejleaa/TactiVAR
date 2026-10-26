@@ -1,9 +1,10 @@
 // Spillergenerator og ny liga (docs/spec.md §1–2). Al tilfældighed fra den seedede rng.
 import { initialCounterTactics } from './counter.js';
+import { FORMATIONS, lineOfRole, positionOfRole } from './formations.js';
 import { TEAM_STAT_DEFAULTS, PLAYER_SEASON_DEFAULTS } from './stats.js';
 import { generateScoutingClues } from './clues.js';
 import { buildSchedule, shuffledIds } from './schedule.js';
-import { initialPotential, publicWage, uniquifyNames, derivedRng } from './career.js';
+import { initialPotential, publicWage, uniquifyNames, derivedRng, bestEleven } from './career.js';
 
 export const TEAM_NAMES = ['Bibamus United', 'FC Vejleå', 'Ølstykke IF', 'Lyngby Tacticians', 'Nordkysten BK', 'Furesø Boldklub', 'Roskilde Rovers', 'Kronborg United'];
 
@@ -32,18 +33,32 @@ export const ARCHETYPES = {
 
 // Truppens opbygning: #1–11 starter, #12–18 bænk (spec §2; #10–11 og #16–18 fastsat).
 // Naturlig position (v3.8) passer til standardopstillingen 4-4-2 (LB CB CB RB / LM CM CM RM / ST ST):
-// 2 MV; forsvar 3 CB + 3 FB; midtbane 3 CM + 2 WM + 1 AM; angreb 3 ST + 1 WM.
+// 2 MV; forsvar 3 CB + 3 FB; midtbane 2 CM + 1 DM + 2 WM + 1 AM; angreb 3 ST + 1 WM.
+// v3.20.0: #15 er defensiv midtbane (DM) – én pr. trup, så 4-4-2 stadig har to CM (QC: med to DM kunne 6 af 8 hold ikke stille rent op).
 const POSITION_OF_LINE = { GK: 'GK', DEF: 'CB', MID: 'CM', ATT: 'ST' };
 const BLUEPRINT = [
   ['GK', 'STARTER', 'GK'], ['DEF', 'STARTER', 'FB'], ['DEF', 'STARTER', 'CB'], ['DEF', 'STAR', 'CB'], ['DEF', 'STARTER', 'FB'],
   ['MID', 'STARTER', 'WM'], ['MID', 'STARTER', 'CM'], ['MID', 'STAR', 'CM'], ['ATT', 'STARTER', 'ST'], ['MID', 'STARTER', 'WM'], ['ATT', 'STARTER', 'ST'],
-  ['GK', 'ROTATION', 'GK'], ['DEF', 'ROTATION', 'CB'], ['DEF', 'TALENT', 'FB'], ['MID', 'ROTATION', 'CM'], ['MID', 'TALENT', 'AM'], ['ATT', 'ROTATION', 'ST'], ['ATT', 'TALENT', 'WM'],
+  ['GK', 'ROTATION', 'GK'], ['DEF', 'ROTATION', 'CB'], ['DEF', 'TALENT', 'FB'], ['MID', 'ROTATION', 'DM'], ['MID', 'TALENT', 'AM'], ['ATT', 'ROTATION', 'ST'], ['ATT', 'TALENT', 'WM'],
 ];
-export const POSITIONS = ['GK', 'CB', 'FB', 'CM', 'WM', 'AM', 'ST'];
+// Ungdom og nye spillere (v3.20.0): den position i kæden, holdet har færrest af i forhold til en ny trup i holdets formation
+// (BLUEPRINT bygget til formationen – formationPositions) – ellers fik de altid CB/CM/ST, og backs, kanter og DM tørrede ud.
+// Kun offentlige data; ved lighed BLUEPRINT's rækkefølge.
+const SHARES = new Map();
+function shareFor(form) {
+  if (!SHARES.has(form)) { const fp = formationPositions(form); SHARES.set(form, BLUEPRINT.reduce((m, [line, , pos], i) => { const l = (m[line] ||= {}); const q = fp[i] ?? pos; l[q] = (l[q] ?? 0) + 1; return m; }, {})); }
+  return SHARES.get(form);
+}
+export function neededPosition(team, line, extra = []) {
+  const want = shareFor(team.tactics?.baseFormation ?? '4-4-2')[line], have = (pos) => [...team.squad, ...extra].filter((p) => p.line === line && p.position === pos).length;
+  return Object.keys(want).reduce((best, pos) => (have(pos) / want[pos] < have(best) / want[best] ? pos : best));
+}
+// Rækkefølgen er visningens (Natur-kolonnens sortering): bagfra og frem.
+export const POSITIONS = ['GK', 'CB', 'FB', 'DM', 'CM', 'AM', 'WM', 'ST'];
 
 // Naturlig position til spillere uden en (ligaer fra før v3.8): pr. kæde efter højde – de
 // højeste bliver stoppere og angribere, de laveste backs og kanter (dokumentets mønster),
-// i samme forhold som BLUEPRINT. Kun spillere uden position røres.
+// i samme forhold som BLUEPRINT (før v3.20 – frosset: migrering 4→5 bygger på den; DM kommer med 7→8). Kun spillere uden position røres.
 export function assignPositions(squad) {
   const byLine = {};
   for (const p of squad) if (!POSITIONS.includes(p.position)) (byLine[p.line] ||= []).push(p);
@@ -105,6 +120,7 @@ export const HEIGHT_BY_POS = {
   CB: { mid: 190, dice: 3, min: 184, max: 198 },
   ST: { mid: 186.5, dice: 4, min: 178, max: 196 },
   CM: { mid: 183.5, dice: 4, min: 175, max: 192 },
+  DM: { mid: 183.5, dice: 4, min: 175, max: 192 },   // v3.20.0: som CM – samme terninger, så rng-forløbet (og alle kampe) er uændret
   AM: { mid: 183.5, dice: 4, min: 175, max: 192 },
   FB: { mid: 175.5, dice: 3, min: 169, max: 183 },
   WM: { mid: 175.5, dice: 3, min: 169, max: 183 },
@@ -196,11 +212,20 @@ export function generatePlayer(rng, line, roleTier, shirtNumber, teamIdx, usedSh
   return player;
 }
 
-// Standardopstilling: truppens 11 første sorteret efter kæde (MÅL, FOR, MID, ANG), så
-// kæderne lander på formationens pladser (kildens trup har #9 ANG før #10 MID).
+// Truppen bygget til formationen (v3.20.0): de 11 første efter kæde (som opstillingen før v3.20) lagt på formationens pladser –
+// har pladsen samme kæde, får spilleren pladsens position (en 4-2-3-1-bot har DM'er på CDM og en OM på CAM). Ellers BLUEPRINT.
+// 4-4-2 giver præcis BLUEPRINT. Kun ved ny liga; højden følger positionen (en bot med fem bagved har flere høje stoppere).
 const LINE_ORDER = { GK: 0, DEF: 1, MID: 2, ATT: 3 };
-export function defaultStarterIds(squad) {
-  return squad.slice(0, 11).map((p, i) => [p, i]).sort((a, b) => LINE_ORDER[a[0].line] - LINE_ORDER[b[0].line] || a[1] - b[1]).map(([p]) => p.id);
+function formationPositions(form) {
+  const roles = (FORMATIONS[form] || FORMATIONS['4-4-2']).map((s) => s.r), out = [];
+  BLUEPRINT.slice(0, 11).map(([line], i) => [line, i]).sort((a, b) => LINE_ORDER[a[0]] - LINE_ORDER[b[0]] || a[1] - b[1])
+    .forEach(([line, i], slot) => { if (lineOfRole(roles[slot]) === line) out[i] = positionOfRole(roles[slot]); });
+  return out;
+}
+// Standardopstilling (v3.20.0): de bedste 11 efter offentlige data × position på formationens pladser (career.js bestEleven).
+// Før: truppens 11 første efter kæde – en 4-2-3-1-bot stod med 5 mand uden for position.
+export function defaultStarterIds(squad, formation = '4-4-2') {
+  return bestEleven(squad, formation);
 }
 
 export function defaultTactics(starterIds, profile) {
@@ -222,10 +247,11 @@ export function generateTeam(rng, idx) {
   const used = new Set();
   // Holdprofil: fysisk "power-hold" op til +3 cm, tekniske hold ned til −1,5 cm (Superligaen 182,9–187,5).
   const heightOffset = rng.int(-3, 6) / 2;
-  const squad = BLUEPRINT.map(([line, tier, pos], i) => generatePlayer(rng, line, tier, i + 1, idx, used, heightOffset, pos));
-  const starters = defaultStarterIds(squad);
   const isBot = idx !== 0;
   const own = isBot ? BOT_PROFILES[idx] : BOT_PROFILES[0];
+  const fp = formationPositions(own.form);
+  const squad = BLUEPRINT.map(([line, tier, pos], i) => generatePlayer(rng, line, tier, i + 1, idx, used, heightOffset, fp[i] ?? pos));
+  const starters = defaultStarterIds(squad, own.form);
   const tactics = defaultTactics(starters, own);
   return {
     id: `team_div1_${idx + 1}`, name: TEAM_NAMES[idx], isBot, ownerUid: null, cashBalance: 5000000,

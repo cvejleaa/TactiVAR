@@ -1,6 +1,6 @@
 // Formation, Plan A/B/C, de tre kampfaser og Hvis-Så-reglerne (docs/spec.md §4).
 import { h, select } from './dom.js';
-import { PHASE_OPTIONS, CONDITIONS, MARGINS } from './labels.js';
+import { PHASE_OPTIONS, CONDITIONS, MARGINS, POSITION } from './labels.js';
 import { FORMATION_NAMES } from '../engine/formations.js';
 import { matchBenchOf } from '../engine/career.js';
 import { MAX_RULES } from '../state/actions.js';
@@ -34,7 +34,7 @@ export function renderTactics({ team, isOwn, ui, on }) {
   h('optgroup', { label: 'Kun formation' }, formations.map(([f]) => h('option', { value: `form:${f}`, selected: targetOf(r) === `form:${f}` }, f))));
   // Udskiftning i en regel: spiller ud (fra startopstillingen) og ind (fra bænken), angivet med id, så det følger
   // spilleren, ikke pladsen. En advarsel står straks, hvis reglen ikke længere passer til opstillingen (Spilfører).
-  const nameOf = (p) => `#${p.shirtNumber} ${p.shortName}`;
+  const nameOf = (p) => { const pos = POSITION[p.position] ?? p.line; return `#${p.shirtNumber} ${p.shortName}${pos ? ` (${pos})` : ''}`; };   // v3.20.0: positionen – indskifteren overtager pladsen
   const starters = t.lineupSlots.map((id) => team.squad.find((p) => p.id === id)).filter(Boolean);
   const benchPl = matchBenchOf(team);   // v3.18.0: kun kamptruppens bænk kan skiftes ind
   const subPicker = (r, i) => {
@@ -53,7 +53,8 @@ export function renderTactics({ team, isOwn, ui, on }) {
     h('div', { class: 'row' },
       h('label', {}, 'Formation ', select(t.baseFormation, formations, on.formation, { id: 'formation', disabled })),
       isOwn ? h('div', { class: 'presets' }, ['Plan A', 'Plan B', 'Plan C'].map((l, i) => h('button', { class: 'mini' + (ui.activePresetIndex === i ? ' active' : ''), onclick: () => on.preset(i) }, l + (ui.activePresetIndex === i ? ' (aktiv)' : '')))) : null,
-      isOwn ? h('button', { class: 'mini', id: 'reset-drag', onclick: on.resetDrag }, '↺ Nulstil træk') : null),
+      isOwn ? h('button', { class: 'mini', id: 'reset-drag', onclick: on.resetDrag }, '↺ Nulstil træk') : null,
+      isOwn ? h('button', { class: 'mini', id: 'arrange-lineup', disabled, title: 'Flyt de 11 på banen rundt, så flest står på deres naturlige position – ingen kommer ind eller ud. Sker også selv, når du skifter formation.', onclick: on.arrange }, '⇄ Stil op efter position') : null),
     !isOwn ? h('div', { class: 'lockbox' }, 'Du ser kun modstanderens startopstilling. 🔒 Deres faser, planer, Hvis-Så-regler og udskiftningsgrænse er skjulte.') : null,
     !isOwn ? null : PHASES.map(([phase, title, fields, help]) => h('fieldset', { class: 'phase', dataset: { phase } }, h('legend', {}, title),
       fields.map(([f, label]) => h('label', {}, label + ' ', select(t.phases[phase][f], PHASE_OPTIONS[f], (v) => on.phase(phase, f, v), { disabled, dataset: { field: f } }))),
@@ -67,7 +68,7 @@ export function renderTactics({ team, isOwn, ui, on }) {
         r.action === 'SUB' ? subPicker(r, i) : null,
         isOwn ? h('button', { class: 'mini', title: 'Slet regel', onclick: () => on.removeRule(i) }, '✕') : null)),
       isOwn && t.conditionalRules.length < MAX_RULES ? h('button', { class: 'mini', id: 'add-rule', onclick: on.addRule }, '+ Tilføj regel') : null,
-      h('div', { class: 'muted help' }, 'Skift til en plan tager planens formation, trukne positioner og faser med – spillerne beholder deres pladser, og det er DISSE regler, der gælder resten af kampen (planens egne Hvis-Så-regler bruges ikke midt i en kamp). En udskiftning: indskifteren overtager pladsen; den sker i første tick fra minuttet (der spilles i 3-minutters ryk), tæller med i udskiftningerne og pauserne, og bænkspilleren bruges ikke til træthedsskift. Reglerne hører til planen – skifter du plan, gælder den plans regler.')),
+      h('div', { class: 'muted help' }, 'Skift til en plan eller formation tager formationen (og planens trukne positioner og faser) med – de 11 på banen fordeles efter deres naturlige position, og det er DISSE regler, der gælder resten af kampen (planens egne Hvis-Så-regler bruges ikke midt i en kamp). En udskiftning: indskifteren overtager pladsen; den sker i første tick fra minuttet (der spilles i 3-minutters ryk), tæller med i udskiftningerne og pauserne, og bænkspilleren bruges ikke til træthedsskift. Reglerne hører til planen – skifter du plan, gælder den plans regler.')),
     // Udskiftninger under kampen (v3.13): holdets grænse – gælder alle planer, hele kampen.
     !isOwn ? null : h('fieldset', { class: 'phase subs', id: 'subs' }, h('legend', {}, 'Udskiftninger under kampen'),
       h('label', {}, 'Skift en træt spiller ud, når hans friskhed i kampen er under ',

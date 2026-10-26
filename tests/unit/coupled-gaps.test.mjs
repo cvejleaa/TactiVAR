@@ -3,6 +3,7 @@
 // de kunne ikke se, om offside-billedet efter kendelsen (momentCheck), tomme pladser (ballOn/oppOn), x-klemningen eller afsparksbilledet
 // var forkerte. Her står tallene bogstaveligt på en kendt opstilling: ST alene på (40, 20), alle andre på y 95, mod en 4-4-2 i
 // mellemblok, hvis dybeste markspiller (stopperne) står på y 73 → offside-linjen 100 − 73 = 27. Hver test nævner, hvad den dræber.
+import { alignPositions } from './helpers/positions.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRng } from '../../public/engine/rng.js';
@@ -23,7 +24,7 @@ function arena() {
   for (const t of [H, A]) {
     for (const p of t.squad) { p.skills = SK(10); p.aerialPower = 10; p.counterTactics = { vsPress: 25, vsLowBlock: 25, vsTrapLong: 25 }; p.varProfile = { cynicism: 10, theatre: 10, varPulse: 10 }; p.injuryMatchesLeft = 0; p.freshness = 100; }
     t.tactics.baseFormation = '4-4-2'; t.tactics.customCoords = {}; t.tactics.conditionalRules = []; t.subsLimit = 0;
-    t.tactics.lineupSlots = t.squad.slice(0, 11).map((p) => p.id);
+    t.tactics.lineupSlots = t.squad.slice(0, 11).map((p) => p.id); alignPositions(t);
     Object.assign(t.tactics.phases.phase1_buildUp, { passingStyle: 'BALANCED', attackFocus: 'CENTRAL', offBallRuns: 'NORMAL' });
     Object.assign(t.tactics.phases.phase2_defending, { pressingHeight: 'MID_BLOCK', offsideTrap: 'OFF', tacklingIntensity: 'NORMAL' });
     Object.assign(t.tactics.phases.phase3_transition, { onBallWon: 'KEEP_POSSESSION', onBallLost: 'DROP_BACK' });
