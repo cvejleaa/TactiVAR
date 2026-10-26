@@ -70,23 +70,20 @@ test('data: kampen har et målmandsark og to markspillere pr. hold, og sporets s
   assert.notEqual(hA.shirtNumber + hA.shortName, hB.shirtNumber + hB.shortName);
 });
 
-test('heat-knappen: kun i DIT holds karakterark ("🔥 Heat map"), markeret når et kort vises; klik tænder holdets kort, klik igen slukker; modstanderen har ingen knap', () => {
+const lineups = (t) => all(t, (x) => cls(x, 'minipitch-wrap') && x.children?.[0]?.textContent?.startsWith('Startopstilling')).length;
+test('dit ark (v3.20.0, brugeren: "fra starten tilsvarende som for min modstander"): holdets heat map øverst OG startopstillingen under – uden knap; modstanderens ark: zoner + opstilling', () => {
   for (const [mine, idx] of [[base.homeId, 0], [base.awayId, 1]]) {
-    const { el, calls } = render(mOf(), mine);
-    const t = tables(el);
-    assert.equal(byId(el, 'heat-btn').length, 1, 'præcis ét heat map-knap');
-    assert.equal(byId(t[idx], 'heat-btn').length, 1, `i hold ${idx}`); assert.equal(byId(t[1 - idx], 'heat-btn').length, 0);
-    const b = byId(el, 'heat-btn')[0];
-    assert.equal(b.textContent, '🔥 Heat map'); assert.equal(cls(b, 'active'), false);
-    b.handlers.click(); assert.deepEqual(calls.heat, [{ playerId: null }]);
-    // Med et kort åbent: knappen er markeret og et klik slukker (null)
-    const open = render(mOf(), mine, { heat: { playerId: null } });
-    const b2 = byId(open.el, 'heat-btn')[0];
-    assert.equal(cls(b2, 'active'), true); b2.handlers.click(); assert.deepEqual(open.calls.heat, [null]);
+    const t = tables(render(mOf(), mine).el);
+    assert.equal(byId(t[idx], 'heat-pitch').length, 1, `dit ark (hold ${idx}) har heat map'et fra start`);
+    assert.equal(byId(t[idx], 'heat-title')[0].textContent, '🔥 Holdet (uden målmand)');
+    assert.equal(lineups(t[idx]), 1, 'og startopstillingen under');
+    assert.equal(byId(t[1 - idx], 'heat-pitch').length, 0, 'modstanderen: ingen spillerkort');
+    assert.equal(lineups(t[1 - idx]), 1, 'men startopstillingen');
+    assert.equal(byId(t[idx], 'heat-btn').length + byId(t[1 - idx], 'heat-btn').length, 0, 'ingen knap at klikke på');
   }
-  // Fremmed seer (hverken hjemme eller ude): ingen knap, og tredjedele for begge
+  // Fremmed seer (hverken hjemme eller ude): ingen spillerkort, og tredjedele for begge
   const none = render(mOf(), 'ingen-af-dem');
-  assert.equal(byId(none.el, 'heat-btn').length, 0); assert.equal(byId(none.el, 'heat-thirds').length, 2);
+  assert.equal(byId(none.el, 'heat-pitch').length, 0); assert.equal(byId(none.el, 'heat-thirds').length, 2);
 });
 
 test('modstanderen kun groft: tredjedelslinjen står i modstanderens ark med hans tal (egen tredjedel · midten · angreb, afrundet, uden målmand) – ikke i dit', () => {
@@ -109,7 +106,7 @@ test('holdets heat map: felterne (6×9) med den rigtige placering og styrke (tæ
   const { el } = render(mOf(), base.homeId, { heat: { playerId: null } });
   assert.equal(byId(el, 'heat-pitch').length, 1, 'kun ét kort (dit hold)');
   assert.equal(byId(el, 'heat-title')[0].textContent, '🔥 Holdet (uden målmand)');
-  assert.equal(byId(el, 'heat-team').length, 0); assert.equal(byId(el, 'heat-back').length, 1);
+  assert.equal(byId(el, 'heat-team').length, 0); assert.equal(byId(el, 'heat-back').length, 0);   // v3.20.0: kortet står altid
   const cells = all(el, (x) => cls(x, 'heat-cell'));
   // Felterne (række, søjle): hA(10,10)→(0,0)·1  hA(20,20)×4→(1,1)·4 hA(12,30)+hA(11,31)→(2,0)·2  hB(55,50)→(4,3)·1  hB(60,60)→(5,3)·1  hB(60,80)→(7,3)·1
   assert.equal(cells.length, 6);
@@ -131,9 +128,8 @@ test('holdets heat map: felterne (6×9) med den rigtige placering og styrke (tæ
   // Titlen er hændelsens ur (evMin af hændelsen), ikke tick'ets – v3.17.0: beregnet fra kampen (faste minutter flyttede sig med motoren)
   assert.ok(C.every((c, i) => /^\d+'$/.test(c) && (i === 0 || parseInt(c) >= parseInt(C[i - 1]))) && new Set(C).size >= 4, `data: kampens ur ${C}`);
   assert.equal(byId(el, 'heat-note')[0].textContent, 'Angriber opad. Farven: hvor holdet stod i kampens 1 øjebliksbilleder og afslutninger. Prikker: 1 mål, 1 reddet, 2 forbi/blokeret, 1 offside, 1 annulleret. Klik på en spiller i listen.');
-  // Knapperne
-  const { el: e2, calls } = render(mOf(), base.homeId, { heat: { playerId: null } });
-  byId(e2, 'heat-back')[0].handlers.click(); assert.deepEqual(calls.heat, [null]);
+  // Uden valg (mc.heat ikke sat) er det samme holdkort (v3.20.0)
+  assert.equal(byId(render(mOf(), base.homeId).el, 'heat-title')[0].textContent, '🔥 Holdet (uden målmand)');
 });
 
 test('en spillers heat map: hans felter og prikker (afslutninger OG oplæg på hans plads), titlen med nummer og navn, "Holdet"-knap og tilbage; noten uden listeklik-opfordring', () => {
@@ -145,8 +141,8 @@ test('en spillers heat map: hans felter og prikker (afslutninger OG oplæg på h
   const dots = all(byId(el, 'heat-pitch')[0], (x) => cls(x, 'heat-shot'));   // kun dit kort (modstanderens zone-kort har sine egne)
   assert.deepEqual(dots.map((d) => [d.className, d.style.left, d.style.top, d.textContent, d.attrs.title]), [['heat-shot assist', '60%', '60%', '🅰', `${C[0]} oplæg`]]);
   assert.equal(byId(el, 'heat-note')[0].textContent, 'Angriber opad. Farven: hvor han stod i kampens 1 øjebliksbilleder og afslutninger. Prikker: 0 mål, 0 reddet, 0 forbi/blokeret, 1 oplæg.');
-  byId(el, 'heat-team')[0].handlers.click(); byId(el, 'heat-back')[0].handlers.click();
-  assert.deepEqual(calls.heat, [{ playerId: null }, null]);
+  assert.equal(byId(el, 'heat-team')[0].textContent, '↩ Holdet'); byId(el, 'heat-team')[0].handlers.click();
+  assert.deepEqual(calls.heat, [{ playerId: null }]);
   // Målmanden som "spiller": hans eget kort tæller hans placeringer (række 8, søjle 3)
   const g = render(mOf(), base.homeId, { heat: { playerId: id(hGk) } }).el;
   const gc = all(g, (x) => cls(x, 'heat-cell'));
@@ -156,7 +152,7 @@ test('en spillers heat map: hans felter og prikker (afslutninger OG oplæg på h
   assert.equal(all(byId(render(mOf(), base.homeId, { heat: { playerId: id(aA) } }).el, 'heat-pitch')[0], (x) => cls(x, 'heat-shot')).length, 0, 'modstanderens spiller findes ikke i dit kort');
 });
 
-test('rækkerne i dit ark: med et heat map åbent kan hver spiller vælges (klik → hans kort; samme spiller igen → holdet), den valgte er markeret; uden kort og i modstanderens ark er rækkerne ikke klikbare', () => {
+test('rækkerne i dit ark: hver spiller kan vælges (klik → hans kort; samme spiller igen → holdet), den valgte er markeret; i modstanderens ark er rækkerne ikke klikbare', () => {
   const team = render(mOf(), base.homeId, { heat: { playerId: null } });
   const t = tables(team.el);
   rowOf(t[0], hA).handlers.click(); assert.deepEqual(team.calls.heat, [{ playerId: id(hA) }]);
@@ -168,10 +164,10 @@ test('rækkerne i dit ark: med et heat map åbent kan hver spiller vælges (klik
   assert.ok(cls(rowOf(u[0], hA), 'heat-sel') && !cls(rowOf(u[0], hB), 'heat-sel'));
   rowOf(u[0], hA).handlers.click(); rowOf(u[0], hB).handlers.click();
   assert.deepEqual(one.calls.heat, [{ playerId: null }, { playerId: id(hB) }], 'samme spiller igen → holdet; en anden → ham');
-  assert.equal(rowOf(u[0], hA).attrs.title, 'Vis hans heat map');
-  // Uden kort: ingen klikbare rækker
+  assert.equal(rowOf(u[0], hA).attrs.title, 'Vis hans heat map (klik igen: holdet)');
+  // v3.20.0: også uden valg (kortet står altid) kan en spiller vælges
   const off = render(mOf(), base.homeId);
-  assert.equal(rowOf(tables(off.el)[0], hA).handlers.click, undefined); assert.ok(!rowOf(tables(off.el)[0], hA).attrs.title);
+  rowOf(tables(off.el)[0], hA).handlers.click(); assert.deepEqual(off.calls.heat, [{ playerId: id(hA) }]);
 });
 
 test('målmanden i holdets kort: kendes han ikke (ingen række med rollen GK), tæller hans felt med; kendes han, er han udeladt (se ovenfor)', () => {

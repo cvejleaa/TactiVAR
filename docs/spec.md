@@ -476,7 +476,8 @@ bedre kan kontrollere spil motoren".
   (Spilfører). Bolden flytter først, spillerne glider efter; ingen opfundne mellembilleder – undtagen afslutningens udfald (v3.16.2),
   der er tegnet ud fra referatets linje. Et grundbillede viser
   stillingen fra FØR tick'ets hændelser.
-- **Heat map** (karakterarket, dit hold): 🔥 viser holdets tæthed (6 × 9 felter, uden målmand) af grundbilleder og
+- **Heat map** (karakterarket, dit hold – v3.20.0: står fra start over startopstillingen, som modstanderens zonekort; 📍 erstatter
+  kun opstillingen): viser holdets tæthed (6 × 9 felter, uden målmand) af grundbilleder og
   øjeblikke, og et klik på en spiller hans – med hans afslutninger efter udfald (⚽ mål, reddet, forbi, offside, annulleret,
   🅰 oplæg; Spilfører: positionerne alene er "der hvor du satte ham"). Modstanderen: "Tyngdepunkt (groft)" i tredjedele og (v3.16.1) et 3 × 3 zone-kort
   med "Deres mål" øverst og "Dit mål" nederst (i rundens andre kampe "Modstanderens mål", uden "din side").

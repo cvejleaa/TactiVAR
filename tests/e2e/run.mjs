@@ -526,20 +526,18 @@ try {
     const vis = await g.evaluate(() => ['home', 'away'].map((c) => [...document.querySelectorAll(`#rp-pitch .rp-token.${c}`)].filter((t) => getComputedStyle(t).display !== 'none').length));
     const totalTok = await g.evaluate(() => document.querySelectorAll('#rp-pitch .rp-token').length);
     check('Afspilning: højst 11 viste brikker pr. hold i sidste trin (udskiftede skjult – målt som tegnet)', vis.every((n) => n >= 7 && n <= 11) && (totalTok <= 22 || vis[0] + vis[1] < totalTok), `${vis} af ${totalTok} brikker`);
-    await g.click('#heat-btn'); await g.waitForSelector('#heat-pitch');
-    const heat = await g.evaluate(() => ({ cells: document.querySelectorAll('#heat-pitch .heat-cell').length, title: document.querySelector('#heat-title').textContent, thirds: document.querySelector('#heat-thirds')?.textContent ?? '' }));
-    check('Heat map: dit hold som felter, modstanderen kun groft i tredjedele', heat.cells >= 6 && /Holdet/.test(heat.title) && /Tyngdepunkt \(groft\)/.test(heat.thirds), JSON.stringify(heat));
-    // Test Manager v3.16: heat map og 📍 udelukker hinanden (app.js heat/snapshot-handlerne nulstiller hinandens valg) – ellers
-    // åbner ↩ det GAMLE øjebliksbillede, eller 📍 gør intet, mens heat map'et står. Kun hvis dit hold har et mål i åbent spil at klikke på.
+    // v3.20.0 (brugeren): dit ark viser fra start holdets heat map OG startopstillingen – som modstanderens (zoner + opstilling)
+    await g.waitForSelector('#heat-pitch');
+    const heat = await g.evaluate(() => ({ cells: document.querySelectorAll('#heat-pitch .heat-cell').length, title: document.querySelector('#heat-title').textContent, thirds: document.querySelector('#heat-thirds')?.textContent ?? '', btn: document.querySelectorAll('#heat-btn').length,
+      lineups: [...document.querySelectorAll('.ratings .minipitch-wrap')].filter((w) => w.firstElementChild?.textContent.startsWith('Startopstilling')).length }));
+    check('Heat map: dit hold som felter fra start (uden knap), modstanderen kun groft i tredjedele – og begge ark har startopstillingen', heat.cells >= 6 && /Holdet/.test(heat.title) && /Tyngdepunkt \(groft\)/.test(heat.thirds) && heat.btn === 0 && heat.lineups === 2, JSON.stringify(heat));
+    // 📍 erstatter kun startopstillingen; heat map'et bliver stående, og ↩ giver startopstillingen tilbage
     if (await g.locator('#feed .snap-btn').count()) {
       const view = async () => ({ snap: await g.locator('#snap-pitch').count(), heat: await g.locator('#heat-pitch').count() });
       await g.locator('#feed .snap-btn').first().click(); const afterPin = await view();
-      await g.click('#heat-btn'); const afterHeat = await view();
-      if (await g.locator('#heat-back').count()) await g.click('#heat-back');   // (uden knappen er heat map'et allerede lukket – checken melder det)
-      const afterBack = await view();
-      check('Heat map og 📍 udelukker hinanden: 📍 lukker heat map, heat map lukker 📍, og ↩ giver startopstillingen (ikke det gamle billede)',
-        afterPin.snap === 1 && afterPin.heat === 0 && afterHeat.snap === 0 && afterHeat.heat === 1 && afterBack.snap === 0 && afterBack.heat === 0, JSON.stringify([afterPin, afterHeat, afterBack]));
-    } else await g.click('#heat-back');
+      await g.click('#snap-back'); const afterBack = await view();
+      check('📍 viser øjebliksbilledet i stedet for startopstillingen, heat map\'et står stadig; ↩ giver startopstillingen', afterPin.snap === 1 && afterPin.heat === 1 && afterBack.snap === 0 && afterBack.heat === 1, JSON.stringify([afterPin, afterBack]));
+    }
   } else check('Afspilning findes efter en spillet runde', false, (await g.locator('#replay').textContent().catch(() => 'intet #replay')) + ' | mc ' + (await g.locator('#match-center').count()));
   // v3.16.3: 📍 i et gem fra før afspilningen (v3.12.1–v3.15: øjebliksbilleder, intet spor) – sporet fjernes fra det gemte spil,
   // siden genindlæses, og 📍-flowet køres i den rigtige app; bagefter lægges det oprindelige gem tilbage.

@@ -479,10 +479,11 @@ const mcHandlers = {
   view: (i) => { mc ||= lastRoundView(game.league.lastRound); mc.viewIdx = i; mc.focus = null; mc.snap = null; renderMc(); },
   // Øjebliksbillede ved et mål (v3.12.1): vis på dit holds minibane og rul derhen; null = startopstillingen.
   // Heat map (v3.16): null = af; { playerId: null } = holdet; { playerId } = én spiller.
-  heat: (v) => { mc ||= lastRoundView(game.league.lastRound); mc.heat = v; if (v) mc.snap = null; renderMc(); },
+  // v3.20.0: heat map'et står altid over opstillingen – det og 📍 (der erstatter opstillingen) udelukker ikke længere hinanden
+  heat: (v) => { mc ||= lastRoundView(game.league.lastRound); mc.heat = v; renderMc(); },
   // 2D-afspilningen springer til hændelsen (referatets 🎬).
   replay: (m, i) => replayJump(m, i),
-  snapshot: (i) => { mc ||= lastRoundView(game.league.lastRound); mc.snap = i; if (i != null) mc.heat = null; renderMc(); if (i != null) document.getElementById('snap-pitch')?.scrollIntoView({ block: 'center' }); },
+  snapshot: (i) => { mc ||= lastRoundView(game.league.lastRound); mc.snap = i; renderMc(); if (i != null) document.getElementById('snap-pitch')?.scrollIntoView({ block: 'center' }); },
   openGoal: (i, goal) => openGoal(i, goal),
   filter: (f) => { mc ||= lastRoundView(game.league.lastRound); mc.filter = f; renderMc(); },
 };

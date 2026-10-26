@@ -76,7 +76,6 @@ try {
       lines.push('', `Afspilning (mål/afslutning): ${(await page.textContent('#rp-caption')).trim()}`);
       await page.click('#rp-prev'); await page.waitForTimeout(1000); await page.locator('#replay').screenshot({ path: path.join(OUT, `${nn}-afspilning-foer.png`) });
       lines.push(`Afspilning (trinet før): ${(await page.textContent('#rp-caption')).trim()}`);
-      await page.click('#heat-btn').catch(() => {});
       if (await page.locator('#heat-pitch').count()) {
         await page.locator('#heat-pitch').screenshot({ path: path.join(OUT, `${nn}-heat-hold.png`) });
         const scorerRow = page.locator('.ratings tr[title]', { hasText: '⚽' }).first();
