@@ -227,14 +227,16 @@ test('pres og afslutning: lav blok lukker ikke flere mål ind end før (≤ 1,42
   const r = {};
   for (const P of ['LOW_BLOCK', 'HIGH_GEGENPRESS']) {
     let ga = 0, g = 0, long = 0;
-    for (let s = 1; s <= 800; s++) {
+    // v3.18.0: 800 → 2400 kampe – langskudsandelen har en støj på ≈ 1 point ved 800 (≈ 1100 mål), samme størrelse som
+    // tolerancen; ved 2400 er forskellen 0,03 (v3.17.0) / 0,36 point (v3.18.0) – ved 800 svingede den 0,8–1,1
+    for (let s = 1; s <= 2400; s++) {
       const L = createLeague(createRng(s)), H = L.teams[s % 8], A = L.teams[(s + 3) % 8];
       A.tactics.phases.phase2_defending.pressingHeight = P;
       const m = simulateMatch(H, A, createRng(s * 31));
       ga += m.homeGoals;
       for (const x of m.goalsPool.filter((x) => x.teamName === H.name)) { g++; if (x.kind === 'LONGSHOT') long++; }
     }
-    r[P] = { ga: ga / 800, long: long / g };
+    r[P] = { ga: ga / 2400, long: long / g };
   }
   assert.ok(r.LOW_BLOCK.ga <= 1.42, JSON.stringify(r));
   assert.ok(r.LOW_BLOCK.long >= r.HIGH_GEGENPRESS.long - 0.01, JSON.stringify(r));

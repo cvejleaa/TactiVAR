@@ -113,6 +113,8 @@ export const RECEIVE_REACH = 25;
 // Den almindelige afslutning: skytten står højst så langt fra skudstedet (v3.16, Spilfører: en stopper skød fra egen halvdel;
 // 28 udelukker stopperne (≈29 fra kanten), men ikke midtbanen – 18 og 25 vendte målfordelingen og modgift-båndene).
 export const SHOT_REACH = 28;
+// Afslutterens pulje og gentagelsesdæmpning (v3.18.0, receiver shot): mindst 4 kandidater; hver tidligere afslutning × 0,65 – halvchancen og cutbacken (den almindelige afslutning uændret: dæmpet gav den langskud imod gegenpres)
+export const SHOT_POOL_MIN = 4, SHOT_REPEAT_DAMP = 0.65;
 const BYLINE_Y = 6, CROSS_FROM_Y = 14;   // hvor cutbacken og indlægget slås fra (holdets egne koordinater)
 // Uden for feltet (y ≥ LONGSHOT_Y i øjeblikket) er et skud et langskud. Den, der får bolden ved
 // feltets kant, har tid og plads (LONGSHOT_BONUS) – det opvejer, at midtbanens afslutning er lavere
@@ -467,16 +469,29 @@ export function simulateMatch(home, away, rng, opts = {}) {
   }
   // prefer: plads-filtre (i → bool) i prioriteret rækkefølge (v3.16.7). Rækkevidden går forud for pladsen: først de
   // foretrukne inden for rækkevidde, så alle inden for rækkevidde, så de foretrukne, så alle.
-  function receiver(side, spot, skill, exclude = null, ctx = { attacking: true, ballX: 50 }, reach = Infinity, prefer = null) {
-    const pos = shapes(side, ctx);
+  // shot (v3.18.0, Spilfører: "N. Jakobsen 13 afslutninger" – 5-4-1's eneste angriber fik alt): en afslutter vælges blandt
+  // mindst SHOT_POOL_MIN (de nærmeste ikke-stoppere fyldes på), og hver afslutning, han allerede er valgt til i kampen, dæmper
+  // hans vægt med SHOT_REPEAT_DAMP. Samme ene rng-træk.
+  const shotPicks = new Map();
+  function receiver(side, spot, skill, exclude = null, ctx = { attacking: true, ballX: 50 }, reach = Infinity, prefer = null, shot = false) {
+    const pos = shapes(side, ctx), d = (i) => Math.hypot(pos[i].x - spot.x, pos[i].y - spot.y);
     const all = side.starters.map((p, i) => ({ p, i })).filter(({ p, i }) => i > 0 && p && p !== exclude);
-    const near = all.filter(({ i }) => Math.hypot(pos[i].x - spot.x, pos[i].y - spot.y) <= reach);
+    let near = all.filter(({ i }) => d(i) <= reach);
+    if (shot && near.length < SHOT_POOL_MIN) {
+      const roles = coordsOf(side.tactics), more = all.filter((c) => !near.includes(c) && roles[c.i].r !== 'CB').sort((a, b) => d(a.i) - d(b.i));
+      near = [...near, ...more.slice(0, SHOT_POOL_MIN - near.length)];
+    }
     const pick = (l) => (prefer ?? []).map((f) => l.filter(({ i }) => f(i))).find((x) => x.length);
     const cand = pick(near) ?? (near.length ? near : null) ?? pick(all) ?? all;
-    const w = cand.map(({ p, i }) => Math.exp(-Math.hypot(pos[i].x - spot.x, pos[i].y - spot.y) / RECEIVE_SPREAD) * (RECEIVE_BASE + Math.max(0, skill(p))));
+    const w = cand.map(({ p, i }) => Math.exp(-d(i) / RECEIVE_SPREAD) * (RECEIVE_BASE + Math.max(0, skill(p))) * (shot ? SHOT_REPEAT_DAMP ** (shotPicks.get(p.id) ?? 0) : 1));
     let r = rng.next() * w.reduce((a, b) => a + b, 0);
-    return (cand[w.findIndex((x) => (r -= x) < 0)] ?? cand.at(-1)).p;
+    const chosen = (cand[w.findIndex((x) => (r -= x) < 0)] ?? cand.at(-1)).p;
+    if (shot) shotPicks.set(chosen.id, (shotPicks.get(chosen.id) ?? 0) + 1);
+    return chosen;
   }
+  // Cutbackens afslutter (v3.18.0): ikke en midtstopper, når en anden er inden for SHOT_REACH (Spilfører: "#3 lagde den tilbage
+  // til midtstopperen")
+  const notCB = (side) => [(i) => coordsOf(side.tactics)[i].r !== 'CB'];
   // Øjebliksbillede ved et mål i åbent spil (v3.12.1, brugeren valgte at kunne SE bevægelsen): KUN
   // dit holds positioner gemmes (QC, §3 – modstanderens røber pres og løb): ved dit mål dit angreb,
   // ved et mål imod dit forsvar i øjeblikket. Punkter pr. spiller-id (indskiftere, Hvis-Så-skift).
@@ -810,7 +825,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
   }
   function halfChance(att, def, cR, dR, min) {
     const spot = shotSpotFor(rng.next(), def.tactics.phases.phase2_defending.pressingHeight);
-    const shooter = receiver(att, spot, (p) => p.skills.finishing, null, { attacking: true, ballX: 50 }, SHOT_REACH);
+    const shooter = receiver(att, spot, (p) => p.skills.finishing, null, { attacking: true, ballX: 50 }, SHOT_REACH, null, true);
     const sp = seen[att.team.id]?.[att.starters.indexOf(shooter)], long = !!sp && sp.y >= LONGSHOT_Y;
     shotSide = att; shotCaught = false; setPieceNow = false; shotBy = shooter; shotLong = long; momentCheck = null;
     const xg = spot === SPOT.EDGE ? HALF_XG.EDGE : HALF_XG.GOAL, gk = dR.gk;
@@ -881,7 +896,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
       if (rng.chance(CROSS_CORNER_P)) corner(att, def, cR, dR, min);
       return;
     }
-    const finisher = receiver(att, SPOT.CUTBACK, (p) => p.skills.finishing, winger, { attacking: true, ballX: wx });
+    const finisher = receiver(att, SPOT.CUTBACK, (p) => p.skills.finishing, winger, { attacking: true, ballX: wx }, SHOT_REACH, notCB(att), true);
     const lead = own(att) ? `✅ ${tag(winger)} når baglinjen og lægger den lavt tilbage til ${tag(finisher)}.` : '';
     if (!lead) addEv(min, 'INFO', 'PLAY', att.isHome, false, 'Mod baglinjen', `↩️ [${att.team.name}] ${tag(winger)} kommer forbi ${tag(back)} og spiller bolden tilbage i feltet.`);
     sheet.adjust(winger.id, 0.15);
@@ -1409,7 +1424,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
           const yourRun = own(att) ? `✅ ${tag(runner)} løber sig fri ${where}` : '';
           let finisher = runner, helper = rng.pick(cR.mids.filter((p) => p !== runner).concat(cR.atts.filter((p) => p !== runner))) ?? assister, kind, lead = '';
           if (choice === 'PASS') {
-            finisher = receiver(att, zone === 'WIDE' ? SPOT.CUTBACK : SPOT.GOAL, (p) => p.skills.finishing, runner, rctx);
+            finisher = receiver(att, zone === 'WIDE' ? SPOT.CUTBACK : SPOT.GOAL, (p) => p.skills.finishing, runner, rctx, SHOT_REACH, notCB(att), true);
             helper = runner; kind = zone === 'WIDE' ? 'CUTBACK' : 'COMBINATION';
             lead = yourRun && `${yourRun} og ${zone !== 'WIDE' ? 'spiller' : focus === 'LOW_CUTBACKS' ? 'lægger den lavt tilbage til' : 'lægger den tværs til'} ${tag(finisher)}.`;
             // Modstanderens løbs-cutback står også i referatet – neutralt som cutback() (§3) – så "Dit felt: cutbacks stoppet

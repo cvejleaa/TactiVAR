@@ -270,11 +270,19 @@ test('almindelig afslutning: kanten (50,32) vælges efter forsvarets pres – me
 // sammenpresningen. Oven i en modspiller skubbes man 6 på tværs: ST (49, 28)/(73, 28) fra stopperne (spejlet (49, 27)/(73, 27)) → 55/79,
 // CM (49, 36)/(73, 36) fra bottens CM'er (spejlet y 41) → 55/79, LM (26, 35) fra RB (spejlet (26, 30)) → 32. Cutback-lodtrækningen
 // (terning 0,5) lander på plads 6 (55, 36): vægtene exp(−afstand/16) til (50, 28) for plads 1–6 når netop halvdelen.
+// v3.18.0 (C): cutbackens afslutter – ikke en midtstopper (4-4-2: plads 2 og 3), ikke løberen, inden for 28 af pletten (50, 28)
+function cutbackScorerOk(r, want) {
+  const sc = r.evs[0].snapshot.scorer, i = r.a.H.tactics.lineupSlots.indexOf(sc), q = want.find((x) => x[0] === sc);
+  assert.ok(i > 0 && i !== 2 && i !== 3, `plads ${i}`);
+  assert.ok(q && Math.hypot(q[1] - 50, q[2] - 28) <= 28, JSON.stringify(q));
+}
 test('løber, højre kant (RM, bold 88): løberen står 12 foran sin levende plads (96, 29 − 12 = 17) – foran linjen, angriberne presset til den (14 → 28) – holdet 11 mod højre, bolden på (50,28), oplægget er løberen – dræber RUN_STEP, ballX-sidebytte, runner-ignoreret, løberen presset med', () => {
   const r = runGoal({ rm: { passing: 20, finishing: 1 } });
   assert.deepEqual(r.m.goalsPool.map((g) => g.kind), ['CUTBACK', 'CUTBACK']);
   const want = pts(r.a.H, [[50, 90], [26, 50], [49, 59], [73, 59], [96, 50], [32, 35], [55, 36], [79, 36], [96, 17], [55, 28], [79, 28]]);
-  assert.deepEqual(r.evs[0].snapshot, { attacking: true, formation: '4-4-2', pts: want, scorer: slot(r.a.H, 6).id, assist: slot(r.a.H, 8).id, ball: [50, 28] });
+  // v3.18.0: afslutteren er ikke en midtstopper og står inden for SHOT_REACH (28) af (50, 28) – før lodtrækningen over plads 1–6 (→ 6)
+  assert.deepEqual(r.evs[0].snapshot, { attacking: true, formation: '4-4-2', pts: want, scorer: r.evs[0].snapshot.scorer, assist: slot(r.a.H, 8).id, ball: [50, 28] });
+  cutbackScorerOk(r, want);
 });
 // v3.16.1: angriberne 14 → 28 (bag linjen 27 + 1), midtbanen 32/29 → 36/35, løberen foran linjen; skubbet 6 på tværs fra modspillerne
 // (spejlet): ST og CM 27 → 33, 51 → 57, RM (74, 35) fra LB (74, 30) → 80. Lodtrækningen (0,25) lander på plads 6 (33, 36).
@@ -282,7 +290,8 @@ test('løber, venstre kant (LM, bold 12): holdet 11 mod venstre (LB 15 → 4), l
   const r = runGoal({ rm: { passing: 20, finishing: 1 }, slotNo: 5, next: 0.25 });
   assert.deepEqual(r.m.goalsPool.map((g) => g.kind), ['CUTBACK', 'CUTBACK']);
   const want = pts(r.a.H, [[50, 90], [4, 50], [27, 59], [51, 59], [74, 50], [4, 17], [33, 36], [57, 36], [80, 35], [33, 28], [57, 28]]);
-  assert.deepEqual(r.evs[0].snapshot, { attacking: true, formation: '4-4-2', pts: want, scorer: slot(r.a.H, 6).id, assist: slot(r.a.H, 5).id, ball: [50, 28] });
+  assert.deepEqual(r.evs[0].snapshot, { attacking: true, formation: '4-4-2', pts: want, scorer: r.evs[0].snapshot.scorer, assist: slot(r.a.H, 5).id, ball: [50, 28] });
+  cutbackScorerOk(r, want);
 });
 
 test('kontra: afslutteren er den FARTIGSTE nær målet (PAC), ikke den bedste afleverer – PAC 20/PAS 1 slår PAC 1/PAS 20 på samme sted – dræber skill → passing', () => {
