@@ -77,10 +77,15 @@ test('sanitize: offentlige tal og træningsrapporten repareres, så en ødelagt 
   const L = createLeague(createRng(5)), me = L.teams[0], p = me.squad[0], q = me.squad[1];
   p.valueStars = { toString: 1 }; p.publicStars = 'x'; p.careerGames = {}; p.age = {}; p.roleTier = 'KONGE';
   q.valueStars = 3.4; q.roleTier = 'STAR';
-  L.trainingReport = { [me.id]: { round: 3, gains: 5, injuries: [] }, [L.teams[1].id]: { round: 3, gains: [{ id: L.teams[1].squad[0].id, skill: 'passing' }], injuries: [] } };
+  const o = L.teams[1], solgt = { id: 'plr_solgt', skill: 'passing' };
+  L.trainingReport = { [me.id]: { round: 3, gains: 5, injuries: [] }, [o.id]: { round: 3, gains: [{ id: o.squad[0].id, skill: 'passing' }, solgt, { id: o.squad[0].id, skill: 'toString' }], injuries: ['plr_solgt', 7] } };
+  me.squad[2].publicStars = 9; me.squad[3].publicStars = 3.6;
   normalizeLeague(L);
   assert.equal(p.valueStars, undefined); assert.equal(p.publicStars, 0); assert.equal(p.careerGames, 0); assert.equal(p.age, 24); assert.equal(p.roleTier, undefined);
   assert.equal(q.valueStars, 3.4); assert.equal(q.roleTier, 'STAR');   // gyldige værdier røres ikke
-  assert.equal(L.trainingReport[me.id], undefined); assert.equal(L.trainingReport[L.teams[1].id].gains.length, 1);
+  assert.equal(L.trainingReport[me.id], undefined);
+  // Holdets rapport bevares; kun den ukendte evne fjernes – en solgt spiller (ukendt id) fjernes enkeltvis
+  assert.deepEqual(L.trainingReport[o.id].gains, [{ id: o.squad[0].id, skill: 'passing' }]); assert.deepEqual(L.trainingReport[o.id].injuries, ['plr_solgt']);
+  assert.equal(me.squad[2].publicStars, 5); assert.equal(me.squad[3].publicStars, 4);
   L.trainingReport = 7; normalizeLeague(L); assert.equal(L.trainingReport, undefined);
 });

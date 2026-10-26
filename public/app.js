@@ -271,6 +271,9 @@ function render() {
 // fanerne og ⚙ Admin tegnes alligevel, med fejlen øverst. Data i browseren røres ikke.
 function renderFailed(e) {
   console.error(e);
+  // Fejlboksen får den også, med stedet (før gik den som en ufanget fejl dertil – QC)
+  const where = /[\w-]+\.js:\d+/.exec(e.stack ?? '')?.[0];
+  window.tactivarFejl?.(`Fejl: ${e.message}${where ? ` (${where})` : ''}`);
   drawTabs('admin');
   app.replaceChildren(h('div', { class: 'notice', id: 'render-error' }, `⚠ Siden kunne ikke tegnes (${e.message}). Dit spil er urørt i browseren – eksportér det som fil herunder, før du prøver andet.`), h('div', { class: 'tabpane tab-admin' }, renderAdmin()));
   document.body.dataset.klar = 'ja';

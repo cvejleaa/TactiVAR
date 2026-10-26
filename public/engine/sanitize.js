@@ -103,9 +103,11 @@ export function normalizeLeague(league) {
       if (!Number.isFinite(p.weeklyWage)) p.weeklyWage = publicWage(p);
       // Offentlige tal, som Værdi og listerne regner på (Security v3.19.0: et objekt her væltede hele siden)
       if (!Number.isFinite(p.age)) p.age = 24;
-      for (const k of ['publicStars', 'careerGames']) if (!Number.isFinite(p[k])) p[k] = 0;
+      // publicStars klemmes til 0–5: stjernerne tegnes med repeat(5 - n), som kaster over 5 (QC)
+      p.publicStars = Number.isFinite(p.publicStars) ? Math.max(0, Math.min(5, Math.round(p.publicStars))) : 0;
+      if (!Number.isFinite(p.careerGames)) p.careerGames = 0;
       if (p.valueStars !== undefined && !Number.isFinite(p.valueStars)) delete p.valueStars;
-      if (p.roleTier !== undefined && !(p.roleTier in TIER_STARS)) delete p.roleTier;
+      if (p.roleTier !== undefined && !Object.hasOwn(TIER_STARS, p.roleTier)) delete p.roleTier;
       if (!p.counterTactics) p.counterTactics = { vsPress: 15, vsLowBlock: 15, vsTrapLong: 15 };
       p.aerialPower = aerialBreakdown(p.heightCm, p.jumpingPower, p.skills.strength, p.skills.positioning).total;
     }
@@ -134,16 +136,15 @@ export function normalizeLeague(league) {
     // Udskiftningsgrænsen (v3.13): gemt før v3.13 → holdets profil (dit hold 70 %); 0 = fra bevares.
     team.subsLimit = clampSubsLimit(team.subsLimit ?? profile.subs);
   });
-  // Træningsrapporten (Security v3.19.0): { holdId: { round, gains: [{ id, skill }], injuries: [id] } } – et ødelagt holds rapport
-  // slettes (næste runde laver en ny); kun spillere og evner, der findes på holdet
+  // Træningsrapporten (Security v3.19.0): { holdId: { round, gains: [{ id, skill }], injuries: [id] } }. En rapport med forkert form
+  // slettes (næste runde laver en ny); ukendte spillere og evner fjernes enkeltvis – en solgt spiller er normal (QC)
   const tr = league.trainingReport;
   if (tr !== undefined && (!tr || typeof tr !== 'object' || Array.isArray(tr))) delete league.trainingReport;
   else if (tr) for (const [id, r] of Object.entries(tr)) {
-    const squad = league.teams.find((t) => t.id === id)?.squad ?? [], has = (pid) => squad.some((q) => q.id === pid);
-    const ok = r && typeof r === 'object' && Number.isInteger(r.round) && Array.isArray(r.gains) && Array.isArray(r.injuries)
-      && r.gains.every((g) => g && has(g.id) && typeof g.skill === 'string' && g.skill in squad.find((q) => q.id === g.id).skills)
-      && r.injuries.every((pid) => typeof pid === 'string');
-    if (!ok) delete tr[id];
+    if (!r || typeof r !== 'object' || !Number.isInteger(r.round) || !Array.isArray(r.gains) || !Array.isArray(r.injuries)) { delete tr[id]; continue; }
+    const byId = new Map((league.teams.find((t) => t.id === id)?.squad ?? []).map((q) => [q.id, q]));
+    r.gains = r.gains.filter((g) => g && byId.get(g.id)?.skills && typeof g.skill === 'string' && Object.hasOwn(byId.get(g.id).skills, g.skill));
+    r.injuries = r.injuries.filter((pid) => typeof pid === 'string');
   }
   return { league, problems, notes };
 }

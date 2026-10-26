@@ -957,7 +957,7 @@ try {
     await pg.route('**/ui/matrix.js', async (route) => { const r = await route.fetch(); route.fulfill({ response: r, body: (await r.text()).replace('export function renderMatrix({ team, isOwn, ui, notes, onSort, onSelect, onSwap, onFilter, onBlocked }) {', '$&\n  throw new Error(\'testfejl i regnearket\');') }); });
     await pg.goto(BASE + '/'); await pg.waitForSelector('body[data-klar="ja"]');
     check('Fejl i tegningen: fejlbesked, faner og ⚙ Admin med Eksportér, Importér og Ny liga', (await pg.textContent('#render-error')).includes('testfejl i regnearket')
-      && (await pg.locator('#tabs .tab').count()) >= 5 && (await pg.isVisible('#export')) && (await pg.isVisible('#new-league')) && (await pg.locator('#matrix').count()) === 0, egne.join(' | '));
+      && (await pg.locator('#tabs .tab').count()) >= 5 && (await pg.isVisible('#export')) && (await pg.isVisible('#new-league')) && (await pg.locator('#matrix').count()) === 0 && (await pg.textContent('#fejlboks')).includes('matrix.js:'), egne.join(' | '));
     await c.close();
   }
   check('Ingen sidefejl under hele forløbet', fejl.length === 0, fejl.join(' | '));
