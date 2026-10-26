@@ -25,12 +25,24 @@
   "5.000.000 kr." -> kan aldrig matche. Bevist v3.19: kassen vist på siden -> ✅. Tjek om den er rettet.
 
 ## Robusthed (delt/importeret gem)
-- v3.19 (A) flyttede Eksportér/Importér/Ny liga fra topbaren til ⚙ Admin-FANEN. renderNow bygger matrix/kort/bane/liste/taktik/
-  tabel FØR `[tab]()` og tabbaren EFTER -> én render-fejl = hvid side, 0 faner, ingen eksport/import/ny liga (gem-kvitteringen ->
-  showTab('admin') -> samme fejl). Bevist: valueStars {"toString":1} på egen spiller (Værdi-kolonnen) og age-objekt (fandtes før,
-  men main kunne redde sig). Data ligger i localStorage, men kun devtools redder dem. Tjek om render har en fallback.
+- v3.19 (A): én render-fejl gav hvid side uden faner. LUKKET senere: render() har nu try/catch -> renderFailed (bekræftet v3.21:
+  duels {"toString":1} i gemt karakterlinje -> "Siden kunne ikke tegnes", 6 faner, ⚙ Admin kan nås). Fjendtlige tal-felter i
+  lastRound.matches[].ratings (freeRuns, duels …) vælter stadig Kamp-fanen (matchcenter.js ~100-101 template-literal) – kendt klasse.
 - sanitize.js typetjekker IKKE valueStars/publicStars/age/careerGames/roleTier eller league.trainingReport (gains: 5 -> Trup vælter,
   training.js:13; kan reddes via Admin, da træningstabellen bygges dovent).
+
+## v3.21 (bevægelse, nearPick, duels, driftSeed) – efterprøvet
+- driftSeed (match.js resultat, GEMMES i lastRound) = kamp 0's FØRSTE rå rng.next() i runden (prepareSide trækker intet) ->
+  brute force 2^32 mulberry32 på 15 s -> 4 kandidater, én genskaber hele runden. Sporet alene bestemmer også driftSeed
+  (par-forskelle i x for centrale spillere; rigtigt seed fundet, 0 falske i 2^20-vindue; naiv JS ~27 t for 2^31). Ufarligt i trin 1
+  (gemmet rummer alt), men trin 2: rundens seed = hver lodtrækning kendt -> hvert offentligt udfald en ulighed på skjulte evner.
+  Kommentaren "røber intet" er forkert. Fix: bevægelsens seed fra en UAFHÆNGIG kilde (+ server-salt i trin 2).
+- nearPick vægt ff/d²: STA-signalet i VALGET er forsvindende (STA 4 mod 18: Δ 0,0085 pr. valg, ~2400 kampe selv hvis alle valg sås).
+  Det store STA-signal i referatet er den GAMLE pres-duel (stamina·0,35): navngivne pres-sejre 0,34 -> 1,02 pr. kamp (også v3.20.2).
+- Spredningen (driftAt) har ingen spiller-input; trace-oracle rekonstruerer alle grundbilleder af taktik + driftSeed + udfald.
+- duels/duelsWon: viewRatingEntry-strip + isOwn-celle (to vagter, ingen test). Mutation af BEGGE: 382 unit + 254 e2e grønne,
+  browser viser 🤼 for alle modstandere. Tjek om der er kommet en td.duel-check som 'fri'-checken (e2e ~474).
+- Grenen flyttede sig to gange under v3.21-gennemgangen (3003be3 -> 036ca77 -> 02eaa61).
 
 ## Kendte accepterede lækager (brugerens valg – skal ikke "lukkes")
 - v3.16 kampens spor + 2D-afspilning: begge holds positioner for alle (§3). Heat map'ets grove modstander = præsentationsvalg.
@@ -53,3 +65,10 @@
   saml pageerror/dialog/requests. ~1 min for 5 varianter.
 - Aflæsning af skjult tilstand fra positioner: sammenlign øjeblik mod samme ticks grundbillede (y i livePositions afhænger
   ikke af ballX) – forskydninger på præcis en konstant afslører motorens interne valg.
+- Instrumentér en kopi af match.js (python str.replace + assert) med `globalThis.__np?.push(...)` i den funktion, der vælger – så
+  kan valgets signal måles direkte (øvre grænse for angriberen). KONTROL: forstærk den mistænkte faktor (fx ff**25) -> skal ses.
+- STA-angreb: samme seeds, ÉN bot-spillers STA 4 mod 18, sammenlign det brugeren ser (navne i referatet) – og samme kørsel på
+  forrige version (git archive) for at skille nyt fra gammelt. Kontrol for spor-statistikker: pres-niveau LOW mod HIGH.
+- Rundens seed fra et gemt rng-output: loop 2^32 med mulberry32-tempereringen (~15 s i node), verificér ved at genspille runden.
+- Browser: alle rundens kampe via `#match-cards .matchcard:nth-child(i)`; tæl td.duel/🤼 pr. ratings-tabel og pr. fane.
+- Hele unit-suiten tager > 10 min ved parallelle kørsler: kør i baggrund med lang timeout, eller kun filer der importerer modulet.

@@ -126,6 +126,11 @@ Konstanterne står ét sted: `public/engine/career.js` (og `transfers.js`). Bån
   - Ejeren kan aflæse sit eget potentiale ret præcist af træningsestimatet ("næste +1 om ca. N runder"); i trin 2 er `dev` et ejerfelt.
   - De afledte tilfældighedstal (`derivedRng`: ungdom, potentiale, træning, pension, bud) bygger på offentlige nøgler – med koden
     kan en ungdomsspillers skjulte tal regnes ud. Trin 2 skal salte dem med en hemmelighed på serveren.
+  - Bevægelsens seed (v3.21.0, `driftSeed`) er rundens første rng-træk: det og sporet (bevægelsen er en ren funktion af det) røber
+    rundens seed og dermed hver lodtrækning. Feltet gemmes ikke (ikke-optælleligt), men sporet bærer det stadig – i trin 1 lækker det
+    intet nyt (gemmet rummer alt); trin 2 skal tage seedet fra en hemmelighed på serveren.
+  - Pres-duellen vejer presserens udholdenhed (`stamina` · 0,35): over mange kampe kan dit referats navngivne pres-sejre
+    pege på en modstanders STA (Security Reviewer v3.21.0 – gammel, uændret af afstandsvalget).
   - En menneskestyret managers træningsfokus kan aflæses af en reserves friskhed (træningsprisen); botternes kan ikke (Alsidig).
   - `viewTeam` er en tilladelsesliste (v3.19.0, `TEAM_PUBLIC_FIELDS`): id, navn, isBot, truppen (gennem `viewPlayer`), kamptruppen
     (`matchBench`) og taktikkens `baseFormation`, `lineupSlots` og `customCoords` – som kopier. Den offentlige klubside tegnes kun
@@ -428,7 +433,7 @@ bedre kan kontrollere spil motoren".
     (udslaget dæmpes inden for `DEPTH_FADE` af linjen – et spejl ville sende angriberne bagud og give flere langskud), modstanderens
     dybeste bliver (linjen er hans), og hans forreste ikke forbi boldholdets bageste; ingen række over `ROW_MAX` 5, dybden
     mindst `MIN_DEPTH`, og står nogen stadig for tæt, flyttes han til den nærmeste ledige plads på tværs (`apartFrom` resolve).
-  - Ét sæt positioner pr. tick: kampens seed trækkes én gang (`driftSeed`, i resultatet til test-oraklerne – følger med i gemmet, et tal), og ALLE kald i
+  - Ét sæt positioner pr. tick: kampens seed trækkes én gang (`driftSeed`, ikke-optælleligt i resultatet til test-oraklerne – gemmes ikke, §3), og ALLE kald i
     tick'et (modtagervalget, VAR-forreste, langskud, øjeblikkene, grundbilledet) får samme bevægelse – billedet viser de
     pladser, motoren regnede på (øjeblikket er afleveringens; grundbilledet tick'ets udfald – median 6 imellem).
   - Afstand vælger duellens mand (`nearPick`, match.js): presseren mod opspilleren og (i midten) forsvareren mod løberen er

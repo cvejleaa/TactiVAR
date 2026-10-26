@@ -1566,9 +1566,11 @@ export function simulateMatch(home, away, rng, opts = {}) {
     endState: { home: endOf(H, own(H)), away: endOf(A, own(A)) },
     ownReports,
     homeGoals: hG, awayGoals: aG, homeVarNet,
-    driftSeed: driftOn ? driftSeed : null,   // v3.21.0: bevægelsens seed (positions.js driftAt) – til test-oraklerne; følger med i gemmet (et tal, røber intet)
     events, stats: st, ratings, goalsPool, injuries, observations, trace, stoppage,
   };
+  // v3.21.0: bevægelsens seed (positions.js driftAt) – kun til test-oraklerne, ikke-optælleligt (som duelLog), så det IKKE gemmes:
+  // det er rundens første rng-træk og røber hele rundens tilfældighed (Security Reviewer F1 – kanalen står i spec §3, trin 2)
+  Object.defineProperty(result, 'driftSeed', { value: driftOn ? driftSeed : null, enumerable: false });
   // Holdenes private tællere pr. hold-id – kun til måleværktøjet; ikke-optællelig, så de
   // aldrig gemmes eller vises (de røber taktik).
   Object.defineProperty(result, 'duelLog', { value: duelLog, enumerable: false });

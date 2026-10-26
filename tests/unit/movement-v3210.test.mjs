@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { driftAt, coupledPositions, livePositions, DRIFT_AXES, MIN_DEPTH, ONSIDE_GAP, ROW_MAX } from '../../public/engine/positions.js';
 import { FORMATIONS } from '../../public/engine/formations.js';
+import { viewRatingEntry, RATING_PRIVATE_FIELDS } from '../../public/engine/visibility.js';
 
 test('spillet sender aldrig drift: false – kun test-arenaerne gør', () => {
   for (const f of ['season.js', 'match.js']) assert.doesNotMatch(fs.readFileSync(new URL(`../../public/engine/${f}`, import.meta.url), 'utf8').replace(/\/\/.*$/gm, ''), /drift\s*:\s*false/);
@@ -82,4 +83,17 @@ test('målt: kortet følger løbet – CM dækker 24–40 % af banen (før 16 %)
   assert.ok(after.roleRank >= 0.5 && before.roleRank < 0.5, `rang ${after.roleRank} (før ${before.roleRank})`);
   assert.ok(after.ownShare <= 0.6, `egen andel af flytningen ${after.ownShare} – mere er rysten`);
   assert.ok(after.jumpMedian <= 8, `spring billede → afslutning ${after.jumpMedian}`);
+});
+
+test('🤼 er privat: modstanderens karakterlinje har hverken duels eller duelsWon – din har (Security Reviewer F2)', async () => {
+  const { createRng } = await import('../../public/engine/rng.js');
+  const { createLeague } = await import('../../public/engine/generator.js');
+  const { simulateMatch } = await import('../../public/engine/match.js');
+  const L = createLeague(createRng(3)), m = simulateMatch(L.teams[0], L.teams[1], createRng(9));
+  const e = m.ratings.away.find((x) => x.duels > 0);
+  assert.ok(e, 'data: en modstander med dueller');
+  const theirs = viewRatingEntry(e, false), mine = viewRatingEntry(e, true);
+  assert.ok(!('duels' in theirs) && !('duelsWon' in theirs), JSON.stringify(theirs));
+  assert.equal(mine.duels, e.duels); assert.ok(RATING_PRIVATE_FIELDS.includes('duels') && RATING_PRIVATE_FIELDS.includes('duelsWon'));
+  assert.ok(!Object.keys(m).includes('driftSeed') && m.driftSeed != null, 'driftSeed er ikke-optælleligt (gemmes ikke, F1)');
 });
