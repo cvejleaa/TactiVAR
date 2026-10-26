@@ -3,7 +3,7 @@
 import { FORMATIONS, clampPos } from '../engine/formations.js';
 import { clampSubsLimit } from '../engine/freshness.js';
 import { MAX_RULES } from '../engine/match-rules.js';
-import { autoMatchBench, validFocus, SQUAD_MAX } from '../engine/career.js';
+import { autoMatchBench, validFocus, SQUAD_MAX, matchBenchOf } from '../engine/career.js';
 
 const IDENTITY = Array.from({ length: 11 }, (_, i) => i);
 
@@ -15,6 +15,21 @@ export function swapBench(team, reserveId, benchId) {
   if (i < 0) return false;
   bench[i] = reserveId; team.matchBenchAuto = false;
   return true;
+}
+// Ét byt-sted (v3.19.0 – før tre kopier i app.js). a = den valgte (eller null), id = den, der klikkes på.
+// Svar: 'deselect' (samme), 'swap' (en starter er med – swapPlayers), 'bench' (bænk ⇄ reserve – swapBench), 'select' (nyt valg).
+export function swapKind(team, a, id) {
+  if (a === id) return 'deselect';
+  if (!a) return 'select';
+  const slots = team.tactics.lineupSlots, benchIds = matchBenchOf(team).map((p) => p.id);
+  if (slots.includes(a) || slots.includes(id)) return 'swap';
+  return benchIds.includes(a) !== benchIds.includes(id) ? 'bench' : 'select';
+}
+export function pickForSwap(team, a, id) {
+  const kind = swapKind(team, a, id), benchIds = matchBenchOf(team).map((p) => p.id);
+  if (kind === 'swap') swapPlayers(team, a, id);
+  if (kind === 'bench') swapBench(team, benchIds.includes(a) ? id : a, benchIds.includes(a) ? a : id);
+  return kind;
 }
 export function setAutoBench(team) { team.matchBenchAuto = true; autoMatchBench(team); return true; }
 

@@ -77,39 +77,40 @@ try {
   const shownPos = await g.evaluate((nr) => JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((x) => !x.isBot).squad.find((x) => String(x.shirtNumber) === nr).position, shown);
   const cardHead = await g.textContent('#player-card .card-head');
   check('Spillerkortet: kæde og naturlig position med fuld betegnelse (kun den ene)', cardHead.includes(` • ${FULL_POS[shownPos]} • `) && Object.values(FULL_POS).filter((t) => cardHead.includes(` • ${t} • `)).length === 1 && !cardHead.includes('(('), `${shownPos}: ${cardHead}`);
-  // Opstilling i Trup: regneark, bane, bænk og kort på samme fane – men ikke taktik-indstillingerne
-  check('Trup-fanen har regneark, bane, bænk og spillerkort – men ikke taktikken', (await g.isVisible('#matrix')) && (await g.isVisible('#pitch')) && (await g.isVisible('#bench')) && (await g.isVisible('#player-card')) && (await g.locator('#tactics').count()) === 0);
-  // Ét fælles byt: start i regnearket (bænkspiller), afslut på banen
+  // v3.19.0 (brugeren): banen og opstillingen er flyttet til Taktik – Trup er regneark, træning og kort
+  check('Trup-fanen har regneark og spillerkort – men ikke banen, bænken, byt-knapper eller taktikken', (await g.isVisible('#matrix')) && (await g.isVisible('#player-card')) && (await g.locator('#pitch').count()) === 0 && (await g.locator('#bench').count()) === 0 && (await g.locator('#tactics').count()) === 0 && !(await g.locator('#matrix thead').textContent()).includes('Byt'));
+  await tab('taktik');
+  // Ét fælles byt (pickForSwap): bænkspiller i listen → brik på banen
   const tName = async (slot) => g.locator(`#pitch .token[data-slot="${slot}"] .token-name`).textContent();
-  const benchRow = g.locator('#matrix tbody tr', { hasText: 'BÆNK' }).first();
-  const benchShort = (await benchRow.locator('td:nth-child(2)').textContent()).trim();
-  await benchRow.locator('button').click();
+  const benchRow = g.locator('#bench tr.bench-p').first();
+  const benchShort = (await benchRow.locator('td:nth-child(2)').textContent()).replace(/^#\d+ /, '').trim();
+  await benchRow.click();
+  check('Taktik: valgt bænkspiller markeres i listen og får en besked ved listen', (await g.locator('#bench tr.active').count()) === 1 && (await g.textContent('#pick-msg')).includes(benchShort));
   await g.click('#pitch .token[data-slot="7"]');
-  check('Byt startet i regnearket kan afsluttes på banen', (await tName(7)) === benchShort, `${benchShort} / ${await tName(7)}`);
-  await g.locator('#matrix tbody tr', { hasText: benchShort }).locator('button').click();
-  await g.locator('#bench .bench-p').first().click();
-  check('…og et byt startet i regnearket kan afsluttes på bænken', (await tName(7)) !== benchShort && (await g.locator('#notice').count()) === 0);
-  // Et byt startet på banen markeres også i regnearket
-  const n7 = await tName(7);
+  check('Byt startet i listen kan afsluttes på banen', (await tName(7)) === benchShort, `${benchShort} / ${await tName(7)}`);
+  // …og en brik → en bænkspiller i listen (listen viser brikkens kæde)
   await g.click('#pitch .token[data-slot="7"]');
-  check('Byt startet på banen markeres i regnearket', (await g.locator('#matrix tbody tr.swapping').count()) === 1 && (await g.locator('#matrix tbody tr.swapping').textContent()).includes(n7));
-  await g.click('#pitch .token[data-slot="7"]');
-  // Samme spiller to gange i regnearket: intet byt, ingen besked
-  const posBefore = await g.locator('#matrix tbody tr td:first-child').allTextContents();
-  await g.locator('#matrix tbody tr:nth-child(3) button').click(); await g.locator('#matrix tbody tr:nth-child(3) button').click();
-  check('Samme spiller valgt to gange: intet byt og ingen besked', JSON.stringify(await g.locator('#matrix tbody tr td:first-child').allTextContents()) === JSON.stringify(posBefore) && (await g.locator('#notice').count()) === 0 && (await g.locator('#matrix tbody tr.swapping').count()) === 0);
+  check('Klik på en brik filtrerer listen til hans kæde', (await g.locator('#lineup-list .toolbar button.active').textContent()) !== 'Alle' && (await g.locator('#bench tr.active').count()) === 1);
+  await g.locator('#lineup-list .toolbar button', { hasText: 'Alle' }).click();   // valget bevares, når filteret skiftes
+  await g.locator('#bench tr.bench-p').first().click();
+  check('…og et byt startet på banen kan afsluttes i listen', (await tName(7)) !== benchShort && (await g.locator('#pick-msg').count()) === 0);
+  // Samme spiller to gange: intet byt, ingen besked
+  const t3 = await tName(3);
+  await g.click('#pitch .token[data-slot="3"]'); await g.click('#pitch .token[data-slot="3"]');
+  check('Samme spiller valgt to gange: intet byt og ingen besked', (await tName(3)) === t3 && (await g.locator('#pick-msg').count()) === 0 && (await g.locator('#bench tr.active').count()) === 0);
   // Bænk → bænk vælger om; holdskift nulstiller valget
-  await g.locator('#bench .bench-p').nth(0).click(); await g.locator('#bench .bench-p').nth(1).click();
-  check('Bænk efter bænk: det nye valg erstatter det gamle', (await g.locator('#bench .bench-p.active').count()) === 1 && (await g.locator('#bench .bench-p').nth(1).getAttribute('class')).includes('active'));
+  await g.locator('#lineup-list .toolbar button', { hasText: 'Alle' }).click();
+  await g.locator('#bench tr.bench-p').nth(0).click(); await g.locator('#bench tr.bench-p').nth(1).click();
+  check('Bænk efter bænk: det nye valg erstatter det gamle', (await g.locator('#bench tr.bench-p.active').count()) === 1 && (await g.locator('#bench tr.bench-p').nth(1).getAttribute('class')).includes('active'));
   await g.selectOption('#team-select', '1'); await g.selectOption('#team-select', '0');
-  check('Holdskift nulstiller et påbegyndt byt', (await g.locator('#bench .bench-p.active').count()) === 0 && (await g.locator('#notice').count()) === 0);
+  check('Holdskift nulstiller et påbegyndt byt', (await g.locator('#bench tr.active').count()) === 0 && (await g.locator('#pick-msg').count()) === 0);
+  await tab('taktik');
   const smallTop = await (async () => { await g.setViewportSize({ width: 1366, height: 768 }); await g.evaluate(() => window.scrollTo(0, 0)); const t = await g.evaluate(() => document.getElementById('pitch').getBoundingClientRect().top); await g.setViewportSize({ width: 1400, height: 1000 }); return t; })();
-  // Mindst den øverste tredjedel af banen (angrebet) skal kunne ses uden at scrolle.
-  check('Laptop (1366×768): banen begynder højt nok til, at mindst 200 px af den ses i Trup', smallTop < 768 - 200, `${Math.round(smallTop)}px`);
+  check('Laptop (1366×768): banen begynder højt nok til, at mindst 200 px af den ses i Taktik', smallTop < 768 - 200, `${Math.round(smallTop)}px`);
   const ratio = await g.evaluate(() => { const r = document.getElementById('pitch').getBoundingClientRect(); return r.width / r.height; });
   check('Banen bevarer sit forhold 68:80 (ikke strakt)', Math.abs(ratio - 68 / 80) < 0.02, ratio.toFixed(3));
   await tab('taktik');
-  check('Taktik-fanen: bane, spillerkort og taktik – men ikke regnearket', (await g.isVisible('#pitch')) && (await g.isVisible('#player-card')) && (await g.locator('#matrix').count()) === 0);
+  check('Taktik-fanen: bane, spillerliste, spillerkort og taktik – men ikke regnearket', (await g.isVisible('#pitch')) && (await g.isVisible('#lineup-list')) && (await g.isVisible('#player-card')) && (await g.locator('#matrix').count()) === 0);
   check('Tre fase-paneler og Hvis-Så-regler', (await g.locator('#tactics fieldset[data-phase]').count()) === 3 && (await g.locator('#rules .rule').count()) === 1);
   const bodyText = await g.textContent('body');
   check('Ingen rå skabelon-rester (${, undefined, NaN, null) på siden', !/\$\{|undefined|NaN|\bnull\b/.test(bodyText));
@@ -180,8 +181,12 @@ try {
   const posOf = async (name) => g.locator('#matrix tbody tr', { hasText: name }).locator('td:first-child').textContent();
   const starter = (await g.locator('#matrix tbody tr:nth-child(2) td:nth-child(2)').textContent());
   const bench = (await g.locator('#matrix tbody tr:nth-child(14) td:nth-child(2)').textContent());
-  await g.locator('#matrix tbody tr:nth-child(2) button').click();
-  await g.locator('#matrix tbody tr', { hasText: bench }).locator('button').click();
+  // v3.19.0: byttet sker i spillerlisten på Taktik; regnearket i Trup viser resultatet
+  await tab('taktik');
+  await g.locator('#lineup-list tr.lp-row', { hasText: starter }).click();
+  await g.locator('#lineup-list .toolbar button', { hasText: 'Alle' }).click();
+  await g.locator('#lineup-list tr.lp-row', { hasText: bench }).click();
+  await tab('trup');
   check('Byt: bænkspilleren overtager pladsen', (await posOf(bench)).startsWith('LB') && (await posOf(starter)).startsWith('BÆNK'));
 
   // Byt på banen: klik på to brikker (som i v2.5)
@@ -199,17 +204,18 @@ try {
   await g.evaluate(() => { const d = JSON.parse(localStorage.getItem('tactivar_save')), t = d.league.teams.find((x) => !x.isBot); t.squad.find((p) => p.id === t.tactics.lineupSlots[6]).shortName = 'T. Jens'; localStorage.setItem('tactivar_save', JSON.stringify(d)); });
   await g.reload(); await g.waitForSelector('body[data-klar="ja"]'); await tab('taktik');
   await g.click('#pitch .token[data-slot="6"]');
-  const swapNote = await g.textContent('#notice');
-  check('Et påbegyndt byt nævner spilleren med rigtigt ejefald: "T. Jens\' plads"', swapNote.includes("for at bytte T. Jens' plads."), swapNote);
+  const swapNote = await g.textContent('#pick-msg');
+  check('Et påbegyndt byt nævner spilleren ved listen: "T. Jens skal byttes med"', swapNote.includes('T. Jens skal byttes med'), swapNote);
   await g.click('#pitch .token[data-slot="6"]'); // fravælg igen
   // Indskiftning fra bænken under banen – uden at forlade Taktik
+  await g.locator('#lineup-list .toolbar button', { hasText: 'Alle' }).click();
   await g.locator('#bench .bench-p').first().click(); await g.locator('#bench .bench-p').first().click();
-  check('Bænken: klik igen på samme bænkspiller fravælger', (await g.locator('#bench .bench-p.active').count()) === 0 && (await g.locator('#notice').count()) === 0);
+  check('Bænken: klik igen på samme bænkspiller fravælger', (await g.locator('#bench .bench-p.active').count()) === 0 && (await g.locator('#pick-msg').count()) === 0);
   const benchBtn = g.locator('#bench .bench-p').first();
-  const benchName = (await benchBtn.textContent()).replace(/^#\d+ /, '').replace(/ · \w+$/, '');
+  const benchName = (await benchBtn.locator('td:nth-child(2)').textContent()).replace(/^#\d+ /, '').trim();
   await benchBtn.click(); await g.click('#pitch .token[data-slot="4"]');
   check('Bænken: klik bænkspiller og så brik skifter ind', (await nameAt(4)) === benchName && (await g.locator('#bench .bench-p', { hasText: n4 }).count()) === 1, `${benchName} / ${await nameAt(4)}`);
-  await g.click('#pitch .token[data-slot="5"]'); await g.locator('#bench .bench-p').first().click();
+  await g.click('#pitch .token[data-slot="5"]'); await g.locator('#lineup-list .toolbar button', { hasText: 'Alle' }).click(); await g.locator('#bench .bench-p').first().click();
   check('Bænken: klik brik og så bænkspiller skifter også ind', (await nameAt(5)) !== n5);
   await tab('trup'); await g.click('#matrix thead th:nth-child(1)'); await tab('taktik');
 
@@ -314,7 +320,9 @@ try {
   check('Modstander: spillerkortet skjuler evner og kontrakt', (await g.locator('#player-card .bars').count()) === 0 && (await g.textContent('#player-card')).includes('🔒 ??'));
   await tab('taktik');
   check('Modstander: faser, Hvis-Så-regler og udskiftningsgrænse er skjulte', (await g.locator('#tactics fieldset').count()) === 0 && (await g.locator('#subs-limit').count()) === 0 && (await g.textContent('#tactics .lockbox')).includes('udskiftningsgrænse'));
-  check('Modstander: ingen bænkrække under banen', (await g.locator('#bench').count()) === 0);
+  check('Modstander: spillerlisten viser friskhed og stjerner, men evnerne er låst, og der er ingen Udtag automatisk', (await g.locator('#lineup-list td.lockcell').count()) >= 18 && (await g.locator('#auto-bench').count()) === 0 && (await g.locator('#lineup-list tbody tr.lp-row').first().textContent()).match(/[★☆–]/));
+  await g.click('#lineup-list thead th.locked');
+  check('Modstander: sortering af listen på en skjult evne afvises (samme vagt som regnearket)', (await g.textContent('#notice')).includes('Anti-spionage'));
   check('Modstander: kun dit hold kan trækkes på banen', (await g.locator('#pitch .token.draggable').count()) === 0);
   check('Modstander: formationen kan ikke ændres og der er ingen byt-knapper', (await g.isDisabled('#formation')) && (await g.locator('#matrix tbody button').count()) === 0);
   check('Modstander: ingen Plan A/B/C og ingen "Nulstil træk" (ville afsløre og ændre deres taktik)', (await g.locator('#tactics .presets').count()) === 0 && (await g.locator('#reset-drag').count()) === 0);
@@ -580,8 +588,8 @@ try {
   await tab('liga'); await g.selectOption('#team-select', '2');
   check('Holdvælgeren i Liga-fanen viser holdet i Trup', (await g.textContent('#tabs .tab.active')).includes('Trup') && (await g.textContent('#club-name')) === (await g.locator('#team-select option').nth(2).textContent()));
   await g.selectOption('#team-select', '0');
-  await g.locator('#matrix tbody tr:nth-child(2) button').click();
-  check('Påbegyndt byt viser besked', (await g.textContent('#notice')).includes('Vælg den spiller'));
+  await tab('taktik'); await g.locator('#lineup-list tr.lp-row').nth(1).click();
+  check('Påbegyndt byt viser besked ved listen', (await g.textContent('#pick-msg')).includes('skal byttes med'));
   await reload();
   check('Efter F5: runden er gemt', (await g.textContent('#play-round')).includes('runde 2 af 14'));
   await tab('kamp');

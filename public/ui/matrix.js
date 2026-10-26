@@ -16,7 +16,7 @@ const money = (v) => (v >= 1e6 ? `${dec(v / 1e6, 1)} mio.` : v.toLocaleString('d
 const modBest = (p) => Math.max(...COUNTER_KEYS.map((k) => p.counterTactics[k]));
 
 const avgSkill = (p) => Object.values(p.skills).reduce((a, b) => a + b, 0) / 9;
-const avgRating = (p) => (p.ratingGames ? p.ratingSum / p.ratingGames : 0);
+export const avgRating = (p) => (p.ratingGames ? p.ratingSum / p.ratingGames : 0);
 
 // field = det felt synligheden afgøres på; num = tal-kolonne (starter faldende ved sortering).
 export const COLUMNS = [
@@ -44,7 +44,7 @@ export const COLUMNS = [
 // v3.18.0: truppen er 18–25 – "Alle (N)" sættes ved visningen; Reserver = hverken startere eller på kamptruppens bænk
 export const FILTERS = [['all', 'Alle'], ['start', 'Start-11'], ['bench', 'Bænk'], ['reserve', 'Reserver'], ['GK', 'MÅL'], ['DEF', 'FOR'], ['MID', 'MID'], ['ATT', 'ANG']];
 
-const heatClass = (v) => (v >= 15 ? 'heat-4' : v >= 12 ? 'heat-3' : v >= 8 ? 'heat-2' : 'heat-1');
+export const heatClass = (v) => (v >= 15 ? 'heat-4' : v >= 12 ? 'heat-3' : v >= 8 ? 'heat-2' : 'heat-1');
 
 export function renderMatrix({ team, isOwn, ui, notes, onSort, onSelect, onSwap, onFilter, onBlocked, onFocusMany = null }) {
   const slotOf = (p) => team.tactics.lineupSlots.indexOf(p.id);
@@ -79,7 +79,7 @@ export function renderMatrix({ team, isOwn, ui, notes, onSort, onSelect, onSwap,
       title: c.title || c.label, class: (c.key === col.key ? 'sorted ' : '') + (allowed ? 'sortable' : 'locked'),
       onclick: () => (allowed ? onSort(c) : onBlocked(c)),
     }, c.label, c.key === col.key ? (desc ? ' ▼' : ' ▲') : '');
-  }), h('th', {}, 'Arketype/Note'), isOwn ? h('th', {}, 'Byt') : null);
+  }), h('th', {}, 'Arketype/Note'), isOwn && onSwap ? h('th', {}, 'Byt') : null);
 
   const body = rows.map(({ p }) => {
     const s = slotOf(p);
@@ -101,7 +101,7 @@ export function renderMatrix({ team, isOwn, ui, notes, onSort, onSelect, onSwap,
     const note = notes[p.id]?.trim() ? h('span', { class: 'note-flag', title: 'Du har en note' }, '📝') : null;
     return h('tr', { class: (ui.selectedPlayerId === p.id ? 'selected ' : '') + (ui.swapId === p.id ? 'swapping' : ''), dataset: { pid: p.id }, onclick: () => onSelect(p) },
       cells, h('td', {}, arch, note),
-      isOwn ? h('td', {}, h('button', { class: 'mini', title: 'Byt: vælg to spillere', onclick: (e) => { e.stopPropagation(); onSwap(p); } }, '🔁')) : null);
+      isOwn && onSwap ? h('td', {}, h('button', { class: 'mini', title: 'Byt: vælg to spillere', onclick: (e) => { e.stopPropagation(); onSwap(p); } }, '🔁')) : null);
   });
 
   return h('div', { class: 'panel' },
