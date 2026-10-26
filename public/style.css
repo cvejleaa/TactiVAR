@@ -214,3 +214,5 @@ tr.heat-sel td { background: #f9731633; } .ratings tr[title] { cursor: pointer; 
 .club-sum { width: 100%; table-layout: fixed; }
 .club-sum th { width: 32%; vertical-align: top; white-space: normal; }
 .club-sum td { white-space: normal; overflow-wrap: anywhere; }
+/* Massehandlingen i regnearkets værktøjslinje: samme højde som filterknapperne (CI-laptop-tjekket: banen skal stå højt nok) */
+select.mini { padding: .1rem .3rem; font-size: .75rem; height: auto; line-height: 1.2; }
