@@ -31,8 +31,8 @@ const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 // 20–23 år + 2 ± 1, ældre ingen plads; klemt til 4–19 og aldrig under det nuværende snit.
 export function initialPotential(p) {
   const r = derivedRng('potential', p.id), avg = keyAvg(p);
-  // Ungdomsspillere (v3.18.0) + 5 ± 2,5: de starter lavt (4–8), og en del skal kunne blive startere (measure-lifecycle)
-  const room = p.roleTier === 'YOUTH' ? 5 + (r.next() * 5 - 2.5) : p.age <= 19 ? 4 + (r.next() * 4 - 2) : p.age <= 23 ? 2 + (r.next() * 2 - 1) : 0;
+  // Ungdomsspillere (v3.18.0) + 4 ± 2,5: de starter lavt (4–8); 10–30 % bliver startere (measure-lifecycle; + 5 gav 35–45 %)
+  const room = p.roleTier === 'YOUTH' ? 4 + (r.next() * 5 - 2.5) : p.age <= 19 ? 4 + (r.next() * 4 - 2) : p.age <= 23 ? 2 + (r.next() * 2 - 1) : 0;
   return Math.round(clamp(Math.max(avg, avg + room), 4, 19) * 10) / 10;
 }
 
@@ -157,8 +157,10 @@ export const NEW_LEAGUE_PLACE = 4.5;
 export const attendance = (placeHome, placeAway, form) => Math.min(GATE_MAX, Math.round(GATE_BASE + 300 * (8 - placeHome) + 150 * (8 - placeAway) + 120 * form));
 export const weeklyWages = (team) => team.squad.reduce((a, p) => a + (p.weeklyWage ?? 0), 0);
 export const wagesPerRound = (team) => Math.round(weeklyWages(team) / ROUNDS_PER_WEEK);
-// Lønbudget pr. uge: 1,35 mio. + 2 % af kassen (mindst 1 mio.) – "Du kan bruge X kr. mere pr. runde"
-export const wageBudget = (team) => Math.max(1000000, 1350000 + 0.02 * Math.max(0, team.cashBalance ?? 0));
+// Lønbudget pr. uge: 1,7 mio. + 2 % af kassen – "Du kan bruge X kr. mere pr. runde". 1,35 mio. lå under lønnen efter
+// genforhandlingen hos de fleste hold (1,0–2,2 mio.), så ingen kunne købe uden at sælge (e2e, sæsonslut)
+export const WAGE_BUDGET_BASE = 1700000;
+export const wageBudget = (team) => WAGE_BUDGET_BASE + 0.02 * Math.max(0, team.cashBalance ?? 0);
 export const wageRoomPerRound = (team) => Math.round((wageBudget(team) - weeklyWages(team)) / ROUNDS_PER_WEEK);
 export const formOf = (team) => (team.finance?.form ?? []).reduce((a, b) => a + b, 0);
 // Én linje i regnskabet pr. runde; præmien lægges på sæsonens sidste rundes linje

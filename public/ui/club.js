@@ -42,7 +42,7 @@ export function renderClub({ league, team, playing }) {
       row('Indtægter pr. runde', `TV ${kr(TV_PER_ROUND)} · billetter i hjemmekampe (op til ${GATE_MAX.toLocaleString('da-DK')} tilskuere à ${TICKET_PRICE} kr.)`),
       row('Prognose ved sæsonslut', h('span', { class: fc.end < 0 ? 'neg' : '' }, `${kr(Math.round(fc.end / 1000) * 1000)} (${fc.rounds} runder, ${fc.home} hjemme, præmie for pladsen nu ${kr(fc.prize)})`), 'club-forecast'))),
     fc.end < 0 ? h('div', { class: 'notice', id: 'club-warning' }, `⚠ Kassen ender i minus ved sæsonslut, hvis intet ændres. Ingen sælges automatisk – du vælger selv. I minus kan du ikke købe spillere.`) : null,
-    h('div', { class: 'muted' }, `Lønbudget pr. uge: ${kr(Math.round(wageBudget(team)))} (1,35 mio. kr. + 2 % af kassen). Præmier: ${PRIZE.map((p, i) => `${i + 1}. ${(p / 1e6).toLocaleString('da-DK')}`).join(' · ')} mio. kr.`),
+    h('div', { class: 'muted' }, `Lønbudget pr. uge: ${kr(Math.round(wageBudget(team)))} (1,7 mio. kr. + 2 % af kassen). Præmier: ${PRIZE.map((p, i) => `${i + 1}. ${(p / 1e6).toLocaleString('da-DK')}`).join(' · ')} mio. kr.`),
     h('h4', {}, `Sæsonen indtil nu: ${signed(net(s))}`),
     h('div', { class: 'muted', id: 'club-season' }, `Billetter ${kr(s.gate ?? 0)} · TV ${kr(s.tv ?? 0)} · Løn ${kr(-(s.wages ?? 0))}${s.prize ? ` · Præmie ${kr(s.prize)}` : ''}${s.transfers ? ` · Transfers ${signed(s.transfers)}` : ''}`),
     h('h4', {}, 'Regnskab pr. runde'),

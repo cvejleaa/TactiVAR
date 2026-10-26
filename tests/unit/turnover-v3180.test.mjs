@@ -212,3 +212,21 @@ test('en bot med 22 spillere tager ingen ungdom op (offentlig regel – ikke all
   assert.equal(bot.squad.length, 22 - retired + botYouthTake(22 - retired, [1, 2]).length);
   assert.ok(!L.turnoverReport.youthTaken.some((y) => y.teamId === bot.id) || 22 - retired < 22);
 });
+
+test('gem fra v3.17.0 (runde 13) → migrering → sidste runde: sæsonskiftet sker én gang, alle ældes, 2 ungdomstilbud, gemmet går igennem igen', async () => {
+  const fs = await import('node:fs');
+  const { parseSave, serialize } = await import('../../public/state/storage.js');
+  const raw = fs.readFileSync(new URL('../fixtures/save-v3.17.0-r13.json', import.meta.url), 'utf8');
+  const r = parseSave(raw); assert.ok(r.ok, r.error);
+  const L = r.state.league, ages = new Map(L.teams.flatMap((t) => t.squad.map((p) => [p.id, p.age])));
+  assert.equal(L.leagueMetadata.round, 13);
+  const rng = createRng(5);
+  commitRound(L, playRound(L, rng), rng);
+  assert.equal(L.leagueMetadata.seasonNumber, 2);
+  for (const t of L.teams) for (const p of t.squad) if (ages.has(p.id)) assert.equal(p.age, ages.get(p.id) + 1);
+  assert.equal(own(L).youthOffers.length, 2);
+  assert.equal(L.turnoverReport.season, 1);
+  const again = parseSave(serialize(r.state));
+  assert.ok(again.ok, again.error); assert.ok(!again.migratedFrom, 'skema 7 – ingen migrering igen');
+  assert.deepEqual(again.state.league.teams.map((t) => t.squad.length), L.teams.map((t) => t.squad.length));
+});

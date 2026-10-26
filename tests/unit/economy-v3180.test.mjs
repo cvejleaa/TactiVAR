@@ -84,12 +84,12 @@ test('regnskabet: én linje pr. runde (præmien på samme linje), højst 30 linj
   assert.equal(t.finance.ledger.length, LEDGER_CAP); assert.equal(t.finance.ledger.at(-1).r, 45);
 });
 
-test('lønbudget: 1,35 mio. + 2 % af kassen pr. uge (mindst 1 mio.), rummet vises pr. runde', () => {
+test('lønbudget: 1,7 mio. + 2 % af kassen pr. uge, rummet vises pr. runde', () => {
   const t = fresh().teams[0];
-  t.cashBalance = 5000000; assert.equal(wageBudget(t), 1450000);
-  t.cashBalance = -20000000; assert.equal(wageBudget(t), 1350000, 'en negativ kasse trækker ikke budgettet ned under grundbeløbet');
+  t.cashBalance = 5000000; assert.equal(wageBudget(t), 1800000);
+  t.cashBalance = -20000000; assert.equal(wageBudget(t), 1700000, 'en negativ kasse trækker ikke budgettet ned under grundbeløbet');
   t.cashBalance = 5000000;
-  assert.equal(wageRoomPerRound(t), Math.round((1450000 - weeklyWages(t)) / 3));
+  assert.equal(wageRoomPerRound(t), Math.round((1800000 - weeklyWages(t)) / 3));
 });
 
 test('prognose: en ny liga har 14 runder tilbage, 7 hjemmekampe, og ender med kassen + rundernes netto + præmien for 4,5 → 5. plads', () => {
