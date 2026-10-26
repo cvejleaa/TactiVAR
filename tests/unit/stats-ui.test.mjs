@@ -103,6 +103,14 @@ test('bedste snit: sæsonens snit af kampenes offentlige stjerner (mindst 3 kamp
   assert.deepEqual(rows.map((r) => r.children.at(-1).textContent.split(' ')[0]), ['4,7', '4,0', '4,0', '3,0']);
   assert.deepEqual(rows.map((r) => r.className), ['', '', 'mine', 'mine']);
   assert.equal(list(root, 'publicStars'), undefined, 'karriere-listen er væk');
+  // Stjernerne er snittet afrundet (4,67 → 5, ikke 4), og en log-post uden stjerner (gammelt gem) tæller ikke
+  const cellStars = (r) => all(r.children.at(-1), (x) => x.className === 'stars')[0]?.title;
+  assert.equal(cellStars(rows[0]), '5 af 5 stjerner'); assert.equal(cellStars(rows[3]), '3 af 5 stjerner');
+  e.matchLog = [LOGE(season, 5), LOGE(season, 5), LOGE(season, 0)];   // 2 med stjerner + en tom → under 3: ikke med
+  assert.ok(!items(list(render(L, me), 'seasonStars')).some((r) => r.children[1].textContent === nm(e)));
+  // Top 5 af 6
+  for (const p of [other.squad[4], other.squad[5], me.squad[4]]) p.matchLog = [LOGE(season, 2), LOGE(season, 2), LOGE(season, 2)];
+  assert.equal(items(list(render(L, me), 'seasonStars')).length, 5);
 });
 test('rundens bedste: rundens kampe efter offentlige stjerner (lighed: mål+oplæg, så kampens spiller), aldrig karakteren; ingen runde → ingen liste', () => {
   const { L, me, other } = world();
@@ -117,6 +125,14 @@ test('rundens bedste: rundens kampe efter offentlige stjerner (lighed: mål+opl�
   L.lastRound.gazette = { playerOfTheRound: { playerId: p1.id, teamId: other.id } };
   assert.equal(items(list(render(L, me), 'roundStars'))[0].children[1].textContent, nm(p1));
   delete L.lastRound.gazette;
+  assert.equal(all(rows[0].children.at(-1), (x) => x.className === 'stars')[0]?.title, '5 af 5 stjerner');
+  // Lighed i stjerner og mål: oplæg tæller (mål+oplæg); en linje uden stjerner eller fra et ukendt hold er ikke med; top 5 af flere
+  const [q1, q2, q3, q4] = [other.squad[5], other.squad[6], me.squad[5], me.squad[6]];
+  L.lastRound.matches.push({ ratings: { home: [E(q1, other, { stars: 2 }), E(q2, other, { stars: 2, assists: 1 }), E(q3, me, { stars: 0 })], away: [E(q4, { id: 'fremmed', name: 'X' }, { stars: 5 })] } });
+  const rr = items(list(render(L, me), 'roundStars')).map((r) => r.children[1].textContent);
+  assert.equal(rr.length, 5); assert.ok(!rr.includes(nm(q3)) && !rr.includes(nm(q4)), 'ingen stjerner / ukendt hold');
+  assert.equal(rr[4], nm(q2), 'oplægget afgør lighed mellem to 2-stjernede');
+  L.lastRound.matches.pop();
   assert.ok(!list(root, 'roundStars').textContent.includes('9,87') && !list(root, 'roundStars').textContent.includes('9.87') && !list(root, 'roundStars').textContent.includes('6,1'), 'ingen karakter');
 });
 

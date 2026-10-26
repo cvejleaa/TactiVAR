@@ -43,6 +43,12 @@ test('afsnit 3 (v3.20.1, brugeren: "en dårlig begrundelse – kampens spiller")
   assert.equal(why({ line: 'GK', saves: 3 }, { hG: 1 }), 'Begrundelse: 3 redninger.', 'et mål imod: intet nul');
   assert.equal(why({ line: 'MID' }, { hG: 0 }), 'Begrundelse: stabil hele kampen.', 'kun MV og forsvar holder nullet');
   assert.equal(why({ goals: 1, tacticWins: 5, isMotM: true }), 'Begrundelse: 1 mål, vandt 5 taktiske dueller – kåret til kampens spiller.');
+  // Test Manager: grænsen er præcis 3, MV holder også nullet, hjemmeholdets spiller, og spilleren findes i den RIGTIGE kamp
+  assert.equal(why({ line: 'MID', tacticWins: 3 }), 'Begrundelse: vandt 3 taktiske dueller.');
+  assert.equal(why({ line: 'GK', saves: 2 }, { hG: 0 }), 'Begrundelse: 2 redninger, holdt nullet.');
+  const two = (home, aG) => sec(buildColumn(inp({ matches: [M({ h: 'x1', a: 'x2', hG: 3, aG: 3, ratings: { home: [], away: [] } }), M({ hG: 2, aG, ratings: { home: [RT({ playerId: 'p1', teamId: 'h1', line: 'DEF', ...home })], away: [] } })], gazette: GZ({ playerOfTheRound: { playerId: 'p1', teamId: 'h1' } }) })), 'col-stars').player.why;
+  assert.equal(two({ aerialWins: 3 }, 0), 'Begrundelse: 3 vundne luftdueller, holdt nullet.', 'hjemmeholdet (h1) lukkede 0 ind – i kamp nr. 2');
+  assert.equal(two({ aerialWins: 3 }, 1), 'Begrundelse: 3 vundne luftdueller.');
   // QC v3.20.1: en MODSTANDERS forsvarsspillers taktiske dueller rummer hans holds offside-fælde – nævnes ikke (seeren er h1, han spiller for a1)
   assert.equal(why({ line: 'DEF', tacticWins: 6 }, { hG: 1 }), 'Begrundelse: stabil hele kampen.');
   assert.equal(sec(buildColumn(inp({ viewerTeamId: 'a1', matches: [M({ ratings: R({ line: 'DEF', tacticWins: 6 }), hG: 1 })], gazette: GZ() })), 'col-stars').player.why, 'Begrundelse: vandt 6 taktiske dueller.', 'dit eget hold: gerne');

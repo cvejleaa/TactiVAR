@@ -409,14 +409,13 @@ function renderNow() {
       // Bekræftelsen står ved listen (QC: beskeden øverst var uden for skærmen, når man stod nede i listen)
       onBuy: (id) => { const name = league.teams.flatMap((t) => t.squad).find((p) => p.id === id)?.shortName; const err = buyPlayer(league, mine, id); view.marketMsg = err ? `💰 ${err}` : `💰 ${name} er købt og står nu i din trup.`; change(() => {}); } })],
   }[tab]();
-  // v3.20.1: tabellerne ruller ikke selv længere – sidens position bevares (et klik i listen må ikke springe til toppen)
-  const pageY = window.scrollY;
+  // v3.20.1: tabellerne ruller ikke selv længere. Sidens position bevares af browseren (replaceChildren er ét skridt, højden
+  // er den samme) – Test Manager: en genskabelse her var død kode (mutationen overlevede); e2e måler, at siden står stille.
   app.replaceChildren(...[
     view.notice ? h('div', { class: 'notice', id: 'notice' }, view.notice,
       view.backupKey && storage.getItem(view.backupKey) ? h('button', { class: 'mini', id: 'download-migration-backup', onclick: () => download(storage.getItem(view.backupKey), `${view.backupKey}.json`) }, ' ⬇ Hent backup som fil') : null) : null,
     h('div', { class: `tabpane tab-${tab}` }, ...content.filter(Boolean)),
   ].filter(Boolean));
-  if (window.scrollY !== pageY) window.scrollTo(0, pageY);
   document.body.dataset.klar = 'ja';
 }
 
