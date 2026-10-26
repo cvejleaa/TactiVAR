@@ -5,7 +5,7 @@
 import { autoMatchBench, logMatch, FOCUS, focusSkills, validFocus, ageTrain, roomOf, addXp, KEY_SKILLS, MATCH_XP, TRAIN_FRESH_FLOOR, TRAIN_INJURY_MATCHES, PLAYED_RELIEF, derivedRng,
   attendance, wagesPerRound, formOf, bookLedger, TV_PER_ROUND, TICKET_PRICE, PRIZE, NEW_LEAGUE_PLACE,
   willRetire, declineSkills, seasonGrowth, trainedSkills, refreshValue, publicWage, freeShirt, neededLine, botYouthTake, repairLineup, YOUTH_OFFERS, SQUAD_MIN, RETIRED_CAP, LINE_MIN } from './career.js';
-import { aerialBreakdown, isArchetypeUnlocked, generatePlayer } from './generator.js';
+import { aerialBreakdown, isArchetypeUnlocked, generatePlayer, neededPosition } from './generator.js';
 import { bookMatchStats, roundHistory, HISTORY_MAX } from './stats.js';
 import { simulateMatch } from './match.js';
 import { openWindow } from './transfers.js';
@@ -248,7 +248,7 @@ export function seasonTurnover(league) {
   league.teams.forEach((team, ti) => {
     const rng = derivedRng('youth', season, team.id), offers = [];
     const prefer = report.retired.filter((r) => r.teamId === team.id).map((r) => r.line);
-    const make = () => { const line = neededLine(team, offers, prefer); const y = generatePlayer(rng, line, 'YOUTH', freeShirt(team, offers), ti, used, 0, undefined, nextId()); offers.push(y); return y; };
+    const make = () => { const line = neededLine(team, offers, prefer); const y = generatePlayer(rng, line, 'YOUTH', freeShirt(team, offers), ti, used, 0, neededPosition(team, line, offers), nextId()); offers.push(y); return y; };
     for (let k = 0; k < YOUTH_OFFERS; k++) make();
     while (team.squad.length + offers.length < SQUAD_MIN) make();   // aldrig under 18 (sanitize-grænsen)
     const take = team.isBot ? botYouthTake(team.squad.length, offers) : offers.slice(0, Math.max(0, SQUAD_MIN - team.squad.length));

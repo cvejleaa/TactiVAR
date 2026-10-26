@@ -40,6 +40,13 @@ const BLUEPRINT = [
   ['MID', 'STARTER', 'WM'], ['MID', 'STARTER', 'CM'], ['MID', 'STAR', 'CM'], ['ATT', 'STARTER', 'ST'], ['MID', 'STARTER', 'WM'], ['ATT', 'STARTER', 'ST'],
   ['GK', 'ROTATION', 'GK'], ['DEF', 'ROTATION', 'CB'], ['DEF', 'TALENT', 'FB'], ['MID', 'ROTATION', 'DM'], ['MID', 'TALENT', 'AM'], ['ATT', 'ROTATION', 'ST'], ['ATT', 'TALENT', 'WM'],
 ];
+// Ungdom og nye spillere (v3.20.0): den position i kæden, holdet har færrest af i forhold til truppens opbygning (BLUEPRINT) –
+// ellers fik de altid CB/CM/ST, og backs, kanter og DM tørrede ud. Kun offentlige data; ved lighed BLUEPRINT's rækkefølge.
+const SHARE = BLUEPRINT.reduce((m, [line, , pos]) => { const l = (m[line] ||= {}); l[pos] = (l[pos] ?? 0) + 1; return m; }, {});
+export function neededPosition(team, line, extra = []) {
+  const want = SHARE[line], have = (pos) => [...team.squad, ...extra].filter((p) => p.line === line && p.position === pos).length;
+  return Object.keys(want).reduce((best, pos) => (have(pos) / want[pos] < have(best) / want[best] ? pos : best));
+}
 // Rækkefølgen er visningens (Natur-kolonnens sortering): bagfra og frem.
 export const POSITIONS = ['GK', 'CB', 'FB', 'DM', 'CM', 'AM', 'WM', 'ST'];
 

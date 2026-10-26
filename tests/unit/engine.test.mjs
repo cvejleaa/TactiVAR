@@ -663,3 +663,15 @@ test('normalizeLeague: spillere uden (gyldig) position får en – gyldige røre
   assert.equal(out.find((p) => p.id === keep.id).position, 'AM');
   assert.equal(out.filter((p) => p.line === 'DEF' && p.position === 'CB').length, 3);
 });
+
+test('neededPosition (v3.20.0): den position i kæden, holdet har færrest af i forhold til opbygningen – ved lighed opbygningens rækkefølge', async () => {
+  const { neededPosition } = await import('../../public/engine/generator.js');
+  const t = createLeague(createRng(3)).teams[0];
+  assert.equal(neededPosition(t, 'MID'), 'WM');                     // fuld trup: alle 1,0 – første i BLUEPRINT's MID-rækkefølge
+  t.squad = t.squad.filter((p) => p.position !== 'DM');
+  assert.equal(neededPosition(t, 'MID'), 'DM');                     // DM'en er solgt → næste MID-ungdom er DM
+  t.squad = t.squad.filter((p) => !(p.line === 'DEF' && p.position === 'FB'));
+  assert.equal(neededPosition(t, 'DEF'), 'FB');
+  assert.equal(neededPosition(t, 'ATT', [{ line: 'ATT', position: 'ST' }]), 'WM');   // 4 ST / 3 > 1 WM / 1 – extra tæller med
+  assert.equal(neededPosition(t, 'GK'), 'GK');
+});
