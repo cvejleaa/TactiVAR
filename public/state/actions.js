@@ -1,6 +1,6 @@
 // Ændringer af eget holds taktik og opstilling – rene funktioner over holdobjektet, så de
 // kan testes uden browser. UI'et kalder dem og gemmer bagefter.
-import { FORMATIONS, clampPos, arrangeByFit } from '../engine/formations.js';
+import { FORMATIONS, clampPos, arrangeByFit, fitOf } from '../engine/formations.js';
 import { clampSubsLimit } from '../engine/freshness.js';
 import { MAX_RULES } from '../engine/match-rules.js';
 import { autoMatchBench, validFocus, SQUAD_MAX, matchBenchOf } from '../engine/career.js';
@@ -77,6 +77,10 @@ export function setFormation(team, formation) {
   team.tactics.customCoords = {};
   arrangeLineup(team, from);
   return true;
+}
+export function outOfPositionCount(team) {
+  const roles = (FORMATIONS[team.tactics.baseFormation] || FORMATIONS['4-4-2']).map((s) => s.r);
+  return team.tactics.lineupSlots.filter((id, i) => { const p = team.squad.find((x) => x.id === id); return p && fitOf(p.position, roles[i]) < 1; }).length;
 }
 // "Stil op efter position": de 11 på banen flyttes rundt, så flest står på deres naturlige position – ingen ind eller ud
 export function arrangeLineup(team, from = team.tactics.baseFormation) {

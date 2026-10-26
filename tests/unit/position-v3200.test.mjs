@@ -66,13 +66,32 @@ test('formationsskift i Taktik fordeler de 11 efter position; "Stil op efter pos
 });
 
 // tools/measure-position.mjs (100 seeds = 1400 kampe): dit hold med 8 mand byttet inden for kæden (LB↔CB, CB↔RB, LM↔CM, CM↔RM).
-// Ombytningen koster i v3.19.0 0,51 mål pr. kamp (rollerne alene) – v3.20.0: 0,85–0,94 (positionsstraffen oveni). Botternes
+// Ombytningen koster i v3.19.0 0,51 mål pr. kamp (rollerne alene) – v3.20.0: 0,85 (4200 kampe; 0,94 ved 1400) – positionsstraffen
+// oveni ombytningen med v3.20-opstillingerne (uden straf: 0,56) er 0,29 (formations.js). Botternes
 // startere uden for position: v3.19.0-opstillingerne 23 %, nu 8 %. Dit holds andel af ligaens point: v3.19.0 0,127, nu 0,12–0,14.
 test('målt: 8 mand på naboplads koster mere end ombytningen selv (≤ −0,68 mål pr. kamp; v3.19: −0,51), og balancen holder', async () => {
   const { measurePosition } = await import('../../tools/measure-position.mjs');
   const r = await measurePosition(100);
   assert.ok(r.games >= 1400, `data: ${r.games}`);
-  assert.ok(r.delta <= -0.68, `ombyttet ${r.delta}`);
+  assert.ok(r.delta <= -0.68 && r.delta >= -1.2, `ombyttet ${r.delta}`);   // nedre grænse: en for hård straf (fx fit to gange) er også en fejl (QC K5)
   assert.ok(r.botOutOfPos <= 0.12, `botter uden for position ${r.botOutOfPos}`);
   assert.ok(r.myPointShare >= 0.10 && r.myPointShare <= 0.16, `dit holds andel ${r.myPointShare}`);
+});
+
+test('Hvis-Så til den formation, du spiller (med trukne positioner): kun trækkene nulstilles – din bevidste opstilling rokeres ikke (QC K1)', async () => {
+  const { simulateMatch } = await import('../../public/engine/match.js');
+  const L = createLeague(createRng(4)), me = L.teams[0];
+  [me.tactics.lineupSlots[1], me.tactics.lineupSlots[9]] = [me.tactics.lineupSlots[9], me.tactics.lineupSlots[1]];   // bevidst: ANG på LB
+  const lineup = me.tactics.lineupSlots.slice();
+  me.tactics.customCoords = { 5: { x: 20, y: 40 } };
+  me.tactics.conditionalRules = [{ ruleId: 1, minuteTrigger: 3, condition: 'ANY', margin: 1, newFormation: '4-4-2', newPlan: null, slotRemapping: [...Array(11).keys()], action: 'SHIFT', subOut: null, subIn: null }];
+  const rng = createRng(2), m = simulateMatch(me, L.teams[1], { ...rng, chance: (p) => (p === 0.06 ? false : rng.chance(p)) });
+  assert.ok(m.events.some((e) => e.type === 'TRIGGER'), 'data: reglen udløses');
+  assert.deepEqual(m.endState.home.customCoords, {});
+  assert.deepEqual(m.endState.home.starters, lineup);
+  // Med en ANDEN formation fordeles de: ANG'en står ikke længere på en back-plads
+  me.tactics.conditionalRules[0].newFormation = '4-3-3';
+  const r2 = createRng(2), m2 = simulateMatch(me, L.teams[1], { ...r2, chance: (p) => (p === 0.06 ? false : r2.chance(p)) });
+  const st = me.squad.find((p) => p.id === lineup[1]), roles = FORMATIONS['4-3-3'].map((s) => s.r);
+  assert.ok(!['LB', 'RB'].includes(roles[m2.endState.home.starters.indexOf(st.id)]), `ANG på ${roles[m2.endState.home.starters.indexOf(st.id)]}`);
 });

@@ -445,7 +445,7 @@ test('fixture skema 4 indlæses (parseSave) – positioner sat, intet tabt, migr
   const d = JSON.parse(FIXTURE4);
   assert.equal(r.state.league.teams.length, 8);
   assert.equal(r.state.league.leagueMetadata.round, d.league.leagueMetadata.round);
-  assert.ok(r.state.league.teams.every((t) => t.squad.length === 18 && t.squad.every((p) => ['GK', 'CB', 'FB', 'CM', 'WM', 'AM', 'ST'].includes(p.position))));
+  assert.ok(r.state.league.teams.every((t) => t.squad.length === 18 && t.squad.every((p) => ['GK', 'CB', 'FB', 'DM', 'CM', 'WM', 'AM', 'ST'].includes(p.position))));   // v3.20.0: + DM (7 → 8)
   assert.equal(JSON.stringify(r.state.league.teams[0].tactics.lineupSlots), JSON.stringify(d.league.teams[0].tactics.lineupSlots));
 });
 

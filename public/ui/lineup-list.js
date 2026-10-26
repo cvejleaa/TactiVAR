@@ -3,9 +3,9 @@
 // kolonnerne er kædens 3 nøgle-evner og kan sorteres. Kolonnerne og synligheden er regnearkets (COLUMNS + canSeeField) –
 // én vagt mod sortering på skjulte data for modstandere (QC).
 import { h, dec, LOCK } from './dom.js';
-import { LINE, starsEl } from './labels.js';
+import { LINE, POSITION, POSITION_FULL, starsEl, fitCost, FIT_HELP } from './labels.js';
 import { canSeeField } from '../engine/visibility.js';
-import { FORMATIONS } from '../engine/formations.js';
+import { FORMATIONS, fitOf } from '../engine/formations.js';
 import { matchBenchOf, reservesOf, KEY_SKILLS, keyAvg } from '../engine/career.js';
 import { COLUMNS, heatClass, avgRating } from './matrix.js';
 
@@ -40,13 +40,16 @@ export function renderLineupList({ team, isOwn, ui, onPick, onSort, onBlocked, o
     return h('td', { class: c.heat ? heatClass(v) : '' }, c.fmt ? c.fmt(v) : v);
   };
   const row = (p, kind) => {
-    const s = slotOf(p), place = kind === 'start' ? roles[s].r : kind === 'bench' ? 'Bænk' : 'Res';
+    const s = slotOf(p), place = kind === 'start' ? roles[s].r : kind === 'bench' ? 'Bænk' : 'Res', fit = kind === 'start' ? fitOf(p.position, roles[s].r) : 1;
     return h('tr', { class: `lp-row ${kind}-p` + (ui.swapId === p.id ? ' active' : '') + (p.injuryMatchesLeft > 0 ? ' injured' : ''), dataset: { pid: p.id },
       title: isOwn ? (kind === 'reserve' ? 'Reserve – ikke med i kampen. Klik og så en bænkspiller (eller en brik) for at tage ham med.' : 'Klik og så en anden spiller (her eller på banen) for at bytte') : '',
       onclick: () => onPick(p) },
-    h('td', { class: 'lp-place' }, place), h('td', {}, `#${p.shirtNumber} ${p.shortName}`), h('td', {}, h('span', { class: 'chip' }, LINE[p.line])), cols.map((c) => cell(c, p)));
+    h('td', { class: 'lp-place' + (fit < 1 ? ' off-pos' : ''), title: fit < 1 ? `Naturlig: ${POSITION_FULL[p.position]} – på ${place} koster det ${fitCost(fit)} i dueller` : '' }, place, fit < 1 ? ` ⚠ ${fitCost(fit)}` : ''),
+    h('td', {}, `#${p.shirtNumber} ${p.shortName}`),
+    // Kæde · naturlig position i alle tre sektioner (QC B4: så man kan se, hvem på bænken der passer)
+    h('td', { title: POSITION_FULL[p.position] ?? '' }, h('span', { class: 'chip' }, LINE[p.line]), ` ${POSITION[p.position] ?? ''}`), cols.map((c) => cell(c, p)));
   };
-  const head = h('tr', {}, h('th', {}, 'Plads'), h('th', {}, 'Spiller'), h('th', {}, 'Kæde'), cols.map((c) => {
+  const head = h('tr', {}, h('th', {}, 'Plads'), h('th', {}, 'Spiller'), h('th', { title: 'Kæde · naturlig position' }, 'Kæde/pos'), cols.map((c) => {
     const allowed = canSeeField(c.field, isOwn);
     return h('th', { class: (sortCol?.key === c.key ? 'sorted ' : '') + (allowed ? 'sortable' : 'locked'), title: c.title || c.label, onclick: () => (allowed ? onSort(c) : onBlocked(c)) }, c.label);
   }));
@@ -61,5 +64,6 @@ export function renderLineupList({ team, isOwn, ui, onPick, onSort, onBlocked, o
     h('div', { class: 'tablewrap' }, h('table', { class: 'matrix lp-table', id: 'lineup-table' }, h('thead', {}, head),
       h('tbody', { id: 'bench' }, [...section('Start-11', starters, 'start'), ...section(`Bænk (${benchAll} udtaget)`, bench, 'bench', auto),
         ...(reservesAll ? section(`Reserver (${reservesAll})`, reserves, 'reserve', null, 'reserves') : [])]))),
-    isOwn ? h('div', { class: 'muted help' }, 'Klik på to spillere (i listen eller på banen) = byt · Bænk og så reserve = tag reserven med i kampen · Træk en brik = justér positionen') : null);
+    isOwn ? h('div', { class: 'muted help' }, 'Klik på to spillere (i listen eller på banen) = byt · Bænk og så reserve = tag reserven med i kampen · Træk en brik = justér positionen') : null,
+    h('div', { class: 'muted help', id: 'fit-help' }, FIT_HELP));
 }

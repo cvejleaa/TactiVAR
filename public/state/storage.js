@@ -6,11 +6,12 @@ import { COUNTER_KEYS, scaleIntoPool, counterFloor } from '../engine/counter.js'
 import { heightAtQuantile, assignPositions, teamCareerDefaults, FIRST_NAMES, LAST_NAMES } from '../engine/generator.js';
 import { initialPotential, publicWage, uniquifyNames, derivedRng } from '../engine/career.js';
 import { buildSchedule } from '../engine/schedule.js';
+import { FORMATIONS, lineOfRole, positionOfRole, arrangeByFit } from '../engine/formations.js';
 import { endSeason } from '../engine/season.js';
 
 export const SAVE_KEY = 'tactivar_save';
 export const BACKUP_PREFIX = 'tactivar_backup_';
-export const SCHEMA_VERSION = 7;
+export const SCHEMA_VERSION = 8;
 
 // Migreringer: MIGRATIONS[n] løfter et gemt objekt fra skema n til n+1. Tilføj en ny,
 // hver gang gemme-formatet ændres – sammen med et fixture fra forrige version i
@@ -115,6 +116,29 @@ export const MIGRATIONS = {
       fixNameTexts(L, renamed);
     }
     return { ...d, schemaVersion: 7 };
+  },
+  // 7 → 8 (v3.20.0): DM som naturlig position, og spil uden for position koster. Offentlige regler, intet andet ændres
+  // (ingen højde, alder eller evner). Pr. hold ÉN CM → DM: (1) en CM på en CDM-plads, (2) en CM uden for startopstillingen,
+  // der ikke er STAR, laveste rygnummer, (3) en CM, der ikke er STAR, laveste rygnummer. Botterne: som i en ny liga står
+  // deres startere på pladsens position, når kæden passer, og de 11 fordeles efter position (samme 11 – QC B1: ellers fik
+  // botterne straffen hver runde). Dit hold: kun DM-reglen – din opstilling og dine spilleres positioner røres ikke.
+  7: (d) => {
+    const L = d.league;
+    if (!L || !Array.isArray(L.teams)) return { ...d, schemaVersion: 8 };
+    for (const t of L.teams) {
+      const squad = Array.isArray(t.squad) ? t.squad : [], slots = t.tactics?.lineupSlots ?? [], roles = (FORMATIONS[t.tactics?.baseFormation] || FORMATIONS['4-4-2']).map((s) => s.r);
+      const byId = new Map(squad.map((p) => [p.id, p]));
+      // Positionen bliver den rolle, han har spillet for botten (højden røres ikke – en migreret bots stopper kan være 178 cm)
+      if (t.isBot) slots.forEach((id, i) => { const p = byId.get(id), to = roles[i] && positionOfRole(roles[i]); if (p && to && p.line === lineOfRole(roles[i])) p.position = to; });
+      if (!squad.some((p) => p.position === 'DM')) {
+        const cms = squad.filter((p) => p.position === 'CM').sort((a, b) => a.shirtNumber - b.shirtNumber);
+        const onCdm = cms.find((p) => roles[slots.indexOf(p.id)] === 'CDM');
+        const pick = onCdm ?? cms.find((p) => !slots.includes(p.id) && p.roleTier !== 'STAR') ?? cms.find((p) => p.roleTier !== 'STAR');
+        if (pick) pick.position = 'DM';
+      }
+      if (t.isBot && slots.length === 11 && slots.every((id) => byId.has(id))) t.tactics.lineupSlots = arrangeByFit(slots.map((id) => byId.get(id)), t.tactics.baseFormation).map((p) => p.id);
+    }
+    return { ...d, schemaVersion: 8 };
   },
 };
 const pick = (o, keys) => Object.fromEntries(keys.filter((k) => o[k] !== undefined).map((k) => [k, o[k]]));

@@ -1,6 +1,6 @@
 // Formation, Plan A/B/C, de tre kampfaser og Hvis-Så-reglerne (docs/spec.md §4).
 import { h, select } from './dom.js';
-import { PHASE_OPTIONS, CONDITIONS, MARGINS } from './labels.js';
+import { PHASE_OPTIONS, CONDITIONS, MARGINS, POSITION } from './labels.js';
 import { FORMATION_NAMES } from '../engine/formations.js';
 import { matchBenchOf } from '../engine/career.js';
 import { MAX_RULES } from '../state/actions.js';
@@ -34,7 +34,7 @@ export function renderTactics({ team, isOwn, ui, on }) {
   h('optgroup', { label: 'Kun formation' }, formations.map(([f]) => h('option', { value: `form:${f}`, selected: targetOf(r) === `form:${f}` }, f))));
   // Udskiftning i en regel: spiller ud (fra startopstillingen) og ind (fra bænken), angivet med id, så det følger
   // spilleren, ikke pladsen. En advarsel står straks, hvis reglen ikke længere passer til opstillingen (Spilfører).
-  const nameOf = (p) => `#${p.shirtNumber} ${p.shortName}`;
+  const nameOf = (p) => { const pos = POSITION[p.position] ?? p.line; return `#${p.shirtNumber} ${p.shortName}${pos ? ` (${pos})` : ''}`; };   // v3.20.0: positionen – indskifteren overtager pladsen
   const starters = t.lineupSlots.map((id) => team.squad.find((p) => p.id === id)).filter(Boolean);
   const benchPl = matchBenchOf(team);   // v3.18.0: kun kamptruppens bænk kan skiftes ind
   const subPicker = (r, i) => {

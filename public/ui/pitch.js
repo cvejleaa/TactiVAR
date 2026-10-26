@@ -1,7 +1,8 @@
 // Taktiktavlen: "Rolle-anker & frit træk" (docs/spec.md §4). Målmanden og modstanderens
 // brikker kan ikke trækkes; uden for ankerradius 28 vises "⚠ Ude af zone (-20%)".
 import { h } from './dom.js';
-import { FORMATIONS, MAX_ANCHOR_RADIUS, slotPosition, isOutOfZone, clampPos } from '../engine/formations.js';
+import { FORMATIONS, MAX_ANCHOR_RADIUS, slotPosition, isOutOfZone, clampPos, fitOf } from '../engine/formations.js';
+import { POSITION_FULL, fitCost } from './labels.js';
 
 export function renderPitch({ team, isOwn, ui, onMove, onSelect, onTokenSwap }) {
   const coords = FORMATIONS[team.tactics.baseFormation];
@@ -15,11 +16,14 @@ export function renderPitch({ team, isOwn, ui, onMove, onSelect, onTokenSwap }) 
     const pos = slotPosition(team.tactics, slot);
     const out = isOutOfZone(team.tactics, slot);
     const custom = !!team.tactics.customCoords?.[slot];
+    // v3.20.0: uden for position – vises sammen med zone-flaget (begge koster), tallet fra tabellen
+    const fit = p ? fitOf(p.position, coords[slot].r) : 1;
     const token = h('div', {
       class: `token${out ? ' out' : custom ? ' custom' : ''}${ui.selectedPlayerId === pid ? ' selected' : ''}${ui.pitchSwapId === pid ? ' swapping' : ''}${p?.injuryMatchesLeft > 0 ? ' injured' : ''}`,
-      style: { left: pos.x + '%', top: pos.y + '%' }, dataset: { slot: String(slot) }, title: `${coords[slot].r} – ${p ? p.name : '?'}`,
+      style: { left: pos.x + '%', top: pos.y + '%' }, dataset: { slot: String(slot), fit: String(fit) }, title: `${coords[slot].r} – ${p ? p.name : '?'}${p ? ` · naturlig: ${POSITION_FULL[p.position] ?? p.position}${fit < 1 ? ` – her ${fitCost(fit)} i dueller` : ''}` : ''}`,
     }, h('span', { class: 'token-num' }, p ? String(p.shirtNumber) : '?'), h('span', { class: 'token-name' }, p ? p.shortName : '?'),
-      out ? h('span', { class: 'token-flag' }, '⚠ Ude af zone (-20%)') : custom ? h('span', { class: 'token-flag ok' }, '✅ Custom pos') : null);
+      out ? h('span', { class: 'token-flag' }, '⚠ Ude af zone (-20%)') : custom ? h('span', { class: 'token-flag ok' }, '✅ Custom pos') : null,
+      fit < 1 ? h('span', { class: 'token-flag pos' }, `⚠ Uden for position (${fitCost(fit)})`) : null);
     token.addEventListener('click', () => {
       if (!p || token.dataset.dragged) { delete token.dataset.dragged; return; }
       // Eget hold: første klik vælger, klik på en anden brik bytter de to (som i v2.5).

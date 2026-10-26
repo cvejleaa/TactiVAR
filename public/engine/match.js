@@ -1081,7 +1081,8 @@ export function simulateMatch(home, away, rng, opts = {}) {
       const validRemap = Array.isArray(remap) && remap.length === 11 && new Set(remap).size === 11 && remap.every((i) => i >= 0 && i < 11);
       // v3.20.0: dit hold (ombytningen kan ikke redigeres i UI'et) og en bot uden ombytning fordeles efter position;
       // en bots bevidste ombytning (generator.js BOT_PROFILES) bevares
-      if (!side.team.isBot || !validRemap || remap.every((v, i) => v === i)) refit(side, rule.newFormation);
+      // Samme formation (dine trukne positioner nulstilles): ingen omrokering – din opstilling er bevidst (QC K1)
+      if (rule.newFormation === from) { /* kun trækkene */ } else if (!side.team.isBot || !validRemap || remap.every((v, i) => v === i)) refit(side, rule.newFormation);
       else { const old = side.starters.slice(); side.starters = remap.map((i) => old[i]); }
       side.tactics.baseFormation = rule.newFormation;
       side.tactics.customCoords = {};
