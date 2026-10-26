@@ -769,6 +769,13 @@ try {
   await g.evaluate(() => { const b = document.getElementById('fejlboks'); b.hidden = true; b.textContent = ''; });
 
   // v3.10: et gem fra v3.9 (runde 2) – kun v3.11's kampprogram-besked, statistikken starter tom fra runde 3
+  // v3.20.0 (QC): et gem fra v3.19.0 med dit hold i 4-3-3 – beskeden navngiver din DM og tæller dine uden for position = flagene på Taktik
+  const fixtureV319 = fs.readFileSync(new URL('../fixtures/save-v3.19.0.json', import.meta.url), 'utf8');
+  await g.evaluate((f) => { for (const k of Object.keys(localStorage)) if (k.startsWith('tactivar_')) localStorage.removeItem(k); localStorage.setItem('tactivar_save', f); }, fixtureV319);
+  await reload();
+  { const note = await g.textContent('#notice'), dm = await g.evaluate(() => { const t = JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((x) => !x.isBot); const p = t.squad.find((x) => x.position === 'DM'); return `#${p.shirtNumber} ${p.shortName}`; });
+    await tab('taktik'); const flags = await g.locator('#pitch .token-flag.pos').count(), n = Number((note.match(/: (\d+) af dine står uden for position/) ?? [])[1]);
+    check('Gem fra v3.19.0: beskeden navngiver din DM, siger at din opstilling er urørt, og antallet uden for position = flagene på Taktik', note.includes(`${dm} nu DM`) && note.includes('Din egen opstilling er ikke ændret') && flags >= 1 && n === flags && (await g.locator('#arrange-lineup').isVisible()), `${flags} flag · ${note.slice(0, 400)}`); }
   const fixtureV39 = fs.readFileSync(new URL('../fixtures/save-v3.9.json', import.meta.url), 'utf8');
   await g.evaluate((f) => { for (const k of Object.keys(localStorage)) if (k.startsWith('tactivar_')) localStorage.removeItem(k); localStorage.setItem('tactivar_save', f); }, fixtureV39);
   await reload();

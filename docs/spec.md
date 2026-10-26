@@ -180,8 +180,10 @@ Tick hvert 3. minut (1..90).
   Kalibreret med `tools/measure-position.mjs` (4200 kampe): planens 0,95/0,88/0,75 kostede 0,58 mål pr. kamp for
   8 mand på naboplads – brugerens "mildt" (≈ 0,15 for 4-5 forkerte) gav 0,975/0,94/0,85. Bånd i
   `tests/unit/position-v3200.test.mjs` (ombytning −0,68…−1,2 mål pr. kamp; v3.19.0 −0,51).
-  Opstilling: ny liga og botternes migrering vælger efter offentlige data × fit (career.js `bestEleven`,
-  formations.js `pickByFit`/`arrangeByFit`, optimal tildeling); en STAR bænkes ikke for en naboplads.
+  Opstilling: en ny liga vælger efter offentlige data × fit (career.js `bestEleven`, formations.js `pickByFit`,
+  optimal tildeling) – en STAR bænkes ikke for en naboplads; migreringen 7 → 8 fordeler botternes SAMME 11 efter
+  position (`arrangeByFit`, §9 – bestEleven midt i en sæson bænkede trætte stjerner). Højden følger positionen ved
+  oprettelsen; en migreret bots starter kan have en anden position end sin højde (den rolle, han spillede).
   Formationsskift (Taktik, plan, Hvis-Så) fordeler de samme 11 efter position – ved lighed samme side og plads;
   "⇄ Stil op efter position" i Taktik gør det samme. Hvis-Så til den formation, man spiller, rokerer ikke.
   **Kendt følge:** botternes egne Hvis-Så-ombytninger (generator.js BOT_PROFILES – 5-3-2/5-4-1 → 4-4-2, 5-4-1-
