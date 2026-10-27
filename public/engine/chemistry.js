@@ -95,6 +95,8 @@ export function decayChemistry(team, round) {
 
 // Ligaens snit (v3.23.0, brugerens valg "i forhold til ligaen"): middel samspil af de nabopar, alle hold stiller op med lige nu –
 // virkningen i kampene (v3.24.0) måles mod det, så samspil hverken inflaterer over sæsonerne eller kun kan straffe.
+// Ligaens snit til virkningen: det gemte (sat efter hver runde), ellers regnet nu – efter en migrering eller i en ny liga (QC).
+export const chemRefOf = (league) => { const v = league?.leagueMetadata?.chemRef; return Number.isFinite(v) ? Math.max(STRANGER, Math.min(CHEM_MAX, v)) : leagueChemRef(league); };
 export function leagueChemRef(league) {
   let n = 0, sum = 0;
   for (const t of league.teams) {
@@ -121,5 +123,5 @@ export function cleanChemistry(chem, ids) {
     return !rest.length && a !== b && ids.has(a) && ids.has(b) && k === pairKey(a, b) && Array.isArray(v) && v.length === 2
       && Number.isFinite(v[0]) && v[0] >= 0 && v[0] <= CHEM_MAX && Number.isInteger(v[1]) && v[1] >= 0;
   }).sort((x, y) => y[1][0] - x[1][0]).slice(0, PAIR_CAP);
-  return Object.fromEntries(ok);
+  return ok.length ? Object.fromEntries(ok) : null;   // ingen gyldige par: seedes igen (QC – ellers var hele holdet tavst fremmede)
 }

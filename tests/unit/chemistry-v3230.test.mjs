@@ -103,11 +103,9 @@ test('runden: commitRound giver startopstillingens nabopar vækst og ligaens sni
   const res = playRound(L, rng);
   const m = res.matches.find((x) => x.homeId === t.id || x.awayId === t.id), list = m.homeId === t.id ? m.ratings.home : m.ratings.away;
   const both90 = [slots[i], slots[j]].every((id) => list.some((e) => e.playerId === id && (e.minIn ?? 1) <= 1 && (e.minOut ?? 90) >= 90));
+  assert.ok(both90, 'data: CB-parret spillede hele kampen (seed 11)');
   commitRound(L, res, rng);
-  const v = t.chemistry[pairKey(slots[i], slots[j])];
-  if (both90) assert.deepEqual(v, [79.3, 1], 'CB-parret: 81,1 efter kampen, − 0,035 · 51,1 = 79,31 efter runden');
-  else assert.ok(v[0] > 0);
-  assert.ok(Number.isFinite(L.leagueMetadata.chemRef) && L.leagueMetadata.chemRef > STRANGER && L.leagueMetadata.chemRef < 100);
+  assert.deepEqual(t.chemistry[pairKey(slots[i], slots[j])], [79.3, 1], 'CB-parret: 81,1 efter kampen, − 0,035 · 51,1 = 79,31 efter runden');
   assert.equal(L.leagueMetadata.chemRef, leagueChemRef(L));
 });
 
@@ -121,7 +119,8 @@ test('gemmet: ukendte spillere, forkert form og over loftet ryddes; mangler tabe
   assert.equal(Object.keys(kept).length, PAIR_CAP); assert.ok(Math.min(...Object.values(kept).map((x) => x[0])) >= Math.min(...Object.values(many).map((x) => x[0])));
   const L = createLeague(createRng(2)); delete L.teams[3].chemistry; L.teams[2].chemistry = { 'nope|x': [50, 1] };
   normalizeLeague(L);
-  assert.ok(Object.keys(L.teams[3].chemistry).length > 50, 'seedet'); assert.deepEqual(L.teams[2].chemistry, {}, 'ryddet, ikke seedet');
+  assert.ok(Object.keys(L.teams[3].chemistry).length > 50, 'manglede: seedet');
+  assert.ok(Object.values(L.teams[2].chemistry).length > 50 && Object.values(L.teams[2].chemistry).every(([v]) => v === CHEM_BASE), 'kun ugyldige par: seedet igen (QC – ellers tavst fremmede)');
 });
 
 // Gemmet fra forrige version (CLAUDE.md §9): tests/fixtures/save-v3.22.1.json er lavet med v3.22.1-koden (main cbb5c30): ny liga
@@ -155,4 +154,14 @@ test('målt: botternes samspil i ligevægt ligger under loftet (72–86; uden tr
   assert.ok(r.base >= 72 && r.base <= 86, `ligevægt ${r.base}`);
   assert.ok(Math.abs(r.base - CHEM_BASE) <= 5, `seed ${CHEM_BASE} mod ${r.base}`);
   assert.ok(r.high < 0.05 && r.sd >= 2, `andel ≥ 95: ${r.high}, spredning ${r.sd}`);
+});
+
+test('ligaens snit (chemRef): middel af nabopar i opstillingerne – kendt værdi på en håndbygget liga; uden gemt værdi regnes det nu', async () => {
+  const { chemRefOf } = await import('../../public/engine/chemistry.js');
+  const L = createLeague(createRng(5));
+  for (const t of L.teams) { const slots = t.tactics.lineupSlots; t.chemistry = {}; for (const [a, b] of neighbourPairs(t.tactics.baseFormation)) t.chemistry[pairKey(slots[a], slots[b])] = [t === L.teams[0] ? 90 : 70, 0]; }
+  const per = L.teams.map((t) => neighbourPairs(t.tactics.baseFormation).length), want = Math.round(((per[0] * 90 + per.slice(1).reduce((x, y) => x + y, 0) * 70) / per.reduce((x, y) => x + y, 0)) * 10) / 10;
+  assert.equal(leagueChemRef(L), want, `(${per[0]}·90 + resten·70)/alle`);
+  delete L.leagueMetadata.chemRef; assert.equal(chemRefOf(L), want, 'ingen gemt værdi: regnet nu');
+  L.leagueMetadata.chemRef = 500; assert.equal(chemRefOf(L), 100, 'klemt'); L.leagueMetadata.chemRef = 75; assert.equal(chemRefOf(L), 75);
 });

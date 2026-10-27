@@ -200,7 +200,6 @@ export function commitRound(league, result, rng) {
   }
   for (const m of result.matches) for (const inj of m.injuries) players.get(inj.playerId).injuryMatchesLeft = inj.matches;
   for (const t of league.teams) decayChemistry(t, result.round);
-  league.leagueMetadata.chemRef = leagueChemRef(league);   // ligaens snit – grundlaget for samspillets virkning (v3.24.0)
   // Træning (v3.18.0) – efter kampene og skaderne, før næste runde
   trainRound(league, result, minutesOf(result));
 
@@ -218,6 +217,8 @@ export function commitRound(league, result, rng) {
     openWindow(league);   // transfervinduet ved sæsonslut
     if (result.gazette) result.gazette.seasonEnd = end;
   } else if (seasonRoundOf(league, result.round) === 7) openWindow(league);   // vinduet før runde 8
+  // Ligaens snit af samspil – efter sæsonskiftet og vinduets handler (QC: ellers forældet i en ny sæsons første runde)
+  league.leagueMetadata.chemRef = leagueChemRef(league);
   return league;
 }
 
