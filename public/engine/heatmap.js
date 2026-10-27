@@ -92,7 +92,7 @@ export function actsOf(acts, side, playerId) {
       if (playerId == null) continue;
       if (s === side && a === playerId) out.won++;
       else if (s !== side && b === playerId) { if (kind === 'trap') out.offside++; else out.lost++; }
-    } else if (COMBO_LABEL[kind] && s === side && (playerId == null || a === playerId || b === playerId)) {
+    } else if (Object.hasOwn(COMBO_LABEL, kind) && s === side && (playerId == null || a === playerId || b === playerId)) {
       out.combos.push({ t, kind, from: a, to: b, out: a === playerId, with: a === playerId ? b : a, ok });
     }
   }

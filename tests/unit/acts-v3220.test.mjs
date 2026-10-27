@@ -53,17 +53,27 @@ test('actsOf: erobringer, bolde tabt, offside og kombinationer begge veje – p�
   assert.equal(actsOf(null, 'h', 'p1'), null, 'ingen log (kamp fra før v3.22.0): intet tal – ikke 0');
 });
 
-test('viewActs: kun ejeren får handlingsloggen; et spor uden log giver null', () => {
-  const tr = M[0].trace;
-  assert.equal(viewActs(tr, true), tr.acts); assert.ok(tr.acts.length > 0);
-  assert.equal(viewActs(tr, false), null);
-  assert.equal(viewActs({ v: 1, frames: [], moments: [] }, true), null);
+test('viewActs: kun din side – dine poster og modstanderens erobringer fra dine spillere UDEN hans navn; hans kombinationer (cross/long røber stilen) aldrig', () => {
+  const tr = M[0].trace, opp = (s) => (s === 'h' ? 'a' : 'h');
+  for (const side of ['h', 'a']) {
+    const v = viewActs(tr, side);
+    assert.deepEqual(v.filter((x) => x[2] === side), tr.acts.filter((x) => x[2] === side), 'egne poster uændrede');
+    const theirs = v.filter((x) => x[2] === opp(side));
+    assert.deepEqual(theirs.map((x) => [x[0], x[1], x[4]]), tr.acts.filter((x) => x[2] === opp(side) && x[5] === null).map((x) => [x[0], x[1], x[4]]), 'hans erobringer – modparten (din spiller) står');
+    assert.ok(theirs.every((x) => x[3] === null), 'hans spiller er fjernet');
+    assert.ok(!v.some((x) => x[2] === opp(side) && x[5] !== null), 'ingen af hans kombinationer');
+  }
+  assert.ok(tr.acts.some((x) => x[5] !== null) && tr.acts.some((x) => x[5] === null), 'data: begge slags poster');
+  assert.equal(viewActs(tr, null), null, 'ikke dit hold');
+  assert.equal(viewActs({ v: 1, frames: [], moments: [] }, 'h'), null);
+  // Bolde tabt tæller stadig rigtigt på den filtrerede log (actsOf bruger kun modparten)
+  for (const m of M.slice(0, 20)) for (const e of m.ratings.home) assert.equal(actsOf(viewActs(m.trace, 'h'), 'h', e.playerId).lost, actsOf(m.trace.acts, 'h', e.playerId).lost);
 });
 
 test('gemmet: et spor med gyldig log er gyldigt; en ødelagt log afviser sporet; et spor uden log (før v3.22.0) er stadig gyldigt', () => {
   const tr = structuredClone(M[1].trace);
   assert.ok(isValidTrace(tr));
   assert.ok(isValidTrace({ ...tr, acts: undefined }));
-  for (const bad of [[[1, 'press', 'x', 'a', 'b', null]], [[1, 'cb', 'h', 'a', 'b', 3]], [[-1, 'press', 'h', 'a', 'b', null]], [[1, 'press', 'h', 'a']], 'x', Array(401).fill([1, 'press', 'h', 'a', 'b', null])])
+  for (const bad of [[[1, 'toString', 'h', 'a', 'b', null]], [[1, 'press', 'h', {}, 'b', null]], [[1, 'press', 'x', 'a', 'b', null]], [[1, 'cb', 'h', 'a', 'b', 3]], [[-1, 'press', 'h', 'a', 'b', null]], [[1, 'press', 'h', 'a']], 'x', Array(401).fill([1, 'press', 'h', 'a', 'b', null])])
     assert.equal(isValidTrace({ ...tr, acts: bad }), false, JSON.stringify(bad).slice(0, 60));
 });

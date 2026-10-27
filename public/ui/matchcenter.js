@@ -87,7 +87,7 @@ function ratingsTable(list, isOwn, title, formation, snap = null, onSnap = null,
   const mine = canHeat ? heat.mine ?? { playerId: null } : null;
   return h('div', { class: 'ratings' }, h('h4', {}, title),
     heat?.trace && !isOwn ? thirdsLine(heat.trace, heat.side, gkId, heat.vsMe, down, heat.stoppage, heat.events) : null,
-    canHeat ? heatPitch(rows, { ...heat, mine, acts: viewActs(heat.trace, isOwn) }, gkId, span) : null,
+    canHeat ? heatPitch(rows, { ...heat, mine, acts: viewActs(heat.trace, isOwn ? heat.side : null) }, gkId, span) : null,
     // Øjebliksbillede ved et mål (kun dit hold, v3.12.1) – ellers startopstillingen
     isOwn && snap ? snapPitch(rows, snap, onSnap)
       : formation && rows.some((e) => isStarter(e) && e.slot != null) ? miniPitch(rows.filter(isStarter), formation, isOwn, down) : null,
@@ -158,7 +158,7 @@ function matchNumbers(pid, a, rows, heat) {
   if (!a) return h('div', { class: 'muted', id: 'match-numbers' }, '📊 Kampens tal findes for kampe spillet fra v3.22.0.');
   const byId = new Map(rows.map((r) => [r.playerId, r]));
   const who = (id) => { const r = byId.get(id); return r ? `#${r.shirtNumber} ${r.shortName}` : 'en medspiller'; };
-  const minOf = (c) => { const tg = who(c.to), e = (heat.events ?? []).find((x) => x.min === c.t && x.text?.includes(tg)); return e ? evMin(e) : fmtMin(tickClock(c.t / 3, heat.stoppage)); };
+  const minOf = (c) => { const tg = who(c.to), e = (heat.events ?? []).find((x) => x.min === c.t && typeof x.text === 'string' && x.text.includes(tg)); return e ? evMin(e) : fmtMin(tickClock(c.t / 3, heat.stoppage)); };
   const combos = a.combos.slice().sort((x, y) => x.t - y.t);
   const line = (c) => `${pid == null ? `${who(c.from)} til ${who(c.to)}` : c.out ? `til ${who(c.to)}` : `fra ${who(c.from)}`}: ${COMBO_LABEL[c.kind]}, ${minOf(c)} – ${COMBO_OUT[c.ok]}`;
   const none = 'ingen cutbacks, indlæg, løb eller dødbolde med en medspiller i denne kamp';

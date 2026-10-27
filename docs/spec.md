@@ -515,7 +515,9 @@ bedre kan kontrollere spil motoren".
   tilfældigt, QC). Under holdets heat map står 🤝 Holdets samarbejde (alle kombinationer, "X til Y"); klik på din spiller: erobringer, bolde tabt,
   gange fanget offside og 🤝 Samarbejde ("til …"/"fra …", minut og udfald). Minuttet er referatets (linjen i tick'et, der nævner
   modtageren; ellers tick'ets ur). Dueller og luftdueller står kun i listen (🤼, ✈ – én kilde).
-  Kun dit hold (`visibility.js viewActs`); en kamp fra før v3.22.0 viser "findes fra v3.22.0", aldrig 0. Over 8 poster pr. kamp (acts-v3220.test.mjs; ca. 13 og 0,5 KB i 200 kampe),
+  Kun dit hold vises (`visibility.js viewActs`: dine poster og modstanderens erobringer fra dine spillere uden hans navn – hans
+  'cross'/'long' ville røbe angrebsfokus og afleveringsstil). Dataene ligger i gemmet for begge hold som resten af sporet (§3) og
+  skal deles op pr. side i trin 2; en kamp fra før v3.22.0 viser "findes fra v3.22.0", aldrig 0. Over 8 poster pr. kamp (acts-v3220.test.mjs; ca. 13 og 0,5 KB i 200 kampe),
   kun i den seneste runde. Ikke pr. zone: positionerne er en formel (rolle og pres), så en zone ville gentage rollen
   (QC). Samspil som mekanik (par, der spiller sig sammen) er overvejet som næste trin.
 - **Heat map** (karakterarket, dit hold – v3.20.0: står fra start over startopstillingen, som modstanderens zonekort; 📍 erstatter

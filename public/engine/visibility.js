@@ -35,10 +35,13 @@ export function viewRatingEntry(entry, viewerOwnsTeam) {
   return out;
 }
 
-// Kampens tal (v3.22.0, trace.acts): hvem erobrede bolden fra hvem og hvem kombinerede med hvem – kun for seerens eget hold
-// (samme valg som heat map'et pr. spiller, §3): tallene røber pres, løb og holdets mønstre. null = ingen tal at vise.
-export function viewActs(trace, viewerOwnsTeam) {
-  return viewerOwnsTeam && Array.isArray(trace?.acts) ? trace.acts : null;
+// Kampens tal (v3.22.0, trace.acts): kun seerens egen side (ownSide 'h'/'a'; null = ikke hans hold → null). Hans egne poster
+// og modstanderens erobringer FRA hans spillere – uden modstanderens spiller (Security Reviewer: modstanderens 'cross'/'long'
+// røbede angrebsfokus og afleveringsstil, offside-fældens back og dødboldtageren står ikke i referatet). Dataene ligger stadig
+// i gemmet (trin 1, §3) – det er visningen, der er afgrænset.
+export function viewActs(trace, ownSide) {
+  if ((ownSide !== 'h' && ownSide !== 'a') || !Array.isArray(trace?.acts)) return null;
+  return trace.acts.filter((x) => x[2] === ownSide || x[5] === null).map((x) => (x[2] === ownSide ? x : [x[0], x[1], x[2], null, x[4], null]));
 }
 
 // Må seeren sortere/filtrere på dette felt for dette hold? (blokerer "sort-spoofing").
