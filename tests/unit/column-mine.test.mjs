@@ -238,7 +238,7 @@ test('kun seerens egen kamprapport læses: to menneskehold i samme kamp får hve
 test('"De øvrige kampe": seerens egen kamp er ikke med, hver kamp har sit indeks, sin overskrift og sin ene sætning (comeback > sent mål > stil)', () => {
   const o = (idx, o2) => M({ h: `x${idx}`, a: `y${idx}`, hn: `H${idx}`, an: `U${idx}`, ...o2 });
   const matches = [
-    o(0, { hG: 1, aG: 2, ev: [[10, 'GOAL', true, 1, 0], [40, 'GOAL', false, 1, 1], [60, 'GOAL', false, 1, 2]] }),   // udehold vender
+    o(0, { hG: 1, aG: 2, ev: [[10, 'GOAL', true, 1, 0], [50, 'GOAL', false, 1, 1], [60, 'GOAL', false, 1, 2]] }),   // udehold vender (bagud til efter pausen – v3.21.2)
     o(1, { hG: 2, aG: 1, ev: [[10, 'GOAL', true, 1, 0], [40, 'GOAL', false, 1, 1], [83, 'GOAL', true, 2, 1]] }),     // sent hjemmemål
     M({ hG: 1, aG: 0 }),                                                                                              // seerens kamp (indeks 2)
     o(3, { hG: 0, aG: 1, stats: { hPoss: 30, aPoss: 70 } }),                                                          // udesejr, vinderen har bolden
@@ -248,11 +248,12 @@ test('"De øvrige kampe": seerens egen kamp er ikke med, hver kamp har sit indek
     o(7, { hG: 2, aG: 1, stats: { hPoss: 70, aPoss: 30 } }),                                                          // hjemmesejr uden at 'wait' passer
     o(8, { hG: 1, aG: 2, ev: [[10, 'GOAL', false, 0, 1], [20, 'GOAL', true, 1, 1], [85, 'GOAL', false, 1, 2]] }),                  // sent udemål uden at have været bagud
     o(9, { hG: 0, aG: 0 }),
-    o(10, { hG: 1, aG: 2, ev: [[10, 'GOAL', true, 1, 0], [40, 'GOAL', false, 1, 1], [60, 'GOAL', false, 1, 2]] }),               // endnu et udehold-comeback (indeks 10)
+    o(10, { hG: 1, aG: 2, ev: [[10, 'GOAL', true, 1, 0], [50, 'GOAL', false, 1, 1], [60, 'GOAL', false, 1, 2]] }),               // endnu et udehold-comeback (indeks 10)
+    o(11, { hG: 1, aG: 2, ev: [[10, 'GOAL', true, 1, 0], [40, 'GOAL', false, 1, 1], [60, 'GOAL', false, 1, 2]] }),               // v3.21.2: udlignet FØR pausen – ikke et comeback
   ];
   const c = buildColumn(inp({ matches, round: 5 }));
   const others = sec(c, 'col-others').others;
-  assert.deepEqual(others.map((x) => x.idx), [0, 1, 3, 4, 5, 6, 7, 8, 9, 10], 'seerens kamp (indeks 2) er fravalgt, indeksene er kampens plads i runden');
+  assert.deepEqual(others.map((x) => x.idx), [0, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11], 'seerens kamp (indeks 2) er fravalgt, indeksene er kampens plads i runden');
   const by = Object.fromEntries(others.map((x) => [x.idx, x]));
   for (const x of others) assert.equal(x.head, headlineOf(publicFacts(matches[x.idx], x.idx), 5), `overskrift ${x.idx}`);
   assert.notEqual(by[3].head, headlineOf(publicFacts(matches[3], 3), 0), 'runden indgår i overskriften (runde 5 ≠ 0 for denne kamp)');
@@ -265,6 +266,7 @@ test('"De øvrige kampe": seerens egen kamp er ikke med, hver kamp har sit indek
   assert.equal(by[6].note, say('air', 'U6', 6), 'to regler passer: den første i tabellen');
   assert.equal(by[7].note, say('ball', 'H7', 7));
   assert.match(by[8].note, /^(Afgjort i 85\. minut\.|U8 slog til sent – i 85\. minut\.|Sejrsmålet faldt i 85\. minut\.)$/, 'udeholdet var aldrig bagud → sent mål, ikke comeback');
+  assert.doesNotMatch(by[11].note, /bagfra|vendte|Comeback/, 'bagud 0-1 kun før pausen er ikke et comeback (v3.21.2)');
   // Bogstavelige pinde i runde 5: valget afhænger af skabelon-nøglen OG kampens indeks (indeks 0 og 10 vælger hver sin comeback-tekst, 1 sin sent-mål-tekst)
   assert.deepEqual([by[0].note, by[10].note, by[1].note], ['Comeback til U0.', 'U10 kom bagfra og vandt.', 'Afgjort i 83. minut.']);
   assert.deepEqual(c.sections.map((x) => x.title), ['Din kamp', 'De øvrige kampe'], 'afsnitstitlerne');
@@ -276,19 +278,22 @@ test('"De øvrige kampe": seerens egen kamp er ikke med, hver kamp har sit indek
 
 // ---------- Overskriften: rundens største historie ----------
 const NEUTRAL = (i) => M({ h: `n${i}`, a: `m${i}`, hn: `N${i}`, an: `M${i}`, hG: 1, aG: 0 });
-const OTHER_CB = M({ h: 'c1', a: 'c2', hn: 'C1', an: 'C2', hG: 1, aG: 2, ev: [[10, 'GOAL', true, 1, 0], [40, 'GOAL', false, 1, 1], [60, 'GOAL', false, 1, 2]] });
+const OTHER_CB = M({ h: 'c1', a: 'c2', hn: 'C1', an: 'C2', hG: 1, aG: 2, ev: [[10, 'GOAL', true, 1, 0], [50, 'GOAL', false, 1, 1], [60, 'GOAL', false, 1, 2]] });
 const OTHER_LATE = M({ h: 'l1', a: 'l2', hn: 'L1', an: 'L2', hG: 2, aG: 1, ev: [[10, 'GOAL', true, 1, 0], [40, 'GOAL', false, 1, 1], [85, 'GOAL', true, 2, 1]] });
 const UPSET = { upset: { winner: 'U1', loser: 'U2', winnerPos: 7, loserPos: 1, score: '2-1' } };
 const MINE_CB = [[10, 'GOAL', false, 0, 1], [50, 'GOAL', true, 1, 1], [60, 'GOAL', true, 2, 1]];
 const MINE_CB_BIG = [[10, 'GOAL', false, 0, 1], [20, 'GOAL', true, 1, 1], [30, 'GOAL', true, 2, 1], [40, 'GOAL', true, 3, 1], [50, 'GOAL', true, 4, 1]];
+// v3.21.2 (Spilfører: "vi vandt 5-1 ude, men overskriften er 'FC Vejleå vendte kampen'"): din kamps historier før de andres –
+// før: overraskelse > andres comeback > dit comeback > sent drama > stor sejr
 const FEATURES = [   // faldende nyhedsværdi: [navn, titel]
-  ['upset', 'Overraskelse: U1 slog U2'], ['oc', 'C2 vendte kampen'], ['mc', 'Hjem kom tilbage mod Ude'], ['ol', 'Sent drama: L1 afgjorde det i 85. minut'], ['big', 'Hjem kørte over Ude'],
+  ['upset', 'Overraskelse: U1 slog U2'], ['mc', 'Hjem kom tilbage mod Ude'], ['big', 'Hjem kørte over Ude'], ['oc', 'C2 vendte kampen'], ['ol', 'Sent drama: L1 afgjorde det i 85. minut'],
 ];
-test('overskriften: den største historie vinder – overraskelse > andres comeback > dit comeback > sent drama > stor sejr (alle 32 kombinationer)', () => {
+test('overskriften: den største historie vinder – overraskelse > dit comeback > din storsejr > andres comeback > andres sene drama (alle 32 kombinationer)', () => {
   let n = 0;
   for (let mask = 0; mask < 32; mask++) {
     const on = FEATURES.map((_, i) => !!(mask & (1 << i)));
-    const [upset, oc, mc, ol, big] = on;
+    const [upset, mc, big, oc, ol] = on;
+    if (mc && big) on[1] = false;   // v3.21.2: en sejr med 3+ mål er en storsejr, ikke et comeback (tidligt 0-1 → 4-1)
     const mine = big ? (mc ? M({ hG: 4, aG: 1, ev: MINE_CB_BIG }) : M({ hG: 4, aG: 0 })) : mc ? M({ hG: 2, aG: 1, ev: MINE_CB }) : M({ hG: 1, aG: 0 });
     const matches = [mine, oc ? OTHER_CB : NEUTRAL(1), ol ? OTHER_LATE : NEUTRAL(2), NEUTRAL(3)];
     const c = buildColumn(inp({ matches, gazette: upset ? UPSET : { totalGoals: 1 }, round: 5 }));
@@ -377,7 +382,8 @@ test('"De øvrige kampe": ved uafgjort ingen "ventede"-regel (wait forklarer en 
   const other = (hG, aG) => buildColumn(inp({ matches: [M({ h: 'x1', a: 'y1', hn: 'X', an: 'Y', hG, aG, stats: { hPoss: 30, aPoss: 70, hShots: 2, aShots: 3 } })], viewerTeamId: 'zzz' }))
     .sections.find((s) => s.id === 'col-others').others[0].note;
   // Data: X har 30 % af bolden og scorer – wait-reglens test er sand for X i begge kampe
-  assert.ok(waitRule.test({ poss: 30, goals: 1 }));
+  assert.ok(waitRule.test({ poss: 30, goals: 1, against: 0 }) && waitRule.test({ poss: 30, goals: 1, against: 1 }));
+  assert.ok(!waitRule.test({ poss: 30, goals: 2, against: 5 }), 'v3.21.2: tabt 2-5 er ikke "scorede, selv om …"');
   const win = other(1, 0);
   assert.ok(waitRule.say.some((t) => win === `X ${t}.`), `sejr: X forklares med wait-reglen (${win})`);
   const draw = other(1, 1);

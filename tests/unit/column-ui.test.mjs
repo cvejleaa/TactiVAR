@@ -129,10 +129,13 @@ test('klummen: defensiv aktion kun uden mål; overraskelsen er #upset (kun den s
   assert.equal(txt(end), '🏆 Sæson 2 er slut: Mester er mester med 33 point. Du sluttede nr. 3. Topscorer: #9 Skytte (Ude), 17 mål. En ny sæson starter med nulstillet tabel – se Tidligere sæsoner på Liga-fanen.');
   assert.equal(txt(byId(renderGazette(G({ seasonEnd: { seasonNumber: 1 } }), 'h1', null, MATCHES, COL), 'season-end')), '🏆 Sæson 1 er slut: En ny sæson starter med nulstillet tabel – se Tidligere sæsoner på Liga-fanen.');
   // Dit holds løber: kun for dit hold
-  const run = { teamId: 'h1', shirtNumber: 8, shortName: 'Løber', distanceKm: 11.234, hiShare: 45.4, topSpeed: 31.56 };
-  assert.equal(txt(byId(renderGazette(G({ myRunner: run }), 'h1', null, MATCHES, COL), 'my-runner')), '🏃 Dit holds løber: #8 Løber – 11,2 km, 45 % højintenst, topfart 31,6 km/t.');
+  // v3.21.2: kun ved ≥ RUNNER_BOX_KM 12,3 km (Spilfører: boksen stod i 10 af 14 klummer) – 12,3 vises, 12,29 ikke
+  const run = { teamId: 'h1', shirtNumber: 8, shortName: 'Løber', distanceKm: 12.334, hiShare: 45.4, topSpeed: 31.56 };
+  assert.equal(txt(byId(renderGazette(G({ myRunner: run }), 'h1', null, MATCHES, COL), 'my-runner')), '🏃 Dit holds løber: #8 Løber – 12,3 km, 45 % højintenst, topfart 31,6 km/t.');
+  assert.equal(byId(renderGazette(G({ myRunner: { ...run, distanceKm: 12.29 } }), 'h1', null, MATCHES, COL), 'my-runner'), undefined, 'under 12,3 km: ingen boks');
+  assert.ok(byId(renderGazette(G({ myRunner: { ...run, distanceKm: 12.3 } }), 'h1', null, MATCHES, COL), 'my-runner'), 'præcis 12,3: boks');
   assert.equal(byId(renderGazette(G({ myRunner: run }), 'a1', null, MATCHES, COL), 'my-runner'), undefined, 'en anden seer ser ikke dit holds løber');
-  assert.equal(txt(byId(renderGazette(G({ myRunner: { ...run, hiShare: null, topSpeed: 0 } }), 'h1', null, MATCHES, COL), 'my-runner')), '🏃 Dit holds løber: #8 Løber – 11,2 km.');
+  assert.equal(txt(byId(renderGazette(G({ myRunner: { ...run, hiShare: null, topSpeed: 0 } }), 'h1', null, MATCHES, COL), 'my-runner')), '🏃 Dit holds løber: #8 Løber – 12,3 km.');
 });
 
 test('Match Center: klummen kommer med efter afspilningen (ikke under), og kampoverskrifterne åbner via on.view', () => {
@@ -157,4 +160,12 @@ test('de øvrige kampe (v3.16.7): har overskriften selv en tankestreg, sættes n
   const c = { ...COL, sections: COL.sections.map((s) => (s.id === 'col-others' ? { ...s, others } : s)) };
   const lis = all(byId(renderGazette(G(), 'h1', null, MATCHES, c, null), 'headlines'), (e) => e.tag === 'li').map(txt);
   assert.deepEqual(lis, ['Beta får klø – Alfa vinder 4-0. Alfa afsluttede 14 gange.', 'Alfa slår Beta 2-0 – Alfa havde bolden.']);
+});
+
+// v3.21.2 Test Manager: den GAMLE avis (uden klumme) bruger samme tærskel – ledningen i renderGazette (ikke kun klummens) var ubevist
+test('den gamle avis (uden klumme): dit holds løber kun ved ≥ 12,3 km og kun for dit hold', () => {
+  const run = { teamId: 'h1', shirtNumber: 8, shortName: 'Løber', distanceKm: 12.3, hiShare: null, topSpeed: 0 };
+  assert.equal(txt(byId(renderGazette(G({ myRunner: run }), 'h1', null, MATCHES), 'my-runner')), '🏃 Dit holds løber: #8 Løber – 12,3 km.');
+  assert.equal(byId(renderGazette(G({ myRunner: { ...run, distanceKm: 12.29 } }), 'h1', null, MATCHES), 'my-runner'), undefined, 'under 12,3 km: ingen boks');
+  assert.equal(byId(renderGazette(G({ myRunner: run }), 'a1', null, MATCHES), 'my-runner'), undefined, 'en anden seer');
 });

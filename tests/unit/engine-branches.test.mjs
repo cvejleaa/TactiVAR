@@ -720,7 +720,9 @@ test('bots hviler en træt starter (< 70 %) for en frisk bænkspiller i samme k�
 import { viewRatingEntry, viewPlayer } from '../../public/engine/visibility.js';
 import { createSheet, finalizeSheet, runProfile } from '../../public/engine/ratings.js';
 import { counterXpForMatch } from '../../public/engine/counter.js';
-import { goalSpectacle, describeGoal, pickBy } from '../../public/engine/clues.js';
+import { goalSpectacle, describeGoal, pickBy, gen } from '../../public/engine/clues.js';
+// v3.21.2: dødboldens hovedstødslinje har 3 skabeloner (vary) – oplægsgiveren A slår ind, hovedstødsspilleren S header
+const spLine = (t, kind, A, S) => t.includes(`${A} slår ${kind}et ind, og ${S} (`) || (t.includes(`${S} (`) && t.includes(`kommer højest på ${gen(A)} ${kind} og header`)) || t.includes(`${gen(A)} ${kind} finder ${S} (`);
 import { headline } from '../../public/engine/gazette.js';
 
 // ---------- #6 Privatfelter: km og topfart røber STA og PAC ----------
@@ -1185,16 +1187,14 @@ test('måltype: hovedstød har egen type og tekst – et mål, VAR har tjekket, 
 
 // ---------- #4 Avisen ----------
 const M = (hName, aName, hG, aG, extra = {}) => ({ homeId: hName, awayId: aName, homeName: hName, awayName: aName, homeGoals: hG, awayGoals: aG, stats: { hVarChecks: 0, aVarChecks: 0 }, ratings: { home: [], away: [] }, goalsPool: [], ...extra });
-test('overskrifter: variant = (hjemme·7 + ude·3 + runde) % 3; vinder og score i rigtig rækkefølge', () => {
-  assert.equal(headline(M('A', 'B', 3, 0), 0), 'A knuser B 3-0');               // 21 % 3 = 0 → stor sejr
-  assert.equal(headline(M('A', 'B', 3, 0), 1), 'Opvisning: A sender B hjem med 3-0');
-  assert.equal(headline(M('A', 'B', 2, 0), 2), 'A snupper sejren mod B (2-0)'); // (14 + 2) % 3 = 1; 2 mål er ikke stor
-  assert.equal(headline(M('A', 'B', 0, 2), 0), 'B slår A 2-0');                 // udesejr: vinderen først
-  assert.equal(headline(M('A', 'B', 0, 3), 2), 'A får klø – B vinder 3-0');     // 9 + 2 = 11 % 3 = 2
-  assert.equal(headline(M('A', 'B', 1, 1), 0), 'A og B skilles 1-1');           // 10 % 3 = 1
-  assert.equal(headline(M('A', 'B', 0, 0), 0), 'Målløst mellem A og B');
-  assert.equal(headline(M('A', 'B', 0, 0), 2), 'Ingen vinder – A og B spiller 0-0');
-  assert.equal(new Set([0, 1, 2].map((r) => headline(M('A', 'B', 1, 0), r))).size, 3);
+test('overskrifter: alle skabeloner pr. udfald over runderne (v3.21.2: 6 pr. sejr/storsejr, pickBy pr. kamp – før (hjemme·7 + ude·3 + runde) % 3); vinder og score i rigtig rækkefølge', () => {
+  const over = (hG, aG, n) => new Set(Array.from({ length: n }, (_, r) => headline(M('A', 'B', hG, aG), r)));
+  assert.equal(over(3, 0, 6).size, 6); assert.equal(over(2, 0, 6).size, 6); assert.equal(over(0, 0, 3).size, 3); assert.equal(over(1, 1, 3).size, 3);
+  for (const t of over(3, 0, 6)) assert.match(t, /3-0/, t);   // vinderens mål først
+  for (const t of over(0, 3, 6)) assert.match(t, /3-0/, t);   // også ved udesejr
+  for (const t of over(0, 2, 6)) assert.ok(/B/.test(t) && /2-0/.test(t) && !/0-2/.test(t), t);
+  assert.ok([...over(0, 0, 3)].every((t) => /0-0|Målløst/.test(t)) && ![...over(1, 1, 3)].some((t) => /Målløst/.test(t)));
+  assert.notEqual(headline(M('A', 'B', 3, 0), 0), headline(M('A', 'B', 3, 0), 1), 'næste runde = næste skabelon');
 });
 test('rundens overraskelse: ≥3 pladser OG ≥3 point under taberen; uafgjort tæller ikke; størst afstand vinder', () => {
   const pos = { A: { pos: 1, points: 9 }, B: { pos: 4, points: 6 }, C: { pos: 2, points: 9 }, D: { pos: 7, points: 3 }, E: { pos: 3, points: 7 }, F: { pos: 6, points: 5 } };
@@ -1898,7 +1898,7 @@ test('frispark i skudafstand: 37 % direkte skud (bedste FIN+PAS, MV +4) – elle
   assert.ok(cross.kinds.length === 30 && cross.kinds.every((k) => k === 'SETPIECE'));
   assert.equal(rOf(cross.m, 'home', cross.a.H, 3).goals, 30); assert.equal(rOf(cross.m, 'home', cross.a.H, 3).headerGoals, 30);
   assert.equal(cross.m.ratings.home.reduce((x, e) => x + e.assists, 0), 30);
-  assert.match(cross.m.events.find((x) => x.type === 'HEADER_GOAL').text, /MÅÅÅL PÅ FRISPARK! #\d+ .+ slår frisparket ind, og #\d+ .+ \(\d+ cm\) header bolden ind/);
+  assert.match(cross.m.events.find((x) => x.type === 'HEADER_GOAL').text, /MÅÅÅL PÅ FRISPARK! (#\d+ .+ slår frisparket ind, og #\d+ .+ \(\d+ cm\) header bolden ind|#\d+ .+ \(\d+ cm\) kommer højest på .+ frispark og header bolden ind|#\d+ .+ frispark finder #\d+ .+ \(\d+ cm\), der header bolden ind)/);
   // Dødbolden giver forsvaret +0,5: 20 + 3 mod 10 + 3,8 + 3 + 0,5 → mål; angriber 10,7: 13,7 > 17,3 falsk
   assert.equal(sp({ script: { 0.061: true }, tweak: (a) => { for (const p of a.H.squad) p.aerialPower = 13.7; } }).m.homeGoals, 0);
 });
@@ -2098,7 +2098,7 @@ test('frispark-indlæg: taker = bedste PAS får assist (xG 0,1, ét skud), hoved
   const e = rOf(m, 'home', a.H, 3);
   assert.deepEqual([e.goals, e.headerGoals, e.setPieceGoals, e.aerialWins], [1, 1, 1, 1]);
   assert.ok(m.observations.some((o) => o.playerId === slot(a.H, 3).id && /^Luftduel \(mod .+\): .+ scorede med /.test(o.text)));   // v3.16.3: uden minut
-  assert.ok(m.events.find((x) => x.type === 'HEADER_GOAL').text.includes(`MÅÅÅL PÅ FRISPARK! ${tg(slot(a.H, 6))} slår frisparket ind, og ${tg(slot(a.H, 3))} (`));
+  { const t = m.events.find((x) => x.type === 'HEADER_GOAL').text; assert.ok(t.includes('MÅÅÅL PÅ FRISPARK! ') && spLine(t, 'frispark', tg(slot(a.H, 6)), tg(slot(a.H, 3))), t); }
   // Taker, der selv er bedst i luften, er ikke hovedstødsspiller: han slår ind, en anden header (ellers ingen assist)
   const self = spx({ script: { 0.061: once }, tweak: (a2) => { t(a2); slot(a2.H, 6).aerialPower = 25; } });
   assert.equal(self.pool[0].scorer, tg(slot(self.a.H, 3))); assert.equal(rOf(self.m, 'home', self.a.H, 6).assists, 1);
@@ -2153,7 +2153,7 @@ test('hjørnespark-mål i detaljer: hoved +1,35, oplægsgiver (bedste PAS) +0,55
   assert.equal(pool[0].spectacle, goalSpectacle('CORNER', { aerialPower: 20 }, pool[0].min, half));
   assert.equal(pool[0].desc, describeGoal('CORNER', tg(slot(a.H, 7)), tg(slot(a.H, 6)), pool[0].min, half));
   assert.ok(m.observations.some((o) => o.playerId === slot(a.H, 7).id && /^Luftduel \(mod .+\): .+ scorede med /.test(o.text)));   // v3.16.3: uden minut
-  assert.ok(m.events.find((x) => x.type === 'HEADER_GOAL').text.includes(`MÅÅÅL PÅ HJØRNESPARK! ${tg(slot(a.H, 6))} slår hjørnesparket ind, og ${tg(slot(a.H, 7))} (`));
+  { const t = m.events.find((x) => x.type === 'HEADER_GOAL').text; assert.ok(t.includes('MÅÅÅL PÅ HJØRNESPARK! ') && spLine(t, 'hjørnespark', tg(slot(a.H, 6)), tg(slot(a.H, 7))), t); }
   // xG: skud 0,2·… + 0,04 pr. hjørnespark (ingen ekstra uden hjørnet)
   const no = spx({ script: { 0.3: shots(2) }, gk: 15, tweak: t });
   assert.ok(Math.abs(m.stats.hXg - no.m.stats.hXg - 2 * 0.04) < 1e-9, `${m.stats.hXg} ${no.m.stats.hXg}`);
@@ -2611,9 +2611,10 @@ test('haltende: frisparksmålet siger det ("forseelse. X halter, så Y tager fri
   assert.ok(gl.length >= 25, `data: ${gl.length} frisparksmål`);
   for (const e of gl) assert.ok(e.text.includes(`forseelse. ${tg(slot(goal.a.H, 1))} halter, så ${tg(slot(goal.a.H, 10))} tager frisparket: `), e.text);
   const cross = sp({ script: { ...limpFirst, 0.061: true }, tweak: (a) => { noBench(a); slot(a.H, 1).skills.passing = 20; slot(a.H, 3).aerialPower = 20; } });
-  const lines = cross.m.events.filter((e) => /slår frisparket ind/.test(e.text));
+  const lines = cross.m.events.filter((e) => e.type === 'HEADER_GOAL' && /MÅÅÅL PÅ FRISPARK!/.test(e.text));
   assert.ok(lines.length >= 20, `data: ${lines.length} indlæg`);
-  assert.ok(lines.every((e) => !e.text.includes(`${tg(slot(cross.a.H, 1))} slår frisparket ind`)), lines[0].text);
+  const lame = tg(slot(cross.a.H, 1));   // den haltende slår aldrig indlægget – i ingen af de 3 skabeloner (v3.21.2)
+  assert.ok(lines.every((e) => !e.text.includes(`${lame} slår frisparket ind`) && !e.text.includes(`${gen(lame)} frispark`)), lines[0].text);
 });
 test('haltende: han spiller hele kampen – minOut 90 og intet udminut i referatets ur (playerSpan)', () => {
   const g = sp({ script: { ...limpFirst }, tweak: (a) => noBench(a) });
@@ -2711,4 +2712,30 @@ test('halvchancen: en let redning tæller i 🧤, men ikke i karakterfradraget �
   const g = simulateMatch(b.H, b.A, stubRng({ [HM.HALF_P.OPEN]: true, [HM.CHANCE_P.NORMAL]: true }, 0.001));
   assert.ok(g.homeGoals >= 20, `data: ${g.homeGoals} mål`);
   assert.equal(g.stats.hShots, g.homeGoals, 'én afslutning pr. minut – halvchancens mål');
+});
+
+// v3.21.2 Test Manager: dødboldens hovedstødslinje (match.js 'sphead') – ALLE tre skabeloner forekommer, og samme par får aldrig samme to gange i træk
+// (regex-testene ovenfor accepterer en hvilken som helst af de tre, så `vary` → første skabelon var grøn: "samme sætning ordret 5 gange" kunne vende tilbage)
+test('dødboldens hovedstødslinje: de tre skabeloner vekslerer for samme par (30 frispark-mål, samme oplægsgiver og hovedstødsspiller)', () => {
+  const cross = sp({ script: { 0.061: true }, tweak: (a) => { slot(a.H, 3).aerialPower = 20; } });
+  const lines = cross.m.events.filter((e) => e.type === 'HEADER_GOAL').map((e) => e.text);
+  assert.equal(lines.length, 30);
+  const tmpl = (t) => (/ slår frisparket ind, og /.test(t) ? 0 : / kommer højest på /.test(t) ? 1 : / frispark finder /.test(t) ? 2 : -1);
+  const ks = lines.map(tmpl);
+  assert.ok(ks.every((k) => k >= 0), lines.find((t) => tmpl(t) < 0));
+  assert.deepEqual([...new Set(ks)].sort(), [0, 1, 2], 'alle tre skabeloner');
+  for (let i = 1; i < ks.length; i++) assert.notEqual(ks[i], ks[i - 1], `mål ${i}: samme skabelon to gange i træk\n${lines[i - 1]}\n${lines[i]}`);
+});
+// Hovedstødsprosaen: fem varianter pr. bånd, og alle forekommer i en kamp med samme hovedstødsspiller (lave bånd scorer næsten aldrig i en simuleret sæson)
+test('hovedstødsprosa: fem forskellige pr. bånd (v3.21.2), og hvert bånd bruger dem alle og skifter hver gang', async () => {
+  const { HEADER_PROSE } = await import('../../public/engine/clues.js');
+  for (const b of ['high', 'mid', 'low']) assert.equal(new Set(HEADER_PROSE[b]).size, 5, b);
+  assert.equal(new Set([...HEADER_PROSE.high, ...HEADER_PROSE.mid, ...HEADER_PROSE.low]).size, 15);
+  for (const [band, aerial] of [['high', 20], ['mid', 12], ['low', 10]]) {
+    const g = sp({ script: { 0.061: true }, gk: 1, tweak: (a) => { for (const p of a.H.squad) p.aerialPower = 1; for (const p of a.A.squad) p.aerialPower = 0; slot(a.H, 3).aerialPower = aerial; } });
+    const used = g.m.events.filter((e) => e.type === 'HEADER_GOAL').map((e) => HEADER_PROSE[band].findIndex((p) => e.text.endsWith(`– ${p}.`) || e.text.includes(`– ${p}.`)));
+    assert.equal(used.length, 30); assert.ok(used.every((i) => i >= 0), `${band}: ${used}`);
+    assert.deepEqual([...new Set(used)].sort(), [0, 1, 2, 3, 4], `${band}: alle fem`);
+    for (let i = 1; i < used.length; i++) assert.notEqual(used[i], used[i - 1], `${band}: samme prosa to gange i træk`);
+  }
 });

@@ -92,9 +92,12 @@ test('stil-gæt: hver tærskel på begge sider af grænsen (kun den ene regel ra
   assert.deepEqual([guess({ poss: 57 }), guess({ poss: 58 })], [[], ['ball']]);
   assert.deepEqual([guess({ poss: 43, goals: 3 }), guess({ poss: 42, goals: 1 }), guess({ poss: 42, goals: 0 }), guess({ poss: 41, goals: 2 })], [[], ['wait'], [], ['wait']]);
   assert.deepEqual([guess({ poss: 30, goals: 0 }), guess({ goals: 5 })], [[], []], 'wait kræver BÅDE lav besiddelse og mål');
+  // v3.21.2 (Spilfører: efter et 5-2-nederlag): kun når de ikke tabte
+  assert.deepEqual([guess({ poss: 30, goals: 2, against: 5 }), guess({ poss: 30, goals: 2, against: 2 }), guess({ poss: 30, goals: 2, against: 3 })], [[], ['wait'], []]);
   assert.deepEqual([guess({ shots: 23 }), guess({ shots: 24 })], [[], ['shots']]);   // v3.17.0: 12 → 24 (11/12 er nu begge under)
   assert.deepEqual([guess({ shots: 12 }), guess({ onTarget: 9 }), guess({ onTarget: 10 })], [[], [], ['target']]);
-  assert.deepEqual([guess({ setPieceGoals: 0 }), guess({ setPieceGoals: 1 })], [[], ['dead']]);
+  // v3.21.2 (Spilfører: "slog til på dødbolde" med 1 af 4 mål): mindst 2 og mindst halvdelen af målene (før: ét var nok)
+  assert.deepEqual([guess({ setPieceGoals: 1, goals: 1 }), guess({ setPieceGoals: 2, goals: 2 }), guess({ setPieceGoals: 2, goals: 4 }), guess({ setPieceGoals: 2, goals: 5 })], [[], ['dead'], ['dead'], []]);
   assert.deepEqual([guess({ reorganised: 0 }), guess({ reorganised: 1 })], [[], ['switch']]);
   // Rækkefølgen er tabellens (første træf styrer noten); intet filtreres væk eller vendes
   assert.deepEqual(guess({ headerGoals: 2, poss: 60, shots: 30, onTarget: 12, reorganised: 1 }), ['air', 'ball', 'shots', 'target', 'switch']);
@@ -103,27 +106,27 @@ test('stil-gæt: "basis" er præcis de fakta, reglen læser (målt med en proxy)
   for (const r of STYLE_RULES) {
     const read = new Set();
     const spy = (base) => new Proxy({ ...ZERO, ...base }, { get(t, k) { read.add(k); return t[k]; } });
-    for (const base of [{}, { headerGoals: 1, counterGoals: 1, setPieceGoals: 1, reorganised: 1, poss: 40, goals: 2, shots: 20, corners: 9 }, { poss: 60 }, { poss: 30, goals: 0 }]) r.test(spy(base));
+    for (const base of [{}, { headerGoals: 1, counterGoals: 1, setPieceGoals: 1, reorganised: 1, poss: 40, goals: 2, shots: 20, corners: 9 }, { poss: 60 }, { poss: 30, goals: 0 }, { setPieceGoals: 2, goals: 2 }]) r.test(spy(base));
     assert.deepEqual([...read].sort(), [...r.basis].sort(), `${r.key}: basis ≠ det, testen læser`);
   }
 });
 
 // ---------- headline: alle 12 skabeloner ----------
-test('overskrifter: alle tolv skabeloner, vinderen først, stor sejr fra 3 mål, og gazette.headline giver samme tekst', () => {
+test('overskrifter: alle skabeloner (v3.21.2: 6 pr. sejr/storsejr – før 3; Spilfører: "snupper sejren" ca. 12 gange), vinderen først, stor sejr fra 3 mål, og gazette.headline giver samme tekst', () => {
   const F = (hG, aG) => ({ home: { goals: hG, name: 'A' }, away: { goals: aG, name: 'B' } });
-  const all = (hG, aG) => [0, 1, 2].map((r) => headlineOf(F(hG, aG), r)).sort();
-  assert.deepEqual(all(3, 0), ['A knuser B 3-0', 'B får klø – A vinder 3-0', 'Opvisning: A sender B hjem med 3-0'].sort());
-  assert.deepEqual(all(0, 4), ['B knuser A 4-0', 'A får klø – B vinder 4-0', 'Opvisning: B sender A hjem med 4-0'].sort());
-  assert.deepEqual(all(2, 0), ['A slår B 2-0', 'A snupper sejren mod B (2-0)', 'Tre point til A efter 2-0 mod B'].sort(), '2 mål er ikke stor sejr');
-  assert.deepEqual(all(1, 2), ['B slår A 2-1', 'B snupper sejren mod A (2-1)', 'Tre point til B efter 2-1 mod A'].sort());
-  assert.deepEqual(all(0, 0), ['Målløst mellem A og B', 'Taktisk skak: A og B deler 0-0', 'Ingen vinder – A og B spiller 0-0'].sort());
-  assert.deepEqual(all(2, 2), ['Point deles: A – B 2-2', 'A og B skilles 2-2', 'Uafgjort 2-2 mellem A og B'].sort());
+  const all = (hG, aG, n = 6) => [...new Set(Array.from({ length: n }, (_, r) => headlineOf(F(hG, aG), r)))].sort();
+  assert.deepEqual(all(3, 0), ['A knuser B 3-0', 'B får klø – A vinder 3-0', 'Opvisning: A sender B hjem med 3-0', 'A ruller over B – 3-0', 'Storsejr: A 3-0 mod B', 'B sat på plads: 3-0 til A'].sort());
+  assert.deepEqual(all(0, 4), ['B knuser A 4-0', 'A får klø – B vinder 4-0', 'Opvisning: B sender A hjem med 4-0', 'B ruller over A – 4-0', 'Storsejr: B 4-0 mod A', 'A sat på plads: 4-0 til B'].sort());
+  assert.deepEqual(all(2, 0), ['A slår B 2-0', 'A snupper sejren mod B (2-0)', 'Tre point til A efter 2-0 mod B', 'A vinder 2-0 over B', '2-0: A er for stærke for B', 'A henter sejren mod B – 2-0'].sort(), '2 mål er ikke stor sejr');
+  assert.deepEqual(all(1, 2), ['B slår A 2-1', 'B snupper sejren mod A (2-1)', 'Tre point til B efter 2-1 mod A', 'B vinder 2-1 over A', '2-1: B er for stærke for A', 'B henter sejren mod A – 2-1'].sort());
+  assert.deepEqual(all(0, 0, 3), ['Målløst mellem A og B', 'Taktisk skak: A og B deler 0-0', 'Ingen vinder – A og B spiller 0-0'].sort());
+  assert.deepEqual(all(2, 2, 3), ['Point deles: A – B 2-2', 'A og B skilles 2-2', 'Uafgjort 2-2 mellem A og B'].sort());
   assert.deepEqual(all(1, 1).includes('Målløst mellem A og B'), false, '1-1 er ikke målløst');
-  // runden indgår i valget; gazette.headline sender runden videre (ikke 0) og bruger samme tekst
-  assert.equal(headlineOf(F(3, 0), 1), 'Opvisning: A sender B hjem med 3-0');
+  // runden indgår i valget (næste runde = næste skabelon); gazette.headline sender runden videre og bruger samme tekst
+  assert.notEqual(headlineOf(F(3, 0), 1), headlineOf(F(3, 0), 0));
   const mm = { homeName: 'A', awayName: 'B', homeGoals: 3, awayGoals: 0 };
-  assert.equal(headline(mm, 1), 'Opvisning: A sender B hjem med 3-0');
-  assert.equal(headline(mm), 'A knuser B 3-0', 'runde 0 uden argument');
+  assert.equal(headline(mm, 1), headlineOf(F(3, 0), 1));
+  assert.equal(headline(mm), headlineOf(F(3, 0), 0), 'runde 0 uden argument');
 });
 test('pickBy: nøglerne og runden indgår begge i valget, og tallet er heltals-afrundet', () => {
   const L = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];

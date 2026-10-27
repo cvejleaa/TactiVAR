@@ -51,6 +51,10 @@ export function publicFacts(m, idx = 0) {
 export const compactFacts = (f) => Object.fromEntries([f.home, f.away].map((s) => [s.id, Object.fromEntries(PUBLIC_FACT_KEYS.map((k) => [k, s[k]]))]));
 
 
+export const COMEBACK_GAP = 2, COMEBACK_MIN = 46, COMEBACK_MAX_WIN = 2;
+// Overskriftens vægte (højest vinder). v3.21.2: din kamps historier over de andres comeback og sene drama.
+export const STORY = { champion: 95, upset: 90, myComeback: 80, myLate: 78, myFightback: 77, myLevel: 76, myBig: 75, comeback: 70, late: 60, streakEnd: 50 };
+export const SCOUT_TAIL = ['det kan blive kampens tema', 'det skal I være klar på', 'hold øje med det', 'det skal I have en plan for', 'det kan I ikke se bort fra'];
 // Kampens drama ud fra stillingen efter hvert mål (offentligt i referatet).
 function drama(f) {
   const g = f.events.filter((e) => GOAL_TYPES.has(e.type));
@@ -58,9 +62,19 @@ function drama(f) {
   // Sent sejrsmål: vinderen scorede sidst, i 80.+, til 1 måls forskel – altså fra uafgjort (QC F1: ikke et reduceringsmål).
   // Sent = 80. minut eller senere på uret, når det findes (QC v3.16.4: ellers "sent drama … i 79. minut")
   const late = last && (last.clock ? last.clock.m + (last.clock.plus ?? 0) : last.min) >= 80 && Math.abs(diff) === 1 && last.isHome === (diff > 0) && last.hG - last.aG === diff ? (diff > 0 ? f.home : f.away) : null;
-  const behind = (h) => g.some((e) => (h ? e.hG - e.aG : e.aG - e.hG) <= -1);
-  const comeback = diff > 0 && behind(true) ? f.home : diff < 0 && behind(false) ? f.away : null;
-  return { late, comeback, lateMin: last?.min, lateAt: inMinute(last?.clock ?? { m: last?.min }) };   // lateAt: "i 87. minut" / "i tillægstiden" (v3.16.4)
+  // Comeback (v3.21.2, Spilfører: "Comeback til X" om en 5-1-sejr efter 0-1 i 3. minut): bagud med COMEBACK_GAP mål, eller stadig
+  // bagud efter pausen (målet, der udlignede, faldt i COMEBACK_MIN. minut eller senere) – ikke ét tidligt mål imod
+  // Halvlegens minut uden tillægstid (QC: en udligning i 45+2' er før pausen) – gamle gem uden ur: min
+  const halfMin = (e) => (e?.clock ? e.clock.m : e?.min ?? 90), minOf = (e) => (e?.clock ? e.clock.m + (e.clock.plus ?? 0) : e?.min ?? 90);
+  const behind = (h) => g.some((e, i) => { const d = h ? e.hG - e.aG : e.aG - e.hG; return d <= -COMEBACK_GAP || (d <= -1 && (i + 1 >= g.length || halfMin(g[i + 1]) >= COMEBACK_MIN)); });
+  // … og kun når sejren er lille (Spilfører: ved 3+ mål er storsejren historien, det tidlige mål imod en bisætning)
+  const comeback = diff > 0 && diff <= COMEBACK_MAX_WIN && behind(true) ? f.home : diff < 0 && -diff <= COMEBACK_MAX_WIN && behind(false) ? f.away : null;
+  // Uafgjort (Spilfører v3.21.2 – bundholdets store øjeblik): sent point = udligning i 80.+ som kampens sidste mål; rejste sig =
+  // uafgjort efter at have været bagud med to
+  const leveller = diff === 0 && last && minOf(last) >= 80 ? (last.isHome ? f.home : f.away) : null;
+  const twoDown = (h) => g.some((e) => (h ? e.hG - e.aG : e.aG - e.hG) <= -COMEBACK_GAP);
+  const fightback = diff === 0 ? (twoDown(true) ? f.home : twoDown(false) ? f.away : null) : null;
+  return { late, comeback, leveller, fightback, lateMin: last?.min, lateAt: inMinute(last?.clock ?? { m: last?.min }) };   // lateAt: "i 87. minut" / "i tillægstiden" (v3.16.4)
 }
 
 // Stil-gæt for ét hold ud fra offentlige tal (QC B2: om kampen, i datid; aldrig indstillingens navn eller pres).
@@ -72,7 +86,8 @@ export const STYLE_RULES = [
     say: ['slog til i omstillingerne', 'straffede boldtab med hurtige angreb', 'var dødbringende, når bolden blev vundet', 'gik hurtigt fremad efter erobringer', 'udnyttede den åbne bane bag forsvaret'] },
   { key: 'ball', basis: ['poss'], test: (s) => s.poss >= 58,
     say: ['havde bolden det meste af tiden', 'styrede rytmen med bolden', 'spillede roligt bolden rundt', 'satte sig på kampen med bolden', 'lod modstanderen løbe efter bolden'] },
-  { key: 'wait', basis: ['poss', 'goals'], test: (s) => s.poss <= 42 && s.goals >= 1,
+  // v3.21.2 (Spilfører: "scorede, selv om de havde bolden mindst" efter et 5-2-nederlag): kun når de ikke tabte
+  { key: 'wait', basis: ['poss', 'goals', 'against'], test: (s) => s.poss <= 42 && s.goals >= 1 && s.goals >= s.against,
     say: ['havde under halvdelen af bolden og scorede alligevel', 'klarede sig uden meget af bolden', 'scorede, selv om de havde bolden mindst', 'fik meget ud af lidt', 'var effektive på få muligheder'] },
   // v3.17.0 (≈ 25 skud pr. kamp): tærsklerne er 95-percentilen for ét hold i én kamp som før (12 skud var det i v3.16.7 – nu 24
   // skud og 10 på mål – `node tools/measure-duels.mjs 800 percentil`). "Testede målmanden" bærer kun skud PÅ mål (Spilfører – halvdelen går forbi).
@@ -80,7 +95,9 @@ export const STYLE_RULES = [
     say: ['skød fra alle vinkler', 'havde skudstøvlerne på', 'afsluttede, hver gang muligheden bød sig', 'skød på alt, der bevægede sig', 'prøvede lykken igen og igen'] },
   { key: 'target', basis: ['onTarget'], test: (s) => s.onTarget >= 10,
     say: ['testede målmanden igen og igen', 'pressede mange afslutninger igennem på mål', 'gav målmanden travlt', 'ramte målet igen og igen', 'holdt målmanden i ilden'] },
-  { key: 'dead', basis: ['setPieceGoals'], test: (s) => s.setPieceGoals >= 1,
+  // v3.21.2 (Spilfører: "slog til på dødbolde" med 1 af 4 mål): mindst 2 dødboldmål (flertal – QC: ikke ét straffe i en 1-0) og mindst
+  // halvdelen af målene, som 'air'
+  { key: 'dead', basis: ['setPieceGoals', 'goals'], test: (s) => s.setPieceGoals >= 2 && s.setPieceGoals * 2 >= s.goals,
     say: ['fik dødboldene til at tælle', 'var skarpe på de faste situationer', 'slog til på dødbolde', 'var farlige, når bolden lå stille', 'høstede på standardsituationerne'] },
   { key: 'switch', basis: ['reorganised'], test: (s) => s.reorganised >= 1,
     say: ['skiftede om undervejs', 'omorganiserede sig i løbet af kampen', 'ændrede ansigt midt i kampen', 'lagde om i løbet af kampen', 'fandt en ny opstilling undervejs'] },
@@ -127,7 +144,9 @@ function scout(history, teamId, uptoRound = Infinity) {
   const past = history.filter((r) => r.round <= uptoRound && r.facts?.[teamId]).slice(-3).map((r) => r.facts[teamId]);
   if (!past.length) return null;
   const sum = Object.fromEntries(PUBLIC_FACT_KEYS.map((k) => [k, past.reduce((a, f) => a + (f[k] ?? 0), 0) / past.length]));
-  const rule = STYLE_RULES.find((r) => r.test({ ...sum, headerGoals: sum.headerGoals >= 0.5 ? 1 : 0, counterGoals: sum.counterGoals >= 0.5 ? 1 : 0, setPieceGoals: sum.setPieceGoals >= 0.5 ? 1 : 0, reorganised: sum.reorganised >= 0.5 ? 1 : 0, goals: sum.goals >= 1 ? 1 : 0 }));
+  // Snittet som én kamp: 1 = "i halvdelen af kampene"; dødbolde kun med mindst ét i snit og mindst halvdelen af målene (2 = reglens
+  // flertal), og 'wait' kun når de ikke tabte i snit (v3.21.2)
+  const rule = STYLE_RULES.find((r) => r.test({ ...sum, headerGoals: sum.headerGoals >= 0.5 ? 1 : 0, counterGoals: sum.counterGoals >= 0.5 ? 1 : 0, setPieceGoals: sum.setPieceGoals >= 1 && sum.setPieceGoals * 2 >= sum.goals ? 2 : 0, reorganised: sum.reorganised >= 0.5 ? 1 : 0, goals: sum.goals >= 1 ? 1 : 0, against: sum.against > sum.goals ? 2 : 0 }));
   return { n: past.length, rule };
 }
 
@@ -152,6 +171,8 @@ export function buildColumn({ matches = [], gazette = null, history = [], table 
       D: [`${me.name} og ${opp.name} delte point efter ${score}.`, `Uafgjort ${score} mellem ${me.name} og ${opp.name}.`, `Et point hver: ${me.name} – ${opp.name} ${score}.`] }[res];
     const paras = [pickBy(open, round, 'open', me.id)];
     if (d.comeback === me) paras.push('I kom bagfra – det siger noget om moralen.');
+    else if (d.fightback === me) paras.push('I var bagud med mindst to mål og hentede et point.');
+    else if (d.leveller === me) paras.push(`Udligningen kom ${d.lateAt}.`);
     else if (d.late === me) paras.push(`Sejrsmålet kom ${d.lateAt}.`);
     else if (d.late === opp) paras.push(`Det gjorde ondt: ${opp.name} afgjorde det ${d.lateAt}.`);
     paras.push(...yourVerdict(report, me, round));
@@ -172,9 +193,14 @@ export function buildColumn({ matches = [], gazette = null, history = [], table 
     // Modstanderens kort uden påstand om, hvor længe de var færre (kortets minut er ikke en offentlig fakta her – Spilfører)
     if (opp.reds) paras.push(`${opp.name} ${opp.reds > 1 ? `fik ${opp.reds} røde kort` : 'fik rødt kort'} undervejs.`);
     sections.push({ id: 'col-mine', title: 'Din kamp', paras });
-    if (res === 'W' && me.goals - me.against >= 3) stories.push([55, `${me.name} kørte over ${opp.name}`]);
-    if (d.comeback === me) stories.push([65, `${me.name} kom tilbage mod ${opp.name}`]);
-    if (form[me.id]?.prevWin >= 3 && res !== 'W') stories.push([50, `${gen(me.name)} sejrsstime er slut`]);
+    // v3.21.2 (Spilfører: "vi vandt 5-1 ude, men overskriften er 'FC Vejleå vendte kampen'"): din kamps store historie går forud
+    // for de andre kampes – klummen er skrevet til dig. Dit sene sejrsmål er en historie (før kun de andres).
+    if (res === 'W' && me.goals - me.against >= 3) stories.push([STORY.myBig, `${me.name} kørte over ${opp.name}`]);
+    if (d.comeback === me) stories.push([STORY.myComeback, `${me.name} kom tilbage mod ${opp.name}`]);
+    else if (d.late === me) stories.push([STORY.myLate, `Sent drama: ${me.name} vandt det ${d.lateAt}`]);
+    if (d.fightback === me) stories.push([STORY.myFightback, `${me.name} rejste sig mod ${opp.name}`]);
+    else if (d.leveller === me) stories.push([STORY.myLevel, `Sent point: ${me.name} udlignede ${d.lateAt}`]);
+    if (form[me.id]?.prevWin >= 3 && res !== 'W') stories.push([STORY.streakEnd, `${gen(me.name)} sejrsstime er slut`]);
   }
 
   // 2. De øvrige kampe – en fed overskrift pr. kamp (skimbart) og én sætning med det mest bemærkelsesværdige.
@@ -188,8 +214,8 @@ export function buildColumn({ matches = [], gazette = null, history = [], table 
       const who = w ?? f.home, g = styleGuess(who).filter((r) => w || r.key !== 'wait')[0];
       note = g ? `${who.name} ${say(g, round, f.idx)}.` : '';
     }
-    if (d.comeback) stories.push([70, `${d.comeback.name} vendte kampen`]);
-    if (d.late) stories.push([60, `Sent drama: ${d.late.name} afgjorde det ${d.lateAt}`]);
+    if (d.comeback) stories.push([STORY.comeback, `${d.comeback.name} vendte kampen`]);
+    if (d.late) stories.push([STORY.late, `Sent drama: ${d.late.name} afgjorde det ${d.lateAt}`]);
     return { idx: f.idx, head: headlineOf(f, round), note };
   });
   if (others.length) sections.push({ id: 'col-others', title: 'De øvrige kampe', others });
@@ -212,7 +238,7 @@ export function buildColumn({ matches = [], gazette = null, history = [], table 
 
   // 4. Formen – stimer og rundens overraskelse (kun sæsonens resultater; ét gæt ad gangen).
   const formParas = [];
-  if (gazette?.upset) { formParas.push(`Rundens overraskelse: nr. ${gazette.upset.winnerPos} ${gazette.upset.winner} slog nr. ${gazette.upset.loserPos} ${gazette.upset.loser} ${gazette.upset.score}.`); stories.push([90, `Overraskelse: ${gazette.upset.winner} slog ${gazette.upset.loser}`]); }
+  if (gazette?.upset) { formParas.push(`Rundens overraskelse: nr. ${gazette.upset.winnerPos} ${gazette.upset.winner} slog nr. ${gazette.upset.loserPos} ${gazette.upset.loser} ${gazette.upset.score}.`); stories.push([STORY.upset, `Overraskelse: ${gazette.upset.winner} slog ${gazette.upset.loser}`]); }
   const name = (id) => table.find((t) => t.teamId === id)?.teamName ?? '';
   const hot = Object.entries(form).filter(([, s]) => s.win >= 3).sort((a, b) => b[1].win - a[1].win)[0];
   const cold = Object.entries(form).filter(([, s]) => s.lose >= 3).sort((a, b) => b[1].lose - a[1].lose)[0];
@@ -232,7 +258,7 @@ export function buildColumn({ matches = [], gazette = null, history = [], table 
     }
     const before = (t) => t.points - (earned[t.teamId] ?? 0);
     const wasDecided = decided && before(table[0]) - Math.max(...table.slice(1).map(before)) > 3 * (roundsLeft + 1);
-    if (decided && !wasDecided) stories.push([95, `${table[0].teamName} er mester før tid`]);
+    if (decided && !wasDecided) stories.push([STORY.champion, `${table[0].teamName} er mester før tid`]);
     formParas.push(decided ? `🏆 ${table[0].teamName} er mester – ${roundsLeft === 1 ? 'én runde' : `${roundsLeft} runder`} før tid (${gap} point foran ${table[1].teamName}).` : newSeason ? null : gap === 0 ? `${table[0].teamName} og ${table[1].teamName} står lige i toppen med ${table[0].points} point.` : `${table[0].teamName} fører med ${table[0].points} point${gap != null ? `, ${gap} foran ${table[1].teamName}` : ''}.`);
   }
   // Ved sæsonslut står mesteren i banneret og avisens sæsonslut-afsnit – ikke en tredje gang her (v3.16.7, Spilfører/QC)
@@ -250,10 +276,14 @@ export function buildColumn({ matches = [], gazette = null, history = [], table 
       const k = before.rule.key, said = `Før kampen skrev jeg, at ${opp.name} ${pickBy(before.rule.say, round - 1, k, 'scout')}`;
       const spHead = vf.goals.filter((g) => g.teamName === opp.name && (g.kind === 'CORNER' || g.kind === 'SETPIECE')).length;
       const airAll = opp.headerGoals + spHead;
-      const held = k === 'wait' ? opp.poss < 50 && opp.goals >= 1 : k === 'air' ? before.rule.test(opp) || (airAll >= 1 && airAll * 2 >= opp.goals) : before.rule.test(opp);
-      const why = k === 'wait' && opp.goals >= 1 && !before.rule.test(opp) ? (held ? `: de scorede med ${opp.poss} % af bolden` : `, men de havde ${opp.poss} % af bolden mod jer`)
+      // 'wait' holder ikke efter et nederlag (v3.21.2, QC)
+      const held = k === 'wait' ? opp.poss < 50 && opp.goals >= 1 && opp.goals >= opp.against : k === 'air' ? before.rule.test(opp) || (airAll >= 1 && airAll * 2 >= opp.goals) : before.rule.test(opp);
+      const scored = k === 'wait' && opp.goals >= 1 && opp.goals >= opp.against;   // efter et nederlag: "det holdt ikke" (QC v3.21.2)
+      const why = scored && !before.rule.test(opp) ? (held ? `: de scorede med ${opp.poss} % af bolden` : `, men de havde ${opp.poss} % af bolden mod jer`)
         : k === 'air' && held && spHead && !before.rule.test(opp) ? `: ${spHead === opp.goals ? (spHead === 1 ? 'deres eneste mål' : spHead === 2 ? 'begge deres mål' : `alle ${spHead} mål`) : `${spHead} af deres mål`} kom på hovedstød efter dødbolde` : '';
-      preview.push(held ? `${said} – det holdt også mod jer${why}.` : k === 'wait' && opp.goals >= 1 ? `${said} – de scorede igen${why}.` : `${said} – det gjorde de ikke mod jer.`);
+      // "– det holdt ikke mod jer" passer til alle udsagn og påstår kun, at gættet ikke holdt (Spilfører v3.21.2: "var farlige i luften –
+      // det gjorde de ikke"; QC: en nægtelse af udsagnet ville påstå det modsatte af et gæt)
+      preview.push(held ? `${said} – det holdt også mod jer${why}.` : scored ? `${said} – de scorede igen${why}.` : `${said} – det holdt ikke mod jer.`);
     }
   }
   const nx = next.find((x) => x.homeId === viewerTeamId || x.awayId === viewerTeamId);
@@ -261,7 +291,8 @@ export function buildColumn({ matches = [], gazette = null, history = [], table 
     const nOpp = nx.homeId === viewerTeamId ? { id: nx.awayId, name: nx.awayName } : { id: nx.homeId, name: nx.homeName };
     const sc = scout(history, nOpp.id);
     preview.push(`${newSeason ? 'Ny sæson: ' : 'Næste runde: '}${nx.homeId === viewerTeamId ? `${nOpp.name} kommer på besøg` : `ude mod ${nOpp.name}`}.${newSeason ? '' : form[nOpp.id]?.win >= 2 ? ` De har vundet ${form[nOpp.id].win} i træk.` : form[nOpp.id]?.lose >= 2 ? ` De har tabt ${form[nOpp.id].lose} i træk.` : ''}`);
-    if (sc?.rule && !newSeason) preview.push(`Mit bud ud fra ${sc.n === 1 ? 'deres seneste kamp' : `deres seneste ${sc.n} kampe`}: ${nOpp.name} ${pickBy(sc.rule.say, round, sc.rule.key, 'scout')} – det kan blive kampens tema.`);   // v3.16.7: "… ud fra" stod efter verbet
+    // Halen varierer (v3.21.2, Spilfører: "det kan blive kampens tema" i 10 af 14 klummer)
+    if (sc?.rule && !newSeason) preview.push(`Mit bud ud fra ${sc.n === 1 ? 'deres seneste kamp' : `deres seneste ${sc.n} kampe`}: ${nOpp.name} ${pickBy(sc.rule.say, round, sc.rule.key, 'scout')} – ${pickBy(SCOUT_TAIL, round, 'tail', nOpp.id)}.`);   // v3.16.7: "… ud fra" stod efter verbet
   }
   if (preview.length) sections.push({ id: 'col-next', title: 'Næste runde', paras: preview });
 
@@ -273,13 +304,16 @@ export function buildColumn({ matches = [], gazette = null, history = [], table 
 
 // Overskrift pr. kamp (genbruger avisens tre varianter pr. udfald).
 const HEADS = {
-  BIG: [(w, l, s) => `${w} knuser ${l} ${s}`, (w, l, s) => `Opvisning: ${w} sender ${l} hjem med ${s}`, (w, l, s) => `${l} får klø – ${w} vinder ${s}`],
-  WIN: [(w, l, s) => `${w} slår ${l} ${s}`, (w, l, s) => `${w} snupper sejren mod ${l} (${s})`, (w, l, s) => `Tre point til ${w} efter ${s} mod ${l}`],
+  // v3.21.2 (Spilfører: "snupper sejren" ca. 12 gange, "får klø" 6 på en sæson): 6 pr. udfald
+  BIG: [(w, l, s) => `${w} knuser ${l} ${s}`, (w, l, s) => `Opvisning: ${w} sender ${l} hjem med ${s}`, (w, l, s) => `${l} får klø – ${w} vinder ${s}`,
+    (w, l, s) => `${w} ruller over ${l} – ${s}`, (w, l, s) => `Storsejr: ${w} ${s} mod ${l}`, (w, l, s) => `${l} sat på plads: ${s} til ${w}`],
+  WIN: [(w, l, s) => `${w} slår ${l} ${s}`, (w, l, s) => `${w} snupper sejren mod ${l} (${s})`, (w, l, s) => `Tre point til ${w} efter ${s} mod ${l}`,
+    (w, l, s) => `${w} vinder ${s} over ${l}`, (w, l, s) => `${s}: ${w} er for stærke for ${l}`, (w, l, s) => `${w} henter sejren mod ${l} – ${s}`],
   DRAW0: [(h, a) => `Målløst mellem ${h} og ${a}`, (h, a) => `Taktisk skak: ${h} og ${a} deler 0-0`, (h, a) => `Ingen vinder – ${h} og ${a} spiller 0-0`],
   DRAW: [(h, a, s) => `Point deles: ${h} – ${a} ${s}`, (h, a, s) => `${h} og ${a} skilles ${s}`, (h, a, s) => `Uafgjort ${s} mellem ${h} og ${a}`],
 };
 export function headlineOf(f, round) {
-  const hG = f.home.goals, aG = f.away.goals, pick = (list) => list[(hG * 7 + aG * 3 + round) % list.length];
+  const hG = f.home.goals, aG = f.away.goals, pick = (list) => pickBy(list, round, 'head', f.home.name, hG * 7 + aG * 3);   // v3.21.2: pickBy pr. kamp (før én formel)
   if (hG === aG) return hG === 0 ? pick(HEADS.DRAW0)(f.home.name, f.away.name) : pick(HEADS.DRAW)(f.home.name, f.away.name, `${hG}-${aG}`);
   const [w, l, s] = hG > aG ? [f.home.name, f.away.name, `${hG}-${aG}`] : [f.away.name, f.home.name, `${aG}-${hG}`];
   return pick(Math.abs(hG - aG) >= 3 ? HEADS.BIG : HEADS.WIN)(w, l, s);

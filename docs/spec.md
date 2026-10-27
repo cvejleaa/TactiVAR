@@ -587,7 +587,7 @@ Fra sæsongennemgangen af v3.16.6. Fase T (kun tekst og visning – noprose uæn
   bud ud fra deres seneste N kampe: …"; ved sæsonslut står mesteren i banneret og avisens sæsonboks, ikke i Formen.
 - **Dansk**: `pl` (ental/flertal), `dec` (decimalkomma i al synlig visning, ikke CSS), "straffespark", holdmærke på alle linjer.
 - **Gentagelser** (vary/pickBy, intet rng): offside-fælden fuldt første gang pr. halvleg, derefter kort; FASE 1 og
-  hovedstødsprosa (HEADER_PROSE) i tre varianter; vary starter fra runden; "🎯 forbi"-teksterne gentages ikke i en kamp, før
+  hovedstødsprosa (HEADER_PROSE) i fem varianter pr. bånd (v3.21.2; før tre), hjørne-/frispark-hovedstødet i tre (`sphead`); vary starter fra runden; "🎯 forbi"-teksterne gentages ikke i en kamp, før
   alle seks er brugt (samme ene rng-træk); målteksten for dit holds løb bruger ikke en variant op.
 - **Visning**: skift lige efter hinanden står på samme minut ("tages med i pausen" / "i samme skifte-pause"); friskheden i
   sæsonens sidste runde "… til første runde i næste sæson".
@@ -648,9 +648,10 @@ skal styre chancen, alle småfund med. Hvert motortal er målt (`node tools/meas
 - MotM 👑 = højeste karakter.
 - Avis: 🏆 Rundens Spiller (højeste karakter på tværs), 🚀 Rundens Mål, ingen mål →
   Rundens Defensive Aktion; kort klumme. **v3.7** (brugeren: "avisen er stadig kedelig, og
-  rundens mål er altid VAR-dramatik"): en overskrift pr. kamp (3 varianter pr. udfald),
+  rundens mål er altid VAR-dramatik"): en overskrift pr. kamp (3 varianter pr. udfald; v3.21.2: 6 for sejr/storsejr),
   😮 Rundens overraskelse (fra runde 3: vinderen ≥3 pladser og ≥3 point under taberen før
-  runden), 🏃 Dit holds løber (kun eget hold – km/topfart er private).
+  runden), 🏃 Dit holds løber (kun eget hold – km/topfart er private; fra v3.21.2 kun ved ≥ 12,3 km, `RUNNER_BOX_KM`,
+  ca. hver 3. runde).
 - **Måltyper (v3.7)**, afgjort ét sted pr. mål og brugt i referat, observation og avis (oplæg/🅰 kun
   for typer med oplægsgiver):
   LONGSHOT (fra v3.12.1: skytten står uden for feltet, §5; før vægtet af FIN) og DRIBBLE (vægtet af PAC+BAL), begge uden oplæg, COMBINATION, CUTBACK (fra v3.12 kun fra
@@ -674,6 +675,14 @@ skal styre chancen, alle småfund med. Hvert motortal er målt (`node tools/meas
 - **Klummen (v3.14**, brugeren: "avisen er stadig kedelig"; `column.js`): avisen er en klumme, bygget VED VISNING
   for den, der ser (brugeren: afsnit 1 "skal varieres så det er den indlogget spillers hold det indeholder"):
   overskrift efter rundens største historie (overraskelse, comeback, sent drama, stime brudt, din store sejr);
+  **v3.21.2** (Spilførerens sæsongennemgang): rækkefølgen er `STORY` – mester 95, overraskelse 90, dit comeback 80, dit sene
+  sejrsmål 78 ("Sent drama: X vandt det …"), "X rejste sig mod Y" 77 (fra mindst to mål bagud), dit sene point 76 ("Sent point: X udlignede …"), din storsejr
+  75, de andres comeback 70 og sene drama 60, stime brudt 50 – din kamps historie går forud for de andres. Comeback kræver
+  bagud med 2 (`COMEBACK_GAP`) eller bagud efter pausen (udligning i minut ≥ 46, `COMEBACK_MIN`, tillægstid i 1. halvleg
+  tæller som før) og sejr med højst 2 (`COMEBACK_MAX_WIN`; 0-1 → 5-1 er en storsejr). Stil-gæt med belæg: "dødbolde"
+  kræver ≥ 2 dødboldmål og mindst halvdelen; "scorede med mindst bolden" kræver, at holdet ikke tabte (også i opfølgningen: efter et nederlag "det holdt ikke"). Opfølgningen
+  siger "– det holdt ikke mod jer"; "Mit bud" har fem haler (`SCOUT_TAIL`), kamp-overskrifterne seks pr. sejr/storsejr (uafgjort tre), valgt
+  med `pickBy` (intet rng). Målt i `tools/measure-column.mjs` (3 sæsoner).
   1) **Din kamp** – resultat, drama og højst 2 sætninger om dine valg med belæg fra din kamprapport (`ownReport`,
   gemt ved kampen: den spillede taktik og dueltallene – samme objekt som fuldtids-analysen); 2) **De øvrige kampe**
   – fed overskrift pr. kamp (klik = referatet) og én sætning (comeback, sent mål eller stil-gæt); 3) **Rundens
