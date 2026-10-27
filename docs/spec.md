@@ -648,7 +648,7 @@ skal styre chancen, alle småfund med. Hvert motortal er målt (`node tools/meas
 - MotM 👑 = højeste karakter.
 - Avis: 🏆 Rundens Spiller (højeste karakter på tværs), 🚀 Rundens Mål, ingen mål →
   Rundens Defensive Aktion; kort klumme. **v3.7** (brugeren: "avisen er stadig kedelig, og
-  rundens mål er altid VAR-dramatik"): en overskrift pr. kamp (3 varianter pr. udfald),
+  rundens mål er altid VAR-dramatik"): en overskrift pr. kamp (3 varianter pr. udfald; v3.21.2: 6 for sejr/storsejr),
   😮 Rundens overraskelse (fra runde 3: vinderen ≥3 pladser og ≥3 point under taberen før
   runden), 🏃 Dit holds løber (kun eget hold – km/topfart er private; fra v3.21.2 kun ved ≥ 12,3 km, `RUNNER_BOX_KM`,
   ca. hver 3. runde).
@@ -676,12 +676,12 @@ skal styre chancen, alle småfund med. Hvert motortal er målt (`node tools/meas
   for den, der ser (brugeren: afsnit 1 "skal varieres så det er den indlogget spillers hold det indeholder"):
   overskrift efter rundens største historie (overraskelse, comeback, sent drama, stime brudt, din store sejr);
   **v3.21.2** (Spilførerens sæsongennemgang): rækkefølgen er `STORY` – mester 95, overraskelse 90, dit comeback 80, dit sene
-  sejrsmål 78 ("Sent drama: X vandt det …"), "X hentede 0-2" 77, dit sene point 76 ("Sent point: X udlignede …"), din storsejr
+  sejrsmål 78 ("Sent drama: X vandt det …"), "X rejste sig mod Y" 77 (fra mindst to mål bagud), dit sene point 76 ("Sent point: X udlignede …"), din storsejr
   75, de andres comeback 70 og sene drama 60, stime brudt 50 – din kamps historie går forud for de andres. Comeback kræver
   bagud med 2 (`COMEBACK_GAP`) eller bagud efter pausen (udligning i minut ≥ 46, `COMEBACK_MIN`, tillægstid i 1. halvleg
   tæller som før) og sejr med højst 2 (`COMEBACK_MAX_WIN`; 0-1 → 5-1 er en storsejr). Stil-gæt med belæg: "dødbolde"
-  kræver ≥ 2 dødboldmål og mindst halvdelen; "scorede med mindst bolden" kræver, at holdet ikke tabte. Opfølgningen
-  siger "– det holdt ikke mod jer"; "Mit bud" har fem haler (`SCOUT_TAIL`), kamp-overskrifterne seks pr. udfald, valgt
+  kræver ≥ 2 dødboldmål og mindst halvdelen; "scorede med mindst bolden" kræver, at holdet ikke tabte (også i opfølgningen: efter et nederlag "det holdt ikke"). Opfølgningen
+  siger "– det holdt ikke mod jer"; "Mit bud" har fem haler (`SCOUT_TAIL`), kamp-overskrifterne seks pr. sejr/storsejr (uafgjort tre), valgt
   med `pickBy` (intet rng). Målt i `tools/measure-column.mjs` (3 sæsoner).
   1) **Din kamp** – resultat, drama og højst 2 sætninger om dine valg med belæg fra din kamprapport (`ownReport`,
   gemt ved kampen: den spillede taktik og dueltallene – samme objekt som fuldtids-analysen); 2) **De øvrige kampe**

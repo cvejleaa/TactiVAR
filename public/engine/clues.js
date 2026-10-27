@@ -89,7 +89,7 @@ export const GOAL_TEXTS = {
     (s, a) => `${a} og ${s} spillede 1-2, og ${s} gjorde det færdigt.`,
     // v3.21.2 (Spilfører: "Tre hurtige afleveringer …" ca. 15 mål på en sæson): 6
     (s, a) => `Et gennembrud gennem midten: ${a} fandt ${s} mellem stopperne, og han scorede.`,
-    (s, a) => `${s} tog imod ${gen(a)} stikning og sendte den forbi målmanden.`,
+    (s, a) => `${s} tog imod ${gen(a)} stikpasning og sendte den forbi målmanden.`,
     (s, a) => `Tålmodigt opspil, og så det afgørende: ${a} til ${s}, mål.`,
   ],
   PENALTY: [

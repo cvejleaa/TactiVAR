@@ -245,6 +245,10 @@ test('afsnit 5: opfølgning på spådommens to dele ("wait") – scorede de, men
   assert.equal(fu(W, 1, 1, { hPoss: 50, aPoss: 50 }), `${pre}de scorede igen, men de havde 50 % af bolden mod jer.`, '50 % er ikke under halvdelen');
   assert.equal(fu(W, 1, 0, { hPoss: 70, aPoss: 30 }), `${pre}det holdt ikke mod jer.`, '30 %, men ingen mål: "scorede igen" ville være forkert');
   assert.equal(fu(W, 1, 0, { hPoss: 40, aPoss: 60 }), `${pre}det holdt ikke mod jer.`, 'hverken lidt bold eller mål');
+  // v3.21.2 (QC): efter et nederlag holdt "scorede, selv om …" ikke – heller ikke med mål og lidt bold (før: "de scorede igen, men de
+  // havde 30 % af bolden mod jer", en modsigelse)
+  assert.equal(fu(W, 3, 1, { hPoss: 70, aPoss: 30 }), `${pre}det holdt ikke mod jer.`, 'tabte 1-3 med 30 %');
+  assert.equal(fu(W, 3, 1, { hPoss: 40, aPoss: 60 }), `${pre}det holdt ikke mod jer.`, 'tabte 1-3 med 60 %');
   // En anden regel ("ball"), der ikke holdt, mens de scorede: ingen "scorede igen"
   const B = Array.from({ length: 5 }, () => ({ poss: 60 }));
   assert.equal(fu(B, 1, 1, { hPoss: 70, aPoss: 30 }), `Før kampen skrev jeg, at Ude ${pickBy(RULE('ball').say, 4, 'ball', 'scout')} – det holdt ikke mod jer.`);

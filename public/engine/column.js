@@ -54,7 +54,7 @@ export const compactFacts = (f) => Object.fromEntries([f.home, f.away].map((s) =
 export const COMEBACK_GAP = 2, COMEBACK_MIN = 46, COMEBACK_MAX_WIN = 2;
 // Overskriftens vægte (højest vinder). v3.21.2: din kamps historier over de andres comeback og sene drama.
 export const STORY = { champion: 95, upset: 90, myComeback: 80, myLate: 78, myFightback: 77, myLevel: 76, myBig: 75, comeback: 70, late: 60, streakEnd: 50 };
-export const SCOUT_TAIL = ['det kan blive kampens tema', 'det skal I være klar på', 'hold øje med det', 'der kan kampen blive afgjort', 'det bliver jeres opgave at stoppe'];
+export const SCOUT_TAIL = ['det kan blive kampens tema', 'det skal I være klar på', 'hold øje med det', 'det skal I have en plan for', 'det kan I ikke se bort fra'];
 // Kampens drama ud fra stillingen efter hvert mål (offentligt i referatet).
 function drama(f) {
   const g = f.events.filter((e) => GOAL_TYPES.has(e.type));
@@ -69,7 +69,7 @@ function drama(f) {
   const behind = (h) => g.some((e, i) => { const d = h ? e.hG - e.aG : e.aG - e.hG; return d <= -COMEBACK_GAP || (d <= -1 && (i + 1 >= g.length || halfMin(g[i + 1]) >= COMEBACK_MIN)); });
   // … og kun når sejren er lille (Spilfører: ved 3+ mål er storsejren historien, det tidlige mål imod en bisætning)
   const comeback = diff > 0 && diff <= COMEBACK_MAX_WIN && behind(true) ? f.home : diff < 0 && -diff <= COMEBACK_MAX_WIN && behind(false) ? f.away : null;
-  // Uafgjort (Spilfører v3.21.2 – bundholdets store øjeblik): sent point = udligning i 80.+ som kampens sidste mål; hentede 0-2 =
+  // Uafgjort (Spilfører v3.21.2 – bundholdets store øjeblik): sent point = udligning i 80.+ som kampens sidste mål; rejste sig =
   // uafgjort efter at have været bagud med to
   const leveller = diff === 0 && last && minOf(last) >= 80 ? (last.isHome ? f.home : f.away) : null;
   const twoDown = (h) => g.some((e) => (h ? e.hG - e.aG : e.aG - e.hG) <= -COMEBACK_GAP);
@@ -171,7 +171,7 @@ export function buildColumn({ matches = [], gazette = null, history = [], table 
       D: [`${me.name} og ${opp.name} delte point efter ${score}.`, `Uafgjort ${score} mellem ${me.name} og ${opp.name}.`, `Et point hver: ${me.name} – ${opp.name} ${score}.`] }[res];
     const paras = [pickBy(open, round, 'open', me.id)];
     if (d.comeback === me) paras.push('I kom bagfra – det siger noget om moralen.');
-    else if (d.fightback === me) paras.push('I var bagud med to mål og hentede et point.');
+    else if (d.fightback === me) paras.push('I var bagud med mindst to mål og hentede et point.');
     else if (d.leveller === me) paras.push(`Udligningen kom ${d.lateAt}.`);
     else if (d.late === me) paras.push(`Sejrsmålet kom ${d.lateAt}.`);
     else if (d.late === opp) paras.push(`Det gjorde ondt: ${opp.name} afgjorde det ${d.lateAt}.`);
@@ -198,7 +198,7 @@ export function buildColumn({ matches = [], gazette = null, history = [], table 
     if (res === 'W' && me.goals - me.against >= 3) stories.push([STORY.myBig, `${me.name} kørte over ${opp.name}`]);
     if (d.comeback === me) stories.push([STORY.myComeback, `${me.name} kom tilbage mod ${opp.name}`]);
     else if (d.late === me) stories.push([STORY.myLate, `Sent drama: ${me.name} vandt det ${d.lateAt}`]);
-    if (d.fightback === me) stories.push([STORY.myFightback, `${me.name} hentede 0-2 mod ${opp.name}`]);
+    if (d.fightback === me) stories.push([STORY.myFightback, `${me.name} rejste sig mod ${opp.name}`]);
     else if (d.leveller === me) stories.push([STORY.myLevel, `Sent point: ${me.name} udlignede ${d.lateAt}`]);
     if (form[me.id]?.prevWin >= 3 && res !== 'W') stories.push([STORY.streakEnd, `${gen(me.name)} sejrsstime er slut`]);
   }
@@ -278,11 +278,12 @@ export function buildColumn({ matches = [], gazette = null, history = [], table 
       const airAll = opp.headerGoals + spHead;
       // 'wait' holder ikke efter et nederlag (v3.21.2, QC)
       const held = k === 'wait' ? opp.poss < 50 && opp.goals >= 1 && opp.goals >= opp.against : k === 'air' ? before.rule.test(opp) || (airAll >= 1 && airAll * 2 >= opp.goals) : before.rule.test(opp);
-      const why = k === 'wait' && opp.goals >= 1 && !before.rule.test(opp) ? (held ? `: de scorede med ${opp.poss} % af bolden` : `, men de havde ${opp.poss} % af bolden mod jer`)
+      const scored = k === 'wait' && opp.goals >= 1 && opp.goals >= opp.against;   // efter et nederlag: "det holdt ikke" (QC v3.21.2)
+      const why = scored && !before.rule.test(opp) ? (held ? `: de scorede med ${opp.poss} % af bolden` : `, men de havde ${opp.poss} % af bolden mod jer`)
         : k === 'air' && held && spHead && !before.rule.test(opp) ? `: ${spHead === opp.goals ? (spHead === 1 ? 'deres eneste mål' : spHead === 2 ? 'begge deres mål' : `alle ${spHead} mål`) : `${spHead} af deres mål`} kom på hovedstød efter dødbolde` : '';
       // "– det holdt ikke mod jer" passer til alle udsagn og påstår kun, at gættet ikke holdt (Spilfører v3.21.2: "var farlige i luften –
       // det gjorde de ikke"; QC: en nægtelse af udsagnet ville påstå det modsatte af et gæt)
-      preview.push(held ? `${said} – det holdt også mod jer${why}.` : k === 'wait' && opp.goals >= 1 ? `${said} – de scorede igen${why}.` : `${said} – det holdt ikke mod jer.`);
+      preview.push(held ? `${said} – det holdt også mod jer${why}.` : scored ? `${said} – de scorede igen${why}.` : `${said} – det holdt ikke mod jer.`);
     }
   }
   const nx = next.find((x) => x.homeId === viewerTeamId || x.awayId === viewerTeamId);

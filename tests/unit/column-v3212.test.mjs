@@ -1,4 +1,4 @@
-// v3.21.2 – klummen (Spilførerens sæsonfund): din kamps historie i overskriften, ægte comebacks, sent point og "hentede 0-2",
+// v3.21.2 – klummen (Spilførerens sæsonfund): din kamps historie i overskriften, ægte comebacks, sent point og "rejste sig",
 // "det holdt ikke" i opfølgningen og varianter. På håndbyggede kampe med kendte tal (samme hjælpere som column-mine).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -38,13 +38,13 @@ test('overskriften: din kamps historie går forud for de andres (Spilfører: "vi
   assert.ok(STORY.myComeback > STORY.myLate && STORY.myLate > STORY.myFightback && STORY.myFightback > STORY.myLevel && STORY.myLevel > STORY.myBig && STORY.myBig > STORY.comeback && STORY.comeback > STORY.late && STORY.upset > STORY.myComeback && STORY.champion > STORY.upset);
 });
 
-test('uafgjort (Spilfører: bundholdets store øjeblik): sent point og "hentede 0-2" er din historie – ikke "comeback"', () => {
+test('uafgjort (Spilfører: bundholdets store øjeblik): sent point og "rejste sig" (fra mindst to mål bagud) er din historie – ikke "comeback"', () => {
   const level = M({ hG: 1, aG: 1, ev: [G(30, false, 0, 1), G(88, true, 1, 1)] });
   assert.equal(title(level), 'Sent point: Hjem udlignede i 88. minut');
   assert.ok(buildColumn(inp({ matches: [level] })).sections[0].paras.includes('Udligningen kom i 88. minut.'));
   const back = M({ hG: 2, aG: 2, ev: [G(10, false, 0, 1), G(20, false, 0, 2), G(50, true, 1, 2), G(70, true, 2, 2)] });
-  assert.equal(title(back), 'Hjem hentede 0-2 mod Ude');
-  assert.ok(buildColumn(inp({ matches: [back] })).sections[0].paras.includes('I var bagud med to mål og hentede et point.'));
+  assert.equal(title(back), 'Hjem rejste sig mod Ude');
+  assert.ok(buildColumn(inp({ matches: [back] })).sections[0].paras.includes('I var bagud med mindst to mål og hentede et point.'));
   assert.doesNotMatch(title(back), /tilbage|vendte|Comeback/);
   // Modstanderens sene udligning er ikke din historie; en tidlig udligning heller ikke
   assert.doesNotMatch(title(M({ hG: 1, aG: 1, ev: [G(30, true, 1, 0), G(88, false, 1, 1)] })), /Sent point/);
