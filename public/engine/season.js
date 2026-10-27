@@ -159,7 +159,7 @@ export function commitRound(league, result, rng) {
   for (const m of result.matches) {
     applyStanding(league.leagueMetadata.standings, m);
     // Samspil (v3.23.0): fælles minutter på nabopladser i den formation, holdet startede i
-    for (const [id, list] of [[m.homeId, m.ratings.home], [m.awayId, m.ratings.away]]) applyChemistry(byId.get(id), list, m.teams?.[id]?.start?.formation ?? byId.get(id).tactics.baseFormation, result.round);
+    for (const [id, list] of [[m.homeId, m.ratings.home], [m.awayId, m.ratings.away]]) applyChemistry(byId.get(id), list, m.startFormations?.[id === m.homeId ? 'home' : 'away'] ?? byId.get(id).tactics.baseFormation, result.round);
     for (const [oppId, list] of [[m.awayId, m.ratings.home], [m.homeId, m.ratings.away]]) {
       const opp = byId.get(oppId);
       for (const r of list) {
