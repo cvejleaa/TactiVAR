@@ -42,9 +42,9 @@ const pos = (e) => [e.style.left, e.style.top].join('/');
 const match = (s) => { const L = createLeague(createRng(s)); return simulateMatch(L.teams[s % 8], L.teams[(s + 3) % 8], createRng(s * 31)); };
 
 // Finder et mål/redning/forbi med oplægger (med eller uden recv), og viser øjeblikkets trin
-function open(wantRecv) {
+function open(wantRecv, wantAir = false) {
   for (let s = 1; s < 200; s++) {
-    const m = match(s), o = m.trace.moments.find((x) => x.from && !!x.recv === wantRecv && ['GOAL', 'HEADER_GOAL', 'SAVE', 'MISS'].includes(x.kind));
+    const m = match(s), o = m.trace.moments.find((x) => x.from && !!x.recv === wantRecv && !!x.air === wantAir && ['GOAL', 'HEADER_GOAL', 'SAVE', 'MISS'].includes(x.kind));
     if (!o) continue;
     clearReplays(); queue = [];
     const el = replayEl(m, o.side);
@@ -105,5 +105,19 @@ test('et grundbillede (intet øjeblik) har ingen ben', () => {
   const st = replaySteps(m.trace, false, m.events);
   while (st[Number(el.dataset.step)].kind !== 'frame') byId(el, 'rp-prev').handlers.click();   // tilbage til et grundbillede
   assert.equal(el.dataset.leg, '', 'leg nulstillet i et grundbillede');
+  assert.equal(live().length, 0);
+});
+
+// v3.22.1 (QC): et indlæg, en lang bold eller et hovedstød går i luften fra oplæggeren direkte til afslutningen – ingen jordaflevering
+// til skytten på linjen først; skytten løber ind fra linjen samtidig.
+test('luftbold (air) med recv: pass (skytten på linjen) → shot direkte – intet recv-ben for bolden', () => {
+  const { el, ball, sh, fr, o } = open(true, true);
+  assert.ok(o.air && o.recv, 'data: et indlæg med recv');
+  assert.equal(el.dataset.leg, 'pass'); assert.equal(pos(ball), pos(fr));
+  const atRecv = pos(sh), [t] = live();
+  assert.equal(live().length, 1);
+  fire(t);
+  assert.equal(el.dataset.leg, 'shot', 'direkte til afslutningen');
+  assert.notEqual(pos(sh), atRecv, 'skytten løb ind fra linjen'); assert.equal(pos(ball), pos(sh));
   assert.equal(live().length, 0);
 });
