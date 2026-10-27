@@ -6,13 +6,15 @@ import { h, dec, LOCK, select } from './dom.js';
 import { LINE, POSITION_FULL, SKILL_LABELS, kr, starsEl } from './labels.js';
 import { aerialBreakdown } from '../engine/generator.js';
 import { runStats } from '../engine/stats.js';
+import { BAND_WORD } from '../engine/chemistry.js';
 import { COUNTER_KEYS, COUNTER_LABELS, COUNTER_POOL } from '../engine/counter.js';
 
 const dk = (v) => v.toLocaleString('da-DK', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const bar = (label, v, max = 20) => h('div', { class: 'bar' }, h('span', { class: 'bar-label' }, label),
   h('span', { class: 'bar-track' }, h('span', { class: 'bar-fill', style: { width: `${Math.round((v / max) * 100)}%` } })), h('span', { class: 'bar-val' }, String(v)));
 
-export function renderCard({ player: p, team, isOwn, scouting, note, onNote, teams = null, latest = null, onOpenMatch = null, onFocus = null, retiring = false, market = null, hideLog = null, season = null, starter = false, trainNote = false }) {
+// chem (v3.24.0, kun dit hold): { best, pairs, isNew } fra chemistry.js – samspillet med hans naboer i ord (intet 0–100-tal, QC)
+export function renderCard({ player: p, team, isOwn, scouting, note, onNote, teams = null, latest = null, onOpenMatch = null, onFocus = null, retiring = false, market = null, hideLog = null, season = null, starter = false, trainNote = false, chem = null }) {
   if (!p) return h('div', { class: 'panel muted' }, 'Klik på en spiller for at se spillerkortet.');
   const head = h('div', { class: 'card-head' },
     h('h3', {}, `#${p.shirtNumber} ${p.name}`),
@@ -35,6 +37,7 @@ export function renderCard({ player: p, team, isOwn, scouting, note, onNote, tea
       h('div', { class: 'muted', id: 'run-stats' }, run.km90 != null ? `🏃 ${dec(run.km90, 1)} km pr. 90 min · ${run.hiPct != null ? `${run.hiPct} % højintenst` : 'højintenst: kommer efter næste kamp'} · topfart ${dec(p.topSpeedMax, 1)} km/t (alle kampe)` : '🏃 Løbedata kommer efter første kamp'),
       onFocus ? renderTraining(p, onFocus, starter) : trainNote ? h('div', { class: 'muted', id: 'card-train-note' }, `🏋️ Træner: ${FOCUS[trainingEstimate(p).key].label} – ændr i Trup`) : null,
       h('div', { class: 'muted', id: 'card-wage' }, `Løn ${kr(Math.round(p.weeklyWage / 3))} pr. runde · Værdi ${kr(publicValue(p))} (offentlig – ud fra stjerner og alder)`),
+      chem ? renderChem(chem) : null,
     ];
   } else {
     body = [h('div', { class: 'lockbox' }, `Evner, spring, luftduel, arketype og kontrakt: ${LOCK}`), h('div', {}, 'Offentlig vurdering: ', starsEl(p.publicStars))];
@@ -70,13 +73,24 @@ function renderTraining(p, onFocus, starter = false) {
     h('div', { class: 'muted', id: 'train-estimate' }, `Skøn: ${p.shortName} ${roomWords(roomOf(p))} · ${p.age} år – jo yngre, jo hurtigere. Kampe giver også lidt (${dec(MATCH_XP, 2)} pr. 90 min i kædens nøgle-evner).`));
 }
 
+// 🤝 Samspil (v3.24.0): bedste makker kun ved "stærkt" (QC); hans par med de naboer, han står ved lige nu (bænk: ingen)
+function renderChem({ best, pairs, isNew }) {
+  return h('div', { id: 'card-chem' },
+    h('div', { id: 'card-best' }, isNew ? '🤝 Ny i truppen – fremmed for alle, indtil han har spillet kampe ved siden af de samme'
+      : best ? `🤝 Bedste makker: #${best.mate.shirtNumber} ${best.mate.shortName} (samspil: stærkt)` : '🤝 Ingen særlig makker endnu'),
+    pairs.length ? h('div', { class: 'muted', id: 'card-pairs' }, 'Samspil med naboerne nu: ' + pairs.map((x) => `#${x.mate.shirtNumber} ${x.mate.shortName} ${BAND_WORD[x.band]}`).join(' · ')) : null);
+}
+
 // 💰 Marked på kortet: en bots spiller har en fast, synlig pris; din egen kan sættes til salg (QC: fast pris, ingen forhandling)
 function renderMarketBox(p, m) {
   if (m.own) return h('div', { class: 'marketbox', id: 'card-market' }, h('h4', {}, '💰 Marked'),
-    h('label', {}, h('input', { type: 'checkbox', id: 'list-toggle', checked: m.listed, onchange: (e) => m.onList(e.target.checked) }), ' Til salg – de andre klubber byder, når transfervinduet er åbent (se 💼 Klub)'));
+    h('label', {}, h('input', { type: 'checkbox', id: 'list-toggle', checked: m.listed, onchange: (e) => m.onList(e.target.checked) }), ' Til salg – de andre klubber byder, når transfervinduet er åbent (se 💼 Klub)'),
+    // Samspil (v3.24.0, QC/Spilfører UI): prisen ved beslutningen – kun stærke par med hans naboer nu, 🤝 (ikke ⚠ – det er ingen afgift)
+    m.strong?.length ? h('div', { class: 'muted', id: 'list-chem' }, `🤝 Stærkt samspil med ${m.strong.map((x) => `#${x.mate.shirtNumber} ${x.mate.shortName}`).join(' og ')} – et salg bryder parret.`) : null);
   return h('div', { class: 'marketbox', id: 'card-market' }, h('h4', {}, '💰 Marked'),
     h('div', {}, `Pris: ${kr(m.price)} (offentlig værdi ${kr(publicValue(p))}${m.starter ? ' · starter: +60 %' : ' · +30 %'})`),
     h('div', { class: 'muted', id: 'buy-terms' }, `Hans løn hos dig: ${kr(m.wage)} pr. runde · du har ${kr(Math.max(0, m.room))} pr. runde til løn (budgettet – efter et salg din løn før salget) · kassen efter købet: ${kr(m.cashAfter)}`),
+    m.settle ? h('div', { class: 'muted', id: 'buy-chem' }, `🤝 Ny i truppen: fremmed for alle – ca. ${m.settle} kampe ved siden af de samme, før han har spillet sig ind.`) : null,
     m.reason ? h('div', { class: 'muted', id: 'buy-reason' }, m.reason) : h('button', { id: 'buy-player', onclick: m.onBuy }, `💰 Køb for ${kr(m.price)}`));
 }
 

@@ -83,6 +83,26 @@ try {
   // v3.19.0 (brugeren): banen og opstillingen er flyttet til Taktik – Trup er regneark, træning og kort
   check('Trup-fanen har regneark og spillerkort – men ikke banen, bænken, byt-knapper eller taktikken', (await g.isVisible('#matrix')) && (await g.isVisible('#player-card')) && (await g.locator('#pitch').count()) === 0 && (await g.locator('#bench').count()) === 0 && (await g.locator('#tactics').count()) === 0 && !(await g.locator('#matrix thead').textContent()).includes('Byt'));
   await tab('taktik');
+  // v3.24.0 samspil: én streg pr. par, motoren læser (ikke angriberparret), alle "spillet sammen" ved start; legenden nævner det svageste par
+  { const want = await g.evaluate(async () => { const m = await import('/engine/chemistry.js'), d = JSON.parse(localStorage.getItem('tactivar_save')), me = d.league.teams.find((t) => !t.isBot);
+      return { n: m.readPairs(me.tactics.baseFormation).length, all: m.neighbourPairs(me.tactics.baseFormation).length }; });
+    const lines = await g.evaluate(() => [...document.querySelectorAll('#pitch #chem-lines line.chem')].map((l) => l.getAttribute('class')));
+    check('Samspil: Taktik-banen har én streg pr. par, motoren læser (ikke angriberparret), alle "spillet sammen" ved start', lines.length === want.n && want.n < want.all && lines.every((c) => c.includes('chem-sammen')), JSON.stringify({ want, lines: lines.length }));
+    check('Samspil: legenden under banen nævner det svageste par i ord – intet 0–100-tal', /^Svagest lige nu: .+ \(spillet sammen\)\./.test(await g.textContent('#chem-weakest')) && !/\d/.test((await g.textContent('#chem-legend')).replace(/#\d+/g, '')), await g.textContent('#chem-legend')); }
+  // Et par spillet stærkt sammen: tyk streg, kortets bedste makker og salgslinjen nævner makkeren
+  { const pair = await g.evaluate(async () => { const m = await import('/engine/chemistry.js'), d = JSON.parse(localStorage.getItem('tactivar_save')), me = d.league.teams.find((t) => !t.isBot), s = me.tactics.lineupSlots;
+      const [i, j] = m.readPairs(me.tactics.baseFormation)[0]; me.chemistry[m.pairKey(s[i], s[j])] = [85, 0]; localStorage.setItem('tactivar_save', JSON.stringify(d));
+      const by = (id) => me.squad.find((p) => p.id === id); return { a: by(s[i]), b: by(s[j]) }; });
+    await g.reload(); await g.waitForSelector('body[data-klar="ja"]'); await tab('taktik');
+    check('Samspil: et stærkt par får en tyk streg (chem-staerkt), resten er uændrede', (await g.locator('#pitch #chem-lines line.chem-staerkt').count()) === 1);
+    await tab('trup');
+    await g.locator('#matrix tbody tr', { hasText: pair.a.shortName }).first().click();
+    const best = await g.textContent('#card-best'), list = await g.textContent('#list-chem').catch(() => '');
+    check('Samspil: spillerkortet viser den stærke makker, og salgslinjen siger at et salg bryder parret', best === `🤝 Bedste makker: #${pair.b.shirtNumber} ${pair.b.shortName} (samspil: stærkt)` && list.includes(`#${pair.b.shirtNumber} ${pair.b.shortName}`) && list.includes('et salg bryder parret'), best + ' | ' + list);
+    // en anden klubs spiller: købelinjen ved prisen
+    await g.selectOption('#team-select', '1'); await g.locator('#matrix tbody tr').first().click();
+    check('Samspil: en anden klubs spiller – købeboksen siger "fremmed for alle – ca. 8 kampe"', (await g.textContent('#buy-chem')) === '🤝 Ny i truppen: fremmed for alle – ca. 8 kampe ved siden af de samme, før han har spillet sig ind.' && (await g.locator('#card-chem').count()) === 0);
+    await g.selectOption('#team-select', '0'); await tab('taktik'); }
   // Ét fælles byt (pickForSwap): bænkspiller i listen → brik på banen
   const tName = async (slot) => g.locator(`#pitch .token[data-slot="${slot}"] .token-name`).textContent();
   const benchRow = g.locator('#bench tr.bench-p').first();
@@ -106,7 +126,8 @@ try {
   check('Klik på en brik filtrerer listen til hans kæde', (await g.locator('#lineup-list .toolbar button.active').textContent()) !== 'Alle' && (await g.locator('#bench tr.active').count()) === 1);
   await g.locator('#lineup-list .toolbar button', { hasText: 'Alle' }).click();   // valget bevares, når filteret skiftes
   await g.locator('#bench tr.bench-p').first().click();
-  check('…og et byt startet på banen kan afsluttes i listen', (await tName(7)) !== benchShort && (await g.locator('#pick-msg').count()) === 0);
+  // v3.24.0: efter byttet må der stå en samspilsbesked (🤝) – ikke byt-beskeden (🔁)
+  check('…og et byt startet på banen kan afsluttes i listen', (await tName(7)) !== benchShort && ((await g.locator('#pick-msg').count()) === 0 || (await g.textContent('#pick-msg')).startsWith('🤝')));
   // Samme spiller to gange: intet byt, ingen besked
   const t3 = await tName(3);
   await g.click('#pitch .token[data-slot="3"]'); await g.click('#pitch .token[data-slot="3"]');

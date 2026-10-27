@@ -6,7 +6,7 @@ import { matchBenchOf } from './career.js';
 import { FORMATIONS, lineOfRole, isOutOfZone, slotPosition, fitOf, arrangeByFit } from './formations.js';
 import { livePositions as livePos0, coupledPositions as coupled0, kickoffPositions, apartFrom, apartOnLine, ONSIDE_GAP, MIN_APART } from './positions.js';
 import { masteryVs, counterXpForMatch } from './counter.js';
-import { chemScale, slotChem, CHEM_BASE } from './chemistry.js';
+import { chemScale, slotChem, bandOf, BAND_WORD, CHEM_BASE } from './chemistry.js';
 import { createSheet, finalizeSheet } from './ratings.js';
 import { assignClock } from './clock.js';
 import { describeFinish, headerBand, describeVarTiming, describeGoal, goalSpectacle, pickBy, gen, pl } from './clues.js';
@@ -322,6 +322,12 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // Samspil: skalaen for spilleren på hans plads blandt dem, der står på banen nu – målt mod ligaens snit (opts.chemRef; uden = BASE)
   const chemRef = Number.isFinite(opts.chemRef) ? opts.chemRef : CHEM_BASE;
   const chemAt = (side, p) => { const v = slotChem(side.team, side.starters, side.tactics.baseFormation, side.starters.indexOf(p)); return v == null ? 0 : chemScale(v, chemRef); };
+  // Midtbanens samspil ved kampstart (fuldtids-analysen – samme læsning som opbygningen, QC/Spilfører: virkningen sidder dér)
+  const midChemBand = (side) => {
+    const c = FORMATIONS[side.tactics.baseFormation] ?? FORMATIONS['4-4-2'], vals = side.starters.map((p, i) => (p && i > 0 && lineOfRole(c[i].r) === 'MID' ? slotChem(side.team, side.starters, side.tactics.baseFormation, i) : null)).filter((v) => v != null);
+    return side.team.chemistry && vals.length ? bandOf(vals.reduce((x, y) => x + y, 0) / vals.length, chemRef) : null;
+  };
+  const kickoffMidBand = new Map([[H, midChemBand(H)], [A, midChemBand(A)]]);
 
   // Varianter pr. kamp (v3.16.3, Spilfører: "styrer midtbanen" tre gange for samme spiller i én kamp – pickBy på tick'et ramte
   // samme variant hvert 4. tick): hver (familie, aktør) går videre til næste variant, hver gang den bruges. Intet rng-træk.
@@ -1592,7 +1598,10 @@ export function simulateMatch(home, away, rng, opts = {}) {
       // v3.12 (brugeren: "ikke en eneste reference til cutbacks"): dit angreb efter dine valg og
       // dit felt – modstanderens indstilling navngives ikke, kun hvad dit forsvar mødte.
       + ` ⚔️ Angreb (${FOCUS_LABEL[ph.attackFocus] ?? ph.attackFocus} · ${PASS_LABEL[ph.passingStyle] ?? ph.passingStyle}): ${attackLine(d, ph)}.`
-      + ` 🛡️ Dit felt: modstanderens cutbacks stoppet ${d.oppCutbacksBlocked} af ${d.oppCutbacks} · luftdueller i åbent spil vundet ${d.oppCrosses - d.oppCrossesWon} af ${d.oppCrosses}.`);
+      + ` 🛡️ Dit felt: modstanderens cutbacks stoppet ${d.oppCutbacksBlocked} af ${d.oppCutbacks} · luftdueller i åbent spil vundet ${d.oppCrosses - d.oppCrossesWon} af ${d.oppCrosses}.`
+      // Samspil (v3.24.0): årsagen, ikke udfaldet – midtbanen ved kampstart, hvor virkningen sidder (opbygningen)
+      + (kickoffMidBand.get(meSide) === 'fremmede' || kickoffMidBand.get(meSide) === 'finder' ? ` 🤝 Samspil: din midtbane har ikke spillet sig sammen endnu (${BAND_WORD[kickoffMidBand.get(meSide)]}) – det gør opbygningen lidt sværere.`
+        : kickoffMidBand.get(meSide) === 'staerkt' ? ' 🤝 Samspil: din midtbane har spillet sig sammen (stærkt) – det hjælper opbygningen lidt.' : ''));
   }
   const ratings = finalizeSheet(sheet, hG, aG, rng, counterXpForMatch);
   addEv(90, 'END', 'HIGHLIGHT', true, false, 'Slutfløjt', `🏁 SLUTFLØJT! ${home.name} ${hG} - ${aG} ${away.name}.${ratings.motm ? ` Kampens spiller: #${ratings.motm.shirtNumber} ${ratings.motm.shortName} (${ratings.motm.teamName}).` : ''}`);

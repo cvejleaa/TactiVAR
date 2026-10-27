@@ -7,6 +7,7 @@ import { placesBefore } from '../engine/season.js';
 import { windowOf, marketInfo, wageCap, wageRoom, needsYouth, wageFreed, saleBlock, YOUTH_WAGE, SALES_PER_WINDOW } from '../engine/transfers.js';
 import { TEAM_PUBLIC_FIELDS } from '../engine/visibility.js';
 import { SEASON_ROUNDS, seasonRoundOf } from '../engine/schedule.js';
+import { playerPairs, chemRefOf, gamesToSettle } from '../engine/chemistry.js';
 
 // Dine salg tilbage i vinduet (samme tæller som transfers.js sellBlock)
 const salesLeft = (league, team) => { const w = windowOf(league); return SALES_PER_WINDOW - (w != null && league.windowSales?.w === w ? league.windowSales.n?.[team.id] ?? 0 : 0); };
@@ -95,7 +96,9 @@ export function renderMarket({ league, team, playing, onAccept, onDecline, onUnl
         // Fritstil kun uden bud (QC: uigenkaldelig, ikke ved siden af Sælg) og kun når et salg er muligt
         w != null && onRelease && !o && !block ? h('button', { class: 'mini release', onclick: () => onRelease(p.id) }, 'Fritstil (gratis)') : null,
         h('button', { class: 'mini linklike', onclick: () => onUnlist(p.id) }, 'Fjern fra listen'),
-        w != null && !block ? h('div', { class: 'muted market-gain' }, `${o ? 'Salg' : 'Salg eller fritstilling (uden betaling – kan ikke fortrydes)'} ${gain}.`) : null);
+        w != null && !block ? h('div', { class: 'muted market-gain' }, `${o ? 'Salg' : 'Salg eller fritstilling (uden betaling – kan ikke fortrydes)'} ${gain}.`) : null,
+        // Samspil (v3.24.0): samme linje som på kortet ved "Til salg" – kun stærke par med hans naboer nu
+        (() => { const st = playerPairs(team, chemRefOf(league), p.id).filter((x) => x.band === 'staerkt'); return st.length ? h('div', { class: 'muted market-chem' }, `🤝 Stærkt samspil med ${st.map((x) => `#${x.mate.shirtNumber} ${x.mate.shortName}`).join(' og ')} – et salg bryder parret.`) : null; })());
     }) : h('p', { class: 'muted', id: 'market-empty' }, 'Ingen. Sæt en spiller til salg på hans spillerkort (dit hold).'),
     w != null && onBuy ? renderForSale(league, team, onBuy, onLine, line, msg) : null);
 }
@@ -110,6 +113,8 @@ function renderForSale(league, me, onBuy, onLine, line, msg = '') {
   return h('div', { id: 'for-sale' },
     h('h4', {}, `Til salg i ligaen – du kan købe ${rows.length}`),
     msg ? h('div', { class: 'notice', id: 'for-sale-msg' }, msg) : null,
+    // Samspil (v3.24.0, QC: prisen hvor man køber): én linje for alle køb – antallet af kampe regnet ud af modellen
+    h('div', { class: 'muted', id: 'for-sale-chem' }, `🤝 Et køb er fremmed for alle i truppen – ca. ${gamesToSettle(chemRefOf(league))} kampe ved siden af de samme, før han har spillet sig ind.`),
     h('div', { class: 'toolbar' }, [['all', 'Alle'], ['GK', 'MÅL'], ['DEF', 'FOR'], ['MID', 'MID'], ['ATT', 'ANG']].map(([v, l]) => h('button', { class: 'mini' + (line === v ? ' active' : ''), onclick: () => onLine?.(v) }, l))),
     rows.length ? h('div', { class: 'tablewrap' }, h('table', { class: 'ledger', id: 'for-sale-table' },
       // Køb først (360 px: sidste kolonne lå uden for skærmen – QC); Klub og Løn skjules på smal skærm

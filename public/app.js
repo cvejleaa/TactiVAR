@@ -16,6 +16,7 @@ import { renderClub, shownCash, renderMarket, renderTransferLog, renderPublicClu
 import { marketInfo, buyPlayer, setListed, acceptOffer, declineOffer, releasePlayer, wageRoom, isStarter } from './engine/transfers.js';
 import { renderSeasonReport } from './ui/season-report.js';
 import { viewTeam } from './engine/visibility.js';
+import { lineupPairs, chemRefOf, weakestPair, swapChanges, BAND_WORD, bestPartner, playerPairs, gamesToSettle, bandOf, chemOf } from './engine/chemistry.js';
 import { renderPitch } from './ui/pitch.js';
 import { renderTactics } from './ui/tactics.js';
 import { renderStandings } from './ui/standings.js';
@@ -79,6 +80,7 @@ const NEWS = {
   '3.14.1': 'Rettelser: VAR tjekker nu offside for den forreste – scorer en spiller længere tilbage, er det hans forreste holdkammerat, der tjekkes, og billedet ved målet viser skytten, hvor han skød fra. Statistikken på Liga-fanen gælder sæsonen.',
   '3.14.2': 'Rettelse: Ved et VAR-tjek står den tjekkede nu, hvor han stod (forrest), i billedet ved målet – ikke flyttet bag en holdkammerat.',
   '3.14.3': 'Rettelser: Langskud tages fra skudafstand (ikke fra egen banehalvdel) i billedet ved målet, referatet fortæller et oplæg én gang, og efter sæsonens sidste runde viser tabellen slutstillingen og mesteren, til næste sæson går i gang.',
+  '3.24.0': '🤝 Samspil: spillere, der spiller kampe side om side, finder hinanden – det gør opbygningen lidt lettere og forsvaret bedre mod løb i ryggen. Et nyt køb er fremmed for alle i ca. 8 kampe. Se stregerne mellem dine spillere i Taktik (tyk = stærkt, stiplet = fremmede), din bedste makker på spillerkortet, og hvad et byt eller et salg bryder.',
   '3.22.1': '🎬 Afspilningen viser nu afleveringen før målet og før afslutninger efter en cutback, et løb eller et indlæg: bolden går fra oplæggeren til skytten, der står onside på linje med forsvaret – derefter løber han igennem og afslutter (et indlæg går i luften direkte ind i feltet). Før så det ud, som om han stod offside. Målene i den runde, du allerede har spillet, vises også rigtigt.',
   '3.22.0': '📊 Kampens tal: klik på en af dine spillere efter kampen. Under hans heat map står, hvor mange bolde han erobrede og tabte, og 🤝 hvem han spillede sammen med – cutbacks, indlæg, løb og dødbolde, med minut og udfald. Kun det, kampen selv afgjorde.',
   '3.21.2': '📰 Klummen handler mere om dig: din kamps store øjeblik – et comeback, et sent sejrsmål, et sent point, at I rejste jer fra to mål bagud, eller en storsejr – går nu forud for de andre kampe i overskriften. "Comeback" bruges kun, når et hold var bagud med to eller stadig bagud efter pausen. Stil-gættene kræver bedre belæg, "Mit bud" og kamp-overskrifterne varierer mere, og 🏃 Dit holds løber vises kun, når løbet er værd at nævne.',
@@ -342,8 +344,9 @@ function renderNow() {
     onNote: (v) => { game.notes[selected.id] = v; persist(); renderControls(); }, teams: league.teams, latest,
     onFocus: isOwn && tab === 'trup' ? (k) => change(() => act.setFocus(team, selected.id, k)) : null,
     trainNote: isOwn && tab !== 'trup',
-    market: !selected || mc?.playing ? null : isOwn ? { own: true, listed: (team.listed ?? []).includes(selected.id), onList: (on) => change(() => setListed(league, team, selected.id, on)) }
-      : { ...marketInfo(league, mine, team, selected), starter: isStarter(team, selected), wage: Math.round(publicWage(selected) / 3), room: Math.round(wageRoom(league, mine) / 3), cashAfter: mine.cashBalance - marketInfo(league, mine, team, selected).price, onBuy: () => { const err = buyPlayer(league, mine, selected.id); view.notice = err ? `💰 ${err}` : `💰 ${selected.shortName} er købt og står nu i din trup.`; change(() => {}); } },
+    chem: isOwn && selected ? chemCard(team, selected) : null,
+    market: !selected || mc?.playing ? null : isOwn ? { own: true, listed: (team.listed ?? []).includes(selected.id), onList: (on) => change(() => setListed(league, team, selected.id, on)), strong: playerPairs(team, chemRefOf(league), selected.id).filter((x) => x.band === 'staerkt') }
+      : { ...marketInfo(league, mine, team, selected), settle: gamesToSettle(chemRefOf(league)), starter: isStarter(team, selected), wage: Math.round(publicWage(selected) / 3), room: Math.round(wageRoom(league, mine) / 3), cashAfter: mine.cashBalance - marketInfo(league, mine, team, selected).price, onBuy: () => { const err = buyPlayer(league, mine, selected.id); view.notice = err ? `💰 ${err}` : `💰 ${selected.shortName} er købt og står nu i din trup.`; change(() => {}); } },
     hideLog: mc?.playing && league.lastRound ? seasonAndRound(league, league.lastRound.round) : null,
     // Under afspilningen af sæsonens sidste runde er det stadig den afsluttede sæson, der vises
     season: mc?.playing && league.lastRound ? seasonAndRound(league, league.lastRound.round)[0] : league.leagueMetadata.seasonNumber ?? 1, starter: !!selected && team.tactics.lineupSlots.includes(selected.id),
@@ -351,11 +354,12 @@ function renderNow() {
     onOpenMatch: (hi, ai) => { const i = lr.matches.findIndex((m) => m.homeId === league.teams[hi]?.id && m.awayId === league.teams[ai]?.id); if (i >= 0) openReport(i); } });
 
   const pitch = h('div', { class: 'panel' }, h('h3', { id: 'pitch-title' }, `${team.name} – ${team.tactics.baseFormation}`), isOwn ? null : h('div', { class: 'muted', id: 'pitch-opp' }, 'Modstanderhold – kun offentlige data'),
-    renderPitch({ team, isOwn, ui: view,
+    renderPitch({ team, isOwn, ui: view, pairs: isOwn ? lineupPairs(team, chemRefOf(league)) : null,
       onSelect: (p, own) => { if (own) { view.listLine = p.line; pickForSwap(team, p); } else { view.selectedPlayerId = p.id; view.listLine = p.line; render(); } },
-      onTokenSwap: (a, b) => { clearSwap(); view.notice = ''; change(() => act.swapPlayers(team, a, b)); },
+      onTokenSwap: (a, b) => { clearSwap(); view.notice = ''; withChem(team, () => change(() => act.swapPlayers(team, a, b))); },
       onMove: (slot, pos) => { clearSwap(); change(() => act.moveSlot(team, slot, pos)); } }),
-    isOwn ? h('div', { class: 'muted help' }, 'Træk = justér position (målmanden står fast) · Klik på en brik = vælg (listen viser hans kæde) · Klik på en anden = byt') : null);
+    isOwn ? h('div', { class: 'muted help' }, 'Træk = justér position (målmanden står fast) · Klik på en brik = vælg (listen viser hans kæde) · Klik på en anden = byt') : null,
+    isOwn ? chemLegend(lineupPairs(team, chemRefOf(league))) : null);
 
   // Spillerlisten ved banen (v3.19.0): opstilling, bænk og reserver ét sted
   const lineupList = renderLineupList({ team, isOwn, ui: { ...view, swapId: view.pitchSwapId }, msg: isOwn ? view.pickMsg ?? '' : '',
@@ -368,14 +372,14 @@ function renderNow() {
   const tactics = renderTactics({ team, isOwn, ui: game.ui, on: {
     formation: (f) => {   // QC K3: sig, hvad der skete, når brikkerne flytter sig
       const before = team.tactics.lineupSlots.slice();
-      change(() => act.setFormation(team, f));
+      withChem(team, () => change(() => act.setFormation(team, f)));
       const moved = team.tactics.lineupSlots.filter((id, i) => id !== before[i]).length, out = act.outOfPositionCount(team);
       view.notice = `${f}: ${moved ? `${moved} spillere er flyttet, så flest står på deres naturlige position` : 'ingen behøvede at flytte'}${out ? ` – ${out} står uden for position (se ⚠ på banen)` : ''}.`;
       render();
     },
-    preset: (i) => change(() => { act.switchPreset(team, game.ui.activePresetIndex, i); game.ui.activePresetIndex = i; }),
+    preset: (i) => withChem(team, () => change(() => { act.switchPreset(team, game.ui.activePresetIndex, i); game.ui.activePresetIndex = i; })),
     resetDrag: () => change(() => act.resetDrag(team)),
-    arrange: () => { const moved = act.arrangeLineup(team); view.notice = moved ? '⇄ De 11 er flyttet, så flest står på deres naturlige position.' : '⇄ De 11 står allerede bedst muligt efter position.'; change(() => {}); },
+    arrange: () => { let moved = 0; withChem(team, () => { moved = act.arrangeLineup(team); }); view.notice = moved ? '⇄ De 11 er flyttet, så flest står på deres naturlige position.' : '⇄ De 11 står allerede bedst muligt efter position.'; change(() => {}); },
     phase: (ph, f, v) => change(() => act.setPhase(team, ph, f, v)),
     rule: (i, patch) => change(() => act.updateRule(team, i, patch)),
     addRule: () => change(() => act.addRule(team)),
@@ -440,6 +444,26 @@ function renderNow() {
   document.body.dataset.klar = 'ja';
 }
 
+// Samspil på spillerkortet (v3.24.0): ny = ingen par i holdets tabel (fremmed for alle)
+function chemCard(team, p) {
+  const ref = chemRefOf(game.league), isNew = !Object.keys(team.chemistry ?? {}).some((k) => k.split('|').includes(p.id));
+  return { isNew, best: isNew ? null : bestPartner(team, ref, p.id), pairs: playerPairs(team, ref, p.id) };
+}
+// Samspil (v3.24.0): forklaringen under banen og det svageste par i ord (Spilfører UI: på mobil er det eneste måde at se et pars bånd)
+function chemLegend(pairs) {
+  const w = weakestPair(pairs), key = (b) => h('span', { class: `chem-key ${b}` });
+  return h('div', { class: 'chem-legend', id: 'chem-legend' },
+    h('div', {}, '🤝 Samspil mellem naboer: ', key('staerkt'), 'stærkt ', key('sammen'), 'spillet sammen ', key('finder'), 'finder hinanden ', key('fremmede'), 'fremmede'),
+    w ? h('div', { id: 'chem-weakest' }, `Svagest lige nu: ${w.label} (${BAND_WORD[w.band]}). Par spiller sig sammen med kampe side om side – et nyt køb er fremmed for alle.`) : null);
+}
+// Byt og formation (v3.24.0): sig det, når et pars samspil skifter bånd – ved spillerlisten (QC/Spilfører UI: ikke øverst på siden)
+function withChem(team, fn) {
+  const ref = chemRefOf(game.league), before = lineupPairs(team, ref);
+  fn();
+  const ch = swapChanges(before, lineupPairs(team, ref));
+  if (ch.length) { view.pickMsg = `🤝 ${ch.join(' · ')}`; render(); }
+}
+
 // Ét byt-sted (v3.19.0, før tre kopier): første klik vælger; andet klik: en starter med i spil → byt (swapPlayers),
 // bænk ⇄ reserve → kamptruppen (swapBench), samme spiller → fravælg, bænk → bænk / reserve → reserve → nyt valg.
 function pickForSwap(team, p) {
@@ -447,7 +471,7 @@ function pickForSwap(team, p) {
   view.selectedPlayerId = p.id;
   const kind = act.swapKind(team, a, p.id);
   if (kind === 'deselect') { clearSwap(); view.notice = ''; render(); return; }
-  if (kind === 'swap' || kind === 'bench') { clearSwap(); view.notice = ''; change(() => act.pickForSwap(team, a, p.id)); return; }
+  if (kind === 'swap' || kind === 'bench') { clearSwap(); view.notice = ''; withChem(team, () => change(() => act.pickForSwap(team, a, p.id))); return; }
   const slots = team.tactics.lineupSlots, benchIds = matchBenchOf(team).map((x) => x.id);
   view.pitchSwapId = p.id;
   view.pickMsg = slots.includes(p.id) ? `🔁 Klik på den spiller, ${p.shortName} skal byttes med – på banen eller i listen.`
