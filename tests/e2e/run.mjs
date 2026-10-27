@@ -893,6 +893,12 @@ try {
   { const note = await g.textContent('#notice'), dm = await g.evaluate(() => { const t = JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((x) => !x.isBot); const p = t.squad.find((x) => x.position === 'DM'); return `#${p.shirtNumber} ${p.shortName}`; });
     await tab('taktik'); const flags = await g.locator('#pitch .token-flag.pos').count(), n = Number((note.match(/: (\d+) af dine står uden for position/) ?? [])[1]);
     check('Gem fra v3.19.0: beskeden navngiver din DM, siger at din opstilling er urørt, og antallet uden for position = flagene på Taktik', note.includes(`${dm} nu DM`) && note.includes('Din egen opstilling er ikke ændret') && flags >= 1 && n === flags && (await g.locator('#arrange-lineup').isVisible()), `${flags} flag · ${note.slice(0, 400)}`); }
+  // v3.23.0 (Release Manager): et gem fra v3.22.1 (skema 8) – en kort besked om samspillet, så backup-knappen findes; gemt som 9
+  const fixtureV3221 = fs.readFileSync(new URL('../fixtures/save-v3.22.1.json', import.meta.url), 'utf8');
+  await g.evaluate((f) => { for (const k of Object.keys(localStorage)) if (k.startsWith('tactivar_')) localStorage.removeItem(k); localStorage.setItem('tactivar_save', f); }, fixtureV3221);
+  await reload();
+  { const note = await g.textContent('#notice').catch(() => ''), saved = await g.evaluate(() => { const d = JSON.parse(localStorage.getItem('tactivar_save')); return { schema: d.schemaVersion, chem: Object.keys(d.league.teams[0].chemistry ?? {}).length, backups: Object.keys(localStorage).filter((k) => k.startsWith('tactivar_backup_')).length }; });
+    check('Gem fra v3.22.1 (skema 8): kort besked om samspillet med backup-knap, gemt som skema 9 med samspilstabel', note.startsWith('Dit spil er opdateret: Forberedelse til samspil') && (await g.locator('#download-migration-backup').isVisible()) && saved.schema === 9 && saved.chem > 50 && saved.backups === 1, JSON.stringify(saved) + ' ' + note.slice(0, 200)); }
   const fixtureV39 = fs.readFileSync(new URL('../fixtures/save-v3.9.json', import.meta.url), 'utf8');
   await g.evaluate((f) => { for (const k of Object.keys(localStorage)) if (k.startsWith('tactivar_')) localStorage.removeItem(k); localStorage.setItem('tactivar_save', f); }, fixtureV39);
   await reload();

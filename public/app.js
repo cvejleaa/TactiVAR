@@ -186,7 +186,6 @@ function tiredStarters() {
 // Forklaringen på en migrering – både ved indlæsning og ved import af en ældre fil.
 function migrationNotice(from) {
   if (from == null) return '';
-  // 8 → 9 (v3.23.0, samspil): intet at fortælle endnu – samspillet har ingen virkning, før det kan ses (QC)
   const lines = [
     from <= 1 ? 'Hvis-Så-regler kan nu sættes til "Bagud/Foran med mindst N mål" og skifte til dine egne planer – "Foran med 1" gælder fra 1 mål og opefter.' : '',
     from <= 2 ? 'Mod-kunnen er sat ca. 45 % ned (alle hold): hver spiller har nu højst 100 point fordelt på de tre stilarter – lærer han noget nyt, glemmer han lidt af det gamle.' : '',
@@ -195,6 +194,9 @@ function migrationNotice(from) {
     from <= 6 ? 'Ny i v3.18: træning, aldring, økonomi og transfers – se 💼 Klub. Alle spillere bliver et år ældre ved sæsonslut, lønnen følger nu de offentlige stjerner og alderen, og spillere med samme kortnavn på tværs af holdene har fået et nyt navn.' : '',
     from <= 4 ? 'Hver spiller har nu en naturlig position (kolonnen "Natur"), og højden følger Superliga-dokumentets tabel pr. position: midtstoppere og målmænd højere, backs og kanter lavere. Den højeste i hver position er stadig den højeste – i hver kæde blev de højeste til stoppere/angribere og de laveste til backs/kanter. Luftduellerne er regnet om. Løbene i kampen følger nu den plads, spilleren står på (CM løber længst, kanter og wingbacks har flest højintense løb) – sæsonens km og andel højintenst på spillerkortet blander indtil videre den gamle og den nye beregning.' : '',
     from <= 7 ? dmNotice() : '',
+    // 8 → 9 (v3.23.0): en kort linje, så backup-knappen vises (Release Manager: ellers kunne backuppen ikke findes) – samspillet har
+    // ingen virkning i kampene endnu og nævnes kun som forberedelse
+    from <= 8 ? 'Forberedelse til samspil: hvert hold har fået et samspilstal for spillerne på nabopladser – det ændrer intet i kampene endnu.' : '',
   ].filter(Boolean);
   return lines.length ? 'Dit spil er opdateret: ' + lines.join(' ') : '';
 }
