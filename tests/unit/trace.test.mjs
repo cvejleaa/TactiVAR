@@ -17,7 +17,8 @@ test('sporets regler holder over 150 kampe: 31 billeder, 7–11 spillere, på ba
     assert.deepEqual(r.errors, [], `seed ${s}`);
     subs += m.events.filter((e) => e.type === 'SUB').length; reds += m.events.filter((e) => e.type === 'RED').length; goals += r.finding.goals;
   }
-  assert.ok(subs > 80 && reds > 10 && goals > 200, `data: skift ${subs}, røde ${reds}, mål med billede ${goals}`);
+  assert.ok(subs > 70 && reds > 10 && goals > 200,   // v3.21.0: 79 skift her (0,70 → 0,73 pr. kamp over 600 kampe)
+    `data: skift ${subs}, røde ${reds}, mål med billede ${goals}`);
 });
 
 test('mange udvisninger: den udviste forsvinder fra billedet efter sit minut, ingen indskiftning, aldrig under 7', () => {

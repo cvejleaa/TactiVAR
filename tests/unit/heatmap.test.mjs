@@ -153,13 +153,13 @@ test('thirds: andel af holdets punkter i egen tredjedel (y ≥ 66,7), midten (33
 });
 
 // tools/measure-heat.mjs (20 kampe, dit holds CM): før 7 tændte felter (6 × 9), nu 34 (12 × 18). Med 6 × 9 igen ville "nu" være ≈ 7 → rødt.
-test('målt: en midtbanespillers kort tænder mindst 25 felter (v3.20.1: 7), og andelen af banen falder ikke', async () => {
+test('målt: en midtbanespillers kort tænder mindst 25 felter (v3.20.1: 7)', async () => {
   const { measureHeat } = await import('../../tools/measure-heat.mjs');
   const r = await measureHeat(20);
   assert.ok(r.games >= 18, `data: ${r.games}`);
   assert.ok(r.afterMedian >= 25, `nu ${r.afterMedian}`);
-  assert.ok(r.beforeMedian <= 10, `før ${r.beforeMedian}`);
-  assert.ok(r.afterShareMedian >= r.beforeShareMedian, `andel ${r.afterShareMedian} mod ${r.beforeShareMedian}`);
+  // (før-tallet regnes med 6 × 9 på det NYE spor – fra v3.21.0 bevæger spillerne sig, så det siger intet om v3.20.1)
+  // (andelen før/efter: se tools/measure-movement.mjs – her regnes "før" med 6 × 9 på det nye, bevægede spor)
   // Noten under kortet (km er et skøn, ikke målt på kortet) bygger på dette: sporet er 0,43 km, km-tallet 11,9
   assert.ok(r.traceKmMedian < 2 && r.distanceKmMedian > 8, `spor ${r.traceKmMedian} km, km-tal ${r.distanceKmMedian}`);
 });

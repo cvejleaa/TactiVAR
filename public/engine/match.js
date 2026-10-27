@@ -4,7 +4,7 @@
 // permanent), og Hvis-Så-reglerne kører for begge hold og skifter reelt formation.
 import { matchBenchOf } from './career.js';
 import { FORMATIONS, lineOfRole, isOutOfZone, slotPosition, fitOf, arrangeByFit } from './formations.js';
-import { livePositions, coupledPositions, kickoffPositions, apartFrom, ONSIDE_GAP, MIN_APART } from './positions.js';
+import { livePositions as livePos0, coupledPositions as coupled0, kickoffPositions, apartFrom, ONSIDE_GAP, MIN_APART } from './positions.js';
 import { masteryVs, counterXpForMatch } from './counter.js';
 import { createSheet, finalizeSheet } from './ratings.js';
 import { assignClock } from './clock.js';
@@ -118,6 +118,8 @@ export const FLANK_BONUS = { LOW_BLOCK: -2, MID_BLOCK: 0, HIGH_GEGENPRESS: 3 }; 
 // (RECEIVE_BASE + evne), så den nærmeste oftest, men ikke altid, når bolden.
 // Pladserne er i holdets egne koordinater (lille y = fremme ved modstanderens mål).
 export const RECEIVE_SPREAD = 16, RECEIVE_BASE = 10;
+// Duellens mand (v3.21.0, nearPick): de NEAR_POOL nærmeste, vægt friskhed / afstand² med afstanden mindst NEAR_MIN
+export const NEAR_POOL = 3, NEAR_MIN = 6;
 // Rækkevidde (v3.13, brugerens eksempel: en CB på egen halvdel "når baglinjen" og lægger tilbage): den, der
 // slår bolden fra kanten (cutback, indlæg), skal stå højst RECEIVE_REACH derfra – ellers fik de fjerne en hale på
 // ≈ 25 %. Er ingen så tæt, alle. Afsluttere vælges uden grænse (andenbolde falder også til en stopper).
@@ -299,6 +301,14 @@ export function simulateMatch(home, away, rng, opts = {}) {
   const events = [];
   const lineupNotes = [];
   const H = prepareSide(home, true, lineupNotes), A = prepareSide(away, false, lineupNotes);
+  // Bevægelsen (v3.21.0, positions.js driftAt): kampens seed trækkes én gang; tick'et (curMin / 3) og holdet giver hver spiller
+  // samme plads i alle kald i samme tick – modtagervalget, VAR-forreste, øjeblikkene og sporet læser de samme positioner.
+  // opts.drift = false KUN til de deterministiske test-arenaer med pinnede koordinater og trukne aktører (som liveEnergy): uden
+  // bevægelsen og uden afstandsvalget (nearPick) – spillet sender det aldrig.
+  const driftOn = opts.drift !== false, driftSeed = driftOn ? Math.floor(rng.next() * 2 ** 31) : 0;
+  const driftOf = (tac) => (!driftOn ? null : tac === H.tactics ? { seed: driftSeed, team: 1, t: curMin / 3 } : tac === A.tactics ? { seed: driftSeed, team: 2, t: curMin / 3 } : null);
+  const livePositions = (tac, o = {}) => livePos0(tac, { ...o, drift: driftOf(tac) });
+  const coupledPositions = (b, o, opt = {}) => coupled0(b, o, { ...opt, ballDrift: driftOf(b), oppDrift: driftOf(o) });
   const sheet = createSheet();
   const goalsPool = [], injuries = [], observations = [];
   const st = { hPoss: 10, aPoss: 10, hShots: 0, aShots: 0, hOnTarget: 0, aOnTarget: 0, hXg: 0, aXg: 0, hAerialWon: 0, aAerialWon: 0, hVarChecks: 0, aVarChecks: 0, hTacticSuccess: 0, aTacticSuccess: 0, hFouls: 0, aFouls: 0, hInjuries: 0, aInjuries: 0, hCorners: 0, aCorners: 0, hFreeKicks: 0, aFreeKicks: 0, hPenalties: 0, aPenalties: 0, hPenaltyGoals: 0, aPenaltyGoals: 0, hSetPieceGoals: 0, aSetPieceGoals: 0, hHeaderGoals: 0, aHeaderGoals: 0, hCounterGoals: 0, aCounterGoals: 0, hYellows: 0, aYellows: 0, hReds: 0, aReds: 0 };
@@ -502,6 +512,22 @@ export function simulateMatch(home, away, rng, opts = {}) {
     const chosen = (cand[w.findIndex((x) => (r -= x) < 0)] ?? cand.at(-1)).p;
     if (shot) shotPicks.set(chosen.id, (shotPicks.get(chosen.id) ?? 0) + 1);
     return chosen;
+  }
+  // Duellens mand efter afstand (v3.21.0, brugeren: "så må spillet også blive mere præcist"; Spilfører: vægtet blandt de
+  // nærmeste, ikke altid den nærmeste – ellers samles duellerne på én): blandt de NEAR_POOL nærmeste af cands (holdet side's
+  // pladser i pos) vægter hver friskhed / afstand² (afstanden mindst NEAR_MIN). Ét rng-træk som rng.pick; skriver ikke i seen.
+  const nearRank = new Map();
+  const mirrorPt = (q) => (q ? { x: 100 - q.x, y: 100 - q.y } : { x: 50, y: 50 });
+  function nearPick(side, cands, pt, pos) {
+    if (!driftOn) return rng.pick(cands);   // test-arenaerne (opts.drift = false): motoren fra før v3.21 – også valget
+    const l = cands.map((p) => ({ p, i: side.starters.indexOf(p) })).filter(({ i }) => i > 0 && pos[i])
+      .map((c) => ({ ...c, d: Math.max(NEAR_MIN, Math.hypot(pos[c.i].x - pt.x, pos[c.i].y - pt.y)) })).sort((a, b) => a.d - b.d || a.i - b.i).slice(0, NEAR_POOL);
+    if (!l.length) return rng.pick(cands);
+    const w = l.map(({ p, d }) => Math.max(0.05, ff(p)) / d ** 2);
+    let r = rng.next() * w.reduce((a, b) => a + b, 0);
+    const k = Math.max(0, w.findIndex((x) => (r -= x) < 0));
+    nearRank.set(l[k].p.id, k);   // 0 = den nærmeste – teksten siger kun "nærmest" om ham (QC)
+    return l[k].p;
   }
   // Cutbackens afslutter (v3.18.0): ikke en midtstopper, når en anden er inden for SHOT_REACH (Spilfører: "#3 lagde den tilbage
   // til midtstopperen")
@@ -1209,7 +1235,10 @@ export function simulateMatch(home, away, rng, opts = {}) {
     const frame = tickFrame(min / 3, att);
     const attR = homeHasBall ? hR : aR, defR = homeHasBall ? aR : hR;
     const attPh = att.tactics.phases, defPh = def.tactics.phases;
-    const playmaker = rng.pick(attR.mids), presser = rng.pick(defR.mids), back = rng.pick(defR.defs), striker = rng.pick(attR.atts);
+    // Presseren er den, der står nærmest opspilleren i tick'ets billede (v3.21.0 – nearPick); før en tilfældig midtbanespiller
+    const playmaker = rng.pick(attR.mids), back = rng.pick(defR.defs), striker = rng.pick(attR.atts);
+    const tickPos = coupledPositions(att.tactics, def.tactics, { ballX: livePositions(att.tactics, { attacking: true, ballX: 50 })[att.starters.indexOf(playmaker)]?.x ?? 50, ...onOf(att, def) });
+    const presser = nearPick(def, defR.mids, mirrorPt(tickPos.ball[att.starters.indexOf(playmaker)]), tickPos.opp);
     const who = { playmaker, presser, striker, defs: attR.defs };
 
     // Trukne positioner vurderes (25 %): uden for zonen straffes, inden for belønnes.
@@ -1245,6 +1274,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
       duelLog[att.team.id].build++; duelLog[def.team.id].press++;
       tickDuel = build >= press ? 'BUILD' : 'LOST';
       if (build >= press) {
+        sheet.bump(presser.id, 'duels');   // 🤼: presserens duel (offside-fælden er bagkædens, ikke hans)
         duelLog[att.team.id].buildWon++;
         st[k(att, 'TacticSuccess')]++;
         sheet.adjust(playmaker.id, DUEL_BONUS); sheet.bump(playmaker.id, 'tacticWins');
@@ -1254,7 +1284,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
         // Kun dit eget holds valg navngives; modstanderens stil beskrives ikke.
         // Teksten er den samme, uanset om en stilbonus afgjorde duellen (ellers røbede ordvalget modstanderens stil).
         const text = own(att) ? `✅ [DIN OPBYGNING VIRKER] ${YOUR_PASS[pass]} bryder igennem ${gen(def.team.name)} pres.${note}`
-          : own(def) ? `❌ [DIT PRES BRYDES] ${att.team.name} spiller sig igennem ${YOUR_PRESS[height]}.${note}`
+          : own(def) ? `❌ [DIT PRES BRYDES] ${att.team.name} spiller sig igennem ${YOUR_PRESS[height]} – presset når ikke frem.${note}`
           : `✅ [FASE 1 VIRKER • ${att.team.name}] ${vary([`${att.team.name} spiller sig igennem ${gen(def.team.name)} pres.`, `${att.team.name} kommer forbi ${gen(def.team.name)} pres.`, `${gen(def.team.name)} pres bliver spillet over.`], 'fase1', att.team.id)}${note}`;
         addEv(min, 'TACTIC_WIN', 'TACTIC', att.isHome, false, 'Fase 1 virker', text);
         if (!own(att) && !own(def)) faseQuiet(att.team, 'win');
@@ -1279,14 +1309,14 @@ export function simulateMatch(home, away, rng, opts = {}) {
           if (!own(att) && !own(def)) faseQuiet(def.team, 'stop');
           frame('trap', who);
         } else {
-          sheet.adjust(presser.id, DUEL_BONUS); sheet.adjust(playmaker.id, -0.2); sheet.bump(presser.id, 'tacticWins');
+          sheet.adjust(presser.id, DUEL_BONUS); sheet.adjust(playmaker.id, -0.2); sheet.bump(presser.id, 'tacticWins'); sheet.bump(presser.id, 'duels'); sheet.bump(presser.id, 'duelsWon');
           // Kontra (v3.9): afgøres FØR teksten, så "din lynkontra" kun loves, når den kommer.
           const won = defPh.phase3_transition.onBallWon;
           const goesCounter = rng.chance(counterChance(attPh.phase1_buildUp.offBallRuns, attPh.phase3_transition.onBallLost, won, fbCount(att)));
           if (!goesCounter && won === 'KEEP_POSSESSION') def.calm = true;
           const counter = !own(def) ? '' : won === 'FAST_COUNTER' ? (goesCounter ? ' Din lynkontra sættes straks i gang.' : ' ' + vary(['Din lynkontra løber ind i et organiseret forsvar.', 'Modstanderen når hjem, før lynkontraen kommer i gang.', 'Lynkontraen bremses – de er hurtigt tilbage i position.'], 'lyn', presser.id))
             : (goesCounter ? ' Dit hold ser hullet og går direkte.' : ' Dit hold falder til ro på bolden.');
-          const text = own(def) ? `✅ [DIT PRES VIRKER] ${cap(YOUR_PRESS[height])} lukker af: ${tag(presser)} erobrer bolden fra ${tag(playmaker)} (${att.team.name}).${counter}`
+          const text = own(def) ? `✅ [DIT PRES VIRKER] ${cap(YOUR_PRESS[height])} lukker af: ${tag(presser)} erobrer bolden fra ${tag(playmaker)} (${att.team.name}) – han stod ${nearRank.get(presser.id) === 0 ? 'nærmest' : 'tæt på'}.${counter}`
             : own(att) ? `❌ [DIN OPBYGNING STOPPES] ${YOUR_PASS[pass]} kommer ikke igennem: ${tag(presser)} (${def.team.name}) erobrer bolden fra ${tag(playmaker)} (${att.team.name}).`
             : `🛑 [FASE 2 VIRKER • ${def.team.name}] ${tag(presser)} erobrer bolden fra ${tag(playmaker)} (${att.team.name}).`;   // holdmærke som de andre (v3.17.0)
           addEv(min, 'TACTIC_FAIL', 'TACTIC', def.isHome, false, 'Fase 2 pres virker', text);
@@ -1423,10 +1453,13 @@ export function simulateMatch(home, away, rng, opts = {}) {
         const runner = pick.p, rs = runner.skills, zone = runZone(slotPosition(att.tactics, pick.i));
         // En kantløber møder backen på sin kant (v3.17.0, Spilfører: løbs-cutbacken nævnte en tilfældig forsvarer) – samme
         // forsvarer i løbet, driblingen og teksten
-        const marker = zone === 'WIDE' ? flankBack(def, slotPosition(att.tactics, pick.i).x < 50 ? 12 : 88) : defender;
+        // I midten dækker den forsvarer, der står nærmest løberen (v3.21.0 – nearPick); på kanten backen på hans side
+        const runPos = zone === 'WIDE' ? null : coupledPositions(att.tactics, def.tactics, { ballX: 50, ...onOf(att, def) });
+        const marker = zone === 'WIDE' ? flankBack(def, slotPosition(att.tactics, pick.i).x < 50 ? 12 : 88) : nearPick(def, dR.defs, mirrorPt(runPos.ball[pick.i]), runPos.opp);
         sheet.bump(runner.id, 'freeRuns'); duelLog[att.team.id].runs++;
         const runWon = (rs.positioning + rs.pace * 0.5) * ff(runner) + rng.next() * 8 + (RUN_DUEL_BONUS[runs] ?? 0)
           > (marker.skills.positioning + marker.skills.intercepting * 0.5) * ff(marker) + rng.next() * 8 + (RUN_COVER[defPh.phase1_buildUp.offBallRuns] ?? 0);
+        sheet.bump(marker.id, 'duels'); if (!runWon) sheet.bump(marker.id, 'duelsWon');
         if (runWon) {
           sheet.bump(runner.id, 'freeRunsWon'); duelLog[att.team.id].runsWon++; sheet.adjust(runner.id, 0.15);
           // Løberen står nu længere fremme end sin levende position (positions.js) – det er dét
@@ -1535,6 +1568,9 @@ export function simulateMatch(home, away, rng, opts = {}) {
     homeGoals: hG, awayGoals: aG, homeVarNet,
     events, stats: st, ratings, goalsPool, injuries, observations, trace, stoppage,
   };
+  // v3.21.0: bevægelsens seed (positions.js driftAt) – kun til test-oraklerne, ikke-optælleligt (som duelLog), så det IKKE gemmes:
+  // det er rundens første rng-træk og røber hele rundens tilfældighed (Security Reviewer F1 – kanalen står i spec §3, trin 2)
+  Object.defineProperty(result, 'driftSeed', { value: driftOn ? driftSeed : null, enumerable: false });
   // Holdenes private tællere pr. hold-id – kun til måleværktøjet; ikke-optællelig, så de
   // aldrig gemmes eller vises (de røber taktik).
   Object.defineProperty(result, 'duelLog', { value: duelLog, enumerable: false });

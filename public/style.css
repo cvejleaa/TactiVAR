@@ -253,3 +253,6 @@ button.savestatus.failed { color: var(--rød); font-weight: 700; }
   .tired-txt, .save-txt { display: none; }          /* advarslen og kvitteringen som ikon – teksten står i title/Admin */
   .topbar .tabs { margin-bottom: -.5rem; }
 }
+
+/* v3.21.0: duel-tallet i karakterarket brydes ikke */
+.ratings td.duel { white-space: nowrap; }

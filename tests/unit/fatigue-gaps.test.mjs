@@ -5,7 +5,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRng } from '../../public/engine/rng.js';
 import { createLeague, BOT_PROFILES } from '../../public/engine/generator.js';
-import { simulateMatch, ruleConditionMet } from '../../public/engine/match.js';
+import { simulateMatch as sim0, ruleConditionMet } from '../../public/engine/match.js';
+// v3.21.0: pinnede koordinater og scriptede rng-træk – uden bevægelsen (opts.drift = false, kun test-arenaer)
+const simulateMatch = (h, a, r, o = {}) => sim0(h, a, r, { drift: false, ...o });
+
 import { runProfile } from '../../public/engine/ratings.js';
 import { drainFactor, clampSubsLimit, SUBS_LIMIT, IN_MATCH_BASE, IN_MATCH_STA, IN_MATCH_MIN, TIRED_PER_POINT } from '../../public/engine/freshness.js';
 import { MATCH_RULES, MAX_RULES } from '../../public/engine/match-rules.js';
@@ -406,11 +409,11 @@ test('afslutninger: en træt målmand (STA 0) slipper mål ind senere i kampen �
 });
 // Resten af kaldstederne (hovedstød, kontra, indlæg, cutback, løb, dribling, opbygning/pres) er kun bundet af denne vagt:
 // hvert tal i en duel går gennem ff(...), aldrig direkte gennem freshFactor(...) – ellers er tabet i kampen væk dér.
-test('match.js bruger ff(...) i alle dueller – freshFactor kaldes kun inde i ff selv (22 kald; v3.17.0 + halvchancens målmand og skytte)', async () => {
+test('match.js bruger ff(...) i alle dueller – freshFactor kaldes kun inde i ff selv (23 kald; v3.17.0 + halvchancens målmand og skytte; v3.21.0 + nearPick)', async () => {
   const fs = await import('node:fs');
   const src = fs.readFileSync(new URL('../../public/engine/match.js', import.meta.url), 'utf8').replace(/\/\/.*$/gm, '');
   assert.equal((src.match(/\bfreshFactor\(/g) ?? []).length, 1, 'kun ff-definitionen kalder freshFactor(');
-  assert.equal((src.match(/(?<![A-Za-z])ff\(/g) ?? []).length, 22);
+  assert.equal((src.match(/(?<![A-Za-z])ff\(/g) ?? []).length, 23);
 });
 
 // ---------- Hvis-Så og reserverede bænkspillere ----------

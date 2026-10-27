@@ -11,7 +11,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRng } from '../../public/engine/rng.js';
 import { createLeague } from '../../public/engine/generator.js';
-import { simulateMatch, PENALTY_P, FREEKICK_P, FK_SHOT_P, CORNER_P, CROSS_CORNER_P, QUIET_FOUL_P, QUIET_CARD_P } from '../../public/engine/match.js';
+import { simulateMatch as sim0, PENALTY_P, FREEKICK_P, FK_SHOT_P, CORNER_P, CROSS_CORNER_P, QUIET_FOUL_P, QUIET_CARD_P } from '../../public/engine/match.js';
+// v3.21.0: pinnede koordinater og scriptede rng-træk – uden bevægelsen (opts.drift = false, kun test-arenaer)
+const simulateMatch = (h, a, r, o = {}) => sim0(h, a, r, { drift: false, ...o });
+
 import { VAR_RULES, MISS_P, MISS_BLOCK_SHARE, MISS_CORNER_P, CARD_RULES } from '../../public/engine/match-rules.js';
 
 function stubRng(script = {}, nextValue = 0.5) {

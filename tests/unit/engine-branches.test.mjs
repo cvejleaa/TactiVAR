@@ -1426,7 +1426,7 @@ import { FORMATIONS } from '../../public/engine/formations.js';
 import { RUN_BY_ROLE } from '../../public/engine/ratings.js';
 // v3.13: friskheden falder i kampen (freshness.js). Denne fils tærskler forudsætter fuld friskhed hele
 // kampen, så friskhed i kampen slås fra her – de nye tests i fatigue.test.mjs prøver den slået TIL.
-const simulateMatch = (h, a, r, o = {}) => simLive(h, a, r, { liveEnergy: false, ...o });
+const simulateMatch = (h, a, r, o = {}) => simLive(h, a, r, { liveEnergy: false, drift: false, ...o });
 const slotRoles = (team) => FORMATIONS[team.tactics.baseFormation].map((s) => s.r);
 const RUN_HI = (role, line) => (role ? RUN_BY_ROLE[role].hi : RUN_BY_ROLE[{ GK: 'GK', DEF: 'CB', MID: 'CM', ATT: 'ST' }[line]].hi);
 

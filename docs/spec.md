@@ -126,6 +126,11 @@ Konstanterne står ét sted: `public/engine/career.js` (og `transfers.js`). Bån
   - Ejeren kan aflæse sit eget potentiale ret præcist af træningsestimatet ("næste +1 om ca. N runder"); i trin 2 er `dev` et ejerfelt.
   - De afledte tilfældighedstal (`derivedRng`: ungdom, potentiale, træning, pension, bud) bygger på offentlige nøgler – med koden
     kan en ungdomsspillers skjulte tal regnes ud. Trin 2 skal salte dem med en hemmelighed på serveren.
+  - Bevægelsens seed (v3.21.0, `driftSeed`) er rundens første rng-træk: det og sporet (bevægelsen er en ren funktion af det) røber
+    rundens seed og dermed hver lodtrækning. Feltet gemmes ikke (ikke-optælleligt), men sporet bærer det stadig – i trin 1 lækker det
+    intet nyt (gemmet rummer alt); trin 2 skal tage seedet fra en hemmelighed på serveren.
+  - Pres-duellen vejer presserens udholdenhed (`stamina` · 0,35): over mange kampe kan dit referats navngivne pres-sejre
+    pege på en modstanders STA (Security Reviewer v3.21.0 – gammel, uændret af afstandsvalget).
   - En menneskestyret managers træningsfokus kan aflæses af en reserves friskhed (træningsprisen); botternes kan ikke (Alsidig).
   - `viewTeam` er en tilladelsesliste (v3.19.0, `TEAM_PUBLIC_FIELDS`): id, navn, isBot, truppen (gennem `viewPlayer`), kamptruppen
     (`matchBench`) og taktikkens `baseFormation`, `lineupSlots` og `customCoords` – som kopier. Den offentlige klubside tegnes kun
@@ -418,6 +423,30 @@ bedre kan kontrollere spil motoren".
 - **Kontrolværktøjet** `node tools/trace-invariants.mjs [N]`: regler (31 billeder, 7–11 spillere, på banen = arkets skift og
   udvisninger, scoreren og spillerne i øjeblikkene, bolden ved skytten) og motor-viden: hvor målscorerne stod pr. måltype
   og hvor ofte holdets forreste stod bag modstanderens sidste forsvarer (før de koblede linjer ≈100 %, nu 0 %).
+- **Bevægelse (v3.21.0**, brugeren: "skal kortet passe til kilometerne, skal motoren flytte spillerne mere rundt i kampen …
+  så må spillet også blive mere præcist"; valgt: billedet = motoren OG afstand i duellerne, spredningen kun af rolle og taktik):
+  - `driftAt` (positions.js): hver markspiller bevæger sig glidende om sin levende plads – to bølger pr. akse (perioder 6–11 og
+    2,5–4 tick), en ren funktion af (kampens seed, hold, plads, tick). Udslaget pr. akse efter rollen (`DRIFT_AXES`: backen langs
+    linjen, CM i en boks, stopperen lidt) × rollens løb (`runBase` km, samme tabel som km-tallet) × pres (ikke løb uden bold: det
+    udvandede løbenes effekt – "Mange" +0,10 mål for på v3.20.2, +0,05 med, +0,12 uden).
+    INGEN udholdenhed eller friskhed: modstanderens kort viser begge hold fuldt (§3) og må ikke røbe hans STA.
+  - Bredden lægges på i `livePositions`, dybden EFTER sammenpresningen (`applyDepth`): boldholdet kommer ikke forbi offside-linjen
+    (udslaget dæmpes inden for `DEPTH_FADE` af linjen – et spejl ville sende angriberne bagud og give flere langskud), modstanderens
+    dybeste bliver (linjen er hans), og hans forreste ikke forbi boldholdets bageste; ingen række over `ROW_MAX` 5, dybden
+    mindst `MIN_DEPTH`, og står nogen stadig for tæt, flyttes han til den nærmeste ledige plads på tværs (`apartFrom` resolve).
+  - Ét sæt positioner pr. tick: kampens seed trækkes én gang (`driftSeed`, ikke-optælleligt i resultatet til test-oraklerne – gemmes ikke, §3), og ALLE kald i
+    tick'et (modtagervalget, VAR-forreste, langskud, øjeblikkene, grundbilledet) får samme bevægelse – billedet viser de
+    pladser, motoren regnede på (øjeblikket er afleveringens; grundbilledet tick'ets udfald – median 6 imellem).
+  - Afstand vælger duellens mand (`nearPick`, match.js): presseren mod opspilleren og (i midten) forsvareren mod løberen er
+    vægtet blandt de `NEAR_POOL` 3 nærmeste med friskhed / afstand² (afstanden mindst `NEAR_MIN` 6) – ét rng-træk; på kanten
+    stadig backen på hans side. Dit referat: "… erobrer bolden fra … – han stod nærmest" (kun når den valgte var nr. 1, ellers "tæt på" –
+    QC) / "– presset når ikke frem". 🤼 tæller presserens dueller (ikke offside-fælden – den er bagkædens) og markørens i midten.
+    Karakterarket (kun dit hold): `duelsWon/duels` 🤼 – private felter (`RATING_PRIVATE_FIELDS`, røber positionering).
+  - `opts.drift = false` kun i test-arenaerne (pinnede koordinater og trukne aktører – uden bevægelsen og uden nearPick); spillet
+    sender det aldrig (vagt i movement-v3210.test.mjs).
+  - Målt (`tools/measure-movement.mjs`, 40 kampe, samme kampe uden → med): CM-dækning 16 % → 28 %, rollernes rækkefølge i dækning
+    mod km 0,26 → 0,71, egen andel af flytningen 0,20 → 0,49, spring grundbillede → øjeblik 4 → 6. Balance (`measure-duels 300
+    maal`, `measure-shooters 400`): mål pr. kamp 2,87 → 2,83, langskud 8 → 9 %, midtbanen 21 → 20 %, 5-4-1's ST 41,9 → 42,2 %.
 - **Koblede linjer (v3.16**, Spilførerens sæsongennemgang i afspilningen: angriberne stod altid langt offside, forsvarende
   angribere ved modstanderens mål, kontramål fra midterlinjen, "langskud" fra hjørneflaget; brugeren valgte "ret linjerne
   først"). `coupledPositions` (positions.js) oven på holdenes egen form (`livePositions`, uændret) – ét sted, som
@@ -479,8 +508,8 @@ bedre kan kontrollere spil motoren".
 - **Heat map** (karakterarket, dit hold – v3.20.0: står fra start over startopstillingen, som modstanderens zonekort; 📍 erstatter
   kun opstillingen): viser holdets tæthed (v3.20.2: 12 × 18 felter, før 6 × 9; uden målmand) af grundbilleder og
   øjeblikke plus vejen mellem to grundbilleder (punkter hver 2. enhed, vægt 0,5; kun når spilleren er med i begge – ingen streg
-  fra bænken), udglattet med en 1-2-1-kerne og tegnet over 4 % af det tætteste felt (`tools/measure-heat.mjs`: en CM tænder 34
-  felter mod 7, men dækker 16 % af banen mod 13 % – motoren holder ham nær sin plads; km-tallet kommer fra rolle, udholdenhed, pres og løb – ratings.js – ikke sporet: sporets længde er 0,43 km mod 11,9; noten under
+  fra bænken), udglattet med en 1-2-1-kerne og tegnet over 4 % af det tætteste felt (`tools/measure-heat.mjs`: v3.20.2 en CM tænder 34
+  felter mod 7, men dækker 16 % af banen mod 13 % – motoren holdt ham nær sin plads; fra v3.21.0 bevæger han sig (Bevægelse ovenfor): 28 %; km-tallet kommer fra rolle, udholdenhed, pres og løb – ratings.js – ikke sporet: sporets længde er 0,43 km mod 11,9; noten under
   en spillers kort og kolonnens forklaring siger det. Vejen mellem billederne er en bevidst forskel fra afspilningens "ingen opfundne
   mellembilleder": den tegnes ikke, men tæller med halv vægt i kortet), og et klik på en spiller hans – med hans afslutninger efter udfald (⚽ mål, reddet, forbi, offside, annulleret,
   🅰 oplæg; Spilfører: positionerne alene er "der hvor du satte ham"). Modstanderen: "Tyngdepunkt (groft)" i tredjedele og (v3.16.1) et 3 × 3 zone-kort

@@ -19,7 +19,9 @@ test('VAR-tjekket nævner kun en af de forreste som offside-mand – og en skytt
   let plain = 0, ahead = 0;
   for (let seed = 1; seed <= 120; seed++) {   // v3.17.0: 60 → 120 (færre hovedchancer)
     const L = createLeague(createRng(seed)), H = L.teams[0], A = L.teams[1];
-    const m = simulateMatch(H, A, forceVar(createRng(seed * 7)));
+    // v3.21.0: uden bevægelsen – reglen (frontOrder) er uændret; at motoren og billedet læser samme bevægede positioner,
+    // beviser trace-oracle.test.mjs
+    const m = simulateMatch(H, A, forceVar(createRng(seed * 7)), { drift: false });
     const cut = Math.min(...m.events.filter((e) => e.isHome && ['SUB', 'TRIGGER', 'RED'].includes(e.type)).map((e) => e.min), 91);
     const starters = H.tactics.lineupSlots.map((id) => H.squad.find((p) => p.id === id));
     const pos = livePositions(H.tactics, { attacking: true, ballX: 50 });
