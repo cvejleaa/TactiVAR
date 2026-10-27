@@ -161,3 +161,11 @@ test('de øvrige kampe (v3.16.7): har overskriften selv en tankestreg, sættes n
   const lis = all(byId(renderGazette(G(), 'h1', null, MATCHES, c, null), 'headlines'), (e) => e.tag === 'li').map(txt);
   assert.deepEqual(lis, ['Beta får klø – Alfa vinder 4-0. Alfa afsluttede 14 gange.', 'Alfa slår Beta 2-0 – Alfa havde bolden.']);
 });
+
+// v3.21.2 Test Manager: den GAMLE avis (uden klumme) bruger samme tærskel – ledningen i renderGazette (ikke kun klummens) var ubevist
+test('den gamle avis (uden klumme): dit holds løber kun ved ≥ 12,3 km og kun for dit hold', () => {
+  const run = { teamId: 'h1', shirtNumber: 8, shortName: 'Løber', distanceKm: 12.3, hiShare: null, topSpeed: 0 };
+  assert.equal(txt(byId(renderGazette(G({ myRunner: run }), 'h1', null, MATCHES), 'my-runner')), '🏃 Dit holds løber: #8 Løber – 12,3 km.');
+  assert.equal(byId(renderGazette(G({ myRunner: { ...run, distanceKm: 12.29 } }), 'h1', null, MATCHES), 'my-runner'), undefined, 'under 12,3 km: ingen boks');
+  assert.equal(byId(renderGazette(G({ myRunner: run }), 'a1', null, MATCHES), 'my-runner'), undefined, 'en anden seer');
+});

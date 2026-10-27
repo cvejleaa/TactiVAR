@@ -2713,3 +2713,29 @@ test('halvchancen: en let redning tæller i 🧤, men ikke i karakterfradraget �
   assert.ok(g.homeGoals >= 20, `data: ${g.homeGoals} mål`);
   assert.equal(g.stats.hShots, g.homeGoals, 'én afslutning pr. minut – halvchancens mål');
 });
+
+// v3.21.2 Test Manager: dødboldens hovedstødslinje (match.js 'sphead') – ALLE tre skabeloner forekommer, og samme par får aldrig samme to gange i træk
+// (regex-testene ovenfor accepterer en hvilken som helst af de tre, så `vary` → første skabelon var grøn: "samme sætning ordret 5 gange" kunne vende tilbage)
+test('dødboldens hovedstødslinje: de tre skabeloner vekslerer for samme par (30 frispark-mål, samme oplægsgiver og hovedstødsspiller)', () => {
+  const cross = sp({ script: { 0.061: true }, tweak: (a) => { slot(a.H, 3).aerialPower = 20; } });
+  const lines = cross.m.events.filter((e) => e.type === 'HEADER_GOAL').map((e) => e.text);
+  assert.equal(lines.length, 30);
+  const tmpl = (t) => (/ slår frisparket ind, og /.test(t) ? 0 : / kommer højest på /.test(t) ? 1 : / frispark finder /.test(t) ? 2 : -1);
+  const ks = lines.map(tmpl);
+  assert.ok(ks.every((k) => k >= 0), lines.find((t) => tmpl(t) < 0));
+  assert.deepEqual([...new Set(ks)].sort(), [0, 1, 2], 'alle tre skabeloner');
+  for (let i = 1; i < ks.length; i++) assert.notEqual(ks[i], ks[i - 1], `mål ${i}: samme skabelon to gange i træk\n${lines[i - 1]}\n${lines[i]}`);
+});
+// Hovedstødsprosaen: fem varianter pr. bånd, og alle forekommer i en kamp med samme hovedstødsspiller (lave bånd scorer næsten aldrig i en simuleret sæson)
+test('hovedstødsprosa: fem forskellige pr. bånd (v3.21.2), og hvert bånd bruger dem alle og skifter hver gang', async () => {
+  const { HEADER_PROSE } = await import('../../public/engine/clues.js');
+  for (const b of ['high', 'mid', 'low']) assert.equal(new Set(HEADER_PROSE[b]).size, 5, b);
+  assert.equal(new Set([...HEADER_PROSE.high, ...HEADER_PROSE.mid, ...HEADER_PROSE.low]).size, 15);
+  for (const [band, aerial] of [['high', 20], ['mid', 12], ['low', 10]]) {
+    const g = sp({ script: { 0.061: true }, gk: 1, tweak: (a) => { for (const p of a.H.squad) p.aerialPower = 1; for (const p of a.A.squad) p.aerialPower = 0; slot(a.H, 3).aerialPower = aerial; } });
+    const used = g.m.events.filter((e) => e.type === 'HEADER_GOAL').map((e) => HEADER_PROSE[band].findIndex((p) => e.text.endsWith(`– ${p}.`) || e.text.includes(`– ${p}.`)));
+    assert.equal(used.length, 30); assert.ok(used.every((i) => i >= 0), `${band}: ${used}`);
+    assert.deepEqual([...new Set(used)].sort(), [0, 1, 2, 3, 4], `${band}: alle fem`);
+    for (let i = 1; i < used.length; i++) assert.notEqual(used[i], used[i - 1], `${band}: samme prosa to gange i træk`);
+  }
+});
