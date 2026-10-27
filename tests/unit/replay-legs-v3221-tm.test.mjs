@@ -42,9 +42,9 @@ const pos = (e) => [e.style.left, e.style.top].join('/');
 const match = (s) => { const L = createLeague(createRng(s)); return simulateMatch(L.teams[s % 8], L.teams[(s + 3) % 8], createRng(s * 31)); };
 
 // Finder et mål/redning/forbi med oplægger (med eller uden recv), og viser øjeblikkets trin
-function open(wantRecv, wantAir = false) {
+function open(wantRecv, wantAir = null) {   // wantAir null = ligegyldigt
   for (let s = 1; s < 200; s++) {
-    const m = match(s), o = m.trace.moments.find((x) => x.from && !!x.recv === wantRecv && !!x.air === wantAir && ['GOAL', 'HEADER_GOAL', 'SAVE', 'MISS'].includes(x.kind));
+    const m = match(s), o = m.trace.moments.find((x) => x.from && !!x.recv === wantRecv && (wantAir == null || !!x.air === wantAir) && ['GOAL', 'HEADER_GOAL', 'SAVE', 'MISS'].includes(x.kind));
     if (!o) continue;
     clearReplays(); queue = [];
     const el = replayEl(m, o.side);
@@ -58,7 +58,7 @@ function open(wantRecv, wantAir = false) {
 }
 
 test('benene med recv: pass (bolden hos oplæggeren) → recv (bolden hos skytten på linjen) → shot (begge ved afslutningen); to timere, ingen 0', () => {
-  const { el, ball, sh, fr } = open(true);
+  const { el, ball, sh, fr } = open(true, false);   // en jordaflevering (air: se testen for luftbolden)
   assert.equal(el.dataset.leg, 'pass');
   assert.equal(pos(ball), pos(fr), 'pass: bolden ligger hos oplæggeren');
   const d = STEP_MS.moment, [t1] = live();
