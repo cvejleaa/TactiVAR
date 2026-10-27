@@ -6,7 +6,7 @@ import { createRng } from '../../public/engine/rng.js';
 import { createLeague } from '../../public/engine/generator.js';
 import { simulateMatch } from '../../public/engine/match.js';
 import { playRound, commitRound } from '../../public/engine/season.js';
-import { gen, pickBy, describeGoal, GOAL_KINDS } from '../../public/engine/clues.js';
+import { gen, pickBy, describeGoal, GOAL_KINDS, GOAL_TEXTS } from '../../public/engine/clues.js';
 import { pickBy as columnPickBy } from '../../public/engine/column.js';
 
 const tag = (e) => `#${e.shirtNumber} ${e.shortName}`;
@@ -41,12 +41,12 @@ const counting = (vals) => { let n = 0; return { get n() { return n; }, next: ()
 test('describeGoal: præcis ét rng.next() pr. kald – med og uden brugte tekster, også når den springer videre (ellers ændres kampene)', () => {
   for (const kind of GOAL_KINDS) {
     const used = new Set(), r = counting([0]), plain = counting([0]);
-    const texts = [0, 1, 2, 3].map(() => describeGoal(kind, 'S', 'A', 50, r, used));
+    const n = GOAL_TEXTS[kind].length, texts = Array.from({ length: n + 1 }, () => describeGoal(kind, 'S', 'A', 50, r, used));
     describeGoal(kind, 'S', 'A', 50, plain); describeGoal(kind, 'S', 'A', 50, plain);
-    assert.equal(r.n, 4, `${kind}: fire kald, fire træk`); assert.equal(plain.n, 2);
-    // rng'en siger hver gang tekst 0: 0, så næste ubrugte (1, 2), og når alle er brugt, rng'ens valg igen (0)
-    assert.equal(new Set(texts.slice(0, 3)).size, 3, `${kind}: tre forskellige, før en gentages`);
-    assert.equal(texts[3], texts[0], `${kind}: alle brugt → rng'ens tekst`);
+    assert.equal(r.n, n + 1, `${kind}: ${n + 1} kald, ${n + 1} træk`); assert.equal(plain.n, 2);
+    // rng'en siger hver gang tekst 0: 0, så næste ubrugte (1, 2, …), og når alle er brugt, rng'ens valg igen (0)
+    assert.equal(new Set(texts.slice(0, n)).size, n, `${kind}: ${n} forskellige, før en gentages`);
+    assert.equal(texts[n], texts[0], `${kind}: alle brugt → rng'ens tekst`);
     assert.equal(texts[0], describeGoal(kind, 'S', 'A', 50, { next: () => 0 }), 'første kald = uden used');
   }
   // Springet går videre i rækkefølge: rng 0,5 (tekst 1) i en kamp, hvor 1 er brugt → 2; hvor 1 og 2 er brugt → 0
@@ -56,9 +56,9 @@ test('describeGoal: præcis ét rng.next() pr. kald – med og uden brugte tekst
   assert.equal(describeGoal('COUNTER', 'S', 'A', 50, { next: () => 0.5 }, new Set(['DRIBBLE:1'])), at(1), 'nøglen er typen + teksten');
 });
 
-// Hvilken af typens tre tekster en beskrivelse er (skabelonen med pladsholdere → regex)
-const TMPL = Object.fromEntries(GOAL_KINDS.map((k) => [k, [0, 1, 2].map((j) => {
-  const t = describeGoal(k, 'SSS', 'AAA', 0, { next: () => (j + 0.5) / 3 });
+// Hvilken af typens tekster en beskrivelse er (skabelonen med pladsholdere → regex; v3.21.2: 6 for kombination og cutback)
+const TMPL = Object.fromEntries(GOAL_KINDS.map((k) => [k, GOAL_TEXTS[k].map((_, j) => {
+  const t = describeGoal(k, 'SSS', 'AAA', 0, { next: () => (j + 0.5) / GOAL_TEXTS[k].length });
   return new RegExp(`^${t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/SSS'|SSSs|SSS|AAA'|AAAs|AAA/g, '.+?')}$`);
 })]));
 const variantOf = (g) => TMPL[g.kind].findIndex((r) => r.test(g.desc));

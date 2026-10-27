@@ -485,8 +485,10 @@ try {
   // v3.14: avisen er en klumme – overskrift, "Din kamp", de 3 øvrige kampe (fed overskrift, klik = referatet),
   // rundens spiller og mål, næste runde; dit holds løber står stadig som boks.
   const colIds = await g.locator('#gazette .col-sec').evaluateAll((ss) => ss.map((x) => x.id));
-  check('Klummen: overskrift, "Din kamp" først, 3 øvrige kampe, rundens spiller og mål, næste runde – og dit holds løber', (await g.locator('#col-title').count()) === 1 && colIds[0] === 'col-mine' && colIds.includes('col-others') && colIds.includes('col-stars') && colIds.includes('col-next')
-    && (await g.locator('#headlines li').count()) === 3 && /Dit holds løber: #\d+ .+ – \d+,\d km, \d+ % højintenst/.test(gzText), `${colIds.join(',')} | ${gzText.slice(0, 160)}`);
+  // v3.21.2: løberboksen kun ved ≥ 12,3 km (RUNNER_BOX_KM) – ellers ingen boks
+  const runKm = await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.lastRound?.gazette?.myRunner?.distanceKm ?? 0);
+  check('Klummen: overskrift, "Din kamp" først, 3 øvrige kampe, rundens spiller og mål, næste runde – og dit holds løber kun ved ≥ 12,3 km', (await g.locator('#col-title').count()) === 1 && colIds[0] === 'col-mine' && colIds.includes('col-others') && colIds.includes('col-stars') && colIds.includes('col-next')
+    && (await g.locator('#headlines li').count()) === 3 && (runKm >= 12.3 ? /Dit holds løber: #\d+ .+ – \d+,\d km, \d+ % højintenst/.test(gzText) : !gzText.includes('Dit holds løber')), `${colIds.join(',')} | ${runKm} km | ${gzText.slice(0, 160)}`);
   const myMatchTxt = await g.textContent('#col-mine');
   const myName = await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((t) => !t.isBot).name);
   check('Klummen, "Din kamp": handler om dit hold (seeren)', myMatchTxt.includes(myName), myMatchTxt.slice(0, 160));

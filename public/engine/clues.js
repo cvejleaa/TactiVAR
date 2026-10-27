@@ -33,12 +33,13 @@ export function describeFinish(finishing) {
   return 'et klodset forsøg, der på mirakuløs vis gled ind';
 }
 
-// Tre varianter pr. bånd (v3.16.7, Spilfører: "tårnhøj magtdemonstration" 22 og "kraftfuldt og veltimet" 18 gange på en sæson) –
+// Varianter pr. bånd (v3.16.7, Spilfører: "tårnhøj magtdemonstration" 22 og "kraftfuldt og veltimet" 18 gange på en sæson) –
 // båndets betydning (scouting i ord) er den samme i alle tre; n vælges af kalderen (vary – intet rng).
 export const HEADER_PROSE = Object.freeze({
-  high: ['en tårnhøj magtdemonstration i luftrummet', 'et hovedstød fra en etage over alle andre', 'et nik, ingen i feltet kunne nå op til'],
-  mid: ['et kraftfuldt og veltimet hovedstød', 'et solidt og velplaceret nik', 'et hårdt hovedstød med god timing'],
-  low: ['et kluntet, men effektivt nik', 'et halvklodset nik, der alligevel gik ind', 'et skævt hovedstød, der fandt vej'],
+  // v3.21.2 (Spilfører: ≈ 25 hovedstødsmål på en sæson delte 3 halesætninger): 5 pr. bånd
+  high: ['en tårnhøj magtdemonstration i luftrummet', 'et hovedstød fra en etage over alle andre', 'et nik, ingen i feltet kunne nå op til', 'et kraftspring over forsvarerne', 'et hovedstød, målmanden aldrig så'],
+  mid: ['et kraftfuldt og veltimet hovedstød', 'et solidt og velplaceret nik', 'et hårdt hovedstød med god timing', 'et præcist nik i hjørnet', 'et rent hovedstød fra kort hold'],
+  low: ['et kluntet, men effektivt nik', 'et halvklodset nik, der alligevel gik ind', 'et skævt hovedstød, der fandt vej', 'et nik med nakken, der snød målmanden', 'et heldigt strejf med panden'],
 });
 export const headerBand = (aerialPower) => (aerialPower >= 15 ? HEADER_PROSE.high : aerialPower >= 11 ? HEADER_PROSE.mid : HEADER_PROSE.low);
 export const describeHeader = (aerialPower) => headerBand(aerialPower)[0];   // båndets første variant (scouting-ordet; referatet bruger vary)
@@ -52,7 +53,7 @@ export function describeVarTiming(varPulse) {
 // ---------- Måltyper (v3.7, brugeren: "rundens mål er altid VAR-dramatik, det har endnu ikke
 // været et flot langskud eller en god dribletur") ----------
 // Hver type har mindst tre tekster, så avisen ikke gentager sig efter to runder.
-const GOAL_TEXTS = {
+export const GOAL_TEXTS = {
   LONGSHOT: [
     (s, a) => `Et brag af et langskud: ${s} fik bolden et godt stykke uden for feltet og hamrede den op i det lange hjørne.`,
     (s, a) => `${s} prøvede lykken fra distancen – og bolden dalede ind under overliggeren.`,
@@ -77,11 +78,19 @@ const GOAL_TEXTS = {
     (s, a) => `Lavt cutback: ${a} nåede baglinjen og lagde den tilbage til ${s}, der sparkede den ind.`,
     (s, a) => `${a} trak bolden tilbage fra baglinjen, og ${s} var på pletten.`,
     (s, a) => `Indøvet variant: cutback fra ${a}, førstegangsafslutning fra ${s}.`,
+    // v3.21.2 (Spilfører: "Indøvet variant …" ca. 14 mål på en sæson): 6 – samme rng-træk, kun længere liste
+    (s, a) => `${a} gik helt ned til baglinjen og spillede ${s} fri foran mål.`,
+    (s, a) => `Bolden blev trukket tilbage fra kanten af målfeltet, og ${s} placerede den sikkert efter ${gen(a)} aflevering.`,
+    (s, a) => `${a} vandt duellen ved baglinjen, og ${s} skulle bare skubbe den over stregen.`,
   ],
   COMBINATION: [
     (s, a) => `Kombinationsfodbold: ${a} spillede ${s} fri, og han sluttede sikkert af.`,
     (s, a) => `Tre hurtige afleveringer, og ${s} kunne score efter oplæg fra ${a}.`,
     (s, a) => `${a} og ${s} spillede 1-2, og ${s} gjorde det færdigt.`,
+    // v3.21.2 (Spilfører: "Tre hurtige afleveringer …" ca. 15 mål på en sæson): 6
+    (s, a) => `Et gennembrud gennem midten: ${a} fandt ${s} mellem stopperne, og han scorede.`,
+    (s, a) => `${s} tog imod ${gen(a)} stikning og sendte den forbi målmanden.`,
+    (s, a) => `Tålmodigt opspil, og så det afgørende: ${a} til ${s}, mål.`,
   ],
   PENALTY: [
     (s, a) => `Straffespark: ${a} blev fældet i feltet, og ${s} sendte målmanden den forkerte vej.`,

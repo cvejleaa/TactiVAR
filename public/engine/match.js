@@ -750,7 +750,10 @@ export function simulateMatch(home, away, rng, opts = {}) {
       const prose = vary(headerBand(shooter.aerialPower), 'head', shooter.id);
       observe(shooter, `Luftduel (mod ${def.team.name}): ${shooter.shortName} scorede med ${prose}.`);
       goalsPool.push({ scorer: tag(shooter), teamName: att.team.name, match: `${home.name} - ${away.name}`, min, kind, spectacle: goalSpectacle(kind, { aerialPower: shooter.aerialPower }, min, rng), desc: describeGoal(kind, tag(shooter), tag(assister ?? shooter), min, rng, goalTexts) });
-      const how = setPiece ? `MÅÅÅL PÅ ${setPiece.toUpperCase()}! ${tag(assister)} slår ${setPiece}et ind, og ${tag(shooter)} (${shooter.heightCm} cm) header bolden ind – ${prose}.`
+      // Dødboldens linje varierer (v3.21.2, Spilfører: samme sætning ordret 5 gange på en sæson for samme to spillere) – vary: intet rng
+      const how = setPiece ? `MÅÅÅL PÅ ${setPiece.toUpperCase()}! ${vary([`${tag(assister)} slår ${setPiece}et ind, og ${tag(shooter)} (${shooter.heightCm} cm) header bolden ind`,
+          `${tag(shooter)} (${shooter.heightCm} cm) kommer højest på ${gen(tag(assister))} ${setPiece} og header bolden ind`,
+          `${gen(tag(assister))} ${setPiece} finder ${tag(shooter)} (${shooter.heightCm} cm), der header bolden ind`], 'sphead', `${assister?.id}|${shooter.id}`)} – ${prose}.`
         // Oplægsgiveren nævnes, som Rundens mål gør (v3.16.7, Spilfører) – "oplæg", ikke "indlæg": en lang bold er ingen
         // indlæg, og kilden må ikke røbe modstanderens stil (QC)
         : `MÅÅÅL! ${tag(shooter)} (${shooter.heightCm} cm) header bolden ind efter oplæg fra ${tag(assister)} – ${prose}.`;

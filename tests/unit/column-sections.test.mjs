@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { buildColumn, pickBy, STYLE_RULES } from '../../public/engine/column.js';
+import { buildColumn, pickBy, STYLE_RULES, SCOUT_TAIL } from '../../public/engine/column.js';
 import { parseSave } from '../../public/state/storage.js';
 
 const M = ({ h = 'h1', a = 'a1', hn = 'Hjem', an = 'Ude', hG = 0, aG = 0, ratings, stats } = {}) =>
@@ -149,7 +149,8 @@ test('afsnit 5: optakt-scouting – modstanderens seneste 3 offentlige kampe, ge
   const bud = (rows, o = {}) => (next({ next: [NX('h1', 'o2')], history: H('o2', rows), ...o }) ?? [])[1];
   const say = (rule, round = 5) => pickBy(RULE(rule).say, round, rule, 'scout');
   // v3.16.3 (Spilfører): "… havde bolden det meste af tiden i deres seneste 3 kampe" læstes som en påstand om kampene – nu "ud fra"
-  const text = (rule, n, round = 5) => `Mit bud ud fra ${n === 1 ? 'deres seneste kamp' : `deres seneste ${n} kampe`}: Opp2 ${say(rule, round)} – det kan blive kampens tema.`;   // v3.16.7: "ud fra" først
+  // v3.21.2: halen varierer (SCOUT_TAIL pr. runde og modstander; før altid "det kan blive kampens tema")
+  const text = (rule, n, round = 5) => `Mit bud ud fra ${n === 1 ? 'deres seneste kamp' : `deres seneste ${n} kampe`}: Opp2 ${say(rule, round)} – ${pickBy(SCOUT_TAIL, round, 'tail', 'o2')}.`;   // v3.16.7: "ud fra" først
   assert.doesNotMatch(bud([{ poss: 60 }, { poss: 60 }]), / i deres seneste/, 'ikke "i deres seneste"');
   // Gennemsnittet af de TRE seneste (ikke de fire, ikke de to, ikke kun den sidste, ikke summen): 75, 60, 40 → 58,3 ≥ 58 = "ball"
   assert.equal(bud([{ poss: 0 }, { poss: 75 }, { poss: 60 }, { poss: 40 }]), text('ball', 3));
@@ -176,10 +177,15 @@ test('afsnit 5: optakt-scouting – modstanderens seneste 3 offentlige kampe, ge
   };
   assert.deepEqual(flag('headerGoals', 'air'), [true, false, true, false, true, false]);
   assert.deepEqual(flag('counterGoals', 'break'), [true, false, true, false, true, false]);
-  assert.deepEqual(flag('setPieceGoals', 'dead'), [true, false, true, false, true, false]);
+  // v3.21.2: dødbolde kræver snit ≥ 1 dødboldmål pr. kamp og mindst halvdelen af målene (før: snit ≥ 0,5 var nok)
+  assert.deepEqual(flag('setPieceGoals', 'dead'), [false, false, false, false, false, false]);
+  const sp = (...r) => bud(r.map(([x, g]) => ({ setPieceGoals: x, goals: g })));
+  assert.equal(sp([1, 1], [1, 1]), text('dead', 2)); assert.equal(sp([2, 2], [0, 0]), text('dead', 2), 'snit 1,0');
+  assert.equal(sp([1, 3], [1, 3]), undefined, '1 af 3 mål pr. kamp er ikke "dødbolde"'); assert.equal(sp([1, 1], [0, 0]), undefined, 'snit 0,5');
   assert.deepEqual(flag('reorganised', 'switch'), [true, false, true, false, true, false]);
   // "wait" kræver lav besiddelse OG snit ≥ 1 mål pr. kamp
   const w = (...g) => bud(g.map((x) => ({ poss: 40, goals: x })));
+  assert.equal(bud([{ poss: 40, goals: 2, against: 5 }, { poss: 40, goals: 2, against: 5 }]), undefined, 'v3.21.2: tabte i snit – ingen "scorede alligevel"');
   assert.equal(w(1, 1), text('wait', 2)); assert.equal(w(2, 0), text('wait', 2), 'snit 1,0'); assert.equal(w(1, 0), undefined, 'snit 0,5 er ikke ét mål'); assert.equal(w(1, 1, 0), undefined, 'snit 0,67'); assert.equal(w(0, 0), undefined);
   // hjørner og besiddelse bruges som gennemsnit (ikke afrundet til ja/nej)
   assert.equal(bud([{ corners: 7 }, { corners: 7 }]), text('air', 2)); assert.equal(bud([{ corners: 6 }, { corners: 7 }]), undefined);
@@ -203,7 +209,7 @@ test('afsnit 5: opfølgning – "Før kampen skrev jeg …" bruger historikken F
   };
   const say = (rule, round) => pickBy(RULE(rule).say, round, rule, 'scout');
   const held = `Før kampen skrev jeg, at Ude ${say('ball', 4)} – det holdt også mod jer.`;
-  const notHeld = `Før kampen skrev jeg, at Ude ${say('ball', 4)} – det gjorde de ikke mod jer.`;
+  const notHeld = `Før kampen skrev jeg, at Ude ${say('ball', 4)} – det holdt ikke mod jer.`;
   assert.notEqual(say('ball', 4), say('ball', 5), 'forudsætning: runde 4 og 5 vælger forskellig variant');
   const P60 = { hPoss: 40, aPoss: 60 }, P30 = { hPoss: 70, aPoss: 30 };
   // runderne 2-4 (+ runde 5, den spillede): bud "ball"; ude holdt 60 % i kampen → holdt; ude holdt 30 % → holdt ikke
@@ -226,7 +232,7 @@ test('afsnit 5: opfølgning – "Før kampen skrev jeg …" bruger historikken F
   assert.equal(t, `Før kampen skrev jeg, at Hjem ${say('ball', 4)} – det holdt også mod jer.`);
 });
 // v3.16.3 (Spilfører): "wait" er to-delt (lidt af bolden OG scorede). Holdt den ikke, men de scorede, er det besiddelsen, der
-// ikke holdt – og det siges. Kun for "wait": en anden regel, der ikke holdt, får "det gjorde de ikke", også når de scorede.
+// ikke holdt – og det siges. Kun for "wait": en anden regel, der ikke holdt, får "det holdt ikke", også når de scorede.
 test('afsnit 5: opfølgning på spådommens to dele ("wait") – scorede de, men havde halvdelen af bolden eller mere: "de scorede igen, men de havde N % af bolden mod jer"', () => {
   const fu = (rows, hG, aG, played) => (sec(buildColumn(inp({ matches: [M({ hG, aG, stats: played })], history: H('a1', rows), round: 5 })), 'col-next')?.paras ?? []).find((t) => t.startsWith('Før kampen')) ?? null;
   const W = Array.from({ length: 5 }, () => ({ poss: 40, goals: 1 }));
@@ -237,11 +243,11 @@ test('afsnit 5: opfølgning på spådommens to dele ("wait") – scorede de, men
   assert.equal(fu(W, 0, 2, { hPoss: 40, aPoss: 60 }), `${pre}de scorede igen, men de havde 60 % af bolden mod jer.`, '2 mål tæller også');
   assert.equal(fu(W, 1, 1, { hPoss: 53, aPoss: 47 }), `${pre}det holdt også mod jer: de scorede med 47 % af bolden.`, '47 % er under halvdelen: det holdt (før: "mere af bolden")');
   assert.equal(fu(W, 1, 1, { hPoss: 50, aPoss: 50 }), `${pre}de scorede igen, men de havde 50 % af bolden mod jer.`, '50 % er ikke under halvdelen');
-  assert.equal(fu(W, 1, 0, { hPoss: 70, aPoss: 30 }), `${pre}det gjorde de ikke mod jer.`, '30 %, men ingen mål: "scorede igen" ville være forkert');
-  assert.equal(fu(W, 1, 0, { hPoss: 40, aPoss: 60 }), `${pre}det gjorde de ikke mod jer.`, 'hverken lidt bold eller mål');
+  assert.equal(fu(W, 1, 0, { hPoss: 70, aPoss: 30 }), `${pre}det holdt ikke mod jer.`, '30 %, men ingen mål: "scorede igen" ville være forkert');
+  assert.equal(fu(W, 1, 0, { hPoss: 40, aPoss: 60 }), `${pre}det holdt ikke mod jer.`, 'hverken lidt bold eller mål');
   // En anden regel ("ball"), der ikke holdt, mens de scorede: ingen "scorede igen"
   const B = Array.from({ length: 5 }, () => ({ poss: 60 }));
-  assert.equal(fu(B, 1, 1, { hPoss: 70, aPoss: 30 }), `Før kampen skrev jeg, at Ude ${pickBy(RULE('ball').say, 4, 'ball', 'scout')} – det gjorde de ikke mod jer.`);
+  assert.equal(fu(B, 1, 1, { hPoss: 70, aPoss: 30 }), `Før kampen skrev jeg, at Ude ${pickBy(RULE('ball').say, 4, 'ball', 'scout')} – det holdt ikke mod jer.`);
 });
 
 test('gem fra v3.10.1 (historik UDEN results og facts): klummen bygges af det migrerede gem uden fejl, og formen/optakten har intet at bygge på', () => {

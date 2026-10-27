@@ -58,8 +58,8 @@ test('opfølgning på "air": hovedstød efter dødbolde tæller med – "det hol
   assert.equal(fu([['CORNER', 'Ude'], ['SETPIECE', 'Ude']], 2), `${pre} – det holdt også mod jer: begge deres mål kom på hovedstød efter dødbolde.`);
   assert.equal(fu([['CORNER', 'Ude']], 1), `${pre} – det holdt også mod jer: deres eneste mål kom på hovedstød efter dødbolde.`);
   assert.equal(fu([['CORNER', 'Ude'], ['COMBINATION', 'Ude']], 2), `${pre} – det holdt også mod jer: 1 af deres mål kom på hovedstød efter dødbolde.`, 'halvdelen af målene');
-  assert.equal(fu([['CORNER', 'Ude'], ['COMBINATION', 'Ude'], ['LONGSHOT', 'Ude']], 3), `${pre} – det gjorde de ikke mod jer.`, '1 af 3 er ikke luft-holdet (QC F3)');
-  assert.equal(fu([], 0), `${pre} – det gjorde de ikke mod jer.`);
+  assert.equal(fu([['CORNER', 'Ude'], ['COMBINATION', 'Ude'], ['LONGSHOT', 'Ude']], 3), `${pre} – det holdt ikke mod jer.`, '1 af 3 er ikke luft-holdet (QC F3)');
+  assert.equal(fu([], 0), `${pre} – det holdt ikke mod jer.`);
 });
 
 // ---------- Gentagelser (T3 – tekst, intet rng; noprose uændret) ----------
@@ -84,14 +84,14 @@ test('offside: det fulde banner "[DIN OFFSIDE-FÆLDE VIRKER] … dirigerer linje
   }
   assert.ok(full >= 30 && short >= 30, `data: ${full} fulde, ${short} korte`);
 });
-test('hovedstød: båndets tre varianter, aldrig samme to gange i træk for samme spiller; dit/deres åbne spil nævner oplægsgiveren', () => {
+test('hovedstød: båndets varianter (v3.21.2: 5 – før 3), aldrig samme to gange i træk for samme spiller; dit/deres åbne spil nævner oplægsgiveren', () => {
   const all = [...HEADER_PROSE.high, ...HEADER_PROSE.mid, ...HEADER_PROSE.low];
   let goals = 0, named = 0; const seen = new Set();
   for (const m of C) {
     const last = new Map();
     for (const e of m.events.filter((x) => x.type === 'HEADER_GOAL')) {
       const pr = all.find((p) => e.text.includes(`– ${p}.`)); assert.ok(pr, e.text); seen.add(pr);
-      const who = e.text.match(/(#\d+ [^(]+?) \(\d+ cm\) header/)[1];
+      const who = e.text.match(/(#\d+ [^(]+?) \(\d+ cm\)/)[1];   // v3.21.2: dødboldens linje har 3 skabeloner
       assert.notEqual(last.get(who), pr, `samme prosa to gange i træk: ${who}`); last.set(who, pr);
       goals++;
       if (/MÅÅÅL! /.test(e.text)) { assert.match(e.text, /header bolden ind efter oplæg fra #\d+ .+ – /); named++; }
@@ -205,7 +205,7 @@ test('"air"-opfølgningen tæller kun MODSTANDERENS dødboldshovedstød; "alle 3
   const air = STYLE_RULES.find((r) => r.key === 'air'), hist = H([{}, {}, {}, {}]);
   const fu = (pool, aG, st = { hPoss: 50, aPoss: 50, aCorners: 2 }) => (buildColumn({ matches: [M({ aG, pool, stats: st })], history: hist, viewerTeamId: 'h1', round: 5 }).sections.find((s) => s.id === 'col-next')?.paras ?? []).find((t) => t.startsWith('Før kampen'));
   const pre = `Før kampen skrev jeg, at Ude ${pickBy(air.say, 4, 'air', 'scout')}`;
-  assert.equal(fu([['CORNER', 'Hjem'], ['CORNER', 'Hjem'], ['COMBINATION', 'Ude']], 1), `${pre} – det gjorde de ikke mod jer.`, 'dit holds hjørnesparksmål tæller ikke');
+  assert.equal(fu([['CORNER', 'Hjem'], ['CORNER', 'Hjem'], ['COMBINATION', 'Ude']], 1), `${pre} – det holdt ikke mod jer.`, 'dit holds hjørnesparksmål tæller ikke');
   assert.equal(fu([['CORNER', 'Ude'], ['SETPIECE', 'Ude'], ['CORNER', 'Ude']], 3), `${pre} – det holdt også mod jer: alle 3 mål kom på hovedstød efter dødbolde.`);
   assert.equal(fu([['CORNER', 'Ude']], 1, { hPoss: 50, aPoss: 50, aCorners: 8 }), `${pre} – det holdt også mod jer.`, 'reglen holdt af sig selv (8 hjørnespark): ingen tilføjelse');
   const R = (o) => ({ build: 8, buildWon: 2, press: 0, pressWon: 0, crosses: 0, crossesWon: 0, cutbacks: 0, cutbacksBlocked: 0, cutbackGoals: 0, runGoals: 0, counterGoalsAgainst: 0, start: { formation: '4-4-2' }, end: { formation: '4-4-2' }, ...o });

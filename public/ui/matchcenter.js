@@ -171,6 +171,10 @@ const legend = (isOwn = true) => h('div', { class: 'muted legend', id: 'icon-leg
 // matches: rundens kampe – bruges til at finde kampen for mål fra før v3.7.1 (uden matchIdx).
 // column (v3.14, column.js): klummen bygget for seeren. Uden den (gamle visninger/tests) den gamle avis.
 // onOpenReport(i): åbner kamp i's referat (kampoverskrifterne i "De øvrige kampe").
+// "Dit holds løber" kun, når det er værd at nævne (v3.21.2, Spilfører: boksen stod i 10 af 14 klummer med næsten samme tal – rundens
+// bedste løber ligger på 11,9–12,6 km; ≥ 12,3 km: 16 af 42 runder, før alle 42 – tools/measure-column.mjs). Tallene står altid i karakterarket.
+export const RUNNER_BOX_KM = 12.3;
+export const showRunner = (g, myTeamId) => !!(g?.myRunner && g.myRunner.teamId === myTeamId && g.myRunner.distanceKm >= RUNNER_BOX_KM);
 export function renderGazette(g, myTeamId, onOpenMatch = null, matches = null, column = null, onOpenReport = null) {
   if (g && column) return renderColumn(g, myTeamId, onOpenMatch, matches, column, onOpenReport);
   const goal = g?.goalOfTheRound;
@@ -195,7 +199,7 @@ export function renderGazette(g, myTeamId, onOpenMatch = null, matches = null, c
         ? h('button', { class: 'linklike', id: 'goal-of-round-match', title: 'Åbn referatet af kampen – målet er markeret', onclick: () => onOpenMatch(goalIdx, goal) }, `📺 ${g.goalOfTheRound.match.replace(' - ', ' – ')}`)
         : h('span', { class: 'muted' }, `(${g.goalOfTheRound.match.replace(' - ', ' – ')})`)) : null) : null,
     g.upset ? h('p', { id: 'upset' }, h('strong', {}, '😮 Rundens overraskelse: '), `${g.upset.winner} (nr. ${g.upset.winnerPos}) slog ${g.upset.loser} (nr. ${g.upset.loserPos}) ${g.upset.score}.`) : null,
-    g.myRunner && g.myRunner.teamId === myTeamId ? h('p', { id: 'my-runner' }, h('strong', {}, '🏃 Dit holds løber: '), `#${g.myRunner.shirtNumber} ${g.myRunner.shortName} – ${dec(g.myRunner.distanceKm, 1)} km${g.myRunner.hiShare != null ? `, ${Math.round(g.myRunner.hiShare)} % højintenst` : ''}${g.myRunner.topSpeed ? `, topfart ${dec(g.myRunner.topSpeed, 1)} km/t` : ''}.`) : null,
+    showRunner(g, myTeamId) ? h('p', { id: 'my-runner' }, h('strong', {}, '🏃 Dit holds løber: '), `#${g.myRunner.shirtNumber} ${g.myRunner.shortName} – ${dec(g.myRunner.distanceKm, 1)} km${g.myRunner.hiShare != null ? `, ${Math.round(g.myRunner.hiShare)} % højintenst` : ''}${g.myRunner.topSpeed ? `, topfart ${dec(g.myRunner.topSpeed, 1)} km/t` : ''}.`) : null,
     !g.goalOfTheRound && g.defensiveAction ? h('p', {}, h('strong', {}, '🛡 Rundens defensive aktion: '), `#${g.defensiveAction.shirtNumber} ${g.defensiveAction.shortName} (${g.defensiveAction.teamName}) holdt nullet.`) : null);
 }
 
@@ -226,7 +230,7 @@ function renderColumn(g, myTeamId, onOpenMatch, matches, col, onOpenReport) {
       if (s.id === 'col-form') return sec(s, ...(s.paras ?? []).map((t) => h('p', { id: t.startsWith('Rundens overraskelse') ? 'upset' : null }, t)));
       return sec(s, ...paras(s));
     }),
-    g.myRunner && g.myRunner.teamId === myTeamId ? h('p', { id: 'my-runner', class: 'col-box' }, h('strong', {}, '🏃 Dit holds løber: '), `#${g.myRunner.shirtNumber} ${g.myRunner.shortName} – ${dec(g.myRunner.distanceKm, 1)} km${g.myRunner.hiShare != null ? `, ${Math.round(g.myRunner.hiShare)} % højintenst` : ''}${g.myRunner.topSpeed ? `, topfart ${dec(g.myRunner.topSpeed, 1)} km/t` : ''}.`) : null);
+    showRunner(g, myTeamId) ? h('p', { id: 'my-runner', class: 'col-box' }, h('strong', {}, '🏃 Dit holds løber: '), `#${g.myRunner.shirtNumber} ${g.myRunner.shortName} – ${dec(g.myRunner.distanceKm, 1)} km${g.myRunner.hiShare != null ? `, ${Math.round(g.myRunner.hiShare)} % højintenst` : ''}${g.myRunner.topSpeed ? `, topfart ${dec(g.myRunner.topSpeed, 1)} km/t` : ''}.`) : null);
 }
 
 const snapOf = (m, mc) => (mc.snap != null && m.events[mc.snap]?.snapshot ? { ev: m.events[mc.snap], snap: m.events[mc.snap].snapshot } : null);
