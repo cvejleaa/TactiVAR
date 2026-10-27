@@ -549,7 +549,7 @@ try {
         const a = await read(); await g.waitForTimeout(1750); const b = await read();
         check('Afspilning: afleveringen før afslutningen – bolden hos oplæggeren, mens skytten står bag bolden på linjen; derefter løber han ind med bolden',
           a.leg === 'pass' && JSON.stringify(a.ball) === JSON.stringify(a.from) && b.leg === 'shot' && JSON.stringify(b.ball) === JSON.stringify(b.shooter) && JSON.stringify(a.shooter) !== JSON.stringify(b.shooter), JSON.stringify([a, b]));
-      } else check('Afspilning: en afslutning efter en aflevering findes i kampen (data)', true, 'ingen i denne kamp – unit-testen dækker'); }
+      } }   // ingen aflevering i denne kamp: benene er bevist deterministisk i replay-legs-v3221-tm.test.mjs (TM: en altid-grøn else-gren beviser intet)
     await g.locator('#feed .replay-btn').last().click();   // den tidligste afslutning – så er der trin efter den
     const s0 = await g.getAttribute('#replay', 'data-step');
     await g.click('#rp-next'); const s1 = await g.getAttribute('#replay', 'data-step');
