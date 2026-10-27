@@ -156,8 +156,14 @@ const okBall = (b) => Array.isArray(b) && b.length === 2 && b.every((v) => Numbe
 const nat = (x, max) => Number.isInteger(x) && x >= 0 && x <= max;
 export const isValidClock = (c) => !!c && typeof c === 'object' && nat(c.m, 90) && (c.plus === undefined || nat(c.plus, 8));
 export const isValidStoppage = (st) => Array.isArray(st) && st.length === 2 && st.every((x) => x && nat(x.S, 8) && nat(x.var, 8) && x.var <= x.S);
+const ACT_KINDS = new Set(['press', 'trap', 'flank', 'tackle', 'cb', 'run', 'cross', 'long', 'corner', 'fk']);   // match.js act – tilladelsesliste
 export function isValidTrace(tr) {
   return !!tr && tr.v === 1 && Array.isArray(tr.frames) && tr.frames.length <= 31 && Array.isArray(tr.moments) && tr.moments.length <= 400
     && [...tr.frames, ...tr.moments].every((f) => f && Number.isInteger(f.t) && f.t >= 0 && f.t <= 30 && okBall(f.ball) && okPts(f.h) && okPts(f.a))
-    && tr.moments.every((m) => Number.isInteger(m.ev) && (m.side === 'h' || m.side === 'a'));
+    && tr.moments.every((m) => Number.isInteger(m.ev) && (m.side === 'h' || m.side === 'a'))
+    // Kampens tal (v3.22.0): valgfri; [minut, art, side, spiller, modpart, udfald] – ældre spor har dem ikke
+    && (tr.acts === undefined || (Array.isArray(tr.acts) && tr.acts.length <= 400 && tr.acts.every((x) => Array.isArray(x) && x.length === 6
+      && Number.isInteger(x[0]) && x[0] >= 0 && x[0] <= 130 && ACT_KINDS.has(x[1]) && (x[2] === 'h' || x[2] === 'a')
+      && (x[3] === null || typeof x[3] === 'string') && (x[4] === null || typeof x[4] === 'string')
+      && (x[5] === null || x[5] === 0 || x[5] === 1 || x[5] === 2))));
 }

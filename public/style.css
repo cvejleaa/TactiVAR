@@ -256,3 +256,5 @@ button.savestatus.failed { color: var(--rød); font-weight: 700; }
 
 /* v3.21.0: duel-tallet i karakterarket brydes ikke */
 .ratings td.duel { white-space: nowrap; }
+.match-numbers { margin: .4rem 0; font-size: .85rem; line-height: 1.45; } .match-numbers > div { margin-bottom: .2rem; }   /* v3.22.0: Kampens tal under spillerens heat map */
+.mn-list { margin: .2rem 0 .3rem 1.1rem; padding: 0; } .mn-list li { margin: .1rem 0; }

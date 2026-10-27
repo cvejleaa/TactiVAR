@@ -72,3 +72,23 @@
 - Rundens seed fra et gemt rng-output: loop 2^32 med mulberry32-tempereringen (~15 s i node), verificér ved at genspille runden.
 - Browser: alle rundens kampe via `#match-cards .matchcard:nth-child(i)`; tæl td.duel/🤼 pr. ratings-tabel og pr. fane.
 - Hele unit-suiten tager > 10 min ved parallelle kørsler: kør i baggrund med lang timeout, eller kun filer der importerer modulet.
+
+## v3.22.0 (trace.acts, Kampens tal) – efterprøvet på 3698ce8 + 5b09196
+- acts ligger i det DELTE spor for begge hold; viewActs er kun en boolsk port (giver ejeren HELE listen, begge sider). UI'et
+  lækker intet: non-interference (62 bot-poster forvansket -> 0 af 16 billeder ændret; kontrol: én egen erobring fjernet -> 1).
+- NYT i data (trin 2-problem): 'cross' <=> attackFocus HIGH_CROSSES, 'long' <=> DIRECT_LONG og ikke HIGH_CROSSES – 175/175 rigtige,
+  i 92 af 252 bot-kampsider (sporets hovedstødsmål-øjeblik kun 32, alle delmængde). Referatet skjuler kilden med vilje (match.js
+  aerialDuel0 "Kun dit eget hold får sin kilde nævnt"). Også ny: trap-backen (0/227 i referatet; rng.pick – lav værdi),
+  hjørne-/frisparkstager (36/476 i referatet; crossTaker = bedste afleverer -> ordinal af skjult evne).
+- IKKE nyt: duelsWon – acts 'press' = 65 % af botternes duelsWon, 584/584 navngivet i referatet ("erobrer bolden fra"); duels/
+  løbsduellens sejre er ikke i acts. freeRunsWon: acts 'run' 48 % eksakt, 0 falske – samme klasse som den accepterede RUN_STEP-lækage.
+- Robusthed: art 'toString'/'valueOf' (<= 8 tegn) passerer isValidTrace -> COMBO_LABEL-prototypeopslag -> "function toString() {
+  [native code] }" som tekst (ingen XSS). HTML/objekt i spiller-id: inert (who() slår navn op). Én ugyldig post sletter HELE sporet.
+  5b09196 minOf `x.text?.includes` -> hændelse med tal-tekst vælter Kamp-fanen (renderFailed) – 3698ce8 tegnede samme fil fint.
+- Grenen flyttede sig igen under gennemgangen (3698ce8 -> 5b09196, QC-rettelser i matchcenter/heatmap; motor/visibility uændret).
+
+## PoC-mønstre (tilføjet v3.22)
+- Positiv kontrol i non-interference skal give en SYNLIG ændring: press<->tackle er begge "erobring" -> 0 forskelle (falsk kontrol).
+  Brug: fjern en egen erobring (x[3]='zzz') -> tallet for ham ændres.
+- "Står det allerede i referatet?": for hver post, find hændelse samme `min` hvis tekst indeholder tag(a) OG tag(b) (tag = `#nr kortnavn`).
+- git archive <sha> til scratch/wt + symlink node_modules; scripts tager træets sti som argv (engine, tools/serve.mjs, playwright-core).

@@ -1,2 +1,2 @@
 // Bumpes ved hver udgivelse, så det kan ses på siden, hvilken version der er live.
-export const VERSION = '3.21.2';
+export const VERSION = '3.22.0';
