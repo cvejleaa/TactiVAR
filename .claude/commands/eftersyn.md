@@ -92,7 +92,7 @@ derudover:
 
 ### 8. Brugsværdien
 
-Kør **domæne-rådgiver**-agenten retrospektivt på perioden i stedet for på en
+Kør de fire **Spilførere** (`spilfoerer-motor`, `-oekonomi`, `-klub`, `-ui`) retrospektivt på perioden i stedet for på en
 plan: hvilke features blev brugt, hvilke gav reaktioner, og hvilke faldt døde?
 Hvor faldt aktiviteten — og hvornår? Fodr agentens hukommelse med svarene; det
 er dét, der gør dens næste plan-vurdering bedre end et gæt. Ét konkret forslag

@@ -7,6 +7,7 @@
 // (v3.16.2): efter et mål, en redning eller et skud forbi går bolden derhen, referatet siger – tegnet ud fra udfaldet, ikke motoren.
 import { h } from './dom.js';
 import { evMin, fmtMin, tickClock } from '../engine/clock.js';
+import { apartOnLine, ONSIDE_GAP } from '../engine/positions.js';
 
 // Banens skala i tegningen (v3.16.3, Spilfører: målmanden stod 10 % ude, forsvarerne aldrig i eget felt): formationernes
 // y 90/10 (målmanden) tegnes ved mållinjen (≈97/3) – kun visningen; motoren og sporet er uændrede. Symmetrisk om 50, så
@@ -25,7 +26,7 @@ export function replaySteps(trace, highlights = false, events = null, idOf = nul
     if (!highlights) steps.push({ kind: 'frame', t: f.t, h: f.h, a: f.a, ball: f.ball, ev: null, poss: f.poss ?? null, duel: f.lost ? 'lost' : f.run ? 'run' : f.offside ? 'offside' : f.poss ? 'ball' : null });
     // Højdepunkter: halvchancen (v3.17.0, half) kun som mål – ellers blev uddraget en halv afspilning (Spilfører)
     for (const m of trace.moments.filter((x) => x.t === f.t && !(highlights && x.half && !x.scorer))) {
-      const step = { kind: 'moment', t: m.t, h: m.h, a: m.a, ball: m.ball, ev: m.ev, actor: m.scorer ?? m.shooter, assist: m.assist ?? null };
+      const step = { kind: 'moment', t: m.t, h: m.h, a: m.a, ball: m.ball, ev: m.ev, actor: m.scorer ?? m.shooter, assist: m.assist ?? null, ...passOf(m) };
       steps.push(step);
       const end = shotEnd(m, events?.[m.ev], idOf);
       // endPlayer: endepunktet er en spillers plads (redning, blokering) og tegnes som brikkerne; ellers et mållinje-punkt
@@ -33,6 +34,19 @@ export function replaySteps(trace, highlights = false, events = null, idOf = nul
     }
   }
   return steps;
+}
+// Afleveringen før afslutningen (v3.22.1): oplæggerens plads (from), skyttens onside-plads (recv) og om bolden går i luften (air)
+// – fra sporet (match.js momentAt). Et spor fra før v3.22.1 har dem ikke: et mål med oplæg får dem her ud fra øjeblikkets
+// billede (QC: ellers så brugeren sit gemte mål uændret) – linjen er modstanderens næstdybeste (den dybeste er målmanden).
+export function passOf(m) {
+  const pos = (id) => m[m.side]?.find((q) => q[0] === id);
+  if (m.from !== undefined) { const fq = pos(m.from); return { from: fq ? [fq[1], fq[2]] : null, recv: fq && m.recv ? m.recv : null, air: !!(fq && m.air) }; }
+  const aq = m.scorer && m.assist && m.assist !== m.scorer && pos(m.assist), sq = aq && pos(m.scorer);
+  if (!sq) return { from: null, recv: null, air: false };
+  const fwd = (y) => (m.side === 'h' ? -y : y), opp = m[m.side === 'h' ? 'a' : 'h'].map((q) => fwd(q[2])).sort((a, b) => b - a);
+  const deep = opp[1] ?? opp[0], ry = m.side === 'h' ? -deep + ONSIDE_GAP : deep - ONSIDE_GAP;
+  const recv = fwd(sq[2]) > fwd(ry) ? apartOnLine(sq[1], ry, [...m.h, ...m.a].filter((q) => q[0] !== m.scorer).map((q) => [q[1], q[2]])) : null;
+  return { from: [aq[1], aq[2]], recv, air: m.kind === 'HEADER_GOAL' };
 }
 // Hvor skuddet endte, i sporets fælles koordinater (hjemme angriber mod y 0, ude mod y 100) – efter referatets linje (QC
 // v3.16.2: "forbi" er blokeret, stolpen, over eller forbi, og billedet må ikke modsige teksten). Målmanden = forsvarets spiller
@@ -131,6 +145,7 @@ export function replayEl(m, ownSide) {
   }
   function show() {
     const s = r.steps[r.i];
+    clearTimeout(r.leg); r.leg = null;
     if (!s) return;
     // Overgangene følger trinets længde ved alle hastigheder (QC: med faste 1,1 s hang brikkerne bagud ved 2× og 4×).
     // Grundbillede: bolden først (35 %), spillerne glider efter. Afslutning: skytten først, så bolden (Spilfører v3.16: bolden
@@ -154,6 +169,19 @@ export function replayEl(m, ownSide) {
     ball.style.transition = `left ${bt}, top ${bt}`; flag(ball, 'over', false);
     place(s, `left ${glide}, top ${glide}`);
     ball.style.left = vx(s.ball[0]) + '%'; ball.style.top = vy(s.ball[1]) + '%';
+    el.dataset.leg = '';
+    // Afleveringen før afslutningen (v3.22.1, brugeren: "så er målscoreren offside"): bolden til oplæggeren, mens skytten står
+    // onside på linjen (recv); så afleveringen derhen, og til sidst løber han ind og afslutter – samme trin, samme længde. Et indlæg,
+    // en lang bold og et hovedstød (air, QC) går i luften fra oplæggeren direkte til afslutningen, mens skytten løber ind fra linjen.
+    if (shot && s.from) {
+      const sh = r.tokens.get(s.actor), at = (t, xy) => { t.style.left = vx(xy[0]) + '%'; t.style.top = vy(xy[1]) + '%'; }, go = (ms) => `left ${ms}ms ease-in-out, top ${ms}ms ease-in-out`;
+      const leg = (name, fn, ms) => { r.leg = setTimeout(() => { fn(); el.dataset.leg = name; }, ms); };
+      ball.style.transition = go(Math.round(d * 0.25)); at(ball, s.from); el.dataset.leg = 'pass';
+      if (sh && s.recv) at(sh, s.recv);
+      const toShot = () => { if (sh) { sh.style.transition = go(Math.round(d * 0.25)); at(sh, s.ball); } ball.style.transition = go(Math.round(d * 0.25)); at(ball, s.ball); };
+      if (s.recv && !s.air) leg('recv', () => { ball.style.transition = go(Math.round(d * 0.15)); at(ball, s.recv); leg('shot', toShot, Math.round(d * 0.2)); }, Math.round(d * 0.35));
+      else leg('shot', toShot, Math.round(d * 0.4));
+    }
     // Stillingen og teksten: den seneste hændelse til og med trinet (et øjeblik viser sin egen linje)
     // Et grundbillede er tick'ets duel, før afslutningerne (v3.16.1) – stillingen er den fra før (aldrig et mål for tidligt),
     // og teksten siger, hvordan duellen gik (QC v3.16.1: ellers står bolden pludselig hos modspilleren uden forklaring)
@@ -172,7 +200,7 @@ export function replayEl(m, ownSide) {
     r.timer = setTimeout(tick, STEP_MS[r.steps[r.i].kind] / r.speed);
   }
   function play() { clearTimeout(r.timer); if (r.i >= r.steps.length - 1) r.i = 0; r.playing = true; playBtn.textContent = '⏸ Pause'; show(); r.timer = setTimeout(tick, STEP_MS[r.steps[r.i].kind] / r.speed); }
-  function pause() { r.playing = false; clearTimeout(r.timer); playBtn.textContent = '▶ Afspil'; }
+  function pause() { r.playing = false; clearTimeout(r.timer); clearTimeout(r.leg); playBtn.textContent = '▶ Afspil'; }
   // 🎬: afslutningen og dens udfald – står på udfaldet (QC v3.16.2: ellers stoppede springet med bolden ved skytten)
   r.jump = (evIdx) => {
     pause(); if (r.highlights) { r.highlights = false; r.steps = replaySteps(m.trace, false, m.events, idOf); flag(hlBtn, 'active', false); }

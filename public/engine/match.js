@@ -4,7 +4,7 @@
 // permanent), og Hvis-Så-reglerne kører for begge hold og skifter reelt formation.
 import { matchBenchOf } from './career.js';
 import { FORMATIONS, lineOfRole, isOutOfZone, slotPosition, fitOf, arrangeByFit } from './formations.js';
-import { livePositions as livePos0, coupledPositions as coupled0, kickoffPositions, apartFrom, ONSIDE_GAP, MIN_APART } from './positions.js';
+import { livePositions as livePos0, coupledPositions as coupled0, kickoffPositions, apartFrom, apartOnLine, ONSIDE_GAP, MIN_APART } from './positions.js';
 import { masteryVs, counterXpForMatch } from './counter.js';
 import { createSheet, finalizeSheet } from './ratings.js';
 import { assignClock } from './clock.js';
@@ -377,8 +377,21 @@ export function simulateMatch(home, away, rng, opts = {}) {
     // Bolden ved skytten (Spilfører v3.16: bolden stod på en fast plet, mens skytten stod ved hjørneflaget). 📍 er uændret.
     const at = shooter != null && att.find((q) => q[0] === shooter);
     const ball = at ? [at[1], at[2]] : common(side, spot.x, spot.y);
-    trace.moments.push({ t: curMin / 3, ev: events.length - 1, kind, side: side === H ? 'h' : 'a', ball, h: side === H ? att : dpts, a: side === H ? dpts : att,
-      shooter, ...(shotLong && shooter != null && !PASS_MOMENTS.has(kind) ? { long: true } : {}), ...(extra.scorer ? { scorer: extra.scorer, assist: extra.assist ?? null } : {}) });
+    // Afleveringen før afslutningen (v3.22.1, brugeren: "så er målscoreren offside – alle modstanderne er langt fremme"): billedet
+    // er afleveringens forsvar og oplægger, men skytten står, hvor han skød. from = oplæggeren (målets oplæg, ellers tick'ets
+    // kombination i handlingsloggen); recv = skyttens plads, da bolden blev spillet – på linjen (onside, som det tjekkede i
+    // PASS_MOMENTS), når han i billedet står bag den. Afspilningen spiller bolden fra → recv, og så løber han ind (replay.js).
+    // Et mål uden oplæg (solo) har ingen oplægger (QC); air = indlæg/lang bold/hovedstød – bolden går i luften til afslutningen.
+    const sd = side === H ? 'h' : 'a', act0 = !PASS_MOMENTS.has(kind) && shooter != null && !extra.scorer
+      ? trace.acts.findLast((e) => e[0] === curMin && e[2] === sd && e[4] === shooter && e[5] !== null) : null;
+    const combo = PASS_MOMENTS.has(kind) || shooter == null ? null : extra.scorer ? extra.assist ?? null : act0?.[3] ?? null;
+    const from = combo != null && combo !== shooter && att.some((q) => q[0] === combo) ? combo : null, s1 = from && ownXY(shooter);
+    const r0 = s1 && s1[1] < line + ONSIDE_GAP ? common(side, s1[0], line + ONSIDE_GAP) : null;
+    const recv = r0 && apartOnLine(r0[0], r0[1], [...att, ...dpts].filter((q) => q[0] !== shooter).map((q) => [q[1], q[2]]));
+    const air = !!from && (kind === 'HEADER_GOAL' || act0?.[1] === 'cross' || act0?.[1] === 'long');
+    trace.moments.push({ t: curMin / 3, ev: events.length - 1, kind, side: sd, ball, h: side === H ? att : dpts, a: side === H ? dpts : att,
+      shooter, ...(shotLong && shooter != null && !PASS_MOMENTS.has(kind) ? { long: true } : {}), ...(extra.scorer ? { scorer: extra.scorer, assist: extra.assist ?? null } : {}),
+      ...(from ? { from, ...(recv ? { recv } : {}), ...(air ? { air: true } : {}) } : {}) });
   }
   const PASS_MOMENTS = new Set(['VAR_CHECK', 'VAR_NO_GOAL', 'OFFSIDE_FLAG']);
   const SHOT_MOMENTS = new Set(['SAVE', 'MISS', 'OFFSIDE_FLAG', 'VAR_CHECK', 'VAR_NO_GOAL']);

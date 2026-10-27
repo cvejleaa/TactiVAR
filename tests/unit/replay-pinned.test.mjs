@@ -153,9 +153,11 @@ test('trin frem og tilbage: bolden og brikkerne følger trinet; stillingen i et 
   // bolden og brikkerne
   click(el, 'rp-next'); click(el, 'rp-next');   // mål, trin 2
   const ball = byId(el, 'rp-ball');
-  // skala (v3.16.3): 22 → 50 − 28·1,175 = 17,1; 39 → 50 − 11·1,175 = 37,075 → 37.1
-  assert.deepEqual([ball.style.left, ball.style.top], ['41%', '17.1%']);
-  assert.deepEqual([tok(el, 'h3').style.left, tok(el, 'h3').style.top, tok(el, 'a2').style.left, tok(el, 'a2').style.top], ['41%', '17.1%', '33%', '37.1%']);
+  // v3.22.1 (brugeren: "så er målscorer offside"): målet har oplæg (h2) – trinet begynder med bolden hos oplæggeren (25, 62 →
+  // 50 + 12·1,175 = 64,1), og skytten står onside på linjen: ude-forsvarets næstdybeste (a2, y 39) + 1 = 40 → 38,25 → 38.3
+  // (sporet er fra før v3.22.1: passOf). Før: bolden og skytten straks ved afslutningen (41 %, 17.1 %) – offside-billedet.
+  assert.deepEqual([ball.style.left, ball.style.top], ['25%', '64.1%']);
+  assert.deepEqual([tok(el, 'h3').style.left, tok(el, 'h3').style.top, tok(el, 'a2').style.left, tok(el, 'a2').style.top], ['41%', '38.3%', '33%', '37.1%']);
   click(el, 'rp-next');   // skudtrinnet: bolden i nettet ved siden af keeperen (45, 2) – et mållinje-punkt skaleres ikke; skytten står, hvor han skød
   assert.deepEqual([ball.style.left, ball.style.top], ['45%', '2%']);
   assert.deepEqual([tok(el, 'h3').style.left, tok(el, 'h3').style.top], ['41%', '17.1%']);
@@ -372,10 +374,11 @@ test('udeholds-seer: brikker og bold spejles (x → 100 − x, y → 100 − y) 
     assert.deepEqual(at(e, 'a3'), ['68%', '62.9%'], `${side}: 61 → 62,925 → 62.9, ingen spejling`);
     assert.deepEqual([at(e, 'h1'), at(e, 'a1')], [['50%', '97%'], ['50%', '3%']], String(side));
   }
-  // Bolden i et øjeblik spejles og skaleres: målet ev1 ved (41, 22) → (59, 78) → 50 + 28·1,175 = 82,9
+  // Bolden i et øjeblik spejles og skaleres: målet ev1 begynder hos oplæggeren h2 (25, 62) → (75, 38) → 50 − 12·1,175 = 35,9;
+  // skytten onside på linjen (41, 40) → (59, 60) → 61,75 → 61.8 (v3.22.1; før bolden og skytten straks ved (59 %, 82.9 %))
   click(a, 'rp-next'); click(a, 'rp-next');
-  assert.deepEqual([byId(a, 'rp-ball').style.left, byId(a, 'rp-ball').style.top], ['59%', '82.9%']);
-  assert.deepEqual(at(a, 'h3'), ['59%', '82.9%'], 'skytten under bolden');
+  assert.deepEqual([byId(a, 'rp-ball').style.left, byId(a, 'rp-ball').style.top], ['75%', '35.9%']);
+  assert.deepEqual(at(a, 'h3'), ['59%', '61.8%'], 'skytten på linjen, spejlet');
   // skudtrinnet: mållinje-punktet (45, 2) spejles, men skaleres ikke → (55, 98)
   click(a, 'rp-next');
   assert.deepEqual([byId(a, 'rp-ball').style.left, byId(a, 'rp-ball').style.top], ['55%', '98%']);

@@ -33,10 +33,14 @@ en rolle, der altid siger "ser fint ud", holder man op med at læse.
   Den skal ANGRIBE ændringen: konkrete skridt en fjendtlig bruger ville tage,
   efterprøvet mod den rigtige adgangsmodel (emulator/testmiljø), ikke
   ræsonneret.
-- **Domæne-rådgiver** (tilpas navnet til produktet): vurderer om ændringen gør
-  produktet bedre eller dårligere at BRUGE — og køres kun på PLANEN, før koden
-  skrives (hvornår: se trin 0). Rådgivende, ikke blokerende: et "det her gør
-  produktet dårligere" skal besvares i planen, ikke nødvendigvis adlydes.
+- **Spilførerne** (fire, hver med sit område – brugeren 2026-10-27): `spilfoerer-motor`
+  (kampmotoren og afspilningen), `spilfoerer-oekonomi` (løn, transfers, værdier),
+  `spilfoerer-klub` (trup, udvikling, sæson, samspil) og `spilfoerer-ui` (brugerflade,
+  tekster og spilfornemmelse). De vurderer om ændringen gør spillet bedre eller
+  dårligere at SPILLE – på PLANEN, før koden skrives (hvornår: se trin 0), og kun
+  dem, hvis område planen rører. Rådgivende, ikke blokerende: et "det her gør
+  spillet dårligere" skal besvares i planen, ikke nødvendigvis adlydes. Desuden
+  fylder de backloggen (se "Backloggen").
 
 Rollerne kører på hver sin model (sat i deres frontmatter — de hyppige på
 billigere modeller, de sjældne på de stærkeste), og flere af dem fører en
@@ -48,13 +52,13 @@ selv.
 
 00. Er opgaven større end en enkelt rettelse: kør **Arkitekten** på opgaven
    først. Dens plan (delopgaver, genbrug, rækkefølge) er det, de næste trin
-   arbejder ud fra — og QC-på-plan og domæne-rådgiveren kan gennemgå DEN i
+   arbejder ud fra — og QC-på-plan og Spilførerne kan gennemgå DEN i
    stedet for en løs idé.
 0. Tilføjer ændringen ny brugerflade eller nye tal på skærmen: kør Quality
    Control på PLANEN først — og kør den på opus (sig det ved invokationen;
    den kører ellers på sonnet). De dyreste fund er designfejl, ikke kodefejl —
-   to minutter dér sparer en omskrivning. Rører planen KERNEOPLEVELSEN (det,
-   domæne-rådgiveren dækker), så kør domæne-rådgiveren på planen samtidig —
+   to minutter dér sparer en omskrivning. Kør samtidig de Spilførere, hvis
+   område planen rører (motor, økonomi, klub, UI) —
    en dårlig feature, der først opdages færdigbygget, koster det samme som en
    designfejl.
 0b. Får ændringen en knap eller en fane: afgør FØRST hvor den hører hjemme —
@@ -90,6 +94,17 @@ selv.
 
 Rapportér rollernes konklusioner til brugeren, før du merger. Er en rolle
 uenig, så løs det først — eller sig klart, hvad du lander med og hvorfor.
+
+## Backloggen – så udviklingen ikke står stille
+
+`docs/backlog.md` er den fælles, prioriterede liste over det næste. Brugerens ønsker
+går forrest; ellers tages det øverste punkt i "Næste", når det forrige er live – uden
+at vente på et nyt ønske (spørg kun, når et punkt kræver en beslutning om spillets
+retning, eller det skriver i produktionsdata). Er der færre end 3 punkter i "Næste",
+eller er en større udgivelse landet, så kør `/spilfoerere`
+(`.claude/commands/spilfoerere.md`): de fire Spilførere går hvert deres område
+igennem og fylder listen. Et nyt ønske fra brugeren, der ikke tages med det samme,
+skrives ind i listen.
 
 ## Eftersyn
 

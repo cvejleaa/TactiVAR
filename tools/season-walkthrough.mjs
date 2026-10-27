@@ -3,7 +3,7 @@
 // Spiller en hel sæson (14 runder) i den rigtige side i Chromium som en bruger: ▶ Spil runde, ⏭ spring frem.
 // Gemmer i OUT (standard walkthrough/): pr. runde alle fire kampes referater, statistik og klummen som tekst, og
 // skærmbilleder af Kamp-fanen (din kamp + det første 📍-billede) og Liga-fanen; til sidst slutstillingen og fejl.
-// Spilføreren (domaene-raadgiver) læser mappen bagefter – den kan ikke selv køre browseren.
+// Spilførerne (spilfoerer-motor/-ui, eller alle fire i /spilfoerere) læser mappen bagefter – den kan ikke selv køre browseren.
 // v3.16 (brugeren: "spilføreren skal gennemspille 1 sæson mere, men hvor der nu kigger på alle funktionaliteter og især
 // spilmotor"): også alle faner (Trup, Taktik, Kamp, Liga med statistik), pr. runde afspilningen (et mål og et højdepunkt),
 // heat map for holdet og målscoreren, og kontrolværktøjets rapport for alle fire kampe (tools/trace-invariants.mjs) –
