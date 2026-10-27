@@ -512,11 +512,12 @@ bedre kan kontrollere spil motoren".
   aflevering, `cross`/`long`/`corner`/`fk` indlæg, lang bold og dødbolde → hovedstødsmanden; udfald 2 mål, 1 afslutning, 0 clearet).
   Kun optegnelse: intet rng, ingen skrivning i seen – kampene er uændrede (fingerprint full og noprose). Ingen opfundne
   afleveringer: motoren spiller ikke enkelte afleveringer, og en "opbygning vundet" er ikke et par (angriberen er trukket
-  tilfældigt, QC). Klik på din spiller i arket: under hans heat map står erobringer, bolde tabt, gange fanget offside og 🤝
-  Samarbejde (→ han spillede den, ← han fik den, med minut og udfald). Dueller og luftdueller står kun i listen (🤼, ✈ – én kilde).
-  Kun dit hold (`visibility.js viewActs`); en kamp fra før v3.22.0 viser "findes fra v3.22.0", aldrig 0. Ca. 13 poster og 0,5 KB
-  pr. kamp, kun i den seneste runde. Ikke pr. zone: positionerne er en formel (rolle og pres), så en zone ville gentage rollen
-  (QC). Samspil som mekanik (par, der spiller sig sammen) er næste trin.
+  tilfældigt, QC). Under holdets heat map står 🤝 Holdets samarbejde (alle kombinationer, "X til Y"); klik på din spiller: erobringer, bolde tabt,
+  gange fanget offside og 🤝 Samarbejde ("til …"/"fra …", minut og udfald). Minuttet er referatets (linjen i tick'et, der nævner
+  modtageren; ellers tick'ets ur). Dueller og luftdueller står kun i listen (🤼, ✈ – én kilde).
+  Kun dit hold (`visibility.js viewActs`); en kamp fra før v3.22.0 viser "findes fra v3.22.0", aldrig 0. Over 8 poster pr. kamp (acts-v3220.test.mjs; ca. 13 og 0,5 KB i 200 kampe),
+  kun i den seneste runde. Ikke pr. zone: positionerne er en formel (rolle og pres), så en zone ville gentage rollen
+  (QC). Samspil som mekanik (par, der spiller sig sammen) er overvejet som næste trin.
 - **Heat map** (karakterarket, dit hold – v3.20.0: står fra start over startopstillingen, som modstanderens zonekort; 📍 erstatter
   kun opstillingen): viser holdets tæthed (v3.20.2: 12 × 18 felter, før 6 × 9; uden målmand) af grundbilleder og
   øjeblikke plus vejen mellem to grundbilleder (punkter hver 2. enhed, vægt 0,5; kun når spilleren er med i begge – ingen streg

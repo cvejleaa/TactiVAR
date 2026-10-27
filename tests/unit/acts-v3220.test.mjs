@@ -45,8 +45,11 @@ test('actsOf: erobringer, bolde tabt, offside og kombinationer begge veje – p�
     [15, 'tackle', 'a', 'x5', 'p1', null], [18, 'cb', 'h', 'p1', 'p2', 2], [21, 'corner', 'h', 'p3', 'p1', 0], [24, 'press', 'h', 'p2', 'x1', null], [27, 'cross', 'a', 'x1', 'x2', 1]];
   const r = actsOf(acts, 'h', 'p1');
   assert.deepEqual({ won: r.won, lost: r.lost, offside: r.offside }, { won: 2, lost: 2, offside: 1 });
-  assert.deepEqual(r.combos, [{ t: 18, kind: 'cb', out: true, with: 'p2', ok: 2 }, { t: 21, kind: 'corner', out: false, with: 'p3', ok: 0 }]);
-  assert.deepEqual(actsOf(acts, 'h', 'p2'), { won: 1, lost: 0, offside: 0, combos: [{ t: 18, kind: 'cb', out: false, with: 'p1', ok: 2 }] });
+  assert.deepEqual(r.combos, [{ t: 18, kind: 'cb', from: 'p1', to: 'p2', out: true, with: 'p2', ok: 2 }, { t: 21, kind: 'corner', from: 'p3', to: 'p1', out: false, with: 'p3', ok: 0 }]);
+  assert.deepEqual(actsOf(acts, 'h', 'p2'), { won: 1, lost: 0, offside: 0, combos: [{ t: 18, kind: 'cb', from: 'p1', to: 'p2', out: false, with: 'p1', ok: 2 }] });
+  // Holdet (playerId null, QC): alle holdets kombinationer – ingen erobringer pr. spiller, ikke modstanderens
+  const team = actsOf(acts, 'h', null);
+  assert.deepEqual([team.won, team.lost, team.offside, team.combos.map((c) => `${c.from}>${c.to}`)], [0, 0, 0, ['p1>p2', 'p3>p1']]);
   assert.equal(actsOf(null, 'h', 'p1'), null, 'ingen log (kamp fra før v3.22.0): intet tal – ikke 0');
 });
 

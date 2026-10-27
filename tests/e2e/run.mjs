@@ -566,6 +566,15 @@ try {
     check('Heat map: dit hold som felter fra start (uden knap), modstanderen kun groft i tredjedele – og begge ark har startopstillingen', heat.cells >= 6 && /Holdet/.test(heat.title) && /Tyngdepunkt \(groft\)/.test(heat.thirds) && heat.btn === 0 && heat.lineups === 2, JSON.stringify(heat));
     // v3.22.0 Kampens tal: klik på din spiller → erobringer/bolde tabt og samarbejde under hans heat map – tallene er dem i gemmets
     // handlingslog (trace.acts) for ham; modstanderens ark har ingen (kun dit hold)
+    { const team = await g.evaluate(() => {
+        const d = JSON.parse(localStorage.getItem('tactivar_save')), lr = d.league.lastRound, me = d.league.teams.find((t) => !t.isBot).id;
+        const m = lr.matches.find((x) => x.homeId === me || x.awayId === me), side = m.homeId === me ? 'h' : 'a';
+        const combos = m.trace.acts.filter((x) => ['cb', 'run', 'cross', 'long', 'corner', 'fk'].includes(x[1]) && x[2] === side).length;
+        const opp = m.trace.acts.filter((x) => ['cb', 'run', 'cross', 'long', 'corner', 'fk'].includes(x[1]) && x[2] !== side).length;
+        return { combos, opp, items: document.querySelectorAll('#mn-combos li').length, title: document.querySelector('#mn-combos strong')?.textContent, ball: document.querySelectorAll('#mn-ball').length };
+      });
+      check('Holdets samarbejde: under holdets heat map står alle dit holds kombinationer (ikke modstanderens) – erobringer først ved klik på en spiller',
+        team.title === '🤝 Holdets samarbejde' && team.items === team.combos && team.ball === 0, JSON.stringify(team)); }
     { const row = g.locator('.ratings tr[title^="Vis hans heat map"]').nth(5);
       await row.click(); await g.waitForSelector('#match-numbers');
       const mn = await g.evaluate(() => {
@@ -575,10 +584,10 @@ try {
         const pid = (side === 'h' ? m.ratings.home : m.ratings.away).find((e) => e.shirtNumber === nr).playerId;
         const won = m.trace.acts.filter((x) => ['press', 'trap', 'flank', 'tackle'].includes(x[1]) && x[2] === side && x[3] === pid).length;
         const combos = m.trace.acts.filter((x) => ['cb', 'run', 'cross', 'long', 'corner', 'fk'].includes(x[1]) && x[2] === side && (x[3] === pid || x[4] === pid)).length;
-        return { text: document.querySelector('#match-numbers').textContent, n: document.querySelectorAll('#match-numbers').length, won, combos, arrows: (document.querySelector('#mn-combos').textContent.match(/[→←]/g) ?? []).length };
+        return { text: document.querySelector('#match-numbers').textContent, n: document.querySelectorAll('#match-numbers').length, won, combos, items: document.querySelectorAll('#mn-combos li').length };
       });
       check('Kampens tal: dine spillers erobringer og samarbejde står under hans heat map – samme tal som kampens handlingslog, kun ét sted (dit hold)',
-        mn.n === 1 && mn.text.includes(`${mn.won} erobring`) && mn.arrows === mn.combos && /Samarbejde/.test(mn.text), JSON.stringify(mn));
+        mn.n === 1 && mn.text.includes(`${mn.won} erobring`) && mn.items === mn.combos && /Samarbejde/.test(mn.text) && (mn.combos > 0 || /ingen cutbacks/.test(mn.text)), JSON.stringify(mn));
       await g.click('#heat-team'); }
     // 📍 erstatter kun startopstillingen; heat map'et bliver stående, og ↩ giver startopstillingen tilbage
     if (await g.locator('#feed .snap-btn').count()) {

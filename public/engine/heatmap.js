@@ -80,7 +80,8 @@ export function shotsOf(trace, side, playerId = null) {
 
 // Kampens tal for én spiller (v3.22.0) ud fra handlingsloggen (match.js act): erobringer (pres, offside-fælde, lukket kant,
 // tackling i driblingen), bolde tabt (presset af, tacklet, kanten lukket), fanget offside og kombinationerne med medspillere –
-// begge veje (→ han spillede den, ← han fik den). Dueller og luftdueller står i arket (én kilde, QC). acts = viewActs(…).
+// begge veje (out: han spillede den). playerId null = holdets kombinationer (QC: samarbejdet samlet). Dueller og luftdueller
+// står i arket (én kilde, QC). acts = viewActs(…).
 export const COMBO_LABEL = { cb: 'cutback', run: 'løb og aflevering', cross: 'indlæg', long: 'lang bold', corner: 'hjørnespark', fk: 'frisparksindlæg' };
 const WINS = new Set(['press', 'trap', 'flank', 'tackle']);
 export function actsOf(acts, side, playerId) {
@@ -88,10 +89,11 @@ export function actsOf(acts, side, playerId) {
   const out = { won: 0, lost: 0, offside: 0, combos: [] };
   for (const [t, kind, s, a, b, ok] of acts) {
     if (WINS.has(kind)) {
+      if (playerId == null) continue;
       if (s === side && a === playerId) out.won++;
       else if (s !== side && b === playerId) { if (kind === 'trap') out.offside++; else out.lost++; }
-    } else if (COMBO_LABEL[kind] && s === side && (a === playerId || b === playerId)) {
-      out.combos.push({ t, kind, out: a === playerId, with: a === playerId ? b : a, ok });
+    } else if (COMBO_LABEL[kind] && s === side && (playerId == null || a === playerId || b === playerId)) {
+      out.combos.push({ t, kind, from: a, to: b, out: a === playerId, with: a === playerId ? b : a, ok });
     }
   }
   return out;
