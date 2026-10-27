@@ -88,7 +88,7 @@ try {
       return { n: m.readPairs(me.tactics.baseFormation).length, all: m.neighbourPairs(me.tactics.baseFormation).length }; });
     const lines = await g.evaluate(() => [...document.querySelectorAll('#pitch #chem-lines line.chem')].map((l) => l.getAttribute('class')));
     check('Samspil: Taktik-banen har én streg pr. par, motoren læser (ikke angriberparret), alle "spillet sammen" ved start', lines.length === want.n && want.n < want.all && lines.every((c) => c.includes('chem-sammen')), JSON.stringify({ want, lines: lines.length }));
-    check('Samspil: legenden under banen nævner det svageste par i ord – intet 0–100-tal', /^Svagest lige nu: .+ \(spillet sammen\)\./.test(await g.textContent('#chem-weakest')) && !/\d/.test((await g.textContent('#chem-legend')).replace(/#\d+/g, '')), await g.textContent('#chem-legend')); }
+    check('Samspil: legenden under banen – ved start ingen advarsel (alle spillet sammen), hvad samspil gør, intet 0–100-tal', /^Alle par har spillet sig sammen\. Samspil hjælper opbygningen og forsvaret mod løb i ryggen/.test(await g.textContent('#chem-weakest')) && !/\d/.test((await g.textContent('#chem-legend')).replace(/#\d+/g, '')), await g.textContent('#chem-legend')); }
   // Et par spillet stærkt sammen: tyk streg, kortets bedste makker og salgslinjen nævner makkeren
   { const pair = await g.evaluate(async () => { const m = await import('/engine/chemistry.js'), d = JSON.parse(localStorage.getItem('tactivar_save')), me = d.league.teams.find((t) => !t.isBot), s = me.tactics.lineupSlots;
       const [i, j] = m.readPairs(me.tactics.baseFormation)[0]; me.chemistry[m.pairKey(s[i], s[j])] = [85, 0]; localStorage.setItem('tactivar_save', JSON.stringify(d));

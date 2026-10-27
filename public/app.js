@@ -16,7 +16,7 @@ import { renderClub, shownCash, renderMarket, renderTransferLog, renderPublicClu
 import { marketInfo, buyPlayer, setListed, acceptOffer, declineOffer, releasePlayer, wageRoom, isStarter } from './engine/transfers.js';
 import { renderSeasonReport } from './ui/season-report.js';
 import { viewTeam } from './engine/visibility.js';
-import { lineupPairs, chemRefOf, weakestPair, swapChanges, BAND_WORD, bestPartner, playerPairs, gamesToSettle, bandOf, chemOf } from './engine/chemistry.js';
+import { lineupPairs, chemRefOf, weakestPair, swapChanges, BAND_WORD, bestPartner, saleChemText, playerPairs, gamesToSettle, bandOf, chemOf, BAND_RANK } from './engine/chemistry.js';
 import { renderPitch } from './ui/pitch.js';
 import { renderTactics } from './ui/tactics.js';
 import { renderStandings } from './ui/standings.js';
@@ -345,7 +345,7 @@ function renderNow() {
     onFocus: isOwn && tab === 'trup' ? (k) => change(() => act.setFocus(team, selected.id, k)) : null,
     trainNote: isOwn && tab !== 'trup',
     chem: isOwn && selected ? chemCard(team, selected) : null,
-    market: !selected || mc?.playing ? null : isOwn ? { own: true, listed: (team.listed ?? []).includes(selected.id), onList: (on) => change(() => setListed(league, team, selected.id, on)), strong: playerPairs(team, chemRefOf(league), selected.id).filter((x) => x.band === 'staerkt') }
+    market: !selected || mc?.playing ? null : isOwn ? { own: true, listed: (team.listed ?? []).includes(selected.id), onList: (on) => change(() => setListed(league, team, selected.id, on)), saleChem: saleChemText(team, chemRefOf(league), selected.id) }
       : { ...marketInfo(league, mine, team, selected), settle: gamesToSettle(chemRefOf(league)), starter: isStarter(team, selected), wage: Math.round(publicWage(selected) / 3), room: Math.round(wageRoom(league, mine) / 3), cashAfter: mine.cashBalance - marketInfo(league, mine, team, selected).price, onBuy: () => { const err = buyPlayer(league, mine, selected.id); view.notice = err ? `💰 ${err}` : `💰 ${selected.shortName} er købt og står nu i din trup.`; change(() => {}); } },
     hideLog: mc?.playing && league.lastRound ? seasonAndRound(league, league.lastRound.round) : null,
     // Under afspilningen af sæsonens sidste runde er det stadig den afsluttede sæson, der vises
@@ -444,7 +444,7 @@ function renderNow() {
   document.body.dataset.klar = 'ja';
 }
 
-// Samspil på spillerkortet (v3.24.0): ny = ingen par i holdets tabel (fremmed for alle)
+// Samspil på spillerkortet (v3.24.0): ingen par i holdets tabel = fremmed for alle (et køb – eller en reserve, hvis par er glemt)
 function chemCard(team, p) {
   const ref = chemRefOf(game.league), isNew = !Object.keys(team.chemistry ?? {}).some((k) => k.split('|').includes(p.id));
   return { isNew, best: isNew ? null : bestPartner(team, ref, p.id), pairs: playerPairs(team, ref, p.id) };
@@ -454,7 +454,9 @@ function chemLegend(pairs) {
   const w = weakestPair(pairs), key = (b) => h('span', { class: `chem-key ${b}` });
   return h('div', { class: 'chem-legend', id: 'chem-legend' },
     h('div', {}, '🤝 Samspil mellem naboer: ', key('staerkt'), 'stærkt ', key('sammen'), 'spillet sammen ', key('finder'), 'finder hinanden ', key('fremmede'), 'fremmede'),
-    w ? h('div', { id: 'chem-weakest' }, `Svagest lige nu: ${w.label} (${BAND_WORD[w.band]}). Par spiller sig sammen med kampe side om side – et nyt køb er fremmed for alle.`) : null);
+    // QC: kun en advarsel, når der er noget at advare om – og hvad samspil gør i kampen
+    h('div', { id: 'chem-weakest' }, (w && BAND_RANK[w.band] < BAND_RANK.sammen ? `Svagest lige nu: ${w.label} (${BAND_WORD[w.band]}). ` : 'Alle par har spillet sig sammen. ')
+      + 'Samspil hjælper opbygningen og forsvaret mod løb i ryggen – par spiller sig sammen med kampe side om side.'));
 }
 // Byt og formation (v3.24.0): sig det, når et pars samspil skifter bånd – ved spillerlisten (QC/Spilfører UI: ikke øverst på siden)
 function withChem(team, fn) {

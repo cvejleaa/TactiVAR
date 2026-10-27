@@ -76,7 +76,7 @@ function renderTraining(p, onFocus, starter = false) {
 // 🤝 Samspil (v3.24.0): bedste makker kun ved "stærkt" (QC); hans par med de naboer, han står ved lige nu (bænk: ingen)
 function renderChem({ best, pairs, isNew }) {
   return h('div', { id: 'card-chem' },
-    h('div', { id: 'card-best' }, isNew ? '🤝 Ny i truppen – fremmed for alle, indtil han har spillet kampe ved siden af de samme'
+    h('div', { id: 'card-best' }, isNew ? '🤝 Fremmed for alle i truppen – indtil han spiller kampe ved siden af de samme'
       : best ? `🤝 Bedste makker: #${best.mate.shirtNumber} ${best.mate.shortName} (samspil: stærkt)` : '🤝 Ingen særlig makker endnu'),
     pairs.length ? h('div', { class: 'muted', id: 'card-pairs' }, 'Samspil med naboerne nu: ' + pairs.map((x) => `#${x.mate.shirtNumber} ${x.mate.shortName} ${BAND_WORD[x.band]}`).join(' · ')) : null);
 }
@@ -86,7 +86,7 @@ function renderMarketBox(p, m) {
   if (m.own) return h('div', { class: 'marketbox', id: 'card-market' }, h('h4', {}, '💰 Marked'),
     h('label', {}, h('input', { type: 'checkbox', id: 'list-toggle', checked: m.listed, onchange: (e) => m.onList(e.target.checked) }), ' Til salg – de andre klubber byder, når transfervinduet er åbent (se 💼 Klub)'),
     // Samspil (v3.24.0, QC/Spilfører UI): prisen ved beslutningen – kun stærke par med hans naboer nu, 🤝 (ikke ⚠ – det er ingen afgift)
-    m.strong?.length ? h('div', { class: 'muted', id: 'list-chem' }, `🤝 Stærkt samspil med ${m.strong.map((x) => `#${x.mate.shirtNumber} ${x.mate.shortName}`).join(' og ')} – et salg bryder parret.`) : null);
+    m.saleChem ? h('div', { class: 'muted', id: 'list-chem' }, m.saleChem) : null);
   return h('div', { class: 'marketbox', id: 'card-market' }, h('h4', {}, '💰 Marked'),
     h('div', {}, `Pris: ${kr(m.price)} (offentlig værdi ${kr(publicValue(p))}${m.starter ? ' · starter: +60 %' : ' · +30 %'})`),
     h('div', { class: 'muted', id: 'buy-terms' }, `Hans løn hos dig: ${kr(m.wage)} pr. runde · du har ${kr(Math.max(0, m.room))} pr. runde til løn (budgettet – efter et salg din løn før salget) · kassen efter købet: ${kr(m.cashAfter)}`),

@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { chemScale, bandOf, BAND_WORD, readPairs, lineupPairs, weakestPair, swapChanges, bestPartner, playerPairs, gamesToSettle, pairKey,
-  CHEM_TOP, CHEM_BASE, STRANGER, neighbourPairs } from '../../public/engine/chemistry.js';
+  CHEM_TOP, CHEM_BASE, STRANGER, neighbourPairs, saleChemText } from '../../public/engine/chemistry.js';
 import { createRng } from '../../public/engine/rng.js';
 import { createLeague } from '../../public/engine/generator.js';
 import { simulateMatch } from '../../public/engine/match.js';
@@ -54,12 +54,20 @@ test('holdets par: navne, når de er entydige, ellers numrene; svageste par; byt
 
 test('spillerkortet: bedste makker kun ved "stærkt"; hans par med naboerne nu; et køb er ca. 8 kampe om at spille sig ind', () => {
   const L = createLeague(createRng(4)), t = L.teams.find((x) => !x.isBot), slots = t.tactics.lineupSlots;
-  const [i, j] = neighbourPairs(t.tactics.baseFormation).find(([a, b]) => a > 0 && b > 0);
+  const [i, j] = readPairs(t.tactics.baseFormation)[0], f = t.tactics.baseFormation, c = FORMATIONS[f];
   assert.equal(bestPartner(t, CHEM_BASE, slots[i]), null, 'på snittet: ingen bedste makker');
   t.chemistry[pairKey(slots[i], slots[j])] = [81.1, 0]; assert.equal(bestPartner(t, CHEM_BASE, slots[i]), null, 'lige under stærkt');
   t.chemistry[pairKey(slots[i], slots[j])] = [84, 0]; assert.equal(bestPartner(t, CHEM_BASE, slots[i]).mate.id, slots[j]);
   assert.ok(playerPairs(t, CHEM_BASE, slots[i]).some((x) => x.mate.id === slots[j] && x.band === 'staerkt'));
+  // QC: kun par, motoren læser, og kun naboer nu – et stærkt angriberpar eller en tidligere nabo er ingen "bedste makker"
+  const st = neighbourPairs(f).find(([a, b]) => c[a].r === 'ST' && c[b].r === 'ST');
+  if (st) { t.chemistry[pairKey(slots[st[0]], slots[st[1]])] = [90, 0]; assert.equal(bestPartner(t, CHEM_BASE, slots[st[0]]), null, 'ST-ST stærkt: ingen makker'); }
   const bench = t.squad.find((p) => !slots.includes(p.id));
+  t.chemistry[pairKey(slots[i], bench.id)] = [90, 0];
+  assert.equal(bestPartner(t, CHEM_BASE, slots[i]).mate.id, slots[j], 'en stærk tidligere nabo (nu på bænken) tæller ikke');
+  assert.equal(bestPartner(t, CHEM_BASE, bench.id), null, 'bænk: ingen makker trods stærkt par');
+  assert.equal(saleChemText(t, CHEM_BASE, slots[i]), `🤝 Stærkt samspil med #${t.squad.find((p) => p.id === slots[j]).shirtNumber} ${t.squad.find((p) => p.id === slots[j]).shortName} – et salg bryder parret.`);
+  assert.equal(saleChemText(t, CHEM_BASE, bench.id), null);
   assert.deepEqual(playerPairs(t, CHEM_BASE, bench.id), [], 'bænk: ingen naboer');
   assert.equal(gamesToSettle(78), 8); assert.ok(gamesToSettle(82) >= gamesToSettle(78));
 });

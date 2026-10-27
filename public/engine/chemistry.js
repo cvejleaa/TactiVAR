@@ -190,15 +190,15 @@ export function swapChanges(before, after) {
 }
 // En spillers par med hans naboer i opstillingen lige nu (bænk: ingen).
 export const playerPairs = (team, ref, pid) => lineupPairs(team, ref).filter((x) => x.a.id === pid || x.b.id === pid).map((x) => ({ ...x, mate: x.a.id === pid ? x.b : x.a }));
-// Bedste makker: kun når parret er stærkt (QC: ellers fik næsten alle en "bedste makker").
+// Bedste makker: kun når parret er stærkt (QC: ellers fik næsten alle en "bedste makker") – og kun blandt hans par med naboerne nu,
+// som stregerne og kortets naboliste (QC: ellers kunne angriberparret eller en tidligere nabo stå som makker uden virkning).
 export function bestPartner(team, ref, pid) {
-  const byId = new Map(team.squad.map((p) => [p.id, p])); let best = null;
-  for (const [k, [v]] of Object.entries(team.chemistry ?? {})) {
-    const [a, b] = k.split('|'); if (a !== pid && b !== pid) continue;
-    const mate = byId.get(a === pid ? b : a);
-    if (mate && bandOf(v, ref) === 'staerkt' && (!best || v > best.v)) best = { mate, v };
-  }
-  return best;
+  return playerPairs(team, ref, pid).filter((x) => x.band === 'staerkt').sort((x, y) => y.v - x.v)[0] ?? null;
+}
+// Salgslinjen (kortet og Klub – ét sted, QC): hans stærke par med naboerne nu; null uden.
+export function saleChemText(team, ref, pid) {
+  const st = playerPairs(team, ref, pid).filter((x) => x.band === 'staerkt');
+  return st.length ? `🤝 Stærkt samspil med ${st.map((x) => `#${x.mate.shirtNumber} ${x.mate.shortName}`).join(' og ')} – et salg bryder parret.` : null;
 }
 // Kampe fra fremmede til "spillet sammen" for en fast mand ved siden af de samme (købelinjen – regnet, ikke skrevet fast; QC).
 export function gamesToSettle(ref) {

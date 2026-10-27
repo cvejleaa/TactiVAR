@@ -7,7 +7,7 @@ import { placesBefore } from '../engine/season.js';
 import { windowOf, marketInfo, wageCap, wageRoom, needsYouth, wageFreed, saleBlock, YOUTH_WAGE, SALES_PER_WINDOW } from '../engine/transfers.js';
 import { TEAM_PUBLIC_FIELDS } from '../engine/visibility.js';
 import { SEASON_ROUNDS, seasonRoundOf } from '../engine/schedule.js';
-import { playerPairs, chemRefOf, gamesToSettle } from '../engine/chemistry.js';
+import { saleChemText, chemRefOf, gamesToSettle } from '../engine/chemistry.js';
 
 // Dine salg tilbage i vinduet (samme tæller som transfers.js sellBlock)
 const salesLeft = (league, team) => { const w = windowOf(league); return SALES_PER_WINDOW - (w != null && league.windowSales?.w === w ? league.windowSales.n?.[team.id] ?? 0 : 0); };
@@ -98,7 +98,7 @@ export function renderMarket({ league, team, playing, onAccept, onDecline, onUnl
         h('button', { class: 'mini linklike', onclick: () => onUnlist(p.id) }, 'Fjern fra listen'),
         w != null && !block ? h('div', { class: 'muted market-gain' }, `${o ? 'Salg' : 'Salg eller fritstilling (uden betaling – kan ikke fortrydes)'} ${gain}.`) : null,
         // Samspil (v3.24.0): samme linje som på kortet ved "Til salg" – kun stærke par med hans naboer nu
-        (() => { const st = playerPairs(team, chemRefOf(league), p.id).filter((x) => x.band === 'staerkt'); return st.length ? h('div', { class: 'muted market-chem' }, `🤝 Stærkt samspil med ${st.map((x) => `#${x.mate.shirtNumber} ${x.mate.shortName}`).join(' og ')} – et salg bryder parret.`) : null; })());
+        (() => { const t = saleChemText(team, chemRefOf(league), p.id); return t ? h('div', { class: 'muted market-chem' }, t) : null; })());
     }) : h('p', { class: 'muted', id: 'market-empty' }, 'Ingen. Sæt en spiller til salg på hans spillerkort (dit hold).'),
     w != null && onBuy ? renderForSale(league, team, onBuy, onLine, line, msg) : null);
 }
