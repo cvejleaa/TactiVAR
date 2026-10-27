@@ -125,3 +125,23 @@ export function cleanChemistry(chem, ids) {
   }).sort((x, y) => y[1][0] - x[1][0]).slice(0, PAIR_CAP);
   return ok.length ? Object.fromEntries(ok) : null;   // ingen gyldige par: seedes igen (QC – ellers var hele holdet tavst fremmede)
 }
+
+// ---------- Virkningen i kampene (v3.24.0) ----------
+// Skalaen omkring ligaens snit (ref = chemRefOf): fremmede (30) = −1, et fast par i ligevægt (CHEM_TOP ≈ 86) = +1 – så en fast
+// kerne kan mærkes lige så meget som et nyt køb koster (QC: nævneren ref − 30 under, CHEM_TOP − ref over). ref ≥ CHEM_TOP: kun ned.
+export const CHEM_TOP = Math.round(((100 * K_GAIN + STRANGER * LEAK) / (K_GAIN + LEAK)) * 10) / 10;   // 86,0
+export function chemScale(v, ref) {
+  if (v >= ref) return ref >= CHEM_TOP ? 0 : Math.min(1, (v - ref) / (CHEM_TOP - ref));
+  return -Math.min(1, (ref - v) / Math.max(1, ref - STRANGER));
+}
+// En spillers samspil på sin plads lige nu: middel over hans nabopar blandt de spillere, der står på banen (starters i slot-orden).
+export function slotChem(team, starters, formation, slot) {
+  if (!(slot > 0)) return null;
+  const vals = [];
+  for (const [i, j] of neighbourPairs(formation)) {
+    if (i !== slot && j !== slot) continue;
+    const o = starters[i === slot ? j : i];
+    if (o) vals.push(chemOf(team, starters[slot].id, o.id));
+  }
+  return vals.length ? vals.reduce((x, y) => x + y, 0) / vals.length : null;
+}
