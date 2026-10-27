@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRng } from '../../public/engine/rng.js';
 import { createLeague } from '../../public/engine/generator.js';
-import { setListed, acceptOffer, releasePlayer, buyPlayer, marketInfo, wageCap, wageRoom, openWindow, needsYouth, SALES_PER_WINDOW } from '../../public/engine/transfers.js';
+import { setListed, acceptOffer, releasePlayer, buyPlayer, marketInfo, wageCap, wageRoom, openWindow, needsYouth, wageFreed, saleBlock, YOUTH_WAGE, SALES_PER_WINDOW } from '../../public/engine/transfers.js';
 import { publicWage, weeklyWages, wageBudget, LINE_MIN } from '../../public/engine/career.js';
 
 const fresh = (s = 8) => createLeague(createRng(s));
@@ -90,4 +90,28 @@ test('needsYouth: over 18 og over kædens minimum kommer ingen ungdomsspiller', 
   const n = me.squad.length, p = reserve(me, 'MID');
   assert.equal(releasePlayer(L, me, p.id), null);
   assert.equal(me.squad.length, n - 1, 'ingen ungdomsspiller ved 19');
+});
+
+test('"frigør X" er netto (QC): ved 18 hans løn minus akademispillerens – præcis det, loftet giver plads til; YOUTH_WAGE = den nye spillers løn', () => {
+  const L = fresh(), me = own(L); me.cashBalance = 50000000; overBy(me, 200000);
+  const p = me.squad.filter((x) => x.line !== 'GK' && x !== me.squad[1]).sort((a, b) => b.weeklyWage - a.weeklyWage)[0];
+  const freed = wageFreed(me, p), w0 = weeklyWages(me);
+  assert.equal(freed, p.weeklyWage - YOUTH_WAGE); assert.ok(YOUTH_WAGE > 0);
+  setListed(L, me, p.id, true); assert.equal(acceptOffer(L, me, p.id), null);
+  const y = me.squad.find((x) => x.id.startsWith('plr_y'));
+  assert.equal(y.weeklyWage, YOUTH_WAGE, 'akademispillerens løn = YOUTH_WAGE');
+  assert.equal(w0 - weeklyWages(me), freed, 'lønnen faldt med netop det viste');
+  assert.equal(wageRoom(L, me), freed, 'loftet giver plads til netop det viste');
+  // Over 18: hele lønnen
+  me.squad.push({ ...structuredClone(y), id: 'x9', shortName: 'X. X9', shirtNumber: 88 });
+  const q = me.squad.find((x) => x.line === 'ATT' && x.id !== 'x9');
+  assert.equal(wageFreed(me, q), q.weeklyWage);
+});
+
+test('saleBlock: efter 2 salg siger den hvorfor (Sælg skjules, "Intet bud"-teksten er ikke længere usand)', () => {
+  const L = fresh(), me = own(L);
+  const [a, b, c] = me.squad.filter((p) => !me.tactics.lineupSlots.includes(p.id) && p.line !== 'GK').slice(0, 3);
+  assert.equal(saleBlock(L, me, c), null);
+  releasePlayer(L, me, a.id); releasePlayer(L, me, b.id);
+  assert.match(saleBlock(L, me, c), /solgt 2/);
 });

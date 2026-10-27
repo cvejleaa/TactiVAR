@@ -417,7 +417,7 @@ function renderNow() {
       // v3.21.1: beskeden ved listen (QC) – og den nye akademispiller ved navn, hvis han kom ind
       onAccept: (id) => { view.marketMsg = transferMsg(id, () => acceptOffer(league, mine, id), 'solgt'); change(() => {}); },
       onRelease: (id) => { view.marketMsg = transferMsg(id, () => releasePlayer(league, mine, id), 'fritstillet'); change(() => {}); },
-      onDecline: (id) => change(() => declineOffer(league, mine, id)), onUnlist: (id) => change(() => setListed(league, mine, id, false)),
+      onDecline: (id) => change(() => { view.marketMsg = ''; declineOffer(league, mine, id); }), onUnlist: (id) => change(() => { view.marketMsg = ''; setListed(league, mine, id, false); }),
       line: view.marketLine ?? 'all', onLine: (v) => { view.marketLine = v; view.marketMsg = ''; render(); }, msg: view.marketMsg ?? '',
       // Bekræftelsen står ved listen (QC: beskeden øverst var uden for skærmen, når man stod nede i listen)
       onBuy: (id) => { const name = league.teams.flatMap((t) => t.squad).find((p) => p.id === id)?.shortName; const err = buyPlayer(league, mine, id); view.marketMsg = err ? `💰 ${err}` : `💰 ${name} er købt og står nu i din trup.`; change(() => {}); } })],

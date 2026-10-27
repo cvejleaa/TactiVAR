@@ -131,6 +131,12 @@ export function acceptOffer(league, team, playerId) {
   team.listed = (team.listed ?? []).filter((id) => id !== playerId);
   return null;
 }
+// Akademispillerens ugeløn: 1★ (ubeprøvet ungdom) · alder 16–18 (ageFactor 1,3) – den samme for alle (career.js publicWage)
+export const YOUTH_WAGE = publicWage({ roleTier: 'YOUTH', age: 17, careerGames: 0 });
+// Hvad et salg/en fritstilling sparer i ugeløn (QC: netto – akademispillerens løn trækkes fra, som i wageCap; kan være ≤ 0)
+export const wageFreed = (team, p) => (p.weeklyWage ?? 0) - (needsYouth(team, p) ? YOUTH_WAGE : 0);
+// Hvorfor din spiller ikke kan sælges/fritstilles nu (null = han kan) – samme vagt som bud, Sælg og Fritstil
+export const saleBlock = (league, team, p) => sellBlock(league, team, p, windowOf(league));
 // Kommer der en ungdomsspiller ind, hvis han går? (truppen på 18 eller kæden på sit minimum) – vises FØR klikket (QC/Spilfører)
 export const needsYouth = (team, p) => team.squad.length - 1 < SQUAD_MIN || lineCount(team, p.line) - 1 < LINE_MIN[p.line];
 // Fritstil (v3.21.1, Spilfører/QC: udvejen, når ingen klub byder): gratis, tæller som et salg i vinduet, og en ungdomsspiller kommer

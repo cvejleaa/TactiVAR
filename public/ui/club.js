@@ -4,10 +4,12 @@ import { h } from './dom.js';
 import { kr, LINE, POSITION, starsEl } from './labels.js';
 import { weeklyWages, wagesPerRound, wageBudget, wageRoomPerRound, attendance, formOf, TV_PER_ROUND, TICKET_PRICE, GATE_MAX, PRIZE, ROUNDS_PER_WEEK, publicValue, publicWage, starsForValue } from '../engine/career.js';
 import { placesBefore } from '../engine/season.js';
-import { windowOf, marketInfo, wageCap, wageRoom, needsYouth, SALES_PER_WINDOW } from '../engine/transfers.js';
+import { windowOf, marketInfo, wageCap, wageRoom, needsYouth, wageFreed, saleBlock, YOUTH_WAGE, SALES_PER_WINDOW } from '../engine/transfers.js';
 import { TEAM_PUBLIC_FIELDS } from '../engine/visibility.js';
 import { SEASON_ROUNDS, seasonRoundOf } from '../engine/schedule.js';
 
+// Dine salg tilbage i vinduet (samme tæller som transfers.js sellBlock)
+const salesLeft = (league, team) => { const w = windowOf(league); return SALES_PER_WINDOW - (w != null && league.windowSales?.w === w ? league.windowSales.n?.[team.id] ?? 0 : 0); };
 const net = (e) => (e.gate ?? 0) + (e.tv ?? 0) + (e.wages ?? 0) + (e.prize ?? 0) + (e.transfers ?? 0);
 const signed = (n) => (n > 0 ? '+' : n < 0 ? '−' : '') + kr(Math.abs(n));
 // Under afspilningen er runden bogført, men kampene ikke vist: kassen og regnskabet vises som før runden (præmien ville afsløre slutstillingen)
@@ -46,7 +48,7 @@ export function renderClub({ league, team, playing }) {
     h('table', { class: 'club-sum' }, h('tbody', {},
       row('Klubkasse', h('strong', { class: cash < 0 ? 'neg' : '' }, kr(cash)), 'club-cash'),
       row('Løn', `${kr(wagesPerRound(team))} pr. runde (${kr(weeklyWages(team))} pr. uge – 1 uge = ${ROUNDS_PER_WEEK} runder)`, 'club-wages'),
-      row('Lønbudget', room >= 0 ? `Du kan bruge ${kr(room)} mere pr. runde i løn` : capRoom > 0
+      row('Lønbudget', room >= 0 ? `Du kan bruge ${kr(Math.max(room, capRoom))} mere pr. runde i løn${capRoom > room ? ' (din løn før salget i vinduet)' : ''}` : capRoom > 0
         ? `Du er ${kr(-room)} over budgettet pr. runde – efter dit salg i vinduet må du dog købe for op til ${kr(capRoom)} pr. runde i løn (lønnen bliver ikke højere end før salget)`
         : `Du er ${kr(-room)} over budgettet pr. runde – sælg eller fritstil en spiller i et åbent vindue, så kan du købe for den løn, du sparer`, 'club-room'),
       row('Indtægter pr. runde', `TV ${kr(TV_PER_ROUND)} · billetter i hjemmekampe (op til ${GATE_MAX.toLocaleString('da-DK')} tilskuere à ${TICKET_PRICE} kr.)`),
@@ -72,7 +74,7 @@ export function renderMarket({ league, team, playing, onAccept, onDecline, onUnl
   const w = windowOf(league), offers = (league.offers ?? []).filter((o) => o.from === team.id);
   const listed = (team.listed ?? []).map((id) => team.squad.find((p) => p.id === id)).filter(Boolean);
   const teamName = (id) => league.teams.find((t) => t.id === id)?.name ?? '?';
-  const sold = w != null && league.windowSales?.w === w ? league.windowSales.n?.[team.id] ?? 0 : 0;
+  const sold = SALES_PER_WINDOW - salesLeft(league, team);
   return h('div', { class: 'panel market', id: 'market' },
     h('h3', {}, '🔁 Transfermarked'),
     h('p', { id: 'window-state', class: w != null ? 'open' : 'muted' }, w != null
@@ -82,14 +84,18 @@ export function renderMarket({ league, team, playing, onAccept, onDecline, onUnl
     // v3.21.1 (QC/Spilfører): hvad et salg giver, FØR klikket – lønnen, der frigøres, og om en ungdomsspiller kommer ind
     w != null ? h('div', { class: 'muted', id: 'sales-left' }, `Salg i vinduet: ${sold} af ${SALES_PER_WINDOW}${sold >= SALES_PER_WINDOW ? ' – næste salg i næste vindue' : ''}.`) : null,
     listed.length ? listed.map((p) => {
-      const o = offers.find((x) => x.playerId === p.id), youth = needsYouth(team, p);
-      const gain = `frigør ${kr(Math.round((p.weeklyWage ?? 0) / 3))} pr. runde i løn${youth ? ' – en ungdomsspiller kommer ind fra akademiet i samme kæde (1★, lav løn)' : ''}`;
+      const o = offers.find((x) => x.playerId === p.id), youth = needsYouth(team, p), freed = Math.round(wageFreed(team, p) / 3), block = w != null ? saleBlock(league, team, p) : null;
+      // Netto (QC): akademispillerens løn trækkes fra – samme tal som købsloftet
+      const gain = youth ? `${freed > 0 ? `frigør ${kr(freed)} pr. runde i løn` : 'frigør ingen løn'} – en ungdomsspiller kommer ind fra akademiet i samme kæde (1★, ${kr(Math.round(YOUTH_WAGE / 3))} pr. runde)`
+        : `frigør ${kr(freed)} pr. runde i løn`;
       return h('div', { class: 'market-row', dataset: { pid: p.id } }, `#${p.shirtNumber} ${p.shortName} (${kr(publicValue(p))}) `,
-        o ? [h('strong', {}, `Bud fra ${teamName(o.to)}: ${kr(o.price)} `), h('button', { class: 'mini offer-accept', onclick: () => onAccept(p.id) }, 'Sælg'), h('button', { class: 'mini offer-decline', onclick: () => onDecline(p.id) }, 'Afvis')]
+        block ? h('span', { class: 'muted' }, `${block} `)
+          : o ? [h('strong', {}, `Bud fra ${teamName(o.to)}: ${kr(o.price)} `), h('button', { class: 'mini offer-accept', onclick: () => onAccept(p.id) }, 'Sælg'), h('button', { class: 'mini offer-decline', onclick: () => onDecline(p.id) }, 'Afvis')]
           : h('span', { class: 'muted' }, w != null ? 'Intet bud – ingen klub har råd og plads lige nu. ' : 'Venter på vinduet. '),
-        w != null && onRelease && sold < SALES_PER_WINDOW ? h('button', { class: 'mini release', title: 'Gratis: han forlader klubben uden betaling – tæller som et salg i vinduet', onclick: () => onRelease(p.id) }, 'Fritstil (gratis)') : null,
+        // Fritstil kun uden bud (QC: uigenkaldelig, ikke ved siden af Sælg) og kun når et salg er muligt
+        w != null && onRelease && !o && !block ? h('button', { class: 'mini release', onclick: () => onRelease(p.id) }, 'Fritstil (gratis)') : null,
         h('button', { class: 'mini linklike', onclick: () => onUnlist(p.id) }, 'Fjern fra listen'),
-        w != null ? h('div', { class: 'muted market-gain' }, `Salg eller fritstilling ${gain}.`) : null);
+        w != null && !block ? h('div', { class: 'muted market-gain' }, `${o ? 'Salg' : 'Salg eller fritstilling (uden betaling – kan ikke fortrydes)'} ${gain}.`) : null);
     }) : h('p', { class: 'muted', id: 'market-empty' }, 'Ingen. Sæt en spiller til salg på hans spillerkort (dit hold).'),
     w != null && onBuy ? renderForSale(league, team, onBuy, onLine, line, msg) : null);
 }
@@ -112,7 +118,7 @@ function renderForSale(league, me, onBuy, onLine, line, msg = '') {
         h('td', {}, h('button', { class: 'mini buy-row', onclick: () => onBuy(p.id) }, '💰 Køb')),
         h('td', {}, `#${p.shirtNumber} ${p.shortName}`), h('td', { class: 'num' }, kr(m.price)), h('td', {}, `${LINE[p.line]} · ${POSITION[p.position] ?? ''}`), h('td', { class: 'num' }, p.age),
         h('td', {}, starsEl(p.publicStars)), h('td', { class: 'wide' }, t.name), h('td', { class: 'num wide' }, kr(Math.round(publicWage(p) / 3)))))))) :
-      h('p', { class: 'muted', id: 'for-sale-empty' }, line === 'all' ? (wageRoom(league, me) <= 0 ? 'Ingen lige nu – du er over lønbudgettet: sæt en spiller til salg eller fritstil ham, så kan du købe for den løn, du sparer (se Lønbudget øverst i 💼 Klub).' : 'Ingen lige nu – kassen eller lønbudgettet er for lille (se øverst i 💼 Klub), eller klubberne har solgt deres 2 i dette vindue.') : 'Ingen i denne kæde lige nu – prøv "Alle".'));
+      h('p', { class: 'muted', id: 'for-sale-empty' }, line === 'all' ? (wageRoom(league, me) <= 0 ? (salesLeft(league, me) > 0 ? 'Ingen lige nu – du er over lønbudgettet: sæt en spiller til salg eller fritstil ham, så kan du købe for den løn, du sparer (se Lønbudget øverst i 💼 Klub).' : `Ingen lige nu – du er over lønbudgettet og har brugt dine ${SALES_PER_WINDOW} salg i vinduet.`) : 'Ingen lige nu – kassen eller lønbudgettet er for lille (se øverst i 💼 Klub), eller klubberne har solgt deres 2 i dette vindue.') : 'Ingen i denne kæde lige nu – prøv "Alle".'));
 }
 
 // Ligaens transfers (offentligt): de seneste skifter og fritstillinger
