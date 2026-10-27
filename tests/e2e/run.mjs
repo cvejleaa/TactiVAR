@@ -968,6 +968,30 @@ try {
       await relRow.locator('.release').click();
       const relAfter = await g.evaluate((id) => { const d = JSON.parse(localStorage.getItem('tactivar_save')), me = d.league.teams.find((t) => !t.isBot); return { n: me.squad.length, gone: !me.squad.some((p) => p.id === id), log: d.league.transferLog.some((e) => e.id === id && e.kind === 'release') }; }, rel.id);
       check('Transfer: "Fritstil (gratis)" – han er væk (gemt, i transferlisten som fritstillet), beskeden står ved listen, og salget tæller', relAfter.gone && relAfter.log && relAfter.n === rel.n - 1 && (await g.textContent('#for-sale-msg')).includes(`${rel.name} er fritstillet`) && (await g.textContent('#sales-left')).includes('1 af 2'), JSON.stringify(relAfter));
+      // v3.21.1 (Test Manager): ved 18 henter en fritstilling en akademispiller – beskeden nævner ham ved navn (" og starter i hans plads" kræver, at han er bedst i kæden – kan ikke styres her)
+      const acad = await g.evaluate(() => {
+        const d = JSON.parse(localStorage.getItem('tactivar_save')), me = d.league.teams.find((t) => !t.isBot), MIN = { GK: 2, DEF: 6, MID: 6, ATT: 3 }, cnt = (l) => me.squad.filter((x) => x.line === l).length;
+        for (const x of me.squad.slice().reverse()) if (me.squad.length > 18 && !me.tactics.lineupSlots.includes(x.id) && cnt(x.line) > MIN[x.line]) me.squad = me.squad.filter((y) => y !== x);
+        const ids = new Set(me.squad.map((x) => x.id)), s = me.squad.find((x) => x.line === 'MID' && me.tactics.lineupSlots.includes(x.id));
+        me.matchBench = (me.matchBench ?? []).filter((id) => ids.has(id)); me.listed = [s.id];
+        localStorage.setItem('tactivar_save', JSON.stringify(d)); return { id: s.id, name: s.shortName, n: me.squad.length, ids: [...ids] };
+      });
+      await g.reload(); await g.waitForSelector('body[data-klar="ja"]');
+      await tab('klub');
+      await g.locator(`.market-row[data-pid="${acad.id}"] .release`).click();
+      const acadAfter = await g.evaluate((old) => { const me = JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((t) => !t.isBot), y = me.squad.find((x) => !old.includes(x.id)); return { n: me.squad.length, y: y && { name: y.shortName, line: y.line, age: y.age, no: y.shirtNumber } }; }, acad.ids);
+      const acadMsg = await g.textContent('#for-sale-msg');
+      check('Transfer: Fritstil af en starter ved 18 -> beskeden nævner akademispilleren ved nummer, navn og alder ("kommer ind fra akademiet"), han er i samme kæde – og truppen er stadig 18',
+        acad.n === 18 && acadAfter.n === 18 && acadAfter.y?.line === 'MID' && acadMsg === `🔁 ${acad.name} er fritstillet. #${acadAfter.y.no} ${acadAfter.y.name} (${acadAfter.y.age} år) kommer ind fra akademiet.`, JSON.stringify({ acad: { ...acad, ids: undefined }, acadAfter, acadMsg }));
+      // v3.21.1 (Test Manager): kortets "du har X pr. runde til løn" følger LOFTET (lønnen før vinduets første salg), ikke budgettet – ledningen er i app.js
+      // (uden et salg over budgettet er de to tal ens, så loftet sættes direkte: lønnen + 5.000.000 -> 1.666.667 kr. pr. runde, langt over budgettet)
+      await g.evaluate(() => { const d = JSON.parse(localStorage.getItem('tactivar_save')), me = d.league.teams.find((t) => !t.isBot); (d.league.windowSales.before ||= {})[me.id] = me.squad.reduce((a, p) => a + (p.weeklyWage ?? 0), 0) + 5000000; localStorage.setItem('tactivar_save', JSON.stringify(d)); });
+      await g.reload(); await g.waitForSelector('body[data-klar="ja"]');
+      await tab('trup');
+      await g.selectOption('#team-select', String(buyable.i));
+      await g.locator('#matrix tbody tr').first().click();
+      const terms = await g.textContent('#buy-terms');
+      check('Transfer: kortets "du har … pr. runde til løn" er loftet efter salget (lønnen før salget), ikke budgettet', terms.includes(`du har ${(1666667).toLocaleString('da-DK')} kr. pr. runde til løn`), terms);
       await g.selectOption('#team-select', '0');
     } else check('Transfer: en spiller kan købes ved sæsonslut (forudsætning)', false);
     await tab('liga');
