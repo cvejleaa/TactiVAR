@@ -19,3 +19,10 @@ fund der er rettet (så du ikke finder dem igen), hvad brugeren har valgt fra, o
   RW 0,33 mål/90 vs LW 0,07, RWB 0,067 vs LWB 0,008.
 - Backlog #3 (skud uden oplægger) ses også ved "virvar foran mål"/"returbold": skytten alene ved målet, alle andre 30 m ude (R4, R8).
 - Gule kort: 1872 af ~1950 begrundes "for et frispark".
+
+## Plan-gennemgang samspil (2026-10-27, arkitektplan PR-B)
+- Offside-fælden er en HANDICAP i dag: den udløses kun efter vundet pres (match.js:1325) og erstatter erobring+kontra.
+  A/B 1200 kampe (scratchpad chem-measure.mjs, motor-kopi med TRAPP/BUILDB-globals): fælde OFF net +0,405, p=0,33 +0,333,
+  p=0,45 +0,289, p=0,53 +0,207 (kontramål for 0,343/0,230/0,177/0,147; mål imod uændret ≈1,25–1,29). Højere fælde-p = dårligere.
+- Opbygnings-bonus er stejl: build −1,8 → buildWon 52,7 %, net −0,012; +1,2 → 75,9 %, net +0,333 (basis 68 %, +0,289).
+- Anbefalet: flyt fælde-hook'en til løbsduellens markør (match.js:1491, centrale løb) og skru BUILD_CHEM ned til ≈1.
