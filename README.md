@@ -74,7 +74,7 @@ roller i projektet. Typiske årsager:
 | `.claude/agents/quality-control-manager.md` | projektets fælder, invarianter og delte flader |
 | `.claude/agents/test-manager.md` | forretningskritiske områder og test-lagene |
 | `.claude/agents/arkitekt.md` | projektets grundform (apps/miljøer, spejlede filer) og hvor adgang afgøres |
-| `.claude/agents/domaene-raadgiver.md` | HELE rollen — omdøb den gerne til noget produktnært (i spillet hed den Spilfører) |
+| `.claude/agents/spilfoerer-*.md` | de fire Spilførere (motor, økonomi, klub, UI) – udfyldt for TactiVAR; backloggen i `docs/backlog.md` |
 | `.claude/commands/eftersyn.md` | hvad koster penge (punkt 1), og hvad en rolig periode er |
 
 Skabelonen må gerne starte uudfyldt — rollerne virker fra dag ét og bliver
