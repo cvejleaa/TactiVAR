@@ -11,3 +11,8 @@ fund der er rettet (så du ikke finder dem igen), hvad brugeren har valgt fra, o
    20–23: 1,23; ≤19: 4,20. I sæsonens Trup: 10 af 18 "tæt på sit loft".
 4. Ingen sæsonmål/forventning; præmiestigen 1.–8. = 1,4 mio. ≈ 2,5 runders løn (551.000/runde efter +31 %).
 Samspil (backlog 1) er allerede i backloggen – foreslå ikke igen.
+
+## Plan-gennemgang samspil (arkitektplan PR-A/PR-B, 2026-10-27)
+Fund: lineær GAIN 6 + loft 100 + seed 60 → fast par mætter efter 7 kampe (halv sæson); rotation (7 af 14 kampe) ender
+OGSÅ på 100 → stabilitet belønnes ikke over sæsoner. Foreslog aftagende vækst `chem += k·(100−chem)·min/90`, k≈0,12
+(0→60: 8 kampe; 60→90: 11; 60→99: 29; rotation 84 vs fast 93 efter en sæson). Plus købs-hint "ny mand, samspil 0".
