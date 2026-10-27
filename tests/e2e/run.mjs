@@ -600,6 +600,55 @@ try {
   // v3.16.3: 📍 i et gem fra før afspilningen (v3.12.1–v3.15: øjebliksbilleder, intet spor) – sporet fjernes fra det gemte spil,
   // siden genindlæses, og 📍-flowet køres i den rigtige app; bagefter lægges det oprindelige gem tilbage.
   const savedWithTrace = await g.evaluate(() => localStorage.getItem('tactivar_save'));
+  // TM v3.22.0: et spor fra før Kampens tal (v3.14–v3.21: heat map, men ingen trace.acts) viser forklaringen – ikke 0 erobringer / 0 bolde tabt
+  { await g.evaluate(() => { const d = JSON.parse(localStorage.getItem('tactivar_save')); for (const m of d.league.lastRound.matches) delete m.trace.acts; localStorage.setItem('tactivar_save', JSON.stringify(d)); });
+    await reload(); await tab('kamp');
+    await g.locator('.ratings tr[title^="Vis hans heat map"]').nth(5).click(); await g.waitForSelector('#match-numbers');
+    const old = await g.evaluate(() => ({ text: document.querySelector('#match-numbers').textContent, n: document.querySelectorAll('#match-numbers').length, balls: document.querySelectorAll('#mn-ball, #mn-combos').length }));
+    check('Kampens tal: et spor uden handlingslog (før v3.22.0) forklarer, at tallene findes fra v3.22.0 – ingen 0-tal', old.n === 1 && old.balls === 0 && old.text === '📊 Kampens tal findes for kampe spillet fra v3.22.0.', JSON.stringify(old));
+    // TM v3.22.0: visningen af erobringer, bolde tabt, offside og kombinationer bevist for HVER spiller på dit ark. Spillets egne tal er
+    // tilfældige pr. kørsel (randomSeed) og rummer ofte kun 1–2 kombinationer – så en kendt handlingslog lægges i det gemte spor og
+    // genindlæses: alle seks arter, begge retninger, alle tre udfald, mål ikke i tidsrækkefølge, modstanderens poster (tabt/offside) og
+    // en modstander-kombination, der ikke må tælles. Forventningen er skrevet med egne bogstavelige tekster (ikke heatmap.js' COMBO_LABEL).
+    // Mutation: byt pil, udfald, art, medspiller, minut, rækkefølge, offside/tabt eller side → rød.
+    { await g.evaluate(() => {
+        const d = JSON.parse(localStorage.getItem('tactivar_save')), me = d.league.teams.find((t) => !t.isBot).id;
+        const m = d.league.lastRound.matches.find((x) => x.homeId === me || x.awayId === me), mine = m.homeId === me ? 'h' : 'a', opp = mine === 'h' ? 'a' : 'h';
+        const P = (mine === 'h' ? m.ratings.home : m.ratings.away).map((e) => e.playerId), Q = (mine === 'h' ? m.ratings.away : m.ratings.home).map((e) => e.playerId);
+        m.trace.acts = [[50, 'corner', mine, P[1], P[2], 0], [12, 'cb', mine, P[3], P[1], 2], [30, 'cross', mine, P[2], P[4], 1], [75, 'long', mine, P[4], P[1], 2], [20, 'run', mine, P[5], P[1], 1], [60, 'fk', mine, P[1], P[6], 0],
+          [10, 'press', mine, P[1], Q[1], null], [11, 'trap', mine, P[2], Q[2], null], [13, 'flank', mine, P[3], Q[3], null], [14, 'tackle', mine, P[3], Q[3], null],
+          [15, 'press', opp, Q[1], P[1], null], [16, 'trap', opp, Q[2], P[1], null], [17, 'flank', opp, Q[3], P[1], null], [18, 'tackle', opp, Q[4], P[5], null], [19, 'press', opp, Q[1], P[2], null],
+          [40, 'cross', opp, Q[1], Q[2], 2]];
+        localStorage.setItem('tactivar_save', JSON.stringify(d)); });
+      await reload(); await tab('kamp');
+      const labels = { cb: 'cutback', run: 'løb og aflevering', cross: 'indlæg', long: 'lang bold', corner: 'hjørnespark', fk: 'frisparksindlæg' }, outs = { 2: '⚽ mål', 1: 'afslutning, ikke mål', 0: 'clearet' };
+      const exp = await g.evaluate(async ({ labels, outs }) => {
+        const { evMin, fmtMin, tickClock } = await import('./engine/clock.js');   // referatets ur: linjen i tick'et, der nævner modtageren
+        const d = JSON.parse(localStorage.getItem('tactivar_save')), me = d.league.teams.find((t) => !t.isBot).id;
+        const m = d.league.lastRound.matches.find((x) => x.homeId === me || x.awayId === me), side = m.homeId === me ? 'h' : 'a', list = side === 'h' ? m.ratings.home : m.ratings.away;
+        const nm = (id) => { const r = list.find((e) => e.playerId === id); return `#${r.shirtNumber} ${r.shortName}`; };
+        const plr = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+        const minOf = (t, to) => { const ev = m.events.find((x) => x.min === t && typeof x.text === 'string' && x.text.includes(nm(to))); return ev ? evMin(ev) : fmtMin(tickClock(t / 3, m.stoppage ?? null)); };
+        return list.map((e) => {
+          const A = m.trace.acts, wins = A.filter((x) => ['press', 'trap', 'flank', 'tackle'].includes(x[1]) && x[2] === side && x[3] === e.playerId).length;
+          const lost = A.filter((x) => ['press', 'flank', 'tackle'].includes(x[1]) && x[2] !== side && x[4] === e.playerId).length;
+          const off = A.filter((x) => x[1] === 'trap' && x[2] !== side && x[4] === e.playerId).length;
+          const combos = A.filter((x) => labels[x[1]] && x[2] === side && (x[3] === e.playerId || x[4] === e.playerId))
+            .sort((p, q) => p[0] - q[0]).map((x) => `${x[3] === e.playerId ? `til ${nm(x[4])}` : `fra ${nm(x[3])}`}: ${labels[x[1]]}, ${minOf(x[0], x[4])} – ${outs[x[5]]}`);
+          return { nr: e.shirtNumber, ball: `${plr(wins, 'erobring', 'erobringer')} · ${plr(lost, 'bold tabt', 'bolde tabt')}${off ? ` · fanget offside ${plr(off, 'gang', 'gange')}` : ''}`, combos: combos.length ? combos.join(' | ') : 'ingen cutbacks, indlæg, løb eller dødbolde med en medspiller i denne kamp' };
+        });
+      }, { labels, outs });
+      const bad = [];
+      for (const x of exp) {
+        await g.locator('.ratings tr[title^="Vis hans heat map"]').filter({ hasText: `#${x.nr} ` }).first().click(); await g.waitForSelector('#match-numbers');
+        const got = await g.evaluate(() => ({ ball: document.querySelector('#mn-ball').textContent.replace(/^📊 Kampens tal: /, ''), combos: document.querySelectorAll('#mn-combos li').length ? [...document.querySelectorAll('#mn-combos li')].map((li) => li.textContent).join(' | ') : document.querySelector('#mn-combos').textContent.replace(/^🤝 Samarbejde/, '') }));
+        if (got.ball !== x.ball || got.combos !== x.combos) bad.push(`#${x.nr}: ${JSON.stringify(got)} ≠ ${JSON.stringify(x)}`);
+      }
+      const all = exp.map((x) => x.ball + ' | ' + x.combos).join('\n');
+      check('Kampens tal: hver af dine spillere viser præcis sine erobringer, bolde tabt, offside og kombinationer (til/fra, medspiller, art, referatets minut, udfald) ud fra handlingsloggen',
+        bad.length === 0 && exp.length >= 11 && all.includes('fanget offside 1 gang') && all.includes('til #') && all.includes('fra #') && all.includes('afslutning, ikke mål') && all.includes('⚽ mål') && all.includes('clearet') && all.includes('ingen cutbacks'), `${bad.slice(0, 2).join(' | ')}`);
+    }
+    await g.evaluate((s) => localStorage.setItem('tactivar_save', s), savedWithTrace); }
   await g.evaluate(() => { const d = JSON.parse(localStorage.getItem('tactivar_save')); for (const m of d.league.lastRound.matches) delete m.trace; localStorage.setItem('tactivar_save', JSON.stringify(d)); });
   await reload(); await tab('kamp');
   // v3.12.1: 📍 ved mål i åbent spil viser dit holds positioner i øjeblikket på minibanen
