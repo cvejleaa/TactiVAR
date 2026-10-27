@@ -29,37 +29,35 @@ function sellBlock(league, seller, p, w) {
   if (salesOf(league, seller.id, w) >= SALES_PER_WINDOW) return `${seller.name} har solgt ${SALES_PER_WINDOW} spillere i dette vindue.`;
   return null;
 }
-// credit: din lønkredit i vinduet (wageCredit) – over budgettet må du købe, hvis lønnen ikke stiger (v3.21.1)
-function buyBlock(buyer, price, wage, credit = 0) {
+// Lønloftet for et køb (v3.21.1, brugeren: "Jeg kan ikke sælge fordi jeg kun har 18 spillere, men kan heller ikke købe fordi jeg har
+// brugt mit lønbudget … Denne måde låser mig for meget"): lønnen efter købet må højst være budgettet – ELLER din løn før vinduets
+// første salg, hvis den var højere (QC: lønnen stiger aldrig i forhold til før salget; ét tal pr. vindue, ungdommens løn er med).
+// Kun dit hold (botterne har intet loft fra salg).
+const before = (league, team, w) => (w != null && league.windowSales?.w === w && Number.isFinite(league.windowSales.before?.[team.id]) ? league.windowSales.before[team.id] : 0);
+export const wageCap = (league, team, w = windowOf(league)) => Math.max(wageBudget(team), team.isBot ? 0 : before(league, team, w));
+// Hvad du kan bruge på løn pr. uge lige nu (kan være negativ: over loftet)
+export const wageRoom = (league, team) => wageCap(league, team) - weeklyWages(team);
+function buyBlock(buyer, price, wage, cap = wageBudget(buyer)) {
   if (buyer.squad.length >= SQUAD_MAX) return `Truppen er fuld (${SQUAD_MAX} spillere).`;
   if ((buyer.cashBalance ?? 0) < 0) return 'Klubkassen er i minus – ingen køb, før den er i plus.';
   if (buyer.cashBalance < price) return 'Der er ikke penge nok i klubkassen.';
-  if (overBudget(buyer, wage) && wage > credit) return credit > 0
-    ? `Lønnen ville komme over lønbudgettet – dit salg i vinduet dækker kun ${fmtKr(credit)} kr./uge (han får ${fmtKr(wage)}).`
-    : 'Lønnen ville komme over lønbudgettet – sælg en spiller, så kan du købe for den løn, han havde.';
+  if (weeklyWages(buyer) + wage > cap) return cap > wageBudget(buyer)
+    ? 'Lønnen ville blive højere end før dit salg i vinduet.'
+    : 'Lønnen ville komme over lønbudgettet – sælg eller fritstil en spiller, så kan du købe for den løn, du sparer.';
   return null;
-}
-const overBudget = (team, wage) => weeklyWages(team) + wage > wageBudget(team);
-const fmtKr = (v) => Math.round(v).toLocaleString('da-DK');
-// Lønkreditten (v3.21.1, brugeren: "Jeg kan ikke sælge fordi jeg kun har 18 spillere, men kan heller ikke købe fordi jeg har brugt
-// mit lønbudget"): ugelønnen for dine solgte spillere i vinduet minus ungdomsspillerne, der kom ind i stedet. Over budgettet må du
-// købe for højst den løn – lønnen stiger ikke i forhold til før salget. Ligger i windowSales, så den nulstilles med vinduet.
-export const wageCredit = (league, team, w = windowOf(league)) => (w != null && league.windowSales?.w === w ? league.windowSales.credit?.[team.id] ?? 0 : 0);
-function addCredit(league, team, delta) {
-  const c = (league.windowSales.credit ||= {});
-  c[team.id] = Math.max(0, (c[team.id] ?? 0) + delta);
 }
 
 // Til kortet: prisen og om du kan købe – eller hvorfor ikke
 export function marketInfo(league, buyer, seller, p) {
   const price = askPrice(seller, p), w = windowOf(league);
-  return { price, reason: sellBlock(league, seller, p, w) ?? buyBlock(buyer, price, publicWage(p), buyer.isBot ? 0 : wageCredit(league, buyer, w)) };
+  return { price, reason: sellBlock(league, seller, p, w) ?? buyBlock(buyer, price, publicWage(p), wageCap(league, buyer, w)) };
 }
 
 // Selve skiftet: løn genforhandles, nyt nummer ved behov, regnskab hos begge, offentlig log, opstillingerne repareres
 function move(league, p, seller, buyer, price, kind = 'buy') {
   const w = windowOf(league), r = league.leagueMetadata.round, s = league.leagueMetadata.seasonNumber ?? 1;
-  const oldWage = p.weeklyWage ?? 0;
+  league.windowSales = league.windowSales?.w === w ? league.windowSales : { w, n: {} };
+  if (!seller.isBot) (league.windowSales.before ||= {})[seller.id] ??= weeklyWages(seller);   // lønnen før vinduets første salg
   seller.squad = seller.squad.filter((x) => x.id !== p.id);
   // Under 18 eller under minimum i kæden kommer en ungdomsspiller ind i samme kæde – for botterne (v3.18.1) og for dig (v3.21.1:
   // før kunne du ikke sælge ved 18, og over lønbudgettet heller ikke købe – du sad fast)
@@ -73,11 +71,10 @@ function move(league, p, seller, buyer, price, kind = 'buy') {
     bookLedger(buyer, { r, s, transfers: -price });
   }
   if (price) bookLedger(seller, { r, s, transfers: price });
-  league.windowSales = league.windowSales?.w === w ? league.windowSales : { w, n: {} };
   league.windowSales.n[seller.id] = (league.windowSales.n[seller.id] ?? 0) + 1;
-  if (!seller.isBot) addCredit(league, seller, oldWage - (youth?.weeklyWage ?? 0));
   league.transferLog = [...(league.transferLog ?? []), { s, r, id: p.id, name: p.shortName, from: seller.id, to: buyer?.id ?? null, price, kind }].slice(-TRANSFER_LOG_CAP);
   league.offers = (league.offers ?? []).filter((o) => o.playerId !== p.id);
+  return youth;
 }
 
 // En bot, der sælger under 18 eller under minimum i kæden, henter en ungdomsspiller i samme kæde (afledt rng, nyt id, unikt navn)
@@ -89,6 +86,7 @@ function refillYouth(league, team, line, key, taken = null) {
   do { id = `plr_y${league.nextPlayerSeq ?? 1}`; league.nextPlayerSeq = (league.nextPlayerSeq ?? 1) + 1; } while (ids.has(id));
   const y = generatePlayer(derivedRng('refill', key), line, 'YOUTH', freeShirt(team), league.teams.indexOf(team), used, 0, neededPosition(team, line), id);
   team.squad.push(y);
+  y.lastMove = windowOf(league);   // kan ikke sælges videre straks (QC v3.21.1: ellers en pengemaskine – sælg, ny gratis, sælg …)
   return y;
 }
 
@@ -98,9 +96,7 @@ export function buyPlayer(league, buyer, playerId) {
   if (!seller) return 'Spilleren kan ikke købes.';
   const p = seller.squad.find((x) => x.id === playerId), { price, reason } = marketInfo(league, buyer, seller, p);
   if (reason) return reason;
-  const wage = publicWage(p), useCredit = overBudget(buyer, wage);
   move(league, p, seller, buyer, price);
-  if (useCredit) addCredit(league, buyer, -wage);   // købet over budgettet bruger af kreditten
   return null;
 }
 
@@ -117,7 +113,7 @@ export function makeOffers(league, team) {
   for (const id of team.listed ?? []) {
     if ((league.offers ?? []).some((o) => o.playerId === id)) continue;
     const p = team.squad.find((x) => x.id === id);
-    if (!p || quarantined(p, w)) continue;
+    if (!p || sellBlock(league, team, p, w)) continue;   // også dine 2 salg pr. vindue (v3.21.1)
     const price = round25k(publicValue(p) * (0.9 + 0.1 * derivedRng('offer', w, id).next()));
     const bot = league.teams.filter((t) => t.isBot && !buyBlock(t, price, publicWage(p)))
       .sort((a, b) => lineCount(a, p.line) / LINE_MIN[p.line] - lineCount(b, p.line) / LINE_MIN[p.line] || a.squad.length - b.squad.length || b.cashBalance - a.cashBalance)[0];
@@ -128,8 +124,23 @@ export function acceptOffer(league, team, playerId) {
   const o = (league.offers ?? []).find((x) => x.playerId === playerId && x.from === team.id);
   const bot = o && league.teams.find((t) => t.id === o.to), p = team.squad.find((x) => x.id === playerId);
   if (!o || !bot || !p || o.w !== windowOf(league)) return 'Buddet er udløbet.';
+  const block = sellBlock(league, team, p, windowOf(league));
+  if (block) return block;
   if (buyBlock(bot, o.price, publicWage(p))) return `${bot.name} kan ikke længere betale.`;
   move(league, p, team, bot, o.price);
+  team.listed = (team.listed ?? []).filter((id) => id !== playerId);
+  return null;
+}
+// Kommer der en ungdomsspiller ind, hvis han går? (truppen på 18 eller kæden på sit minimum) – vises FØR klikket (QC/Spilfører)
+export const needsYouth = (team, p) => team.squad.length - 1 < SQUAD_MIN || lineCount(team, p.line) - 1 < LINE_MIN[p.line];
+// Fritstil (v3.21.1, Spilfører/QC: udvejen, når ingen klub byder): gratis, tæller som et salg i vinduet, og en ungdomsspiller kommer
+// ind ved 18. Kun når du selv trykker (B5). Svar: null = fritstillet, ellers årsagen.
+export function releasePlayer(league, team, playerId) {
+  const p = team.squad.find((x) => x.id === playerId);
+  if (!p) return 'Spilleren er ikke i din trup.';
+  const block = sellBlock(league, team, p, windowOf(league));
+  if (block) return block;
+  move(league, p, team, null, 0, 'release');
   team.listed = (team.listed ?? []).filter((id) => id !== playerId);
   return null;
 }

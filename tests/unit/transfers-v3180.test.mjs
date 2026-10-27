@@ -107,10 +107,18 @@ test('til salg: en bot byder 0,9–1,0 · værdien i et åbent vindue; Sælg fly
   setListed(L, me, q.id, false); assert.ok(!me.listed.includes(q.id));
 });
 
-test('dit hold på 18: et bud kan ikke accepteres; et lukket vindue giver ingen bud – buddene udløber ved næste runde', () => {
+test('dit hold på 18: et bud KAN accepteres (v3.21.1 – en ungdomsspiller kommer ind; før "kun 18"); et lukket vindue giver ingen bud – buddene udløber ved næste runde', () => {
   const L = fresh(), me = own(L), p = reserve(me, 'MID');
   setListed(L, me, p.id, true);
-  assert.match(acceptOffer(L, me, p.id), /kun 18/);
+  const o = L.offers.find((x) => x.playerId === p.id), cash = me.cashBalance;
+  assert.equal(acceptOffer(L, me, p.id), null);
+  assert.equal(me.squad.length, 18); assert.ok(!me.squad.includes(p));
+  const y = me.squad.find((x) => x.id.startsWith('plr_y'));
+  assert.ok(y && y.line === 'MID' && y.age <= 18, 'ungdomsspiller i samme kæde');
+  assert.equal(me.cashBalance, cash + o.price);
+  setListed(L, me, y.id, true);
+  assert.ok(!L.offers.some((x) => x.playerId === y.id), 'akademispilleren kan ikke sælges videre i samme vindue (ingen pengemaskine)');
+  const q = reserve(me, 'ATT'); setListed(L, me, q.id, true);
   play(L, 1);
   assert.deepEqual(L.offers, []);
   setListed(L, me, p.id, true);

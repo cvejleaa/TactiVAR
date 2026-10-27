@@ -13,7 +13,7 @@ import { renderLineupList } from './ui/lineup-list.js';
 import { renderTrainingTable } from './ui/training.js';
 import { renderCard, trainingSummary } from './ui/card.js';
 import { renderClub, shownCash, renderMarket, renderTransferLog, renderPublicClub } from './ui/club.js';
-import { marketInfo, buyPlayer, setListed, acceptOffer, declineOffer, isStarter } from './engine/transfers.js';
+import { marketInfo, buyPlayer, setListed, acceptOffer, declineOffer, releasePlayer, wageRoom, isStarter } from './engine/transfers.js';
 import { renderSeasonReport } from './ui/season-report.js';
 import { viewTeam } from './engine/visibility.js';
 import { renderPitch } from './ui/pitch.js';
@@ -79,6 +79,7 @@ const NEWS = {
   '3.14.1': 'Rettelser: VAR tjekker nu offside for den forreste – scorer en spiller længere tilbage, er det hans forreste holdkammerat, der tjekkes, og billedet ved målet viser skytten, hvor han skød fra. Statistikken på Liga-fanen gælder sæsonen.',
   '3.14.2': 'Rettelse: Ved et VAR-tjek står den tjekkede nu, hvor han stod (forrest), i billedet ved målet – ikke flyttet bag en holdkammerat.',
   '3.14.3': 'Rettelser: Langskud tages fra skudafstand (ikke fra egen banehalvdel) i billedet ved målet, referatet fortæller et oplæg én gang, og efter sæsonens sidste runde viser tabellen slutstillingen og mesteren, til næste sæson går i gang.',
+  '3.21.1': '🔁 Du sidder ikke længere fast på transfermarkedet: du kan sælge, selv om du kun har 18 spillere – en ungdomsspiller fra akademiet kommer ind i samme kæde. Er du over lønbudgettet, kan du stadig købe for den løn, du har sparet ved salget i vinduet (lønnen bliver aldrig højere end før salget). Byder ingen, kan du fritstille en spiller gratis. Højst 2 salg pr. vindue – også for dig. 💼 Klub viser, hvad et salg frigør, før du trykker.',
   '3.21.0': '🏃 Spillerne bevæger sig i kampen: hver spiller glider rundt om sin plads efter sin rolle og holdets pres, og motoren regner på de samme pladser, som du ser i 2D-afspilningen. Heat map\'et viser derfor hans område – en midtbanespiller dækker nu over en fjerdedel af banen (kilometertallet er stadig et skøn). En af de nærmeste går i pres og dækker løberen i midten (på kanten backen på hans side), så din opstilling afgør, hvem der tager duellen: 🤼 i karakterarket viser hvor mange dueller hver af dine spillere vandt.',
   '3.20.2': 'Heat map\'et i karakterarket er finere (12 × 18 felter) og tæller vejen, spilleren løb mellem kampens øjebliksbilleder, og farven er udglattet, så du ser hans område og ikke enkelte firkanter. Kortet bygger på kampens øjebliksbilleder (ét hvert 3. minut) og viser hans område, ikke hver meter. Kilometertallet er et skøn ud fra hans rolle og kondition – det er ikke målt på kortet, og det står nu også under kortet.',
   '3.20.1': 'Rettelser: 📋 Taktik har formation, faser og Hvis-Så lige under banen, og tabellerne har ikke længere deres egen rulning (kun referatet i kampen ruller). Efter kampen står afspilningen til venstre med statistik og referat ved siden af. 🏆 Liga viser "Bedste snit" for sæsonen (stjernerne fra hver kamp, mindst 3 kampe) og "Rundens bedste", og rundens spiller får en rigtig begrundelse (taktiske dueller, holdt nullet).',
@@ -271,6 +272,14 @@ function renderAdmin() {
 // Én tegning ad gangen (v3.13, fundet af e2e): replaceChildren fjerner et fokuseret felt, dets change-hændelse
 // fyrer midt i tegningen og bad om en ny – "node to be removed is no longer a child". Den tegnes bagefter.
 let rendering = false, renderAgain = false;
+// Salg/fritstilling af din spiller (v3.21.1): svaret til listen – med akademispilleren, der kom ind i stedet (ved 18 eller kædens minimum)
+function transferMsg(id, act, verb) {
+  const mine = myTeam(), name = mine.squad.find((p) => p.id === id)?.shortName ?? 'Spilleren', ids = new Set(mine.squad.map((p) => p.id));
+  const err = act();
+  if (err) return `🔁 ${err}`;
+  const y = mine.squad.find((p) => !ids.has(p.id));
+  return `🔁 ${name} er ${verb}.${y ? ` #${y.shirtNumber} ${y.shortName} (${y.age} år) kommer ind fra akademiet${mine.tactics.lineupSlots.includes(y.id) ? ' – og starter i hans plads' : ''}.` : ''}`;
+}
 function render() {
   if (rendering) { renderAgain = true; return; }
   rendering = true;
@@ -326,7 +335,7 @@ function renderNow() {
     onFocus: isOwn && tab === 'trup' ? (k) => change(() => act.setFocus(team, selected.id, k)) : null,
     trainNote: isOwn && tab !== 'trup',
     market: !selected || mc?.playing ? null : isOwn ? { own: true, listed: (team.listed ?? []).includes(selected.id), onList: (on) => change(() => setListed(league, team, selected.id, on)) }
-      : { ...marketInfo(league, mine, team, selected), starter: isStarter(team, selected), wage: Math.round(publicWage(selected) / 3), room: wageRoomPerRound(mine), cashAfter: mine.cashBalance - marketInfo(league, mine, team, selected).price, onBuy: () => { const err = buyPlayer(league, mine, selected.id); view.notice = err ? `💰 ${err}` : `💰 ${selected.shortName} er købt og står nu i din trup.`; change(() => {}); } },
+      : { ...marketInfo(league, mine, team, selected), starter: isStarter(team, selected), wage: Math.round(publicWage(selected) / 3), room: Math.round(wageRoom(league, mine) / 3), cashAfter: mine.cashBalance - marketInfo(league, mine, team, selected).price, onBuy: () => { const err = buyPlayer(league, mine, selected.id); view.notice = err ? `💰 ${err}` : `💰 ${selected.shortName} er købt og står nu i din trup.`; change(() => {}); } },
     hideLog: mc?.playing && league.lastRound ? seasonAndRound(league, league.lastRound.round) : null,
     // Under afspilningen af sæsonens sidste runde er det stadig den afsluttede sæson, der vises
     season: mc?.playing && league.lastRound ? seasonAndRound(league, league.lastRound.round)[0] : league.leagueMetadata.seasonNumber ?? 1, starter: !!selected && team.tactics.lineupSlots.includes(selected.id),
@@ -405,7 +414,9 @@ function renderNow() {
     klub: () => (!isOwn ? [renderPublicClub({ league, pub: viewTeam(team, false), me: mine, playing: !!mc?.playing, msg: view.marketMsg ?? '',
       onBack: () => showTeam(myIdx()),
       onBuy: (id) => { const name = team.squad.find((p) => p.id === id)?.shortName; const err = buyPlayer(league, mine, id); view.marketMsg = err ? `💰 ${err}` : `💰 ${name} er købt og står nu i din trup.`; change(() => {}); } })] : null) ?? [renderClub({ league, team: mine, playing: !!mc?.playing }), renderMarket({ league, team: mine, playing: !!mc?.playing,
-      onAccept: (id) => { const err = acceptOffer(league, mine, id); view.notice = err ? `🔁 ${err}` : '🔁 Spilleren er solgt.'; change(() => {}); },
+      // v3.21.1: beskeden ved listen (QC) – og den nye akademispiller ved navn, hvis han kom ind
+      onAccept: (id) => { view.marketMsg = transferMsg(id, () => acceptOffer(league, mine, id), 'solgt'); change(() => {}); },
+      onRelease: (id) => { view.marketMsg = transferMsg(id, () => releasePlayer(league, mine, id), 'fritstillet'); change(() => {}); },
       onDecline: (id) => change(() => declineOffer(league, mine, id)), onUnlist: (id) => change(() => setListed(league, mine, id, false)),
       line: view.marketLine ?? 'all', onLine: (v) => { view.marketLine = v; view.marketMsg = ''; render(); }, msg: view.marketMsg ?? '',
       // Bekræftelsen står ved listen (QC: beskeden øverst var uden for skærmen, når man stod nede i listen)

@@ -959,6 +959,15 @@ try {
       await row.locator('.buy-row').click();
       const after2 = await g.evaluate((id) => { const me = JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((t) => !t.isBot); return { cash: me.cashBalance, has: me.squad.some((p) => p.id === id) }; }, sale.id);
       check('Transfer: "💰 Køb" i listen Til salg i ligaen køber til den viste pris – bekræftelsen står ved listen', after2.has && after2.cash === before - sale.price && (await g.textContent('#for-sale-msg')).includes('er købt'), JSON.stringify({ sale, before, after2 }));
+      // v3.21.1 (brugeren: "låser mig for meget som manager"): sæt en reserve til salg; rækken viser, hvad et salg frigør, og Fritstil
+      const rel = await g.evaluate(() => { const d = JSON.parse(localStorage.getItem('tactivar_save')), me = d.league.teams.find((t) => !t.isBot), p = me.squad.find((x) => x.line === 'ATT' && !me.tactics.lineupSlots.includes(x.id)) ?? me.squad.find((x) => x.line === 'MID' && !me.tactics.lineupSlots.includes(x.id)); me.listed = [p.id]; localStorage.setItem('tactivar_save', JSON.stringify(d)); return { id: p.id, name: p.shortName, n: me.squad.length }; });
+      await g.reload(); await g.waitForSelector('body[data-klar="ja"]');
+      await tab('klub');
+      const relRow = g.locator(`.market-row[data-pid="${rel.id}"]`);
+      check('Transfer: din spiller til salg viser før klikket, hvad et salg frigør i løn, og "Salg i vinduet: 0 af 2"', (await relRow.locator('.market-gain').textContent()).includes('frigør') && (await g.textContent('#sales-left')).includes('0 af 2'), await relRow.textContent());
+      await relRow.locator('.release').click();
+      const relAfter = await g.evaluate((id) => { const d = JSON.parse(localStorage.getItem('tactivar_save')), me = d.league.teams.find((t) => !t.isBot); return { n: me.squad.length, gone: !me.squad.some((p) => p.id === id), log: d.league.transferLog.some((e) => e.id === id && e.kind === 'release') }; }, rel.id);
+      check('Transfer: "Fritstil (gratis)" – han er væk (gemt, i transferlisten som fritstillet), beskeden står ved listen, og salget tæller', relAfter.gone && relAfter.log && relAfter.n === rel.n - 1 && (await g.textContent('#for-sale-msg')).includes(`${rel.name} er fritstillet`) && (await g.textContent('#sales-left')).includes('1 af 2'), JSON.stringify(relAfter));
       await g.selectOption('#team-select', '0');
     } else check('Transfer: en spiller kan købes ved sæsonslut (forudsætning)', false);
     await tab('liga');
