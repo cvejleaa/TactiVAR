@@ -79,7 +79,9 @@ test('vinduet, trin 2: en bot under minimum i en kæde køber den billigste ikke
   assert.ok(L.transferLog.some((e) => e.to === buyer.id), 'købt fra en anden bot (v3.18.1: alle botter kan sælge – de henter selv ungdom)');
 });
 
-test('QC: du kan ikke sælge under minimum i kæden (aldrig uden målmand)', async () => {
+// v3.21.1 (brugeren: "låser mig for meget"): salget ved kædens minimum går igennem, og en ungdomsmålmand kommer ind – stadig aldrig
+// uden målmand (før: "kun 2 i kæden")
+test('QC: sælger du under minimum i kæden, kommer en ungdomsspiller ind – aldrig uden målmand', async () => {
   const { acceptOffer } = await import('../../public/engine/transfers.js');
   const L = fresh(), me = L.teams[0];
   me.squad.push(...[1, 2].map((i) => ({ ...structuredClone(me.squad.find((p) => p.line === 'MID')), id: `m${i}`, shortName: `M. Q${i}`, shirtNumber: 70 + i })));
@@ -87,8 +89,10 @@ test('QC: du kan ikke sælge under minimum i kæden (aldrig uden målmand)', asy
   for (const t of L.teams.filter((x) => x.isBot)) t.cashBalance = 20000000;
   setListed(L, me, gk.id, true);
   assert.ok(L.offers.some((o) => o.playerId === gk.id), 'data: der er et bud');
-  assert.match(acceptOffer(L, me, gk.id), /kun 2 i kæden/);
+  assert.equal(acceptOffer(L, me, gk.id), null);
+  assert.ok(!me.squad.includes(gk));
   assert.equal(me.squad.filter((p) => p.line === 'GK').length, 2);
+  assert.ok(me.squad.some((p) => p.line === 'GK' && p.id.startsWith('plr_y')), 'ungdomsmålmand');
 });
 
 test('QC: sanitize fylder en trup under 18 op med ungdom (med besked) – og en trup over 25 låser ikke ligaen ude', () => {
