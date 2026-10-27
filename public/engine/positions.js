@@ -82,6 +82,15 @@ export function livePositions(tactics, { attacking = true, ballX = 50, runner = 
 // caught: holdet med bolden har lige vundet den (kontra) – det står i forsvarsform, modstanderen i angrebsform.
 // Returnerer { ball, opp, line } – begge i hvert holds egne koordinater (lille y = ved modstanderens mål); line i boldholdets.
 export const ONSIDE_GAP = 1, MIN_APART = 6;
+// Afleveringens modtager på linjen (v3.22.1, QC: halvdelen stod oven i en forsvarer på linjen): den bredde nærmest x, hvor han står
+// mindst gap fra alle andre (others = [[x, y], …] i samme koordinater) – i skridt på 2 ud til ±40; ellers x.
+export function apartOnLine(x, y, others, gap = MIN_APART) {
+  for (let k = 0; k <= 40; k++) {
+    const cx = x + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 2;
+    if (cx >= 4 && cx <= 96 && others.every(([ox, oy]) => Math.hypot(ox - cx, oy - y) >= gap)) return [cx, y];
+  }
+  return [x, y];
+}
 // v3.21.0: højst ROW_MAX fra et hold på samme række i dybden (applyDepth)
 export const SEPARATE_PASSES = 3, ROW_MAX = 5;
 // Boldholdets udslag i dybden dæmpes inden for DEPTH_FADE af offside-linjen (applyDepth fade)
