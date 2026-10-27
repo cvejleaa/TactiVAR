@@ -35,6 +35,12 @@ export function viewRatingEntry(entry, viewerOwnsTeam) {
   return out;
 }
 
+// Kampens tal (v3.22.0, trace.acts): hvem erobrede bolden fra hvem og hvem kombinerede med hvem – kun for seerens eget hold
+// (samme valg som heat map'et pr. spiller, §3): tallene røber pres, løb og holdets mønstre. null = ingen tal at vise.
+export function viewActs(trace, viewerOwnsTeam) {
+  return viewerOwnsTeam && Array.isArray(trace?.acts) ? trace.acts : null;
+}
+
 // Må seeren sortere/filtrere på dette felt for dette hold? (blokerer "sort-spoofing").
 export function canSeeField(field, viewerOwnsTeam) {
   if (PUBLIC_FIELDS.includes(field)) return true;

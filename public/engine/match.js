@@ -339,7 +339,12 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // skiftene; moments: afslutningerne (mål, redning, forbi, flag, VAR-tjek) med aktørerne, hvor motoren kender dem.
   // Dødbolde (straffe, frispark, hjørne) får bevidst intet billede – motoren regner ingen placeringer dér.
   // Spillere på banen = holdets 11 pladser (en skadet uden indskiftning halter videre og står der; en udvist er væk).
-  const trace = { v: 1, frames: [], moments: [] };
+  const trace = { v: 1, frames: [], moments: [], acts: [] };
+  // Kampens tal (v3.22.0, landstrænerens InStat-ark): hvem erobrede bolden fra hvem, og hvem kombinerede med hvem – kun det,
+  // motoren selv har afgjort (begge parter står i referatets linje). Ren optegnelse: intet rng, ingen skrivning i seen.
+  // [minut, art, side, spiller, modpart, udfald]; udfald for kombinationer: 2 mål, 1 afslutning, 0 stoppet (null = ikke en kombination).
+  const act = (kind, side, a, b = null, ok = null) => { const e = [curMin, kind, side === H ? 'h' : 'a', a?.id ?? null, b?.id ?? null, ok]; trace.acts.push(e); return e; };
+  const comboOk = (res) => (res === true || res === 'goal' ? 2 : res === 'cleared' ? 0 : 1);   // 'cleared': luftduellen tabt
   let shotSide = null, shotCaught = false, setPieceNow = false, shotBy = null, shotLong = false, momentCheck = null;
   const common = (side, x, y) => (side === H ? [Math.round(x), Math.round(y)] : [Math.round(100 - x), Math.round(100 - y)]);
   const ptsOf = (side, pos, moves = null, starters = side.starters) => starters.map((p, i) => p && [p.id, ...common(side, ...(moves?.[p.id] ?? [pos[i].x, pos[i].y]))]).filter(Boolean);
@@ -720,7 +725,14 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // afgør hvilken – ingen ekstra terning. To trin (v3.12): duellen, så hovedstødet mod keeperen.
   // source (åbent spil): 'cross' eller 'long' – kun til teksten for dit eget hold.
   // Returnerer 'goal', 'saved', 'missed', 'disallowed' (VAR) eller 'cleared'.
+  // Indlæg, lange bolde og dødbolde: tager/oplægger → hovedstødsmand (samme oplægger som linjen – helperFor er uden rng)
   function aerialDuel(att, def, cR, dR, min, shooter, assister, defender, setPiece = null, source = null, snapMoves = null) {
+    const c = act(setPiece ? (setPiece === 'hjørnespark' ? 'corner' : 'fk') : source === 'long' ? 'long' : 'cross', att, setPiece ? assister : helperFor(cR, shooter, assister), shooter, 0);
+    const res = aerialDuel0(att, def, cR, dR, min, shooter, assister, defender, setPiece, source, snapMoves);
+    c[5] = comboOk(res);
+    return res;
+  }
+  function aerialDuel0(att, def, cR, dR, min, shooter, assister, defender, setPiece = null, source = null, snapMoves = null) {
     if (!setPiece) { shotSide = att; shotCaught = false; setPieceNow = false; shotBy = shooter; shotLong = false; momentCheck = null; assister = helperFor(cR, shooter, assister); }
     const gk = dR.gk;
     const aDef = dR.cbs.length ? (dR.cbs.includes(defender) ? defender : dR.cbs[Math.max(0, dR.defs.indexOf(defender)) % dR.cbs.length]) : defender;
@@ -930,7 +942,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
     log.cutbacks++;
     if ((ws.pace + ws.ballControl) * ff(winger) + rng.next() * 8
       <= (bs.pace + bs.positioning) * ff(back) + rng.next() * 8 + CUTBACK_DEF_EDGE + (FLANK_BONUS[def.tactics.phases.phase2_defending.pressingHeight] ?? 0)) {
-      log.cutbacksBlocked++;
+      log.cutbacksBlocked++; act('flank', def, back, winger);
       st[k(att, 'Shots')]--; st[k(att, 'Xg')] -= xg;
       sheet.adjust(back.id, 0.3); sheet.bump(back.id, 'tacticWins');
       addEv(min, 'INFO', 'PLAY', def.isHome, false, 'Kanten lukket', own(att)
@@ -943,8 +955,9 @@ export function simulateMatch(home, away, rng, opts = {}) {
     const lead = own(att) ? `✅ ${tag(winger)} når baglinjen og lægger den lavt tilbage til ${tag(finisher)}.` : '';
     if (!lead) addEv(min, 'INFO', 'PLAY', att.isHome, false, 'Mod baglinjen', `↩️ [${att.team.name}] ${tag(winger)} kommer forbi ${tag(back)} og spiller bolden tilbage i feltet.`);
     sheet.adjust(winger.id, 0.15);
-    finishAttempt(att, def, cR, dR, min, finisher, winger, 'CUTBACK', { bonus: CUTBACK_FINISH_BONUS, lead, onGoal: () => { log.cutbackGoals++; },
-      snapMoves: { [winger.id]: [wx, BYLINE_Y], [finisher.id]: [SPOT.CUTBACK.x, SPOT.CUTBACK.y] } });
+    const c = act('cb', att, winger, finisher, 0);
+    c[5] = comboOk(finishAttempt(att, def, cR, dR, min, finisher, winger, 'CUTBACK', { bonus: CUTBACK_FINISH_BONUS, lead, onGoal: () => { log.cutbackGoals++; },
+      snapMoves: { [winger.id]: [wx, BYLINE_Y], [finisher.id]: [SPOT.CUTBACK.x, SPOT.CUTBACK.y] } }));
   }
   // Straffe-VAR (v3.15.1): byVar = VAR kaldte dommeren ud til et straffespark, han ikke så (PEN_AWARD_P). Ellers tjekkes en
   // given straffe med PEN_CHECK_P: filmning (den fældedes theatre – lodtrækning) eller offside i opspillet. Kendelsen falder
@@ -1298,7 +1311,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
         st[k(def, 'TacticSuccess')]++;
         if (defPh.phase2_defending.offsideTrap !== 'OFF' && rng.chance(0.45)) {
           duelLog[def.team.id].trapWon++;   // med i pressWon (presset stoppede opbygningen), men tælles for sig (Spilfører v3.16.6)
-          sheet.adjust(back.id, 0.4); sheet.adjust(striker.id, -0.25); sheet.bump(back.id, 'tacticWins');
+          sheet.adjust(back.id, 0.4); sheet.adjust(striker.id, -0.25); sheet.bump(back.id, 'tacticWins'); act('trap', def, back, striker);
           // Kun din egen offside-fælde navngives; hos modstandere er det blot en offside.
           // Det fulde banner første gang pr. halvleg, derefter en kort linje (v3.16.7, Spilfører: 399 banner-linjer på en sæson,
           // "dirigerer linjen perfekt" 30 gange) – intet rng
@@ -1313,6 +1326,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
           frame('trap', who);
         } else {
           sheet.adjust(presser.id, DUEL_BONUS); sheet.adjust(playmaker.id, -0.2); sheet.bump(presser.id, 'tacticWins'); sheet.bump(presser.id, 'duels'); sheet.bump(presser.id, 'duelsWon');
+          act('press', def, presser, playmaker);
           // Kontra (v3.9): afgøres FØR teksten, så "din lynkontra" kun loves, når den kommer.
           const won = defPh.phase3_transition.onBallWon;
           const goesCounter = rng.chance(counterChance(attPh.phase1_buildUp.offBallRuns, attPh.phase3_transition.onBallLost, won, fbCount(att)));
@@ -1489,7 +1503,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
             if (!beat) {
               // Opsnapning: ingen afslutning – og samme kontra-tjek som efter et vundet pres.
               st[k(att, 'Shots')]--; st[k(att, 'Xg')] -= shotXg;
-              sheet.adjust(marker.id, 0.3); sheet.bump(marker.id, 'tacticWins');
+              sheet.adjust(marker.id, 0.3); sheet.bump(marker.id, 'tacticWins'); act('tackle', def, marker, runner);
               addEv(min, 'INFO', 'PLAY', def.isHome, false, 'Opsnappet', own(att) ? `❌ [${att.team.name}] ${tag(runner)} løber sig fri ${where}, men ${tag(marker)} (${def.team.name}) tager bolden i driblingen.` : `🛡️ [${def.team.name}] ${tag(marker)} tager bolden fra ${tag(runner)} (${att.team.name}).`);
               if (rng.chance(counterChance(runs, attPh.phase3_transition.onBallLost, defPh.phase3_transition.onBallWon, fbCount(att)))) counterAttack(def, att, min, dR, cR);
               continue;
@@ -1506,7 +1520,9 @@ export function simulateMatch(home, away, rng, opts = {}) {
           // En aflevering fra kanten er en rigtig cutback – tælles med i fuldtids-analysens cutbacks.
           const log = duelLog[att.team.id], cut = kind === 'CUTBACK';
           if (cut) log.cutbacks++;
-          finishAttempt(att, def, cR, dR, min, finisher, helper, kind, { bonus: RUN_FINISH_BONUS, lead, onGoal: () => { log.runGoals++; if (cut) log.cutbackGoals++; } });
+          const c = choice === 'PASS' ? act('run', att, runner, finisher, 0) : null;   // løbets aflevering – kun når han spillede den
+          const res = finishAttempt(att, def, cR, dR, min, finisher, helper, kind, { bonus: RUN_FINISH_BONUS, lead, onGoal: () => { log.runGoals++; if (cut) log.cutbackGoals++; } });
+          if (c) c[5] = comboOk(res);
         } else {
           // Ikke fri: almindelig afslutning. Typen afgøres efter evnerne, når bolden er inde
           // (langskud og dribletur vægtet af evnerne; cutback og kontra kommer kun fra deres egne hændelser).

@@ -3,7 +3,7 @@
 // modstandere vises kun som stjerner (engine/visibility.js).
 import { h, dec } from './dom.js';
 import { starsEl } from './labels.js';
-import { viewRatingEntry } from '../engine/visibility.js';
+import { viewRatingEntry, viewActs } from '../engine/visibility.js';
 import { GOAL_KIND_LABEL, goalMatchIdx } from '../engine/gazette.js';
 import { championText } from '../engine/season.js';
 import { FORMATIONS } from '../engine/formations.js';
@@ -12,7 +12,8 @@ import { replayEl, drawY } from './replay.js';
 import { evMin, fmtMin, timelinePos, halfPos, playerSpan, tickClock, clockNum } from '../engine/clock.js';
 // Afslutningens minut i heat- og zone-kortet: hændelsens eget ur (QC v3.16.4 – ellers tick'ets start, fx "42'" for et mål i 45+6)
 const shotMin = (s, { events, stoppage }) => (s.ev != null && events?.[s.ev] ? evMin(events[s.ev]) : fmtMin(tickClock(s.t, stoppage)));
-import { heatGrid, shotsOf, thirds, zones, zoneShots, COLS, ROWS, HEAT_MIN } from '../engine/heatmap.js';
+import { pl } from '../engine/clues.js';
+import { heatGrid, shotsOf, thirds, zones, zoneShots, actsOf, COMBO_LABEL, COLS, ROWS, HEAT_MIN } from '../engine/heatmap.js';
 
 export const REPORT_FILTERS = [['all', 'Alle hændelser'], ['tactic', 'Kun taktik'], ['key', 'Kun nøglemomenter']];
 // VAR_GOAL: kun i gem fra før v3.15.1 (VAR var en chancetype). VAR_CHECK/VAR_PEN/VAR_RED: VAR tjekker et mål, en straffe og
@@ -86,7 +87,7 @@ function ratingsTable(list, isOwn, title, formation, snap = null, onSnap = null,
   const mine = canHeat ? heat.mine ?? { playerId: null } : null;
   return h('div', { class: 'ratings' }, h('h4', {}, title),
     heat?.trace && !isOwn ? thirdsLine(heat.trace, heat.side, gkId, heat.vsMe, down, heat.stoppage, heat.events) : null,
-    canHeat ? heatPitch(rows, { ...heat, mine }, gkId, span) : null,
+    canHeat ? heatPitch(rows, { ...heat, mine, acts: viewActs(heat.trace, isOwn) }, gkId, span) : null,
     // Øjebliksbillede ved et mål (kun dit hold, v3.12.1) – ellers startopstillingen
     isOwn && snap ? snapPitch(rows, snap, onSnap)
       : formation && rows.some((e) => isStarter(e) && e.slot != null) ? miniPitch(rows.filter(isStarter), formation, isOwn, down) : null,
@@ -146,8 +147,26 @@ function heatPitch(rows, heat, gkId, span = null) {
     h('div', { class: 'minipitch heat' },
       grid.flatMap((r, y) => r.map((v, x) => v > HEAT_MIN ? h('div', { class: 'heat-cell', style: { left: `${(x * 100) / COLS}%`, top: `${(y * 100) / ROWS}%`, width: `${100 / COLS}%`, height: `${100 / ROWS}%`, opacity: String(0.15 + v * 0.7) } }) : null)),
       shots.map((s) => h('div', { class: `heat-shot ${s.outcome}`, style: { left: s.x + '%', top: s.y + '%' }, title: `${shotMin(s, heat)} ${OUT_LABEL[s.outcome]}` }, s.outcome === 'goal' ? '⚽' : s.outcome === 'assist' ? '🅰' : '●'))),
+    pid != null && e ? matchNumbers(e, actsOf(heat.acts, heat.side, pid), rows) : null,
     h('div', { class: 'muted', id: 'heat-note' }, `Angriber opad. Farven: hvor ${pid != null ? 'han' : 'holdet'} var og bevægede sig i kampens ${heat.trace.frames.length} øjebliksbilleder (vejen imellem dem talt med) og afslutninger${pid != null && e && on(e) < 90 ? ` (han var på banen i ${on(e)} min – kortet er mørkest, hvor han stod oftest)` : ''}. Prikker: ${shots.length ? `${n('goal')} mål, ${n('save')} reddet, ${n('miss')} forbi/blokeret${n('offside') ? `, ${n('offside')} offside` : ''}${n('disallowed') ? `, ${n('disallowed')} annulleret` : ''}${n('assist') ? `, ${n('assist')} oplæg` : ''}` : 'ingen afslutninger'}.${pid == null ? ' Klik på en spiller i listen.' : ' Kortet viser hans område, ikke hver meter: spredningen følger hans rolle og holdets pres – kilometertallet i listen er et skøn ud fra rolle, kondition og holdets pres og løb, ikke målt på kortet.'}`));
 }
+// Kampens tal (v3.22.0, landstrænerens InStat-ark: "hvordan spillerne arbejder sammen") – under hans heat map, kun dit hold.
+// Kun det, motoren selv afgjorde (heatmap.js actsOf); dueller og luftdueller står i listen (🤼, ✈) – ikke to tal for det samme.
+const COMBO_OUT = { 2: '⚽', 1: 'afslutning', 0: 'clearet' };
+function matchNumbers(e, a, rows) {
+  if (!a) return h('div', { class: 'muted', id: 'match-numbers' }, '📊 Kampens tal findes for kampe spillet fra v3.22.0.');
+  const byId = new Map(rows.map((r) => [r.playerId, r]));
+  const who = (id) => { const r = byId.get(id); return r ? `#${r.shirtNumber} ${r.shortName}` : 'en medspiller'; };
+  const combos = a.combos.slice().sort((x, y) => x.t - y.t);
+  return h('div', { class: 'match-numbers', id: 'match-numbers' },
+    h('div', { id: 'mn-ball' }, h('strong', {}, '📊 Kampens tal: '),
+      `${pl(a.won, 'erobring', 'erobringer')} · ${pl(a.lost, 'bold tabt', 'bolde tabt')}${a.offside ? ` · ${pl(a.offside, 'gang', 'gange')} fanget offside` : ''}`),
+    h('div', { id: 'mn-combos' }, h('strong', {}, '🤝 Samarbejde: '), combos.length
+      ? combos.map((c) => `${c.out ? '→' : '←'} ${who(c.with)} (${COMBO_LABEL[c.kind]}, ${c.t}') ${COMBO_OUT[c.ok] ?? ''}`.trim()).join(' · ')
+      : 'ingen kombinationer med en medspiller i denne kamp'),
+    h('div', { class: 'muted' }, 'Erobringer: pres, offside-fælde, lukket kant og tacklinger. Bolde tabt: presset af eller tacklet. → han spillede bolden til en medspiller, ← han fik den. Kun det, kampen selv afgjorde – dueller og luftdueller står i listen.'));
+}
+
 // Modstanderen groft (brugerens valg 2026-10-24; v3.16.1 som kort): 3 × 3 zoner set fra din side – han angriber nedad mod dit
 // mål – med procent i hvert felt og hans afslutninger som prikker. Ingen enkeltspillere (heatmap.js zones).
 // vsMe: holdet spiller mod dit hold. Ellers (rundens andre kampe) samme kort, men uden "dit mål" (QC v3.16.1).

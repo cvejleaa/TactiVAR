@@ -159,5 +159,9 @@ export const isValidStoppage = (st) => Array.isArray(st) && st.length === 2 && s
 export function isValidTrace(tr) {
   return !!tr && tr.v === 1 && Array.isArray(tr.frames) && tr.frames.length <= 31 && Array.isArray(tr.moments) && tr.moments.length <= 400
     && [...tr.frames, ...tr.moments].every((f) => f && Number.isInteger(f.t) && f.t >= 0 && f.t <= 30 && okBall(f.ball) && okPts(f.h) && okPts(f.a))
-    && tr.moments.every((m) => Number.isInteger(m.ev) && (m.side === 'h' || m.side === 'a'));
+    && tr.moments.every((m) => Number.isInteger(m.ev) && (m.side === 'h' || m.side === 'a'))
+    // Kampens tal (v3.22.0): valgfri; [minut, art, side, spiller, modpart, udfald] – ældre spor har dem ikke
+    && (tr.acts === undefined || (Array.isArray(tr.acts) && tr.acts.length <= 400 && tr.acts.every((x) => Array.isArray(x) && x.length === 6
+      && Number.isInteger(x[0]) && x[0] >= 0 && x[0] <= 130 && typeof x[1] === 'string' && x[1].length <= 8 && (x[2] === 'h' || x[2] === 'a')
+      && (x[5] === null || x[5] === 0 || x[5] === 1 || x[5] === 2))));
 }
