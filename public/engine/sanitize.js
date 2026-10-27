@@ -5,6 +5,7 @@ import { clampSubsLimit } from './freshness.js';
 import { MAX_RULES } from './match-rules.js';
 import { TEAM_STAT_DEFAULTS, PLAYER_SEASON_DEFAULTS } from './stats.js';
 import { FORMATIONS } from './formations.js';
+import { cleanChemistry, seedChemistry } from './chemistry.js';
 import { buildSchedule, isValidSchedule, SEASON_ROUNDS } from './schedule.js';
 import { defaultTactics, defaultStarterIds, emptyStanding, BOT_PROFILES, aerialBreakdown, assignPositions, teamCareerDefaults, generatePlayer, neededPosition } from './generator.js';
 import { initialPotential, publicWage, TIER_STARS, MATCH_LOG_CAP, SQUAD_MIN, SQUAD_MAX, derivedRng, neededLine, freeShirt } from './career.js';
@@ -133,6 +134,9 @@ export function normalizeLeague(league) {
     // Et ungdomstilbud er en spiller: uden evner, kæde og id kan det ikke tages op (Security: et tomt tilbud i en delt fil brickede spillet)
     const validYouth = (y) => y && typeof y.id === 'string' && !ids.has(y.id) && ['GK', 'DEF', 'MID', 'ATT'].includes(y.line) && y.skills && Object.values(y.skills).every(Number.isFinite) && typeof y.shortName === 'string' && Number.isFinite(y.age);
     team.youthOffers = Array.isArray(team.youthOffers) ? team.youthOffers.filter(validYouth).slice(0, 2) : [];
+    // Samspil (v3.23.0): ukendte spillere og forkert form fjernes; mangler tabellen, seedes holdet (alle par på BASE)
+    const chem = cleanChemistry(team.chemistry, ids);
+    if (chem) team.chemistry = chem; else seedChemistry(team, Number.isInteger(league.leagueMetadata?.round) ? league.leagueMetadata.round : 0);
     // Udskiftningsgrænsen (v3.13): gemt før v3.13 → holdets profil (dit hold 70 %); 0 = fra bevares.
     team.subsLimit = clampSubsLimit(team.subsLimit ?? profile.subs);
   });

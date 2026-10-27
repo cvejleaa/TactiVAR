@@ -4,6 +4,7 @@
 import { publicValue, publicWage, repairLineup, freeShirt, refreshValue, autoMatchBench, bookLedger, weeklyWages, wageBudget, derivedRng, LINE_MIN, SQUAD_MIN, SQUAD_MAX } from './career.js';
 import { seasonRoundOf } from './schedule.js';
 import { generatePlayer, neededPosition } from './generator.js';
+import { pruneChemistry } from './chemistry.js';
 
 export const BUY_MARKUP = 1.3, STARTER_MARKUP = 1.6, SALES_PER_WINDOW = 2, WINDOW_ROUNDS = [1, 8], TRANSFER_LOG_CAP = 40, BOT_BUY_CASH = 2000000;
 const round25k = (v) => Math.round(v / 25000) * 25000;
@@ -74,6 +75,7 @@ function move(league, p, seller, buyer, price, kind = 'buy') {
   league.windowSales.n[seller.id] = (league.windowSales.n[seller.id] ?? 0) + 1;
   league.transferLog = [...(league.transferLog ?? []), { s, r, id: p.id, name: p.shortName, from: seller.id, to: buyer?.id ?? null, price, kind }].slice(-TRANSFER_LOG_CAP);
   league.offers = (league.offers ?? []).filter((o) => o.playerId !== p.id);
+  pruneChemistry(seller); if (buyer) pruneChemistry(buyer);   // samspil (v3.23.0): han er fremmed i den nye klub
   return youth;
 }
 

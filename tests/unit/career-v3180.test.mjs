@@ -15,7 +15,7 @@ const dupes = (L) => { const n = names(L); return n.length - new Set(n).size; };
 
 test('migrering 6 → 7 (gem fra v3.17.0, runde 9): truppen og alle felter intakte, ingen ældes, nye felter er der', () => {
   const raw = JSON.parse(R9);
-  assert.equal(raw.schemaVersion, 6); assert.equal(SCHEMA_VERSION, 8);   // v3.20.0: 7 → 8 kører bagefter (migrate-v3200)
+  assert.equal(raw.schemaVersion, 6); assert.equal(SCHEMA_VERSION, 9);   // v3.20.0: 7 → 8 kører bagefter (migrate-v3200); v3.23.0: 8 → 9 (samspil)
   const r = parseSave(R9);
   assert.ok(r.ok, r.error); assert.equal(r.migratedFrom, 6);
   const L = r.state.league, old = raw.league;

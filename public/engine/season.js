@@ -16,6 +16,7 @@ import { SEASON_ROUNDS, seasonRoundOf } from './schedule.js';
 import { emptyStanding } from './generator.js';
 import { PLAYER_SEASON_DEFAULTS, PLAYER_SEASON_FIELDS, TEAM_STAT_FIELDS } from './stats.js';
 import { REST_BENCH, afterMatchFreshness } from './freshness.js';
+import { applyChemistry, decayChemistry, pruneChemistry, leagueChemRef } from './chemistry.js';
 
 // Næste rundes kampe efter programmet (v3.11) som [hjemmeIdx, udeIdx]. Kampen med et
 // menneskestyret hold står først: avisen, afspilningen og Kamp-fanens første kort bygger på det.
@@ -157,6 +158,8 @@ export function commitRound(league, result, rng) {
 
   for (const m of result.matches) {
     applyStanding(league.leagueMetadata.standings, m);
+    // Samspil (v3.23.0): fælles minutter på nabopladser i den formation, holdet startede i
+    for (const [id, list] of [[m.homeId, m.ratings.home], [m.awayId, m.ratings.away]]) applyChemistry(byId.get(id), list, m.startFormations?.[id === m.homeId ? 'home' : 'away'] ?? byId.get(id).tactics.baseFormation, result.round);
     for (const [oppId, list] of [[m.awayId, m.ratings.home], [m.homeId, m.ratings.away]]) {
       const opp = byId.get(oppId);
       for (const r of list) {
@@ -196,6 +199,7 @@ export function commitRound(league, result, rng) {
     p.injuryMatchesLeft = Math.max(0, p.injuryMatchesLeft - 1);
   }
   for (const m of result.matches) for (const inj of m.injuries) players.get(inj.playerId).injuryMatchesLeft = inj.matches;
+  for (const t of league.teams) decayChemistry(t, result.round);
   // Træning (v3.18.0) – efter kampene og skaderne, før næste runde
   trainRound(league, result, minutesOf(result));
 
@@ -209,9 +213,12 @@ export function commitRound(league, result, rng) {
     const end = endSeason(league, result.round, true);
     payPrizes(league, result.round, league.seasons.at(-1).table);
     seasonTurnover(league);
+    for (const t of league.teams) pruneChemistry(t);   // pension: hans par forsvinder
     openWindow(league);   // transfervinduet ved sæsonslut
     if (result.gazette) result.gazette.seasonEnd = end;
   } else if (seasonRoundOf(league, result.round) === 7) openWindow(league);   // vinduet før runde 8
+  // Ligaens snit af samspil – efter sæsonskiftet og vinduets handler (QC: ellers forældet i en ny sæsons første runde)
+  league.leagueMetadata.chemRef = leagueChemRef(league);
   return league;
 }
 
