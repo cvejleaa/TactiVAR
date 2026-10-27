@@ -77,3 +77,27 @@ test('gemmet: et spor med gyldig log er gyldigt; en ødelagt log afviser sporet;
   for (const bad of [[[1, 'toString', 'h', 'a', 'b', null]], [[1, 'press', 'h', {}, 'b', null]], [[1, 'press', 'x', 'a', 'b', null]], [[1, 'cb', 'h', 'a', 'b', 3]], [[-1, 'press', 'h', 'a', 'b', null]], [[1, 'press', 'h', 'a']], 'x', Array(401).fill([1, 'press', 'h', 'a', 'b', null])])
     assert.equal(isValidTrace({ ...tr, acts: bad }), false, JSON.stringify(bad).slice(0, 60));
 });
+
+// Gemmet fra forrige version (CLAUDE.md, Release Manager): tests/fixtures/save-v3.21.2.json er lavet med v3.21.2-koden (main ce6d0ff):
+// ny liga (seed 19) + 6 runder + serialize. Sporet har ingen acts – det indlæses uændret (intet skema-bump), Kampens tal siger
+// "findes fra v3.22.0" (null, ikke 0), og den næste runde, spillet med v3.22.0, får loggen og overlever gem → indlæs.
+test('gem fra v3.21.2: indlæses uden migrering med sporene i behold; næste runde får handlingsloggen, og den overlever gem og indlæsning', async () => {
+  const fs = await import('node:fs');
+  const { parseSave, serialize } = await import('../../public/state/storage.js');
+  const { playRound, commitRound } = await import('../../public/engine/season.js');
+  const RAW = fs.readFileSync(new URL('../fixtures/save-v3.21.2.json', import.meta.url), 'utf8'), raw = JSON.parse(RAW);
+  const r = parseSave(RAW);
+  assert.ok(r.ok, r.error); assert.equal(r.migratedFrom, null);
+  const L = r.state.league, before = raw.league.lastRound.matches;
+  assert.equal(L.lastRound.matches.length, before.length);
+  L.lastRound.matches.forEach((m, i) => { assert.deepEqual(m.trace, before[i].trace, 'sporet er urørt'); assert.equal(m.trace.acts, undefined); });
+  const me = L.teams.find((t) => !t.isBot).id, mine = L.lastRound.matches.find((m) => m.homeId === me || m.awayId === me);
+  const side = mine.homeId === me ? 'h' : 'a';
+  assert.equal(actsOf(viewActs(mine.trace, side), side, (side === 'h' ? mine.ratings.home : mine.ratings.away)[0].playerId), null, 'ingen tal – ikke 0');
+  const rng = createRng(7); commitRound(L, playRound(L, rng), rng);
+  const back = parseSave(serialize({ league: L, notes: {}, ui: {} }));
+  assert.ok(back.ok, back.error);
+  const ms = back.state.league.lastRound.matches;
+  assert.ok(ms.every((m) => Array.isArray(m.trace?.acts) && m.trace.acts.length > 0), 'den nye runde har loggen efter gem → indlæs');
+  assert.deepEqual(ms.map((m) => m.trace.acts), L.lastRound.matches.map((m) => m.trace.acts));
+});
