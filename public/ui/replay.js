@@ -25,7 +25,10 @@ export function replaySteps(trace, highlights = false, events = null, idOf = nul
     if (!highlights) steps.push({ kind: 'frame', t: f.t, h: f.h, a: f.a, ball: f.ball, ev: null, poss: f.poss ?? null, duel: f.lost ? 'lost' : f.run ? 'run' : f.offside ? 'offside' : f.poss ? 'ball' : null });
     // Højdepunkter: halvchancen (v3.17.0, half) kun som mål – ellers blev uddraget en halv afspilning (Spilfører)
     for (const m of trace.moments.filter((x) => x.t === f.t && !(highlights && x.half && !x.scorer))) {
-      const step = { kind: 'moment', t: m.t, h: m.h, a: m.a, ball: m.ball, ev: m.ev, actor: m.scorer ?? m.shooter, assist: m.assist ?? null };
+      // from/recv (v3.22.1): oplæggerens plads og skyttens onside-plads, da bolden blev spillet (match.js momentAt)
+      const fq = m.from != null && m[m.side]?.find((q) => q[0] === m.from);
+      const step = { kind: 'moment', t: m.t, h: m.h, a: m.a, ball: m.ball, ev: m.ev, actor: m.scorer ?? m.shooter, assist: m.assist ?? null,
+        from: fq ? [fq[1], fq[2]] : null, recv: fq && m.recv ? m.recv : null };
       steps.push(step);
       const end = shotEnd(m, events?.[m.ev], idOf);
       // endPlayer: endepunktet er en spillers plads (redning, blokering) og tegnes som brikkerne; ellers et mållinje-punkt
@@ -131,6 +134,7 @@ export function replayEl(m, ownSide) {
   }
   function show() {
     const s = r.steps[r.i];
+    clearTimeout(r.leg); r.leg = null;
     if (!s) return;
     // Overgangene følger trinets længde ved alle hastigheder (QC: med faste 1,1 s hang brikkerne bagud ved 2× og 4×).
     // Grundbillede: bolden først (35 %), spillerne glider efter. Afslutning: skytten først, så bolden (Spilfører v3.16: bolden
@@ -154,6 +158,18 @@ export function replayEl(m, ownSide) {
     ball.style.transition = `left ${bt}, top ${bt}`; flag(ball, 'over', false);
     place(s, `left ${glide}, top ${glide}`);
     ball.style.left = vx(s.ball[0]) + '%'; ball.style.top = vy(s.ball[1]) + '%';
+    el.dataset.leg = '';
+    // Afleveringen før afslutningen (v3.22.1, brugeren: "så er målscoreren offside"): bolden til oplæggeren, mens skytten står
+    // onside på linjen (recv); så afleveringen derhen, og til sidst løber han ind og afslutter – samme trin, samme længde.
+    if (shot && s.from) {
+      const sh = r.tokens.get(s.actor), at = (t, xy) => { t.style.left = vx(xy[0]) + '%'; t.style.top = vy(xy[1]) + '%'; }, go = (ms) => `left ${ms}ms ease-in-out, top ${ms}ms ease-in-out`;
+      const leg = (name, fn, ms) => { r.leg = setTimeout(() => { fn(); el.dataset.leg = name; }, ms); };
+      ball.style.transition = go(Math.round(d * 0.25)); at(ball, s.from); el.dataset.leg = 'pass';
+      if (sh && s.recv) at(sh, s.recv);
+      const toShot = () => { if (sh) { sh.style.transition = go(Math.round(d * 0.25)); at(sh, s.ball); } ball.style.transition = go(Math.round(d * 0.25)); at(ball, s.ball); };
+      if (s.recv) leg('recv', () => { ball.style.transition = go(Math.round(d * 0.15)); at(ball, s.recv); leg('shot', toShot, Math.round(d * 0.2)); }, Math.round(d * 0.35));
+      else leg('shot', toShot, Math.round(d * 0.4));
+    }
     // Stillingen og teksten: den seneste hændelse til og med trinet (et øjeblik viser sin egen linje)
     // Et grundbillede er tick'ets duel, før afslutningerne (v3.16.1) – stillingen er den fra før (aldrig et mål for tidligt),
     // og teksten siger, hvordan duellen gik (QC v3.16.1: ellers står bolden pludselig hos modspilleren uden forklaring)

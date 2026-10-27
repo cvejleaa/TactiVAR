@@ -466,6 +466,12 @@ bedre kan kontrollere spil motoren".
   - ét billede pr. øjeblik (QC): positionerne er afleveringens øjeblik; i afslutningens billede står skytten i feltet
     (y ≤ SHOT_BOX_Y 12, x 30–70; langskud y 30–38, x 20–80), og i et offside-billede står den tjekkede på den side af
     linjen, VAR-kendelsen siger (kendelsen er stadig lodtrækningen). Afsparksbilledet: begge hold i egen halvdel.
+  - afleveringen før afslutningen (v3.22.1, brugeren: "bolden kommer fra venstre ind til målscoreren, men oplægsmanden står
+    bagved … så er målscorer offside, alle modstanderne er langt fremme"): billedet blandede afleveringens forsvar med skyttens
+    afslutningsplads. Øjeblikket har nu `from` (oplæggeren: målets oplæg, ellers tick'ets kombination i `acts`) og `recv`
+    (skyttens plads, da bolden blev spillet: hans bredde, på linjen + ONSIDE_GAP – kun når han i billedet står bag linjen).
+    Afspilningen: bolden til oplæggeren, mens skytten står onside (`recv`); afleveringen derhen; så løber han ind og afslutter –
+    i samme trin og samme tid. Kun sporet – kampene uændrede.
 - **Formationerne i billedet (v3.16.1**, brugeren: "2 spillere stående lige oven i hinanden … 7 spillere på midterlinjen ved
   start … ingen udvikling i starten af kampen … ingen heat map for modstander"):
   - sammenpresning i stedet for klemning (`squeeze`): de, der står foran målet for linjen/presset eller inden for

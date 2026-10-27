@@ -298,7 +298,7 @@ export function renderMatchCenter({ mc, myTeamId, on, column = null }) {
         // Et mål åbnet fra avisen markeres i referatet (samme minut, samme målscorer).
         h('div', { class: 'feed', id: 'feed' }, feed.map((e) => { const focus = mc.focus && /GOAL/.test(e.type) && e.min === mc.focus.min && e.text.includes(mc.focus.scorer);
           // Mål med øjebliksbillede (kun efter slutfløjt): 📍 viser, hvor dit hold stod.
-          const film = !mc.playing && moments.has(all.indexOf(e)) ? h('button', { class: 'mini replay-btn', title: 'Vis i afspilningen', onclick: () => on.replay(m, all.indexOf(e)) }, '🎬') : null;
+          const film = !mc.playing && moments.has(all.indexOf(e)) ? h('button', { class: 'mini replay-btn', title: 'Vis i afspilningen', dataset: { ev: all.indexOf(e) }, onclick: () => on.replay(m, all.indexOf(e)) }, '🎬') : null;
           // 📍 kun hvor afspilningen ikke har afslutningen (gamle kampe uden spor – QC v3.16.3: ellers to knapper, én handling)
           const pin = e.snapshot && !mc.playing && !film ? h('button', { class: 'mini snap-btn', title: e.snapshot.attacking ? 'Se hvor dit hold stod, da målet faldt' : 'Se hvor dit forsvar stod, da målet faldt', onclick: () => on.snapshot(all.indexOf(e)) }, '📍') : null;
           const row = h('div', { class: `ev ${e.category.toLowerCase()} ${e.type.toLowerCase()}${e.minor ? ' minor' : ''}${focus ? ' focus' : ''}${mc.snap === all.indexOf(e) ? ' snapped' : ''}`, id: focus ? 'goal-focus' : null }, h('span', { class: 'ev-min' }, evMin(e)), e.text, film, pin);

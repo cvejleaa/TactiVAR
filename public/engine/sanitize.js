@@ -160,7 +160,8 @@ const ACT_KINDS = new Set(['press', 'trap', 'flank', 'tackle', 'cb', 'run', 'cro
 export function isValidTrace(tr) {
   return !!tr && tr.v === 1 && Array.isArray(tr.frames) && tr.frames.length <= 31 && Array.isArray(tr.moments) && tr.moments.length <= 400
     && [...tr.frames, ...tr.moments].every((f) => f && Number.isInteger(f.t) && f.t >= 0 && f.t <= 30 && okBall(f.ball) && okPts(f.h) && okPts(f.a))
-    && tr.moments.every((m) => Number.isInteger(m.ev) && (m.side === 'h' || m.side === 'a'))
+    && tr.moments.every((m) => Number.isInteger(m.ev) && (m.side === 'h' || m.side === 'a')
+      && (m.from === undefined || typeof m.from === 'string') && (m.recv === undefined || okBall(m.recv)))   // v3.22.1: afleveringen før afslutningen
     // Kampens tal (v3.22.0): valgfri; [minut, art, side, spiller, modpart, udfald] – ældre spor har dem ikke
     && (tr.acts === undefined || (Array.isArray(tr.acts) && tr.acts.length <= 400 && tr.acts.every((x) => Array.isArray(x) && x.length === 6
       && Number.isInteger(x[0]) && x[0] >= 0 && x[0] <= 130 && ACT_KINDS.has(x[1]) && (x[2] === 'h' || x[2] === 'a')

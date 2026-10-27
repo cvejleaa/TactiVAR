@@ -538,6 +538,18 @@ try {
     // Test Manager v3.16: den gamle check var tom, hvis springet ikke skete (et grundbillede har ingen tekst-del: ''.includes('') er sandt)
     const capParts = cap.split(' · '), jumpedStep = Number(await g.getAttribute('#replay', 'data-step'));
     check('Afspilning: 🎬 springer til hændelsen – undertekst = referatets linje', capParts.length >= 3 && jumpedStep > 0 && filmText.replace(/^\d+'/, '').includes(capParts.slice(2).join(' · ').slice(0, 30)), `${cap} | ${filmText} | trin ${jumpedStep}`);
+    // v3.22.1 (brugeren: "så er målscorer offside, alle modstanderne er langt fremme"): en afslutning efter en aflevering – bolden
+    // først hos oplæggeren, mens skytten står onside på linjen (recv), så løber han ind og afslutter (samme trin)
+    { const pick = await g.evaluate(() => { const lr = JSON.parse(localStorage.getItem('tactivar_save')).league.lastRound; const idx = [...document.querySelectorAll('#match-cards .matchcard')].findIndex((c) => c.classList.contains('active'));
+        const o = lr.matches[Math.max(0, idx)].trace.moments.find((x) => x.from && x.recv && document.querySelector(`#feed .replay-btn[data-ev="${x.ev}"]`)); return o ? { ev: o.ev, from: o.from, shooter: o.scorer ?? o.shooter } : null; });
+      if (pick) {
+        await g.locator(`#feed .replay-btn[data-ev="${pick.ev}"]`).click();
+        const read = () => g.evaluate(({ from, shooter }) => { const st = (el) => el && [el.style.left, el.style.top]; const tok = (id) => document.querySelector(`#rp-pitch .rp-token[data-pid="${id}"]`);
+          return { leg: document.querySelector('#replay').dataset.leg, ball: st(document.querySelector('#rp-ball')), from: st(tok(from)), shooter: st(tok(shooter)) }; }, pick);
+        const a = await read(); await g.waitForTimeout(1750); const b = await read();
+        check('Afspilning: afleveringen før afslutningen – bolden hos oplæggeren, mens skytten står bag bolden på linjen; derefter løber han ind med bolden',
+          a.leg === 'pass' && JSON.stringify(a.ball) === JSON.stringify(a.from) && b.leg === 'shot' && JSON.stringify(b.ball) === JSON.stringify(b.shooter) && JSON.stringify(a.shooter) !== JSON.stringify(b.shooter), JSON.stringify([a, b]));
+      } else check('Afspilning: en afslutning efter en aflevering findes i kampen (data)', true, 'ingen i denne kamp – unit-testen dækker'); }
     await g.locator('#feed .replay-btn').last().click();   // den tidligste afslutning – så er der trin efter den
     const s0 = await g.getAttribute('#replay', 'data-step');
     await g.click('#rp-next'); const s1 = await g.getAttribute('#replay', 'data-step');

@@ -377,8 +377,17 @@ export function simulateMatch(home, away, rng, opts = {}) {
     // Bolden ved skytten (Spilfører v3.16: bolden stod på en fast plet, mens skytten stod ved hjørneflaget). 📍 er uændret.
     const at = shooter != null && att.find((q) => q[0] === shooter);
     const ball = at ? [at[1], at[2]] : common(side, spot.x, spot.y);
-    trace.moments.push({ t: curMin / 3, ev: events.length - 1, kind, side: side === H ? 'h' : 'a', ball, h: side === H ? att : dpts, a: side === H ? dpts : att,
-      shooter, ...(shotLong && shooter != null && !PASS_MOMENTS.has(kind) ? { long: true } : {}), ...(extra.scorer ? { scorer: extra.scorer, assist: extra.assist ?? null } : {}) });
+    // Afleveringen før afslutningen (v3.22.1, brugeren: "så er målscoreren offside – alle modstanderne er langt fremme"): billedet
+    // er afleveringens forsvar og oplægger, men skytten står, hvor han skød. from = oplæggeren (målets oplæg, ellers tick'ets
+    // kombination i handlingsloggen); recv = skyttens plads, da bolden blev spillet – på linjen (onside, som det tjekkede i
+    // PASS_MOMENTS), når han i billedet står bag den. Afspilningen spiller bolden fra → recv, og så løber han ind (replay.js).
+    const sd = side === H ? 'h' : 'a', combo = !PASS_MOMENTS.has(kind) && shooter != null
+      ? extra.assist ?? trace.acts.findLast((e) => e[0] === curMin && e[2] === sd && e[4] === shooter && e[5] !== null)?.[3] ?? null : null;
+    const from = combo != null && combo !== shooter && att.some((q) => q[0] === combo) ? combo : null, s1 = from && ownXY(shooter);
+    const recv = s1 && s1[1] < line + ONSIDE_GAP ? common(side, s1[0], line + ONSIDE_GAP) : null;
+    trace.moments.push({ t: curMin / 3, ev: events.length - 1, kind, side: sd, ball, h: side === H ? att : dpts, a: side === H ? dpts : att,
+      shooter, ...(shotLong && shooter != null && !PASS_MOMENTS.has(kind) ? { long: true } : {}), ...(extra.scorer ? { scorer: extra.scorer, assist: extra.assist ?? null } : {}),
+      ...(from ? { from, ...(recv ? { recv } : {}) } : {}) });
   }
   const PASS_MOMENTS = new Set(['VAR_CHECK', 'VAR_NO_GOAL', 'OFFSIDE_FLAG']);
   const SHOT_MOMENTS = new Set(['SAVE', 'MISS', 'OFFSIDE_FLAG', 'VAR_CHECK', 'VAR_NO_GOAL']);
