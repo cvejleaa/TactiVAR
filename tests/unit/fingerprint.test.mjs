@@ -23,7 +23,7 @@ import { fingerprint } from '../../tools/fingerprint.mjs';
 // v3.17.0: halvchancen (≈ 25 skud), KEEPER_EDGE 1,9, løft pr. løbe-indstilling (før df778b60…)
 // v3.17.0: halvchancen (≈ 25 skud, 27 % konvertering), opbygningens løft pr. løbe-indstilling (før 5aab5417…)
 // v3.18.0: afslutterne spredes (pulje ≥ 4, gentagelser × 0,65), cutback uden midtstopper (før 47d94e7a…)
-const NOPROSE_400 = '9bdaf01c6667898767c3991534212906148482d55ada988506bcea2ce4e25251';   // v3.21.0: spillerne bevæger sig (positions.js driftAt – motoren og sporet læser samme positioner), presser og markør efter afstand (nearPick), duel-tal (før b976d3f2…) · v3.20.0: uden for position (fit i ff), opstilling og indskiftere efter position, botternes trupper bygget til formationen, formationsskift fordeler efter position (før 498ff725…)
+const NOPROSE_400 = '8d3d32ba90143cde6d0fd827d387b3d7ff94df2e3881f4a5759683dab635c2d8';   // v3.21.0: spillerne bevæger sig (positions.js driftAt – motoren og sporet læser samme positioner; uden løbe-faktor), presser og markør efter afstand (nearPick), duel-tal, driftSeed ikke i resultatet (mellemtrin 9bdaf01c…; før b976d3f2…) · v3.20.0: uden for position (fit i ff), opstilling og indskiftere efter position, botternes trupper bygget til formationen, formationsskift fordeler efter position (før 498ff725…)
 
 test('fingeraftryk uden prosa: de 400 seedede kampe er de samme som ved sidste bevidste motorændring (v3.16.6 M5)', async () => {
   const r = await fingerprint(400);

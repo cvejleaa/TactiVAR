@@ -49,18 +49,21 @@ test('duels/duelsWon er private (viewRatingEntry): modstanderens ark viser dem i
   for (const k of ['duels', 'duelsWon']) assert.ok(RATING_PRIVATE_FIELDS.includes(k), k);
 });
 
-test('duel-tallene: pr. hold = presserens duel + modstanderens løb (som markør); vundet = pressWon + modstanderens tabte løb – ingen NaN, vundet ≤ dueller, målmanden aldrig', () => {
-  let press = 0, runs = 0, won = 0;
+// Offside-fælden er bagkædens duel, ikke presserens (5575241): presseren tælles i build-grenen og i pres-uden-fælde-grenen (pressWon − trapWon).
+test('duel-tallene: pr. hold = presserens duel (opbygning vundet + pres uden fælde) + modstanderens løb (som markør); vundet = pres uden fælde + modstanderens tabte løb – offside-fælden tæller ikke', () => {
+  let press = 0, runs = 0, won = 0, trap = 0;
   for (const { s, home, away, m } of G) for (const [side, team, other] of [['home', home, away], ['away', away, home]]) {
     const d = m.duelLog[team.id], o = m.duelLog[other.id], list = m.ratings[side];
     const sum = (k) => list.reduce((a, e) => a + e[k], 0);
     assert.ok(list.every((e) => Number.isInteger(e.duels) && Number.isInteger(e.duelsWon) && e.duelsWon <= e.duels), `seed ${s}: heltal, vundet ≤ dueller`);
-    assert.equal(sum('duels'), d.press + o.runs, `seed ${s} ${side}: dueller = pres (${d.press}) + modstanderens løb (${o.runs})`);
-    assert.equal(sum('duelsWon'), d.pressWon + (o.runs - o.runsWon), `seed ${s} ${side}: vundne = pres vundet (${d.pressWon}) + tabte løb (${o.runs - o.runsWon})`);
+    const noTrap = d.pressWon - d.trapWon;   // presset vandt uden fælde = presserens vundne duel
+    assert.equal(sum('duels'), d.press - d.trapWon + o.runs, `seed ${s} ${side}: dueller = pres (${d.press}) − fælde (${d.trapWon}) + modstanderens løb (${o.runs})`);
+    assert.equal(sum('duelsWon'), noTrap + (o.runs - o.runsWon), `seed ${s} ${side}: vundne = pres uden fælde (${noTrap}) + tabte løb (${o.runs - o.runsWon})`);
+    trap += d.trapWon;
     assert.ok(list.filter((e) => e.role === 'GK').every((e) => e.duels === 0), `seed ${s}: målmanden er aldrig nærmeste mand`);
     press += d.press; runs += o.runs; won += sum('duelsWon');
   }
-  assert.ok(press > 1500 && runs > 150 && won > 800 && won < press + runs, `data: pres ${press}, løb ${runs}, vundne ${won}`);   // begge slags dueller tælles
+  assert.ok(press > 1500 && runs > 150 && won > 700 && won < press + runs && trap > 100, `data: pres ${press}, løb ${runs}, vundne ${won}, fælder ${trap}`);   // begge slags dueller tælles, og fælder findes (ellers beviser det ikke at de er fraregnet)
 });
 
 // Presseren er en af de NEAR_POOL = 3 nærmeste midtbanespillere (vægt friskhed / afstand²) – målt i det billede, motoren regnede på
@@ -69,7 +72,7 @@ test('duel-tallene: pr. hold = presserens duel + modstanderens løb (som markør
 // afstand i stedet for afstand² (52 / 32 / 16), afstand³ (75 / 20 / 4), NEAR_MIN 20 (44 / 40 / 16), den fjerneste først (0 / 69 / 24).
 test('presseren vælges efter afstand: blandt de tre nærmeste midtbanespillere til opspilleren, oftest den nærmeste – men ikke altid', () => {
   const hist = [0, 0, 0, 0, 0, 0];
-  let n = 0;
+  let n = 0, own = 0, ownClose = 0;
   for (const { home, away, m } of BIG.slice(0, 500)) {
     const T = { h: home, a: away };
     const stop = m.events.find((e) => ['SUB', 'RED', 'TRIGGER'].includes(e.type))?.min ?? Infinity;   // før skift er alle 11 på banen med den trukne form
@@ -89,8 +92,10 @@ test('presseren vælges efter afstand: blandt de tre nærmeste midtbanespillere 
       const rank = ds.findIndex((x) => x.i === pr.slot);
       assert.ok(rank >= 0, `${tag(pr)} er en midtbanespiller`);
       hist[rank]++; n++;
+      if (/\[DIT PRES VIRKER\]/.test(e.text)) { own++; assert.equal(/han stod nærmest\./.test(e.text), rank === 0, `"nærmest" kun om nr. 1 (rang ${rank}): ${e.text}`); if (rank > 0) ownClose++; }
     }
   }
+  assert.ok(own >= 20 && ownClose >= 3, `data: ${own} egne erobringer, ${ownClose} tæt på`);
   const share = hist.map((x) => x / n);
   assert.ok(n >= 400, `data: ${n} erobringer`);
   assert.equal(hist.slice(3).reduce((a, b) => a + b, 0), 0, `kun de 3 nærmeste: ${hist}`);
@@ -130,14 +135,16 @@ test('markøren i midten er en af de tre nærmeste forsvarere til løberen – o
   assert.ok(hist[0] / n >= 0.5 && hist[0] / n < 1, `nærmeste ${hist[0] / n} (hist ${hist})`);
 });
 
-test('presset fortælles med den nærmeste mand: kun i dit eget holds referat, og kun på de to pres-linjer', () => {
-  let brydes = 0, virker = 0;
+test('presset fortælles kun i dit eget holds referat: "nærmest" kun om nr. 1, ellers "tæt på"; når presset brydes nævnes presseren ikke', () => {
+  let brydes = 0, nearest = 0, close = 0;
   for (const { m } of G) for (const e of m.events) {
-    if (/\[DIT PRES BRYDES\]/.test(e.text)) { brydes++; assert.match(e.text, / – din nærmeste mand når ikke frem\./); }
-    else if (/\[DIT PRES VIRKER\]/.test(e.text)) { virker++; assert.match(e.text, /erobrer bolden fra #\d+ .+ \(.+\) – han stod nærmest\./); }
-    else assert.doesNotMatch(e.text, /nærmeste mand|stod nærmest/, e.text);   // modstanderens og andre holds tekster røber intet om afstand
+    if (/\[DIT PRES BRYDES\]/.test(e.text)) { brydes++; assert.match(e.text, / – presset når ikke frem\./); assert.doesNotMatch(e.text, /nærmeste mand|nærmest|tæt på/); }
+    else if (/\[DIT PRES VIRKER\]/.test(e.text)) {
+      assert.match(e.text, /erobrer bolden fra #\d+ .+ \(.+\) – han stod (nærmest|tæt på)\./);
+      if (/han stod nærmest\./.test(e.text)) nearest++; else close++;
+    } else assert.doesNotMatch(e.text, /nærmeste mand|stod nærmest|stod tæt på|presset når ikke frem/, e.text);   // modstanderens og andre holds tekster røber intet om afstand
   }
-  assert.ok(brydes >= 20 && virker >= 10, `data: ${brydes} brydes, ${virker} virker`);
+  assert.ok(brydes >= 20 && nearest >= 8 && close >= 3, `data: ${brydes} brydes, ${nearest} nærmest, ${close} tæt på`);
 });
 
 // 🤼-kolonnen: dit ark har den (vundet / i alt), modstanderens ikke (det røber hvem der står nærmest = hans opstilling)

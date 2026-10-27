@@ -44,11 +44,11 @@ test('spejl ved grænsen, ikke klemt: kun få flyttede lander præcis på linjen
   assert.ok(atDeep / moved <= 0.04, `${atDeep} af ${moved} på modstanderens dybeste`);
 });
 
-// Gitteret (6000 tilfælde, find.mjs) rammer MIN_DEPTH-tilbagerulningen 2 gange: uden den har modstanderen 17 i dybden (grænsen er 18)
-test('MIN_DEPTH-tilbagerulningen: de to billeder hvor bevægelsen ellers presser modstanderen sammen til 17 holder 18', () => {
+// Gitteret (60000 tilfælde, find.mjs) rammer MIN_DEPTH-tilbagerulningen 32 gange: uden den har modstanderen 16–17 i dybden (grænsen er 18)
+test('MIN_DEPTH-tilbagerulningen: de to billeder hvor bevægelsen ellers presser modstanderen sammen til 16–17 holder 18', () => {
   const cases = [
-    [tac('4-1-4-1', 'HIGH_GEGENPRESS', 'MANY'), tac('4-2-3-1', 'MID_BLOCK'), 594, 9],
-    [tac('4-2-3-1', 'HIGH_GEGENPRESS', 'FEW'), tac('4-1-4-1', 'LOW_BLOCK'), 521, 22],
+    [tac('4-2-3-1', 'HIGH_GEGENPRESS', 'FEW'), tac('4-1-4-1', 'LOW_BLOCK'), 521, 22],   // uden tilbagerulning: 16
+    [tac('4-2-3-1', 'HIGH_GEGENPRESS', 'FEW'), tac('4-1-4-1', 'LOW_BLOCK'), 530, 5],    // uden: 17
   ];
   for (const [a, b, seed, t] of cases) {
     const r = coupledPositions(a, b, { ballX: 50, ballDrift: { seed, team: 1, t }, oppDrift: { seed, team: 2, t } });
@@ -57,17 +57,18 @@ test('MIN_DEPTH-tilbagerulningen: de to billeder hvor bevægelsen ellers presser
   }
 });
 
-// ROW_MAX-søgningen går FØRST mod hans plads (y0), ikke altid bagud: 2 af 80000 gitter-tilfælde (find.mjs) hvor retningen afgør (51 af 80000 rammer den)
+// ROW_MAX-søgningen går FØRST mod hans plads (y0), ikke altid bagud: 39 af 60000 gitter-tilfælde (find.mjs) hvor retningen afgør
 test('ROW_MAX: står han stadig i en fuld række, søger han den nærmeste ledige dybde mod sin plads – ikke i den anden retning', () => {
-  const r1 = coupledPositions(tac('5-4-1', 'LOW_BLOCK'), tac('5-3-2', 'LOW_BLOCK'), { ballX: 30, ballDrift: { seed: 578, team: 1, t: 9 }, oppDrift: { seed: 578, team: 2, t: 9 } });
-  assert.equal(r1.opp[4].y, 85, `modstanderens plads 4 (mutant: 81): ${r1.opp.map((q) => q.y)}`);
-  const r2 = coupledPositions(tac('4-3-3', 'LOW_BLOCK', 'MANY'), tac('4-4-2', 'HIGH_GEGENPRESS'), { ballX: 30, ballDrift: { seed: 533, team: 1, t: 23 }, oppDrift: { seed: 533, team: 2, t: 23 } });
-  assert.equal(r2.ball[7].y, 34, `boldholdets plads 7 (mutant: 32): ${r2.ball.map((q) => q.y)}`);
+  const dr = (seed, t) => ({ ballDrift: { seed, team: 1, t }, oppDrift: { seed, team: 2, t } });
+  const r1 = coupledPositions(tac('4-3-1-2', 'MID_BLOCK', 'FEW'), tac('5-4-1', 'MID_BLOCK'), { ballX: 88, ...dr(546, 12) });
+  assert.equal(r1.opp[2].y, 75, `modstanderens plads 2 (mutant: 71): ${r1.opp.map((q) => q.y)}`);
+  const r2 = coupledPositions(tac('4-3-3', 'HIGH_GEGENPRESS', 'FEW'), tac('4-4-2', 'MID_BLOCK'), { ballX: 30, ...dr(506, 27) });
+  assert.equal(r2.opp[4].y, 71, `modstanderens plads 4 (mutant: 69): ${r2.opp.map((q) => q.y)}`);
 });
 
 // driftAt (positions.js): hash, perioder, blanding, km-faktor, pres og løb overlevede alle movement-v3210.test.mjs (kun bånd og største udslag) og
 // blev kun fanget af golden-hashene. Her er funktionen pinnet: (seed 77, hold 1, tick 5, CM, plads 6) er den samme størrelse overalt, så kvotienterne
-// er de aftalte faktorer (spec §Bevægelse): pres LOW 0,85 / MID 1 / HIGH 1,2, løb FEW 0,9 / NORMAL 1 / MANY 1,15.
+// er de aftalte faktorer (spec §Bevægelse): pres LOW 0,85 / MID 1 / HIGH 1,2. Løb uden bold indgår IKKE (DRIFT_RUNS fjernet i 5575241: det udvandede løbenes effekt).
 test('driftAt: pinnede værdier og faktorer (pres, løb, rolle, hold, plads, tick)', async () => {
   const { driftAt } = await import('../../public/engine/positions.js');
   const near = (got, want, msg) => got.forEach((v, i) => assert.ok(Math.abs(v - want[i]) < 0.002, `${msg}: ${got.map((x) => x.toFixed(3))} mod ${want}`));
@@ -82,8 +83,11 @@ test('driftAt: pinnede værdier og faktorer (pres, løb, rolle, hold, plads, tic
   near(driftAt({ seed: 77, team: 2, t: 11.3 }, 'ST', 10), [2.016, -0.322], 'ST');
   near(driftAt({ seed: 4242, team: 1, t: 17 }, 'RW', 9), [-8.199, -3.852], 'RW');
   const base = driftAt(d, 'CM', 6);
-  for (const [p, r, f] of [['HIGH_GEGENPRESS', null, 1.2], ['LOW_BLOCK', null, 0.85], ['MID_BLOCK', null, 1], [null, 'MANY', 1.15], [null, 'FEW', 0.9], [null, 'NORMAL', 1], ['HIGH_GEGENPRESS', 'MANY', 1.2 * 1.15], ['LOW_BLOCK', 'FEW', 0.85 * 0.9]]) {
-    near(driftAt(d, 'CM', 6, ph(p, r)), base.map((v) => v * f), `${p}/${r} × ${f}`);
+  for (const [p, f] of [['HIGH_GEGENPRESS', 1.2], ['LOW_BLOCK', 0.85], ['MID_BLOCK', 1]]) near(driftAt(d, 'CM', 6, ph(p, null)), base.map((v) => v * f), `${p} × ${f}`);
+  // Løb uden bold ændrer ikke bevægelsen (før: MANY 1,15 / FEW 0,9) – hverken alene eller sammen med pres
+  for (const r of ['FEW', 'NORMAL', 'MANY']) {
+    near(driftAt(d, 'CM', 6, ph(null, r)), base, `løb ${r}`);
+    near(driftAt(d, 'CM', 6, ph('HIGH_GEGENPRESS', r)), base.map((v) => v * 1.2), `HIGH + løb ${r}`);
   }
 });
 
@@ -101,13 +105,13 @@ test('pinnede billeder: apartFrom-fladen (caught, højre først, 3–97), ROW_MA
   const col = (pts, k) => pts.map((q) => q[k]).join(',');
   // apartFrom(opp) ved en erobring (caught) skal også finde en ledig plads: uden resolve står plads 9 på 62 (mutant R02), med på 68
   assert.equal(col(run('5-4-1', 'LOW_BLOCK', 'FEW', '5-3-2', 'LOW_BLOCK', 30, 591, 17, true).opp, 'x'), '50,18,36,58,77,94,34,61,80,68,62');
-  // søgningen går først mod venstre (x − d) ved lige afstand: plads 8 på 37 (mutant R09: 71)
-  assert.equal(col(run('4-2-3-1', 'MID_BLOCK', 'MANY', '4-1-4-1', 'HIGH_GEGENPRESS', 50, 522, 7).ball, 'x'), '50,13,39,58,85,26,66,26,37,86,53');
+  // søgningen går først mod venstre (x − d) ved lige afstand: plads 8 på 40 (mutant R09: 64)
+  assert.equal(col(run('4-3-1-2', 'HIGH_GEGENPRESS', 'NORMAL', '5-4-1', 'HIGH_GEGENPRESS', 88, 559, 23).ball, 'x'), '50,22,48,80,86,38,62,88,40,52,74');
   // ledige pladser ligger inden for 3–97, ikke 0–100: plads 4 på 59 (mutant R10: 98)
   assert.equal(col(run('4-4-1-1', 'HIGH_GEGENPRESS', 'NORMAL', '4-3-1-2', 'HIGH_GEGENPRESS', 70, 508, 11, true).ball, 'x'), '50,17,37,80,59,11,34,74,86,57,54');
-  // ROW_MAX: kandidaterne [−d, d/2, −d/2, 0, 2d, −2d]: opp plads 5 på 74 (mutant A05k, kun −d: 77); boldhold plads 1 på 38 (mutant A05l, uden 0: 44)
+  // ROW_MAX: kandidaterne [−d, d/2, −d/2, 0, 2d, −2d]: opp plads 5 på 74 (mutant A05k, kun −d: 77); boldhold plads 1 på 38 (mutant A05l, uden 0: 40)
   assert.equal(col(run('4-2-3-1', 'HIGH_GEGENPRESS', 'FEW', '4-1-4-1', 'LOW_BLOCK', 50, 502, 26).opp, 'y'), '90,78,83,80,68,74,65,67,56,68,64');
-  assert.equal(col(run('5-4-1', 'MID_BLOCK', 'MANY', '5-3-2', 'HIGH_GEGENPRESS', 30, 518, 8).ball, 'y'), '90,38,61,62,56,49,28,27,28,29,26');
+  assert.equal(col(run('5-4-1', 'MID_BLOCK', 'MANY', '5-3-2', 'HIGH_GEGENPRESS', 30, 518, 8).ball, 'y'), '90,38,61,62,57,48,29,26,29,30,26');
   // MIN_DEPTH måles på hele holdet (rowIdx), ikke kun de bevægede (A06b): modstanderens y i dette billede
   assert.equal(col(run('4-4-2', 'LOW_BLOCK', 'FEW', '3-5-2', 'MID_BLOCK', 12, 543, 15).opp, 'y'), '90,68,74,68,56,56,55,61,60,55,51');
   // modstanderen får ikke fade (C12: hans forreste ville dæmpes ved boldholdets bageste): plads 8–10 på 25,16,23 (mutant 24,18,18)
@@ -124,8 +128,8 @@ test('dybden flytter begge hold: boldholdets og modstanderens markspillere står
 });
 
 // Rækkefølgen squeeze → applyDepth → spread (ikke spread før applyDepth): spredningen ser den bevægede dybde. Én pinnet sag (gitter-nr. 4 i find.mjs):
-// spread-først giver x 94 og 89 for plads 7 og 10 (her 93 og 86) – ingen invariant skiller dem ad (MIN_APART-brud 66 begge veje).
+// spread-først giver x 84 og 89 for plads 7 og 10 (her 86 og 91) – ingen invariant skiller dem ad (MIN_APART-brud 66 begge veje).
 test('rækkefølge: spredningen på tværs sker EFTER dybden (pinnet billede)', () => {
   const r = coupledPositions(tac('3-4-3', 'MID_BLOCK', 'FEW'), tac('4-3-3', 'MID_BLOCK'), { ballX: 88, ballDrift: { seed: 504, team: 1, t: 21 }, oppDrift: { seed: 504, team: 2, t: 21 } });
-  assert.equal(r.ball.map((q) => q.x).join(','), '50,34,61,91,22,38,66,93,43,57,86');
+  assert.equal(r.ball.map((q) => q.x).join(','), '50,33,61,91,23,37,65,86,43,57,91');
 });
