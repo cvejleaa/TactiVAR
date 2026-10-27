@@ -154,7 +154,8 @@ function start() {
     game = r.state; view.savedAt = r.state.savedAt;
     if (r.repairs?.length) view.notice = `🛠 ${r.repairs.join(' ')}`;
     if (r.migratedFrom != null) {
-      view.notice = migrationNotice(r.migratedFrom) + (r.backupKey ? ' Det gamle spil ligger som backup i browseren.' : '');
+      const note = migrationNotice(r.migratedFrom);
+      if (note) view.notice = note + (r.backupKey ? ' Det gamle spil ligger som backup i browseren.' : '');
       view.backupKey = r.backupKey || null; // knap i beskeden: hent den gamle version som fil
       // Gem straks i det nye format (ellers tog hver genindlæsning en ny backup) – men kun
       // når backuppen af det gamle format lykkedes; ellers står det gamle urørt, og der advares.
@@ -185,7 +186,8 @@ function tiredStarters() {
 // Forklaringen på en migrering – både ved indlæsning og ved import af en ældre fil.
 function migrationNotice(from) {
   if (from == null) return '';
-  return 'Dit spil er opdateret: ' + [
+  // 8 → 9 (v3.23.0, samspil): intet at fortælle endnu – samspillet har ingen virkning, før det kan ses (QC)
+  const lines = [
     from <= 1 ? 'Hvis-Så-regler kan nu sættes til "Bagud/Foran med mindst N mål" og skifte til dine egne planer – "Foran med 1" gælder fra 1 mål og opefter.' : '',
     from <= 2 ? 'Mod-kunnen er sat ca. 45 % ned (alle hold): hver spiller har nu højst 100 point fordelt på de tre stilarter – lærer han noget nyt, glemmer han lidt af det gamle.' : '',
     from <= 3 ? 'Spillerhøjderne er rettet efter Superliga-målinger (ligasnit ca. 184 cm, 168–201 cm) – hver spiller beholder sin plads i højde-rækkefølgen i sin kæde, og luftduellerne er regnet om. Friskhed betyder nu noget: en kamp koster efter løbet distance, og en træt spiller yder mindre (50 % friskhed ≈ 12,5 % svagere).' : '',
@@ -193,7 +195,8 @@ function migrationNotice(from) {
     from <= 6 ? 'Ny i v3.18: træning, aldring, økonomi og transfers – se 💼 Klub. Alle spillere bliver et år ældre ved sæsonslut, lønnen følger nu de offentlige stjerner og alderen, og spillere med samme kortnavn på tværs af holdene har fået et nyt navn.' : '',
     from <= 4 ? 'Hver spiller har nu en naturlig position (kolonnen "Natur"), og højden følger Superliga-dokumentets tabel pr. position: midtstoppere og målmænd højere, backs og kanter lavere. Den højeste i hver position er stadig den højeste – i hver kæde blev de højeste til stoppere/angribere og de laveste til backs/kanter. Luftduellerne er regnet om. Løbene i kampen følger nu den plads, spilleren står på (CM løber længst, kanter og wingbacks har flest højintense løb) – sæsonens km og andel højintenst på spillerkortet blander indtil videre den gamle og den nye beregning.' : '',
     from <= 7 ? dmNotice() : '',
-  ].filter(Boolean).join(' ');
+  ].filter(Boolean);
+  return lines.length ? 'Dit spil er opdateret: ' + lines.join(' ') : '';
 }
 // 7 → 8 (v3.20.0, QC): hvem der blev DM på dit hold, og hvor mange af dine der nu står uden for position – din opstilling er urørt
 function dmNotice() {

@@ -8,10 +8,11 @@ import { initialPotential, publicWage, uniquifyNames, derivedRng } from '../engi
 import { buildSchedule } from '../engine/schedule.js';
 import { FORMATIONS, lineOfRole, positionOfRole, arrangeByFit } from '../engine/formations.js';
 import { endSeason } from '../engine/season.js';
+import { seedChemistry } from '../engine/chemistry.js';
 
 export const SAVE_KEY = 'tactivar_save';
 export const BACKUP_PREFIX = 'tactivar_backup_';
-export const SCHEMA_VERSION = 8;
+export const SCHEMA_VERSION = 9;
 
 // Migreringer: MIGRATIONS[n] løfter et gemt objekt fra skema n til n+1. Tilføj en ny,
 // hver gang gemme-formatet ændres – sammen med et fixture fra forrige version i
@@ -139,6 +140,13 @@ export const MIGRATIONS = {
       if (t.isBot && slots.length === 11 && slots.every((id) => byId.has(id))) t.tactics.lineupSlots = arrangeByFit(slots.map((id) => byId.get(id)), t.tactics.baseFormation).map((p) => p.id);
     }
     return { ...d, schemaVersion: 8 };
+  },
+  // 8 → 9 (v3.23.0): samspil – hvert hold får sin tabel med alle par af markspillere på BASE ("truppen har spillet sammen før"),
+  // så intet hold spiller anderledes efter migreringen. Backuppen tages af loadGame (alle migreringer).
+  8: (d) => {
+    const L = d.league;
+    if (L && Array.isArray(L.teams)) for (const t of L.teams) if (Array.isArray(t.squad)) seedChemistry(t, Number.isInteger(L.leagueMetadata?.round) ? L.leagueMetadata.round : 0);
+    return { ...d, schemaVersion: 9 };
   },
 };
 const pick = (o, keys) => Object.fromEntries(keys.filter((k) => o[k] !== undefined).map((k) => [k, o[k]]));

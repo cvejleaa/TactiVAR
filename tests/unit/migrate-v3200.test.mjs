@@ -15,7 +15,7 @@ const outOfPos = (t) => t.tactics.lineupSlots.filter((id, i) => fitOf(t.squad.fi
 
 for (const [name, RAW] of [['runde 9, dit hold i 4-3-3', R9], ['efter sæsonslut', R15]]) test(`migrering 7 → 8 (${name}): én DM pr. hold, alt andet intakt, dit hold og dine positioner urørt`, () => {
   const raw = JSON.parse(RAW);
-  assert.equal(raw.schemaVersion, 7); assert.equal(SCHEMA_VERSION, 8);
+  assert.equal(raw.schemaVersion, 7); assert.equal(SCHEMA_VERSION, 9);   // v3.23.0: 8 → 9 (samspil) kører bagefter
   const r = parseSave(RAW);
   assert.ok(r.ok, r.error); assert.equal(r.migratedFrom, 7);
   const L = r.state.league;

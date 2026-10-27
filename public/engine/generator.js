@@ -5,6 +5,7 @@ import { TEAM_STAT_DEFAULTS, PLAYER_SEASON_DEFAULTS } from './stats.js';
 import { generateScoutingClues } from './clues.js';
 import { buildSchedule, shuffledIds } from './schedule.js';
 import { initialPotential, publicWage, uniquifyNames, derivedRng, bestEleven } from './career.js';
+import { seedChemistry } from './chemistry.js';
 
 export const TEAM_NAMES = ['Bibamus United', 'FC Vejleå', 'Ølstykke IF', 'Lyngby Tacticians', 'Nordkysten BK', 'Furesø Boldklub', 'Roskilde Rovers', 'Kronborg United'];
 
@@ -282,6 +283,7 @@ export function createLeague(rng) {
   // Unikke kortnavne i hele ligaen (v3.18.0, brugeren): afledt rng af truppen, så kampene er de samme
   uniquifyNames(teams, derivedRng('names', ...teams.flatMap((t) => t.squad.map((p) => p.name))), FIRST_NAMES, LAST_NAMES);
   // Observationer ligger hos observatøren (dig), ikke på spilleren (spec §2 "Rettet").
+  for (const t of teams) seedChemistry(t, 0);   // samspil (v3.23.0): truppen har spillet sammen før – alle par på BASE
   // Ligaen starter med de indtryk, man har fra forsæsonen.
   // scouting[observatørens hold-id][spiller-id] – i trin 2 bliver det ét dokument pr. bruger.
   const scouting = {};

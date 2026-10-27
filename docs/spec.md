@@ -530,6 +530,17 @@ bedre kan kontrollere spil motoren".
   skal deles op pr. side i trin 2; en kamp fra før v3.22.0 viser "findes fra v3.22.0", aldrig 0. Over 8 poster pr. kamp (acts-v3220.test.mjs; ca. 13 og 0,5 KB i 200 kampe),
   kun i den seneste runde. Ikke pr. zone: positionerne er en formel (rolle og pres), så en zone ville gentage rollen
   (QC). Samspil som mekanik (par, der spiller sig sammen) er overvejet som næste trin.
+- **Samspil (v3.23.0 – data; virkning og visning i v3.24.0)** (brugerens landstræner: "hvordan spillerne arbejder/tænker
+  sammen"; brugeren valgte "i forhold til ligaen"; `engine/chemistry.js`, `tools/measure-chemistry.mjs`): `team.chemistry =
+  { "idA|idB": [samspil 0–100, sidste fælles runde] }`. Nabopar efter afstand i FORMATIONS (≤ 29; målmanden uden par; hver
+  markplads har mindst én nabo – ellers den nærmeste). Efter hver kamp: `samspil += 0,14 · (100 − samspil) · fælles min/90` for
+  nabopar i den formation, holdet startede i (indskiftere fra deres minut; Hvis-Så kan flytte pladser uden at arket følger – accepteret).
+  Efter hver runde: alle par trækkes 0,035 · (samspil − 30) ned (et fast par ender ≈ 86, et med halvdelen af kampene lavere), og
+  efter 3+ runder uden fælles minutter desuden −5; ved 30 slettes parret. Et ukendt par er fremmede (30): et køb, en ungdomsspiller
+  – salg, køb og pension sletter hans par. Seed (ny liga, migrering 8 → 9, et hold uden tabel): alle par af markspillere på 78 =
+  botternes ligevægt (målt 79,6 over 4 seeds × 4 sæsoner; uden trækket 97,6 – alt mættede). `leagueMetadata.chemRef` = ligaens
+  snit af nabopar i opstillingerne – virkningen i kampene måles mod det (v3.24.0). Tabellen fylder ≈ 27 KB ved seed og ≈ 10 KB
+  efter en sæson (loft 300 par pr. hold i sanitize). Kampene er uændrede i v3.23.0 (fingeraftrykket).
 - **Heat map** (karakterarket, dit hold – v3.20.0: står fra start over startopstillingen, som modstanderens zonekort; 📍 erstatter
   kun opstillingen): viser holdets tæthed (v3.20.2: 12 × 18 felter, før 6 × 9; uden målmand) af grundbilleder og
   øjeblikke plus vejen mellem to grundbilleder (punkter hver 2. enhed, vægt 0,5; kun når spilleren er med i begge – ingen streg
@@ -875,7 +886,8 @@ referaterne).
   ændrer skemaet, tilføjer et fixture gemt af den forrige version og en
   test, der indlæser det med truppen intakt. Skema 1 → 2 (v3.4, Hvis-Så) og
   2 → 3 (v3.6, mod-kunnen-pulje og højde), 3 → 4 (v3.7, Superliga-højder), 4 → 5 (v3.8,
-  naturlig position og højde pr. position), 7 → 8 (v3.20.0, DM: pr. hold én CM → DM – CM på CDM-plads, ellers en
+  naturlig position og højde pr. position), 8 → 9 (v3.23.0, samspil: hvert hold får alle par af markspillere på 78 ved
+  ligaens runde – intet andet ændres, ingen besked; fixture `save-v3.22.1.json`, test i `chemistry-v3230.test.mjs`), 7 → 8 (v3.20.0, DM: pr. hold én CM → DM – CM på CDM-plads, ellers en
   ikke-starter uden STAR, ellers en uden STAR, laveste rygnummer; botternes startere får den rolle, de har spillet
   (samme kæde – højden røres ikke), og de 11 fordeles efter position; dit hold røres ellers ikke; fixtures
   `save-v3.19.0.json` (runde 9, dit hold i 4-3-3) og `save-v3.19.0-r15.json`), 6 → 7 (v3.18.0, livsløbet: nye felter med standardværdier, løn efter

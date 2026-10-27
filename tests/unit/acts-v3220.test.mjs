@@ -87,7 +87,7 @@ test('gem fra v3.21.2: indlæses uden migrering med sporene i behold; næste run
   const { playRound, commitRound } = await import('../../public/engine/season.js');
   const RAW = fs.readFileSync(new URL('../fixtures/save-v3.21.2.json', import.meta.url), 'utf8'), raw = JSON.parse(RAW);
   const r = parseSave(RAW);
-  assert.ok(r.ok, r.error); assert.equal(r.migratedFrom, null);
+  assert.ok(r.ok, r.error); assert.equal(r.migratedFrom, 8);   // v3.23.0: 8 → 9 (samspil) – sporet er stadig urørt
   const L = r.state.league, before = raw.league.lastRound.matches;
   assert.equal(L.lastRound.matches.length, before.length);
   L.lastRound.matches.forEach((m, i) => { assert.deepEqual(m.trace, before[i].trace, 'sporet er urørt'); assert.equal(m.trace.acts, undefined); });
