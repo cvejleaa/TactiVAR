@@ -18,7 +18,7 @@ const FOCUS_OF = { GK: 'KEEPER', DEF: 'DEFENCE', MID: 'TECH', ATT: 'FINISH' };
 function activeTurn(L) {
   const me = L.teams.find((t) => !t.isBot);
   for (const p of me.squad) p.trainingFocus = p.age <= 25 ? FOCUS_OF[p.line] : 'GENERAL';
-  for (const y of [...(me.youthOffers ?? [])]) if (me.squad.length < 22) takeYouth(me, y.id);
+  for (const y of [...(me.youthOffers ?? [])]) if (me.squad.length < 22) takeYouth(me, y.id, L);
   if (windowOf(L) != null && !L._bought?.[windowOf(L)]) {
     const line = Object.keys(LINE_MIN).sort((a, b) => me.squad.filter((p) => p.line === a).length / LINE_MIN[a] - me.squad.filter((p) => p.line === b).length / LINE_MIN[b])[0];
     const cand = L.teams.filter((t) => t.isBot).flatMap((t) => t.squad.filter((p) => p.line === line).map((p) => ({ p, m: marketInfo(L, me, t, p) }))).filter((o) => !o.m.reason).sort((a, b) => a.m.price - b.m.price);

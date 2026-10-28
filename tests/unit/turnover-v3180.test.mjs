@@ -147,14 +147,14 @@ test('under 18 efter pension: dit hold fyldes op med ungdom automatisk (aldrig u
 test('ungdomstilbud: Tag op (højst 25, ikke i minus), Lad gå – og ubesvarede går ved næste runde', () => {
   const L = toSeasonEnd(6), me = own(L), [a, b] = me.youthOffers, n = me.squad.length;
   me.cashBalance = -1;
-  assert.match(takeYouth(me, a.id), /minus/); assert.equal(me.squad.length, n);
+  assert.match(takeYouth(me, a.id, L), /minus/); assert.equal(me.squad.length, n);
   me.cashBalance = 1000;
-  assert.equal(takeYouth(me, a.id), null); assert.equal(me.squad.length, n + 1); assert.ok(me.squad.some((p) => p.id === a.id));
-  assert.match(takeYouth(me, a.id), /udløbet/);
+  assert.equal(takeYouth(me, a.id, L), null); assert.equal(me.squad.length, n + 1); assert.ok(me.squad.some((p) => p.id === a.id));
+  assert.match(takeYouth(me, a.id, L), /udløbet/);
   dropYouth(me, b.id); assert.deepEqual(me.youthOffers, []);
   const L2 = toSeasonEnd(6), me2 = own(L2);
   while (me2.squad.length < SQUAD_MAX) me2.squad.push({ ...me2.squad[17], id: `fill${me2.squad.length}` });
-  assert.match(takeYouth(me2, me2.youthOffers[0].id), /fuld/);
+  assert.match(takeYouth(me2, me2.youthOffers[0].id, L2), /fuld/);
   const rng = createRng(1);
   commitRound(L2, playRound(L2, rng), rng);
   assert.deepEqual(me2.youthOffers, [], 'udløbet ved næste runde');

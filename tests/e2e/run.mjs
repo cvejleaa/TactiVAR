@@ -1129,9 +1129,26 @@ try {
     const nBefore = await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((t) => !t.isBot).squad.length);
     check('Sæsonslut, Liga: sæsonrapporten – ældre, ny løn og 2 ungdomstilbud med Tag op / Lad gå', (await g.isVisible('#season-report')) && (await g.textContent('#sr-aged')).includes('et år ældre')
       && (await g.textContent('#sr-wages')).includes('pr. runde') && (await g.locator('#youth-offers .youth-offer').count()) === 2 && !/undefined|NaN/.test(await g.textContent('#season-report')));
+    const takenId = await g.locator('#youth-offers .youth-offer').first().getAttribute('data-yid');
     await g.locator('#youth-offers .youth-take').first().click();
     const nAfter = await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((t) => !t.isBot).squad.length);
     check('Sæsonslut: Tag op – spilleren er i truppen (gemt), og ét tilbud er tilbage', nAfter === nBefore + 1 && (await g.locator('#youth-offers .youth-offer').count()) === 1, `${nBefore} → ${nAfter}`);
+    // v3.24.1 (Test Manager): Tag op i APPEN sender ligaen videre – den optagne har lastMove = vinduets id i det gemte spil, og i Klub står
+    // karantænen som årsag (ingen Sælg/Fritstil) – ellers kan han sælges straks for ≈ 350.000 kr. (pengemaskine)
+    const tq = await g.evaluate(async (id) => {
+      const { windowOf } = await import('/engine/transfers.js');
+      const l = JSON.parse(localStorage.getItem('tactivar_save')).league, p = l.teams.find((t) => !t.isBot).squad.find((x) => x.id === id);
+      return { w: windowOf(l), lm: p?.lastMove };
+    }, takenId);
+    check('Sæsonslut: Tag op giver karantæne som et køb – lastMove = vinduets id i det gemte spil', tq.w != null && tq.lm === tq.w, JSON.stringify(tq));
+    await g.evaluate((id) => { const d = JSON.parse(localStorage.getItem('tactivar_save')), me = d.league.teams.find((t) => !t.isBot); me.listed = [id]; localStorage.setItem('tactivar_save', JSON.stringify(d)); }, takenId);
+    await g.reload(); await g.waitForSelector('body[data-klar="ja"]');
+    await tab('klub');
+    const qRow = g.locator(`.market-row[data-pid="${takenId}"]`), qTxt = await qRow.textContent();
+    check('Sæsonslut, Klub: den optagne ungdomsspiller til salg viser karantænen ("kom til klubben i dette eller sidste vindue") – hverken Sælg, Fritstil eller bud',
+      qTxt.includes('kom til klubben i dette eller sidste vindue – kan handles igen ved sæsonslut før sæson') && !qTxt.includes('skiftede klub') && (await qRow.locator('.offer-accept, .release').count()) === 0 && !qTxt.includes('Bud fra'), qTxt);
+    await g.evaluate(() => { const d = JSON.parse(localStorage.getItem('tactivar_save')), me = d.league.teams.find((t) => !t.isBot); me.listed = []; localStorage.setItem('tactivar_save', JSON.stringify(d)); });
+    await g.reload(); await g.waitForSelector('body[data-klar="ja"]');
     await tab('trup');
     check('Sæsonslut, Trup: "1 ungdomstilbud venter" med link til rapporten', (await g.textContent('#youth-pending')).includes('1 ungdomstilbud'));
     // v3.18.0 transfers: vinduet er åbent ved sæsonslut – køb en spiller, der kan købes, til den viste faste pris
