@@ -58,8 +58,11 @@ Firebase-konsollen for projektet **tactivar**:
    APIs & Services → Credentials → nøglen: *Application restrictions* = HTTP referrers `https://tactivar.web.app/*`,
    *API restrictions* = Identity Toolkit API + Token Service API + Cloud Firestore API.
 3. **Læse-nøgle til `tools/fetch-match.mjs`:** https://console.cloud.google.com/iam-admin/serviceaccounts?project=tactivar →
-   **Opret servicekonto** `github-read` med rollen **Cloud Datastore Viewer** (kun læsning) → Nøgler → JSON. Læg indholdet i
-   miljøvariablen `FIREBASE_READ_KEY` (Claude-miljøets indstillinger → Network secrets). Slet filen bagefter.
+   **Opret servicekonto** `github-read` med rollen **Cloud Datastore Viewer** (kun læsning) → Nøgler → JSON. Åbn filen i
+   Notesblok og kopiér to værdier (uden anførselstegn) ind under Claude-miljøets indstillinger → **Miljøvariabler**, én
+   linje hver: `FIREBASE_READ_EMAIL=<client_email>` og `FIREBASE_READ_PRIVATE_KEY=<private_key>` (den lange linje, der
+   starter med `-----BEGIN PRIVATE KEY-----\n` – præcis som i filen). Gem; en ny session læser dem. Slet filen bagefter.
+   (Network secrets passer ikke her: de sætter en fast header, men værktøjet skal selv signere med nøglen.)
 
 Hent en kamp: `node tools/fetch-match.mjs K-7F3Q --replay` (gemmer `kampe/K-7F3Q.json`, ignoreret af git).
 Reglerne testes mod emulatoren med `npm run test:rules` (også i CI).

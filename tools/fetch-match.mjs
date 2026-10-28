@@ -20,15 +20,25 @@ async function accessToken(key) {
   return (await r.json()).access_token;
 }
 
+// Nøglen fra miljøet: enten hele JSON-filen (FIREBASE_READ_KEY) eller – lettere at indsætte i miljøets "Miljøvariabler", én
+// linje hver – FIREBASE_READ_EMAIL (client_email) og FIREBASE_READ_PRIVATE_KEY (private_key, med \n som i filen)
+const unquote = (v) => v.trim().replace(/^"(.*)"$/s, '$1');
+export function readKey(env) {
+  if (env.FIREBASE_READ_KEY) return JSON.parse(env.FIREBASE_READ_KEY);
+  if (env.FIREBASE_READ_EMAIL && env.FIREBASE_READ_PRIVATE_KEY) {
+    const client_email = unquote(env.FIREBASE_READ_EMAIL), private_key = unquote(env.FIREBASE_READ_PRIVATE_KEY).replace(/\\n/g, '\n');
+    return { client_email, private_key, project_id: env.FIREBASE_READ_PROJECT ?? client_email.split('@')[1]?.split('.')[0] ?? 'tactivar' };
+  }
+  throw new Error('Nøglen mangler: sæt FIREBASE_READ_EMAIL og FIREBASE_READ_PRIVATE_KEY (eller FIREBASE_READ_KEY) – se README, afsnittet "Kamp-id".');
+}
+
 export async function fetchMatch(id) {
   if (!ID_RE.test(id)) throw new Error(`"${id}" er ikke et kamp-id (K-XXXX).`);
   const emu = process.env.FIRESTORE_EMULATOR_HOST;
   let url, auth;
   if (emu) { url = `http://${emu}/v1/projects/${process.env.GCLOUD_PROJECT ?? 'demo-tactivar'}/databases/(default)/documents/matches/${id}`; auth = 'Bearer owner'; }
   else {
-    const raw = process.env.FIREBASE_READ_KEY;
-    if (!raw) throw new Error('FIREBASE_READ_KEY mangler – se README, afsnittet "Kamp-id".');
-    const key = JSON.parse(raw);
+    const key = readKey(process.env);
     url = `https://firestore.googleapis.com/v1/projects/${key.project_id}/databases/(default)/documents/matches/${id}`; auth = `Bearer ${await accessToken(key)}`;
   }
   const r = await fetch(url, { headers: { authorization: auth } });

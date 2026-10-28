@@ -36,7 +36,7 @@ async function anonToken(cfg, storage, fetchFn) {
     if (r.ok) { const j = await r.json(); return { token: j.id_token, uid: j.user_id }; }
   }
   const r = await fetchFn(ep.signUp, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ returnSecureToken: true }) });
-  if (!r.ok) throw new Error(`Anonym login fejlede (${r.status}) – er "Anonymous" slået til i Firebase?`);
+  if (!r.ok) throw new Error(`Kampen kunne ikke sendes lige nu – prøv igen senere (login: ${r.status}).`);   // QC v3.24.4: spillerens sprog
   const j = await r.json();
   try { storage.setItem(TOKEN_KEY, JSON.stringify({ refreshToken: j.refreshToken })); } catch { /* fuldt lager: ny bruger næste gang */ }
   return { token: j.idToken, uid: j.localId };
