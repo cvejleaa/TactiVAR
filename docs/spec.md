@@ -544,7 +544,7 @@ bedre kan kontrollere spil motoren".
   **Virkning (v3.24.0)**, målt mod ligaens snit (`chemRef`; ukendt: 78) på skalaen `chemScale` (fremmede 30 = −1, snit = 0, et fast
   pars ligevægt `CHEM_TOP` = (100·0,14 + 30·0,035)/(0,14 + 0,035) = 86 = +1; snit ≥ 86: ingen bonus). Værdien for en spiller er
   snittet af hans nabopar blandt dem på banen nu (`slotChem`). Opbygningen: `build += 0,3 · samspil(opspilleren)`; løbsduellen ved
-  centrale løb: markørens værdi `+ 3 · samspil(markøren)`. Offside-fælden får ingen virkning (backlog nr. 4). Intet ekstra rng –
+  centrale løb: markørens værdi `+ 3 · samspil(markøren)`. Offside-fælden får ingen virkning (backlog: "Offside-fælden slået fra er bedst"). Intet ekstra rng –
   ved snittet er kampene uændrede (fingeraftrykket). Målt (`measure-chemistry effect 2000`, hold A tvunget mod B på snittet, net
   mål/kamp i forhold til snittet): alle par fremmede −0,12, alle faste +0,09 (spænd 0,11–0,21 efter seeds; løbsduellen alene ±0,02).
   myVsBots (`measure-lifecycle`, 3 seeds × 3 sæsoner) flytter højst +0,025 (passiv og aktiv køber – inden for støjen).
