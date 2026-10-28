@@ -106,11 +106,13 @@ export function strongLines(team, strong) {
   const lines = [];
   if (up.length === 1) lines.push(`🤝 ${up[0]} spiller nu stærkt sammen.`);
   else if (up.length > 1) lines.push(up.length >= 4 ? `🤝 ${up.length} par spiller nu stærkt sammen.` : `🤝 Spiller nu stærkt sammen: ${up.join(' · ')}.`);
-  if (down.length) lines.push(down.length >= 4 ? `Ikke længere stærkt (spillede ikke sammen i runden): ${down.length} par.` : `Ikke længere stærkt (spillede ikke sammen i runden): ${down.join(' · ')}.`);
-  return lines;
+  const downs = down.length === 1 ? `${down[0]} spiller ikke længere stærkt sammen – de spillede ikke sammen i runden.`
+    : down.length >= 4 ? `${down.length} par spiller ikke længere stærkt sammen – de spillede ikke sammen i runden.`
+    : down.length ? `Spiller ikke længere stærkt sammen (de spillede ikke sammen i runden): ${down.join(' · ')}.` : null;
+  return { up: lines, down: downs ? [downs] : [] };
 }
 export function trainingSummary(report, team, roundLabel = report?.round, onTaktik = null) {
-  const strong = report ? strongLines(team, report.strong) : [];
+  const sl = report ? strongLines(team, report.strong) : { up: [], down: [] }, strong = [...sl.up, ...sl.down];
   if (!report || !(report.gains.length || report.injuries.length || strong.length)) return null;
   const name = (id) => team.squad.find((p) => p.id === id)?.shortName ?? '?';
   const by = new Map();
@@ -120,7 +122,10 @@ export function trainingSummary(report, team, roundLabel = report?.round, onTakt
   const inj = report.injuries.filter((id) => known.has(id)).map((id) => `🚑 ${name(id)} skadet i træningen`);
   if (!ups.length && !inj.length && !strong.length) return null;
   return h('div', { class: 'panel train-summary', id: 'training-summary' },
-    strong.length ? h('div', { id: 'training-strong' }, strong.join(' '), onTaktik ? [' ', h('button', { class: 'linklike', onclick: onTaktik }, 'se stregerne på Taktik')] : null) : null,
+    // QC: hver linje for sig; linket hører til op-linjen (stregerne viser de stærke)
+    strong.length ? h('div', { id: 'training-strong' },
+      sl.up.length ? h('div', { class: 'strong-up' }, sl.up[0], onTaktik ? [' ', h('button', { class: 'linklike', onclick: onTaktik }, 'se stregerne på Taktik')] : null) : null,
+      sl.down.length ? h('div', { class: 'muted strong-down' }, sl.down[0]) : null) : null,
     ups.length || inj.length ? h('div', {}, h('strong', {}, `🏋️ Træning og kampe efter runde ${roundLabel}: `), [...ups, ...inj].join(' · ')) : null);
 }
 

@@ -452,7 +452,7 @@ function chemCard(team, p) {
   const ref = chemRefOf(game.league), isNew = !Object.keys(team.chemistry ?? {}).some((k) => k.split('|').includes(p.id));
   return { isNew, best: isNew ? null : bestPartner(team, ref, p.id), pairs: playerPairs(team, ref, p.id) };
 }
-const strongCount = (pairs) => { const n = pairs.filter((x) => x.band === 'staerkt').length; return n === 0 ? '' : n === pairs.length ? `Alle ${n} par spiller stærkt sammen. ` : `${n} af ${pairs.length} par spiller stærkt. `; };
+const strongCount = (pairs) => { const n = pairs.filter((x) => x.band === 'staerkt').length; return n === 0 ? '' : n === pairs.length ? 'De spiller alle stærkt sammen. ' : `${n} af ${pairs.length} par spiller stærkt. `; };
 // Samspil (v3.24.0): forklaringen under banen og det svageste par i ord (Spilfører UI: på mobil er det eneste måde at se et pars bånd)
 function chemLegend(pairs) {
   const w = weakestPair(pairs), key = (b) => h('span', { class: `chem-key ${b}` });

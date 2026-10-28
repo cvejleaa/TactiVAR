@@ -149,6 +149,12 @@ export function normalizeLeague(league) {
     const byId = new Map((league.teams.find((t) => t.id === id)?.squad ?? []).map((q) => [q.id, q]));
     r.gains = r.gains.filter((g) => g && byId.get(g.id)?.skills && typeof g.skill === 'string' && Object.hasOwn(byId.get(g.id).skills, g.skill));
     r.injuries = r.injuries.filter((pid) => typeof pid === 'string');
+    // v3.24.2 (QC): de stærke par { up, down: [[idA, idB]] } – forkert form slettes, ellers kun par af to strenge
+    if (r.strong !== undefined) {
+      const pairs = (xs) => (Array.isArray(xs) ? xs.filter((x) => Array.isArray(x) && x.length === 2 && x.every((v) => typeof v === 'string')) : null);
+      const up = pairs(r.strong?.up), down = pairs(r.strong?.down);
+      if (!up || !down) delete r.strong; else r.strong = { up, down };
+    }
   }
   return { league, problems, notes };
 }

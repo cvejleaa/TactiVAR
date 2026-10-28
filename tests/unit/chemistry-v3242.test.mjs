@@ -8,6 +8,7 @@ import { createLeague } from '../../public/engine/generator.js';
 import { playRound, commitRound } from '../../public/engine/season.js';
 import { lineupPairs, pairKey, strongChanges, bandOf } from '../../public/engine/chemistry.js';
 import { strongLines } from '../../public/ui/card.js';
+import { normalizeLeague } from '../../public/engine/sanitize.js';
 
 const own = (L) => L.teams.find((t) => !t.isBot);
 
@@ -27,6 +28,10 @@ test('strongChanges: op kun ved fælles kamp i runden, ned kun uden – snittet 
   const r = strongChanges(me, before, ref, R);
   assert.deepEqual(r.up, [[ps[0].a.id, ps[0].b.id]]);
   assert.deepEqual(r.down, [[ps[1].a.id, ps[1].b.id]]);
+  // QC: samme snit før og efter – også når snittet ikke er 78. Ved 81 er stærkt ≥ 83: 81,5 → 83,5 med fælles kamp er "op"
+  // (målt mod 78 var 81,5 allerede stærkt – et fast eller gammelt snit giver intet "op")
+  const b2 = new Map([[k[6], 81.5]]); me.chemistry[k[6]] = [83.5, R];
+  assert.deepEqual(strongChanges(me, b2, 81, R).up, [[ps[6].a.id, ps[6].b.id]]);
 });
 
 test('commitRound: dit holds rapport får de stærke par – hvert "op" er stærkt nu og spillede sammen i runden; data findes', () => {
@@ -50,10 +55,25 @@ test('commitRound: dit holds rapport får de stærke par – hvert "op" er stær
 test('teksten: ét par med numre og navne, 2–3 i en liste, fra 4 kun antallet; ned på egen sætning; solgte spillere udelades', () => {
   const L = createLeague(createRng(4)), me = own(L), s = me.squad, w = (p) => `#${p.shirtNumber} ${p.shortName}`;
   const pr = (i, j) => [s[i].id, s[j].id];
-  assert.deepEqual(strongLines(me, { up: [pr(1, 2)], down: [] }), [`🤝 ${w(s[1])} og ${w(s[2])} spiller nu stærkt sammen.`]);
-  assert.deepEqual(strongLines(me, { up: [pr(1, 2), pr(3, 4)], down: [] }), [`🤝 Spiller nu stærkt sammen: ${w(s[1])} og ${w(s[2])} · ${w(s[3])} og ${w(s[4])}.`]);
-  assert.deepEqual(strongLines(me, { up: [pr(1, 2), pr(3, 4), pr(5, 6), pr(7, 8)], down: [] }), ['🤝 4 par spiller nu stærkt sammen.']);
-  assert.deepEqual(strongLines(me, { up: [], down: [pr(1, 2)] }), [`Ikke længere stærkt (spillede ikke sammen i runden): ${w(s[1])} og ${w(s[2])}.`]);
-  assert.deepEqual(strongLines(me, { up: [[s[1].id, 'solgt']], down: [] }), [], 'en solgt spiller: intet "?"');
-  assert.deepEqual(strongLines(me, undefined), [], 'rapport fra v3.24.1 uden strong');
+  const up = (x) => strongLines(me, { up: x, down: [] }).up, down = (x) => strongLines(me, { up: [], down: x }).down;
+  assert.deepEqual(up([pr(1, 2)]), [`🤝 ${w(s[1])} og ${w(s[2])} spiller nu stærkt sammen.`]);
+  assert.deepEqual(up([pr(1, 2), pr(3, 4)]), [`🤝 Spiller nu stærkt sammen: ${w(s[1])} og ${w(s[2])} · ${w(s[3])} og ${w(s[4])}.`]);
+  assert.deepEqual(up([pr(1, 2), pr(3, 4), pr(5, 6), pr(7, 8)]), ['🤝 4 par spiller nu stærkt sammen.']);
+  assert.deepEqual(down([pr(1, 2)]), [`${w(s[1])} og ${w(s[2])} spiller ikke længere stærkt sammen – de spillede ikke sammen i runden.`]);
+  assert.deepEqual(down([pr(1, 2), pr(3, 4)]), [`Spiller ikke længere stærkt sammen (de spillede ikke sammen i runden): ${w(s[1])} og ${w(s[2])} · ${w(s[3])} og ${w(s[4])}.`]);
+  assert.deepEqual(up([[s[1].id, 'solgt']]), [], 'en solgt spiller: intet "?"');
+  assert.deepEqual(strongLines(me, undefined), { up: [], down: [] }, 'rapport fra v3.24.1 uden strong');
+});
+
+test('sanitize (QC): en rapport med forkert strong-form mister strong – resten bevares; gyldige par beholdes', () => {
+  const L = createLeague(createRng(5)), me = own(L), [a, b] = me.squad.map((p) => p.id);
+  for (const bad of [5, { up: 5, down: [] }, { up: [null], down: [] }, { up: [[a]], down: [] }, { up: [], down: 'x' }, null]) {
+    L.trainingReport = { [me.id]: { round: 1, gains: [], injuries: [], strong: bad } };
+    const r = normalizeLeague(structuredClone(L)).league.trainingReport[me.id];
+    assert.ok(r, 'rapporten bevares');
+    if (bad && Array.isArray(bad.up) && Array.isArray(bad.down)) assert.deepEqual(r.strong, { up: [], down: [] }, JSON.stringify(bad));
+    else assert.equal(r.strong, undefined, JSON.stringify(bad));
+  }
+  L.trainingReport = { [me.id]: { round: 1, gains: [], injuries: [], strong: { up: [[a, b]], down: [] } } };
+  assert.deepEqual(normalizeLeague(structuredClone(L)).league.trainingReport[me.id].strong, { up: [[a, b]], down: [] });
 });
