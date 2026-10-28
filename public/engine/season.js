@@ -16,7 +16,7 @@ import { SEASON_ROUNDS, seasonRoundOf } from './schedule.js';
 import { emptyStanding } from './generator.js';
 import { PLAYER_SEASON_DEFAULTS, PLAYER_SEASON_FIELDS, TEAM_STAT_FIELDS } from './stats.js';
 import { REST_BENCH, afterMatchFreshness } from './freshness.js';
-import { applyChemistry, decayChemistry, pruneChemistry, leagueChemRef } from './chemistry.js';
+import { applyChemistry, decayChemistry, pruneChemistry, leagueChemRef, chemRefOf } from './chemistry.js';
 
 // Næste rundes kampe efter programmet (v3.11) som [hjemmeIdx, udeIdx]. Kampen med et
 // menneskestyret hold står først: avisen, afspilningen og Kamp-fanens første kort bygger på det.
@@ -51,7 +51,8 @@ export function playPairs(league, pairs, rng) {
   const lastOfSeason = seasonRoundOf(league, round) === SEASON_ROUNDS;
   // Kamptruppen (v3.18.0): botterne – og dit hold med "Udtag automatisk" – udtager bænken før runden (intet rng)
   for (const t of league.teams) if (t.isBot || t.matchBenchAuto !== false) autoMatchBench(t);
-  const matches = pairs.map(([h, a]) => simulateMatch(league.teams[h], league.teams[a], rng, { round, lastOfSeason }));
+  const chemRef = chemRefOf(league);   // samspil (v3.24.0): virkningen måles mod ligaens snit
+  const matches = pairs.map(([h, a]) => simulateMatch(league.teams[h], league.teams[a], rng, { round, lastOfSeason, chemRef }));
   // Hvert mål ved, hvilken kamp i runden det faldt i (avisen linker til referatet, v3.7.1).
   matches.forEach((m, i) => m.goalsPool.forEach((g) => { g.matchIdx = i; }));
   return { round, matches, gazette: buildGazette(matches, { positions: tableBefore(league, round), round }) };

@@ -6,6 +6,7 @@ import { matchBenchOf } from './career.js';
 import { FORMATIONS, lineOfRole, isOutOfZone, slotPosition, fitOf, arrangeByFit } from './formations.js';
 import { livePositions as livePos0, coupledPositions as coupled0, kickoffPositions, apartFrom, apartOnLine, ONSIDE_GAP, MIN_APART } from './positions.js';
 import { masteryVs, counterXpForMatch } from './counter.js';
+import { chemScale, slotChem, bandOf, BAND_WORD, CHEM_BASE } from './chemistry.js';
 import { createSheet, finalizeSheet } from './ratings.js';
 import { assignClock } from './clock.js';
 import { describeFinish, headerBand, describeVarTiming, describeGoal, goalSpectacle, pickBy, gen, pl } from './clues.js';
@@ -297,6 +298,9 @@ function attackLine(d, ph) {
   return parts.length ? parts.join(', ') : 'ingen cutbacks eller høje bolde';
 }
 
+// Samspil i kampen (v3.24.0, chemistry.js): duellens tillæg = vægt · skala (−1 fremmede … +1 fast par) målt mod ligaens snit.
+// Vægtene kalibreret med tools/measure-chemistry.mjs effect (spec §5). Muterbart objekt kun til måleværktøjet.
+export const CHEM_EFFECT = { build: 0.3, run: 3 };
 export function simulateMatch(home, away, rng, opts = {}) {
   const events = [];
   const lineupNotes = [];
@@ -315,6 +319,15 @@ export function simulateMatch(home, away, rng, opts = {}) {
   let hG = 0, aG = 0, homeVarNet = 0;
   const k = (side, name) => (side.isHome ? 'h' : 'a') + name;
   const other = (side) => (side === H ? A : H);
+  // Samspil: skalaen for spilleren på hans plads blandt dem, der står på banen nu – målt mod ligaens snit (opts.chemRef; uden = BASE)
+  const chemRef = Number.isFinite(opts.chemRef) ? opts.chemRef : CHEM_BASE;
+  const chemAt = (side, p) => { const v = slotChem(side.team, side.starters, side.tactics.baseFormation, side.starters.indexOf(p)); return v == null ? 0 : chemScale(v, chemRef); };
+  // Midtbanens samspil ved kampstart (fuldtids-analysen – samme læsning som opbygningen, QC/Spilfører: virkningen sidder dér)
+  const midChemBand = (side) => {
+    const c = FORMATIONS[side.tactics.baseFormation] ?? FORMATIONS['4-4-2'], vals = side.starters.map((p, i) => (p && i > 0 && lineOfRole(c[i].r) === 'MID' ? slotChem(side.team, side.starters, side.tactics.baseFormation, i) : null)).filter((v) => v != null);
+    return side.team.chemistry && vals.length ? bandOf(vals.reduce((x, y) => x + y, 0) / vals.length, chemRef) : null;
+  };
+  const kickoffMidBand = new Map([[H, midChemBand(H)], [A, midChemBand(A)]]);
 
   // Varianter pr. kamp (v3.16.3, Spilfører: "styrer midtbanen" tre gange for samme spiller i én kamp – pickBy på tick'et ramte
   // samme variant hvert 4. tick): hver (familie, aktør) går videre til næste variant, hver gang den bruges. Intet rng-træk.
@@ -1294,6 +1307,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
       const pmM = masteryVs(playmaker, def.team), prM = masteryVs(presser, att.team);
       let build = (playmaker.skills.passing + playmaker.skills.ballControl) * ff(playmaker) + pmM * MASTERY_WEIGHT + rng.next() * 7;
       if (att.calm) { build += CALM_BUILD_BONUS; att.calm = false; } // "Hold på bolden" efter sidste erobring
+      build += CHEM_EFFECT.build * chemAt(att, playmaker);   // samspil (v3.24.0): opspilleren og hans naboer kender hinanden – intet rng
       let press = (presser.skills.intercepting + presser.skills.positioning * 0.85 + presser.skills.stamina * 0.35) * ff(presser) + prM * MASTERY_WEIGHT + rng.next() * 7;
       const pass = attPh.phase1_buildUp.passingStyle, focus = attPh.phase1_buildUp.attackFocus, height = defPh.phase2_defending.pressingHeight;
       if (pass === 'SHORT' && height === 'LOW_BLOCK') build += STYLE_BONUS;
@@ -1488,7 +1502,8 @@ export function simulateMatch(home, away, rng, opts = {}) {
         const marker = zone === 'WIDE' ? flankBack(def, slotPosition(att.tactics, pick.i).x < 50 ? 12 : 88) : nearPick(def, dR.defs, mirrorPt(runPos.ball[pick.i]), runPos.opp);
         sheet.bump(runner.id, 'freeRuns'); duelLog[att.team.id].runs++;
         const runWon = (rs.positioning + rs.pace * 0.5) * ff(runner) + rng.next() * 8 + (RUN_DUEL_BONUS[runs] ?? 0)
-          > (marker.skills.positioning + marker.skills.intercepting * 0.5) * ff(marker) + rng.next() * 8 + (RUN_COVER[defPh.phase1_buildUp.offBallRuns] ?? 0);
+          > (marker.skills.positioning + marker.skills.intercepting * 0.5) * ff(marker) + rng.next() * 8 + (RUN_COVER[defPh.phase1_buildUp.offBallRuns] ?? 0)
+            + (zone === 'WIDE' ? 0 : CHEM_EFFECT.run * chemAt(def, marker));   // samspil (v3.24.0): et nyt midtstopperpar bliver løbet i ryggen
         sheet.bump(marker.id, 'duels'); if (!runWon) sheet.bump(marker.id, 'duelsWon');
         if (runWon) {
           sheet.bump(runner.id, 'freeRunsWon'); duelLog[att.team.id].runsWon++; sheet.adjust(runner.id, 0.15);
@@ -1583,7 +1598,10 @@ export function simulateMatch(home, away, rng, opts = {}) {
       // v3.12 (brugeren: "ikke en eneste reference til cutbacks"): dit angreb efter dine valg og
       // dit felt – modstanderens indstilling navngives ikke, kun hvad dit forsvar mødte.
       + ` ⚔️ Angreb (${FOCUS_LABEL[ph.attackFocus] ?? ph.attackFocus} · ${PASS_LABEL[ph.passingStyle] ?? ph.passingStyle}): ${attackLine(d, ph)}.`
-      + ` 🛡️ Dit felt: modstanderens cutbacks stoppet ${d.oppCutbacksBlocked} af ${d.oppCutbacks} · luftdueller i åbent spil vundet ${d.oppCrosses - d.oppCrossesWon} af ${d.oppCrosses}.`);
+      + ` 🛡️ Dit felt: modstanderens cutbacks stoppet ${d.oppCutbacksBlocked} af ${d.oppCutbacks} · luftdueller i åbent spil vundet ${d.oppCrosses - d.oppCrossesWon} af ${d.oppCrosses}.`
+      // Samspil (v3.24.0): årsagen, ikke udfaldet – midtbanen ved kampstart, hvor virkningen sidder (opbygningen)
+      + (kickoffMidBand.get(meSide) === 'fremmede' || kickoffMidBand.get(meSide) === 'finder' ? ` 🤝 Samspil: din midtbane har ikke spillet sig sammen endnu (${BAND_WORD[kickoffMidBand.get(meSide)]}) – det gør opbygningen lidt sværere.`
+        : kickoffMidBand.get(meSide) === 'staerkt' ? ' 🤝 Samspil: din midtbane har spillet sig sammen (stærkt) – det hjælper opbygningen lidt.' : ''));
   }
   const ratings = finalizeSheet(sheet, hG, aG, rng, counterXpForMatch);
   addEv(90, 'END', 'HIGHLIGHT', true, false, 'Slutfløjt', `🏁 SLUTFLØJT! ${home.name} ${hG} - ${aG} ${away.name}.${ratings.motm ? ` Kampens spiller: #${ratings.motm.shirtNumber} ${ratings.motm.shortName} (${ratings.motm.teamName}).` : ''}`);

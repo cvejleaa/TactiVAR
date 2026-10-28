@@ -258,3 +258,10 @@ button.savestatus.failed { color: var(--rød); font-weight: 700; }
 .ratings td.duel { white-space: nowrap; }
 .match-numbers { margin: .4rem 0; font-size: .85rem; line-height: 1.45; } .match-numbers > div { margin-bottom: .2rem; }   /* v3.22.0: Kampens tal under spillerens heat map */
 .mn-list { margin: .2rem 0 .3rem 1.1rem; padding: 0; } .mn-list li { margin: .1rem 0; }
+/* v3.24.0 samspil: streger mellem nabopladser under brikkerne – tykkelse og stiplet bærer båndet, ikke kun farven (Spilfører UI) */
+.chem-lines { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.chem-lines .chem { vector-effect: non-scaling-stroke; stroke-linecap: round; }
+.chem-staerkt { stroke: #facc15; stroke-width: 5; } .chem-sammen { stroke: #e5e7eb88; stroke-width: 2.5; }
+.chem-finder { stroke: #fb923c; stroke-width: 1.5; } .chem-fremmede { stroke: #ef4444; stroke-width: 1.5; stroke-dasharray: 4 3; }
+.chem-legend { font-size: .82rem; margin-top: .35rem; } .chem-legend .chem-key { display: inline-block; width: 1.4rem; height: 0; vertical-align: middle; margin: 0 .2rem; border-top: 2px solid; }
+.chem-key.staerkt { border-top: 5px solid #facc15; } .chem-key.sammen { border-top-color: #e5e7eb88; } .chem-key.finder { border-top: 1.5px solid #fb923c; } .chem-key.fremmede { border-top: 2px dashed #ef4444; }

@@ -3,13 +3,28 @@
 import { h } from './dom.js';
 import { FORMATIONS, MAX_ANCHOR_RADIUS, slotPosition, isOutOfZone, clampPos, fitOf } from '../engine/formations.js';
 import { POSITION_FULL, fitCost } from './labels.js';
+import { BAND_WORD } from '../engine/chemistry.js';
 
-export function renderPitch({ team, isOwn, ui, onMove, onSelect, onTokenSwap }) {
+// pairs (v3.24.0, kun dit hold): samspillet mellem nabopladser (chemistry.js lineupPairs) – streger under brikkerne, og hver brik
+// nævner sine par i title (QC: en streg med pointer-events:none kan ikke vise et tooltip)
+export function renderPitch({ team, isOwn, ui, onMove, onSelect, onTokenSwap, pairs = null }) {
   const coords = FORMATIONS[team.tactics.baseFormation];
   const byId = new Map(team.squad.map((p) => [p.id, p]));
   const pitch = h('div', { class: 'pitch', id: 'pitch' }, h('div', { class: 'pitch-line mid' }), h('div', { class: 'pitch-box top' }), h('div', { class: 'pitch-box bottom' }));
   const anchorRing = h('div', { class: 'anchor-ring', hidden: true });
   pitch.append(anchorRing);
+  if (isOwn && pairs?.length) {
+    const ns = 'http://www.w3.org/2000/svg', svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('class', 'chem-lines'); svg.setAttribute('id', 'chem-lines'); svg.setAttribute('viewBox', '0 0 100 100'); svg.setAttribute('preserveAspectRatio', 'none');
+    for (const x of pairs) {
+      const a = slotPosition(team.tactics, x.i), b = slotPosition(team.tactics, x.j), l = document.createElementNS(ns, 'line');
+      for (const [k, v] of [['x1', a.x], ['y1', a.y], ['x2', b.x], ['y2', b.y]]) l.setAttribute(k, String(v));
+      l.setAttribute('class', `chem chem-${x.band}`); l.dataset.pair = `${x.i}-${x.j}`;
+      svg.append(l);
+    }
+    pitch.append(svg);
+  }
+  const pairText = (pid) => (pairs ?? []).filter((x) => x.a.id === pid || x.b.id === pid).map((x) => { const m = x.a.id === pid ? x.b : x.a; return `samspil med #${m.shirtNumber} ${m.shortName}: ${BAND_WORD[x.band]}`; }).join(' · ');
 
   team.tactics.lineupSlots.forEach((pid, slot) => {
     const p = byId.get(pid);
@@ -20,7 +35,7 @@ export function renderPitch({ team, isOwn, ui, onMove, onSelect, onTokenSwap }) 
     const fit = p ? fitOf(p.position, coords[slot].r) : 1;
     const token = h('div', {
       class: `token${out ? ' out' : custom ? ' custom' : ''}${ui.selectedPlayerId === pid ? ' selected' : ''}${ui.pitchSwapId === pid ? ' swapping' : ''}${p?.injuryMatchesLeft > 0 ? ' injured' : ''}`,
-      style: { left: pos.x + '%', top: pos.y + '%' }, dataset: { slot: String(slot), fit: String(fit) }, title: `${coords[slot].r} – ${p ? p.name : '?'}${p ? ` · naturlig: ${POSITION_FULL[p.position] ?? p.position}${fit < 1 ? ` – her ${fitCost(fit)} i dueller` : ''}` : ''}`,
+      style: { left: pos.x + '%', top: pos.y + '%' }, dataset: { slot: String(slot), fit: String(fit) }, title: `${coords[slot].r} – ${p ? p.name : '?'}${p ? ` · naturlig: ${POSITION_FULL[p.position] ?? p.position}${fit < 1 ? ` – her ${fitCost(fit)} i dueller` : ''}` : ''}${p && isOwn && pairs?.length && pairText(pid) ? ` · 🤝 ${pairText(pid)}` : ''}`,
     }, h('span', { class: 'token-num' }, p ? String(p.shirtNumber) : '?'), h('span', { class: 'token-name' }, p ? p.shortName : '?'),
       out ? h('span', { class: 'token-flag' }, '⚠ Ude af zone (-20%)') : custom ? h('span', { class: 'token-flag ok' }, '✅ Custom pos') : null,
       fit < 1 ? h('span', { class: 'token-flag pos' }, `⚠ Uden for position (${fitCost(fit)})`) : null);

@@ -45,5 +45,34 @@ export function measureBytes() {
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const [mode = 'base', a, b] = process.argv.slice(2);
-  console.log(JSON.stringify(mode === 'bytes' ? measureBytes() : measureBase(Number(a || 4), Number(b || 4))));
+  console.log(JSON.stringify(mode === 'bytes' ? measureBytes() : mode === 'effect' ? await measureEffect(Number(a || 600)) : measureBase(Number(a || 4), Number(b || 4))));
+}
+
+// node tools/measure-chemistry.mjs effect [N=600] – virkningen i kampene (v3.24.0): hold A med alle par tvunget til fremmede (30),
+// ligaens niveau (ref = CHEM_BASE) og et fast par i ligevægt (CHEM_TOP) mod hold B på ref, begge baner, N kampe pr. linje; hver
+// kobling for sig (build/run) og samlet. net = mål for − mål imod pr. kamp for A.
+export async function measureEffect(N = 600) {
+  const { simulateMatch, CHEM_EFFECT } = await import('../public/engine/match.js');
+  const { CHEM_TOP, STRANGER, pairKey } = await import('../public/engine/chemistry.js');
+  const saved = { ...CHEM_EFFECT }, out = {};
+  const force = (t, v) => { const ids = t.squad.map((p) => p.id), c = {}; for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) c[pairKey(ids[i], ids[j])] = [v, 0]; t.chemistry = c; };
+  for (const [name, w] of [['build', { build: saved.build, run: 0 }], ['run', { build: 0, run: saved.run }], ['both', saved]]) {
+    Object.assign(CHEM_EFFECT, w);
+    const line = {};
+    for (const [lab, v] of [['fremmede', STRANGER], ['ref', CHEM_BASE], ['fast', CHEM_TOP]]) {
+      let net = 0, n = 0;
+      for (let s = 1; n < N; s++) {
+        const L = createLeague(createRng(s * 13)), A = L.teams[s % 8], B = L.teams[(s + 3) % 8];
+        force(A, v); force(B, CHEM_BASE);
+        for (const home of [true, false]) {
+          const m = simulateMatch(home ? A : B, home ? B : A, createRng(s * 101 + (home ? 1 : 2)), { chemRef: CHEM_BASE });
+          net += home ? m.homeGoals - m.awayGoals : m.awayGoals - m.homeGoals; n++;
+        }
+      }
+      line[lab] = Math.round((net / n) * 1000) / 1000;
+    }
+    out[name] = line;
+  }
+  Object.assign(CHEM_EFFECT, saved);
+  return out;
 }

@@ -2,7 +2,7 @@
 // modellen; docs/spec.md §5. Par af spillere på nabopladser spiller sig sammen med fælles minutter; et nyt køb er fremmed for alle.
 // team.chemistry = { "idA|idB": [samspil 0–100, sidste fælles runde] } (id'er sorteret). Rent modul: ingen rng, ingen import af
 // season.js. v3.23.0 er data uden virkning i kampene (PR-A); virkningen og visningen kommer samtidig i v3.24.0 (QC: ingen usynlig skat).
-import { FORMATIONS } from './formations.js';
+import { FORMATIONS, lineOfRole } from './formations.js';
 
 export const CHEM_MAX = 100;
 // Seedet: ligevægten for botternes opstillinger (QC: ikke et gæt – ellers drifter ligaen den første sæson). tools/measure-chemistry.mjs
@@ -124,4 +124,85 @@ export function cleanChemistry(chem, ids) {
       && Number.isFinite(v[0]) && v[0] >= 0 && v[0] <= CHEM_MAX && Number.isInteger(v[1]) && v[1] >= 0;
   }).sort((x, y) => y[1][0] - x[1][0]).slice(0, PAIR_CAP);
   return ok.length ? Object.fromEntries(ok) : null;   // ingen gyldige par: seedes igen (QC – ellers var hele holdet tavst fremmede)
+}
+
+// ---------- Virkningen i kampene (v3.24.0) ----------
+// Skalaen omkring ligaens snit (ref = chemRefOf): fremmede (30) = −1, et fast par i ligevægt (CHEM_TOP ≈ 86) = +1 – så en fast
+// kerne kan mærkes lige så meget som et nyt køb koster (QC: nævneren ref − 30 under, CHEM_TOP − ref over). ref ≥ CHEM_TOP: kun ned.
+export const CHEM_TOP = Math.round(((100 * K_GAIN + STRANGER * LEAK) / (K_GAIN + LEAK)) * 10) / 10;   // 86,0
+export function chemScale(v, ref) {
+  if (v >= ref) return ref >= CHEM_TOP ? 0 : Math.min(1, (v - ref) / (CHEM_TOP - ref));
+  return -Math.min(1, (ref - v) / Math.max(1, ref - STRANGER));
+}
+// En spillers samspil på sin plads lige nu: middel over hans nabopar blandt de spillere, der står på banen (starters i slot-orden).
+export function slotChem(team, starters, formation, slot) {
+  if (!(slot > 0)) return null;
+  const vals = [];
+  for (const [i, j] of neighbourPairs(formation)) {
+    if (i !== slot && j !== slot) continue;
+    const o = starters[i === slot ? j : i];
+    if (o) vals.push(chemOf(team, starters[slot].id, o.id));
+  }
+  return vals.length ? vals.reduce((x, y) => x + y, 0) / vals.length : null;
+}
+
+// ---------- Visningen (v3.24.0) – ét sted for bånd, ord og de par, motoren læser ----------
+// Båndet afgøres på den SAMME skala som virkningen (QC: rå point skiftede ord, når ligaens snit flyttede sig); ordene er de eneste,
+// spilleren ser – intet 0–100-tal (QC B3). ref er påkrævet: visning og kamp må ikke kunne skilles ad.
+export const BANDS = [['fremmede', -0.5], ['finder', -0.15], ['sammen', 0.4], ['staerkt', Infinity]];
+export const BAND_WORD = { fremmede: 'fremmede', finder: 'finder hinanden', sammen: 'spillet sammen', staerkt: 'stærkt' };
+export function bandOf(v, ref) {
+  if (!Number.isFinite(ref)) throw new Error('bandOf kræver ligaens snit');
+  const sc = chemScale(v, ref);
+  return sc <= -0.5 ? 'fremmede' : sc <= -0.15 ? 'finder' : sc < 0.4 ? 'sammen' : 'staerkt';
+}
+// De par, motoren læser (QC/Spilfører: et angriberpar påvirker intet og vises ikke): mindst én af de to er forsvarer eller midtbane.
+export function readPairs(formation) {
+  const c = FORMATIONS[formation] ?? FORMATIONS['4-4-2'];
+  return neighbourPairs(formation).filter(([i, j]) => [i, j].some((k) => ['DEF', 'MID'].includes(lineOfRole(c[k].r))));
+}
+const SIDE = (r) => (r.startsWith('L') ? 'L' : r.startsWith('R') ? 'R' : null);
+function pairName(ra, rb) {
+  const both = (set) => set.has(ra) && set.has(rb), one = (set) => set.has(ra) || set.has(rb);
+  if (ra === 'CB' && rb === 'CB') return 'Midtstopper-parret';
+  if (both(new Set(['CM', 'CDM', 'CAM']))) return 'Den centrale midtbane';
+  const wide = new Set(['LB', 'LWB', 'LM', 'LW', 'RB', 'RWB', 'RM', 'RW']);
+  if (both(wide) && SIDE(ra) && SIDE(ra) === SIDE(rb)) return SIDE(ra) === 'L' ? 'Venstre side' : 'Højre side';
+  return null;
+}
+// Holdets par i opstillingen lige nu (kun dem, motoren læser): navn (eller numrene, når navnet ikke er entydigt), værdi og bånd.
+export function lineupPairs(team, ref) {
+  const c = FORMATIONS[team.tactics.baseFormation] ?? FORMATIONS['4-4-2'], slots = team.tactics.lineupSlots, byId = new Map(team.squad.map((p) => [p.id, p]));
+  const raw = readPairs(team.tactics.baseFormation).map(([i, j]) => ({ i, j, a: byId.get(slots[i]), b: byId.get(slots[j]) })).filter((x) => x.a && x.b)
+    .map((x) => { const v = chemOf(team, x.a.id, x.b.id); return { ...x, v, band: bandOf(v, ref), name: pairName(c[x.i].r, c[x.j].r) }; });
+  const count = new Map(); for (const x of raw) if (x.name) count.set(x.name, (count.get(x.name) ?? 0) + 1);
+  return raw.map((x) => ({ ...x, label: x.name && count.get(x.name) === 1 ? x.name : `#${x.a.shirtNumber} ${x.a.shortName} og #${x.b.shirtNumber} ${x.b.shortName}` }));
+}
+export const BAND_RANK = { fremmede: 0, finder: 1, sammen: 2, staerkt: 3 };
+// Det svageste par (legenden) – laveste bånd, så laveste værdi.
+export const weakestPair = (pairs) => pairs.slice().sort((x, y) => BAND_RANK[x.band] - BAND_RANK[y.band] || x.v - y.v)[0] ?? null;
+// Byt: de par, hvis bånd skiftede (QC: båndet, ikke point) – største fald først, højst 2. Par sammenlignes på pladserne.
+export function swapChanges(before, after) {
+  const was = new Map(before.map((x) => [`${x.i}-${x.j}`, x]));
+  return after.map((x) => ({ x, w: was.get(`${x.i}-${x.j}`) })).filter(({ x, w }) => w && w.band !== x.band)
+    .sort((p, q) => (BAND_RANK[p.x.band] - BAND_RANK[p.w.band]) - (BAND_RANK[q.x.band] - BAND_RANK[q.w.band])).slice(0, 2)
+    .map(({ x, w }) => `${x.label}: ${BAND_WORD[w.band]} → ${BAND_WORD[x.band]}`);
+}
+// En spillers par med hans naboer i opstillingen lige nu (bænk: ingen).
+export const playerPairs = (team, ref, pid) => lineupPairs(team, ref).filter((x) => x.a.id === pid || x.b.id === pid).map((x) => ({ ...x, mate: x.a.id === pid ? x.b : x.a }));
+// Bedste makker: kun når parret er stærkt (QC: ellers fik næsten alle en "bedste makker") – og kun blandt hans par med naboerne nu,
+// som stregerne og kortets naboliste (QC: ellers kunne angriberparret eller en tidligere nabo stå som makker uden virkning).
+export function bestPartner(team, ref, pid) {
+  return playerPairs(team, ref, pid).filter((x) => x.band === 'staerkt').sort((x, y) => y.v - x.v)[0] ?? null;
+}
+// Salgslinjen (kortet og Klub – ét sted, QC): hans stærke par med naboerne nu; null uden.
+export function saleChemText(team, ref, pid) {
+  const st = playerPairs(team, ref, pid).filter((x) => x.band === 'staerkt');
+  return st.length ? `🤝 Stærkt samspil med ${st.map((x) => `#${x.mate.shirtNumber} ${x.mate.shortName}`).join(' og ')} – et salg bryder parret.` : null;
+}
+// Kampe fra fremmede til "spillet sammen" for en fast mand ved siden af de samme (købelinjen – regnet, ikke skrevet fast; QC).
+export function gamesToSettle(ref) {
+  let v = STRANGER, n = 0;
+  while (bandOf(v, ref) !== 'sammen' && bandOf(v, ref) !== 'staerkt' && n < 60) { v = v + K_GAIN * (CHEM_MAX - v); v = v - LEAK * (v - STRANGER); n++; }
+  return n;
 }

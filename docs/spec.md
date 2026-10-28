@@ -530,7 +530,7 @@ bedre kan kontrollere spil motoren".
   skal deles op pr. side i trin 2; en kamp fra før v3.22.0 viser "findes fra v3.22.0", aldrig 0. Over 8 poster pr. kamp (acts-v3220.test.mjs; ca. 13 og 0,5 KB i 200 kampe),
   kun i den seneste runde. Ikke pr. zone: positionerne er en formel (rolle og pres), så en zone ville gentage rollen
   (QC). Samspil som mekanik (par, der spiller sig sammen) er overvejet som næste trin.
-- **Samspil (v3.23.0 – data; virkning og visning i v3.24.0)** (brugerens landstræner: "hvordan spillerne arbejder/tænker
+- **Samspil (v3.23.0 – data; v3.24.0 – virkning og visning)** (brugerens landstræner: "hvordan spillerne arbejder/tænker
   sammen"; brugeren valgte "i forhold til ligaen"; `engine/chemistry.js`, `tools/measure-chemistry.mjs`): `team.chemistry =
   { "idA|idB": [samspil 0–100, sidste fælles runde] }`. Nabopar efter afstand i FORMATIONS (≤ 29; målmanden uden par; hver
   markplads har mindst én nabo – ellers den nærmeste). Efter hver kamp: `samspil += 0,14 · (100 − samspil) · fælles min/90` for
@@ -541,6 +541,19 @@ bedre kan kontrollere spil motoren".
   botternes ligevægt (målt 79,6 over 4 seeds × 4 sæsoner; uden trækket 97,6 – alt mættede). `leagueMetadata.chemRef` = ligaens
   snit af nabopar i opstillingerne – virkningen i kampene måles mod det (v3.24.0). Tabellen fylder ≈ 27 KB ved seed og ≈ 10 KB
   efter en sæson (loft 300 par pr. hold i sanitize). Kampene er uændrede i v3.23.0 (fingeraftrykket).
+  **Virkning (v3.24.0)**, målt mod ligaens snit (`chemRef`; ukendt: 78) på skalaen `chemScale` (fremmede 30 = −1, snit = 0, et fast
+  pars ligevægt `CHEM_TOP` = (100·0,14 + 30·0,035)/(0,14 + 0,035) = 86 = +1; snit ≥ 86: ingen bonus). Værdien for en spiller er
+  snittet af hans nabopar blandt dem på banen nu (`slotChem`). Opbygningen: `build += 0,3 · samspil(opspilleren)`; løbsduellen ved
+  centrale løb: markørens værdi `+ 3 · samspil(markøren)`. Offside-fælden får ingen virkning (backlog nr. 4). Intet ekstra rng –
+  ved snittet er kampene uændrede (fingeraftrykket). Målt (`measure-chemistry effect 2000`, hold A tvunget mod B på snittet, net
+  mål/kamp i forhold til snittet): alle par fremmede −0,12, alle faste +0,09 (spænd 0,11–0,21 efter seeds; løbsduellen alene ±0,02).
+  myVsBots (`measure-lifecycle`, 3 seeds × 3 sæsoner) flytter højst +0,025 (passiv og aktiv køber – inden for støjen).
+  **Visning** (kun dit hold; ét sæt bånd på samme skala, intet 0–100-tal): fremmede ≤ −0,5 < finder hinanden ≤ −0,15 < spillet
+  sammen < 0,4 ≤ stærkt (ved snit 78: 54 / 70,8 / 81,2). Kun par, motoren læser (mindst én forsvarer eller midtbane – ikke
+  angriberparret). Taktik: en streg pr. par (tyk = stærkt, stiplet = fremmede) og "Svagest lige nu" under banen; ved byt eller
+  formation en 🤝-besked med de bånd, der skiftede (største fald først, højst 2). Spillerkortet: bedste makker kun ved stærkt, hans
+  par med naboerne nu; salgslinjen (kortet og Klub) ved stærkt; købeboksen og "Til salg i ligaen": fremmed for alle, ca. 8 kampe
+  (`gamesToSettle`). Fuldtidsanalysen: én sætning om din midtbane ved kampstart (finder hinanden/fremmede eller stærkt).
 - **Heat map** (karakterarket, dit hold – v3.20.0: står fra start over startopstillingen, som modstanderens zonekort; 📍 erstatter
   kun opstillingen): viser holdets tæthed (v3.20.2: 12 × 18 felter, før 6 × 9; uden målmand) af grundbilleder og
   øjeblikke plus vejen mellem to grundbilleder (punkter hver 2. enhed, vægt 0,5; kun når spilleren er med i begge – ingen streg
