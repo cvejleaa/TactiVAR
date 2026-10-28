@@ -1,18 +1,20 @@
 # Hukommelse – spilfoerer-klub
 
-Oprettet 2026-10-27 (v3.22.1). Den fælles backlog er `docs/backlog.md`; skriv her kun det, der hjælper DIG næste gang:
-fund der er rettet (så du ikke finder dem igen), hvad brugeren har valgt fra, og målinger med deres tal.
+Den fælles backlog er `docs/backlog.md`; her kun det, der hjælper MIG næste gang: hvad der er i backloggen fra mig,
+hvad brugeren har valgt fra, og målinger med deres tal. Måle-scripts fra rundtur 2 ligger (ikke committet) i
+scratchpad `klub2/` (arc.mjs, rot.mjs, youth.mjs, r9.mjs) – genskriv dem, hvis de er væk.
 
-## Rundtur 1 (2026-10-27, v3.22.1, branch claude/busy-hawking-lpk4y5) – foreslået, ikke afgjort
-1. Sæsonrapporten fortæller ikke sæsonen (ingen placering/topscorer/sæsonens spiller – står kun i Liga "Tidligere sæsoner").
-2. Sæsonhistorik pr. spiller: kun `careerGames` overlever; matchLog cap 28 (career.js:17) → mål/oplæg glemmes efter 2 sæsoner.
-3. Spillere 24+ kan ikke udvikle sig: `initialPotential` giver room 0 for >23 år (career.js:33–38), roomOf klemt til 0,1.
-   Måling (scratchpad klub/room.mjs, 5 seeds, mit hold, fokus = kædens): 24+ 45/45 ved loftet, 0,00 evnepoint/spiller/sæson;
-   20–23: 1,23; ≤19: 4,20. I sæsonens Trup: 10 af 18 "tæt på sit loft".
-4. Ingen sæsonmål/forventning; præmiestigen 1.–8. = 1,4 mio. ≈ 2,5 runders løn (551.000/runde efter +31 %).
-Samspil (backlog 1) er allerede i backloggen – foreslå ikke igen.
+## Allerede i backloggen fra mig (foreslå ikke igen)
+Din sæson i sæsonrapporten (5) · bestyrelsens mål (9) · 24+ kan udvikle sig (10) · historie pr. sæson (19).
+Samspil v3.23/v3.24 er lavet (aftagende vækst K 0,14, LEAK 0,035, CHEM_TOP 86, virkning mod ligaens snit).
 
-## Plan-gennemgang samspil (arkitektplan PR-A/PR-B, 2026-10-27)
-Fund: lineær GAIN 6 + loft 100 + seed 60 → fast par mætter efter 7 kampe (halv sæson); rotation (7 af 14 kampe) ender
-OGSÅ på 100 → stabilitet belønnes ikke over sæsoner. Foreslog aftagende vækst `chem += k·(100−chem)·min/90`, k≈0,12
-(0→60: 8 kampe; 60→90: 11; 60→99: 29; rotation 84 vs fast 93 efter en sæson). Plus købs-hint "ny mand, samspil 0".
+## Rundtur 2 (2026-10-28, v3.24.0) – foreslået, ikke afgjort
+1. Samspil: rotation er gratis. rot.mjs (6 seeds, sæson 2): fast XI samspil 80,7 / skala 0,32 / 5,5 af 12 par "stærkt";
+   3 byttet hver anden runde 77,7 / 0,17 / 4,0. Spec: alle faste +0,09 mål/kamp → forskel ≈ 0,014 mål/kamp ≈ 0,2 mål/sæson.
+   "stærkt" kræver kun ref + 2,4 (82,4 ved snit 80). arc.mjs: passivt hold 81–82 mod snit 80 i 3 sæsoner, flad kurve.
+2. Ungdomsskøn skiller ikke: 39 af 47 tilbud "har meget mere i sig" (potentiale 7,5–14,1); 50 af 171 unge har pot ≥ 12,
+   0 af 68, der nåede 21+, havde nøglesnit 12 efter 5 passive sæsoner. Kampenes 40 % af sæsonvæksten er skjult på kortet.
+3. Samme kampprogram hver sæson (generator.js:282 bygger én gang; endSeason bygger ikke nyt).
+4. Par-historie: "41 kampe sammen" (chemistry-tabellen har kun værdi + sidste runde).
+Midterholdet: 4.–6. efter runde 9 er 1,9 p fra naboerne og flytter 1,8 pladser til slut (10 seeds × 2) – der ER noget at
+kæmpe for; det bliver bare ikke sagt (argument for backlog 9 op).
