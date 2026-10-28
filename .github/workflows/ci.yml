@@ -10,7 +10,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - name: Version bumpet, når public/ er ændret
@@ -21,9 +21,10 @@ jobs:
           if git diff --quiet "$BASE" HEAD -- public/version.js; then
             echo "::error::public/ er ændret, men public/version.js er ikke bumpet – deploy-tjekket kan så ikke se, om den nye version er live."; exit 1
           fi
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
+          check-latest: true   # nyeste 22.x – ikke en ældre fra runnerens cache (Node-sikkerhedsrettelser, 2026-10-21: 22.23.4)
           cache: npm
       - run: npm ci --no-audit --no-fund
       - name: Statisk tjek (syntaks og imports)

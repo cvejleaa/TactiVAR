@@ -25,7 +25,7 @@ jobs:
     env:
       HAS_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT != '' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
@@ -35,10 +35,11 @@ jobs:
           echo "::error::Secret FIREBASE_SERVICE_ACCOUNT mangler – intet er deployet. Se README, afsnittet Deploy."
           exit 1
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         if: env.HAS_KEY == 'true'
         with:
-          node-version: 22   # som CI og engines (Release Manager v3.16)
+          node-version: 22
+          check-latest: true   # nyeste 22.x – ikke en ældre fra runnerens cache (Node-sikkerhedsrettelser, 2026-10-21: 22.23.4) – som CI og engines
 
       - name: Skriv servicekonto-nøgle
         if: env.HAS_KEY == 'true'
@@ -61,13 +62,13 @@ jobs:
           gcloud services list --enabled --project tactivar --filter="config.name:firebaserules.googleapis.com" --format="value(config.name)" \
             || echo "(kunne ikke læse API-listen)"
           echo "--- Firebase-projekter kontoen kan se ---"
-          npx --yes firebase-tools@13 projects:list --non-interactive || true
+          npx --yes firebase-tools@15 projects:list --non-interactive || true
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/sa.json
 
       - name: Deploy hosting og Firestore-regler
         if: env.HAS_KEY == 'true'
-        run: npx --yes firebase-tools@13 deploy --only hosting,firestore:rules --project tactivar --non-interactive --force
+        run: npx --yes firebase-tools@15 deploy --only hosting,firestore:rules --project tactivar --non-interactive --force
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/sa.json
 
