@@ -39,7 +39,11 @@ jobs:
         if: env.HAS_KEY == 'true'
         with:
           node-version: 22
-          check-latest: true   # nyeste 22.x – ikke en ældre fra runnerens cache (Node-sikkerhedsrettelser, 2026-10-21: 22.23.4) – som CI og engines
+          check-latest: true   # nyeste 22.x, ikke runnerens cache; mindstekravet står i package.json engines
+
+      - name: Node opfylder package.json engines (sikkerhedsrettelser)
+        if: env.HAS_KEY == 'true'
+        run: node -e "const [a,b,c]=process.versions.node.split('.').map(Number),[x,y,z]=require('./package.json').engines.node.replace('>=','').split('.').map(Number);if(a!==x?a<x:b!==y?b<y:c<z){console.error('::error::Node '+process.version+' er ældre end engines '+x+'.'+y+'.'+z);process.exit(1)}console.log('Node '+process.version+' ok')"
 
       - name: Skriv servicekonto-nøgle
         if: env.HAS_KEY == 'true'
@@ -90,13 +94,14 @@ jobs:
           echo "Ulogget læsning gav HTTP $CODE"
           [ "$CODE" = "403" ] || { echo "::error::Firestore svarer $CODE på en ulogget læsning – forventede 403. Er reglerne deployet?"; exit 1; }
 
+      # QC (2026-10-28): nøglen væk FØR npm ci – et kompromitteret install-script i afhængighederne skal ikke kunne læse den
+      - name: Fjern nøgle
+        if: always()
+        run: rm -f "$RUNNER_TEMP/sa.json"
+
       - name: Smoke-test mod den live side
         if: env.HAS_KEY == 'true'
         run: npm ci --no-audit --no-fund && npm run test:e2e
         env:
           BASE_URL: https://tactivar.web.app
           CHROME_PATH: /usr/bin/google-chrome
-
-      - name: Fjern nøgle
-        if: always()
-        run: rm -f "$RUNNER_TEMP/sa.json"
