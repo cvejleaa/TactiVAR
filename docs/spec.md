@@ -554,6 +554,10 @@ bedre kan kontrollere spil motoren".
   formation en 🤝-besked med de bånd, der skiftede (største fald først, højst 2). Spillerkortet: bedste makker kun ved stærkt, hans
   par med naboerne nu; salgslinjen (kortet og Klub) ved stærkt; købeboksen og "Til salg i ligaen": fremmed for alle, ca. 8 kampe
   (`gamesToSettle`). Fuldtidsanalysen: én sætning om din midtbane ved kampstart (finder hinanden/fremmede eller stærkt).
+  **v3.24.2** (Spilfører UI: "belønningen er tavs"): efter runden står øverst i Trup de par i din opstilling, der blev stærke –
+  kun når de spillede sammen i runden – og dem, der holdt op, fordi de ikke spillede sammen (`strongChanges`; før og efter mod
+  det NYE snit, så snittet alene aldrig flytter et par; kun par, der fandtes før). Navne fra truppen nu; fra 4 par kun antallet;
+  link til Taktik. Legenden tæller de stærke ("3 af 12 par spiller stærkt."). Gemt i `trainingReport[dit hold].strong` (id-par).
 - **Heat map** (karakterarket, dit hold – v3.20.0: står fra start over startopstillingen, som modstanderens zonekort; 📍 erstatter
   kun opstillingen): viser holdets tæthed (v3.20.2: 12 × 18 felter, før 6 × 9; uden målmand) af grundbilleder og
   øjeblikke plus vejen mellem to grundbilleder (punkter hver 2. enhed, vægt 0,5; kun når spilleren er med i begge – ingen streg

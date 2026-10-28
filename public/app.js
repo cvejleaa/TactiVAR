@@ -80,6 +80,7 @@ const NEWS = {
   '3.14.1': 'Rettelser: VAR tjekker nu offside for den forreste – scorer en spiller længere tilbage, er det hans forreste holdkammerat, der tjekkes, og billedet ved målet viser skytten, hvor han skød fra. Statistikken på Liga-fanen gælder sæsonen.',
   '3.14.2': 'Rettelse: Ved et VAR-tjek står den tjekkede nu, hvor han stod (forrest), i billedet ved målet – ikke flyttet bag en holdkammerat.',
   '3.14.3': 'Rettelser: Langskud tages fra skudafstand (ikke fra egen banehalvdel) i billedet ved målet, referatet fortæller et oplæg én gang, og efter sæsonens sidste runde viser tabellen slutstillingen og mesteren, til næste sæson går i gang.',
+  '3.24.2': '🤝 Samspil siger det nu: når to spillere har spillet sig stærkt sammen i en runde, står det øverst i Trup efter runden (og hvis et stærkt par mistede det, fordi de ikke spillede sammen). Under Taktik-banen står, hvor mange af dine par der spiller stærkt.',
   '3.24.1': '🧒 Rettelse: en ungdomsspiller, der rykkes op ved sæsonslut (af dig eller automatisk til 18), kan – som et køb – først sælges ved næste sæsonslut. Før kunne han sælges straks uden at have spillet. Kortet siger nu, hvornår en spiller kan handles igen.',
   '3.24.0': '🤝 Samspil: spillere, der spiller kampe side om side, finder hinanden – det gør opbygningen lidt lettere og forsvaret bedre mod løb i ryggen. Et nyt køb er fremmed for alle i ca. 8 kampe. Se stregerne mellem dine spillere i Taktik (tyk = stærkt, stiplet = fremmede), din bedste makker på spillerkortet, og hvad et byt eller et salg bryder.',
   '3.22.1': '🎬 Afspilningen viser nu afleveringen før målet og før afslutninger efter en cutback, et løb eller et indlæg: bolden går fra oplæggeren til skytten, der står onside på linje med forsvaret – derefter løber han igennem og afslutter (et indlæg går i luften direkte ind i feltet). Før så det ud, som om han stod offside. Målene i den runde, du allerede har spillet, vises også rigtigt.',
@@ -401,7 +402,7 @@ function renderNow() {
       // Sæsonslut under afspilning (som bogført-før-afspilning): runden er bogført, og sæsonskiftet er sket
       mc?.playing && seasonJustEnded(league) ? h('div', { class: 'notice', id: 'turnover-booked' }, '🗓 Sæsonen sluttede med denne runde: alle er blevet et år ældre, og sæsonrapporten med ungdomstilbuddene står på Liga, når kampene er spillet.') : null,
       !mc?.playing && mine.youthOffers?.length ? h('div', { class: 'notice', id: 'youth-pending' }, `🧒 ${mine.youthOffers.length} ungdomstilbud venter – `, h('button', { class: 'linklike', onclick: () => showTab('liga') }, 'se sæsonrapporten på Liga')) : null,
-      isOwn && !mc?.playing ? trainingSummary(league.trainingReport?.[team.id], team, league.trainingReport?.[team.id] ? seasonAndRound(league, league.trainingReport[team.id].round)[1] : null) : null, matrix,
+      isOwn && !mc?.playing ? trainingSummary(league.trainingReport?.[team.id], team, league.trainingReport?.[team.id] ? seasonAndRound(league, league.trainingReport[team.id].round)[1] : null, () => showTab('taktik')) : null, matrix,
       // v3.20.1 (QC): kortet | træningsoversigten 2:3 – træningstabellen skal bruge ≈ 760 px (1366 px: 625 → vandret rulning)
       h('div', { class: 'tactics-layout trup-layout' }, h('section', {}, card),
         h('section', {}, isOwn ? renderTrainingTable({ team, report: !mc?.playing ? league.trainingReport?.[team.id] : null, line: view.trainLine ?? 'all', onLine: (v) => { view.trainLine = v; view.trainMsg = ''; render(); }, msg: view.trainMsg ?? '',
@@ -451,14 +452,16 @@ function chemCard(team, p) {
   const ref = chemRefOf(game.league), isNew = !Object.keys(team.chemistry ?? {}).some((k) => k.split('|').includes(p.id));
   return { isNew, best: isNew ? null : bestPartner(team, ref, p.id), pairs: playerPairs(team, ref, p.id) };
 }
+const strongCount = (pairs) => { const n = pairs.filter((x) => x.band === 'staerkt').length; return n === 0 ? '' : n === pairs.length ? `Alle ${n} par spiller stærkt sammen. ` : `${n} af ${pairs.length} par spiller stærkt. `; };
 // Samspil (v3.24.0): forklaringen under banen og det svageste par i ord (Spilfører UI: på mobil er det eneste måde at se et pars bånd)
 function chemLegend(pairs) {
   const w = weakestPair(pairs), key = (b) => h('span', { class: `chem-key ${b}` });
   return h('div', { class: 'chem-legend', id: 'chem-legend' },
     h('div', {}, '🤝 Samspil mellem naboer: ', key('staerkt'), 'stærkt ', key('sammen'), 'spillet sammen ', key('finder'), 'finder hinanden ', key('fremmede'), 'fremmede'),
     // QC: kun en advarsel, når der er noget at advare om – og hvad samspil gør i kampen
+    // v3.24.2 (Spilfører UI/QC): tallet for stærke par står i alle tilstande
     h('div', { id: 'chem-weakest' }, (w && BAND_RANK[w.band] < BAND_RANK.sammen ? `Svagest lige nu: ${w.label} (${BAND_WORD[w.band]}). ` : 'Alle par har spillet sig sammen. ')
-      + 'Samspil hjælper opbygningen og forsvaret mod løb i ryggen – par spiller sig sammen med kampe side om side.'));
+      + strongCount(pairs) + 'Samspil hjælper opbygningen og forsvaret mod løb i ryggen – par spiller sig sammen med kampe side om side.'));
 }
 // Byt og formation (v3.24.0): sig det, når et pars samspil skifter bånd – ved spillerlisten (QC/Spilfører UI: ikke øverst på siden)
 function withChem(team, fn) {

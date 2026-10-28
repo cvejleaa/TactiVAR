@@ -95,6 +95,15 @@ try {
       const by = (id) => me.squad.find((p) => p.id === id); return { a: by(s[i]), b: by(s[j]) }; });
     await g.reload(); await g.waitForSelector('body[data-klar="ja"]'); await tab('taktik');
     check('Samspil: et stærkt par får en tyk streg (chem-staerkt), resten er uændrede', (await g.locator('#pitch #chem-lines line.chem-staerkt').count()) === 1);
+    // v3.24.2: legenden tæller de stærke par; Trup-panelet siger, hvilket par der blev stærkt i runden (navne fra truppen), og linker til Taktik
+    { const nLines = await g.locator('#pitch #chem-lines line.chem').count();
+      check('Samspil: legenden tæller de stærke par ("1 af N par spiller stærkt")', (await g.textContent('#chem-weakest')).includes(`Alle par har spillet sig sammen. 1 af ${nLines} par spiller stærkt.`), await g.textContent('#chem-weakest'));
+      await g.evaluate((pr) => { const d = JSON.parse(localStorage.getItem('tactivar_save')), me = d.league.teams.find((t) => !t.isBot); d.league.trainingReport = { [me.id]: { round: d.league.leagueMetadata.round || 1, gains: [], injuries: [], strong: { up: [[pr.a.id, pr.b.id]], down: [] } } }; localStorage.setItem('tactivar_save', JSON.stringify(d)); }, pair);
+      await g.reload(); await g.waitForSelector('body[data-klar="ja"]'); await tab('trup');
+      const ts = await g.textContent('#training-strong').catch(() => '');
+      check('Samspil: Trup-panelet siger, at parret nu spiller stærkt sammen – med numre og navne – og linker til Taktik', ts.startsWith(`🤝 #${pair.a.shirtNumber} ${pair.a.shortName} og #${pair.b.shirtNumber} ${pair.b.shortName} spiller nu stærkt sammen.`) && ts.includes('se stregerne på Taktik'), ts);
+      await g.locator('#training-strong button.linklike').click();
+      check('Samspil: linket åbner Taktik med stregerne', (await g.locator('#pitch #chem-lines line.chem-staerkt').count()) === 1); }
     await tab('trup');
     await g.locator('#matrix tbody tr', { hasText: pair.a.shortName }).first().click();
     const best = await g.textContent('#card-best'), list = await g.textContent('#list-chem').catch(() => '');
