@@ -13,7 +13,7 @@ const own = (L) => L.teams.find((t) => !t.isBot);
 
 test('strongChanges: op kun ved fælles kamp i runden, ned kun uden – snittet alene flytter intet; ukendte par tæller ikke', () => {
   const L = createLeague(createRng(2)), me = own(L), R = 5, ref = 78;
-  const ps = lineupPairs(me, ref).slice(0, 6), k = ps.map((x) => pairKey(x.a.id, x.b.id)), before = new Map();
+  const ps = lineupPairs(me, ref).slice(0, 7), k = ps.map((x) => pairKey(x.a.id, x.b.id)), before = new Map();
   // ved snit 78 er stærkt ≥ 81,2
   const set = (i, was, now, round) => { before.set(k[i], was); me.chemistry[k[i]] = [now, round]; };
   set(0, 81.0, 81.5, R);        // krydser op, spillede sammen → op
@@ -22,6 +22,7 @@ test('strongChanges: op kun ved fælles kamp i runden, ned kun uden – snittet 
   set(3, 85.0, 80.0, R);        // falder ud, men spillede sammen → intet (snittet steg)
   set(4, 84.0, 85.0, R);        // var stærkt, er stærkt → intet
   me.chemistry[k[5]] = [90, R]; // fandtes ikke før → intet
+  set(6, 81.5, 81.5, R);        // uændret og stærkt ved snit 78 – men ikke ved et andet snit (81): med blandet snit et falsk "op"
   assert.equal(bandOf(81.0, ref), 'sammen'); assert.equal(bandOf(81.5, ref), 'staerkt');   // data: grænsen ligger imellem
   const r = strongChanges(me, before, ref, R);
   assert.deepEqual(r.up, [[ps[0].a.id, ps[0].b.id]]);
