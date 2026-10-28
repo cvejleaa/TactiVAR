@@ -933,7 +933,7 @@ referaterne).
   hændelsernes stats væk, så pakken. Sendte id'er huskes i `tactivar_sent` (de nyeste 30, også efter ny liga) og står
   under "📤 Sendte kampe". Anonym bruger: refresh-token i `tactivar_uploader`.
   `firestore.rules`: kun oprettelse med eget uid, id-mønster, faste felter med typer og længder, json < 400.000 tegn; ingen læsning,
-  ændring eller sletning fra klienten – hentning kun med servicekontoen (`FIREBASE_READ_KEY`, Cloud Datastore
+  ændring eller sletning fra klienten – hentning kun med servicekontoen (`FIREBASE_READ_EMAIL` + `FIREBASE_READ_PRIVATE_KEY`, Cloud Datastore
   Viewer). Regeltests mod emulatoren: `npm run test:rules` (CI). Opsætning: README, "Engangsopsætning: kamp-id";
   indtil `public/firebase-config.js` er udfyldt, står der "📤 Kamp-id: ikke sat op endnu".
 
