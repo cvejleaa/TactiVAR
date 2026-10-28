@@ -1,0 +1,91 @@
+// v3.24.3 (brugeren: "gemme kampene i firebase med et id, så jeg kan referere til det når vi skal justere på motoren"):
+// gengivelsespakken. En kamp skal kunne spilles igen tal for tal ud fra de to hold (som de stod lige før kampen), rng-
+// tilstanden lige før kampen og kampens opts – også efter en JSON-rundtur (pakken sendes som tekst).
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { createRng } from '../../public/engine/rng.js';
+import { createLeague } from '../../public/engine/generator.js';
+import { playRound, commitRound } from '../../public/engine/season.js';
+import { simulateMatch } from '../../public/engine/match.js';
+import { saveReplay, loadReplay, clearReplay, replayOf, REPLAY_KEY } from '../../public/state/replay.js';
+import { resetGame, SAVE_KEY } from '../../public/state/storage.js';
+
+const fakeStorage = () => { const m = new Map(); return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k), key: (i) => [...m.keys()][i] ?? null, get length() { return m.size; } }; };
+
+test('rng.state(): createRng(state) fortsætter præcis, hvor generatoren er', () => {
+  const r = createRng(42); for (let i = 0; i < 17; i++) r.next();
+  const c = createRng(r.state());
+  assert.deepEqual([r.next(), r.next(), r.next()], [c.next(), c.next(), c.next()]);
+});
+
+test('gengivelse: hver kamp i runden spilles igen identisk ud fra pakken – også efter JSON – i flere runder og ligaer', () => {
+  for (const seed of [1, 7]) {
+    const L = createLeague(createRng(seed)), rng = createRng(seed * 11);
+    for (let r = 0; r < 3; r++) {
+      const res = playRound(L, rng, { replay: true });
+      assert.equal(res.replay.packs.length, res.matches.length);
+      res.replay.packs.forEach((p0, i) => {
+        const p = JSON.parse(JSON.stringify(p0));
+        const again = simulateMatch(p.home, p.away, createRng(p.rngState), p.opts);
+        again.goalsPool.forEach((g) => { g.matchIdx = i; });   // playPairs nummererer målene efter kampen
+        assert.equal(JSON.stringify(again), JSON.stringify(res.matches[i]), `liga ${seed} runde ${r + 1} kamp ${i}`);
+        assert.ok(replayOf(res.replay, res.round, i, res.matches[i]), 'replayOf finder pakken');
+      });
+      // modbevis: forkert rng-tilstand giver en anden kamp; hold taget EFTER bogføringen giver en anden kamp
+      const p = res.replay.packs[0], m0 = JSON.stringify(res.matches[0]);
+      assert.notEqual(JSON.stringify(simulateMatch(p.home, p.away, createRng(p.rngState + 1), p.opts)), m0);
+      commitRound(L, res, rng);
+      const after = simulateMatch(L.teams.find((t) => t.id === p.home.id), L.teams.find((t) => t.id === p.away.id), createRng(p.rngState), p.opts);
+      assert.notEqual(JSON.stringify(after), m0, 'holdene efter commitRound er ikke dem, kampen blev spillet med');
+    }
+  }
+});
+
+test('uden replay: ingen pakke (måleværktøjerne og bots betaler intet); replayOf afviser en anden runde eller andre hold', () => {
+  const L = createLeague(createRng(3)), res = playRound(L, createRng(5));
+  assert.equal(res.replay, undefined);
+  const r2 = playRound(createLeague(createRng(3)), createRng(5), { replay: true });
+  assert.equal(replayOf(r2.replay, r2.round + 1, 0, r2.matches[0]), null);
+  assert.equal(replayOf(r2.replay, r2.round, 0, r2.matches[1]), null);
+});
+
+test('lageret: gemt under sin egen nøgle (ikke i spillets gem), læses igen, og ryddes når en ny liga startes', () => {
+  const st = fakeStorage(), L = createLeague(createRng(2)), res = playRound(L, createRng(9), { replay: true });
+  assert.ok(saveReplay(st, res.replay));
+  assert.equal(loadReplay(st).round, res.round);
+  assert.equal(st.getItem(SAVE_KEY), null, 'ikke i gemmet');
+  st.setItem(REPLAY_KEY, '{"round":"x"}'); assert.equal(loadReplay(st), null, 'forkert form → null');
+  saveReplay(st, res.replay);
+  const r = resetGame(st, { schemaVersion: 9, league: createLeague(createRng(4)), ui: {}, notes: {} });
+  assert.ok(r.ok); assert.equal(st.getItem(REPLAY_KEY), null, 'ny liga: gengivelsen er væk');
+  clearReplay(st); assert.equal(loadReplay(st), null);
+});
+
+test('sendte id\'er (QC): nyeste først, højst SENT_MAX, samme id kun én gang, skrald afvises – og overlever ny liga', async () => {
+  const { rememberSent, loadSent, SENT_KEY, SENT_MAX } = await import('../../public/state/replay.js');
+  const st = fakeStorage();
+  assert.deepEqual(loadSent(st), []);
+  for (let i = 0; i < SENT_MAX + 5; i++) rememberSent(st, { id: `K-A${i}`, label: `kamp ${i}`, replay: true });
+  const l = loadSent(st);
+  assert.equal(l.length, SENT_MAX); assert.equal(l[0].id, `K-A${SENT_MAX + 4}`, 'nyeste først'); assert.equal(l.at(-1).id, 'K-A5', 'de ældste røg ud');
+  rememberSent(st, { id: 'K-A10', label: 'igen', replay: false });
+  assert.equal(loadSent(st).filter((x) => x.id === 'K-A10').length, 1); assert.equal(loadSent(st)[0].label, 'igen');
+  st.setItem(SENT_KEY, '[{"id":5},{"id":"K-B","label":"ok"},null]'); assert.deepEqual(loadSent(st).map((x) => x.id), ['K-B']);
+  st.setItem(SENT_KEY, '{nej'); assert.deepEqual(loadSent(st), []);
+  rememberSent(st, { id: 'K-C', label: 'x', replay: true });
+  resetGame(st, { schemaVersion: 9, league: createLeague(createRng(4)), ui: {}, notes: {} });
+  assert.equal(loadSent(st)[0].id, 'K-C', 'ny liga sletter ikke de sendte id\'er – kampene ligger stadig i Firestore');
+});
+
+test('pakkens hold (Security): uden kasse, regnskab, salgsliste, ungdomstilbud og ejer – men med de gemte planer, som Hvis-Så kan skifte til', () => {
+  const L = createLeague(createRng(6));
+  L.teams.forEach((t) => { t.ownerUid = 'hemmelig'; t.tacticPresets ??= [{ formation: '4-4-2' }]; });
+  assert.ok(L.teams.every((t) => 'cashBalance' in t && 'finance' in t), 'data: holdene HAR penge og regnskab');
+  const res = playRound(L, createRng(2), { replay: true });
+  for (const p of res.replay.packs) for (const t of [p.home, p.away]) {
+    for (const k of ['cashBalance', 'finance', 'listed', 'youthOffers', 'ownerUid']) assert.ok(!(k in t), `${k} sendes ikke`);
+    assert.ok(Array.isArray(t.tacticPresets) && t.tacticPresets.length > 0, 'tacticPresets er med');
+    assert.ok(t.squad.length >= 11 && t.chemistry && t.tactics, 'truppen, samspillet og taktikken er med');
+  }
+  assert.ok(L.teams.every((t) => t.ownerUid === 'hemmelig' && 'cashBalance' in t), 'ligaen selv er urørt');
+});

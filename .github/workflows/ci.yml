@@ -33,6 +33,13 @@ jobs:
         run: npm run check
       - name: Unit-tests
         run: npm test
+      # v3.24.3 (kamp-id): Firestore-reglerne mod Auth- og Firestore-emulatoren (projekt demo-tactivar – aldrig produktion)
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Firestore-regler (emulator)
+        run: npm run test:rules
       - name: End-to-end
         run: npm run test:e2e
         env:

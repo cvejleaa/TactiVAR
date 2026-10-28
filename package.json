@@ -8,8 +8,9 @@
     "test:e2e": "node tests/e2e/run.mjs",
     "check": "node tools/check.mjs",
     "serve": "node tools/serve.mjs",
-    "emulators": "firebase emulators:start --only hosting,firestore",
-    "deploy": "firebase deploy --only hosting,firestore:rules"
+    "emulators": "firebase emulators:start --only auth,hosting,firestore",
+    "deploy": "firebase deploy --only hosting,firestore:rules",
+    "test:rules": "firebase emulators:exec --only auth,firestore --project demo-tactivar \"node tests/rules/run.mjs\""
   },
   "devDependencies": {
     "firebase-tools": "^15.34.1",

@@ -6,6 +6,9 @@ import { createLeague } from './engine/generator.js';
 import { matchBenchOf, reservesOf, FOCUS, willRetire, RETIRE_WARN_ROUND, publicWage, wageRoomPerRound } from './engine/career.js';
 import { loadGame, saveGame, resetGame, exportGame, importGame, backupRaw, SAVE_KEY } from './state/storage.js';
 import * as act from './state/actions.js';
+import { saveReplay, loadReplay, replayOf, rememberSent, loadSent } from './state/replay.js';
+import { buildPayload, uploadMatch } from './state/upload.js';
+import { FIREBASE } from './firebase-config.js';
 import { h, select } from './ui/dom.js';
 import { kr } from './ui/labels.js';
 import { renderMatrix } from './ui/matrix.js';
@@ -80,6 +83,7 @@ const NEWS = {
   '3.14.1': 'Rettelser: VAR tjekker nu offside for den forreste – scorer en spiller længere tilbage, er det hans forreste holdkammerat, der tjekkes, og billedet ved målet viser skytten, hvor han skød fra. Statistikken på Liga-fanen gælder sæsonen.',
   '3.14.2': 'Rettelse: Ved et VAR-tjek står den tjekkede nu, hvor han stod (forrest), i billedet ved målet – ikke flyttet bag en holdkammerat.',
   '3.14.3': 'Rettelser: Langskud tages fra skudafstand (ikke fra egen banehalvdel) i billedet ved målet, referatet fortæller et oplæg én gang, og efter sæsonens sidste runde viser tabellen slutstillingen og mesteren, til næste sæson går i gang.',
+  '3.24.3': '📤 Kamp-id: i Match Center kan den viste kamp i seneste runde sendes med et kort id (fx K-7F3Q) – så kan den findes og spilles igen, når kampmotoren justeres. Kun den ene kamp sendes, ikke dit spil. Dine sendte id\'er står under "📤 Sendte kampe".',
   '3.24.2': '🤝 Samspil siger det nu: når to spillere har spillet sig stærkt sammen i en runde, står det øverst i Trup efter runden (og hvis et stærkt par mistede det, fordi de ikke spillede sammen). Under Taktik-banen står, hvor mange af dine par der spiller stærkt.',
   '3.24.1': '🧒 Rettelse: en ungdomsspiller, der rykkes op ved sæsonslut (af dig eller automatisk til 18), kan – som et køb – først sælges ved næste sæsonslut. Før kunne han sælges straks uden at have spillet. Kortet siger nu, hvornår en spiller kan handles igen.',
   '3.24.0': '🤝 Samspil: spillere, der spiller kampe side om side, finder hinanden – det gør opbygningen lidt lettere og forsvaret bedre mod løb i ryggen. Et nyt køb er fremmed for alle i ca. 8 kampe. Se stregerne mellem dine spillere i Taktik (tyk = stærkt, stiplet = fremmede), din bedste makker på spillerkortet, og hvad et byt eller et salg bryder.',
@@ -411,7 +415,7 @@ function renderNow() {
     // Taktik (v3.19.0): banen og spillerlisten side om side – opstillingen ét sted; kortet under listen; faser og Hvis-Så nedenunder
     // v3.20.1 (brugeren: "langt ned til taktikindstillingerne"): indstillingerne under banen, listen og kortet ved siden af
     taktik: () => [h('div', { class: 'tactics-layout taktik-layout' }, h('section', { class: 'tk-pitch' }, pitch), h('section', { class: 'tk-list' }, lineupList), h('section', { class: 'tk-tactics' }, tactics), h('section', { class: 'tk-card' }, card))],
-    kamp: () => [shown ? renderMatchCenter({ mc: shown, myTeamId: mine.id, on: mcHandlers, column: !shown.playing && shown.round === league.lastRound?.round ? columnNow() : null }) : h('div', { class: 'panel empty', id: 'no-matches' }, 'Ingen kampe spillet endnu. Tryk ▶ Spil runde i topbaren – modstanderen følger kampprogrammet på Liga-fanen.')],
+    kamp: () => [shown ? renderMatchCenter({ mc: sendState(shown), myTeamId: mine.id, on: mcHandlers, column: !shown.playing && shown.round === league.lastRound?.round ? columnNow() : null }) : h('div', { class: 'panel empty', id: 'no-matches' }, 'Ingen kampe spillet endnu. Tryk ▶ Spil runde i topbaren – modstanderen følger kampprogrammet på Liga-fanen.')],
     liga: () => [mc?.playing ? h('div', { class: 'notice', id: 'booked-league' }, '📺 Runden spilles i Kamp-fanen – tabellen herunder er allerede opdateret med den.') : null,
       !mc?.playing ? renderSeasonReport({ league, mine,
         onTake: (id) => { const err = act.takeYouth(mine, id, game.league); view.notice = err ? `🧒 ${err}` : '🧒 Ungdomsspilleren er rykket op i truppen.'; change(() => {}); },
@@ -494,7 +498,8 @@ function pickForSwap(team, p) {
 function playNextRound() {
   clearSwap(); view.notice = '';
   const rng = createRng(randomSeed());
-  const result = playRound(game.league, rng);
+  const result = playRound(game.league, rng, { replay: true });
+  saveReplay(storage, result.replay); delete result.replay;   // v3.24.3: gengivelsen ligger for sig selv, ikke i gemmet
   commitRound(game.league, result, rng);
   game.ui.tab = 'kamp'; // gemmes med runden, så F5 midt i afspilningen lander i Kamp
   persist();
@@ -540,8 +545,35 @@ const mcHandlers = {
   snapshot: (i) => { mc ||= lastRoundView(game.league.lastRound); mc.snap = i; renderMc(); if (i != null) document.getElementById('snap-pitch')?.scrollIntoView({ block: 'center' }); },
   openGoal: (i, goal) => openGoal(i, goal),
   filter: (f) => { mc ||= lastRoundView(game.league.lastRound); mc.filter = f; renderMc(); },
+  // v3.24.3 (kamp-id): send den viste kamp (kun seneste runde – ældre kampe gemmes ikke)
+  send: async (i) => {
+    mc ||= lastRoundView(game.league.lastRound);
+    const m = mc.matches[i], round = mc.round, [season, sr] = seasonAndRound(game.league, round);
+    const p = buildPayload({ match: m, pack: replayOf(loadReplay(storage), round, i, m), version: VERSION, round: sr, season });
+    if (p.error) { window.tactivarFejl?.(p.error); return; }
+    mc.sending = i; renderMc();
+    try {
+      const { id } = await uploadMatch(FIREBASE, storage, p.fields); m.sentAs = { id, replay: p.replay }; persist();
+      rememberSent(storage, { id, label: `Sæson ${season} runde ${sr}: ${m.homeName} ${m.homeGoals}-${m.awayGoals} ${m.awayName}`, replay: p.replay });
+    }
+    catch (e) { window.tactivarFejl?.(`📤 ${e.message}`); }
+    finally { mc.sending = null; renderMc(); }
+  },
+  copyId: (id) => (navigator.clipboard ? navigator.clipboard.writeText(id).then(() => true, () => false) : Promise.resolve(false)),
 };
-const matchCenterEl = () => renderMatchCenter({ mc, myTeamId: myTeam().id, on: mcHandlers, column: mc && !mc.playing && game.league.lastRound && mc.round === game.league.lastRound.round ? columnNow() : null });
+// Kan den viste kamp sendes? Kun seneste runde, og kun når upload er sat op (ellers en forklaring i stedet for knappen)
+// QC v3.24.3: mangler gengivelsespakken (fuldt lager, anden liga), siges det FØR afsendelse – og de sendte id'er står i en liste,
+// der overlever næste runde
+const sendState = (v = mc) => {
+  if (!v) return v;
+  const latest = game.league.lastRound && v.round === game.league.lastRound.round;
+  v.canSend = !!(FIREBASE && latest);
+  v.sendWhy = !latest ? 'Kun seneste runde kan sendes – ældre runder gemmes ikke, så de kan ikke spilles igen.' : !FIREBASE ? '📤 Kamp-id: ikke sat op endnu' : null;
+  v.noReplay = v.canSend && !v.playing && !replayOf(loadReplay(storage), v.round, v.viewIdx, v.matches[v.viewIdx]);
+  v.sent = v.playing ? [] : loadSent(storage);
+  return v;
+};
+const matchCenterEl = () => (sendState(), renderMatchCenter({ mc, myTeamId: myTeam().id, on: mcHandlers, column: mc && !mc.playing && game.league.lastRound && mc.round === game.league.lastRound.round ? columnNow() : null }));
 // Under afspilning tegnes kun Match Center om (ikke hele siden).
 function renderMc() { const el = document.getElementById('match-center'); if (el) el.replaceWith(matchCenterEl()); }
 

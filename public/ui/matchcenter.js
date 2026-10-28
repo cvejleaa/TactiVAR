@@ -257,6 +257,22 @@ function renderColumn(g, myTeamId, onOpenMatch, matches, col, onOpenReport) {
 
 const snapOf = (m, mc) => (mc.snap != null && m.events[mc.snap]?.snapshot ? { ev: m.events[mc.snap], snap: m.events[mc.snap].snapshot } : null);
 // mc = { round, matches, gazette, viewIdx, filter, shownCount, playing, snap }
+// QC v3.24.3: forklaringen står synligt (mobil har ingen hover), "uden gengivelse" siges før og efter afsendelse, og
+// "Kopiér" kvitterer
+function sendBox(m, mc, on) {
+  const copy = (id) => h('button', { class: 'mini', id: 'copy-id', onclick: (ev) => on.copyId(id).then((ok) => { ev.target.textContent = ok ? 'Kopieret ✓' : 'Markér og kopiér selv'; }) }, 'Kopiér');
+  if (m.sentAs?.id) return h('span', { class: 'muted', id: 'sent-as' }, `📤 Sendt som ${m.sentAs.id}${m.sentAs.replay ? '' : ' (uden gengivelse – kan ikke spilles igen)'} `, copy(m.sentAs.id));
+  if (!mc.canSend) return h('span', { class: 'muted', id: 'send-off' }, mc.sendWhy ?? '');
+  return h('span', { id: 'send-box' },
+    h('button', { class: 'mini', id: 'send-match', disabled: mc.sending === mc.viewIdx, onclick: () => on.send(mc.viewIdx) }, mc.sending === mc.viewIdx ? '📤 Sender …' : '📤 Send kampen'),
+    h('span', { class: 'muted', id: 'send-note' }, mc.noReplay
+      ? ' ⚠ Gengivelsen mangler (fx fuldt browserlager) – kampen kan sendes, men ikke spilles igen.'
+      : ' Gemmer kampen med et kort id, så den kan spilles igen, når motoren justeres. Kun denne kamp sendes – send før næste runde.'));
+}
+// De sendte id'er (nyeste først) – står også efter næste runde
+const sentList = (sent) => (sent?.length ? h('details', { id: 'sent-list', class: 'muted' }, h('summary', {}, `📤 Sendte kampe (${sent.length})`),
+  h('ul', {}, sent.map((x) => h('li', {}, h('strong', {}, x.id), ` – ${x.label}${x.replay === false ? ' (uden gengivelse)' : ''}`)))) : null);
+
 export function renderMatchCenter({ mc, myTeamId, on, column = null }) {
   const m = mc.matches[mc.viewIdx];
   const all = m.events;
@@ -279,7 +295,9 @@ export function renderMatchCenter({ mc, myTeamId, on, column = null }) {
   return h('div', { class: 'panel matchcenter', id: 'match-center' },
     h('div', { class: 'row' }, h('h3', {}, `📺 Match Center – runde ${mc.round}`),
       mc.playing ? h('button', { class: 'mini', id: 'skip', onclick: on.skip }, '⚡ Spring til slutfløjt') : null,
-),
+      // v3.24.3 (kamp-id): send den viste kamp, så den kan findes igen med id'et, når motoren justeres
+      !mc.playing && on.send ? sendBox(m, mc, on) : null),
+    !mc.playing ? sentList(mc.sent) : null,
     mc.playing ? h('div', { class: 'muted', id: 'booked-note' }, 'Runden er allerede bogført og gemt – tabellen og truppen er opdateret, også hvis du lukker siden nu.') : null,
     h('div', { class: 'cards', id: 'match-cards' }, mc.matches.map((x, i) => h('button', { class: 'matchcard' + (i === mc.viewIdx ? ' active' : ''), disabled: mc.playing && i !== 0, onclick: () => on.view(i) },
       // Under afspilning afsløres de andre kampes resultater ikke før slutfløjt.

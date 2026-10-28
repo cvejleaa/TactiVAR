@@ -920,8 +920,22 @@ referaterne).
 - Eksport/import af hele spillet som JSON-fil (backup og flytning mellem
   browsere/domæner).
 - Gamle data fra vejleaa.dk kan ikke flyttes (localStorage er bundet til
-  domænet, og der ligger intet i Firestore) — den nye version starter med en
+  domænet, og ligaen ligger ikke i Firestore) — den nye version starter med en
   ny liga. Eksport/import gør fremtidige flytninger mulige.
+- **Kamp-id (v3.24.3)** – brugeren: "gemme kampene i firebase med et id, så jeg kan referere til det når vi skal justere
+  på motoren". I Match Center (seneste runde, efter slutfløjt) sender "📤 Send kampen" den viste kamp til
+  Firestore `matches/K-XXXX` (4 tegn uden 0/O/1/I) som en anonym Firebase-bruger (REST, ingen SDK; `public/state/upload.js`).
+  Indhold: kampen som vist + en **gengivelsespakke** (de to hold lige før kampen, rng-tilstanden og kampens opts), så
+  `node tools/fetch-match.mjs K-XXXX --replay` spiller den igen identisk. Pakken for seneste runde ligger i
+  localStorage `tactivar_replay` (ikke i gemmet; overskrives hver runde, ryddes ved ny liga) – derfor kan kun seneste
+  runde sendes. Pakkens hold er uden kasse, regnskab, salgsliste og ungdomstilbud (bruges ikke i kampen). Mangler
+  pakken, siges det før og efter afsendelse ("uden gengivelse"). For stort (> 380.000 bytes; en kamp fylder ca. 170 KB) →
+  hændelsernes stats væk, så pakken. Sendte id'er huskes i `tactivar_sent` (de nyeste 30, også efter ny liga) og står
+  under "📤 Sendte kampe". Anonym bruger: refresh-token i `tactivar_uploader`.
+  `firestore.rules`: kun oprettelse med eget uid, id-mønster, faste felter med typer og længder, json < 400.000 tegn; ingen læsning,
+  ændring eller sletning fra klienten – hentning kun med servicekontoen (`FIREBASE_READ_KEY`, Cloud Datastore
+  Viewer). Regeltests mod emulatoren: `npm run test:rules` (CI). Opsætning: README, "Engangsopsætning: kamp-id";
+  indtil `public/firebase-config.js` er udfyldt, står der "📤 Kamp-id: ikke sat op endnu".
 
 ## 9b. Regressionsnet — hvert punkt, der er faldet af før, har en test
 | Faldt af (kilde) | Test |
@@ -995,7 +1009,7 @@ Modstanderes stjerner: udfyldte i guld, tomme dæmpet.
   hemmeligheder fra klienten til en database i "test mode" (åben for alle).
   Trin 2 erstatter den med Auth + regler + committet `firebase-config.js`.
 - **Login, ejerskab (`ownerUid`), bot-overtagelse, noter i Firestore**
-  (udskudt, trin 2). Datamodellen `teams_public / teams_private /
+  (udskudt, trin 2 – Firestore bruges indtil videre kun til kamp-id, §9). Datamodellen `teams_public / teams_private /
   teams_secrets` + `manager_notes/{uid}` er udgangspunktet.
 - **Server-motor** (udskudt): reel hemmeligholdelse kræver Cloud Functions
   (Blaze-plan) — besluttes i trin 2.

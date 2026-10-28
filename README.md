@@ -48,6 +48,22 @@ jobbet rødt med "Secret FIREBASE_SERVICE_ACCOUNT mangler – intet er deployet"
    **Run workflow** → branch `main` → **Run workflow**. Efter 1–2 minutter skal alle
    trin være grønne, og spillet ligger på https://tactivar.web.app.
 
+### Engangsopsætning: kamp-id ("📤 Send kampen", v3.24.3)
+Brugeren sender en kamp med et kort id (K-XXXX), som vi henter og spiller igen, når motoren justeres. Tre trin i
+Firebase-konsollen for projektet **tactivar**:
+1. **Authentication → Kom i gang → Sign-in method → Anonymous → Aktivér.** (Spillet logger anonymt ind, kun for at sende.)
+2. **Project settings → General → Your apps → Web app** (opret en, hvis der ingen er; ingen hosting-opsætning nødvendig).
+   Kopiér `apiKey` og sæt den i `public/firebase-config.js`: `export const FIREBASE = { apiKey: '…', projectId: 'tactivar' };`.
+   Nøglen er offentlig pr. design (adgangen afgøres af `firestore.rules`). Begræns den i Google Cloud Console →
+   APIs & Services → Credentials → nøglen: *Application restrictions* = HTTP referrers `https://tactivar.web.app/*`,
+   *API restrictions* = Identity Toolkit API + Token Service API + Cloud Firestore API.
+3. **Læse-nøgle til `tools/fetch-match.mjs`:** https://console.cloud.google.com/iam-admin/serviceaccounts?project=tactivar →
+   **Opret servicekonto** `github-read` med rollen **Cloud Datastore Viewer** (kun læsning) → Nøgler → JSON. Læg indholdet i
+   miljøvariablen `FIREBASE_READ_KEY` (Claude-miljøets indstillinger → Network secrets). Slet filen bagefter.
+
+Hent en kamp: `node tools/fetch-match.mjs K-7F3Q --replay` (gemmer `kampe/K-7F3Q.json`, ignoreret af git).
+Reglerne testes mod emulatoren med `npm run test:rules` (også i CI).
+
 ### Hvis deployet fejler
 Åbn kørslen under Actions; trinnet "Diagnose af nøgle og rettigheder" viser kontoens
 roller i projektet. Typiske årsager:

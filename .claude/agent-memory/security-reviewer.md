@@ -1,8 +1,8 @@
 # Security Reviewer – hukommelse
 
 ## Trusselsbilledet (trin 1, gældende indtil login i trin 2)
-- Alt ligger i browseren (localStorage `tactivar_save`); `public/` laver INGEN netværkskald (grep fetch/firestore/XHR = 0),
-  firestore.rules = deny-all. "Anti-spionage" er derfor visuel: en bruger kan altid læse alt i devtools. Fund om hvem-ser-hvad
+- Alt ligger i browseren (localStorage `tactivar_save`). Fra v3.24.3 ÉN netværksvej: "📤 Send kampen" (upload.js, REST,
+  anonym Firebase-bruger) -> matches/K-XXXX, KUN create. Resten af firestore.rules = deny-all (se afsnittet v3.24.3). "Anti-spionage" er derfor visuel: en bruger kan altid læse alt i devtools. Fund om hvem-ser-hvad
   er sjældent blokerende i trin 1 – men skal navngives i docs/spec.md §3, så trin 2 ved hvad der skal gøres seer-afhængigt.
 - Realistisk angriber nu: (a) spilleren selv, der aflæser en bots skjulte evner/indstillinger via UI'en; (b) en delt/importeret
   gemt fil (parseSave -> normalizeLeague). lastRound.matches[] normaliseres IKKE (events, ratings, trace) – en ødelagt fil
@@ -92,3 +92,30 @@
   Brug: fjern en egen erobring (x[3]='zzz') -> tallet for ham ændres.
 - "Står det allerede i referatet?": for hver post, find hændelse samme `min` hvis tekst indeholder tag(a) OG tag(b) (tag = `#nr kortnavn`).
 - git archive <sha> til scratch/wt + symlink node_modules; scripts tager træets sti som argv (engine, tools/serve.mjs, playwright-core).
+
+## v3.24.3 kamp-id (matches/{id}, create-only) – efterprøvet i emulatoren på 597fcf0 + 58d6f99
+- LUKKET (bekræftet, med ejer-kontrol 'Bearer owner' = 200): get/list/runQuery/collectionGroup/count/batchGet, PATCH/commit-
+  update/transform/delete, exists=false på optaget id (409), underdokumenter, "matches" under anden sti, auto-id, uid≠token.
+  listCollectionIds = 403 "Metadata operations require admin". Eksisterende id + gyldig payload = 409, ugyldig = 403 (ligegyldigt orakel).
+- Den oprindelige suite (24) var BLIND for `allow list: if request.auth != null` og for at fjerne version-vagten (mutant grøn).
+  Jeg tilføjede 25 tjek i tests/rules/run.mjs (liste/query/count/batchGet/commit/version + kontroller) -> begge mutanter røde.
+- ÅBENT (rapporteret, ikke-blokerende): round/season/home/away/score uden typetjek (streng/map/null/140 KB/serverTimestamp
+  accepteres). Rettelse verificeret (rød->grøn, hele suiten grøn): `!('f' in data) || (data.f is int && ...)` pr. felt.
+- Kvote: én anonym bruger 120 × 900 KB på 21 s, ingen grænse pr. bruger. Projektet er formentlig Spark (spec §11: Blaze først i
+  trin 2) -> ~1.200 maks-dokumenter fylder 1 GiB = funktionen død, ingen regning. VED BLAZE: omkostningsvektor -> App Check/budget.
+- Id-rum 32^4 = 1.048.576; squatting giver "Kunne ikke finde et ledigt kamp-id" efter 3 forsøg (bekræftet med fast rand).
+- tools/fetch-match.mjs: sti kun fra argv-id (ID_RE før fs) -> ingen sti-flugt. 8 fjendtlige pakker (__proto__-id, tom trup, 1e308,
+  rngState streng …): ingen forurening, ingen hængning, fejl fanges. MEN homeName/season/round printes RÅT: ESC/OSC 52 og
+  prompt-tekst når terminal og agent (bekræftet 7 ESC/BEL i stdout). Kræver at dev henter angriberens id.
+- Payload: ingen noter (game.notes), ingen andre hold. Pakken bærer HELE begge klubber inkl. egen økonomi (cashBalance, finance,
+  listed, youthOffers, tacticPresets) – unødvendigt: 64/64 kampe identiske uden dem. pack[0].rngState = rundens seed (Math.random,
+  ny pr. runde) -> ingen fremtidige runder. TRIN 2: åbnes læsning nogensinde, lækker et dokument alt skjult om begge hold.
+- TACTIVAR_EMULATOR: kun JS i siden kan sætte den; ingen data-afledte id/name-attributter (DOM-clobbering umulig).
+- Deploy-tjekket (tjek/x ulogget = 403) holder, men dækker ikke matches – foreslået tilføjet.
+
+## PoC-mønstre (emulator, v3.24.3)
+- `npx firebase emulators:exec --only auth,firestore --project demo-tactivar "node <script>"` fra repoet; scripts i scratchpad
+  med absolutte imports. Mutér regler i `git archive`-kopi (scratch/wt + symlink node_modules), kør fra wt.
+- Andre agenter (TM-worktree) kører emulatorer samtidig -> "port taken": løkke med 30 s pause, gentag.
+- REST: signUp `http://AUTH/identitytoolkit.googleapis.com/v1/accounts:signUp?key=fake`; `Bearer owner` = regel-fri kontrol.
+  RPC'er: `${DOCS}:runQuery|runAggregationQuery|batchGet|commit|listCollectionIds` (POST). Hver 403 skal have en owner-200 kontrol.
