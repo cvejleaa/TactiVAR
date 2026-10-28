@@ -93,6 +93,10 @@ jobs:
           CODE=$(curl -s -o /dev/null -w '%{http_code}' "https://firestore.googleapis.com/v1/projects/tactivar/databases/(default)/documents/tjek/x")
           echo "Ulogget læsning gav HTTP $CODE"
           [ "$CODE" = "403" ] || { echo "::error::Firestore svarer $CODE på en ulogget læsning – forventede 403. Er reglerne deployet?"; exit 1; }
+          # Security v3.24.3: kampene (kamp-id) kan heller ikke listes ulogget
+          CODE=$(curl -s -o /dev/null -w '%{http_code}' "https://firestore.googleapis.com/v1/projects/tactivar/databases/(default)/documents/matches")
+          echo "Ulogget liste over kampe gav HTTP $CODE"
+          [ "$CODE" = "403" ] || { echo "::error::Firestore svarer $CODE på en ulogget liste over kampe – forventede 403."; exit 1; }
 
       # QC (2026-10-28): nøglen væk FØR npm ci – et kompromitteret install-script i afhængighederne skal ikke kunne læse den
       - name: Fjern nøgle

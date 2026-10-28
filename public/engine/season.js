@@ -48,6 +48,9 @@ export function fixedPairs(league, opponentIdx) {
 // opts.replay (v3.24.3, kamp-id – kun klienten): en gengivelsespakke pr. kamp – de to hold, som de stod lige før kampen
 // (efter bænkudtagelsen, før commitRound ændrer dem), rng-tilstanden lige før kampen og kampens opts. simulateMatch er ren
 // over holdene og trækker kun tilfældighed fra rng, så simulateMatch(home, away, createRng(rngState), opts) giver samme kamp.
+// Gengivelsespakkens hold (Security v3.24.3): klubbens penge, salgsliste og ungdomstilbud spiller ingen rolle i kampen og
+// sendes ikke med. tacticPresets bliver – Hvis-Så kan skifte til en gemt plan midt i kampen (match.js).
+const forPack = ({ cashBalance, finance, listed, youthOffers, ownerUid, ...t }) => structuredClone(t);
 export function playPairs(league, pairs, rng, { replay = false } = {}) {
   const round = (league.leagueMetadata.round || 0) + 1;
   // lastOfSeason: friskheden følger med over sæsonskiftet – referatet siger "til første runde i næste sæson" (v3.16.7)
@@ -57,7 +60,7 @@ export function playPairs(league, pairs, rng, { replay = false } = {}) {
   const chemRef = chemRefOf(league);   // samspil (v3.24.0): virkningen måles mod ligaens snit
   const mopts = { round, lastOfSeason, chemRef }, packs = [];
   const matches = pairs.map(([h, a]) => {
-    if (replay) packs.push({ v: 1, home: structuredClone(league.teams[h]), away: structuredClone(league.teams[a]), rngState: rng.state(), opts: { ...mopts } });
+    if (replay) packs.push({ v: 1, home: forPack(league.teams[h]), away: forPack(league.teams[a]), rngState: rng.state(), opts: { ...mopts } });
     return simulateMatch(league.teams[h], league.teams[a], rng, mopts);
   });
   // Hvert mål ved, hvilken kamp i runden det faldt i (avisen linker til referatet, v3.7.1).

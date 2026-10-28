@@ -37,10 +37,60 @@ check('ekstra felt afvises', (await create('K-CCCC', ok(A.uid, { admin: 'ja' }),
 check('manglende json afvises', (await create('K-DDDD', (({ json, ...r }) => r)(ok(A.uid)), A.token)) === 403);
 check('json som tal afvises', (await create('K-EEEE', ok(A.uid, { json: 5 }), A.token)) === 403);
 check('forkert v afvises', (await create('K-FFFF', ok(A.uid, { v: 2 }), A.token)) === 403);
-check('for stort json (≥ 900.000 tegn) afvises', (await create('K-GGGG', ok(A.uid, { json: 'x'.repeat(900000) }), A.token)) === 403);
-check('lige under grænsen (899.999 tegn) tillades', (await create('K-HHHH', ok(A.uid, { json: 'x'.repeat(899999) }), A.token)) === 200);
+check('for stort json (≥ 400.000 tegn) afvises', (await create('K-GGGG', ok(A.uid, { json: 'x'.repeat(400000) }), A.token)) === 403);
+check('lige under grænsen (399.999 tegn) tillades', (await create('K-HHHH', ok(A.uid, { json: 'x'.repeat(399999) }), A.token)) === 200);
 check('andre samlinger er lukkede (opret)', (await req('POST', 'leagues?documentId=x', A.token, doc({ a: 'b' }))) === 403);
 check('andre samlinger er lukkede (læs)', (await req('GET', 'leagues/x', A.token)) === 403);
+
+// Angreb (Security Reviewer, v3.24.3): læsning ad ALLE REST-veje, skrivning ad omveje og andre stier. Hver afvisning har en
+// positiv kontrol (emulatorens ejer-adgang 'owner' = samme forespørgsel uden regler giver 200) – ellers kunne 403 bare
+// betyde en forkert formet forespørgsel.
+const ROOT = `projects/${PROJECT}/databases/(default)/documents`;
+const rpc = (verb, token, body) => fetch(`${DOCS}:${verb}`, { method: 'POST', headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(body) }).then((r) => r.status);
+const allMatches = { structuredQuery: { from: [{ collectionId: 'matches' }] } };
+check('liste over alle kampe afvises (A)', (await req('GET', 'matches', A.token)) === 403);
+check('liste over alle kampe afvises (ulogget)', (await req('GET', 'matches')) === 403);
+check('kontrol: listen virker med ejer-adgang', (await req('GET', 'matches', 'owner')) === 200);
+check('B kan ikke læse A\'s kamp', (await req('GET', 'matches/K-7F3Q', B.token)) === 403);
+check('runQuery på kampene afvises', (await rpc('runQuery', B.token, allMatches)) === 403);
+check('kontrol: runQuery virker med ejer-adgang', (await rpc('runQuery', 'owner', allMatches)) === 200);
+check('collectionGroup-forespørgsel på "matches" afvises', (await rpc('runQuery', B.token, { structuredQuery: { from: [{ collectionId: 'matches', allDescendants: true }] } })) === 403);
+check('optælling (runAggregationQuery count) afvises', (await rpc('runAggregationQuery', B.token, { structuredAggregationQuery: { ...allMatches, aggregations: [{ alias: 'n', count: {} }] } })) === 403);
+check('kontrol: optælling virker med ejer-adgang', (await rpc('runAggregationQuery', 'owner', { structuredAggregationQuery: { ...allMatches, aggregations: [{ alias: 'n', count: {} }] } })) === 200);
+check('batchGet af A\'s kamp afvises', (await rpc('batchGet', B.token, { documents: [`${ROOT}/matches/K-7F3Q`] })) === 403);
+check('kontrol: batchGet virker med ejer-adgang', (await rpc('batchGet', 'owner', { documents: [`${ROOT}/matches/K-7F3Q`] })) === 200);
+check('commit: sletning af egen kamp afvises', (await rpc('commit', A.token, { writes: [{ delete: `${ROOT}/matches/K-7F3Q` }] })) === 403);
+check('commit: transform på eksisterende kamp afvises', (await rpc('commit', A.token, { writes: [{ transform: { document: `${ROOT}/matches/K-7F3Q`, fieldTransforms: [{ fieldPath: 'score', setToServerValue: 'REQUEST_TIME' }] } }] })) === 403);
+check('commit: oprettelse med transform på et NYT felt afvises (hasOnly ser transforms)', (await rpc('commit', A.token, { writes: [{ update: { name: `${ROOT}/matches/K-JJJ2`, fields: doc(ok(A.uid)).fields }, currentDocument: { exists: false }, updateTransforms: [{ fieldPath: 'admin', setToServerValue: 'REQUEST_TIME' }] }] })) === 403);
+check('kontrol: commit-oprettelse uden transform tillades', (await rpc('commit', A.token, { writes: [{ update: { name: `${ROOT}/matches/K-JJJ3`, fields: doc(ok(A.uid)).fields }, currentDocument: { exists: false } }] })) === 200);
+check('PATCH med currentDocument.exists=false på optaget id: konflikt eller afvisning – aldrig overskrivning', [403, 409].includes(await req('PATCH', 'matches/K-7F3Q?currentDocument.exists=false', B.token, doc(ok(B.uid)))));
+check('underdokument matches/K-7F3Q/x/y afvises', (await req('POST', 'matches/K-7F3Q/x?documentId=y', A.token, doc({ a: 'b' }))) === 403);
+check('en "matches"-samling under en anden sti afvises', (await req('POST', 'foo/bar/matches?documentId=K-JJJ4', A.token, doc(ok(A.uid)))) === 403);
+check('auto-id (uden documentId) afvises', (await req('POST', 'matches', A.token, doc(ok(A.uid)))) === 403);
+check('id med små bogstaver afvises', (await create('k-jjj5', ok(A.uid), A.token)) === 403);
+check('id med 5 tegn afvises', (await create('K-JJJJ6', ok(A.uid), A.token)) === 403);
+check('version som tal afvises', (await create('K-JJJ7', ok(A.uid, { version: 3 }), A.token)) === 403);
+check('version over 16 tegn afvises', (await create('K-JJJ7', ok(A.uid, { version: 'x'.repeat(17) }), A.token)) === 403);
+check('kontrol: version på præcis 16 tegn tillades', (await create('K-JJJ8', ok(A.uid, { version: 'x'.repeat(16) }), A.token)) === 200);
+check('deploy-tjekket (deploy.yml): ulogget læsning af tjek/x giver 403', (await req('GET', 'tjek/x')) === 403);
+
+// Security v3.24.3: felterne ved siden af json typetjekkes (rød på reglerne uden typevagterne, grøn med)
+{
+  const val = (v) => (v === null ? { nullValue: null } : typeof v === 'number' ? { integerValue: String(v) } : Array.isArray(v) ? { arrayValue: { values: v.map(val) } } : typeof v === 'object' ? { mapValue: { fields: Object.fromEntries(Object.entries(v).map(([k, x]) => [k, val(x)])) } } : { stringValue: v });
+  const vdoc = (d) => ({ fields: Object.fromEntries(Object.entries(d).map(([k, v]) => [k, val(v)])) });
+  const make = (id, d) => req('POST', `matches?documentId=${id}`, A.token, vdoc(d));
+  const t = (extra = {}) => ok(A.uid, { home: 'Lyngby Tacticians', ...extra });
+  check('round som streng afvises', (await make('K-TTT2', t({ round: 'x' }))) === 403);
+  check('round = null afvises', (await make('K-TTT3', t({ round: null }))) === 403);
+  check('season som map afvises', (await make('K-TTT4', t({ season: { a: [1, 2] } }))) === 403);
+  check('home over 60 tegn afvises (fx 140.000 tegn)', (await make('K-TTT5', t({ home: 'Æ'.repeat(140000) }))) === 403);
+  check('away som liste afvises', (await make('K-TTT6', t({ away: ['x'] }))) === 403);
+  check('score som liste afvises', (await make('K-TTT7', t({ score: [1, 2] }))) === 403);
+  check('score med fri tekst (styretegn) afvises', (await make('K-TTT8', t({ score: '\u001b]0;x\u0007' }))) === 403);
+  check('serverTimestamp i round afvises', (await rpc('commit', A.token, { writes: [{ update: { name: `${ROOT}/matches/K-TTT9`, fields: vdoc(t()).fields }, currentDocument: { exists: false }, updateTransforms: [{ fieldPath: 'round', setToServerValue: 'REQUEST_TIME' }] }] })) === 403);
+  check('kontrol: home på præcis 60 tegn, score 10-10, runde 99 tillades', (await make('K-TTTA', t({ home: 'x'.repeat(60), score: '10-10', round: 99 }))) === 200);
+  check('kontrol: uden round/season/home/away/score tillades (klienten udelader null)', (await make('K-TTTB', (({ round, season, home, away, score, ...x }) => x)(t()))) === 200);
+}
 
 // Klienten (public/state/upload.js) mod emulatoren: en rigtig kamp sendes, hentes med emulatorens ejer-adgang (som
 // servicekontoen i produktion) og spilles igen – samme kamp

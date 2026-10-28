@@ -1313,7 +1313,7 @@ try {
     check('Kamp-id uden gengivelsespakke: "uden gengivelse" ved id\'et, og pakken er ikke sendt', (await pg.textContent('#sent-as')).includes('uden gengivelse') && JSON.parse(posts[1].body.fields.json.stringValue).replay === null);
     // næste runde: kampene kan ikke sendes længere, men id'erne står i listen
     await pg.click('#play-round'); await pg.click('#skip');
-    const list = await pg.textContent('#sent-list');
+    const list = await pg.locator('#sent-list').textContent({ timeout: 3000 }).catch(() => 'ingen #sent-list');
     check('Kamp-id efter næste runde: begge id\'er står under "📤 Sendte kampe", det uden gengivelse markeret', list.includes('Sendte kampe (2)') && list.includes(id) && (list.match(/K-[A-HJ-NP-Z2-9]{4}/g) ?? []).length === 2 && (list.match(/uden gengivelse/g) ?? []).length === 1 && list.includes('Sæson 1 runde 1'), list);
     check('Kamp-id: ingen sidefejl', egne.length === 0 && (await pg.isHidden('#fejlboks')), egne.join(' | '));
     await c.close();

@@ -14,7 +14,15 @@ service cloud.firestore {
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.v == 1
         && request.resource.data.version is string && request.resource.data.version.size() <= 16
-        && request.resource.data.json is string && request.resource.data.json.size() < 900000;
+        // Security v3.24.3: en kamp + pakke fylder højst ca. 170 KB (tools/measure-match-size.mjs) – loftet holder én bruger
+        // fra at fylde databasen med maks.-dokumenter; public/state/upload.js JSON_MAX følges ad
+        && request.resource.data.json is string && request.resource.data.json.size() < 400000
+        // felterne ved siden af json: typer og længder (ellers kan hvert bære ~150 KB eller vælte en oversigt)
+        && (!('round' in request.resource.data) || (request.resource.data.round is int && request.resource.data.round >= 1 && request.resource.data.round <= 99))
+        && (!('season' in request.resource.data) || (request.resource.data.season is int && request.resource.data.season >= 1 && request.resource.data.season <= 999))
+        && (!('home' in request.resource.data) || (request.resource.data.home is string && request.resource.data.home.size() <= 60))
+        && (!('away' in request.resource.data) || (request.resource.data.away is string && request.resource.data.away.size() <= 60))
+        && (!('score' in request.resource.data) || (request.resource.data.score is string && request.resource.data.score.matches('^[0-9]{1,2}-[0-9]{1,2}$')));
     }
     match /{document=**} {
       allow read, write: if false;

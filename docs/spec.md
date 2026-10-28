@@ -928,10 +928,11 @@ referaterne).
   Indhold: kampen som vist + en **gengivelsespakke** (de to hold lige før kampen, rng-tilstanden og kampens opts), så
   `node tools/fetch-match.mjs K-XXXX --replay` spiller den igen identisk. Pakken for seneste runde ligger i
   localStorage `tactivar_replay` (ikke i gemmet; overskrives hver runde, ryddes ved ny liga) – derfor kan kun seneste
-  runde sendes. Mangler pakken, siges det før og efter afsendelse ("uden gengivelse"). For stort (> 880.000 bytes) →
+  runde sendes. Pakkens hold er uden kasse, regnskab, salgsliste og ungdomstilbud (bruges ikke i kampen). Mangler
+  pakken, siges det før og efter afsendelse ("uden gengivelse"). For stort (> 380.000 bytes; en kamp fylder ca. 170 KB) →
   hændelsernes stats væk, så pakken. Sendte id'er huskes i `tactivar_sent` (de nyeste 30, også efter ny liga) og står
   under "📤 Sendte kampe". Anonym bruger: refresh-token i `tactivar_uploader`.
-  `firestore.rules`: kun oprettelse med eget uid, id-mønster, faste felter, json < 900.000 tegn; ingen læsning,
+  `firestore.rules`: kun oprettelse med eget uid, id-mønster, faste felter med typer og længder, json < 400.000 tegn; ingen læsning,
   ændring eller sletning fra klienten – hentning kun med servicekontoen (`FIREBASE_READ_KEY`, Cloud Datastore
   Viewer). Regeltests mod emulatoren: `npm run test:rules` (CI). Opsætning: README, "Engangsopsætning: kamp-id";
   indtil `public/firebase-config.js` er udfyldt, står der "📤 Kamp-id: ikke sat op endnu".

@@ -4,7 +4,7 @@
 // af ligaen. Endpoints til emulatoren sættes kun af tests (globalThis.TACTIVAR_EMULATOR), aldrig ud fra værtsnavnet.
 export const ID_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';   // uden 0/O/1/I (forveksles, når id'et skrives af)
 export const ID_RE = /^K-[A-HJ-NP-Z2-9]{4}$/;
-export const JSON_MAX = 880000;   // bytes (UTF-8) – under reglernes 900.000 tegn og Firestores 1 MiB pr. dokument (æ/ø/å fylder 2 bytes)
+export const JSON_MAX = 380000;   // bytes (UTF-8) – under reglernes 400.000 tegn (firestore.rules; æ/ø/å fylder 2 bytes, så bytes ≥ tegn)
 const bytes = (s) => new TextEncoder().encode(s).length;
 const TOKEN_KEY = 'tactivar_uploader';
 

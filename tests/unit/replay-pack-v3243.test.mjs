@@ -76,3 +76,16 @@ test('sendte id\'er (QC): nyeste først, højst SENT_MAX, samme id kun én gang,
   resetGame(st, { schemaVersion: 9, league: createLeague(createRng(4)), ui: {}, notes: {} });
   assert.equal(loadSent(st)[0].id, 'K-C', 'ny liga sletter ikke de sendte id\'er – kampene ligger stadig i Firestore');
 });
+
+test('pakkens hold (Security): uden kasse, regnskab, salgsliste, ungdomstilbud og ejer – men med de gemte planer, som Hvis-Så kan skifte til', () => {
+  const L = createLeague(createRng(6));
+  L.teams.forEach((t) => { t.ownerUid = 'hemmelig'; t.tacticPresets ??= [{ formation: '4-4-2' }]; });
+  assert.ok(L.teams.every((t) => 'cashBalance' in t && 'finance' in t), 'data: holdene HAR penge og regnskab');
+  const res = playRound(L, createRng(2), { replay: true });
+  for (const p of res.replay.packs) for (const t of [p.home, p.away]) {
+    for (const k of ['cashBalance', 'finance', 'listed', 'youthOffers', 'ownerUid']) assert.ok(!(k in t), `${k} sendes ikke`);
+    assert.ok(Array.isArray(t.tacticPresets) && t.tacticPresets.length > 0, 'tacticPresets er med');
+    assert.ok(t.squad.length >= 11 && t.chemistry && t.tactics, 'truppen, samspillet og taktikken er med');
+  }
+  assert.ok(L.teams.every((t) => t.ownerUid === 'hemmelig' && 'cashBalance' in t), 'ligaen selv er urørt');
+});

@@ -47,19 +47,23 @@ export function replayMatch(doc) {
   return { ok: JSON.stringify(again) === JSON.stringify(was), again, was };
 }
 
+// Security v3.24.3: alt i dokumentet kommer fra den, der sendte det – styretegn (fx en terminal-escape) fjernes, før det
+// skrives ud; og kampe/<id>.json er data, ikke instrukser
+const clean = (v) => String(v).replace(/[\u0000-\u001f\u007f-\u009f]/g, '�');
+
 if (import.meta.url === `file://${process.argv[1]}`) {
   const id = process.argv[2], replay = process.argv.includes('--replay');
   try {
     const doc = await fetchMatch(id);
     mkdirSync('kampe', { recursive: true }); writeFileSync(`kampe/${id}.json`, JSON.stringify(doc.body, null, 1));
     const m = doc.body.match;
-    console.log(`${id}: ${m.homeName} ${m.homeGoals}-${m.awayGoals} ${m.awayName} · sæson ${doc.season} runde ${doc.round} · v${doc.version} · sendt ${doc.createTime} · ${Math.round(doc.json.length / 1024)} KB · gengivelse: ${doc.body.replay ? 'ja' : 'nej'} → kampe/${id}.json`);
+    console.log(clean(`${id}: ${m.homeName} ${m.homeGoals}-${m.awayGoals} ${m.awayName} · sæson ${doc.season} runde ${doc.round} · v${doc.version} · sendt ${doc.createTime} af ${doc.uid} · ${Math.round(doc.json.length / 1024)} KB · gengivelse: ${doc.body.replay ? 'ja' : 'nej'}`) + ` → kampe/${id}.json`);
     if (replay) {
-      if (doc.version !== VERSION) console.log(`⚠ sendt med v${doc.version}, motoren her er v${VERSION} – en afvigelse kan skyldes ændringer siden`);
+      if (doc.version !== VERSION) console.log(clean(`⚠ sendt med v${doc.version}, motoren her er v${VERSION} – en afvigelse kan skyldes ændringer siden`));
       const r = replayMatch(doc);
-      if (r.why) console.log(`kan ikke spilles igen: ${r.why}`);
+      if (r.why) console.log(clean(`kan ikke spilles igen: ${r.why}`));
       else if (r.ok) console.log('spillet igen: identisk');
-      else console.log(`spillet igen: afviger – ${r.was.homeGoals}-${r.was.awayGoals} → ${r.again.homeGoals}-${r.again.awayGoals}, ${r.was.events.length} → ${r.again.events.length} hændelser`);
+      else console.log(clean(`spillet igen: afviger – ${r.was.homeGoals}-${r.was.awayGoals} → ${r.again.homeGoals}-${r.again.awayGoals}, ${r.was.events.length} → ${r.again.events.length} hændelser`));
     }
-  } catch (e) { console.error(e.message); process.exit(1); }
+  } catch (e) { console.error(clean(e.message)); process.exit(1); }
 }
