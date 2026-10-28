@@ -13,3 +13,14 @@ export function replayOf(replay, round, idx, match) {
   const p = replay?.round === round ? replay.packs?.[idx] : null;
   return p && p.home?.id === match.homeId && p.away?.id === match.awayId ? p : null;
 }
+// Sendte kamp-id'er (QC v3.24.3: id'et må ikke forsvinde med næste runde). De nyeste 30, under egen nøgle; ryddes IKKE ved
+// ny liga – kampene ligger stadig i Firestore og kan stadig hentes.
+export const SENT_KEY = 'tactivar_sent';
+export const SENT_MAX = 30;
+export function loadSent(storage) {
+  try { const l = JSON.parse(storage.getItem(SENT_KEY) ?? '[]'); return Array.isArray(l) ? l.filter((x) => typeof x?.id === 'string' && typeof x.label === 'string') : []; } catch { return []; }
+}
+export function rememberSent(storage, entry) {
+  const l = [entry, ...loadSent(storage).filter((x) => x.id !== entry.id)].slice(0, SENT_MAX);
+  try { storage.setItem(SENT_KEY, JSON.stringify(l)); return true; } catch { return false; }
+}

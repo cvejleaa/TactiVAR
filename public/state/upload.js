@@ -4,7 +4,8 @@
 // af ligaen. Endpoints til emulatoren sættes kun af tests (globalThis.TACTIVAR_EMULATOR), aldrig ud fra værtsnavnet.
 export const ID_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';   // uden 0/O/1/I (forveksles, når id'et skrives af)
 export const ID_RE = /^K-[A-HJ-NP-Z2-9]{4}$/;
-export const JSON_MAX = 880000;   // under reglernes 900.000 (firestore.rules)
+export const JSON_MAX = 880000;   // bytes (UTF-8) – under reglernes 900.000 tegn og Firestores 1 MiB pr. dokument (æ/ø/å fylder 2 bytes)
+const bytes = (s) => new TextEncoder().encode(s).length;
 const TOKEN_KEY = 'tactivar_uploader';
 
 export const newMatchId = (rand = Math.random) => 'K-' + Array.from({ length: 4 }, () => ID_ALPHABET[Math.floor(rand() * ID_ALPHABET.length)]).join('');
@@ -12,9 +13,9 @@ export const newMatchId = (rand = Math.random) => 'K-' + Array.from({ length: 4 
 // Indholdet: kampen (som spilleren så den) og pakken, der kan spille den igen. For stort → events[].stats væk, så pakken.
 export function buildPayload({ match, pack, version, round, season }) {
   let body = { match, replay: pack ?? null }, json = JSON.stringify(body), trimmed = [];
-  if (json.length > JSON_MAX) { body = { ...body, match: { ...match, events: match.events.map(({ stats, ...e }) => e) } }; json = JSON.stringify(body); trimmed.push('stats'); }
-  if (json.length > JSON_MAX) { body = { ...body, replay: null }; json = JSON.stringify(body); trimmed.push('replay'); }
-  if (json.length > JSON_MAX) return { error: 'Kampen er for stor til at blive sendt.' };
+  if (bytes(json) > JSON_MAX) { body = { ...body, match: { ...match, events: match.events.map(({ stats, ...e }) => e) } }; json = JSON.stringify(body); trimmed.push('stats'); }
+  if (bytes(json) > JSON_MAX) { body = { ...body, replay: null }; json = JSON.stringify(body); trimmed.push('replay'); }
+  if (bytes(json) > JSON_MAX) return { error: 'Kampen er for stor til at blive sendt.' };
   return { fields: { v: 1, version, round, season, home: match.homeName, away: match.awayName, score: `${match.homeGoals}-${match.awayGoals}`, json }, trimmed, replay: !!body.replay };
 }
 
@@ -51,7 +52,7 @@ export async function uploadMatch(cfg, storage, payloadFields, { fetchFn = fetch
     const r = await fetchFn(`${ep.docs}/matches?documentId=${id}`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body: JSON.stringify(toFields({ ...payloadFields, uid })) });
     if (r.ok) return { id };
     if (r.status !== 409 && r.status !== 403) throw new Error(`Kampen kunne ikke sendes (${r.status}).`);
-    if (r.status === 403 && i === 2) throw new Error('Kampen blev afvist af serveren (403).');
+    if (r.status === 403 && i === 2) throw new Error('Kampen blev afvist af serveren (403) – opsætningen af kamp-id er måske ikke færdig (README, "Kamp-id").');
   }
   throw new Error('Kunne ikke finde et ledigt kamp-id – prøv igen.');
 }

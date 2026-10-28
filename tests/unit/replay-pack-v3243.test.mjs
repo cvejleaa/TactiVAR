@@ -60,3 +60,19 @@ test('lageret: gemt under sin egen nøgle (ikke i spillets gem), læses igen, og
   assert.ok(r.ok); assert.equal(st.getItem(REPLAY_KEY), null, 'ny liga: gengivelsen er væk');
   clearReplay(st); assert.equal(loadReplay(st), null);
 });
+
+test('sendte id\'er (QC): nyeste først, højst SENT_MAX, samme id kun én gang, skrald afvises – og overlever ny liga', async () => {
+  const { rememberSent, loadSent, SENT_KEY, SENT_MAX } = await import('../../public/state/replay.js');
+  const st = fakeStorage();
+  assert.deepEqual(loadSent(st), []);
+  for (let i = 0; i < SENT_MAX + 5; i++) rememberSent(st, { id: `K-A${i}`, label: `kamp ${i}`, replay: true });
+  const l = loadSent(st);
+  assert.equal(l.length, SENT_MAX); assert.equal(l[0].id, `K-A${SENT_MAX + 4}`, 'nyeste først'); assert.equal(l.at(-1).id, 'K-A5', 'de ældste røg ud');
+  rememberSent(st, { id: 'K-A10', label: 'igen', replay: false });
+  assert.equal(loadSent(st).filter((x) => x.id === 'K-A10').length, 1); assert.equal(loadSent(st)[0].label, 'igen');
+  st.setItem(SENT_KEY, '[{"id":5},{"id":"K-B","label":"ok"},null]'); assert.deepEqual(loadSent(st).map((x) => x.id), ['K-B']);
+  st.setItem(SENT_KEY, '{nej'); assert.deepEqual(loadSent(st), []);
+  rememberSent(st, { id: 'K-C', label: 'x', replay: true });
+  resetGame(st, { schemaVersion: 9, league: createLeague(createRng(4)), ui: {}, notes: {} });
+  assert.equal(loadSent(st)[0].id, 'K-C', 'ny liga sletter ikke de sendte id\'er – kampene ligger stadig i Firestore');
+});
