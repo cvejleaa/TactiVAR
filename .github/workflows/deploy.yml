@@ -62,13 +62,13 @@ jobs:
           gcloud services list --enabled --project tactivar --filter="config.name:firebaserules.googleapis.com" --format="value(config.name)" \
             || echo "(kunne ikke læse API-listen)"
           echo "--- Firebase-projekter kontoen kan se ---"
-          npx --yes firebase-tools@15 projects:list --non-interactive || true
+          npx --yes firebase-tools@15.34.1 projects:list --non-interactive || true
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/sa.json
 
       - name: Deploy hosting og Firestore-regler
         if: env.HAS_KEY == 'true'
-        run: npx --yes firebase-tools@15 deploy --only hosting,firestore:rules --project tactivar --non-interactive --force
+        run: npx --yes firebase-tools@15.34.1 deploy --only hosting,firestore:rules --project tactivar --non-interactive --force
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/sa.json
 
