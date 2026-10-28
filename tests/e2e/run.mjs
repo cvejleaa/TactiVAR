@@ -172,7 +172,7 @@ try {
     check('Samspil: hver streg har sit pars bånd som klasse (2-3 fremmede, 1-2 finder, 6-7 stærkt, de andre ni spillet sammen)', lines.length === 12 && lines.every((l) => l.cls === `chem chem-${WANT[l.pair] ?? 'sammen'}`), JSON.stringify(lines.map((l) => [l.pair, l.cls])));
     check('Samspil: hver streg går fra den ene plads til den andens brik (koordinaterne er pladsernes, i rækkefølge)', lines.every((l) => { const [i, j] = l.pair.split('-'); return pos[i][0] === l.x1 && pos[i][1] === l.y1 && pos[j][0] === l.x2 && pos[j][1] === l.y2; }), JSON.stringify(lines[0]) + JSON.stringify(pos[1]));
     const tail = ' Samspil hjælper opbygningen og forsvaret mod løb i ryggen – par spiller sig sammen med kampe side om side.';
-    check('Samspil: legenden nævner det SVAGESTE par (fremmede slår finder hinanden), med navn og ord', (await p.textContent('#chem-weakest')) === `Svagest lige nu: Midtstopper-parret (fremmede).${tail}`, await p.textContent('#chem-weakest'));
+    check('Samspil: legenden nævner det SVAGESTE par (fremmede slår finder hinanden), med navn og ord', (await p.textContent('#chem-weakest')) === `Svagest lige nu: Midtstopper-parret (fremmede). 1 af 12 par spiller stærkt.${tail}`, await p.textContent('#chem-weakest'));
     const title3 = await p.getAttribute('#pitch .token[data-slot="3"]', 'title');
     check('Samspil: brikkens tooltip nævner hans par med naboerne i rækkefølge, med bånd', title3.endsWith(` · 🤝 samspil med ${info.p2}: fremmede · samspil med ${info.p4}: spillet sammen · samspil med ${info.p7}: spillet sammen`), title3);
     await prep('set(s[1], s[2], 65); return 1;'); await reload();   // prep nulstiller alle par til 78: kun 1-2 er "finder hinanden"
