@@ -6,7 +6,9 @@ import { createLeague } from './engine/generator.js';
 import { matchBenchOf, reservesOf, FOCUS, willRetire, RETIRE_WARN_ROUND, publicWage, wageRoomPerRound } from './engine/career.js';
 import { loadGame, saveGame, resetGame, exportGame, importGame, backupRaw, SAVE_KEY } from './state/storage.js';
 import * as act from './state/actions.js';
-import { saveReplay } from './state/replay.js';
+import { saveReplay, loadReplay, replayOf } from './state/replay.js';
+import { buildPayload, uploadMatch } from './state/upload.js';
+import { FIREBASE } from './firebase-config.js';
 import { h, select } from './ui/dom.js';
 import { kr } from './ui/labels.js';
 import { renderMatrix } from './ui/matrix.js';
@@ -412,7 +414,7 @@ function renderNow() {
     // Taktik (v3.19.0): banen og spillerlisten side om side – opstillingen ét sted; kortet under listen; faser og Hvis-Så nedenunder
     // v3.20.1 (brugeren: "langt ned til taktikindstillingerne"): indstillingerne under banen, listen og kortet ved siden af
     taktik: () => [h('div', { class: 'tactics-layout taktik-layout' }, h('section', { class: 'tk-pitch' }, pitch), h('section', { class: 'tk-list' }, lineupList), h('section', { class: 'tk-tactics' }, tactics), h('section', { class: 'tk-card' }, card))],
-    kamp: () => [shown ? renderMatchCenter({ mc: shown, myTeamId: mine.id, on: mcHandlers, column: !shown.playing && shown.round === league.lastRound?.round ? columnNow() : null }) : h('div', { class: 'panel empty', id: 'no-matches' }, 'Ingen kampe spillet endnu. Tryk ▶ Spil runde i topbaren – modstanderen følger kampprogrammet på Liga-fanen.')],
+    kamp: () => [shown ? renderMatchCenter({ mc: sendState(shown), myTeamId: mine.id, on: mcHandlers, column: !shown.playing && shown.round === league.lastRound?.round ? columnNow() : null }) : h('div', { class: 'panel empty', id: 'no-matches' }, 'Ingen kampe spillet endnu. Tryk ▶ Spil runde i topbaren – modstanderen følger kampprogrammet på Liga-fanen.')],
     liga: () => [mc?.playing ? h('div', { class: 'notice', id: 'booked-league' }, '📺 Runden spilles i Kamp-fanen – tabellen herunder er allerede opdateret med den.') : null,
       !mc?.playing ? renderSeasonReport({ league, mine,
         onTake: (id) => { const err = act.takeYouth(mine, id, game.league); view.notice = err ? `🧒 ${err}` : '🧒 Ungdomsspilleren er rykket op i truppen.'; change(() => {}); },
@@ -542,8 +544,22 @@ const mcHandlers = {
   snapshot: (i) => { mc ||= lastRoundView(game.league.lastRound); mc.snap = i; renderMc(); if (i != null) document.getElementById('snap-pitch')?.scrollIntoView({ block: 'center' }); },
   openGoal: (i, goal) => openGoal(i, goal),
   filter: (f) => { mc ||= lastRoundView(game.league.lastRound); mc.filter = f; renderMc(); },
+  // v3.24.3 (kamp-id): send den viste kamp (kun seneste runde – ældre kampe gemmes ikke)
+  send: async (i) => {
+    mc ||= lastRoundView(game.league.lastRound);
+    const m = mc.matches[i], round = mc.round, [season, sr] = seasonAndRound(game.league, round);
+    const p = buildPayload({ match: m, pack: replayOf(loadReplay(storage), round, i, m), version: VERSION, round: sr, season });
+    if (p.error) { window.tactivarFejl?.(p.error); return; }
+    mc.sending = i; renderMc();
+    try { const { id } = await uploadMatch(FIREBASE, storage, p.fields); m.sentAs = { id, replay: p.replay }; persist(); }
+    catch (e) { window.tactivarFejl?.(`📤 ${e.message}`); }
+    finally { mc.sending = null; renderMc(); }
+  },
+  copyId: (id) => { navigator.clipboard?.writeText(id).catch(() => {}); },
 };
-const matchCenterEl = () => renderMatchCenter({ mc, myTeamId: myTeam().id, on: mcHandlers, column: mc && !mc.playing && game.league.lastRound && mc.round === game.league.lastRound.round ? columnNow() : null });
+// Kan den viste kamp sendes? Kun seneste runde, og kun når upload er sat op (ellers en forklaring i stedet for knappen)
+const sendState = (v = mc) => { if (!v) return v; const latest = game.league.lastRound && v.round === game.league.lastRound.round; v.canSend = !!(FIREBASE && latest); v.sendWhy = !latest ? 'Kun seneste runde kan sendes.' : !FIREBASE ? '📤 Kamp-id: ikke sat op endnu' : null; return v; };
+const matchCenterEl = () => (sendState(), renderMatchCenter({ mc, myTeamId: myTeam().id, on: mcHandlers, column: mc && !mc.playing && game.league.lastRound && mc.round === game.league.lastRound.round ? columnNow() : null }));
 // Under afspilning tegnes kun Match Center om (ikke hele siden).
 function renderMc() { const el = document.getElementById('match-center'); if (el) el.replaceWith(matchCenterEl()); }
 

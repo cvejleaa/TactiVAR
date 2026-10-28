@@ -42,5 +42,29 @@ check('lige under grænsen (899.999 tegn) tillades', (await create('K-HHHH', ok(
 check('andre samlinger er lukkede (opret)', (await req('POST', 'leagues?documentId=x', A.token, doc({ a: 'b' }))) === 403);
 check('andre samlinger er lukkede (læs)', (await req('GET', 'leagues/x', A.token)) === 403);
 
+// Klienten (public/state/upload.js) mod emulatoren: en rigtig kamp sendes, hentes med emulatorens ejer-adgang (som
+// servicekontoen i produktion) og spilles igen – samme kamp
+{
+  const { buildPayload, uploadMatch, ID_RE } = await import('../../public/state/upload.js');
+  const { createRng } = await import('../../public/engine/rng.js');
+  const { createLeague } = await import('../../public/engine/generator.js');
+  const { playRound } = await import('../../public/engine/season.js');
+  const { simulateMatch } = await import('../../public/engine/match.js');
+  globalThis.TACTIVAR_EMULATOR = { auth: AUTH, firestore: FS };
+  const mem = new Map(), storage = { getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, String(v)) };
+  const L = createLeague(createRng(3)), res = playRound(L, createRng(8), { replay: true });
+  const p = buildPayload({ match: res.matches[0], pack: res.replay.packs[0], version: '3.24.3', round: 1, season: 1 });
+  const { id } = await uploadMatch({ apiKey: 'fake', projectId: PROJECT }, storage, p.fields);
+  check('upload.js: kampen sendes og får et id på formen K-XXXX', ID_RE.test(id), id);
+  const got = await fetch(`${DOCS}/matches/${id}`, { headers: { authorization: 'Bearer owner' } }).then((r) => r.json());
+  check('dokumentet bærer brugerens uid og kampens stilling', got.fields?.uid?.stringValue?.length > 5 && got.fields?.score?.stringValue === `${res.matches[0].homeGoals}-${res.matches[0].awayGoals}`, JSON.stringify(got).slice(0, 200));
+  const body = JSON.parse(got.fields.json.stringValue), pk = body.replay;
+  const again = simulateMatch(pk.home, pk.away, createRng(pk.rngState), pk.opts); again.goalsPool.forEach((g) => { g.matchIdx = 0; });
+  check('kampen hentet fra Firestore spilles igen identisk (pakken overlever rundturen)', JSON.stringify(again) === JSON.stringify(body.match));
+  const { id: id2 } = await uploadMatch({ apiKey: 'fake', projectId: PROJECT }, storage, p.fields);
+  const got2 = await fetch(`${DOCS}/matches/${id2}`, { headers: { authorization: 'Bearer owner' } }).then((r) => r.json());
+  check('anden upload genbruger den anonyme bruger (samme uid)', got2.fields.uid.stringValue === got.fields.uid.stringValue && id2 !== id);
+}
+
 console.log(`${fail ? `${fail} fejlede` : `Alle ${pass} bestod`}`);
 process.exit(fail ? 1 : 0);

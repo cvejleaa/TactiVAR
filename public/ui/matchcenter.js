@@ -257,6 +257,12 @@ function renderColumn(g, myTeamId, onOpenMatch, matches, col, onOpenReport) {
 
 const snapOf = (m, mc) => (mc.snap != null && m.events[mc.snap]?.snapshot ? { ev: m.events[mc.snap], snap: m.events[mc.snap].snapshot } : null);
 // mc = { round, matches, gazette, viewIdx, filter, shownCount, playing, snap }
+function sendBox(m, mc, on) {
+  if (m.sentAs?.id) return h('span', { class: 'muted', id: 'sent-as' }, `📤 Sendt som ${m.sentAs.id} `, h('button', { class: 'mini', id: 'copy-id', onclick: () => on.copyId(m.sentAs.id) }, 'Kopiér'));
+  if (!mc.canSend) return h('span', { class: 'muted', id: 'send-off', title: mc.sendWhy ?? '' }, mc.sendWhy ?? '');
+  return h('button', { class: 'mini', id: 'send-match', disabled: mc.sending === mc.viewIdx, onclick: () => on.send(mc.viewIdx), title: 'Gemmer kampen med et kort id (fx K-7F3Q), så den kan findes igen og spilles igen, når motoren justeres. Kun kampen sendes – ikke resten af dit spil.' }, mc.sending === mc.viewIdx ? '📤 Sender …' : '📤 Send kampen');
+}
+
 export function renderMatchCenter({ mc, myTeamId, on, column = null }) {
   const m = mc.matches[mc.viewIdx];
   const all = m.events;
@@ -279,7 +285,8 @@ export function renderMatchCenter({ mc, myTeamId, on, column = null }) {
   return h('div', { class: 'panel matchcenter', id: 'match-center' },
     h('div', { class: 'row' }, h('h3', {}, `📺 Match Center – runde ${mc.round}`),
       mc.playing ? h('button', { class: 'mini', id: 'skip', onclick: on.skip }, '⚡ Spring til slutfløjt') : null,
-),
+      // v3.24.3 (kamp-id): send den viste kamp, så den kan findes igen med id'et, når motoren justeres
+      !mc.playing && on.send ? sendBox(m, mc, on) : null),
     mc.playing ? h('div', { class: 'muted', id: 'booked-note' }, 'Runden er allerede bogført og gemt – tabellen og truppen er opdateret, også hvis du lukker siden nu.') : null,
     h('div', { class: 'cards', id: 'match-cards' }, mc.matches.map((x, i) => h('button', { class: 'matchcard' + (i === mc.viewIdx ? ' active' : ''), disabled: mc.playing && i !== 0, onclick: () => on.view(i) },
       // Under afspilning afsløres de andre kampes resultater ikke før slutfløjt.
