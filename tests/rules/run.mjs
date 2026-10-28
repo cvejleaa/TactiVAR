@@ -63,6 +63,9 @@ check('andre samlinger er lukkede (læs)', (await req('GET', 'leagues/x', A.toke
   check('kampen hentet fra Firestore spilles igen identisk (pakken overlever rundturen)', JSON.stringify(again) === JSON.stringify(body.match));
   const { id: id2 } = await uploadMatch({ apiKey: 'fake', projectId: PROJECT }, storage, p.fields);
   const got2 = await fetch(`${DOCS}/matches/${id2}`, { headers: { authorization: 'Bearer owner' } }).then((r) => r.json());
+  const { fetchMatch, replayMatch } = await import('../../tools/fetch-match.mjs');
+  const doc = await fetchMatch(id), rr = replayMatch(doc);
+  check('tools/fetch-match.mjs henter kampen med id og spiller den igen: identisk', doc.body.match.homeName === res.matches[0].homeName && rr.ok === true, JSON.stringify({ ok: rr.ok, why: rr.why }));
   check('anden upload genbruger den anonyme bruger (samme uid)', got2.fields.uid.stringValue === got.fields.uid.stringValue && id2 !== id);
 }
 
