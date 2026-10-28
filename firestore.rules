@@ -1,9 +1,21 @@
 rules_version = '2';
-// Trin 1: spillet gemmer alt i browseren og bruger ikke Firestore.
-// Databasen blev oprettet i "test mode" (åben for alle) – den lukkes helt her,
-// indtil trin 2 indfører login og en rigtig adgangsmodel (se docs/spec.md §11).
+// Trin 1: spillet gemmer alt i browseren. Den eneste åbning (v3.24.3, kamp-id – brugeren: "gemme kampene i firebase med et
+// id, så jeg kan referere til det når vi skal justere på motoren"): en anonym bruger må OPRETTE ét kamp-dokument med sit eget
+// uid og et id på formen K-XXXX. Ingen må læse, ændre eller slette – kampene hentes kun med en servicekonto
+// (tools/fetch-match.mjs), som ikke er bundet af reglerne. Alt andet er lukket (docs/spec.md §11).
 service cloud.firestore {
   match /databases/{database}/documents {
+    match /matches/{id} {
+      allow read, update, delete: if false;
+      allow create: if request.auth != null
+        && id.matches('^K-[A-HJ-NP-Z2-9]{4}$')
+        && request.resource.data.keys().hasOnly(['v', 'uid', 'version', 'round', 'season', 'home', 'away', 'score', 'json'])
+        && request.resource.data.keys().hasAll(['v', 'uid', 'version', 'json'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.v == 1
+        && request.resource.data.version is string && request.resource.data.version.size() <= 16
+        && request.resource.data.json is string && request.resource.data.json.size() < 900000;
+    }
     match /{document=**} {
       allow read, write: if false;
     }
