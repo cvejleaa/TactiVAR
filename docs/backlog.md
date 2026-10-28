@@ -101,6 +101,9 @@ scratchpad – et tal herfra skal måles igen med et committet værktøj, før d
     `app.js`. Saml vagten ét sted.
 34. **Ungdomstilbuddene er ens i alle ligaer** · klub · S · 2 · `derivedRng('youth', season, team.id)` (`season.js:257`) har
     intet liga-seed – samme navne i 4 seeds. Seed med ligaen.
+35. **Kamp-id: en anonym bruger kan fylde databasen** · drift · S · 3 · Security Reviewer v3.24.3: 120 dokumenter à 900 KB
+    på 21 s, ingen grænse pr. bruger (loftet er nu 400.000 tegn). Slå Firebase App Check til på Firestore, før kamp-id bruges
+    af andre end brugeren – og sæt budget-alarm, hvis projektet kommer på Blaze.
 
 ## Fravalgt / noteret
 - "– det holdt ikke mod jer" efter et nederlag kan misforstås (UI) – bevidst valgt i v3.21.2 (QC); kun noteret.

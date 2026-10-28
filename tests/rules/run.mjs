@@ -37,6 +37,17 @@ check('ekstra felt afvises', (await create('K-CCCC', ok(A.uid, { admin: 'ja' }),
 check('manglende json afvises', (await create('K-DDDD', (({ json, ...r }) => r)(ok(A.uid)), A.token)) === 403);
 check('json som tal afvises', (await create('K-EEEE', ok(A.uid, { json: 5 }), A.token)) === 403);
 check('forkert v afvises', (await create('K-FFFF', ok(A.uid, { v: 2 }), A.token)) === 403);
+// Test Manager (v3.24.3): version-vagten (string, ≤ 16 tegn) og id-grænserne havde ingen afvist-tilfælde
+check('version som tal afvises', (await create('K-JJJJ', ok(A.uid, { version: 3 }), A.token)) === 403);
+check('version på 17 tegn afvises', (await create('K-KKKK', ok(A.uid, { version: 'x'.repeat(17) }), A.token)) === 403);
+check('version på præcis 16 tegn tillades', (await create('K-LLLL', ok(A.uid, { version: 'x'.repeat(16) }), A.token)) === 200);
+check('id med 5 tegn (K-ABCDE) afvises', (await create('K-ABCDE', ok(A.uid), A.token)) === 403);
+check('id med 3 tegn (K-ABC) afvises', (await create('K-ABC', ok(A.uid), A.token)) === 403);
+check('id med små bogstaver (K-abcd) afvises', (await create('K-abcd', ok(A.uid), A.token)) === 403);
+check('id uden bindestreg (KABCD) afvises', (await create('KABCD', ok(A.uid), A.token)) === 403);
+check('alfabetets første og sidste tegn (K-AZ29) tillades', (await create('K-AZ29', ok(A.uid), A.token)) === 200);
+check('uid som tal afvises (uid == auth.uid er en streng)', (await create('K-MMMM', ok(A.uid, { uid: 5 }), A.token)) === 403);
+check('v som tekst "1" afvises', (await create('K-NNNN', ok(A.uid, { v: '1' }), A.token)) === 403);
 check('for stort json (≥ 400.000 tegn) afvises', (await create('K-GGGG', ok(A.uid, { json: 'x'.repeat(400000) }), A.token)) === 403);
 check('lige under grænsen (399.999 tegn) tillades', (await create('K-HHHH', ok(A.uid, { json: 'x'.repeat(399999) }), A.token)) === 200);
 check('andre samlinger er lukkede (opret)', (await req('POST', 'leagues?documentId=x', A.token, doc({ a: 'b' }))) === 403);

@@ -1318,6 +1318,127 @@ try {
     check('Kamp-id: ingen sidefejl', egne.length === 0 && (await pg.isHidden('#fejlboks')), egne.join(' | '));
     await c.close();
   }
+  // ---------- Kamp-id (v3.24.3, Test Manager): "📤 Send kampen" i Match Center ----------
+  // firebase-config.js tvinges i begge retninger (null / sat op), og Googles endpoints er falske: INTET når det rigtige netværk.
+  {
+    const { replayMatch } = await import('../../tools/fetch-match.mjs');
+    const versionTxt = () => fs.readFileSync(new URL('../../public/version.js', import.meta.url), 'utf8').match(/'([^']+)'/)[1];
+    const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' };
+    const open = async ({ firebase, docStatus = 200, signUpStatus = 200, gate = null }) => {
+      const c = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
+      await c.addInitScript(() => { window.__clip = []; Object.defineProperty(navigator, 'clipboard', { value: { writeText: (t) => { window.__clip.push(t); return Promise.resolve(); } }, configurable: true }); });
+      const pg = await c.newPage(), errs = [], log = { signUp: [], refresh: [], doc: [] };
+      pg.on('pageerror', (e) => errs.push(e.message));
+      await pg.route('**/firebase-config.js', (r) => r.fulfill({ contentType: 'text/javascript', body: firebase ? "export const FIREBASE = { apiKey: 'K', projectId: 'p' };" : 'export const FIREBASE = null;' }));
+      await pg.route(/googleapis\.com/, async (r) => {
+        const rq = r.request(), url = rq.url();
+        if (rq.method() === 'OPTIONS') return r.fulfill({ status: 204, headers: cors });
+        const json = (status, o) => r.fulfill({ status, headers: { ...cors, 'content-type': 'application/json' }, body: JSON.stringify(o) });
+        if (url.includes('accounts:signUp')) { log.signUp.push(url); return json(signUpStatus, { idToken: 'IDTOK', refreshToken: 'RTOK', localId: 'UID1' }); }
+        if (url.includes('securetoken')) { log.refresh.push({ url, body: rq.postData() }); return json(200, { id_token: 'IDTOK2', user_id: 'UID1' }); }
+        if (url.includes('/matches?documentId=')) { log.doc.push({ url, auth: rq.headers().authorization, body: rq.postDataJSON() }); if (gate) await gate; return json(docStatus, {}); }
+        return json(404, {});
+      });
+      await pg.goto(BASE + '/'); await pg.waitForSelector('body[data-klar="ja"]');
+      return { pg, log, errs, ctx: c };
+    };
+    const playOne = async (pg) => { await pg.click('#play-round'); await pg.waitForSelector('#match-center'); return pg; };
+    const finish = async (pg) => { await pg.click('#skip'); await pg.waitForSelector('#skip', { state: 'detached' }); };
+    const saved = (pg) => pg.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.lastRound.matches.map((m) => ({ h: m.homeName, a: m.awayName, hid: m.homeId, hg: m.homeGoals, ag: m.awayGoals, sentAs: m.sentAs ?? null })));
+
+    // A) upload ikke sat op: ingen knap, en forklaring – og intet netværk
+    {
+      const { pg, log, errs, ctx } = await open({ firebase: false });
+      await playOne(pg);
+      check('Send kampen: under afspilning er hverken knap eller forklaring der', (await pg.locator('#send-match, #send-off, #sent-as').count()) === 0);
+      await finish(pg);
+      check('Send kampen: uden Firebase-opsætning står "ikke sat op endnu" – ingen knap, intet sendt-mærke, ingen skjult hover-tekst (QC: mobil)', (await pg.textContent('#send-off')) === '📤 Kamp-id: ikke sat op endnu' && (await pg.getAttribute('#send-off', 'title')) === null && (await pg.locator('#send-match').count()) === 0 && (await pg.locator('#sent-as').count()) === 0);
+      await pg.reload(); await pg.waitForSelector('body[data-klar="ja"]');
+      check('Send kampen: forklaringen står også efter genindlæsning (kampsiden tegnet fra gemmet)', (await pg.textContent('#send-off')) === '📤 Kamp-id: ikke sat op endnu' && (await pg.locator('#send-match').count()) === 0);
+      const stor = await pg.evaluate(() => ({ replay: JSON.parse(localStorage.getItem('tactivar_replay') ?? 'null'), save: localStorage.getItem('tactivar_save') }));
+      check('Gengivelsen ligger under sin egen nøgle (runde 1, fire pakker med rng-tilstand) og IKKE i spillets gem', stor.replay?.round === 1 && stor.replay.packs.length === 4 && stor.replay.packs.every((p) => Number.isInteger(p.rngState) && p.home?.id && p.away?.id) && !stor.save.includes('rngState') && !stor.save.includes('"packs"'));
+      check('Send kampen: uden opsætning kaldes Google aldrig', log.signUp.length + log.refresh.length + log.doc.length === 0 && errs.length === 0, errs.join(' | '));
+      // Ny liga rydder gengivelsen (den forrige ligas pakker hører ikke til den nye)
+      await pg.click('#tab-admin'); pg.once('dialog', (d) => d.accept()); await pg.click('#new-league');
+      check('Ny liga rydder gengivelsen', (await pg.evaluate(() => localStorage.getItem('tactivar_replay'))) === null);
+      await ctx.close();
+    }
+
+    // B) opsat: knap → sender → id; hele forløbet mod falske endpoints
+    {
+      let release; const gate = new Promise((r) => { release = r; });
+      const { pg, log, errs, ctx } = await open({ firebase: true, gate });
+      await playOne(pg);
+      check('Send kampen: knappen vises først efter slutfløjt (ikke under afspilning)', (await pg.locator('#send-match').count()) === 0);
+      await finish(pg);
+      const m0 = (await saved(pg))[0], m1 = (await saved(pg))[1];
+      check('Send kampen: opsat + seneste runde → knap "📤 Send kampen", aktiv, ingen forklaring og intet sendt-mærke', (await pg.textContent('#send-match')) === '📤 Send kampen' && (await pg.isEnabled('#send-match')) && (await pg.locator('#send-off, #sent-as').count()) === 0);
+      check('Send kampen: ingen netværkskald før der klikkes', log.signUp.length + log.refresh.length + log.doc.length === 0);
+      await pg.click('#send-match');
+      await pg.waitForFunction(() => document.getElementById('send-match')?.textContent === '📤 Sender …');
+      check('Send kampen: mens der sendes er knappen deaktiveret og siger "Sender …" (ingen dobbeltsend)', await pg.isDisabled('#send-match'));
+      await pg.click('#match-cards .matchcard:nth-child(2)');
+      check('Send kampen: mens kamp 1 sendes, har kamp 2 stadig sin egen aktive "📤 Send kampen" (ikke "Sender …")', (await pg.textContent('#send-match')) === '📤 Send kampen' && (await pg.isEnabled('#send-match')));
+      await pg.click('#match-cards .matchcard:nth-child(1)');
+      check('Send kampen: tilbage på kamp 1 siger den stadig "Sender …" og er deaktiveret', (await pg.textContent('#send-match')) === '📤 Sender …' && (await pg.isDisabled('#send-match')));
+      release();
+      await pg.waitForSelector('#sent-as');
+      const idTxt = await pg.textContent('#sent-as'), id = /K-[A-HJ-NP-Z2-9]{4}/.exec(idTxt)?.[0];
+      check('Send kampen: efter svaret står "📤 Sendt som K-XXXX" med Kopiér-knap – og send-knappen er væk', !!id && idTxt.startsWith(`📤 Sendt som ${id}`) && (await pg.textContent('#copy-id')) === 'Kopiér' && (await pg.locator('#send-match, #send-off').count()) === 0, idTxt);
+      const d = log.doc[0], f = d.body.fields, body = JSON.parse(f.json.stringValue);
+      check('Send kampen: anonym bruger oprettet over https, dokumentet POSTet til matches?documentId=<id> med Bearer og uid', log.signUp.length === 1 && log.signUp[0].startsWith('https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=K') && d.url === `https://firestore.googleapis.com/v1/projects/p/databases/(default)/documents/matches?documentId=${id}` && d.auth === 'Bearer IDTOK' && f.uid.stringValue === 'UID1', JSON.stringify([log.signUp, d.url, d.auth]));
+      check('Send kampen: felterne er KAMP 1 i runde 1 (hold, stilling, version, runde, sæson) – ikke en anden kamp', f.home.stringValue === m0.h && f.away.stringValue === m0.a && f.score.stringValue === `${m0.hg}-${m0.ag}` && f.version.stringValue === versionTxt() && f.round.integerValue === '1' && f.season.integerValue === '1' && f.v.integerValue === '1', JSON.stringify(f).slice(0, 300));
+      const rr = replayMatch({ body });
+      check('Send kampen: gengivelsespakken i det sendte spiller kampen IGEN identisk med den, brugeren så (appen → motor)', body.match.homeName === m0.h && body.replay?.home?.id === m0.hid && rr.ok === true, JSON.stringify({ ok: rr.ok, why: rr.why, replayHome: body.replay?.home?.id, hid: m0.hid }));
+      await pg.click('#copy-id');
+      check('Kopiér-knappen lægger netop id\'et på udklipsholderen', JSON.stringify(await pg.evaluate(() => window.__clip)) === JSON.stringify([id]));
+      check('Send kampen: sendt-mærket gemmes på kampen i spillets gem (kun kamp 1)', JSON.stringify((await saved(pg)).map((m) => m.sentAs?.id ?? null)) === JSON.stringify([id, null, null, null]) && (await saved(pg))[0].sentAs.replay === true);
+      // en anden kamp i samme runde: egen knap, egen pakke, samme anonyme bruger (refresh – ikke en ny signUp)
+      await pg.click('#match-cards .matchcard:nth-child(2)');
+      check('Send kampen: kamp 2 har sin egen knap og intet sendt-mærke', (await pg.locator('#send-match').count()) === 1 && (await pg.locator('#sent-as').count()) === 0);
+      await pg.click('#send-match'); await pg.waitForSelector('#sent-as');
+      const id2 = /K-[A-HJ-NP-Z2-9]{4}/.exec(await pg.textContent('#sent-as'))?.[0], b2 = JSON.parse(log.doc[1].body.fields.json.stringValue), f2 = log.doc[1].body.fields;
+      check('Send kampen: kamp 2 sendes med SIN pakke (hold, stilling og gentagelse stemmer), og er et andet id', !!id2 && id2 !== id && f2.home.stringValue === m1.h && b2.replay?.home?.id === m1.hid && b2.match.homeName === m1.h && replayMatch({ body: b2 }).ok === true && log.doc[1].url.endsWith(`documentId=${id2}`));
+      check('Send kampen: anden afsendelse genbruger brugeren (refresh-token, samme uid) – ingen ny signUp', log.signUp.length === 1 && log.refresh.length === 1 && log.refresh[0].url.startsWith('https://securetoken.googleapis.com/v1/token?key=K') && log.refresh[0].body === 'grant_type=refresh_token&refresh_token=RTOK' && log.doc[1].auth === 'Bearer IDTOK2' && f2.uid.stringValue === 'UID1', JSON.stringify(log.refresh));
+      await pg.click('#match-cards .matchcard:nth-child(1)');
+      check('Send kampen: tilbage på kamp 1 står dens id stadig', (await pg.textContent('#sent-as')).includes(id));
+      await pg.reload(); await pg.waitForSelector('body[data-klar="ja"]');
+      check('Send kampen: id\'et overlever genindlæsning (gemt), og der kan ikke sendes igen', (await pg.textContent('#sent-as')).includes(id) && (await pg.locator('#send-match').count()) === 0);
+      // runde 2: nye kampe, nyt sendt-mærke (ikke runde 1's), gengivelsen overskrevet, og runde/sæson i dokumentet er RUNDE 2 / SÆSON 1 (i runde 1 er begge 1 – et bytte ses først her)
+      await pg.click('#play-round'); await pg.waitForSelector('#match-center'); await finish(pg);
+      check('Send kampen: efter runde 2 har kamp 1 ingen sendt-mærke (runde 1\'s id hører til runde 1) og knappen er tilbage', (await pg.locator('#sent-as').count()) === 0 && (await pg.locator('#send-match').count()) === 1);
+      check('Gengivelsen er overskrevet med runde 2 (ikke en pulje af alle runder)', await pg.evaluate(() => { const r = JSON.parse(localStorage.getItem('tactivar_replay')); return r.round === 2 && r.packs.length === 4 && r.packs.every((p) => p.opts.round === 2); }));
+      const m2 = (await saved(pg))[0];
+      await pg.click('#send-match'); await pg.waitForSelector('#sent-as');
+      const f3 = log.doc[2].body.fields, b3 = JSON.parse(f3.json.stringValue);
+      check('Send kampen: runde 2 sendes med round = 2 og season = 1 og netop runde 2\'s kamp og pakke', f3.round.integerValue === '2' && f3.season.integerValue === '1' && f3.home.stringValue === m2.h && b3.replay?.opts?.round === 2 && replayMatch({ body: b3 }).ok === true, JSON.stringify([f3.round, f3.season]));
+      check('Send kampen: ingen sidefejl', errs.length === 0, errs.join(' | '));
+      await ctx.close();
+    }
+
+    // C) fejl: serveren afviser → synlig fejl, knappen kommer tilbage, intet gemmes som sendt
+    for (const [navn, opt, tekst] of [['Firestore 500', { docStatus: 500 }, '📤 Kampen kunne ikke sendes (500).'], ['anonym login afvist', { signUpStatus: 400 }, '📤 Anonym login fejlede (400)']]) {
+      const { pg, log, ctx } = await open({ firebase: true, ...opt });
+      await playOne(pg); await finish(pg);
+      await pg.click('#send-match');
+      await pg.waitForFunction((t) => document.getElementById('fejlboks')?.textContent.includes(t), tekst.slice(0, 20));
+      await pg.waitForFunction(() => document.getElementById('send-match')?.textContent === '📤 Send kampen');
+      check(`Send kampen (${navn}): fejlen vises, knappen er tilbage og aktiv, intet "Sendt som", intet gemt som sendt`, (await pg.textContent('#fejlboks')).includes(tekst) && (await pg.isEnabled('#send-match')) && (await pg.locator('#sent-as').count()) === 0 && (await saved(pg)).every((m) => m.sentAs === null), await pg.textContent('#fejlboks'));
+      await ctx.close();
+    }
+
+    // D) mangler gengivelsen (fuldt lager, ryddet): kampen sendes alligevel – uden pakke, og det siges i det gemte
+    {
+      const { pg, log, ctx } = await open({ firebase: true });
+      await playOne(pg); await finish(pg);
+      await pg.evaluate(() => localStorage.removeItem('tactivar_replay'));
+      await pg.reload(); await pg.waitForSelector('body[data-klar="ja"]');
+      await pg.click('#send-match'); await pg.waitForSelector('#sent-as');
+      const b = JSON.parse(log.doc[0].body.fields.json.stringValue);
+      check('Send kampen uden gengivelse: kampen sendes med replay = null, og sendt-mærket husker det (replay: false)', b.replay === null && b.match.homeName === (await saved(pg))[0].h && (await saved(pg))[0].sentAs.replay === false);
+      await ctx.close();
+    }
+  }
   check('Ingen sidefejl under hele forløbet', fejl.length === 0, fejl.join(' | '));
 } finally {
   await browser.close();
