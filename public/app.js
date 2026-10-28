@@ -13,7 +13,7 @@ import { renderLineupList } from './ui/lineup-list.js';
 import { renderTrainingTable } from './ui/training.js';
 import { renderCard, trainingSummary } from './ui/card.js';
 import { renderClub, shownCash, renderMarket, renderTransferLog, renderPublicClub } from './ui/club.js';
-import { marketInfo, buyPlayer, setListed, acceptOffer, declineOffer, releasePlayer, wageRoom, isStarter } from './engine/transfers.js';
+import { marketInfo, buyPlayer, setListed, acceptOffer, declineOffer, releasePlayer, wageRoom, isStarter, quarantined, nextWindow, quarantineText } from './engine/transfers.js';
 import { renderSeasonReport } from './ui/season-report.js';
 import { viewTeam } from './engine/visibility.js';
 import { lineupPairs, chemRefOf, weakestPair, swapChanges, BAND_WORD, bestPartner, saleChemText, playerPairs, gamesToSettle, bandOf, chemOf, BAND_RANK } from './engine/chemistry.js';
@@ -80,7 +80,7 @@ const NEWS = {
   '3.14.1': 'Rettelser: VAR tjekker nu offside for den forreste – scorer en spiller længere tilbage, er det hans forreste holdkammerat, der tjekkes, og billedet ved målet viser skytten, hvor han skød fra. Statistikken på Liga-fanen gælder sæsonen.',
   '3.14.2': 'Rettelse: Ved et VAR-tjek står den tjekkede nu, hvor han stod (forrest), i billedet ved målet – ikke flyttet bag en holdkammerat.',
   '3.14.3': 'Rettelser: Langskud tages fra skudafstand (ikke fra egen banehalvdel) i billedet ved målet, referatet fortæller et oplæg én gang, og efter sæsonens sidste runde viser tabellen slutstillingen og mesteren, til næste sæson går i gang.',
-  '3.24.1': '🧒 Rettelse: en ungdomsspiller, du tager op fra akademiet, kan nu ikke sælges i samme eller næste transfervindue – som et køb. Før kunne de sælges straks for ca. 350.000 kr. stykket uden at have spillet.',
+  '3.24.1': '🧒 Rettelse: en ungdomsspiller, der rykkes op ved sæsonslut (af dig eller automatisk til 18), kan – som et køb – først sælges ved næste sæsonslut. Før kunne han sælges straks uden at have spillet. Kortet siger nu, hvornår en spiller kan handles igen.',
   '3.24.0': '🤝 Samspil: spillere, der spiller kampe side om side, finder hinanden – det gør opbygningen lidt lettere og forsvaret bedre mod løb i ryggen. Et nyt køb er fremmed for alle i ca. 8 kampe. Se stregerne mellem dine spillere i Taktik (tyk = stærkt, stiplet = fremmede), din bedste makker på spillerkortet, og hvad et byt eller et salg bryder.',
   '3.22.1': '🎬 Afspilningen viser nu afleveringen før målet og før afslutninger efter en cutback, et løb eller et indlæg: bolden går fra oplæggeren til skytten, der står onside på linje med forsvaret – derefter løber han igennem og afslutter (et indlæg går i luften direkte ind i feltet). Før så det ud, som om han stod offside. Målene i den runde, du allerede har spillet, vises også rigtigt.',
   '3.22.0': '📊 Kampens tal: klik på en af dine spillere efter kampen. Under hans heat map står, hvor mange bolde han erobrede og tabte, og 🤝 hvem han spillede sammen med – cutbacks, indlæg, løb og dødbolde, med minut og udfald. Kun det, kampen selv afgjorde.',
@@ -347,7 +347,7 @@ function renderNow() {
     trainNote: isOwn && tab !== 'trup',
     // TM: målmanden har ingen par (motoren læser ham ikke) – intet samspil på hans kort, ingen "ca. 8 kampe" ved køb
     chem: isOwn && selected && selected.position !== 'GK' ? chemCard(team, selected) : null,
-    market: !selected || mc?.playing ? null : isOwn ? { own: true, listed: (team.listed ?? []).includes(selected.id), onList: (on) => change(() => setListed(league, team, selected.id, on)), saleChem: saleChemText(team, chemRefOf(league), selected.id) }
+    market: !selected || mc?.playing ? null : isOwn ? { own: true, listed: (team.listed ?? []).includes(selected.id), onList: (on) => change(() => setListed(league, team, selected.id, on)), saleChem: saleChemText(team, chemRefOf(league), selected.id), block: quarantined(selected, nextWindow(league)) ? quarantineText(selected) : null }
       : { ...marketInfo(league, mine, team, selected), settle: selected.position === 'GK' ? null : gamesToSettle(chemRefOf(league)), starter: isStarter(team, selected), wage: Math.round(publicWage(selected) / 3), room: Math.round(wageRoom(league, mine) / 3), cashAfter: mine.cashBalance - marketInfo(league, mine, team, selected).price, onBuy: () => { const err = buyPlayer(league, mine, selected.id); view.notice = err ? `💰 ${err}` : `💰 ${selected.shortName} er købt og står nu i din trup.`; change(() => {}); } },
     hideLog: mc?.playing && league.lastRound ? seasonAndRound(league, league.lastRound.round) : null,
     // Under afspilningen af sæsonens sidste runde er det stadig den afsluttede sæson, der vises

@@ -85,6 +85,8 @@ function renderChem({ best, pairs, isNew }) {
 function renderMarketBox(p, m) {
   if (m.own) return h('div', { class: 'marketbox', id: 'card-market' }, h('h4', {}, '💰 Marked'),
     h('label', {}, h('input', { type: 'checkbox', id: 'list-toggle', checked: m.listed, onchange: (e) => m.onList(e.target.checked) }), ' Til salg – de andre klubber byder, når transfervinduet er åbent (se 💼 Klub)'),
+    // v3.24.1 (QC): i karantæne – ingen bud, før den slutter; sig hvornår her, ikke kun i Klub
+    m.block ? h('div', { class: 'muted', id: 'list-block' }, `🔒 ${m.block}`) : null,
     // Samspil (v3.24.0, QC/Spilfører UI): prisen ved beslutningen – kun stærke par med hans naboer nu, 🤝 (ikke ⚠ – det er ingen afgift)
     m.saleChem ? h('div', { class: 'muted', id: 'list-chem' }, m.saleChem) : null);
   return h('div', { class: 'marketbox', id: 'card-market' }, h('h4', {}, '💰 Marked'),

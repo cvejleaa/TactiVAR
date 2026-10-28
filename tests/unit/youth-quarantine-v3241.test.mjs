@@ -25,7 +25,7 @@ test('et ungdomstilbud, du tager op, kan ikke sælges i samme eller næste vindu
     const y = me.youthOffers[0];
     assert.equal(takeYouth(me, y.id, L), null);
     assert.equal(me.squad.find((p) => p.id === y.id).lastMove, w);
-    assert.equal(saleBlock(L, me, y), `${y.shortName} kom til klubben i dette eller sidste vindue og kan ikke handles igen endnu.`);
+    assert.equal(saleBlock(L, me, y), `${y.shortName} kom til klubben i dette eller sidste vindue – kan handles igen ved sæsonslut før sæson ${(w + 2) / 2}.`);
     // forsøget fra rundturen: sæt til salg og tag et bud – intet salg
     setListed(L, me, y.id, true);
     assert.ok(acceptOffer(L, me, y.id), 'intet salg');

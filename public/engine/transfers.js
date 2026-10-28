@@ -18,6 +18,13 @@ export const isStarter = (team, p) => team.tactics.lineupSlots.includes(p.id);
 export const askPrice = (team, p) => round25k(publicValue(p) * (isStarter(team, p) ? STARTER_MARKUP : BUY_MARKUP));
 // Karantæne: den, der skiftede klub i vindue W, kan ikke skifte igen i W eller W + 1 ("et helt vindue")
 export const quarantined = (p, w) => p.lastMove != null && w - p.lastMove <= 1;
+// Det næste vindue (det åbne, ellers det kommende) og hvornår karantænen slutter i ord (v3.24.1, QC: "endnu" skal have en dato)
+export function nextWindow(league) {
+  const w = windowOf(league), s = league.leagueMetadata.seasonNumber ?? 1;
+  return w ?? (seasonRoundOf(league, league.leagueMetadata.round + 1) < 8 ? s * 2 + 1 : (s + 1) * 2);
+}
+const windowWords = (w) => (w % 2 === 0 ? `ved sæsonslut før sæson ${w / 2}` : `før runde 8 i sæson ${(w - 1) / 2}`);
+export const quarantineText = (p) => `${p.shortName} kom til klubben i dette eller sidste vindue – kan handles igen ${windowWords(p.lastMove + 2)}.`;
 const salesOf = (league, teamId, w) => (league.windowSales?.w === w ? league.windowSales.n[teamId] ?? 0 : 0);
 const lineCount = (team, line) => team.squad.filter((p) => p.line === line).length;
 
@@ -26,7 +33,7 @@ const lineCount = (team, line) => team.squad.filter((p) => p.line === line).leng
 // sæson 1, så intet kunne købes).
 function sellBlock(league, seller, p, w) {
   if (w == null) return 'Transfervinduet er lukket – det åbner før sæsonens runde 8 og ved sæsonslut.';
-  if (quarantined(p, w)) return `${p.shortName} kom til klubben i dette eller sidste vindue og kan ikke handles igen endnu.`;
+  if (quarantined(p, w)) return quarantineText(p);
   if (salesOf(league, seller.id, w) >= SALES_PER_WINDOW) return `${seller.name} har solgt ${SALES_PER_WINDOW} spillere i dette vindue.`;
   return null;
 }
