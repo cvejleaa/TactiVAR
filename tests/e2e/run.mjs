@@ -95,6 +95,15 @@ try {
       const by = (id) => me.squad.find((p) => p.id === id); return { a: by(s[i]), b: by(s[j]) }; });
     await g.reload(); await g.waitForSelector('body[data-klar="ja"]'); await tab('taktik');
     check('Samspil: et stærkt par får en tyk streg (chem-staerkt), resten er uændrede', (await g.locator('#pitch #chem-lines line.chem-staerkt').count()) === 1);
+    // v3.24.2: legenden tæller de stærke par; Trup-panelet siger, hvilket par der blev stærkt i runden (navne fra truppen), og linker til Taktik
+    { const nLines = await g.locator('#pitch #chem-lines line.chem').count();
+      check('Samspil: legenden tæller de stærke par ("1 af N par spiller stærkt")', (await g.textContent('#chem-weakest')).includes(`Alle par har spillet sig sammen. 1 af ${nLines} par spiller stærkt.`), await g.textContent('#chem-weakest'));
+      await g.evaluate((pr) => { const d = JSON.parse(localStorage.getItem('tactivar_save')), me = d.league.teams.find((t) => !t.isBot); d.league.trainingReport = { [me.id]: { round: d.league.leagueMetadata.round || 1, gains: [], injuries: [], strong: { up: [[pr.a.id, pr.b.id]], down: [] } } }; localStorage.setItem('tactivar_save', JSON.stringify(d)); }, pair);
+      await g.reload(); await g.waitForSelector('body[data-klar="ja"]'); await tab('trup');
+      const ts = await g.textContent('#training-strong').catch(() => '');
+      check('Samspil: Trup-panelet siger, at parret nu spiller stærkt sammen – med numre og navne – og linker til Taktik', ts.startsWith(`🤝 #${pair.a.shirtNumber} ${pair.a.shortName} og #${pair.b.shirtNumber} ${pair.b.shortName} spiller nu stærkt sammen.`) && ts.includes('se stregerne på Taktik'), ts);
+      await g.locator('#training-strong button.linklike').click();
+      check('Samspil: linket åbner Taktik med stregerne', (await g.locator('#pitch #chem-lines line.chem-staerkt').count()) === 1); }
     await tab('trup');
     await g.locator('#matrix tbody tr', { hasText: pair.a.shortName }).first().click();
     const best = await g.textContent('#card-best'), list = await g.textContent('#list-chem').catch(() => '');
@@ -163,11 +172,16 @@ try {
     check('Samspil: hver streg har sit pars bånd som klasse (2-3 fremmede, 1-2 finder, 6-7 stærkt, de andre ni spillet sammen)', lines.length === 12 && lines.every((l) => l.cls === `chem chem-${WANT[l.pair] ?? 'sammen'}`), JSON.stringify(lines.map((l) => [l.pair, l.cls])));
     check('Samspil: hver streg går fra den ene plads til den andens brik (koordinaterne er pladsernes, i rækkefølge)', lines.every((l) => { const [i, j] = l.pair.split('-'); return pos[i][0] === l.x1 && pos[i][1] === l.y1 && pos[j][0] === l.x2 && pos[j][1] === l.y2; }), JSON.stringify(lines[0]) + JSON.stringify(pos[1]));
     const tail = ' Samspil hjælper opbygningen og forsvaret mod løb i ryggen – par spiller sig sammen med kampe side om side.';
-    check('Samspil: legenden nævner det SVAGESTE par (fremmede slår finder hinanden), med navn og ord', (await p.textContent('#chem-weakest')) === `Svagest lige nu: Midtstopper-parret (fremmede).${tail}`, await p.textContent('#chem-weakest'));
+    check('Samspil: legenden nævner det SVAGESTE par (fremmede slår finder hinanden), med navn og ord', (await p.textContent('#chem-weakest')) === `Svagest lige nu: Midtstopper-parret (fremmede). 1 af 12 par spiller stærkt.${tail}`, await p.textContent('#chem-weakest'));
     const title3 = await p.getAttribute('#pitch .token[data-slot="3"]', 'title');
     check('Samspil: brikkens tooltip nævner hans par med naboerne i rækkefølge, med bånd', title3.endsWith(` · 🤝 samspil med ${info.p2}: fremmede · samspil med ${info.p4}: spillet sammen · samspil med ${info.p7}: spillet sammen`), title3);
     await prep('set(s[1], s[2], 65); return 1;'); await reload();   // prep nulstiller alle par til 78: kun 1-2 er "finder hinanden"
     check('Samspil: kun et "finder hinanden"-par → legenden advarer med numrene og ordet', (await p.textContent('#chem-weakest')) === `Svagest lige nu: ${info.p1} og ${info.p2} (finder hinanden).${tail}`, await p.textContent('#chem-weakest'));
+    // v3.24.2 (Test Manager): tallet i legenden har tre grene – ingen (dækket ovenfor: ingen sætning), nogle ("N af M") og alle ("Alle N par …")
+    await prep('return 1;', { base: 90 }); await reload();   // alle 12 par på 90 = stærkt ved snit 78
+    check('Samspil: alle par stærkt → legenden siger "De spiller alle stærkt sammen." (ikke "12 af 12")', (await p.textContent('#chem-weakest')) === `Alle par har spillet sig sammen. De spiller alle stærkt sammen.${tail}`, await p.textContent('#chem-weakest'));
+    await prep('set(s[1], s[2], 90); set(s[6], s[7], 90); return 1;'); await reload();
+    check('Samspil: to af 12 par stærkt → legenden siger "2 af 12 par spiller stærkt."', (await p.textContent('#chem-weakest')) === `Alle par har spillet sig sammen. 2 af 12 par spiller stærkt.${tail}`, await p.textContent('#chem-weakest'));
     // Kortet: en starter (naboerne nu), en "ny" spiller uden par
     const card = await prep('set(s[2], s[3], 30); const y = arg.bench; for (const k of Object.keys(me.chemistry)) if (k.split("|").includes(y)) delete me.chemistry[k]; return { y, n3: sh(s[3]), p2: sh(s[2]), p4: sh(s[4]), p7: sh(s[7]) };', { bench: (await benchIds()).at(-1) }); await reload('trup');
     await p.locator(`#matrix tbody tr[data-pid="${info.s[3]}"]`).click();

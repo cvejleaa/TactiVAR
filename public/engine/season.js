@@ -16,7 +16,7 @@ import { SEASON_ROUNDS, seasonRoundOf } from './schedule.js';
 import { emptyStanding } from './generator.js';
 import { PLAYER_SEASON_DEFAULTS, PLAYER_SEASON_FIELDS, TEAM_STAT_FIELDS } from './stats.js';
 import { REST_BENCH, afterMatchFreshness } from './freshness.js';
-import { applyChemistry, decayChemistry, pruneChemistry, leagueChemRef, chemRefOf } from './chemistry.js';
+import { applyChemistry, decayChemistry, pruneChemistry, leagueChemRef, chemRefOf, chemSnapshot, strongChanges } from './chemistry.js';
 
 // Næste rundes kampe efter programmet (v3.11) som [hjemmeIdx, udeIdx]. Kampen med et
 // menneskestyret hold står først: avisen, afspilningen og Kamp-fanens første kort bygger på det.
@@ -156,6 +156,7 @@ export function commitRound(league, result, rng) {
   for (const t of league.teams) if (t.youthOffers?.length) t.youthOffers = [];
   league.offers = [];   // botternes bud gælder kun, mens vinduet er åbent
   bookRoundFinances(league, result);
+  const mine = league.teams.find((t) => !t.isBot), chemBefore = mine ? chemSnapshot(mine) : null;   // v3.24.2: stærke par før runden
 
   for (const m of result.matches) {
     applyStanding(league.leagueMetadata.standings, m);
@@ -220,6 +221,8 @@ export function commitRound(league, result, rng) {
   } else if (seasonRoundOf(league, result.round) === 7) openWindow(league);   // vinduet før runde 8
   // Ligaens snit af samspil – efter sæsonskiftet og vinduets handler (QC: ellers forældet i en ny sæsons første runde)
   league.leagueMetadata.chemRef = leagueChemRef(league);
+  const rep = mine && league.trainingReport?.[mine.id];
+  if (rep) rep.strong = strongChanges(mine, chemBefore, league.leagueMetadata.chemRef, result.round);
   return league;
 }
 

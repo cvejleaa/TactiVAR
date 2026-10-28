@@ -206,3 +206,19 @@ export function gamesToSettle(ref) {
   while (bandOf(v, ref) !== 'sammen' && bandOf(v, ref) !== 'staerkt' && n < 60) { v = v + K_GAIN * (CHEM_MAX - v); v = v - LEAK * (v - STRANGER); n++; }
   return n;
 }
+
+// Bånd-skift efter runden (v3.24.2, Spilfører UI/QC): dit holds par i opstillingen, der blev stærke – kun når de spillede sammen
+// i runden – eller holdt op med at være det, fordi de IKKE spillede sammen (rotation, skade). Før og efter måles mod SAMME snit
+// (det nye), så et par aldrig skifter alene fordi ligaens snit flyttede sig. Kun par, der fandtes før runden. Svar: id-par.
+export const chemSnapshot = (team) => new Map(lineupPairs(team, CHEM_BASE).map((x) => [pairKey(x.a.id, x.b.id), x.v]));
+export function strongChanges(team, before, ref, round) {
+  const up = [], down = [];
+  for (const x of lineupPairs(team, ref)) {
+    const k = pairKey(x.a.id, x.b.id);
+    if (!before.has(k)) continue;
+    const was = bandOf(before.get(k), ref) === 'staerkt', now = x.band === 'staerkt', together = team.chemistry?.[k]?.[1] === round;
+    if (now && !was && together) up.push([x.a.id, x.b.id]);
+    else if (was && !now && !together) down.push([x.a.id, x.b.id]);
+  }
+  return { up, down };
+}

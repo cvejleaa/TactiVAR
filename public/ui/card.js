@@ -98,16 +98,35 @@ function renderMarketBox(p, m) {
 
 // Rundens opsamling i Trup (Spilfører): "M. Jensen +1 Afslutning" og træningsskader – kun dit hold (rapporten findes kun for det)
 // roundLabel: sæsonens runde (report.round er ligaens løbende runde – "runde 15" i sæson 2)
-export function trainingSummary(report, team, roundLabel = report?.round) {
-  if (!report || !(report.gains.length || report.injuries.length)) return null;
+// v3.24.2 (Spilfører UI/QC): øverst de par, der blev stærke i runden (og dem, der holdt op, fordi de ikke spillede sammen) –
+// navne ud fra truppen nu (id'er gemt, ikke pladsens navn); fra 4 par kun antallet; link til stregerne på Taktik.
+const pairWords = (team, [a, b]) => { const p = team.squad.find((x) => x.id === a), q = team.squad.find((x) => x.id === b); return p && q ? `#${p.shirtNumber} ${p.shortName} og #${q.shirtNumber} ${q.shortName}` : null; };
+export function strongLines(team, strong) {
+  const up = (strong?.up ?? []).map((x) => pairWords(team, x)).filter(Boolean), down = (strong?.down ?? []).map((x) => pairWords(team, x)).filter(Boolean);
+  const lines = [];
+  if (up.length === 1) lines.push(`🤝 ${up[0]} spiller nu stærkt sammen.`);
+  else if (up.length > 1) lines.push(up.length >= 4 ? `🤝 ${up.length} par spiller nu stærkt sammen.` : `🤝 Spiller nu stærkt sammen: ${up.join(' · ')}.`);
+  const downs = down.length === 1 ? `${down[0]} spiller ikke længere stærkt sammen – de spillede ikke sammen i runden.`
+    : down.length >= 4 ? `${down.length} par spiller ikke længere stærkt sammen – de spillede ikke sammen i runden.`
+    : down.length ? `Spiller ikke længere stærkt sammen (de spillede ikke sammen i runden): ${down.join(' · ')}.` : null;
+  return { up: lines, down: downs ? [downs] : [] };
+}
+export function trainingSummary(report, team, roundLabel = report?.round, onTaktik = null) {
+  const sl = report ? strongLines(team, report.strong) : { up: [], down: [] }, strong = [...sl.up, ...sl.down];
+  if (!report || !(report.gains.length || report.injuries.length || strong.length)) return null;
   const name = (id) => team.squad.find((p) => p.id === id)?.shortName ?? '?';
   const by = new Map();
   const known = new Set(team.squad.map((p) => p.id));   // solgte/stoppede spillere står ikke som "?" (QC K2)
   for (const g of report.gains.filter((x) => known.has(x.id))) { const k = `${g.id}|${g.skill}`; by.set(k, (by.get(k) ?? 0) + 1); }
   const ups = [...by].map(([k, n]) => { const [id, s] = k.split('|'); return `${name(id)} +${n} ${SKILL_NAME[s]}`; });
   const inj = report.injuries.filter((id) => known.has(id)).map((id) => `🚑 ${name(id)} skadet i træningen`);
-  if (!ups.length && !inj.length) return null;
-  return h('div', { class: 'panel train-summary', id: 'training-summary' }, h('strong', {}, `🏋️ Træning og kampe efter runde ${roundLabel}: `), [...ups, ...inj].join(' · '));
+  if (!ups.length && !inj.length && !strong.length) return null;
+  return h('div', { class: 'panel train-summary', id: 'training-summary' },
+    // QC: hver linje for sig; linket hører til op-linjen (stregerne viser de stærke)
+    strong.length ? h('div', { id: 'training-strong' },
+      sl.up.length ? h('div', { class: 'strong-up' }, sl.up[0], onTaktik ? [' ', h('button', { class: 'linklike', onclick: onTaktik }, 'se stregerne på Taktik')] : null) : null,
+      sl.down.length ? h('div', { class: 'muted strong-down' }, sl.down[0]) : null) : null,
+    ups.length || inj.length ? h('div', {}, h('strong', {}, `🏋️ Træning og kampe efter runde ${roundLabel}: `), [...ups, ...inj].join(' · ')) : null);
 }
 
 // 📜 Kampe (v3.18.0, spec §10.4): de seneste 10 stempler, "Vis alle" og en karrierelinje. Andre hold ser stjerner, ikke karakteren
