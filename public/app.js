@@ -344,9 +344,10 @@ function renderNow() {
     onNote: (v) => { game.notes[selected.id] = v; persist(); renderControls(); }, teams: league.teams, latest,
     onFocus: isOwn && tab === 'trup' ? (k) => change(() => act.setFocus(team, selected.id, k)) : null,
     trainNote: isOwn && tab !== 'trup',
-    chem: isOwn && selected ? chemCard(team, selected) : null,
+    // TM: målmanden har ingen par (motoren læser ham ikke) – intet samspil på hans kort, ingen "ca. 8 kampe" ved køb
+    chem: isOwn && selected && selected.position !== 'GK' ? chemCard(team, selected) : null,
     market: !selected || mc?.playing ? null : isOwn ? { own: true, listed: (team.listed ?? []).includes(selected.id), onList: (on) => change(() => setListed(league, team, selected.id, on)), saleChem: saleChemText(team, chemRefOf(league), selected.id) }
-      : { ...marketInfo(league, mine, team, selected), settle: gamesToSettle(chemRefOf(league)), starter: isStarter(team, selected), wage: Math.round(publicWage(selected) / 3), room: Math.round(wageRoom(league, mine) / 3), cashAfter: mine.cashBalance - marketInfo(league, mine, team, selected).price, onBuy: () => { const err = buyPlayer(league, mine, selected.id); view.notice = err ? `💰 ${err}` : `💰 ${selected.shortName} er købt og står nu i din trup.`; change(() => {}); } },
+      : { ...marketInfo(league, mine, team, selected), settle: selected.position === 'GK' ? null : gamesToSettle(chemRefOf(league)), starter: isStarter(team, selected), wage: Math.round(publicWage(selected) / 3), room: Math.round(wageRoom(league, mine) / 3), cashAfter: mine.cashBalance - marketInfo(league, mine, team, selected).price, onBuy: () => { const err = buyPlayer(league, mine, selected.id); view.notice = err ? `💰 ${err}` : `💰 ${selected.shortName} er købt og står nu i din trup.`; change(() => {}); } },
     hideLog: mc?.playing && league.lastRound ? seasonAndRound(league, league.lastRound.round) : null,
     // Under afspilningen af sæsonens sidste runde er det stadig den afsluttede sæson, der vises
     season: mc?.playing && league.lastRound ? seasonAndRound(league, league.lastRound.round)[0] : league.leagueMetadata.seasonNumber ?? 1, starter: !!selected && team.tactics.lineupSlots.includes(selected.id),

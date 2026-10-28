@@ -94,4 +94,8 @@ test('målt: hver kobling koster for fremmede, samlet giver et fast par mere end
   assert.ok(r.run.fremmede < r.run.ref, JSON.stringify(r.run));
   assert.ok(r.both.fast > r.both.ref && r.both.ref > r.both.fremmede, JSON.stringify(r.both));
   assert.ok(r.both.fast - r.both.fremmede >= 0.06, `spænd ${r.both.fast - r.both.fremmede}`);
+  // Øvre grænse (Test Manager): samme måling (N 800, faste seeds) giver spænd 0,074 ved ½ × vægtene, 0,181 ved 1 ×, 0,250 ved 2 × – standardfejl ca.
+  // 0,07, så mål/kamp kan IKKE skelne ½ × og 2 × fra 1 × med sikkerhed (se chemistry-v3240-effect.test.mjs: duellernes vundne andel kan, og vægtene er pinnet).
+  // Grænsen her fanger kun store fejl (≥ 3 ×, en kobling talt dobbelt); den står på 0,32, så en støjflytning ved ændret rng-forbrug ikke gør den rød.
+  assert.ok(r.both.fast - r.both.fremmede <= 0.32, `spænd ${r.both.fast - r.both.fremmede} (0,181 ved 1 ×)`);
 });
