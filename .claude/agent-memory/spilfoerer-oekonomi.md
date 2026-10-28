@@ -5,17 +5,22 @@ fund der er rettet (så du ikke finder dem igen), hvad brugeren har valgt fra, o
 
 ## Rettet (gå ikke efter dem igen)
 - v3.21.1 transferlåsen: salg ved 18 spillere (ungdomsspiller ind), køb der sænker lønnen, fritstilling, højst 2 salg pr.
-  vindue, ungdom i karantæne (ellers pengemaskine), alt vist pr. runde.
+  vindue, ungdom i karantæne (KUN refillYouth – se åbent fund 1), alt vist pr. runde.
 ## Brugerens valg
 - "Ungdomsspiller ind" og "Køb der sænker lønnen" (v3.21.1).
 - Transfers: vinduer + FAST PRIS, ingen forhandling (spec §2 "Transfers"). Foreslå ikke bud/forhandling – justér inden for fast pris.
 
-## Rundtur 2026-10-27 (v3.22.1) – foreslået, ikke besluttet endnu
-1. Pris modsiger stjernerne (44/126 bot-spillere ved vindue 3, seed 1; script: scratchpad stars.mjs – starsForValue vs publicStars)
-   + "Denne sæson forventet" er kun resten af sæsonen (club.js forecast). S.
-2. Ingen-klik vinder: measure-lifecycle 4 seeds × 5 sæsoner – passiv myVsBots 1,01–1,09, 0 runder i minus; aktiv 0,97–1,05,
-   op til 36 runder i minus. Passiv kasse efter 8 sæsoner 5,5/8,8/10,4 mio. mod botter 1–4 mio. Årsag: køb 1,3–1,6× / salg 0,9–1,0×.
-3. Lønhop uden beslutning (+31 % ved sæsonslut i rundturen; "kontrakt 🔒" på kortet, men kontrakter findes ikke).
-4. Dødt bot-marked: 15 transfers i hele ligaen på 10 sæsoner (lifecycle seed 1 passiv); 0 i sæson 1.
-5. Ingen indtægtsbeslutning (billetpris 90 kr. fast, ingen sponsor; tilskuere 4.960–7.390 af 9.000).
-Tjek næste gang om de er i backloggen/lavet, før du foreslår igen.
+## I backloggen fra rundtur 1 (v3.22.1): nr. 7 køb-udvikl-sælg, 11 kontrakter, 13 pris/stjerner, 18 marked, 20 indtægtsvalg.
+
+## Rundtur 2026-10-28 (v3.24.0) – foreslået (scripts i scratchpad/oek: youthflip.mjs, cash.mjs, market.mjs)
+1. Ungdomsflip: takeYouth (state/actions.js:43) sætter ingen lastMove → tag 2 ungdom ved sæsonslut, sælg straks: 350k+375k
+   pr. sæson, 4/4 seeds, 0 kr. løn. Skal lukkes før nr. 7 hæver buddene.
+2. Botmarkedet dør: passiv 3 seeds × 5 sæsoner: 0 transfers i S1–S3 (alle seeds), bot-trupper 18→20→21→22 af ungdom,
+   trin 3 i openWindow kræver <22 og en sælger med overskud (aldrig samtidig). Botkasse snit 5,0 → 1,8–3,3 mio (min ≈ 0);
+   din (18 mand) 4,4–6,2. NB lifecycle.txt i rundturens materiale viste 7–27 transfers – ikke genskabt af mig (4 4 passiv: 0–2).
+3. Værdi i hele stjerner (career.js:41/48): 10 af 18 egne til præcis 1,2 mio; en stjerne over 0,5-grænsen fordobler lønnen →
+   lønhop +39 %/+31 % (seed 2/3, S1) og −1 % i browserrunden. Glidende værdi efter valueStars.
+4. Scouting som køb af viden: corr(vist ★, nøglesnit) 0,64–0,73; pris 1.925k dækker nøglesnit 9,7–15,3.
+- Samspil (v3.24.0) ændrer ikke økonomien målbart (spec: alle fremmede −0,12 mål/kamp; lifecycle ±0,025). measure-lifecycle
+  måler nøglesnit, ikke point – kan ikke se samspil.
+- Til klub: ungdomstilbud er ens i alle ligaer (derivedRng('youth', season, team.id), season.js:257 – samme navne i 4 seeds).
