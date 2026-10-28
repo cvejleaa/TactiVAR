@@ -8,7 +8,7 @@ import { autoMatchBench, logMatch, FOCUS, focusSkills, validFocus, ageTrain, roo
 import { aerialBreakdown, isArchetypeUnlocked, generatePlayer, neededPosition } from './generator.js';
 import { bookMatchStats, roundHistory, HISTORY_MAX } from './stats.js';
 import { simulateMatch } from './match.js';
-import { openWindow } from './transfers.js';
+import { openWindow, windowOf } from './transfers.js';
 import { starsFromRating, starNoise } from './ratings.js';
 import { applyCounterXp } from './counter.js';
 import { buildGazette } from './gazette.js';
@@ -262,7 +262,8 @@ export function seasonTurnover(league) {
     const take = team.isBot ? botYouthTake(team.squad.length, offers) : offers.slice(0, Math.max(0, SQUAD_MIN - team.squad.length));
     // En bot tager altid et tilbud i en kæde under minimum (QC K5: ellers en markspiller i mål)
     if (team.isBot) for (const y of offers) if (!take.includes(y) && team.squad.filter((p) => p.line === y.line).length + take.filter((x) => x.line === y.line).length < LINE_MIN[y.line]) take.push(y);
-    for (const y of take) { team.squad.push(y); report.youthTaken.push({ id: y.id, teamId: team.id }); }
+    // v3.24.1: dit tvungne optag (op til 18) har samme karantæne som takeYouth – ellers sælges de straks (Spilfører økonomi)
+    for (const y of take) { if (!team.isBot) y.lastMove = windowOf(league); team.squad.push(y); report.youthTaken.push({ id: y.id, teamId: team.id }); }
     team.youthOffers = team.isBot ? [] : offers.filter((y) => !take.includes(y));
   });
   for (const team of league.teams) repairLineup(team, goneLine);

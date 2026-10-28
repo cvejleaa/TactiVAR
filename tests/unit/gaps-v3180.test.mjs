@@ -53,7 +53,7 @@ test('grænser: værdi-stjernerne gælder fra præcis 3 kampe; ungdom kan tages 
   assert.equal(starsForValue(p), TIER_STARS.ROTATION);
   p.careerGames = 3; assert.equal(starsForValue(p), 5);
   const t = { squad: Array.from({ length: 18 }, (_, i) => ({ id: `s${i}` })), youthOffers: [{ id: 'y1' }], cashBalance: 0, matchBenchAuto: false };
-  assert.equal(takeYouth(t, 'y1'), null);
+  assert.equal(takeYouth(t, 'y1', { leagueMetadata: { round: 0, seasonNumber: 1 } }), null);
 });
 
 test('bud: den bot, der mangler mest i kæden, byder først', () => {

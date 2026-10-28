@@ -26,7 +26,7 @@ const lineCount = (team, line) => team.squad.filter((p) => p.line === line).leng
 // sæson 1, så intet kunne købes).
 function sellBlock(league, seller, p, w) {
   if (w == null) return 'Transfervinduet er lukket – det åbner før sæsonens runde 8 og ved sæsonslut.';
-  if (quarantined(p, w)) return `${p.shortName} skiftede klub i sidste vindue og kan ikke handles igen endnu.`;
+  if (quarantined(p, w)) return `${p.shortName} kom til klubben i dette eller sidste vindue og kan ikke handles igen endnu.`;
   if (salesOf(league, seller.id, w) >= SALES_PER_WINDOW) return `${seller.name} har solgt ${SALES_PER_WINDOW} spillere i dette vindue.`;
   return null;
 }

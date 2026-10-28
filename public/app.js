@@ -80,6 +80,7 @@ const NEWS = {
   '3.14.1': 'Rettelser: VAR tjekker nu offside for den forreste – scorer en spiller længere tilbage, er det hans forreste holdkammerat, der tjekkes, og billedet ved målet viser skytten, hvor han skød fra. Statistikken på Liga-fanen gælder sæsonen.',
   '3.14.2': 'Rettelse: Ved et VAR-tjek står den tjekkede nu, hvor han stod (forrest), i billedet ved målet – ikke flyttet bag en holdkammerat.',
   '3.14.3': 'Rettelser: Langskud tages fra skudafstand (ikke fra egen banehalvdel) i billedet ved målet, referatet fortæller et oplæg én gang, og efter sæsonens sidste runde viser tabellen slutstillingen og mesteren, til næste sæson går i gang.',
+  '3.24.1': '🧒 Rettelse: en ungdomsspiller, du tager op fra akademiet, kan nu ikke sælges i samme eller næste transfervindue – som et køb. Før kunne de sælges straks for ca. 350.000 kr. stykket uden at have spillet.',
   '3.24.0': '🤝 Samspil: spillere, der spiller kampe side om side, finder hinanden – det gør opbygningen lidt lettere og forsvaret bedre mod løb i ryggen. Et nyt køb er fremmed for alle i ca. 8 kampe. Se stregerne mellem dine spillere i Taktik (tyk = stærkt, stiplet = fremmede), din bedste makker på spillerkortet, og hvad et byt eller et salg bryder.',
   '3.22.1': '🎬 Afspilningen viser nu afleveringen før målet og før afslutninger efter en cutback, et løb eller et indlæg: bolden går fra oplæggeren til skytten, der står onside på linje med forsvaret – derefter løber han igennem og afslutter (et indlæg går i luften direkte ind i feltet). Før så det ud, som om han stod offside. Målene i den runde, du allerede har spillet, vises også rigtigt.',
   '3.22.0': '📊 Kampens tal: klik på en af dine spillere efter kampen. Under hans heat map står, hvor mange bolde han erobrede og tabte, og 🤝 hvem han spillede sammen med – cutbacks, indlæg, løb og dødbolde, med minut og udfald. Kun det, kampen selv afgjorde.',
@@ -412,7 +413,7 @@ function renderNow() {
     kamp: () => [shown ? renderMatchCenter({ mc: shown, myTeamId: mine.id, on: mcHandlers, column: !shown.playing && shown.round === league.lastRound?.round ? columnNow() : null }) : h('div', { class: 'panel empty', id: 'no-matches' }, 'Ingen kampe spillet endnu. Tryk ▶ Spil runde i topbaren – modstanderen følger kampprogrammet på Liga-fanen.')],
     liga: () => [mc?.playing ? h('div', { class: 'notice', id: 'booked-league' }, '📺 Runden spilles i Kamp-fanen – tabellen herunder er allerede opdateret med den.') : null,
       !mc?.playing ? renderSeasonReport({ league, mine,
-        onTake: (id) => { const err = act.takeYouth(mine, id); view.notice = err ? `🧒 ${err}` : '🧒 Ungdomsspilleren er rykket op i truppen.'; change(() => {}); },
+        onTake: (id) => { const err = act.takeYouth(mine, id, game.league); view.notice = err ? `🧒 ${err}` : '🧒 Ungdomsspilleren er rykket op i truppen.'; change(() => {}); },
         onDrop: (id) => change(() => act.dropYouth(mine, id)) }) : null,
       standings,
       // Resultaterne skjules under afspilningen, ligesom avisen (ellers afsløres de).

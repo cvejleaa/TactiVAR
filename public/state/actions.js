@@ -4,6 +4,7 @@ import { FORMATIONS, clampPos, arrangeByFit, fitOf } from '../engine/formations.
 import { clampSubsLimit } from '../engine/freshness.js';
 import { MAX_RULES } from '../engine/match-rules.js';
 import { autoMatchBench, validFocus, SQUAD_MAX, matchBenchOf } from '../engine/career.js';
+import { windowOf } from '../engine/transfers.js';
 
 const IDENTITY = Array.from({ length: 11 }, (_, i) => i);
 
@@ -40,12 +41,16 @@ export function setFocus(team, playerId, key) {
   p.trainingFocus = key; return true;
 }
 // Ungdomstilbud (v3.18.0): tag op (højst 25 i truppen; i minus intet optag – QC B5) eller lad gå. Svar: null = ok, ellers årsagen.
-export function takeYouth(team, id) {
+// v3.24.1 (Spilfører økonomi): en ungdomsspiller, der rykkes op, har samme karantæne som et køb – ellers en pengemaskine (tag begge
+// tilbud, sæt til salg, tag buddene: ≈ 725.000 kr. pr. sæson uden løn og kampe). Samme regel som refillYouth (transfers.js).
+export function takeYouth(team, id, league) {
   const i = (team.youthOffers ?? []).findIndex((y) => y.id === id);
   if (i < 0) return 'Tilbuddet er udløbet.';
   if (team.squad.length >= SQUAD_MAX) return `Truppen er fuld (${SQUAD_MAX} spillere).`;
   if ((team.cashBalance ?? 0) < 0) return 'Klubkassen er i minus – ingen optag, før den er i plus.';
-  team.squad.push(team.youthOffers.splice(i, 1)[0]);
+  const y = team.youthOffers.splice(i, 1)[0];
+  y.lastMove = windowOf(league);
+  team.squad.push(y);
   if (team.matchBenchAuto !== false) autoMatchBench(team);
   return null;
 }

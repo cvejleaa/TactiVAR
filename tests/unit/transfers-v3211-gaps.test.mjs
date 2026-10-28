@@ -47,7 +47,7 @@ test('acceptOffer har sin egen sellBlock: tre bud lagt før salgene – det tred
   setListed(L2, m2, d.id, true);
   assert.ok(L2.offers.some((o) => o.playerId === d.id), 'data: bud');
   d.lastMove = windowOf(L2);
-  assert.match(acceptOffer(L2, m2, d.id), /skiftede klub/);
+  assert.match(acceptOffer(L2, m2, d.id), /kom til klubben/);
   assert.ok(m2.squad.includes(d));
 });
 
@@ -87,11 +87,11 @@ test('ungdomsspilleren er i karantæne i vinduet OG det næste (lastMove = vindu
   assert.equal(buyPlayer(L, me, q.id), null);
   const by = youthOf(bot)[0];
   assert.equal(by.lastMove, w, 'botten henter en ungdomsspiller med karantæne');
-  assert.match(marketInfo(L, me, bot, by).reason, /skiftede klub/);
+  assert.match(marketInfo(L, me, bot, by).reason, /kom til klubben/);
   // Næste vindue (før runde 8): stadig karantæne
   L.leagueMetadata.round = 7; openWindow(L);
   assert.equal(windowOf(L), w + 1);
-  assert.match(releasePlayer(L, me, y.id), /skiftede klub/);
+  assert.match(releasePlayer(L, me, y.id), /kom til klubben/);
 });
 
 test('`before` er lønnen før vinduets FØRSTE salg: efter to salg er loftet stadig den første løn (ikke den lavere løn før andet salg)', () => {
