@@ -1,5 +1,10 @@
 # Test Manager – hukommelse
 
+- v3.24.2 (strong-par): forfatterens unit-test kaldte strongChanges direkte, men intet testede ledningen i commitRound (snapshot før kampene, rapport efter chemRef, nyt snit ikke gammelt) eller trainingSummary (null ved kun strong, strong øverst, linket) -> 14 mutanter overlevede forfatterens tests. Løsning: uafhængigt orakel i testen (kopi af chemistry før, bandOf mod det NYE snit), datafixture 79,5–85 på opstillingsparrene og en bænkspiller byttet ind EFTER playRound (last=0 giver "ned"; kræver runde ≥ 4 pga. ABSENT_ROUNDS). Tekstgrænser (3 vs 4 par) var testet på 2 og 4 -> test grænsen ±1 på begge sider.
+- card.js kan enhedstestes med FakeEl-DOM (cards-ui.test.mjs / chemistry-v3242-tm.test.mjs): lad ikke UI-grene være e2e-only. app.js-lokale hjælpere (strongCount) er ikke eksporteret -> e2e med prep({base, ref}) for hver gren (ingen/nogle/alle; "alle" manglede).
+- sanitize.js renser trainingReport.gains/injuries, ikke nye felter (strong): forkert form i importeret gem kaster ved render. Tjek ved hvert nyt felt på rapporten (todo-test i chemistry-v3242-tm.test.mjs).
+- Delt maskine: andre worktrees' e2e optager porte (EADDRINUSE) og gør `npm test` ~20 min; brug privat PORT og kør kun de relevante unit-filer pr. mutation.
+
 - e2e har hårdkodet port (tests/e2e/run.mjs PORT=5055): ret til privat port i worktree før kørsel; node_modules symlinkes fra hovedcheckoutet.
 - Muter-harness: python-script med (navn, fil, fra, til)-liste, kør `npm test` + `npm run test:e2e`, `git checkout -- fil` mellem. ~10 s pr. mutation.
 - Gentagen mønster: test kalder handlingen direkte (act.syncActivePreset) men intet tester at app.js change() faktisk kalder den -> fjern kaldet, suiten grøn. Tjek altid at "ledningen" er testet, ikke kun funktionen.

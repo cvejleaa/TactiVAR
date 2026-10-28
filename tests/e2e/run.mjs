@@ -177,6 +177,11 @@ try {
     check('Samspil: brikkens tooltip nævner hans par med naboerne i rækkefølge, med bånd', title3.endsWith(` · 🤝 samspil med ${info.p2}: fremmede · samspil med ${info.p4}: spillet sammen · samspil med ${info.p7}: spillet sammen`), title3);
     await prep('set(s[1], s[2], 65); return 1;'); await reload();   // prep nulstiller alle par til 78: kun 1-2 er "finder hinanden"
     check('Samspil: kun et "finder hinanden"-par → legenden advarer med numrene og ordet', (await p.textContent('#chem-weakest')) === `Svagest lige nu: ${info.p1} og ${info.p2} (finder hinanden).${tail}`, await p.textContent('#chem-weakest'));
+    // v3.24.2 (Test Manager): tallet i legenden har tre grene – ingen (dækket ovenfor: ingen sætning), nogle ("N af M") og alle ("Alle N par …")
+    await prep('return 1;', { base: 90 }); await reload();   // alle 12 par på 90 = stærkt ved snit 78
+    check('Samspil: alle par stærkt → legenden siger "De spiller alle stærkt sammen." (ikke "12 af 12")', (await p.textContent('#chem-weakest')) === `Alle par har spillet sig sammen. De spiller alle stærkt sammen.${tail}`, await p.textContent('#chem-weakest'));
+    await prep('set(s[1], s[2], 90); set(s[6], s[7], 90); return 1;'); await reload();
+    check('Samspil: to af 12 par stærkt → legenden siger "2 af 12 par spiller stærkt."', (await p.textContent('#chem-weakest')) === `Alle par har spillet sig sammen. 2 af 12 par spiller stærkt.${tail}`, await p.textContent('#chem-weakest'));
     // Kortet: en starter (naboerne nu), en "ny" spiller uden par
     const card = await prep('set(s[2], s[3], 30); const y = arg.bench; for (const k of Object.keys(me.chemistry)) if (k.split("|").includes(y)) delete me.chemistry[k]; return { y, n3: sh(s[3]), p2: sh(s[2]), p4: sh(s[4]), p7: sh(s[7]) };', { bench: (await benchIds()).at(-1) }); await reload('trup');
     await p.locator(`#matrix tbody tr[data-pid="${info.s[3]}"]`).click();
