@@ -15,6 +15,8 @@ export function createRng(seed = 1) {
     int: (min, max) => min + Math.floor(next() * (max - min + 1)),
     chance: (p) => next() < p,
     pick: (arr) => arr[Math.floor(next() * arr.length)],
+    // Hele tilstanden er ét tal (v3.24.3, kamp-id): createRng(r.state()) fortsætter præcis, hvor r er – en kamp kan gengives
+    state: () => a,
   };
 }
 

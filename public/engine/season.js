@@ -34,7 +34,7 @@ export function tableBefore(league, round) {
   return Object.fromEntries(sortStandings(league.leagueMetadata.standings).map((s, i) => [s.teamId, { pos: i + 1, points: s.points }]));
 }
 
-export const playRound = (league, rng) => playPairs(league, pairRound(league), rng);
+export const playRound = (league, rng, opts) => playPairs(league, pairRound(league), rng, opts);
 
 // Den gamle parring (før v3.11): hold 0 hjemme mod en fast modstander, de øvrige i rækkefølge.
 // Kun til måleværktøjet og tests, så målingerne kan gentages tal for tal med playPairs.
@@ -45,17 +45,26 @@ export function fixedPairs(league, opponentIdx) {
 }
 
 // Spiller faste par – måleværktøjet og tests styrer selv parringen.
-export function playPairs(league, pairs, rng) {
+// opts.replay (v3.24.3, kamp-id – kun klienten): en gengivelsespakke pr. kamp – de to hold, som de stod lige før kampen
+// (efter bænkudtagelsen, før commitRound ændrer dem), rng-tilstanden lige før kampen og kampens opts. simulateMatch er ren
+// over holdene og trækker kun tilfældighed fra rng, så simulateMatch(home, away, createRng(rngState), opts) giver samme kamp.
+export function playPairs(league, pairs, rng, { replay = false } = {}) {
   const round = (league.leagueMetadata.round || 0) + 1;
   // lastOfSeason: friskheden følger med over sæsonskiftet – referatet siger "til første runde i næste sæson" (v3.16.7)
   const lastOfSeason = seasonRoundOf(league, round) === SEASON_ROUNDS;
   // Kamptruppen (v3.18.0): botterne – og dit hold med "Udtag automatisk" – udtager bænken før runden (intet rng)
   for (const t of league.teams) if (t.isBot || t.matchBenchAuto !== false) autoMatchBench(t);
   const chemRef = chemRefOf(league);   // samspil (v3.24.0): virkningen måles mod ligaens snit
-  const matches = pairs.map(([h, a]) => simulateMatch(league.teams[h], league.teams[a], rng, { round, lastOfSeason, chemRef }));
+  const mopts = { round, lastOfSeason, chemRef }, packs = [];
+  const matches = pairs.map(([h, a]) => {
+    if (replay) packs.push({ v: 1, home: structuredClone(league.teams[h]), away: structuredClone(league.teams[a]), rngState: rng.state(), opts: { ...mopts } });
+    return simulateMatch(league.teams[h], league.teams[a], rng, mopts);
+  });
   // Hvert mål ved, hvilken kamp i runden det faldt i (avisen linker til referatet, v3.7.1).
   matches.forEach((m, i) => m.goalsPool.forEach((g) => { g.matchIdx = i; }));
-  return { round, matches, gazette: buildGazette(matches, { positions: tableBefore(league, round), round }) };
+  const out = { round, matches, gazette: buildGazette(matches, { positions: tableBefore(league, round), round }) };
+  if (replay) out.replay = { round, packs };
+  return out;
 }
 
 function applyStanding(standings, m) {

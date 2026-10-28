@@ -6,6 +6,7 @@ import { createLeague } from './engine/generator.js';
 import { matchBenchOf, reservesOf, FOCUS, willRetire, RETIRE_WARN_ROUND, publicWage, wageRoomPerRound } from './engine/career.js';
 import { loadGame, saveGame, resetGame, exportGame, importGame, backupRaw, SAVE_KEY } from './state/storage.js';
 import * as act from './state/actions.js';
+import { saveReplay } from './state/replay.js';
 import { h, select } from './ui/dom.js';
 import { kr } from './ui/labels.js';
 import { renderMatrix } from './ui/matrix.js';
@@ -494,7 +495,8 @@ function pickForSwap(team, p) {
 function playNextRound() {
   clearSwap(); view.notice = '';
   const rng = createRng(randomSeed());
-  const result = playRound(game.league, rng);
+  const result = playRound(game.league, rng, { replay: true });
+  saveReplay(storage, result.replay); delete result.replay;   // v3.24.3: gengivelsen ligger for sig selv, ikke i gemmet
   commitRound(game.league, result, rng);
   game.ui.tab = 'kamp'; // gemmes med runden, så F5 midt i afspilningen lander i Kamp
   persist();

@@ -9,6 +9,7 @@ import { buildSchedule } from '../engine/schedule.js';
 import { FORMATIONS, lineOfRole, positionOfRole, arrangeByFit } from '../engine/formations.js';
 import { endSeason } from '../engine/season.js';
 import { seedChemistry } from '../engine/chemistry.js';
+import { clearReplay } from './replay.js';
 
 export const SAVE_KEY = 'tactivar_save';
 export const BACKUP_PREFIX = 'tactivar_backup_';
@@ -264,6 +265,7 @@ export function resetGame(storage, newState, now = Date.now()) {
     if (!backupKey) return { ok: false, error: 'Det nuværende spil kunne ikke sikkerhedskopieres (er browserens lager fuldt?). Intet er ændret – eksportér spillet først.', backupKey: null };
   }
   const saved = saveGame(storage, newState, now);
+  if (saved.ok) clearReplay(storage);   // v3.24.3: den forrige ligas gengivelse hører ikke til den nye
   return { ...saved, backupKey };
 }
 
