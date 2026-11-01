@@ -314,7 +314,7 @@ function attackLine(d, ph) {
   if (d.wideL + d.wideR) parts.push(`kantangreb ${d.wideL === d.wideR && !d.backL && !d.backR ? `${d.wideL} i hver side` : `${side(d.wideL, d.wideLStop, d.backL, 'venstre')}, ${side(d.wideR, d.wideRStop, d.backR, 'højre')}`}`);
   return parts.length ? parts.join(', ') : 'ingen cutbacks eller høje bolde';
 }
-// Dit felt pr. side (v3.26.0): deres venstre er din højre. Kun når én side tog mindst to tredjedele (ellers intet at handle på).
+// Dit felt pr. side (v3.26.0): deres venstre er din højre. Kun ved mindst 5 kantangreb, hvor én side tog mindst ¾ (QC: ved 2/3 og 3 var 2-1 mod en Begge-bot støj).
 export function oppSideLine(d) {
   const n = d.oppWideL + d.oppWideR; if (n < 5) return '';   // QC v3.26.0: mindst 5 og ≥ 3/4 – 2 af 3 mod en Begge-bot (≈ 50/50) var et mønster, der ikke fandtes
   const [many, mySide, back] = d.oppWideL >= d.oppWideR ? [d.oppWideL, 'højre', d.oppBackL] : [d.oppWideR, 'venstre', d.oppBackR];

@@ -38,6 +38,7 @@ export async function measureSide(N = 60, root = resolve(import.meta.dirname, '.
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const r = await measureSide(Number(process.argv[2] || 60), process.argv[3] ? resolve(process.argv[3]) : undefined);
+  // node tools/measure-side.mjs [N] [rod] [svækkelse] – fx `140 . 10` / `140 . 14` (spec §5 og backlog nr. 68)
+  const r = await measureSide(Number(process.argv[2] || 60), process.argv[3] ? resolve(process.argv[3]) : undefined, { weak: Number(process.argv[4] || 6) });
   for (const [k, v] of Object.entries(r)) console.log(`${k.padEnd(16)} venstre ${Math.round(v.left * 1000) / 10} % · kantangreb/kamp ${v.wide} · netto ${v.net} · ${v.games} kampe`);
 }

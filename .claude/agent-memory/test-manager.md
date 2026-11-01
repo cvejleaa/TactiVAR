@@ -151,3 +151,4 @@
 - Fokus kan ikke skiftes udefra mid-kamp (side.tactics er structuredClone) -> brug Hvis-Så newPlan (tacticPresets[1], minuteTrigger 7 = fra minut 9; ticks ved min 3,6,9..).
 - Position-straffen (FIT 0,94/0,85) er for lille til at flytte en ff-test; brug freshness 0 (freshFactor 0,75).
 - Observation: løbs-cutbacks (match.js ~1597) tælles i `cutbacks` men ikke i wideL/R/Stop/back, og READ gælder ikke dem -> "kantangreb" er lavere end cutbacks+indlæg.
+- v3.26.0 (2. runde): "flere backs"-testen læste kildeteksten og genimplementerede logikken (selvbekræftende). Adfærdstest er mulig: SUB-regel (action 'SUB', subOut/subIn, minuteTrigger 7) på FORSVARET + stub-rng gennem simulateMatch. NEWS i app.js er kun testbar via e2e (gem fra gammel version -> #notice) – unit-mutanter på NEWS overlever altid. tools/measure-side.mjs eksponerer ikke `weak` på kommandolinjen (−10/−14 kun via programkald).
