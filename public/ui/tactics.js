@@ -1,7 +1,10 @@
 // Formation, Plan A/B/C, de tre kampfaser og Hvis-Så-reglerne (docs/spec.md §4).
 import { h, select } from './dom.js';
 import { PHASE_OPTIONS, CONDITIONS, MARGINS, POSITION } from './labels.js';
-import { FORMATION_NAMES } from '../engine/formations.js';
+import { FORMATION_NAMES, FORMATIONS, lineOfRole } from '../engine/formations.js';
+// "5 på midten · mere bold" (v3.25.0, nr. 38): formationens midtbanepladser efter ankrets dybde – samme tælling som motoren
+export const midCountOf = (f) => (FORMATIONS[f] || FORMATIONS['4-4-2']).filter((c, i) => i > 0 && lineOfRole(c.r, c.y) === 'MID').length;
+const midCountText = (f) => { const n = midCountOf(f); return `${n} på midten · ${n >= 5 ? 'mere bold' : n <= 3 ? 'mindre bold' : 'normal boldbesiddelse'}`; };
 import { matchBenchOf } from '../engine/career.js';
 import { MAX_RULES } from '../state/actions.js';
 import { MATCH_RULES } from '../engine/match-rules.js';
@@ -52,6 +55,8 @@ export function renderTactics({ team, isOwn, ui, on }) {
   return h('div', { class: 'panel tactics' + (isOwn ? '' : ' readonly'), id: 'tactics' },
     h('div', { class: 'row' },
       h('label', {}, 'Formation ', select(t.baseFormation, formations, on.formation, { id: 'formation', disabled })),
+      // v3.25.0 (nr. 38): antallet på midten afgør boldbesiddelsen – vist ved formationen, hvor valget tages
+      h('span', { class: 'muted', id: 'mid-count', title: 'Midtbanen vinder bolden: flere på midten giver mere besiddelse (aftagende – den femte giver mindre end den fjerde), men færre i forsvar eller angreb. Kvaliteten (aflevering og boldkontrol) tæller stadig mest.' }, midCountText(t.baseFormation)),
       isOwn ? h('div', { class: 'presets' }, ['Plan A', 'Plan B', 'Plan C'].map((l, i) => h('button', { class: 'mini' + (ui.activePresetIndex === i ? ' active' : ''), onclick: () => on.preset(i) }, l + (ui.activePresetIndex === i ? ' (aktiv)' : '')))) : null,
       isOwn ? h('button', { class: 'mini', id: 'reset-drag', onclick: on.resetDrag }, '↺ Nulstil træk') : null,
       isOwn ? h('button', { class: 'mini', id: 'arrange-lineup', disabled, title: 'Flyt de 11 på banen rundt, så flest står på deres naturlige position – ingen kommer ind eller ud. Sker også selv, når du skifter formation.', onclick: on.arrange }, '⇄ Stil op efter position') : null),

@@ -203,7 +203,16 @@ Tick hvert 3. minut (1..90).
   **Kendt følge:** botternes egne Hvis-Så-ombytninger (generator.js BOT_PROFILES – 5-3-2/5-4-1 → 4-4-2, 5-4-1-
   remappet med en CM på ANG, og standardreglens 4-bagkæde-remap brugt af 3-5-2-botten) bevares og koster nu lidt
   (få spillere på 0,94/0,975 efter skiftet). Dit hold bruger altid fordelingen (ombytningen kan ikke redigeres).
-- Boldbesiddelse: midtbanens (PAS+BAL) + Mod·0,03 + rnd·8 (mod rnd·7,5).
+- Boldbesiddelse: midtbanens snit (PAS+BAL) + tillæg efter formationens antal midtbanepladser + Mod·0,03 + rnd·8 (mod
+  rnd·7,5). **v3.25.0 (nr. 38, brugerens valg – Hattrick: "midtbanen afgør chancemængden"):** før var det kun snittet, så en
+  ekstra midtbanespiller kostede bold (målt 4-3-3 53,7 %, 5-3-2 55,6 %, 4-1-4-1 48,3 %). Nu `MID_EXTRA` {2: −2, 3: −0,9,
+  4: 0, 5: +0,7, 6: +1,2, 7: +1,5} (aftagende; 4 = som før) efter formationens midtbanepladser ved ankrets dybde (3-5-2 har 5; en
+  trukket back tæller ikke; et rødt kort rammer kun via ti mand), og forskellen klemmes til ±1,5 (`POSS_DIFF_CAP`, ≈ 70 % pr.
+  tick) før hjemmebanens 8 mod 7,5. Skalaen: ét point ≈ 12,5 point bold pr. tick, derfor små tal (en vægtet sum gav 3 mod 5
+  ≈ 0 % bold). Taktik viser "N på midten · mere/mindre bold" ved formationen. Målt (`tools/measure-wide.mjs 40`, før → efter):
+  bold 4-3-3 53,7 → 47,7 %, 4-1-4-1 48,3 → 53,3 %, 5-3-2 55,6 → 48,1 %; ≥ 80 % bold i 2–6,3 % → ≤ 1,4 % af kampene; netto
+  4-1-4-1 −0,40 → −0,13, 4-2-3-1 −0,41 → −0,16, 5-3-2 +0,26 → −0,05, 4-3-3 +0,05 → −0,18 – spændet 0,67 → 0,27
+  (`possession-v3250.test.mjs`).
 - Fase-duel 48 %: opbygning PAS+BAL+rnd·7 mod pres INT+POS·0,85+STA·0,35+rnd·7,
   + Mod·0,05, sten-saks-papir: SHORT slår LOW_BLOCK, DIRECT_LONG slår HIGH_GEGENPRESS,
   HIGH_GEGENPRESS slår SHORT, LOW_BLOCK slår CENTRAL (+3).
