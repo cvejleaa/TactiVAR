@@ -364,7 +364,7 @@ try {
     await g0.click('#pitch .token[data-slot="1"]'); await g0.click('#pitch .token[data-slot="9"]');
     await g0.locator('#lineup-list .toolbar button', { hasText: 'Alle' }).click();   // et klik på en brik filtrerer listen til kæden
     const flag = async (s) => (await g0.locator(`#pitch .token[data-slot="${s}"] .token-flag.pos`).textContent().catch(() => '')).trim();
-    check('Byt LB ⇄ ANG: begge brikker viser "⚠ Uden for position (−6 %)", de andre intet, og listen markerer pladserne', (await name(1)) === n9 && (await flag(1)) === '⚠ Uden for position (−6 %)' && (await flag(9)) === '⚠ Uden for position (−6 %)'
+    check('Byt LB ⇄ ANG: begge brikker viser "⚠ Uden for position (−6 %)" (LB-pladsen siger back-plads, v3.24.6), de andre intet, og listen markerer pladserne', (await name(1)) === n9 && (await flag(1)) === '⚠ Uden for position – back-plads (−6 %)' && (await flag(9)) === '⚠ Uden for position (−6 %)'
       && (await g0.locator('#pitch .token-flag.pos').count()) === 2 && (await g0.locator('#lineup-table td.lp-place.off-pos').count()) === 2 && (await g0.textContent('#lineup-table td.lp-place.off-pos')).includes('−6 %'));
     await g0.click('#arrange-lineup');
     check('"⇄ Stil op efter position" flytter dem tilbage, fjerner flagene og siger det', (await name(1)) === n1 && (await name(9)) === n9 && (await g0.locator('#pitch .token-flag.pos').count()) === 0 && (await g0.textContent('#notice')).includes('naturlige position'));
