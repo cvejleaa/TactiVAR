@@ -210,7 +210,7 @@ Tick hvert 3. minut (1..90).
   trukket back tæller ikke; et rødt kort rammer kun via ti mand), og forskellen klemmes til ±1,5 (`POSS_DIFF_CAP`, ≈ 70 % pr.
   tick) før hjemmebanens 8 mod 7,5. Skalaen: ét point ≈ 12,5 point bold pr. tick, derfor små tal (en vægtet sum gav 3 mod 5
   ≈ 0 % bold). Taktik viser "N på midten · mere/mindre bold" ved formationen. Målt (`tools/measure-wide.mjs 40`, før → efter):
-  bold 4-3-3 53,7 → 47,7 %, 4-1-4-1 48,3 → 53,3 %, 5-3-2 55,6 → 48,1 %; ≥ 80 % bold i 2–6,3 % → ≤ 1,4 % af kampene; netto
+  bold 4-3-3 53,7 → 47,7 %, 4-1-4-1 48,3 → 53,3 %, 5-3-2 55,6 → 48,1 %; kampe med ≥ 80 % eller ≤ 20 % bold 2–6,3 % → ≤ 1,4 %; netto
   4-1-4-1 −0,40 → −0,13, 4-2-3-1 −0,41 → −0,16, 5-3-2 +0,26 → −0,05, 4-3-3 +0,05 → −0,18 – spændet 0,67 → 0,27
   (`possession-v3250.test.mjs`).
 - Fase-duel 48 %: opbygning PAS+BAL+rnd·7 mod pres INT+POS·0,85+STA·0,35+rnd·7,

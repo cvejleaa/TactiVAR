@@ -374,8 +374,20 @@ try {
 
   // Hver ændring gemmes STRAKS: genindlæs efter hver enkelt handling
   const reload = async () => { await g.reload(); await g.waitForSelector('body[data-klar="ja"]'); };
+  // v3.25.0 (nr. 38, Test Manager): "N på midten · mere/mindre bold" ved formationsvælgeren følger den valgte formation – straks (uden genindlæsning)
+  // og efter genindlæsning; teksterne er bogstavelige (4 = normal, ikke "mere"; 3-5-2 har 5 på midten, 5-3-2 kun 3 – ankrets dybde)
+  const MID_TXT = { '4-4-2': '4 på midten · normal boldbesiddelse', '4-3-3': '3 på midten · mindre bold', '4-2-3-1': '5 på midten · mere bold', '3-5-2': '5 på midten · mere bold', '3-4-3': '4 på midten · normal boldbesiddelse', '5-3-2': '3 på midten · mindre bold', '5-4-1': '4 på midten · normal boldbesiddelse', '4-1-4-1': '5 på midten · mere bold', '4-4-1-1': '4 på midten · normal boldbesiddelse', '4-3-1-2': '4 på midten · normal boldbesiddelse' };
+  const midTxt = async () => (await g.locator('#mid-count').count()) === 1 ? (await g.textContent('#mid-count')).trim() : null;
+  const midOk = async () => (await midTxt()) === MID_TXT[await g.inputValue('#formation')];
+  check('#mid-count: startformationen viser sin tekst (data: ét felt)', await midOk(), await midTxt());
+  await g.selectOption('#formation', '3-5-2');
+  check('#mid-count: 3-5-2 → "5 på midten · mere bold" straks efter valget', (await midTxt()) === '5 på midten · mere bold', await midTxt());
+  await g.selectOption('#formation', '4-3-3');
+  check('#mid-count: 4-3-3 → "3 på midten · mindre bold" straks efter valget (teksten følger, den hænger ikke fast)', (await midTxt()) === '3 på midten · mindre bold', await midTxt());
+  await g.selectOption('#formation', '3-5-2');
   await g.selectOption('#formation', '3-5-2'); await reload();
   check('Formation gemmes straks', (await g.inputValue('#formation')) === '3-5-2');
+  check('#mid-count: efter genindlæsning stadig 3-5-2s tekst', await midOk() && (await midTxt()) === '5 på midten · mere bold', await midTxt());
   // v3.24.6 (brugeren: "i en 3-5-2 … 2 midtbane kanter der får straf"): 3-5-2's LWB/RWB er kant-pladser – en kant dér
   // passer 100 %, en back betaler nabo-prisen; 5-3-2's (dybe) LWB/RWB er back-pladser
   {
@@ -406,6 +418,7 @@ try {
   check('Hvis-Så: valg af en formation fjerner plan-målet', (await g.inputValue('#rules .rule:nth-of-type(2) .rule-target')) === 'form:4-3-3');
   await g.click('.presets button:nth-child(2)'); await reload();
   check('Plan-skift gemmes straks', (await g.textContent('.presets button.active')).startsWith('Plan B') && (await g.inputValue('#formation')) === '4-3-3');
+  check('#mid-count: planskift til Plan B (4-3-3) opdaterer teksten', (await midTxt()) === '3 på midten · mindre bold', await midTxt());
   const [s7, s8] = [await nameAt(7), await nameAt(8)];
   await g.click('#pitch .token[data-slot="7"]'); await g.click('#pitch .token[data-slot="8"]'); await reload();
   check('Byt gemmes straks', (await nameAt(7)) === s8 && (await nameAt(8)) === s7);

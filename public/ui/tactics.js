@@ -56,7 +56,7 @@ export function renderTactics({ team, isOwn, ui, on }) {
     h('div', { class: 'row' },
       h('label', {}, 'Formation ', select(t.baseFormation, formations, on.formation, { id: 'formation', disabled })),
       // v3.25.0 (nr. 38): antallet på midten afgør boldbesiddelsen – vist ved formationen, hvor valget tages
-      h('span', { class: 'muted', id: 'mid-count', title: 'Midtbanen vinder bolden: flere på midten giver mere besiddelse (aftagende – den femte giver mindre end den fjerde), men færre i forsvar eller angreb. Kvaliteten (aflevering og boldkontrol) tæller stadig mest.' }, midCountText(t.baseFormation)),
+      h('span', { class: 'muted', id: 'mid-count', title: 'Midtbanen vinder bolden: flere på midten giver mere besiddelse (aftagende – den femte giver mindre end den fjerde), men færre i forsvar eller angreb. Spillernes aflevering og boldkontrol tæller også – men forskellen mellem holdene har et loft, så ingen kamp bliver ensidig.' }, midCountText(t.baseFormation)),
       isOwn ? h('div', { class: 'presets' }, ['Plan A', 'Plan B', 'Plan C'].map((l, i) => h('button', { class: 'mini' + (ui.activePresetIndex === i ? ' active' : ''), onclick: () => on.preset(i) }, l + (ui.activePresetIndex === i ? ' (aktiv)' : '')))) : null,
       isOwn ? h('button', { class: 'mini', id: 'reset-drag', onclick: on.resetDrag }, '↺ Nulstil træk') : null,
       isOwn ? h('button', { class: 'mini', id: 'arrange-lineup', disabled, title: 'Flyt de 11 på banen rundt, så flest står på deres naturlige position – ingen kommer ind eller ud. Sker også selv, når du skifter formation.', onclick: on.arrange }, '⇄ Stil op efter position') : null),
