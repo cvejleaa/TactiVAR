@@ -308,20 +308,50 @@ test('Taktik-fanen: Angrebsside står i Fase 1 mellem Angrebsfokus og Løb uden 
   const help = all(fs1, (e) => e.className.includes('phase-help'))[0].textContent;
   assert.ok(help.includes(`Venstre/Højre: ca. ${Math.round(SIDE.CHOICE * 4)} af 4 kantangreb dér`) && help.includes('ca. 3 af 4'), help);
   assert.ok(help.includes('Begge: lidt oftere dér, hvor jeres kant står stærkest mod deres back') && help.includes('ved cutbacks læser deres back på den side det') && help.includes('en lille fordel, ca. ét styret kantangreb pr. kamp, og mest ved Lave cutbacks'), help);
+  // TM: den målte sætning (v3.26.0 −10/−14: Begge 0,354/0,367 ≥ Venstre 0,354/0,365 ≥ Højre 0,278/0,282) – og ingen påstand om, at et fast valg vinder
+  assert.ok(help.includes('Målt: Begge finder selv en svag back – et fast valg er højst lige så godt, så brug det kun, når du vil styre siden.'), help);
+  assert.ok(!help.includes('stor fordel') && !help.includes('er bedre'), help);
   // modstanderens hold: faserne (og dermed hans valgte side) vises slet ikke
   const opp = renderTactics({ team: L.teams[1], isOwn: false, ui: { activePresetIndex: 0 }, on });
   assert.equal(all(opp, (e) => e.dataset.field === 'attackSide').length, 0);
   assert.ok(!opp.textContent.includes('Venstre (LW/LB)'));
 });
 
-// QC v3.26.0: "mod #x" må ikke være kun den sidste back – skiftede backen (udskiftning), står der "flere backs"
-test('back-navnet pr. side: samme back hver gang → hans navn; skiftende → "flere backs"', async () => {
-  const src = (await import('node:fs')).readFileSync(new URL('../../public/engine/match.js', import.meta.url), 'utf8');
-  const line = src.split('\n').find((l) => l.includes("const k = 'back' + sd"));
-  assert.ok(line, 'tildelingen findes');
-  const log = { backL: null };
-  const set = (t) => { const k = 'backL'; log[k] = log[k] == null || log[k] === t ? t : 'flere backs'; };
-  set('#3 A'); set('#3 A'); assert.equal(log.backL, '#3 A');
-  set('#14 B'); assert.equal(log.backL, 'flere backs'); set('#3 A'); assert.equal(log.backL, 'flere backs');
-  assert.ok(line.includes("log[k] == null || log[k] === t ? t : 'flere backs'"), line);
+// QC v3.26.0: "mod #x" må ikke være kun den sidste back – skiftede backen (udskiftning), står der "flere backs".
+// Adfærdstest gennem simulateMatch (stub-rng, ingen kildetekst): deres højre back (plads 4) skiftes af en SUB-regel i minut 7,
+// efter 2 af 4 cutbacks venstre (chancer i tick 3 og 6 – som i 'mixed' ovenfor). Mutanter dræbt: tildelingen overskriver bare (log[k] = t →
+// "mod <indskifteren>"), "flere backs" fastholdes ikke / nulstilles, forkert side får navnet, sammenligningen === fjernet (altid 'flere backs').
+const subbed = ({ side = 'H', swap = true, next = 0.4, n = 4 } = {}) => {
+  const a = arena({ home: { p1: { attackFocus: 'LOW_CUTBACKS' } } });
+  for (const p of a.H.squad) Object.assign(p.skills, { pace: 10, ballControl: 10 });
+  for (const p of a.A.squad) Object.assign(p.skills, { pace: 10, positioning: 10 });
+  homeBall(a); noRotation(a.A);
+  const inP = a.A.squad.slice(11).find((p) => p.line === 'DEF');
+  assert.ok(inP, 'data: en bænk-forsvarer at skifte ind');
+  const out = slot(a.A, 4), outTag = tg(out);
+  if (swap) a.A.tactics.conditionalRules = [{ ruleId: 1, minuteTrigger: 7, condition: 'ANY', margin: 1, newFormation: '4-4-2', newPlan: null, slotRemapping: [...Array(11).keys()], action: 'SUB', subOut: out.id, subIn: inP.id }];
+  if (side === 'A') { a.H.isBot = true; a.A.isBot = false; }   // en bot angriber DIN side (Dit felt)
+  const m = simulateMatch(a.H, a.A, stubRng({ 0.3: shots(n), 0.38: true }, next));
+  return { a, m, d: m.duelLog[a.H.id], t: ftOf(m).text, outTag, inTag: tg(inP) };
+};
+test('back-navnet pr. side (adfærd): samme back hver gang → hans navn; skiftede backen midt i kampen → "flere backs" (ikke den sidste)', () => {
+  const ctl = subbed({ swap: false });
+  assert.deepEqual([ctl.d.cutbacks, ctl.d.wideL, ctl.d.backL, ctl.d.backR], [4, 4, ctl.outTag, null], 'kontrol: uden skift står backens navn');
+  assert.ok(ctl.t.includes(`kantangreb 4 i venstre mod ${ctl.outTag}, 0 i højre.`) && !ctl.t.includes('flere backs'), ctl.t);
+  const r = subbed();
+  assert.ok(r.m.events.some((e) => e.type === 'SUB'), 'data: skiftet fandt sted');
+  assert.notEqual(r.outTag, r.inTag);
+  assert.deepEqual([r.d.cutbacks, r.d.wideL, r.d.wideR, r.d.backL, r.d.backR], [4, 4, 0, 'flere backs', null]);
+  assert.ok(r.t.includes('kantangreb 4 i venstre mod flere backs, 0 i højre.'), r.t);
+  assert.ok(!r.t.includes(r.inTag) && !r.t.includes(r.outTag), 'hverken den første eller den sidste back står som "dem"');
+});
+test('flere backs: skiftet efter ALLE cutbacks (n = 2, regel i minut 7) → stadig kun den ene back; og Dit felt viser "mod flere backs" når din back skiftede', () => {
+  const late = subbed({ n: 2 });   // begge chancer før minut 7: skiftet ændrer intet i tælleren
+  assert.deepEqual([late.d.wideL, late.d.backL], [2, late.outTag]);
+  assert.ok(late.t.includes(`kantangreb 2 i venstre mod ${late.outTag}, 0 i højre.`), late.t);
+  // spejlet: botten angriber din højre side (deres venstre, next 0,4) – 5+ angreb, din RB skiftes efter de to første
+  const d = subbed({ side: 'A', n: 6 });
+  assert.equal(d.d.wideL + d.d.wideR, 6);
+  assert.ok(d.m.events.some((e) => e.type === 'SUB'), 'data: skiftet fandt sted');
+  assert.ok(ftOf(d.m).text.includes('6 af 6 kantangreb kom i din højre side (mod flere backs).'), ftOf(d.m).text);
 });

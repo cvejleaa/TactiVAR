@@ -1084,6 +1084,8 @@ try {
   check('Nyt i v3.12 vises én gang efter opdateringen (sammen med migreringen)', v39note.includes('"Lave cutbacks" giver rigtige cutbacks') && v39note.includes('Direkte lange bolde'), v39note.slice(-200));
   check('Nyhederne står som to sætninger efter hinanden, kun adskilt af ét mellemrum', v39note.includes('i fuldtids-analysen. Spillerne rykker nu med'), v39note.slice(-300));
   check('Hopper man over en version, får man begge nyheder i rækkefølge (3.12.0 før 3.12.1)', v39note.indexOf('"Lave cutbacks"') >= 0 && v39note.indexOf('"Lave cutbacks"') < v39note.indexOf('Spillerne rykker nu med'), v39note.slice(-300));
+  // Test Manager v3.26.0: nyheden om Angrebsside er ærlig (lille fordel, målt: et fast valg er højst lige så godt) og kommer med, når man hopper over versioner
+  check('Nyt i v3.26.0: Angrebsside – lille fordel, mest ved Lave cutbacks, "Målt: … højst lige så godt", Dit felt ved mindst 5 og ¾', v39note.includes('Det er en lille fordel – ca. ét styret kantangreb pr. kamp, mest ved Lave cutbacks.') && v39note.includes('Målt: Begge finder selv en svag back, og et fast valg er højst lige så godt.') && v39note.includes('(mindst 5, ¾)') && !v39note.includes('(mindst 3'), v39note.slice(-700));
   // Test Manager v3.12: nyheden skal være GEMT straks – ellers vises den igen efter F5, hvis man ikke har gjort andet (fanebyt gemmer også)
   await reload();
   check('Nyt i v3.12 er gemt straks: ikke igen efter F5 uden anden handling', (await g.locator('#notice').count()) === 0);
