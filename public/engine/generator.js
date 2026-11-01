@@ -1,6 +1,6 @@
 // Spillergenerator og ny liga (docs/spec.md §1–2). Al tilfældighed fra den seedede rng.
 import { initialCounterTactics } from './counter.js';
-import { FORMATIONS, lineOfRole, positionOfRole } from './formations.js';
+import { FORMATIONS, lineOfRole, positionOfRole, slotPositionOf } from './formations.js';
 import { TEAM_STAT_DEFAULTS, PLAYER_SEASON_DEFAULTS } from './stats.js';
 import { generateScoutingClues } from './clues.js';
 import { buildSchedule, shuffledIds } from './schedule.js';
@@ -218,9 +218,9 @@ export function generatePlayer(rng, line, roleTier, shirtNumber, teamIdx, usedSh
 // 4-4-2 giver præcis BLUEPRINT. Kun ved ny liga; højden følger positionen (en bot med fem bagved har flere høje stoppere).
 const LINE_ORDER = { GK: 0, DEF: 1, MID: 2, ATT: 3 };
 function formationPositions(form) {
-  const roles = (FORMATIONS[form] || FORMATIONS['4-4-2']).map((s) => s.r), out = [];
+  const slots = FORMATIONS[form] || FORMATIONS['4-4-2'], roles = slots.map((s) => s.r), out = [];
   BLUEPRINT.slice(0, 11).map(([line], i) => [line, i]).sort((a, b) => LINE_ORDER[a[0]] - LINE_ORDER[b[0]] || a[1] - b[1])
-    .forEach(([line, i], slot) => { if (lineOfRole(roles[slot]) === line) out[i] = positionOfRole(roles[slot]); });
+    .forEach(([line, i], slot) => { const y = slots[slot].y, pos = slotPositionOf(roles[slot], y); if (lineOfRole(roles[slot], y) === line) out[i] = pos === 'WIDE' ? positionOfRole(roles[slot]) : pos; });   // v3.24.6: kantpladsens dybde
   return out;
 }
 // Standardopstilling (v3.20.0): de bedste 11 efter offentlige data × position på formationens pladser (career.js bestEleven).

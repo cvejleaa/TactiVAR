@@ -53,3 +53,15 @@ test('Taktik: trækker du en kant ned på 3-5-2-wingbacken, kommer straffen – 
   assert.equal(slotFitOf(me.tactics, slot, 'WM'), FIT.own);
   assert.equal(typeof outOfPositionCount(me), 'number');
 });
+
+test('kæden følger dybden som prisen: 3-5-2-wingback = midtbane, 5-3-2-wingback = forsvar, trukket ned = forsvar', async () => {
+  const { lineOfRole, slotLineOf, WIDE_LINE_Y } = await import('../../public/engine/formations.js');
+  const y352 = FORMATIONS['3-5-2'][slotOf('3-5-2', 'LWB')].y, y532 = FORMATIONS['5-3-2'][slotOf('5-3-2', 'LWB')].y;
+  assert.equal(lineOfRole('LWB', y352), 'MID'); assert.equal(lineOfRole('RWB', y352), 'MID');
+  assert.equal(lineOfRole('LWB', y532), 'DEF'); assert.equal(lineOfRole('LB', 70), 'DEF'); assert.equal(lineOfRole('LM', 45), 'MID');
+  assert.equal(lineOfRole('LWB'), 'DEF', 'uden y: som før'); assert.equal(lineOfRole('LW', 80), 'ATT', 'LW er ikke en kantplads');
+  assert.equal(lineOfRole('LM', WIDE_LINE_Y - 0.1), 'MID'); assert.equal(lineOfRole('LM', WIDE_LINE_Y), 'DEF');
+  const L = createLeague(createRng(4)), me = L.teams.find((t) => !t.isBot); setFormation(me, '3-5-2');
+  const s = slotOf('3-5-2', 'LWB'); assert.equal(slotLineOf(me.tactics, s), 'MID');
+  moveSlot(me, s, { x: FORMATIONS['3-5-2'][s].x, y: 68 }); assert.equal(slotLineOf(me.tactics, s), 'DEF');
+});

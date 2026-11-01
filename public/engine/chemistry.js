@@ -159,7 +159,7 @@ export function bandOf(v, ref) {
 // De par, motoren læser (QC/Spilfører: et angriberpar påvirker intet og vises ikke): mindst én af de to er forsvarer eller midtbane.
 export function readPairs(formation) {
   const c = FORMATIONS[formation] ?? FORMATIONS['4-4-2'];
-  return neighbourPairs(formation).filter(([i, j]) => [i, j].some((k) => ['DEF', 'MID'].includes(lineOfRole(c[k].r))));
+  return neighbourPairs(formation).filter(([i, j]) => [i, j].some((k) => ['DEF', 'MID'].includes(lineOfRole(c[k].r, c[k].y))));
 }
 const SIDE = (r) => (r.startsWith('L') ? 'L' : r.startsWith('R') ? 'R' : null);
 function pairName(ra, rb) {
