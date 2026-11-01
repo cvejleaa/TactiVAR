@@ -111,11 +111,6 @@ scratchpad – et tal herfra skal måles igen med et committet værktøj, før d
 37. **Referatet skelner ikke lette og svære redninger** · motor + UI · S · 2 · QC v3.24.5: en let redning kan stå som "tipper
     skuddet … ud til hjørnespark" (match.js ca. l. 939) og ligner en svær – brugeren kan ikke tælle "(2 svære)" efter i referatet.
     Mildere tekst for de lette eller tæl hjørne-tippet som svært. Ændrer fingeraftrykket (prosa eller karakter).
-38. **3-5-2's wingbacks hører stadig til forsvarskæden** · motor + klub · M · 3 · brugeren 2026-11-01: "når det er en 3-5-2
-    opstilling, er det 5 midtbanespillere". v3.24.6 gør prisen dybdeafhængig, men `lineOfRole(LWB)` = DEF: kædeværdien ×0,85
-    ved automatisk opstilling (pickByFit), midtbanens samspil (match.js ca. l. 327) og botternes trupper (generator.js
-    formationPositions giver en back på 3-5-2's LWB, nu −2,5 %). Gør kæden dybdeafhængig som prisen. Plan-skift (switchPreset)
-    fordeler efter ankrene, ikke planens trukne pladser (QC). Ændrer fingeraftrykket.
 
 ## Fravalgt / noteret
 - "– det holdt ikke mod jer" efter et nederlag kan misforstås (UI) – bevidst valgt i v3.21.2 (QC); kun noteret.

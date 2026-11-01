@@ -250,7 +250,10 @@ function rolesOf(side) {
   side.starters.forEach((p, i) => {
     if (i === 0 || !p) return;   // en udvist spillers plads er tom (v3.15)
     if (coords[i].r === 'CB') cbs.push(p);
-    const line = slotLineOf(side.tactics, i);   // v3.24.6: kantpladsens dybde (3-5-2's wingbacks er midtbane)
+    // Kampens opgaver (forsvar/opbygning/angreb) følger rollen: en wingback forsvarer også i 3-5-2. v3.24.6 målte det: talte
+    // 3-5-2's wingbacks som midtbane HER, lukkede holdet 0,17 mål mere ind pr. kamp (tools/measure-wide.mjs) – kæden til valg,
+    // samspil og pris følger dybden (formations.js), opgaven i kampen gør ikke
+    const line = lineOfRole(coords[i].r);
     (line === 'DEF' ? defs : line === 'MID' ? mids : atts).push(p);
   });
   // En tom kæde (udvisning, Hvis-Så-ombytning) lånes fra nabokæden – listerne er aldrig tomme og har aldrig en tom plads.
