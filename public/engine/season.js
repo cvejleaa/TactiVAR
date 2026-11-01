@@ -262,6 +262,7 @@ export function seasonTurnover(league) {
     p.age += 1; p.seasonAgeCounter = (p.seasonAgeCounter ?? 1) + 1;
     if (declineSkills(p, season, trainedSkills(p, team.isBot)).length) afterSkillChange(p);
     refreshValue(p); p.weeklyWage = publicWage(p);   // lønnen genforhandles ved hvert sæsonslut (QC B6, Spilfører)
+    p.freshness = 100;   // v3.26.1, brugeren: "Truppen skal genvinde energien mellem 2 sæsoner" – sommerpausen giver fuld friskhed (skader løber videre)
   }
   league.retired = [...(league.retired ?? []), ...report.retired.map(({ id, name, teamId, age, games }) => ({ id, name, teamId, age, games, season }))].slice(-RETIRED_CAP);
   // Ungdom

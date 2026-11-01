@@ -230,3 +230,20 @@ test('gem fra v3.17.0 (runde 13) → migrering → sidste runde: sæsonskiftet s
   assert.ok(again.ok, again.error); assert.ok(!again.migratedFrom, 'skema 7 – ingen migrering igen');
   assert.deepEqual(again.state.league.teams.map((t) => t.squad.length), L.teams.map((t) => t.squad.length));
 });
+
+// v3.26.1 (brugeren: "Truppen skal genvinde energien mellem 2 sæsoner"): sæsonskiftet giver alle 100 % friskhed –
+// også dem, der spillede runde 14 (før: de startede sæson 2 på ca. 80 %, som efter runde 14). Skader løber videre.
+test('sæsonskiftet: hele truppen (alle hold) 100 % frisk – men en skade bliver', () => {
+  let tired = 0, injured;
+  const L = toSeasonEnd(4, (L) => { injured = own(L).squad[5]; injured.injuryMatchesLeft = 4; });
+  // data: før sæsonskiftet var mange trætte (runde 14 kostede friskhed) – fixture er ikke tomt
+  const L2 = createLeague(createRng(4)), rng = createRng(12);
+  for (let r = 0; r < 14; r++) { const res = playRound(L2, rng); if (r < 13) commitRound(L2, res, rng); }
+  tired = L2.teams.flatMap((t) => t.squad).filter((p) => p.freshness < 90).length;
+  assert.ok(tired >= 30, `trætte spillere før sæsonskiftet: ${tired}`);
+  const all = L.teams.flatMap((t) => t.squad);
+  assert.ok(all.length >= 150);
+  assert.deepEqual(all.filter((p) => p.freshness !== 100).map((p) => [p.id, p.freshness]), []);
+  assert.equal(L.leagueMetadata.seasonNumber, 2);
+  assert.ok(injured.injuryMatchesLeft > 0, 'skaden løber videre');
+});
