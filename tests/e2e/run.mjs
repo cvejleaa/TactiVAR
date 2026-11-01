@@ -872,6 +872,20 @@ try {
   check('Efter F5: runden er gemt', (await g.textContent('#play-round')).includes('runde 2 af 14'));
   await tab('kamp');
   check('Kamp-fanen genviser seneste runde færdigspillet (ikke live)', (await g.isVisible('#match-center')) && (await g.locator('#skip').count()) === 0 && (await g.textContent('#match-center')).includes('runde 1'));
+  // v3.24.5 (brugeren: "9 redninger … 3 stjerner"): karakterarket viser de svære redninger for sig – og forklarer det i legenden
+  {
+    const hit = await g.evaluate(() => { const lr = JSON.parse(localStorage.getItem('tactivar_save')).league.lastRound;
+      for (const [i, m] of lr.matches.entries()) for (const e of [...m.ratings.home, ...m.ratings.away]) if (e.bigSaves != null && e.bigSaves < e.saves) return { i, saves: e.saves, big: e.bigSaves, name: e.shortName };
+      return null; });
+    if (hit) {
+      await g.click(`#match-cards .matchcard:nth-child(${hit.i + 1})`);
+      const want = `🧤${hit.saves} (${hit.big ? `${hit.big} ${hit.big === 1 ? 'svær' : 'svære'}` : 'alle lette'})`;
+      const icons = await g.locator('.ratings td.icons .ricon.nowrap').allTextContents();
+      check('Karakterarket: målmandens 🧤 viser de svære for sig, i ét stykke (nowrap)', icons.includes(want), `${want} | ${icons.join(' ')}`);
+      check('Legenden forklarer svære/lette (mobil har ingen hover)', (await g.textContent('#icon-legend')).includes('heraf 2 svære'));
+      await g.click('#match-cards .matchcard:nth-child(1)');
+    } else check('Karakterarket: data – en målmand med lette redninger i runden', false, 'ingen i runde 1');
+  }
   const evAll = await g.locator('#feed .ev').count();
   // "Rundens mål" i avisen (Liga-fanen) viser kampen og linker til netop dens referat
   await tab('liga');

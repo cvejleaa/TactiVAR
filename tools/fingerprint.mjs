@@ -9,7 +9,7 @@ import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
 
-const VIEW_KEYS = new Set(['clock', 'snapshot', 'trace', 'stoppage']);   // stoppage: tillægstiden (visning, v3.16.4)
+const VIEW_KEYS = new Set(['clock', 'snapshot', 'trace', 'stoppage', 'bigSaves']);   // stoppage: tillægstiden (visning, v3.16.4); bigSaves: delmængde af saves til 🧤-visningen (v3.24.5)
 const strip = (v) => {
   if (typeof v === 'string') return / /.test(v) ? '' : v;
   if (Array.isArray(v)) return v.map(strip);

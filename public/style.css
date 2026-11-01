@@ -104,7 +104,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .star-on { color: #fbbf24; text-shadow: 0 0 1px #000; } .star-off { color: #475569; }
 .tablewrap-x { overflow-x: auto; }
 
-.ratings .place { color: var(--dæmpet); font-weight: 400; } .ratings td.icons { text-align: left; } .ricon { cursor: help; margin-right: .15rem; }
+.ratings .place { color: var(--dæmpet); font-weight: 400; } .ratings td.icons { text-align: left; } .ricon { cursor: help; margin-right: .15rem; } .ricon.nowrap { white-space: nowrap; }
 .legend { margin-top: .5rem; line-height: 1.5; }
 .minipitch-wrap { margin: .3rem 0 .6rem; }
 .minipitch { position: relative; aspect-ratio: 68 / 60; max-width: 26rem; margin: .3rem auto 0; background: repeating-linear-gradient(0deg, #15803d, #15803d 8%, #166534 8%, #166534 16%); border: 1px solid #ffffff90; border-radius: .3rem; }

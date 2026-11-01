@@ -14,7 +14,10 @@ import { pickBy, gen, pl } from './clues.js';
 import { inMinute } from './clock.js';
 
 // De felter på en karakterlinje, klummen må læse (ingen af RATING_PRIVATE_FIELDS – testet).
-export const RATING_PUBLIC = ['playerId', 'shirtNumber', 'shortName', 'teamId', 'teamName', 'line', 'goals', 'assists', 'saves', 'aerialWins', 'tacticWins', 'stars', 'isMotM'];
+// "9 redninger (2 svære)" – samme form i klummen, på kampkortet og i karakterarket (Spilfører UI)
+export const savesSplit = (e) => (e.bigSaves != null && e.bigSaves < e.saves ? (e.bigSaves ? `${e.bigSaves} ${e.bigSaves === 1 ? 'svær' : 'svære'}` : 'alle lette') : null);   // "alle lette" frem for "0 svære" (QC)
+export const savesText = (e) => `${e.saves} redninger${savesSplit(e) ? ` (${savesSplit(e)})` : ''}`;
+export const RATING_PUBLIC = ['playerId', 'shirtNumber', 'shortName', 'teamId', 'teamName', 'line', 'goals', 'assists', 'saves', 'bigSaves', 'aerialWins', 'tacticWins', 'stars', 'isMotM'];
 if (RATING_PUBLIC.some((k) => RATING_PRIVATE_FIELDS.includes(k))) throw new Error('RATING_PUBLIC indeholder et privat felt');
 
 export { pickBy } from './clues.js';   // bor i clues.js (v3.16.3 – også referatets varianter)
@@ -228,7 +231,7 @@ export function buildColumn({ matches = [], gazette = null, history = [], table 
     // v3.20.1 (brugeren: "en dårlig begrundelse – kampens spiller"): hvad han GJORDE, af kampens offentlige tal – vundne taktiske
     // dueller og et holdt nul tæller med; "kampens spiller" er kun et tillæg, aldrig hele begrundelsen
     const f = star && facts.find((x) => x.ratings.some((e) => e.playerId === star.playerId)), side = f && (f.home.id === star.teamId ? f.home : f.away);
-    const why = star ? [star.goals && `${star.goals} mål`, star.assists && `${star.assists} oplæg`, star.saves && `${star.saves} redninger`, star.aerialWins >= 3 && `${star.aerialWins} vundne luftdueller`,
+    const why = star ? [star.goals && `${star.goals} mål`, star.assists && `${star.assists} oplæg`, star.saves && savesText(star), star.aerialWins >= 3 && `${star.aerialWins} vundne luftdueller`,
       // QC v3.20.1: en modstanders forsvarsspillers taktiske dueller rummer hans holds offside-fælde (match.js) – kun dit hold
       star.tacticWins >= 3 && (star.line !== 'DEF' || star.teamId === viewerTeamId) && `vandt ${star.tacticWins} taktiske dueller`, ['GK', 'DEF'].includes(star.line) && side?.against === 0 && 'holdt nullet'].filter(Boolean) : [];
     const motm = star?.isMotM ? ' – kåret til kampens spiller' : '';
