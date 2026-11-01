@@ -38,7 +38,7 @@ export function renderPitch({ team, isOwn, ui, onMove, onSelect, onTokenSwap, pa
       style: { left: pos.x + '%', top: pos.y + '%' }, dataset: { slot: String(slot), fit: String(fit) }, title: `${coords[slot].r}${kind ? ` (${kind})` : ''} – ${p ? p.name : '?'}${p ? ` · naturlig: ${POSITION_FULL[p.position] ?? p.position}${fit < 1 ? ` – her ${fitCost(fit)} i dueller` : ''}` : ''}${p && isOwn && pairs?.length && pairText(pid) ? ` · 🤝 ${pairText(pid)}` : ''}`,
     }, h('span', { class: 'token-num' }, p ? String(p.shirtNumber) : '?'), h('span', { class: 'token-name' }, p ? p.shortName : '?'),
       out ? h('span', { class: 'token-flag' }, '⚠ Ude af zone (-20%)') : custom ? h('span', { class: 'token-flag ok' }, '✅ Custom pos') : null,
-      fit < 1 ? h('span', { class: 'token-flag pos' }, `⚠ Uden for position (${fitCost(fit)})`) : null);
+      fit < 1 ? h('span', { class: 'token-flag pos' }, `⚠ Uden for position${kind && kind !== 'kant-/back-plads' ? ` – ${kind}` : ''} (${fitCost(fit)})`) : null);   // QC v3.24.6: pladstypen synligt (mobil)
     token.addEventListener('click', () => {
       if (!p || token.dataset.dragged) { delete token.dataset.dragged; return; }
       // Eget hold: første klik vælger, klik på en anden brik bytter de to (som i v2.5).
