@@ -246,7 +246,7 @@ function prepareSide(team, isHome, notes) {
 
 function rolesOf(side) {
   const coords = coordsOf(side.tactics);
-  const defs = [], mids = [], atts = [], cbs = [];
+  const defs = [], mids = [], atts = [], cbs = [], possMids = [];
   side.starters.forEach((p, i) => {
     if (i === 0 || !p) return;   // en udvist spillers plads er tom (v3.15)
     if (coords[i].r === 'CB') cbs.push(p);
@@ -255,11 +255,12 @@ function rolesOf(side) {
     // samspil og pris følger dybden (formations.js), opgaven i kampen gør ikke
     const line = lineOfRole(coords[i].r);
     (line === 'DEF' ? defs : line === 'MID' ? mids : atts).push(p);
+    if (lineOfRole(coords[i].r, coords[i].y) === 'MID') possMids.push(p);   // besiddelsen: formationens midtbane (ankrets dybde, nr. 38)
   });
   // En tom kæde (udvisning, Hvis-Så-ombytning) lånes fra nabokæden – listerne er aldrig tomme og har aldrig en tom plads.
   const all = side.starters.filter((p, i) => i > 0 && p);
   const or = (...ls) => ls.find((l) => l.length) ?? all;
-  return { gk: side.starters[0], defs: or(defs, mids, atts), mids: or(mids, defs.concat(atts)), atts: or(atts, mids, defs), cbs };
+  return { gk: side.starters[0], defs: or(defs, mids, atts), mids: or(mids, defs.concat(atts)), atts: or(atts, mids, defs), cbs, possMids: or(possMids, mids, defs.concat(atts)), midCount: coords.filter((c, i) => i > 0 && lineOfRole(c.r, c.y) === 'MID').length };
 }
 
 function customDragged(side) {
@@ -270,6 +271,16 @@ function customDragged(side) {
 }
 
 const avg = (arr, f) => arr.reduce((a, p) => a + f(p), 0) / Math.max(1, arr.length);
+// Midtbanen og bolden (v3.25.0, nr. 38 – Hattrick: "midtbanen afgør chancemængden"; brugerens valg 2026-11-01). Før v3.25 var
+// besiddelsen et GENNEMSNIT af midtbanen: en ekstra midtbanespiller kostede bold (målt 5-3-2 55,6 %, 4-1-4-1 48,3 %). Nu: snittet
+// + et lille tillæg efter formationens antal midtbanepladser (aftagende – 4 = som før). Antallet er formationens (ankrets
+// dybde: 3-5-2 har 5), ikke de tilstedeværende: et rødt kort rammer kun via ti mand (shortF), ikke dobbelt; og en trukket back
+// tæller ikke (QC: gevinst uden pris). Skalaen: ét point forskel ≈ 12,5 point bold pr. tick (rullet 8 mod 7,5) – derfor små tal
+// (Spilfører motor / QC: en vægtet SUM ville give 3 mod 5 midtbanefolk ≈ 0 % bold). Loftet: forskellen klemmes til ±1,5 (≈ 70 %
+// pr. tick), så ≥ 80 % i en hel kamp bliver sjældent (nr. 36's første halvdel).
+export const MID_EXTRA = { 2: -2.0, 3: -0.9, 4: 0, 5: 0.7, 6: 1.2, 7: 1.5 };
+export const POSS_DIFF_CAP = 1.5;
+const midStrength = (R) => avg(R.possMids, (p) => p.skills.passing + p.skills.ballControl) + (MID_EXTRA[Math.max(2, Math.min(7, R.midCount))] ?? 0);
 
 // v3.14 (Arkitekt): trukne positioner og faser gemmes KUN for et menneskestyret hold (ejerens egne valg) – før lå
 // en bots fulde indstillinger i det gemte spil, selv om intet viste dem.
@@ -1271,9 +1282,10 @@ export function simulateMatch(home, away, rng, opts = {}) {
     fatigueSubs(H, min); fatigueSubs(A, min);
 
     let hR = rolesOf(H), aR = rolesOf(A);
-    const hMid = avg(hR.mids, (p) => p.skills.passing + p.skills.ballControl) * shortF(H);
-    const aMid = avg(aR.mids, (p) => p.skills.passing + p.skills.ballControl) * shortF(A);
-    const homeHasBall = hMid + hAvg * 0.03 + rng.next() * 8 >= aMid + aAvg * 0.03 + rng.next() * 7.5;
+    // Loftet gælder midtbanernes forskel – ti mand (shortF) koster oven i, som før (balance.test: ti mand skal kunne mærkes)
+    const hS = midStrength(hR), aS = midStrength(aR);
+    const midDiff = Math.max(-POSS_DIFF_CAP, Math.min(POSS_DIFF_CAP, hS - aS)) + hS * (shortF(H) - 1) - aS * (shortF(A) - 1);
+    const homeHasBall = midDiff + hAvg * 0.03 + rng.next() * 8 >= aAvg * 0.03 + rng.next() * 7.5;
     if (homeHasBall) st.hPoss += 3; else st.aPoss += 3;
     const att = homeHasBall ? H : A, def = homeHasBall ? A : H;
     shotSide = null; setPieceNow = false;

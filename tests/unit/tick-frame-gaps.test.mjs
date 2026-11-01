@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRng } from '../../public/engine/rng.js';
 import { createLeague } from '../../public/engine/generator.js';
-import { simulateMatch as sim0 } from '../../public/engine/match.js';
+import { simulateMatch as sim0, MID_EXTRA } from '../../public/engine/match.js';
 // v3.21.0: pinnede koordinater og scriptede rng-træk – uden bevægelsen (opts.drift = false, kun test-arenaer)
 const simulateMatch = (h, a, r, o = {}) => sim0(h, a, r, { drift: false, ...o });
 
@@ -141,7 +141,10 @@ test('erobring (caught): modstanderens forreste står ikke oven i boldholdets m�
 const holder = (t, f) => t.tactics.lineupSlots.indexOf(f.h.find((q) => q[1] === f.ball[0] && q[2] === f.ball[1])?.[0]);
 test('ens nabobillede uden duel (4-3-3): CDM (x 50) har bolden i t 1, 3, 5 …; i t 2, 4 … stopperen på plads 2 (x 38) – lige langt som plads 3 (x 62), laveste plads vinder; formen er den samme – dræber skiftet fjernet, nøglen uden bolden (t 3 også forsvareren), længst væk i stedet for nærmest og tie-break omvendt', () => {
   const a = arena('4-3-3', '4-4-2');
-  const m = simulateMatch(a.H, a.A, stubRng({}));
+  // v3.25.0: 3 mod 4 på midten giver 4-4-2 bolden i stub-rullet (MID_EXTRA) – her måles billedet, ikke besiddelsen: tillægget
+  // sættes til 0 under kampen (som CHEM_EFFECT i målingerne) og lægges tilbage
+  const keep = MID_EXTRA[3]; MID_EXTRA[3] = 0;
+  let m; try { m = simulateMatch(a.H, a.A, stubRng({})); } finally { MID_EXTRA[3] = keep; }
   const fr = m.trace.frames.slice(1, 11);
   assert.ok(fr.every((f) => f.poss === 'h' && !f.lost && !f.run && !f.offside), 'data: ti tick uden duel');
   assert.deepEqual(fr.map((f) => holder(a.H, f)), [5, 2, 5, 2, 5, 2, 5, 2, 5, 2]);
