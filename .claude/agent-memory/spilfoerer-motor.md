@@ -37,3 +37,9 @@ fund der er rettet (så du ikke finder dem igen), hvad brugeren har valgt fra, o
   p=0,45 +0,289, p=0,53 +0,207 (kontramål for 0,343/0,230/0,177/0,147; mål imod uændret ≈1,25–1,29). Højere fælde-p = dårligere.
 - Opbygnings-bonus er stejl: build −1,8 → buildWon 52,7 %, net −0,012; +1,2 → 75,9 %, net +0,333 (basis 68 %, +0,289).
 - Anbefalet: flyt fælde-hook'en til løbsduellens markør og skru BUILD_CHEM ned. Landet v3.24.0: build 0,3, run 3; fælden IKKE flyttet.
+
+## Hattrick-sammenligning (2026-11-01, v3.24.x; script scratchpad/ht/poss.mjs, 30 seeds × 14 = 420 kampe pr. formation)
+- Boldbesiddelse = GENNEMSNIT af midtbanen (match.js:1274): 4-3-3 54,0 %, 3-5-2 54,1 %, 4-4-2 50,1 %, 4-1-4-1 48,0 % –
+  flere midtbanefolk køber ikke bold. Cutbackens side er en mønt (match.js:961), uanset backs. Hvis-Så kun stilling+minut (match.js:18).
+- Foreslået: midtbaneantal m. aftagende udbytte, angrebsside, mandsopdækning, flere Hvis-Så-betingelser, kampens indsats (friskhed),
+  individuelle løb. Lunken: vejr, formationserfaring (samspil/mod-kunnen dækker).
