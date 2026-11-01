@@ -117,10 +117,10 @@ test('overskrifter: alle skabeloner (v3.21.2: 6 pr. sejr/storsejr – før 3; Sp
   const all = (hG, aG, n = 6) => [...new Set(Array.from({ length: n }, (_, r) => headlineOf(F(hG, aG), r)))].sort();
   assert.deepEqual(all(3, 0), ['A knuser B 3-0', 'B får klø – A vinder 3-0', 'Opvisning: A sender B hjem med 3-0', 'A ruller over B – 3-0', 'Storsejr: A 3-0 mod B', 'B sat på plads: 3-0 til A'].sort());
   assert.deepEqual(all(0, 4), ['B knuser A 4-0', 'A får klø – B vinder 4-0', 'Opvisning: B sender A hjem med 4-0', 'B ruller over A – 4-0', 'Storsejr: B 4-0 mod A', 'A sat på plads: 4-0 til B'].sort());
-  assert.deepEqual(all(2, 0), ['A slår B 2-0', 'A snupper sejren mod B (2-0)', 'Tre point til A efter 2-0 mod B', 'A vinder 2-0 over B', '2-0: A er for stærke for B', 'A henter sejren mod B – 2-0'].sort(), '2 mål er ikke stor sejr');
-  assert.deepEqual(all(1, 2), ['B slår A 2-1', 'B snupper sejren mod A (2-1)', 'Tre point til B efter 2-1 mod A', 'B vinder 2-1 over A', '2-1: B er for stærke for A', 'B henter sejren mod A – 2-1'].sort());
+  assert.deepEqual(all(2, 0, 8), ['A slår B 2-0', 'A snupper sejren mod B (2-0)', 'Tre point til A efter 2-0 mod B', 'A vinder 2-0 over B', '2-0: A er for stærke for B', 'A henter sejren mod B – 2-0', 'B må se sig slået af A (2-0)', 'A tager de tre point hos B: 2-0'].sort(), '2 mål er ikke stor sejr');   // v3.24.6: 8 pr. sejr
+  assert.deepEqual(all(1, 2, 8), ['B slår A 2-1', 'B snupper sejren mod A (2-1)', 'Tre point til B efter 2-1 mod A', 'B vinder 2-1 over A', '2-1: B er for stærke for A', 'B henter sejren mod A – 2-1', 'A må se sig slået af B (2-1)', 'B tager de tre point hos A: 2-1'].sort());   // v3.24.6: 8 pr. sejr
   assert.deepEqual(all(0, 0, 3), ['Målløst mellem A og B', 'Taktisk skak: A og B deler 0-0', 'Ingen vinder – A og B spiller 0-0'].sort());
-  assert.deepEqual(all(2, 2, 3), ['Point deles: A – B 2-2', 'A og B skilles 2-2', 'Uafgjort 2-2 mellem A og B'].sort());
+  assert.deepEqual(all(2, 2, 4), ['Point deles: A – B 2-2', 'A og B skilles 2-2', 'Uafgjort 2-2 mellem A og B', '2-2 – A og B får et point hver'].sort());   // v3.24.6: 4 pr. uafgjort
   assert.deepEqual(all(1, 1).includes('Målløst mellem A og B'), false, '1-1 er ikke målløst');
   // runden indgår i valget (næste runde = næste skabelon); gazette.headline sender runden videre og bruger samme tekst
   assert.notEqual(headlineOf(F(3, 0), 1), headlineOf(F(3, 0), 0));
