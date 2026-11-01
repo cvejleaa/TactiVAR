@@ -692,7 +692,7 @@ skal styre chancen, alle småfund med. Hvert motortal er målt (`node tools/meas
   alle redninger, men en let (halvchance lige på ham) giver +0,10 og en svær +0,40–0,80. Var der lette, står de svære for sig:
   "🧤9 (2 svære)" i karakterarket (ét stykke, forklaret i legenden), "9 redninger (2 svære)" i klummen og avisen; kun lette =
   "(alle lette)". Felt `bigSaves` (kun når der var lette; gamle kampe uden feltet vises som før; strippes i fingeraftrykket).
-  Målt (`tools/measure-gk.mjs`): 79 % af 🧤 er lette; karakteren følger de svære (0–1: 6,85, 2–3: 7,69), ikke de lette (≈ 7,0
+  Målt (`node tools/measure-gk.mjs 6`, 672 målmandskampe): 79 % af 🧤 er lette; karakteren følger de svære (0–1: 6,85, 2–3: 7,69), ikke de lette (≈ 7,0
   i alle grupper). Hovedstødsmål +1,35, mål
   +1,25, oplæg +0,55, redning +0,50 (skytte +0,10), forbi 0, annulleret mål for offside −0,40 til den tjekkede
   (forsvarer +0,45; v3.15.1 – VAR-mål +1,30 fandtes til v3.15.0), annulleret for frispark −0,30, filmning −0,30, straffe

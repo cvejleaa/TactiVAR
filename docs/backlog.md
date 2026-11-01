@@ -108,6 +108,9 @@ scratchpad – et tal herfra skal måles igen med et committet værktøj, før d
     værktøjet kan nu hente sådan en kamp). Spilfører motor, 1344 målmandskampe: < 40 % bold 6,2 skud, > 70 % 23,5 (×3,8; virkeligheden
     ca. ×2,5); 3,7 % af holdkampene ≥ 80 % bold (maks 91 %), 1,6 % ≥ 30 skud. Skudeffektiviteten er normal (10,6 %). Loft over
     besiddelsen og en fladere kurve fra besiddelse til skud (match.js ca. l. 1274). Fingeraftryk før/efter.
+37. **Referatet skelner ikke lette og svære redninger** · motor + UI · S · 2 · QC v3.24.5: en let redning kan stå som "tipper
+    skuddet … ud til hjørnespark" (match.js ca. l. 939) og ligner en svær – brugeren kan ikke tælle "(2 svære)" efter i referatet.
+    Mildere tekst for de lette eller tæl hjørne-tippet som svært. Ændrer fingeraftrykket (prosa eller karakter).
 
 ## Fravalgt / noteret
 - "– det holdt ikke mod jer" efter et nederlag kan misforstås (UI) – bevidst valgt i v3.21.2 (QC); kun noteret.
