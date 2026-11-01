@@ -676,7 +676,7 @@ Fra sæsongennemgangen af v3.16.6. Fase T (kun tekst og visning – noprose uæn
   hovedstødsprosa (HEADER_PROSE) i fem varianter pr. bånd (v3.21.2; før tre), hjørne-/frispark-hovedstødet i tre (`sphead`); vary starter fra runden; "🎯 forbi"-teksterne gentages ikke i en kamp, før
   alle seks er brugt (samme ene rng-træk); målteksten for dit holds løb bruger ikke en variant op.
 - **Visning**: skift lige efter hinanden står på samme minut ("tages med i pausen" / "i samme skifte-pause"); friskheden i
-  sæsonens sidste runde "… til første runde i næste sæson".
+  sæsonens sidste runde nævnes ikke (fra v3.26.1: sæsonskiftet giver alle 100 %; før "… til første runde i næste sæson").
 - **M1 VAR-offside**: intet offside direkte fra hjørnespark, oplægsgiveren tjekkes aldrig (VAR og flag), intet flag efter en
   cutback (`tools/measure-var-offside.mjs`: 16/10/4 → 0/0/0 på 1500 kampe).
 - **M2 Pres**: offside-fælden tælles for sig (`trapWon`, `oppTrapWon`) – "dit pres stoppede opbygningen W af Y gange (X

@@ -99,7 +99,9 @@ test('sæsonslut efter runde 14: tabel og sæsonstatistik arkiveres og nulstille
   assert.ok(L.teams.every((t) => t.squad.every((p) => p.sGames === 0 && p.sGoals === 0 && p.sCleanSheets === 0)));
   assert.equal(L.leagueMetadata.seasonNumber, 2); assert.equal(L.seasonStartRound, 15); assert.equal(L.statsFromRound, 15);
   // Bevaret
-  assert.equal(L.history.length, 14); assert.ok(L.teams.some((t) => t.squad.some((p) => p.ratingGames > 0 && p.freshness < 100)));
+  assert.equal(L.history.length, 14);
+  // v3.26.1: sæsonskiftet giver alle 100 % friskhed (før: friskheden blev bevaret) – karakterhistorikken bevares
+  assert.ok(L.teams.some((t) => t.squad.some((p) => p.ratingGames > 0)) && L.teams.every((t) => t.squad.every((p) => p.freshness === 100)));
   assert.equal(L.leagueMetadata.round, 14);
   // Næste runde er programmets runde 1
   const idx = new Map(L.teams.map((t, i) => [t.id, i]));
