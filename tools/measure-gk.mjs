@@ -18,7 +18,7 @@ export function measureGk(leagues = 12) {
         const gk = m.ratings[side].find((x) => x.slot === 0);
         if (!gk) continue;
         const conceded = side === 'home' ? m.awayGoals : m.homeGoals, scored = side === 'home' ? m.homeGoals : m.awayGoals;
-        rows.push({ saves: gk.saves ?? 0, rating: gk.rating, stars: gk.stars, conceded, lost: scored < conceded, motm: !!gk.isMotM });
+        rows.push({ saves: gk.saves ?? 0, big: gk.bigSaves ?? gk.saves ?? 0, rating: gk.rating, stars: gk.stars, conceded, lost: scored < conceded, motm: !!gk.isMotM });
       }
       commitRound(L, res, rng);
     }
@@ -28,15 +28,22 @@ export function measureGk(leagues = 12) {
     const a = rows.filter((x) => x.saves >= lo && x.saves <= hi);
     return [k, { n: a.length, rating: mean(a.map((x) => x.rating)), top: a.filter((x) => x.stars >= 4).length / Math.max(1, a.length), three: a.filter((x) => x.stars <= 3).length / Math.max(1, a.length) }];
   }));
+  // v3.24.5: karakteren følger de SVÆRE redninger – de lette (skud lige på ham) flytter den næsten ikke
+  const BIG = [['0-1', 0, 1], ['2-3', 2, 3], ['4-5', 4, 5], ['6+', 6, 99]], EASY = [['0-1', 0, 1], ['2-3', 2, 3], ['4-5', 4, 5], ['6+', 6, 99]];
+  const by = (G, f) => Object.fromEntries(G.map(([k, lo, hi]) => { const a = rows.filter((x) => f(x) >= lo && f(x) <= hi); return [k, { n: a.length, rating: mean(a.map((x) => x.rating)), top: a.filter((x) => x.stars >= 4).length / Math.max(1, a.length) }]; }));
+  const bigGroups = by(BIG, (x) => x.big), easyGroups = by(EASY, (x) => x.saves - x.big), easyShare = mean(rows.filter((x) => x.saves).map((x) => (x.saves - x.big) / x.saves));
   // Brugerens kamp: 9+ redninger, højst 2 mål imod, tabte
   const busyLost = rows.filter((x) => x.saves >= 9 && x.conceded <= 2 && x.lost);
-  return { groups, busyLost: { n: busyLost.length, rating: mean(busyLost.map((x) => x.rating)), top: busyLost.filter((x) => x.stars >= 4).length / Math.max(1, busyLost.length) },
+  return { groups, bigGroups, easyGroups, easyShare, busyLost: { n: busyLost.length, rating: mean(busyLost.map((x) => x.rating)), top: busyLost.filter((x) => x.stars >= 4).length / Math.max(1, busyLost.length) },
     motmGk: rows.filter((x) => x.motm).length / Math.max(1, rows.length / 2), motmGkLost: rows.filter((x) => x.motm && x.lost).length / Math.max(1, rows.length / 2) };
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const r = measureGk(Number(process.argv[2] || 12)), f = (v) => Math.round(v * 100) / 100;
   for (const [k, g] of Object.entries(r.groups)) console.log(`${k.padEnd(4)} redninger: n ${g.n} · snit ${f(g.rating)} · 4–5★ ${f(g.top * 100)} % · ≤3★ ${f(g.three * 100)} %`);
+  for (const [k, g] of Object.entries(r.bigGroups)) console.log(`${k.padEnd(4)} svære: n ${g.n} · snit ${f(g.rating)} · 4–5★ ${f(g.top * 100)} %`);
+  for (const [k, g] of Object.entries(r.easyGroups)) console.log(`${k.padEnd(4)} lette: n ${g.n} · snit ${f(g.rating)} · 4–5★ ${f(g.top * 100)} %`);
+  console.log(`andel lette af 🧤 (snit pr. målmand med redninger): ${f(r.easyShare * 100)} %`);
   console.log(`9+ redninger, ≤2 imod, tabt: n ${r.busyLost.n} · snit ${f(r.busyLost.rating)} · 4–5★ ${f(r.busyLost.top * 100)} %`);
   console.log(`målmand kampens spiller: ${f(r.motmGk * 100)} % af kampene (heraf på tabende hold ${f(r.motmGkLost * 100)} %)`);
 }

@@ -108,6 +108,9 @@ export function finalizeSheet(sheet, homeGoals, awayGoals, rng, xpFor) {
     if ((e.saves ?? 0) > SAVES_FULL) e.rating -= 0.25 * (e.saves - SAVES_FULL);
     // Lette redninger (halvchancer, v3.17.0) tæller med i 🧤-tallet, men ikke i fradraget – ellers sænkede flere redninger
     // karakteren (QC). Feltet er midlertidigt og gemmes ikke (som km90).
+    // Brugeren (2026-10-28: "9 redninger … 3 stjerner"): de svære gemmes for sig, når der også var lette – så 🧤-tallet kan
+    // sige "(2 svære)" og karakteren kan forstås. Uden lette udelades feltet (gamle kampe og kampe uden lette ser ud som før).
+    if (e.easySaves) e.bigSaves = e.saves ?? 0;
     e.saves = (e.saves ?? 0) + (e.easySaves ?? 0); delete e.easySaves;
     e.rating = clamp(e.rating, RATING_MIN, RATING_MAX);
     // Clean sheet i statistikken: kun målmanden (v3.11, brugeren: "Det er kun målmanden der får

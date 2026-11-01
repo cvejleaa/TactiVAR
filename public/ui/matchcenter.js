@@ -13,6 +13,7 @@ import { evMin, fmtMin, timelinePos, halfPos, playerSpan, tickClock, clockNum } 
 // Afslutningens minut i heat- og zone-kortet: hændelsens eget ur (QC v3.16.4 – ellers tick'ets start, fx "42'" for et mål i 45+6)
 const shotMin = (s, { events, stoppage }) => (s.ev != null && events?.[s.ev] ? evMin(events[s.ev]) : fmtMin(tickClock(s.t, stoppage)));
 import { pl } from '../engine/clues.js';
+import { savesText, savesSplit } from '../engine/column.js';
 import { heatGrid, shotsOf, thirds, zones, zoneShots, actsOf, COMBO_LABEL, COLS, ROWS, HEAT_MIN } from '../engine/heatmap.js';
 
 export const REPORT_FILTERS = [['all', 'Alle hændelser'], ['tactic', 'Kun taktik'], ['key', 'Kun nøglemomenter']];
@@ -75,6 +76,10 @@ const TIP = Object.fromEntries(RATING_ICONS);
 // Mål og oplæg gentages (⚽⚽); redninger og luftdueller står som tal (🧤4).
 const REPEAT = new Set(['⚽', '🅰']);
 const icon = (sym, n = 0) => h('span', { class: 'ricon', title: TIP[sym] + (n ? `: ${n}` : '') }, !n ? sym : REPEAT.has(sym) ? sym.repeat(n) : `${sym}${n}`);
+// 🧤 med de svære (Spilfører UI: ét stykke, så "(2" og "svære)" ikke deles på mobil; "(0 svære)" når alle var lette)
+const savesIcon = (e) => (savesSplit(e)
+  ? h('span', { class: 'ricon nowrap', title: `${savesText(e)}. De lette (skud lige på ham, halvchancer) løfter karakteren lidt, de svære meget – karakteren kommer fra de svære.` }, `🧤${e.saves} (${savesSplit(e)})`)
+  : icon('🧤', e.saves));
 // heat (v3.16): { trace, side, mine, onHeat } – dit hold: heat map for holdet eller en spiller (mine = null | { playerId });
 // modstanderen: kun tredjedele (brugerens valg – et præsentationsvalg, se heatmap.js).
 // down: holdet angriber nedad i tegningen (modstanderen mod dit hold, udeholdet i andre kampe – v3.16.3, én retningsregel).
@@ -94,7 +99,7 @@ function ratingsTable(list, isOwn, title, formation, snap = null, onSnap = null,
     h('table', {}, h('tbody', {}, rows.map((e) => h('tr', { class: (e.isMotM ? 'motm' : '') + (mine?.playerId === e.playerId ? ' heat-sel' : ''),
         onclick: canHeat ? () => heat.onHeat({ playerId: mine.playerId === e.playerId ? null : e.playerId }) : null, title: canHeat ? 'Vis hans heat map (klik igen: holdet)' : null },
       h('td', {}, `#${e.shirtNumber} ${e.shortName}`, h('span', { class: 'place' }, ` · ${e.place}`)), h('td', { class: 'muted' }, minutes(e, span?.get(e.playerId))),
-      h('td', { class: 'icons' }, e.goals ? icon('⚽', e.goals) : null, e.assists ? icon('🅰', e.assists) : null, e.saves ? icon('🧤', e.saves) : null, e.aerialWins ? icon('✈', e.aerialWins) : null,
+      h('td', { class: 'icons' }, e.goals ? icon('⚽', e.goals) : null, e.assists ? icon('🅰', e.assists) : null, e.saves ? savesIcon(e) : null, e.aerialWins ? icon('✈', e.aerialWins) : null,
         e.yellowCard ? icon('🟨') : null, e.red ? icon('🟥') : null, e.injured ? icon('🚑') : null, e.isMotM ? icon('👑') : null),
       h('td', { class: 'rating' }, isOwn ? dec(e.rating, 1) : starsEl(e.stars)),
       isOwn ? h('td', { class: 'run', title: 'Løbet distance (et skøn ud fra rolle, kondition og holdets taktik – heat map\'et følger samme rolle og taktik, men viser kun kampens øjebliksbilleder) · andel højintenst løb (over ca. 20 km/t) · topfart – kun dit hold (det røber udholdenhed og fart)' }, e.distanceKm > 0 ? `${dec(e.distanceKm, 1)} km${e.hiShare != null ? ` · ${Math.round(e.hiShare)} % HI` : ''}${e.topSpeed ? ` · ${dec(e.topSpeed, 1)} km/t` : ''}` : '–') : null,
@@ -187,7 +192,7 @@ function thirdsLine(trace, side, gkId, vsMe = false, down = true, stoppage = nul
     h('div', { class: 'muted', id: 'heat-opp-note' }, `${vsMe ? 'Set fra din side: de angriber nedad mod dit mål; venstre = din venstre side.' : down ? 'De angriber nedad.' : 'De angriber opad.'} Felterne: hvor holdet stod (groft – ingen enkeltspillere). Prikker: deres ${shots.length} afslutninger i åbent spil og på kontra (⚽ mål, ● reddet, forbi eller offside).`));
 }
 
-const legend = (isOwn = true) => h('div', { class: 'muted legend', id: 'icon-legend' }, RATING_ICONS.map(([s, t]) => `${s} ${t}`).join(' · ') + ' · 🎬 i referatet = vis afslutningen i afspilningen · 📍 i referatet = se hvor dit hold stod, da målet faldt (kampe fra før afspilningen – ellers viser 🎬 det) · HI = andel højintenst løb (over ca. 20 km/t) · "2/3 fri" = løb uden bold: kom fri 2 af 3 gange · "2/3 🤼" = dueller vundet (pres og dækning – en af de nærmeste tager duellen) – alle tre kun dit hold');
+const legend = (isOwn = true) => h('div', { class: 'muted legend', id: 'icon-legend' }, RATING_ICONS.map(([s, t]) => `${s} ${t}`).join(' · ') + ' · 🧤9 (2 svære) = 9 redninger, heraf 2 svære – de lette (skud lige på ham) løfter karakteren lidt, de svære meget' + ' · 🎬 i referatet = vis afslutningen i afspilningen · 📍 i referatet = se hvor dit hold stod, da målet faldt (kampe fra før afspilningen – ellers viser 🎬 det) · HI = andel højintenst løb (over ca. 20 km/t) · "2/3 fri" = løb uden bold: kom fri 2 af 3 gange · "2/3 🤼" = dueller vundet (pres og dækning – en af de nærmeste tager duellen) – alle tre kun dit hold');
 
 // onOpenMatch(i): åbner referatet af kamp i i runden (Liga: skift til Kamp; Kamp: vis kampen).
 // matches: rundens kampe – bruges til at finde kampen for mål fra før v3.7.1 (uden matchIdx).
@@ -204,7 +209,7 @@ export function renderGazette(g, myTeamId, onOpenMatch = null, matches = null, c
   if (!g) return null;
   // Rundens spiller går gennem visibility.js: modstandere vises kun med stjerner.
   const pr = g.playerOfTheRound ? viewRatingEntry(g.playerOfTheRound, g.playerOfTheRound.teamId === myTeamId) : null;
-  const feats = pr ? [pr.goals ? `${pr.goals} mål` : '', pr.assists ? `${pr.assists} oplæg` : '', pr.saves ? `${pr.saves} redninger` : ''].filter(Boolean).join(' • ') : '';
+  const feats = pr ? [pr.goals ? `${pr.goals} mål` : '', pr.assists ? `${pr.assists} oplæg` : '', pr.saves ? savesText(pr) : ''].filter(Boolean).join(' • ') : '';
   return h('div', { class: 'panel gazette', id: 'gazette' }, h('h3', {}, '📰 TactiVAR Avisen'),
     // Sæsonslut (v3.11): mesteren og din placering står øverst.
     g.seasonEnd ? h('p', { id: 'season-end', class: 'season-end' }, h('strong', {}, `🏆 Sæson ${g.seasonEnd.seasonNumber} er slut: `),
