@@ -34,7 +34,7 @@ jobs:
       - name: Unit-tests
         run: npm test
       # v3.24.3 (kamp-id): Firestore-reglerne mod Auth- og Firestore-emulatoren (projekt demo-tactivar – aldrig produktion)
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: 21
