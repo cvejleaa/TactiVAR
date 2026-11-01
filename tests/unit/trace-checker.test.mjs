@@ -20,7 +20,7 @@ const errorsAfter = (m, f) => { const c = structuredClone(m); f(c); return check
 const tagOf = (e) => `#${e.shirtNumber} ${e.shortName}`;
 // side: 'h'/'a' – samme nummer og navn kan findes på begge hold (v3.17.0: "#8 M. Jensen" hos begge i seed 1)
 const entry = (m, tag, side = null) => (side ? m.ratings[side === 'h' ? 'home' : 'away'] : [...m.ratings.home, ...m.ratings.away]).find((e) => tagOf(e) === tag);
-const M = play(3);
+const M = play(4);   // v3.25.0: seed 3 har ingen mål efter besiddelses-ændringen
 
 test('kontrol: en uberørt kamp giver ingen fejl, et spor med forkert version/uden spor melder det', () => {
   assert.deepEqual(checkTrace(M).errors, []);

@@ -1282,8 +1282,9 @@ export function simulateMatch(home, away, rng, opts = {}) {
     fatigueSubs(H, min); fatigueSubs(A, min);
 
     let hR = rolesOf(H), aR = rolesOf(A);
-    const hMid = midStrength(hR) * shortF(H), aMid = midStrength(aR) * shortF(A);
-    const midDiff = Math.max(-POSS_DIFF_CAP, Math.min(POSS_DIFF_CAP, hMid - aMid));   // loftet før hjemmebanens 8 mod 7,5
+    // Loftet gælder midtbanernes forskel – ti mand (shortF) koster oven i, som før (balance.test: ti mand skal kunne mærkes)
+    const hS = midStrength(hR), aS = midStrength(aR);
+    const midDiff = Math.max(-POSS_DIFF_CAP, Math.min(POSS_DIFF_CAP, hS - aS)) + hS * (shortF(H) - 1) - aS * (shortF(A) - 1);
     const homeHasBall = midDiff + hAvg * 0.03 + rng.next() * 8 >= aAvg * 0.03 + rng.next() * 7.5;
     if (homeHasBall) st.hPoss += 3; else st.aPoss += 3;
     const att = homeHasBall ? H : A, def = homeHasBall ? A : H;

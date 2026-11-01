@@ -38,7 +38,7 @@ test('VAR tjekker det røde kort: står det, siger udvisningen det – bliver de
 // Begge grene af reglen: ny formation og en af holdets egne planer (Plan B) – hver med færre og fuldt hold.
 const shiftCase = (rule, RX) => {
   let short = 0, full = 0;
-  for (let s = 1; s <= 400 && short < 5; s++) {
+  for (let s = 1; s <= 800 && (short < 5 || full < 50); s++) {   // v3.25.0: til begge slags er fundet (sæderne flyttede sig)
     const ev = play(s, (me) => { me.tactics.conditionalRules = [{ ruleId: 1, condition: 'ANY', minuteTrigger: 72, margin: 1, slotRemapping: null, ...rule }]; }).events;
     const t = ev.find((e) => e.type === 'TRIGGER' && e.text.startsWith('📋'));
     if (!t) continue;
