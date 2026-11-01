@@ -9,10 +9,11 @@ import { matchBenchOf } from '../engine/career.js';
 import { MAX_RULES } from '../state/actions.js';
 import { MATCH_RULES } from '../engine/match-rules.js';
 import { SUBS_LIMIT } from '../engine/freshness.js';
+import { SIDE } from '../engine/match.js';
 
 const PHASES = [
-  ['phase1_buildUp', 'Fase 1 – Opbygning & indlæg', [['passingStyle', 'Pasningsstil'], ['attackFocus', 'Angrebsfokus'], ['offBallRuns', 'Løb uden bold']],
-    'Angrebsfokus bestemmer, hvordan chancerne kommer: høje indlæg til den, der står i feltet, lave cutbacks fra baglinjen, eller centralt gennem løb og afslutninger. Pasningsstil bestemmer, hvordan bolden kommer frem (direkte lange bolde giver også nogle høje bolde, når fokus ikke er høje indlæg). Løb uden bold: Mange – flere spillere løber sig fri og kommer med ind i feltet (også midtbane, backs og wingbacks), men holdet står ubalanceret, når bolden tabes, og løber flere km. Få – færre løb fremad, færre kontraer imod og mindre slid.'],
+  ['phase1_buildUp', 'Fase 1 – Opbygning & indlæg', [['passingStyle', 'Pasningsstil'], ['attackFocus', 'Angrebsfokus'], ['attackSide', 'Angrebsside'], ['offBallRuns', 'Løb uden bold']],
+    `Angrebsfokus bestemmer, hvordan chancerne kommer: høje indlæg til den, der står i feltet, lave cutbacks fra baglinjen, eller centralt gennem løb og afslutninger. Pasningsstil bestemmer, hvordan bolden kommer frem (direkte lange bolde giver også nogle høje bolde, når fokus ikke er høje indlæg). Løb uden bold: Mange – flere spillere løber sig fri og kommer med ind i feltet (også midtbane, backs og wingbacks), men holdet står ubalanceret, når bolden tabes, og løber flere km. Få – færre løb fremad, færre kontraer imod og mindre slid. ` + `Angrebsside: hvor jeres indlæg og cutbacks kommer fra (ikke de centrale angreb). Begge: lidt oftere dér, hvor jeres kant står stærkest mod deres back. Venstre/Højre: ca. ${Math.round(SIDE.CHOICE * 4)} af 4 kantangreb dér – også når den anden side var bedre, og deres back på den side læser det.`],
   ['phase2_defending', 'Fase 2 – Pres, offside & tacklinger', [['pressingHeight', 'Pres'], ['offsideTrap', 'Offside-fælde'], ['tacklingIntensity', 'Tacklinger']],
     'Pres og feltet: lav blok fylder feltet og vinder flere luftdueller mod indlæg, men giver plads til cutbacks; højt gegenpres lukker kanten, før den når baglinjen.'],
   ['phase3_transition', 'Fase 3 – De første 5 sekunder', [['onBallWon', 'Ved erobring'], ['onBallLost', 'Ved boldtab']],
