@@ -316,9 +316,9 @@ function attackLine(d, ph) {
 }
 // Dit felt pr. side (v3.26.0): deres venstre er din højre. Kun når én side tog mindst to tredjedele (ellers intet at handle på).
 export function oppSideLine(d) {
-  const n = d.oppWideL + d.oppWideR; if (n < 3) return '';
+  const n = d.oppWideL + d.oppWideR; if (n < 5) return '';   // QC v3.26.0: mindst 5 og ≥ 3/4 – 2 af 3 mod en Begge-bot (≈ 50/50) var et mønster, der ikke fandtes
   const [many, mySide, back] = d.oppWideL >= d.oppWideR ? [d.oppWideL, 'højre', d.oppBackL] : [d.oppWideR, 'venstre', d.oppBackR];
-  return many * 3 >= n * 2 ? ` · ${many} af ${n} kantangreb kom i din ${mySide} side${back ? ` (mod ${back})` : ''}` : '';
+  return many * 4 >= n * 3 ? ` · ${many} af ${n} kantangreb kom i din ${mySide} side${back ? ` (mod ${back})` : ''}` : '';
 }
 
 // Samspil i kampen (v3.24.0, chemistry.js): duellens tillæg = vægt · skala (−1 fremmede … +1 fast par) målt mod ligaens snit.
@@ -533,7 +533,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // Fase-dueller pr. hold til pause-analysen: forsøg/sejre med opbygning og med pres.
   const duelLog = Object.fromEntries([H, A].map((s) => [s.team.id, { build: 0, buildWon: 0, press: 0, pressWon: 0, runs: 0, runsWon: 0, runGoals: 0, countersAgainst: 0, counterGoalsAgainst: 0,
     crosses: 0, crossesWon: 0, headerGoals: 0, cutbacks: 0, cutbacksBlocked: 0, cutbackGoals: 0, trapWon: 0,
-    wideL: 0, wideR: 0, wideLStop: 0, wideRStop: 0, backL: null, backR: null }]));   // kantangreb pr. side (nr. 39) – backL/R = deres back sidst   // trapWon: pres-sejre ved offside-fælden (v3.16.7)
+    wideL: 0, wideR: 0, wideLStop: 0, wideRStop: 0, backL: null, backR: null }]));   // kantangreb pr. side (nr. 39) – backL/R = deres back (eller 'flere backs')   // trapWon: pres-sejre ved offside-fælden (v3.16.7)
   // Modtageren: spilleren nær det sted, bolden spilles hen (se RECEIVE_SPREAD). exclude = afleveren.
   // ctx = { attacking, ballX } – øjeblikket (positions.js). Positionerne huskes til øjebliksbilledet ved mål.
   let seen = {}, seenX = {};
@@ -1010,7 +1010,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
       [(i) => WIDE_ROLES.has(aR(i)) && aR(i)[0] === wSide]);
     const back = flankBack(def, wx);
     const log = duelLog[att.team.id], ws = winger.skills, bs = back.skills, sd = wx < 50 ? 'L' : 'R';
-    log.cutbacks++; log['wide' + sd]++; log['back' + sd] = tag(back);
+    log.cutbacks++; log['wide' + sd]++; { const k = 'back' + sd, t = tag(back); log[k] = log[k] == null || log[k] === t ? t : 'flere backs'; }   // QC v3.26.0: et navn kun, når det var den samme back hver gang
     if ((ws.pace + ws.ballControl) * ff(winger) + rng.next() * 8
       <= (bs.pace + bs.positioning) * ff(back) + rng.next() * 8 + CUTBACK_DEF_EDGE + (FLANK_BONUS[def.tactics.phases.phase2_defending.pressingHeight] ?? 0) + sideRead(att, wx)) {
       log.cutbacksBlocked++; log['wide' + sd + 'Stop']++; act('flank', def, back, winger);

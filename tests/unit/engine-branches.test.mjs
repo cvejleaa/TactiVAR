@@ -2502,7 +2502,7 @@ test('fuldtids-analyse (v3.12): dit angreb efter dine valg og dit felt med modst
   const m2 = simulateMatch(b.H, b.A, stubRng({ 0.3: shots(5), 0.15: (k) => k < 2, 0.38: true }));
   const f2 = m2.events.find((e) => e.type === 'FULLTIME');
   assert.equal(f2.isHome, false);
-  assert.ok(f2.text.endsWith(` 🛡️ Dit felt: modstanderens cutbacks stoppet 3 af 3 · luftdueller i åbent spil vundet 0 af 2 · 3 af 3 kantangreb kom i din venstre side (mod ${tg(slot(b.A, 1))}).`), f2.text);   // v3.26.0: deres højre = din venstre
+  assert.ok(f2.text.endsWith(` 🛡️ Dit felt: modstanderens cutbacks stoppet 3 af 3 · luftdueller i åbent spil vundet 0 af 2.`), f2.text);   // v3.26.0: deres højre = din venstre – QC: kun ved ≥ 5 kantangreb, 3 af 3 er for få (side-v3260)
 });
 
 test('fuldtids-analysens angreb nævner kun det, dine valg (eller kampen) gav: centralt uden noget → "ingen …"; høje indlæg uden indlæg → 0 høje bolde; cutbacks fra et løb på kanten tælles også ved andet fokus', () => {

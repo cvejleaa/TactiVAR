@@ -342,7 +342,7 @@ test('fuldtids-analysen: dit angreb (forsøg/mål/stoppet, høje bolde/vundne/ho
   const def = mixedMatch({ meIsAttacker: false });
   assert.equal(def.ft.isHome, false);
   // v3.26.0: deres højre (88) er din venstre – mod din LB på plads 1
-  assert.ok(def.ft.text.endsWith(` ⚔️ Angreb (Centralt · balanceret): ingen cutbacks eller høje bolde. 🛡️ Dit felt: modstanderens cutbacks stoppet 1 af 4 · luftdueller i åbent spil vundet 1 af 3 · 4 af 4 kantangreb kom i din venstre side (mod ${tg(slot(def.a.A, 1))}).`), def.ft.text);
+  assert.ok(def.ft.text.endsWith(` ⚔️ Angreb (Centralt · balanceret): ingen cutbacks eller høje bolde. 🛡️ Dit felt: modstanderens cutbacks stoppet 1 af 4 · luftdueller i åbent spil vundet 1 af 3.`), def.ft.text);   // QC v3.26.0: Dit felt pr. side først ved ≥ 5 kantangreb (her 4)
 });
 test('fuldtids-analysen nævner alle ni kombinationer af fokus og pasningsstil med de rigtige danske navne', () => {
   const F = { CENTRAL: 'Centralt', HIGH_CROSSES: 'Høje indlæg', LOW_CUTBACKS: 'Lave cutbacks' };

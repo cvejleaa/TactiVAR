@@ -424,6 +424,19 @@ try {
   check('Byt gemmes straks', (await nameAt(7)) === s8 && (await nameAt(8)) === s7);
   await g.selectOption('#tactics select[data-field="onBallWon"]', 'KEEP_POSSESSION'); await reload();
   check('Fasevalg gemmes straks', (await g.inputValue('#tactics select[data-field="onBallWon"]')) === 'KEEP_POSSESSION');
+  // v3.26.0 (nr. 39, Test Manager): Angrebsside står i Fase 1 mellem Angrebsfokus og Løb uden bold, standard Begge, valget gemmes straks
+  {
+    const sideSel = '#tactics fieldset[data-phase="phase1_buildUp"] select[data-field="attackSide"]';
+    const fields = await g.locator('#tactics fieldset[data-phase="phase1_buildUp"] select').evaluateAll((els) => els.map((e) => e.dataset.field));
+    check('Angrebsside: Fase 1 har feltet mellem Angrebsfokus og Løb uden bold', fields.join() === 'passingStyle,attackFocus,attackSide,offBallRuns', fields.join());
+    check('Angrebsside: Venstre (LW/LB) / Begge / Højre (RW/RB), et nyt spil står på Begge', (await g.locator(`${sideSel} option`).allTextContents()).join('|') === 'Venstre (LW/LB)|Begge|Højre (RW/RB)' && (await g.inputValue(sideSel)) === 'BOTH');
+    { const help = await g.textContent('#tactics fieldset[data-phase="phase1_buildUp"] .phase-help');   // QC v3.26.0: ærlig om effekten
+    check('Angrebsside: hjælpeteksten nævner ca. 3 af 4, den lille effekt og at deres back læser et fast valg ved cutbacks', /ca\. 3 af 4 kantangreb/.test(help) && help.includes('en lille fordel, ca. ét styret kantangreb pr. kamp') && help.includes('ved cutbacks læser deres back på den side det') && help.includes('kun en fast side mod en tydeligt svag back'), help.slice(-300)); }
+    await g.selectOption(sideSel, 'LEFT'); await reload();
+    check('Angrebsside: Venstre gemmes straks og overlever F5', (await g.inputValue(sideSel)) === 'LEFT');
+    await g.selectOption(sideSel, 'BOTH'); await reload();
+    check('Angrebsside: tilbage til Begge gemmes', (await g.inputValue(sideSel)) === 'BOTH');
+  }
   // v3.13: udskiftningsgrænsen (holdets, ikke planens) og en manuel Hvis-Så-udskiftning
   check('Udskiftninger: feltet står under Hvis-Så med 70 % for et nyt spil og forklarer reglerne (5 skift, 3 pauser)', (await g.inputValue('#subs-limit')) === '70' && (await g.textContent('#subs-help')).includes('højst 5 udskiftninger i højst 3 pauser'));
   await g.selectOption('#subs-limit', '80'); await reload();

@@ -24,9 +24,11 @@ test('målt: Begge finder (lidt) deres svage back, et fast valg styrer siden –
   for (const k of Object.keys(r)) assert.ok(r[k].wide > 0.5, `${k}: kantangreb tælles (${r[k].wide} pr. kamp)`);
 });
 
-test('Dit felt pr. side: deres venstre er din højre; kun ved ≥ 2/3 og mindst 3 – ellers intet', () => {
+// QC v3.26.0: grænsen hævet fra ≥ 3 og 2/3 til ≥ 5 og ¾ (2 af 3 mod en Begge-bot var støj) – 4 af 6 og 3 af 3 vistes før, nu ikke
+test('Dit felt pr. side: deres venstre er din højre; kun ved ≥ ¾ og mindst 5 – ellers intet', () => {
   assert.equal(oppSideLine({ oppWideL: 6, oppWideR: 2, oppBackL: '#3 B. Hansen' }), ' · 6 af 8 kantangreb kom i din højre side (mod #3 B. Hansen)');
   assert.equal(oppSideLine({ oppWideL: 1, oppWideR: 4, oppBackR: null }), ' · 4 af 5 kantangreb kom i din venstre side');
-  assert.equal(oppSideLine({ oppWideL: 3, oppWideR: 2 }), '', '3 af 5 er under 2/3');
-  assert.equal(oppSideLine({ oppWideL: 2, oppWideR: 0 }), '', 'under 3 i alt');
+  assert.equal(oppSideLine({ oppWideL: 3, oppWideR: 2 }), '', '3 af 5 er under ¾');
+  assert.equal(oppSideLine({ oppWideL: 4, oppWideR: 2 }), '', '4 af 6 er under ¾ (vistes ved 2/3)');
+  assert.equal(oppSideLine({ oppWideL: 4, oppWideR: 0 }), '', 'under 5 i alt (4 af 4 vistes ved ≥ 3)');
 });
