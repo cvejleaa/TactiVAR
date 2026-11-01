@@ -257,6 +257,21 @@ Tick hvert 3. minut (1..90).
 - Chance 30 % (v3.9: Få 26 %, Normal 30 %, Mange 36 %; v3.12.1: Få 28,5 %); xG 0,13–0,35 pr. afslutning.
   v3.17.0: chancen løftes efter en vundet opbygning og dæmpes uden duel (BUILD_LIFT_P/OPEN_DAMP_P), og halvchancen kommer
   oven i – se "Balance-gennemgangen (v3.17.0)".
+- **Angrebsside (v3.26.0, nr. 39 – brugerens valg 2026-11-01, Hattrick: "angrib deres svage side"):** Fase 1 `attackSide`
+  Venstre (LW/LB) / Begge / Højre (RW/RB), set fra eget hold; standard Begge (også botter; gamle gem får Begge via sanitize).
+  Kanten i cutbacks og indlæg var et møntkast. Begge: P(venstre) = 0,5 + klem(0,01 · (kant-mod-back venstre − højre), ±0,06),
+  hvor kant-mod-back = jeres bedste kantspiller (PAC+BAL)·friskhed minus deres back på spejlsiden (PAC+POS)·friskhed. Venstre/
+  Højre: 78 % på den side – og forudsigeligt: deres back på den side får +0,5 i kantduellen (`SIDE` i match.js). Samme ene
+  rng-træk. Indlæg: siden afgør kun, hvem der slår indlægget (luftduellen er en forsvarer i feltet). Centralt fokus har næsten
+  ingen kantangreb, så valget virker der knap. Fuldtidsanalysen: "kantangreb N i venstre mod #x Back (n lukket), …" (navnet kun, når
+  det var den samme back hver gang – ellers "flere backs"); Dit felt: "· 6 af 8 kantangreb kom i din højre side (mod #3 …)"
+  ved mindst 5 og ≥ ¾ (QC: 2 af 3 mod en Begge-bot var støj). Cutbacks fra løb på kanten tælles ikke som kantangreb.
+  Målt (`tools/measure-side.mjs 140`, 1960 kampe pr. celle, lave cutbacks, ≈ 1 styret kantangreb pr. kamp): andel venstre Begge
+  53 % / 57 % (deres højre back −6 PAC+POS), Venstre 80 %, Højre 22 % (før 50 % overalt). Netto mod den svage back: Begge 0,33,
+  Venstre 0,33, Højre 0,27 (−10: 0,354/0,354/0,278; −14: 0,367/0,365/0,282 – et fast valg slår aldrig Begge, som selv finder
+  den svage back; hjælpeteksten siger det) – det forkerte valg koster ≈ 0,06; mod normale backs koster et fast valg ≈ 0,04 (forudsigelighed).
+  Virkningen er lille, fordi der er ca. ét styret kantangreb pr. kamp (fokusandelen, nr. 6). Siderne er private (ownReports,
+  §3); fordelingen under Begge røber en smule om modstanderens skjulte back-evner – accepteret.
 - **Angrebsfokus afgør chancens type (v3.12**, brugeren: "Jeg har sat mit hold til cutbacks, og
   alligevel er der ikke en eneste reference til cutbacks i referatet … min modstander vinder 11
   luftdueller"). For ALLE hold (brugerens valg); teksten om en modstander navngiver aldrig

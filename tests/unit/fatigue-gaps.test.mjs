@@ -409,11 +409,11 @@ test('afslutninger: en træt målmand (STA 0) slipper mål ind senere i kampen �
 });
 // Resten af kaldstederne (hovedstød, kontra, indlæg, cutback, løb, dribling, opbygning/pres) er kun bundet af denne vagt:
 // hvert tal i en duel går gennem ff(...), aldrig direkte gennem freshFactor(...) – ellers er tabet i kampen væk dér.
-test('match.js bruger ff(...) i alle dueller – freshFactor kaldes kun inde i ff selv (23 kald; v3.17.0 + halvchancens målmand og skytte; v3.21.0 + nearPick)', async () => {
+test('match.js bruger ff(...) i alle dueller – freshFactor kaldes kun inde i ff selv (24 kald; v3.17.0 + halvchancens målmand og skytte; v3.21.0 + nearPick; v3.26.0 + angrebssiden)', async () => {
   const fs = await import('node:fs');
   const src = fs.readFileSync(new URL('../../public/engine/match.js', import.meta.url), 'utf8').replace(/\/\/.*$/gm, '');
   assert.equal((src.match(/\bfreshFactor\(/g) ?? []).length, 1, 'kun ff-definitionen kalder freshFactor(');
-  assert.equal((src.match(/(?<![A-Za-z])ff\(/g) ?? []).length, 23);
+  assert.equal((src.match(/(?<![A-Za-z])ff\(/g) ?? []).length, 24);   // v3.26.0: + kant-mod-back i angrebssiden (leftShare – ét ff-kald i hjælperen)
 });
 
 // ---------- Hvis-Så og reserverede bænkspillere ----------

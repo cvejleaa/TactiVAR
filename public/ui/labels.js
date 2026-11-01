@@ -8,6 +8,7 @@ export const PHASE_OPTIONS = {
   passingStyle: [['SHORT', 'Korte pasninger'], ['BALANCED', 'Balanceret'], ['DIRECT_LONG', 'Direkte lange bolde']],
   attackFocus: [['CENTRAL', 'Centralt'], ['HIGH_CROSSES', 'Høje indlæg'], ['LOW_CUTBACKS', 'Lave cutbacks']],
   offBallRuns: [['FEW', 'Få'], ['NORMAL', 'Normal'], ['MANY', 'Mange']],
+  attackSide: [['LEFT', 'Venstre (LW/LB)'], ['BOTH', 'Begge'], ['RIGHT', 'Højre (RW/RB)']],   // v3.26.0 (nr. 39) – set fra jeres eget hold
   pressingHeight: [['LOW_BLOCK', 'Lav blok'], ['MID_BLOCK', 'Mellemblok'], ['HIGH_GEGENPRESS', 'Højt gegenpress']],
   offsideTrap: [['OFF', 'Ingen offside-fælde'], ['NORMAL', 'Normal linje'], ['EXTREME_VAR_LINE', 'Ekstrem VAR-linje']],
   tacklingIntensity: [['CAUTIOUS', 'Forsigtig'], ['NORMAL', 'Normal'], ['AGGRESSIVE', 'Aggressiv']],

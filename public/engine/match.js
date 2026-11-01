@@ -309,12 +309,27 @@ function attackLine(d, ph) {
   const parts = [];
   if (ph.attackFocus === 'LOW_CUTBACKS' || d.cutbacks) parts.push(`${pl(d.cutbacks, 'cutback', 'cutbacks')} (${d.cutbackGoals} mål, ${d.cutbacksBlocked} stoppet ved kanten)`);
   if (ph.attackFocus === 'HIGH_CROSSES' || ph.passingStyle === 'DIRECT_LONG' || d.crosses) parts.push(`${pl(d.crosses, 'høj bold', 'høje bolde')} (${pl(d.crossesWon, 'vundet luftduel', 'vundne luftdueller')} i åbent spil, ${d.headerGoals} hovedstødsmål)`);
+  // v3.26.0 (nr. 39): kantangreb pr. side – med deres back, så man kan se, hvem man angreb, og om det virkede
+  const side = (n, stop, back, word) => `${n} i ${word}${back ? ` mod ${back}` : ''}${stop ? ` (${stop} lukket)` : ''}`;
+  if (d.wideL + d.wideR) parts.push(`kantangreb ${d.wideL === d.wideR && !d.backL && !d.backR ? `${d.wideL} i hver side` : `${side(d.wideL, d.wideLStop, d.backL, 'venstre')}, ${side(d.wideR, d.wideRStop, d.backR, 'højre')}`}`);
   return parts.length ? parts.join(', ') : 'ingen cutbacks eller høje bolde';
+}
+// Dit felt pr. side (v3.26.0): deres venstre er din højre. Kun ved mindst 5 kantangreb, hvor én side tog mindst ¾ (QC: ved 2/3 og 3 var 2-1 mod en Begge-bot støj).
+export function oppSideLine(d) {
+  const n = d.oppWideL + d.oppWideR; if (n < 5) return '';   // QC v3.26.0: mindst 5 og ≥ 3/4 – 2 af 3 mod en Begge-bot (≈ 50/50) var et mønster, der ikke fandtes
+  const [many, mySide, back] = d.oppWideL >= d.oppWideR ? [d.oppWideL, 'højre', d.oppBackL] : [d.oppWideR, 'venstre', d.oppBackR];
+  return many * 4 >= n * 3 ? ` · ${many} af ${n} kantangreb kom i din ${mySide} side${back ? ` (mod ${back})` : ''}` : '';
 }
 
 // Samspil i kampen (v3.24.0, chemistry.js): duellens tillæg = vægt · skala (−1 fremmede … +1 fast par) målt mod ligaens snit.
 // Vægtene kalibreret med tools/measure-chemistry.mjs effect (spec §5). Muterbart objekt kun til måleværktøjet.
 export const CHEM_EFFECT = { build: 0.3, run: 3 };
+// Angrebsside (v3.26.0, nr. 39 – Hattrick: "angrib deres svage side"; brugerens valg 2026-11-01). Kantens side i cutbacks og
+// indlæg var et møntkast. Nu: "Begge" læner sig SVAGT mod den side, hvor jeres bedste kant står stærkest mod deres back (GAIN pr.
+// point, højst CAP fra 50 %) – så et bevidst valg betyder noget (QC/Spilfører: et klogt "Begge" gjorde Venstre/Højre til en
+// fælde). Venstre/Højre: CHOICE af kantangrebene på den side – og I bliver forudsigelige: deres back på den side får READ i
+// kantduellen. Samme ene rng-træk som før (rækkefølgen bevares). Muterbart objekt kun til måleværktøjet.
+export const SIDE = { GAIN: 0.01, CAP: 0.06, CHOICE: 0.78, READ: 0.5 };
 export function simulateMatch(home, away, rng, opts = {}) {
   const events = [];
   const lineupNotes = [];
@@ -517,7 +532,8 @@ export function simulateMatch(home, away, rng, opts = {}) {
   const own = (s) => !s.team.isBot;
   // Fase-dueller pr. hold til pause-analysen: forsøg/sejre med opbygning og med pres.
   const duelLog = Object.fromEntries([H, A].map((s) => [s.team.id, { build: 0, buildWon: 0, press: 0, pressWon: 0, runs: 0, runsWon: 0, runGoals: 0, countersAgainst: 0, counterGoalsAgainst: 0,
-    crosses: 0, crossesWon: 0, headerGoals: 0, cutbacks: 0, cutbacksBlocked: 0, cutbackGoals: 0, trapWon: 0 }]));   // trapWon: pres-sejre ved offside-fælden (v3.16.7)
+    crosses: 0, crossesWon: 0, headerGoals: 0, cutbacks: 0, cutbacksBlocked: 0, cutbackGoals: 0, trapWon: 0,
+    wideL: 0, wideR: 0, wideLStop: 0, wideRStop: 0, backL: null, backR: null }]));   // kantangreb pr. side (nr. 39) – backL/R = deres back (eller 'flere backs')   // trapWon: pres-sejre ved offside-fælden (v3.16.7)
   // Modtageren: spilleren nær det sted, bolden spilles hen (se RECEIVE_SPREAD). exclude = afleveren.
   // ctx = { attacking, ballX } – øjeblikket (positions.js). Positionerne huskes til øjebliksbilledet ved mål.
   let seen = {}, seenX = {};
@@ -968,8 +984,23 @@ export function simulateMatch(home, away, rng, opts = {}) {
       [(i) => FB_ROLES.has(dRole(i)) && dRole(i)[0] === bSide, (i) => WIDE_ROLES.has(dRole(i)) && lineOfRole(dRole(i)) !== 'ATT' && dRole(i)[0] === bSide,
       (i) => lineOfRole(dRole(i)) !== 'ATT']);
   }
+  // Sandsynligheden for venstre kant (angriberens venstre) for att mod def – uden rng (nr. 39)
+  function leftShare(att, def) {
+    const choice = att.tactics.phases.phase1_buildUp.attackSide;
+    if (choice === 'LEFT') return SIDE.CHOICE;
+    if (choice === 'RIGHT') return 1 - SIDE.CHOICE;
+    const role = (side, i) => coordsOf(side.tactics)[i].r;
+    const best = (side, test, f) => Math.max(0, ...side.starters.map((p, i) => (p && i > 0 && test(role(side, i)) ? f(p) * ff(p) : 0)));
+    const wing = (L) => best(att, (r) => (WIDE_ROLES.has(r) || r === 'LW' || r === 'RW') && r[0] === L, (p) => p.skills.pace + p.skills.ballControl);
+    const back = (L) => best(def, (r) => FB_ROLES.has(r) && r[0] === L, (p) => p.skills.pace + p.skills.positioning)
+      || best(def, (r) => WIDE_ROLES.has(r) && r[0] === L, (p) => p.skills.pace + p.skills.positioning);
+    // angriberens venstre møder forsvarets højre (spejlet)
+    const edge = (wing('L') - back('R')) - (wing('R') - back('L'));
+    return 0.5 + Math.max(-SIDE.CAP, Math.min(SIDE.CAP, SIDE.GAIN * edge));
+  }
+  const sideRead = (att, wx) => { const c = att.tactics.phases.phase1_buildUp.attackSide; return (c === 'LEFT' && wx < 50) || (c === 'RIGHT' && wx > 50) ? SIDE.READ : 0; };
   function cutback(att, def, cR, dR, min, xg) {
-    const wx = rng.next() < 0.5 ? 12 : 88;
+    const wx = rng.next() < leftShare(att, def) ? 12 : 88;
     // Roller (v3.16.7, Spilfører: midtstoppere lavede cutbacks, angribere lukkede kanten i eget felt): kantmanden er en kant- eller
     // back-plads på den side, ellers den nærmeste (smal formation); backen er backen på sin side, ellers en kantspiller dér,
     // ellers en forsvars- eller midtbanespiller – aldrig en angriber. Samme ene rng-træk pr. valg.
@@ -978,11 +1009,11 @@ export function simulateMatch(home, away, rng, opts = {}) {
     const winger = receiver(att, { x: wx, y: 30 }, (p) => p.skills.pace + p.skills.ballControl, null, { attacking: true, ballX: wx }, RECEIVE_REACH,
       [(i) => WIDE_ROLES.has(aR(i)) && aR(i)[0] === wSide]);
     const back = flankBack(def, wx);
-    const log = duelLog[att.team.id], ws = winger.skills, bs = back.skills;
-    log.cutbacks++;
+    const log = duelLog[att.team.id], ws = winger.skills, bs = back.skills, sd = wx < 50 ? 'L' : 'R';
+    log.cutbacks++; log['wide' + sd]++; { const k = 'back' + sd, t = tag(back); log[k] = log[k] == null || log[k] === t ? t : 'flere backs'; }   // QC v3.26.0: et navn kun, når det var den samme back hver gang
     if ((ws.pace + ws.ballControl) * ff(winger) + rng.next() * 8
-      <= (bs.pace + bs.positioning) * ff(back) + rng.next() * 8 + CUTBACK_DEF_EDGE + (FLANK_BONUS[def.tactics.phases.phase2_defending.pressingHeight] ?? 0)) {
-      log.cutbacksBlocked++; act('flank', def, back, winger);
+      <= (bs.pace + bs.positioning) * ff(back) + rng.next() * 8 + CUTBACK_DEF_EDGE + (FLANK_BONUS[def.tactics.phases.phase2_defending.pressingHeight] ?? 0) + sideRead(att, wx)) {
+      log.cutbacksBlocked++; log['wide' + sd + 'Stop']++; act('flank', def, back, winger);
       st[k(att, 'Shots')]--; st[k(att, 'Xg')] -= xg;
       sheet.adjust(back.id, 0.3); sheet.bump(back.id, 'tacticWins');
       addEv(min, 'INFO', 'PLAY', def.isHome, false, 'Kanten lukket', own(att)
@@ -1483,7 +1514,8 @@ export function simulateMatch(home, away, rng, opts = {}) {
         // Høj bold i åbent spil – samme luftduel som dødboldene. Hovedstødsspilleren er den, der står
         // nær feltets midte; indlægget slås fra kanten, den lange bold fra midtbanen.
         const source = focus === 'HIGH_CROSSES' ? 'cross' : 'long';
-        const cx = source === 'cross' ? (rng.next() < 0.5 ? 12 : 88) : 50, ctx = { attacking: true, ballX: cx };
+        const cx = source === 'cross' ? (rng.next() < leftShare(att, def) ? 12 : 88) : 50, ctx = { attacking: true, ballX: cx };
+        if (source === 'cross') duelLog[att.team.id]['wide' + (cx < 50 ? 'L' : 'R')]++;
         const target = receiver(att, SPOT.CROSS, (p) => p.aerialPower, null, ctx);
         const from = source === 'cross' ? receiver(att, { x: cx, y: 30 }, (p) => p.skills.passing, target, ctx, RECEIVE_REACH) : assister;
         // Billedet: indlæggeren ude på kanten, hovedstødsspilleren i feltet (den lange bold slås fra hans plads).
@@ -1600,7 +1632,8 @@ export function simulateMatch(home, away, rng, opts = {}) {
   const ownReports = Object.fromEntries([H, A].filter(own).map((s) => {
     const d = duelLog[s.team.id], o = duelLog[other(s).team.id], side = s.isHome ? 'home' : 'away';
     return [s.team.id, { side, start: { formation: startFormations[side], phases: startPhases[side] }, end: { formation: s.tactics.baseFormation, phases: structuredClone(s.tactics.phases) },
-      ...d, oppCutbacks: o.cutbacks, oppCutbacksBlocked: o.cutbacksBlocked, oppCrosses: o.crosses, oppCrossesWon: o.crossesWon, oppTrapWon: o.trapWon }];
+      ...d, oppCutbacks: o.cutbacks, oppCutbacksBlocked: o.cutbacksBlocked, oppCrosses: o.crosses, oppCrossesWon: o.crossesWon, oppTrapWon: o.trapWon,
+      oppWideL: o.wideL, oppWideR: o.wideR, oppBackL: o.backL, oppBackR: o.backR }];
   }));
   if (meSide) {
     const d = ownReports[meSide.team.id], ph = meSide.tactics.phases.phase1_buildUp, runs = ph.offBallRuns ?? 'NORMAL';
@@ -1613,7 +1646,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
       // v3.12 (brugeren: "ikke en eneste reference til cutbacks"): dit angreb efter dine valg og
       // dit felt – modstanderens indstilling navngives ikke, kun hvad dit forsvar mødte.
       + ` ⚔️ Angreb (${FOCUS_LABEL[ph.attackFocus] ?? ph.attackFocus} · ${PASS_LABEL[ph.passingStyle] ?? ph.passingStyle}): ${attackLine(d, ph)}.`
-      + ` 🛡️ Dit felt: modstanderens cutbacks stoppet ${d.oppCutbacksBlocked} af ${d.oppCutbacks} · luftdueller i åbent spil vundet ${d.oppCrosses - d.oppCrossesWon} af ${d.oppCrosses}.`
+      + ` 🛡️ Dit felt: modstanderens cutbacks stoppet ${d.oppCutbacksBlocked} af ${d.oppCutbacks} · luftdueller i åbent spil vundet ${d.oppCrosses - d.oppCrossesWon} af ${d.oppCrosses}${oppSideLine(d)}.`
       // Samspil (v3.24.0): årsagen, ikke udfaldet – midtbanen ved kampstart, hvor virkningen sidder (opbygningen)
       + (kickoffMidBand.get(meSide) === 'fremmede' || kickoffMidBand.get(meSide) === 'finder' ? ` 🤝 Samspil: din midtbane har ikke spillet sig sammen endnu (${BAND_WORD[kickoffMidBand.get(meSide)]}) – det gør opbygningen lidt sværere.`
         : kickoffMidBand.get(meSide) === 'staerkt' ? ' 🤝 Samspil: din midtbane har spillet sig sammen (stærkt) – det hjælper opbygningen lidt.' : ''));

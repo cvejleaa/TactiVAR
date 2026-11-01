@@ -2494,7 +2494,7 @@ test('fuldtids-analyse (v3.12): dit angreb efter dine valg og dit felt med modst
   const m = simulateMatch(a.H, a.A, stubRng({ 0.3: shots(5), 0.15: (k) => k < 2, 0.38: true }));
   const ft = m.events.find((e) => e.type === 'FULLTIME').text;
   // v3.16.3-ordlyden ("luftdueller i åbent spil"; cutback-tallene som før – de stoppede er en del af forsøgene)
-  assert.ok(ft.endsWith(' ⚔️ Angreb (Lave cutbacks · direkte lange bolde): 3 cutbacks (3 mål, 0 stoppet ved kanten), 2 høje bolde (2 vundne luftdueller i åbent spil, 2 hovedstødsmål). 🛡️ Dit felt: modstanderens cutbacks stoppet 0 af 0 · luftdueller i åbent spil vundet 0 af 0.'), ft);
+  assert.ok(ft.endsWith(` ⚔️ Angreb (Lave cutbacks · direkte lange bolde): 3 cutbacks (3 mål, 0 stoppet ved kanten), 2 høje bolde (2 vundne luftdueller i åbent spil, 2 hovedstødsmål), kantangreb 0 i venstre, 3 i højre mod ${tg(slot(a.A, 1))}. 🛡️ Dit felt: modstanderens cutbacks stoppet 0 af 0 · luftdueller i åbent spil vundet 0 af 0.`), ft);   // v3.26.0: + kantangreb pr. side
   // Du er ude, og en bot angriber dig: 3 cutbacks lukket af dine backs, 2 lange bolde vundet af angriberen
   const b = arena({ home: { p1: { attackFocus: 'LOW_CUTBACKS', passingStyle: 'DIRECT_LONG' } } });
   b.H.isBot = true; b.A.isBot = false;
@@ -2502,7 +2502,7 @@ test('fuldtids-analyse (v3.12): dit angreb efter dine valg og dit felt med modst
   const m2 = simulateMatch(b.H, b.A, stubRng({ 0.3: shots(5), 0.15: (k) => k < 2, 0.38: true }));
   const f2 = m2.events.find((e) => e.type === 'FULLTIME');
   assert.equal(f2.isHome, false);
-  assert.ok(f2.text.endsWith(' 🛡️ Dit felt: modstanderens cutbacks stoppet 3 af 3 · luftdueller i åbent spil vundet 0 af 2.'), f2.text);
+  assert.ok(f2.text.endsWith(` 🛡️ Dit felt: modstanderens cutbacks stoppet 3 af 3 · luftdueller i åbent spil vundet 0 af 2.`), f2.text);   // v3.26.0: deres højre = din venstre – QC: kun ved ≥ 5 kantangreb, 3 af 3 er for få (side-v3260)
 });
 
 test('fuldtids-analysens angreb nævner kun det, dine valg (eller kampen) gav: centralt uden noget → "ingen …"; høje indlæg uden indlæg → 0 høje bolde; cutbacks fra et løb på kanten tælles også ved andet fokus', () => {

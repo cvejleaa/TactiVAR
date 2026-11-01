@@ -7,7 +7,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRng } from '../../public/engine/rng.js';
 import { createLeague } from '../../public/engine/generator.js';
-import { simulateMatch as simLive } from '../../public/engine/match.js';
+import { simulateMatch as simLive, SIDE } from '../../public/engine/match.js';
+// v3.26.0: testene her bestemmer kanten med stub-rullet og giver kantspiller og back forskellige evner – "Begge" ville flytte
+// siden efter dem. Angrebssiden måles i side-v3260.test.mjs; her er den slået fra (GAIN 0 = møntkastet som før).
+SIDE.GAIN = 0;
 import { goalSpectacle } from '../../public/engine/clues.js';
 // v3.13: friskheden falder i kampen (freshness.js). Denne fils tærskler forudsætter fuld friskhed hele
 // kampen, så friskhed i kampen slås fra her – de nye tests i fatigue.test.mjs prøver den slået TIL.
@@ -333,11 +336,13 @@ test('fuldtids-analysen: dit angreb (forsøg/mål/stoppet, høje bolde/vundne/ho
   const me = mixedMatch({ meIsAttacker: true });
   assert.deepEqual([me.m.duelLog[me.m.homeId].crosses, me.m.duelLog[me.m.homeId].crossesWon, me.m.duelLog[me.m.homeId].headerGoals], [3, 2, 1]);
   assert.deepEqual([me.m.duelLog[me.m.homeId].cutbacks, me.m.duelLog[me.m.homeId].cutbackGoals, me.m.duelLog[me.m.homeId].cutbacksBlocked], [4, 2, 1]);
-  assert.ok(me.ft.text.endsWith(' ⚔️ Angreb (Lave cutbacks · direkte lange bolde): 4 cutbacks (2 mål, 1 stoppet ved kanten), 3 høje bolde (2 vundne luftdueller i åbent spil, 1 hovedstødsmål). 🛡️ Dit felt: modstanderens cutbacks stoppet 0 af 0 · luftdueller i åbent spil vundet 0 af 0.'), me.ft.text);
+  // v3.26.0: + kantangreb pr. side med deres back (GAIN 0 her: alle fire cutbacks i højre side, mod deres LB på plads 1)
+  assert.ok(me.ft.text.endsWith(` ⚔️ Angreb (Lave cutbacks · direkte lange bolde): 4 cutbacks (2 mål, 1 stoppet ved kanten), 3 høje bolde (2 vundne luftdueller i åbent spil, 1 hovedstødsmål), kantangreb 0 i venstre, 4 i højre mod ${tg(slot(me.a.A, 1))} (1 lukket). 🛡️ Dit felt: modstanderens cutbacks stoppet 0 af 0 · luftdueller i åbent spil vundet 0 af 0.`), me.ft.text);
   // Samme kamp set fra forsvarets side: en bot angriber dig. Du har ikke selv noget angreb (Centralt · balanceret).
   const def = mixedMatch({ meIsAttacker: false });
   assert.equal(def.ft.isHome, false);
-  assert.ok(def.ft.text.endsWith(' ⚔️ Angreb (Centralt · balanceret): ingen cutbacks eller høje bolde. 🛡️ Dit felt: modstanderens cutbacks stoppet 1 af 4 · luftdueller i åbent spil vundet 1 af 3.'), def.ft.text);
+  // v3.26.0: deres højre (88) er din venstre – mod din LB på plads 1
+  assert.ok(def.ft.text.endsWith(` ⚔️ Angreb (Centralt · balanceret): ingen cutbacks eller høje bolde. 🛡️ Dit felt: modstanderens cutbacks stoppet 1 af 4 · luftdueller i åbent spil vundet 1 af 3.`), def.ft.text);   // QC v3.26.0: Dit felt pr. side først ved ≥ 5 kantangreb (her 4)
 });
 test('fuldtids-analysen nævner alle ni kombinationer af fokus og pasningsstil med de rigtige danske navne', () => {
   const F = { CENTRAL: 'Centralt', HIGH_CROSSES: 'Høje indlæg', LOW_CUTBACKS: 'Lave cutbacks' };

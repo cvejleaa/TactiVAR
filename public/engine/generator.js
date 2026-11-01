@@ -234,7 +234,7 @@ export function defaultTactics(starterIds, profile) {
   return {
     baseFormation: p.form, lineupSlots: starterIds.slice(), customCoords: {},
     phases: {
-      phase1_buildUp: { passingStyle: p.pass, attackFocus: p.focus, offBallRuns: p.runs ?? 'NORMAL' },
+      phase1_buildUp: { passingStyle: p.pass, attackFocus: p.focus, offBallRuns: p.runs ?? 'NORMAL', attackSide: 'BOTH' },
       phase2_defending: { pressingHeight: p.press, offsideTrap: p.offside, tacklingIntensity: p.tackle },
       phase3_transition: { onBallWon: p.won, onBallLost: p.lost },
     },
