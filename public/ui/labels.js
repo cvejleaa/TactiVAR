@@ -3,7 +3,7 @@ import { FIT } from '../engine/formations.js';
 export const LINE = { GK: 'MÅL', DEF: 'FOR', MID: 'MID', ATT: 'ANG' };
 // Naturlig position (v3.8) med tavlens ord; den fulde betegnelse står i title.
 export const POSITION = { GK: 'MV', CB: 'CB', FB: 'Back', DM: 'DM', CM: 'CM', WM: 'Kant', AM: 'OM', ST: 'ANG' };
-export const POSITION_FULL = { GK: 'Målmand', CB: 'Midtstopper', FB: 'Back/wingback (LB/RB/LWB/RWB)', DM: 'Defensiv midtbane (CDM)', CM: 'Central midtbane (CM)', WM: 'Kant (LM/RM/LW/RW)', AM: 'Offensiv midtbane (CAM/CF)', ST: 'Angriber (ST)' };
+export const POSITION_FULL = { GK: 'Målmand', CB: 'Midtstopper', FB: 'Back/wingback (dybe kantpladser)', DM: 'Defensiv midtbane (CDM)', CM: 'Central midtbane (CM)', WM: 'Kant (høje kantpladser, LW/RW)', AM: 'Offensiv midtbane (CAM/CF)', ST: 'Angriber (ST)' };
 export const PHASE_OPTIONS = {
   passingStyle: [['SHORT', 'Korte pasninger'], ['BALANCED', 'Balanceret'], ['DIRECT_LONG', 'Direkte lange bolde']],
   attackFocus: [['CENTRAL', 'Centralt'], ['HIGH_CROSSES', 'Høje indlæg'], ['LOW_CUTBACKS', 'Lave cutbacks']],
@@ -37,4 +37,4 @@ export const kr = (n) => n.toLocaleString('da-DK') + ' kr.';
 
 // Uden for position (v3.20.0): prisen regnes fra tabellen (formations.js FIT) – aldrig skrevet ind som tal i en tekst
 export const fitCost = (f) => `−${String(Math.round((1 - f) * 1000) / 10).replace('.', ',')} %`;
-export const FIT_HELP = `Uden for position: egen plads 100 %, naboplads (fx DM på CM, back på kant) ${fitCost(FIT.near)}, anden markplads ${fitCost(FIT.other)}, målmand ⇄ markspiller ${fitCost(FIT.keeper)} – i dueller, afslutninger, pres og løb (ikke boldbesiddelsen).`;
+export const FIT_HELP = `Uden for position: egen plads 100 %, naboplads (fx DM på CM, back på kant) ${fitCost(FIT.near)}, anden markplads ${fitCost(FIT.other)}, målmand ⇄ markspiller ${fitCost(FIT.keeper)} – i dueller, afslutninger, pres og løb (ikke boldbesiddelsen). Kantpladser (LB/RB/LWB/RWB/LM/RM): dybden afgør – højt på banen er det en kant-plads, dybt en back-plads, imellem passer begge; trækker du en spiller, følger prisen med.`;

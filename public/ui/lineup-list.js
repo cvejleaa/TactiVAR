@@ -5,7 +5,7 @@
 import { h, dec, LOCK } from './dom.js';
 import { LINE, POSITION, POSITION_FULL, starsEl, fitCost, FIT_HELP } from './labels.js';
 import { canSeeField } from '../engine/visibility.js';
-import { FORMATIONS, fitOf } from '../engine/formations.js';
+import { FORMATIONS, slotFitOf } from '../engine/formations.js';
 import { matchBenchOf, reservesOf, KEY_SKILLS, keyAvg } from '../engine/career.js';
 import { COLUMNS, heatClass, avgRating } from './matrix.js';
 
@@ -40,7 +40,7 @@ export function renderLineupList({ team, isOwn, ui, onPick, onSort, onBlocked, o
     return h('td', { class: c.heat ? heatClass(v) : '' }, c.fmt ? c.fmt(v) : v);
   };
   const row = (p, kind) => {
-    const s = slotOf(p), place = kind === 'start' ? roles[s].r : kind === 'bench' ? 'Bænk' : 'Res', fit = kind === 'start' ? fitOf(p.position, roles[s].r) : 1;
+    const s = slotOf(p), place = kind === 'start' ? roles[s].r : kind === 'bench' ? 'Bænk' : 'Res', fit = kind === 'start' ? slotFitOf(team.tactics, s, p.position) : 1;
     return h('tr', { class: `lp-row ${kind}-p` + (ui.swapId === p.id ? ' active' : '') + (p.injuryMatchesLeft > 0 ? ' injured' : ''), dataset: { pid: p.id },
       title: isOwn ? (kind === 'reserve' ? 'Reserve – ikke med i kampen. Klik og så en bænkspiller (eller en brik) for at tage ham med.' : 'Klik og så en anden spiller (her eller på banen) for at bytte') : '',
       onclick: () => onPick(p) },

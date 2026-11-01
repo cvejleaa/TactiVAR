@@ -90,12 +90,15 @@ function ratingsTable(list, isOwn, title, formation, snap = null, onSnap = null,
   // v3.20.0 (brugeren: "det bør fra starten være tilsvarende som det, der vises for min modstander"): begge ark har kortet
   // øverst og startopstillingen under – dit hold med holdets heat map (klik en spiller for hans), modstanderen groft i zoner.
   const mine = canHeat ? heat.mine ?? { playerId: null } : null;
+  // v3.24.6 (brugeren: "vi skal have allignet informationerne her på kamprapporten"): altid fire blokke – titel, kort,
+  // opstilling, liste – som rækker i ratings-grid'ets subgrid, så de to holds ark starter hver blok i samme højde
+  const slot = (el) => el ?? h('div', { class: 'sheet-gap' });
   return h('div', { class: 'ratings' }, h('h4', {}, title),
-    heat?.trace && !isOwn ? thirdsLine(heat.trace, heat.side, gkId, heat.vsMe, down, heat.stoppage, heat.events) : null,
-    canHeat ? heatPitch(rows, { ...heat, mine, acts: viewActs(heat.trace, isOwn ? heat.side : null) }, gkId, span) : null,
+    slot(heat?.trace && !isOwn ? thirdsLine(heat.trace, heat.side, gkId, heat.vsMe, down, heat.stoppage, heat.events)
+      : canHeat ? heatPitch(rows, { ...heat, mine, acts: viewActs(heat.trace, isOwn ? heat.side : null) }, gkId, span) : null),
     // Øjebliksbillede ved et mål (kun dit hold, v3.12.1) – ellers startopstillingen
-    isOwn && snap ? snapPitch(rows, snap, onSnap)
-      : formation && rows.some((e) => isStarter(e) && e.slot != null) ? miniPitch(rows.filter(isStarter), formation, isOwn, down) : null,
+    slot(isOwn && snap ? snapPitch(rows, snap, onSnap)
+      : formation && rows.some((e) => isStarter(e) && e.slot != null) ? miniPitch(rows.filter(isStarter), formation, isOwn, down) : null),
     h('table', {}, h('tbody', {}, rows.map((e) => h('tr', { class: (e.isMotM ? 'motm' : '') + (mine?.playerId === e.playerId ? ' heat-sel' : ''),
         onclick: canHeat ? () => heat.onHeat({ playerId: mine.playerId === e.playerId ? null : e.playerId }) : null, title: canHeat ? 'Vis hans heat map (klik igen: holdet)' : null },
       h('td', {}, `#${e.shirtNumber} ${e.shortName}`, h('span', { class: 'place' }, ` · ${e.place}`)), h('td', { class: 'muted' }, minutes(e, span?.get(e.playerId))),

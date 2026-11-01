@@ -3,7 +3,7 @@
 // Rettet ift. v2.5b: auto-indskiftning sker i en kamplokal kopi (ændrede før lineupSlots
 // permanent), og Hvis-Så-reglerne kører for begge hold og skifter reelt formation.
 import { matchBenchOf } from './career.js';
-import { FORMATIONS, lineOfRole, isOutOfZone, slotPosition, fitOf, arrangeByFit } from './formations.js';
+import { FORMATIONS, lineOfRole, isOutOfZone, slotPosition, fitOf, slotFitOf, arrangeByFit } from './formations.js';
 import { livePositions as livePos0, coupledPositions as coupled0, kickoffPositions, apartFrom, apartOnLine, ONSIDE_GAP, MIN_APART } from './positions.js';
 import { masteryVs, counterXpForMatch } from './counter.js';
 import { chemScale, slotChem, bandOf, BAND_WORD, CHEM_BASE } from './chemistry.js';
@@ -26,7 +26,7 @@ export function ruleConditionMet(rule, own, opp) {
 }
 const coordsOf = (tactics) => FORMATIONS[tactics.baseFormation] || FORMATIONS['4-4-2'];
 // Hvor godt spilleren passer på pladsen (v3.20.0, formations.js fitOf) – indskiftere og erstatninger vælges inden for kæden efter den
-const slotFit = (tactics, p, slot) => fitOf(p.position, coordsOf(tactics)[slot]?.r);
+const slotFit = (tactics, p, slot) => slotFitOf(tactics, slot, p.position);   // v3.24.6: med pladsens dybde (kantpladser)
 // ÉT valg for alle fem steder (skade før kampen, rotation, udskiftning, træthedsskift, pauseskift): den med størst score × fit
 // på pladsen; ved lighed listens rækkefølge (stabil sortering). score = det, stedet vægter (friskhed, evner …).
 export function pickForSlot(list, tactics, slot, score = () => 1) {

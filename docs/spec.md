@@ -182,6 +182,12 @@ Tick hvert 3. minut (1..90).
   0,975 (CB–Back, CB–DM, Back–Kant, DM–CM, CM–OM, CM–Kant, OM–ANG, OM–Kant, Kant–ANG), anden markplads 0,94,
   målmand ⇄ markspiller 0,85. Rolle → position: LB/RB/LWB/RWB Back, CDM DM, LM/RM/LW/RW Kant, CAM/CF OM. Det er
   den plads, han står på NU (indskiftere og Hvis-Så tæller med). Boldbesiddelsen bruger rå evner og rammes ikke.
+  **Kantpladser (v3.24.6, brugeren: "i en 3-5-2 … 5 midtbanespillere … trækker jeg min wing længere tilbage … skal straffen
+  tilpasses"):** på LB/RB/LWB/RWB/LM/RM afgør pladsens dybde (y, også en trukket plads) positionen: y ≤ 55 = Kant, y ≥ 60 =
+  Back, imellem passer begge (`slotPositionOf`, `slotFitOf`). 3-5-2's LWB/RWB (y 46) er kant-pladser, 5-3-2/5-4-1's (y 64)
+  back-pladser. Brikken siger "kant-plads"/"back-plads". Målt (`tools/measure-wide.mjs 150`, 2100 kampe pr. formation, før →
+  efter): 3-5-2 netto −0,215 → −0,241, 5-3-2 −0,030 → −0,020, 4-4-2 −0,060 → −0,068 (støj); botternes andel uden for
+  position 9,1 % → 7,8 % (`measure-position.mjs 200`).
   Kalibreret med `tools/measure-position.mjs` (4200 kampe): planens 0,95/0,88/0,75 kostede 0,58 mål pr. kamp for
   8 mand på naboplads – brugerens "mildt" (≈ 0,15 for 4-5 forkerte) gav 0,975/0,94/0,85. Bånd i
   `tests/unit/position-v3200.test.mjs` (ombytning −0,68…−1,2 mål pr. kamp; v3.19.0 −0,51).

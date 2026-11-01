@@ -41,10 +41,22 @@ const ROLE_POSITION = { GK: 'GK', CB: 'CB', LB: 'FB', RB: 'FB', LWB: 'FB', RWB: 
 export const positionOfRole = (r) => ROLE_POSITION[r] ?? null;
 export const FIT = { own: 1, near: 0.975, other: 0.94, keeper: 0.85 };
 const NEAR = new Set(['CB-FB', 'CB-DM', 'FB-WM', 'DM-CM', 'CM-AM', 'CM-WM', 'AM-ST', 'AM-WM', 'WM-ST'].flatMap((k) => [k, k.split('-').reverse().join('-')]));
-export function fitOf(position, role) {
-  const want = positionOfRole(role);
+// Kantpladser (v3.24.6, brugeren: "når det er en 3-5-2 opstilling, er det 5 midtbanespillere … Hvis jeg trækker min wing længere
+// tilbage så han mere er back end midtbanespiller, skal vi også have tilpasset straffen"): på en kantplads afgør DYBDEN, om
+// det er en back- eller en kant-plads – ikke rollenavnet. Højt (y ≤ WIDE_MID_Y) = kant, dybt (y ≥ WIDE_BACK_Y) = back,
+// imellem passer begge (intet hop, når man trækker lidt). 3-5-2's LWB/RWB (y 46) er altså kant-pladser, 5-3-2's (y 64) back.
+export const WIDE_ROLES = new Set(['LB', 'RB', 'LWB', 'RWB', 'LM', 'RM']), WIDE_MID_Y = 55, WIDE_BACK_Y = 60;
+export function slotPositionOf(role, y) {
+  if (y == null || !WIDE_ROLES.has(role)) return positionOfRole(role);
+  return y <= WIDE_MID_Y ? 'WM' : y >= WIDE_BACK_Y ? 'FB' : 'WIDE';   // WIDE: både back og kant
+}
+export const slotKindText = (role, y) => ({ WM: 'kant-plads', FB: 'back-plads', WIDE: 'kant-/back-plads' })[slotPositionOf(role, y)] ?? null;
+export function fitOf(position, role, y = null) {
+  const want = slotPositionOf(role, y);
+  if (want === 'WIDE' && (position === 'WM' || position === 'FB')) return FIT.own;
   if (!position || !want || position === want) return FIT.own;
   if ((position === 'GK') !== (want === 'GK')) return FIT.keeper;
+  if (want === 'WIDE') return NEAR.has(`${position}-WM`) || NEAR.has(`${position}-FB`) ? FIT.near : FIT.other;
   return NEAR.has(`${position}-${want}`) ? FIT.near : FIT.other;
 }
 // De SAMME spillere fordelt på formationens pladser efter position (v3.20.0): den fordeling, der giver størst samlet fit
@@ -53,21 +65,21 @@ export function fitOf(position, role) {
 // Bruges ved ny liga, migrering, formationsskift og "Stil op efter position".
 // from = formationen før skiftet: ved lighed bliver en spiller på sin side (LB → LM, ikke RM) og helst på sin plads.
 const sideOf = (r) => (r?.[0] === 'L' ? 'L' : r?.[0] === 'R' ? 'R' : 'C');
-export function arrangeByFit(players, formation, from = formation) {
+export function arrangeByFit(players, formation, from = formation, ys = null) {   // ys: pladsernes (flyttede) dybde – ellers ankrene
   const before = (FORMATIONS[from] || FORMATIONS['4-4-2']).map((s) => s.r), after = (FORMATIONS[formation] || FORMATIONS['4-4-2']).map((s) => s.r);
-  return pickByFit(players, formation, () => 1, (i, slot) => (sideOf(before[i]) === sideOf(after[slot]) ? 4 : 0) + (i === slot ? 1 : 0));   // siden vejer mere end pladsnummeret (5-3-2: LM blev RWB)
+  return pickByFit(players, formation, () => 1, (i, slot) => (sideOf(before[i]) === sideOf(after[slot]) ? 4 : 0) + (i === slot ? 1 : 0), ys);   // siden vejer mere end pladsnummeret (5-3-2: LM blev RWB)
 }
 // Vælg og fordel: de bedste 11 af kandidaterne efter score(p) × fit × kæde (en spiller kan sidde over). Målmand uden for mål og
 // markspiller i mål kun, hvis der ikke er andre (−10). stays(i, slot) × 0,001 afgør ved lighed (side og plads).
 const CHAIN_MISS = 0.85;
-export function pickByFit(candidates, formation, score, stays = () => false) {
-  const roles = (FORMATIONS[formation] || FORMATIONS['4-4-2']).map((s) => s.r), n = Math.max(candidates.length, roles.length);
+export function pickByFit(candidates, formation, score, stays = () => false, ysIn = null) {
+  const roles = (FORMATIONS[formation] || FORMATIONS['4-4-2']).map((s) => s.r), ys = ysIn ?? (FORMATIONS[formation] || FORMATIONS['4-4-2']).map((s) => s.y), n = Math.max(candidates.length, roles.length);
   const value = (i, slot) => {
     const p = candidates[i]; if (!p || slot >= roles.length) return 0;
     const keeperMiss = (p.position === 'GK') !== (roles[slot] === 'GK');
     // Kæden først (motoren vælger efter kæde – en angriber på en stopperplads har angriberens evner): × 0,85 uden for kæden
     const chain = p.line && p.line !== lineOfRole(roles[slot]) ? CHAIN_MISS : 1;
-    return (keeperMiss ? -10 : score(p) * fitOf(p.position, roles[slot]) * chain) + stays(i, slot) * 0.001;
+    return (keeperMiss ? -10 : score(p) * fitOf(p.position, roles[slot], ys[slot]) * chain) + stays(i, slot) * 0.001;
   };
   const cost = Array.from({ length: n }, (_, i) => Array.from({ length: n }, (_, slot) => -value(i, slot)));
   const slotOf = hungarian(cost, n), out = new Array(roles.length).fill(null);
@@ -107,6 +119,9 @@ export function slotPosition(tactics, slot) {
   const c = tactics.customCoords && tactics.customCoords[slot];
   return c ? { x: c.x, y: c.y } : { x: anchor.x, y: anchor.y };
 }
+
+// Fit på en plads i en opstilling – med pladsens (evt. flyttede) dybde. Motor, Taktik og tællerne bruger denne ene.
+export const slotFitOf = (tactics, slot, position) => fitOf(position, (FORMATIONS[tactics.baseFormation] || FORMATIONS['4-4-2'])[slot]?.r, slotPosition(tactics, slot).y);
 
 export function anchorDistance(tactics, slot) {
   const anchor = (FORMATIONS[tactics.baseFormation] || FORMATIONS['4-4-2'])[slot];

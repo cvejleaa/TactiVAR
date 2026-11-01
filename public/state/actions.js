@@ -1,6 +1,6 @@
 // Ændringer af eget holds taktik og opstilling – rene funktioner over holdobjektet, så de
 // kan testes uden browser. UI'et kalder dem og gemmer bagefter.
-import { FORMATIONS, clampPos, arrangeByFit, fitOf } from '../engine/formations.js';
+import { FORMATIONS, clampPos, arrangeByFit, slotFitOf, slotPosition } from '../engine/formations.js';
 import { clampSubsLimit } from '../engine/freshness.js';
 import { MAX_RULES } from '../engine/match-rules.js';
 import { autoMatchBench, validFocus, SQUAD_MAX, matchBenchOf } from '../engine/career.js';
@@ -84,13 +84,13 @@ export function setFormation(team, formation) {
   return true;
 }
 export function outOfPositionCount(team) {
-  const roles = (FORMATIONS[team.tactics.baseFormation] || FORMATIONS['4-4-2']).map((s) => s.r);
-  return team.tactics.lineupSlots.filter((id, i) => { const p = team.squad.find((x) => x.id === id); return p && fitOf(p.position, roles[i]) < 1; }).length;
+  return team.tactics.lineupSlots.filter((id, i) => { const p = team.squad.find((x) => x.id === id); return p && slotFitOf(team.tactics, i, p.position) < 1; }).length;
 }
 // "Stil op efter position": de 11 på banen flyttes rundt, så flest står på deres naturlige position – ingen ind eller ud
 export function arrangeLineup(team, from = team.tactics.baseFormation) {
   const byId = new Map(team.squad.map((p) => [p.id, p])), slots = team.tactics.lineupSlots;
-  const next = arrangeByFit(slots.map((id) => byId.get(id) ?? null), team.tactics.baseFormation, from).map((p, i) => p?.id ?? slots[i]);
+  const ys = from === team.tactics.baseFormation ? slots.map((_, i) => slotPosition(team.tactics, i).y) : null;   // v3.24.6: flyttede kantpladser
+  const next = arrangeByFit(slots.map((id) => byId.get(id) ?? null), team.tactics.baseFormation, from, ys).map((p, i) => p?.id ?? slots[i]);
   if (new Set(next).size !== slots.length) return false;
   const changed = next.some((id, i) => id !== slots[i]);
   team.tactics.lineupSlots = next;

@@ -1,7 +1,7 @@
 // Taktiktavlen: "Rolle-anker & frit træk" (docs/spec.md §4). Målmanden og modstanderens
 // brikker kan ikke trækkes; uden for ankerradius 28 vises "⚠ Ude af zone (-20%)".
 import { h } from './dom.js';
-import { FORMATIONS, MAX_ANCHOR_RADIUS, slotPosition, isOutOfZone, clampPos, fitOf } from '../engine/formations.js';
+import { FORMATIONS, MAX_ANCHOR_RADIUS, slotPosition, isOutOfZone, clampPos, slotFitOf, slotKindText } from '../engine/formations.js';
 import { POSITION_FULL, fitCost } from './labels.js';
 import { BAND_WORD } from '../engine/chemistry.js';
 
@@ -32,10 +32,10 @@ export function renderPitch({ team, isOwn, ui, onMove, onSelect, onTokenSwap, pa
     const out = isOutOfZone(team.tactics, slot);
     const custom = !!team.tactics.customCoords?.[slot];
     // v3.20.0: uden for position – vises sammen med zone-flaget (begge koster), tallet fra tabellen
-    const fit = p ? fitOf(p.position, coords[slot].r) : 1;
+    const fit = p ? slotFitOf(team.tactics, slot, p.position) : 1, kind = slotKindText(coords[slot].r, pos.y);   // v3.24.6: pladsens dybde
     const token = h('div', {
       class: `token${out ? ' out' : custom ? ' custom' : ''}${ui.selectedPlayerId === pid ? ' selected' : ''}${ui.pitchSwapId === pid ? ' swapping' : ''}${p?.injuryMatchesLeft > 0 ? ' injured' : ''}`,
-      style: { left: pos.x + '%', top: pos.y + '%' }, dataset: { slot: String(slot), fit: String(fit) }, title: `${coords[slot].r} – ${p ? p.name : '?'}${p ? ` · naturlig: ${POSITION_FULL[p.position] ?? p.position}${fit < 1 ? ` – her ${fitCost(fit)} i dueller` : ''}` : ''}${p && isOwn && pairs?.length && pairText(pid) ? ` · 🤝 ${pairText(pid)}` : ''}`,
+      style: { left: pos.x + '%', top: pos.y + '%' }, dataset: { slot: String(slot), fit: String(fit) }, title: `${coords[slot].r}${kind ? ` (${kind})` : ''} – ${p ? p.name : '?'}${p ? ` · naturlig: ${POSITION_FULL[p.position] ?? p.position}${fit < 1 ? ` – her ${fitCost(fit)} i dueller` : ''}` : ''}${p && isOwn && pairs?.length && pairText(pid) ? ` · 🤝 ${pairText(pid)}` : ''}`,
     }, h('span', { class: 'token-num' }, p ? String(p.shirtNumber) : '?'), h('span', { class: 'token-name' }, p ? p.shortName : '?'),
       out ? h('span', { class: 'token-flag' }, '⚠ Ude af zone (-20%)') : custom ? h('span', { class: 'token-flag ok' }, '✅ Custom pos') : null,
       fit < 1 ? h('span', { class: 'token-flag pos' }, `⚠ Uden for position (${fitCost(fit)})`) : null);
