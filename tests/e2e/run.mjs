@@ -76,7 +76,7 @@ try {
   await g.selectOption(`#training-table tr[data-pid="${await g.evaluate((nr) => JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((x) => !x.isBot).squad.find((x) => String(x.shirtNumber) === nr).id, shown)}"] select`, 'FINISH');
   check('Spillerkortet viser 9 evne-barer og luftduel-udregningen', (await g.locator('#player-card .bars .bar').count()) === 9 && (await g.textContent('#aerial-breakdown')).includes('× 0,35'));
   // v3.8 (Test Manager): kortets overskrift viser spillerens EGEN naturlige position med fuld betegnelse
-  const FULL_POS = { GK: 'Målmand', CB: 'Midtstopper', FB: 'Back/wingback (LB/RB/LWB/RWB)', DM: 'Defensiv midtbane (CDM)', CM: 'Central midtbane (CM)', WM: 'Kant (LM/RM/LW/RW)', AM: 'Offensiv midtbane (CAM/CF)', ST: 'Angriber (ST)' };
+  const FULL_POS = { GK: 'Målmand', CB: 'Midtstopper', FB: 'Back/wingback (dybe kantpladser)', DM: 'Defensiv midtbane (CDM)', CM: 'Central midtbane (CM)', WM: 'Kant (høje kantpladser, LW/RW)', AM: 'Offensiv midtbane (CAM/CF)', ST: 'Angriber (ST)' };
   const shownPos = await g.evaluate((nr) => JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((x) => !x.isBot).squad.find((x) => String(x.shirtNumber) === nr).position, shown);
   const cardHead = await g.textContent('#player-card .card-head');
   check('Spillerkortet: kæde og naturlig position med fuld betegnelse (kun den ene)', cardHead.includes(` • ${FULL_POS[shownPos]} • `) && Object.values(FULL_POS).filter((t) => cardHead.includes(` • ${t} • `)).length === 1 && !cardHead.includes('(('), `${shownPos}: ${cardHead}`);
@@ -364,7 +364,7 @@ try {
     await g0.click('#pitch .token[data-slot="1"]'); await g0.click('#pitch .token[data-slot="9"]');
     await g0.locator('#lineup-list .toolbar button', { hasText: 'Alle' }).click();   // et klik på en brik filtrerer listen til kæden
     const flag = async (s) => (await g0.locator(`#pitch .token[data-slot="${s}"] .token-flag.pos`).textContent().catch(() => '')).trim();
-    check('Byt LB ⇄ ANG: begge brikker viser "⚠ Uden for position (−6 %)", de andre intet, og listen markerer pladserne', (await name(1)) === n9 && (await flag(1)) === '⚠ Uden for position (−6 %)' && (await flag(9)) === '⚠ Uden for position (−6 %)'
+    check('Byt LB ⇄ ANG: begge brikker viser "⚠ Uden for position (−6 %)" (LB-pladsen siger back-plads, v3.24.6), de andre intet, og listen markerer pladserne', (await name(1)) === n9 && (await flag(1)) === '⚠ Uden for position – back-plads (−6 %)' && (await flag(9)) === '⚠ Uden for position (−6 %)'
       && (await g0.locator('#pitch .token-flag.pos').count()) === 2 && (await g0.locator('#lineup-table td.lp-place.off-pos').count()) === 2 && (await g0.textContent('#lineup-table td.lp-place.off-pos')).includes('−6 %'));
     await g0.click('#arrange-lineup');
     check('"⇄ Stil op efter position" flytter dem tilbage, fjerner flagene og siger det', (await name(1)) === n1 && (await name(9)) === n9 && (await g0.locator('#pitch .token-flag.pos').count()) === 0 && (await g0.textContent('#notice')).includes('naturlige position'));
@@ -376,6 +376,15 @@ try {
   const reload = async () => { await g.reload(); await g.waitForSelector('body[data-klar="ja"]'); };
   await g.selectOption('#formation', '3-5-2'); await reload();
   check('Formation gemmes straks', (await g.inputValue('#formation')) === '3-5-2');
+  // v3.24.6 (brugeren: "i en 3-5-2 … 2 midtbane kanter der får straf"): 3-5-2's LWB/RWB er kant-pladser – en kant dér
+  // passer 100 %, en back betaler nabo-prisen; 5-3-2's (dybe) LWB/RWB er back-pladser
+  {
+    const wide = async (f) => g.evaluate((f) => { const d = JSON.parse(localStorage.getItem('tactivar_save')), t = d.league.teams.find((x) => !x.isBot);
+      return [...document.querySelectorAll('#pitch .token[data-slot]')].map((el) => ({ slot: +el.dataset.slot, fit: +el.dataset.fit, title: el.title,
+        pos: t.squad.find((p) => p.id === t.tactics.lineupSlots[+el.dataset.slot])?.position })).filter((x) => /^[LR]WB/.test(x.title)); }, f);
+    const w = await wide('3-5-2');
+    check('3-5-2: LWB/RWB er kant-pladser – kant 100 %, back −2,5 % (og brikken siger "kant-plads")', w.length === 2 && w.every((x) => x.title.includes('(kant-plads)') && x.fit === (x.pos === 'WM' ? 1 : x.pos === 'FB' ? 0.975 : x.fit)), JSON.stringify(w));
+  }
   await g.click('#add-rule'); await reload();
   check('Ny Hvis-Så-regel gemmes straks', (await g.locator('#rules .rule').count()) === 2);
   // Regel 2: "Foran med mindst 2 mål → skift til Plan C"; regel 1: Uafgjort skjuler antal mål
@@ -388,6 +397,7 @@ try {
   check('Hvis-Så: målvælgeren viser dine planer og markerer den aktive', (await g.locator('#rules .rule:nth-of-type(2) .rule-target option', { hasText: 'aktiv nu' }).count()) === 1);
   // Den aktive plan følger live-taktikken: ændr formation, og "Plan X (…)" i målvælgeren følger med
   await g.selectOption('#formation', '5-3-2'); await reload();
+  check('5-3-2: LWB/RWB er back-pladser', (await g.locator('#pitch .token[data-slot]').evaluateAll((els) => els.filter((el) => /^[LR]WB/.test(el.title)).map((el) => el.title.includes('(back-plads)')))).filter(Boolean).length === 2);
   const activeOpt = await g.locator('#rules .rule:nth-of-type(2) .rule-target option', { hasText: 'aktiv nu' }).textContent();
   check('Hvis-Så: den aktive plan i målvælgeren viser den nye formation', activeOpt.includes('(5-3-2)'), activeOpt);
   const otherPlan = await g.locator('#rules .rule:nth-of-type(2) .rule-target option[value="plan:1"]').textContent();
@@ -885,6 +895,12 @@ try {
       check('Legenden forklarer svære/lette (mobil har ingen hover)', (await g.textContent('#icon-legend')).includes('heraf 2 svære'));
       await g.click('#match-cards .matchcard:nth-child(1)');
     } else check('Karakterarket: data – en målmand med lette redninger i runden', false, 'ingen i runde 1');
+  }
+  // v3.24.6 (brugeren: "vi skal have allignet informationerne her på kamprapporten"): de to ark side om side – titel, kort,
+  // opstilling og liste starter i samme højde
+  {
+    const tops = await g.evaluate(() => [...document.querySelectorAll('.ratings-grid > .ratings')].map((r) => [...r.children].map((c) => Math.round(c.getBoundingClientRect().top))));
+    check('Kamprapporten: de to karakterark står i samme højde (4 blokke, ens top)', tops.length === 2 && tops[0].length === 4 && tops[1].length === 4 && tops[0].every((t, i) => Math.abs(t - tops[1][i]) <= 1) && tops[0][2] > tops[0][1], JSON.stringify(tops));
   }
   const evAll = await g.locator('#feed .ev').count();
   // "Rundens mål" i avisen (Liga-fanen) viser kampen og linker til netop dens referat

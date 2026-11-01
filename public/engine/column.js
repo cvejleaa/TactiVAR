@@ -311,12 +311,15 @@ const HEADS = {
   BIG: [(w, l, s) => `${w} knuser ${l} ${s}`, (w, l, s) => `Opvisning: ${w} sender ${l} hjem med ${s}`, (w, l, s) => `${l} får klø – ${w} vinder ${s}`,
     (w, l, s) => `${w} ruller over ${l} – ${s}`, (w, l, s) => `Storsejr: ${w} ${s} mod ${l}`, (w, l, s) => `${l} sat på plads: ${s} til ${w}`],
   WIN: [(w, l, s) => `${w} slår ${l} ${s}`, (w, l, s) => `${w} snupper sejren mod ${l} (${s})`, (w, l, s) => `Tre point til ${w} efter ${s} mod ${l}`,
-    (w, l, s) => `${w} vinder ${s} over ${l}`, (w, l, s) => `${s}: ${w} er for stærke for ${l}`, (w, l, s) => `${w} henter sejren mod ${l} – ${s}`],
+    (w, l, s) => `${w} vinder ${s} over ${l}`, (w, l, s) => `${s}: ${w} er for stærke for ${l}`, (w, l, s) => `${w} henter sejren mod ${l} – ${s}`,
+    // v3.24.6 (measure-column: "Tre point til …" 10 gange i en sæson efter motorændringen): 8 pr. sejr
+    (w, l, s) => `${l} må se sig slået af ${w} (${s})`, (w, l, s) => `${w} tager de tre point hos ${l}: ${s}`],
   DRAW0: [(h, a) => `Målløst mellem ${h} og ${a}`, (h, a) => `Taktisk skak: ${h} og ${a} deler 0-0`, (h, a) => `Ingen vinder – ${h} og ${a} spiller 0-0`],
-  DRAW: [(h, a, s) => `Point deles: ${h} – ${a} ${s}`, (h, a, s) => `${h} og ${a} skilles ${s}`, (h, a, s) => `Uafgjort ${s} mellem ${h} og ${a}`],
+  DRAW: [(h, a, s) => `Point deles: ${h} – ${a} ${s}`, (h, a, s) => `${h} og ${a} skilles ${s}`, (h, a, s) => `Uafgjort ${s} mellem ${h} og ${a}`,
+    (h, a, s) => `${s} – ${h} og ${a} får et point hver`],
 };
 export function headlineOf(f, round) {
-  const hG = f.home.goals, aG = f.away.goals, pick = (list) => pickBy(list, round, 'head', f.home.name, hG * 7 + aG * 3);   // v3.21.2: pickBy pr. kamp (før én formel)
+  const hG = f.home.goals, aG = f.away.goals, pick = (list) => pickBy(list, round, 'head', f.home.name, f.away.name, hG * 7 + aG * 3);   // v3.21.2: pickBy pr. kamp (før én formel); v3.24.6: + udeholdet (en vært med samme stilling ramte samme variant runde efter runde)
   if (hG === aG) return hG === 0 ? pick(HEADS.DRAW0)(f.home.name, f.away.name) : pick(HEADS.DRAW)(f.home.name, f.away.name, `${hG}-${aG}`);
   const [w, l, s] = hG > aG ? [f.home.name, f.away.name, `${hG}-${aG}`] : [f.away.name, f.home.name, `${aG}-${hG}`];
   return pick(Math.abs(hG - aG) >= 3 ? HEADS.BIG : HEADS.WIN)(w, l, s);

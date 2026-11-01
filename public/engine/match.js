@@ -3,7 +3,7 @@
 // Rettet ift. v2.5b: auto-indskiftning sker i en kamplokal kopi (ændrede før lineupSlots
 // permanent), og Hvis-Så-reglerne kører for begge hold og skifter reelt formation.
 import { matchBenchOf } from './career.js';
-import { FORMATIONS, lineOfRole, isOutOfZone, slotPosition, fitOf, arrangeByFit } from './formations.js';
+import { FORMATIONS, lineOfRole, slotLineOf, isOutOfZone, slotPosition, fitOf, slotFitOf, arrangeByFit } from './formations.js';
 import { livePositions as livePos0, coupledPositions as coupled0, kickoffPositions, apartFrom, apartOnLine, ONSIDE_GAP, MIN_APART } from './positions.js';
 import { masteryVs, counterXpForMatch } from './counter.js';
 import { chemScale, slotChem, bandOf, BAND_WORD, CHEM_BASE } from './chemistry.js';
@@ -26,7 +26,7 @@ export function ruleConditionMet(rule, own, opp) {
 }
 const coordsOf = (tactics) => FORMATIONS[tactics.baseFormation] || FORMATIONS['4-4-2'];
 // Hvor godt spilleren passer på pladsen (v3.20.0, formations.js fitOf) – indskiftere og erstatninger vælges inden for kæden efter den
-const slotFit = (tactics, p, slot) => fitOf(p.position, coordsOf(tactics)[slot]?.r);
+const slotFit = (tactics, p, slot) => slotFitOf(tactics, slot, p.position);   // v3.24.6: med pladsens dybde (kantpladser)
 // ÉT valg for alle fem steder (skade før kampen, rotation, udskiftning, træthedsskift, pauseskift): den med størst score × fit
 // på pladsen; ved lighed listens rækkefølge (stabil sortering). score = det, stedet vægter (friskhed, evner …).
 export function pickForSlot(list, tactics, slot, score = () => 1) {
@@ -226,7 +226,7 @@ function prepareSide(team, isHome, notes) {
   // forbliver brugt (kommer ikke ind i kampen, heller ikke ved skade).
   starters.forEach((p, slot) => {
     if (p && isAvailable(p)) return;
-    const line = p ? p.line : lineOfRole(coordsOf(tactics)[slot].r);
+    const line = p ? p.line : slotLineOf(tactics, slot);
     const inLine = bench().filter((b) => b.line === line).sort((a, b) => avgSkill(b) - avgSkill(a));   // ved lighed: bedste evner
     const sub = pickForSlot(inLine, tactics, slot, (b) => b.freshness ?? 100) || bench()[0];
     if (!sub) return;
@@ -250,6 +250,9 @@ function rolesOf(side) {
   side.starters.forEach((p, i) => {
     if (i === 0 || !p) return;   // en udvist spillers plads er tom (v3.15)
     if (coords[i].r === 'CB') cbs.push(p);
+    // Kampens opgaver (forsvar/opbygning/angreb) følger rollen: en wingback forsvarer også i 3-5-2. v3.24.6 målte det: talte
+    // 3-5-2's wingbacks som midtbane HER, lukkede holdet 0,17 mål mere ind pr. kamp (tools/measure-wide.mjs) – kæden til valg,
+    // samspil og pris følger dybden (formations.js), opgaven i kampen gør ikke
     const line = lineOfRole(coords[i].r);
     (line === 'DEF' ? defs : line === 'MID' ? mids : atts).push(p);
   });
@@ -324,7 +327,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
   const chemAt = (side, p) => { const v = slotChem(side.team, side.starters, side.tactics.baseFormation, side.starters.indexOf(p)); return v == null ? 0 : chemScale(v, chemRef); };
   // Midtbanens samspil ved kampstart (fuldtids-analysen – samme læsning som opbygningen, QC/Spilfører: virkningen sidder dér)
   const midChemBand = (side) => {
-    const c = FORMATIONS[side.tactics.baseFormation] ?? FORMATIONS['4-4-2'], vals = side.starters.map((p, i) => (p && i > 0 && lineOfRole(c[i].r) === 'MID' ? slotChem(side.team, side.starters, side.tactics.baseFormation, i) : null)).filter((v) => v != null);
+    const c = FORMATIONS[side.tactics.baseFormation] ?? FORMATIONS['4-4-2'], vals = side.starters.map((p, i) => (p && i > 0 && slotLineOf(side.tactics, i) === 'MID' ? slotChem(side.team, side.starters, side.tactics.baseFormation, i) : null)).filter((v) => v != null);
     return side.team.chemistry && vals.length ? bandOf(vals.reduce((x, y) => x + y, 0) / vals.length, chemRef) : null;
   };
   const kickoffMidBand = new Map([[H, midChemBand(H)], [A, midChemBand(A)]]);

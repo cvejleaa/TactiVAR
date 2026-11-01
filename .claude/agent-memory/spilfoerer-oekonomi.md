@@ -24,3 +24,10 @@ fund der er rettet (så du ikke finder dem igen), hvad brugeren har valgt fra, o
 - Samspil (v3.24.0) ændrer ikke økonomien målbart (spec: alle fremmede −0,12 mål/kamp; lifecycle ±0,025). measure-lifecycle
   måler nøglesnit, ikke point – kan ikke se samspil.
 - Til klub: ungdomstilbud er ens i alle ligaer (derivedRng('youth', season, team.id), season.js:257 – samme navne i 4 seeds).
+
+## Hattrick-sammenligning 2026-11-01 (v3.24.6; script scratchpad/oek/ht-cash.mjs)
+- Passiv 3 seeds × 5 sæsoner (measure-lifecycle): cashRatio 0,52–0,66 – pengene siver ud, men der er intet at investere i
+  ud over spillere. Kasse-spredning seed 2 S4: −513k til 7,8 mio. Min kasse passiv 2,7–6,4 mio efter 4 sæsoner.
+- Foreslået: stadion (GATE_MAX 9000, career.js:159), fanforventning (= nr. 15's mål), stab på sæsonkontrakt, ungdomsspejder
+  der koster, renter/kredit i minus. Tillæg til nr. 8 (salgsgebyr efter tid i klubben) og nr. 30 (sponsor efter fans + sidste sæson).
+- finance.season nulstilles i sidste runde – mål indtægtsposter før runde 14 commit, ikke efter.

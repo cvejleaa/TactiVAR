@@ -18,3 +18,10 @@ Samspil v3.23/v3.24 er lavet (aftagende vækst K 0,14, LEAK 0,035, CHEM_TOP 86, 
 4. Par-historie: "41 kampe sammen" (chemistry-tabellen har kun værdi + sidste runde).
 Midterholdet: 4.–6. efter runde 9 er 1,9 p fra naboerne og flytter 1,8 pladser til slut (10 seeds × 2) – der ER noget at
 kæmpe for; det bliver bare ikke sagt (argument for backlog 9 op).
+
+## Hattrick-sammenligning (2026-11-01, manualudtræk) – foreslået, ikke afgjort
+Script: scratchpad `klub3/arch.mjs`. Arketyper: 53–62 af 144 har én, 6–10 låst op; virker ikke i motoren (0 i match.js);
+kortet viser rå nøgler ("goalkeeping 12", card.js:36). Ingen form/moral, ingen pokal, ingen op/nedrykning, ingen anfører,
+ingen egen avl. Træning er ikke bundet til minutter: reserve 18 år Afslutning 0,18/runde mod kamp-xp 0,02/90 (career.js:137).
+Foreslået: arketyper med plus/minus · træning efter minutter · skjult form · lille pokal · egen avl via samspil ·
+to rækker · anfører/rutine.

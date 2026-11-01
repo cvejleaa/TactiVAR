@@ -2,7 +2,7 @@
 // en påstand"). Intet her trækker på ligaens rng: tilfældighed kommer fra afledte, seedede rng'er (hash af id og sæson), så en
 // sæsonovergang er reproducerbar og flytter ikke kampene.
 import { createRng } from './rng.js';
-import { pickByFit, fitOf, FORMATIONS } from './formations.js';
+import { pickByFit, slotFitOf, FORMATIONS } from './formations.js';
 
 // ---------- Afledt tilfældighed ----------
 // FNV-1a over en tekst → et 32-bit seed. Samme tekst giver altid samme tal (to indlæsninger giver samme potentiale).
@@ -252,7 +252,7 @@ export function repairLineup(team, goneLine = new Map()) {
     const line = i === 0 ? 'GK' : goneLine.get(id) ?? null;
     const pool = free.filter((p) => (line ? p.line === line : p.line !== 'GK'));
     const best = [pool, free.filter((p) => (i === 0) === (p.line === 'GK')), free].find((l) => l.length) ?? [];
-    const role = (FORMATIONS[team.tactics.baseFormation] || FORMATIONS['4-4-2'])[i]?.r, fit = (p) => fitOf(p.position, role);   // v3.20.0: passer bedst på pladsen
+    const fit = (p) => slotFitOf(team.tactics, i, p.position);   // v3.20.0: passer bedst på pladsen
     const pick = best.sort((a, b) => Math.max(1, pubScore(b)) * fit(b) - Math.max(1, pubScore(a)) * fit(a))[0];   // gulv 1: skadet × fit vender ellers om (QC K4)
     if (pick) { slots[i] = pick.id; changed = true; }
   });

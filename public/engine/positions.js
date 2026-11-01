@@ -58,7 +58,7 @@ export function livePositions(tactics, { attacking = true, ballX = 50, runner = 
   return coords.map((c, i) => {
     const base = slotPosition(tactics, i);
     if (i === 0) return { x: base.x, y: base.y };   // målmanden bliver i målet
-    const line = lineOfRole(c.r);
+    const line = lineOfRole(c.r);   // bevægelsen følger rollen (en wingback falder med tilbage) – kun kæden til valg/samspil følger dybden (v3.24.6)
     let y = base.y;
     if (attacking) {
       const adv = c.r === 'CB' ? ADVANCE.CB : FB.has(c.r) ? ADVANCE.FB : line === 'ATT' ? ADVANCE.ATT : ADVANCE.MID;

@@ -10,7 +10,7 @@ import { createLeague } from '../public/engine/generator.js';
 import { playPairs, fixedPairs, commitRound } from '../public/engine/season.js';
 import { COUNTER_KEYS } from '../public/engine/counter.js';
 import { simulateMatch } from '../public/engine/match.js';
-import { lineOfRole } from '../public/engine/formations.js';
+import { lineOfRole, FORMATIONS } from '../public/engine/formations.js';
 import { replaySteps } from '../public/ui/replay.js';
 
 const ARG_N = Number(process.argv[2] || 20);
@@ -112,13 +112,15 @@ export function measureGoalMix(N = ARG_N) {
     const L = createLeague(createRng(s * 7919));
     for (let i = 0; i < 8; i += 2) {
       const m = simulateMatch(L.teams[i], L.teams[i + 1], createRng(s * 31 + i)); games++;
-      const role = new Map([...m.ratings.home, ...m.ratings.away].map((e) => [`#${e.shirtNumber} ${e.shortName}|${e.teamName}`, e.role]));
+      // v3.24.6: kæden efter pladsens dybde (3-5-2's wingback-mål er midtbanemål, som brugeren ser dem)
+      const ent = (e, side) => [`#${e.shirtNumber} ${e.shortName}|${e.teamName}`, { r: e.role, y: e.slot != null ? FORMATIONS[m.startFormations?.[side]]?.[e.slot]?.y : null }];
+      const role = new Map([...m.ratings.home.map((e) => ent(e, 'home')), ...m.ratings.away.map((e) => ent(e, 'away'))]);
       for (const g of m.goalsPool) {
         n++;
         if (SP.has(g.kind)) t.setPiece++; else { t.open++; if (g.kind === 'COUNTER') t.counter++; if (g.kind === 'LONGSHOT') t.longshot++; }
-        let r = role.get(`${g.scorer}|${g.teamName}`) ?? 'ST';
-        if (r.startsWith('SUB (')) r = { DEF: 'CB', MID: 'CM', ATT: 'ST', GK: 'GK' }[r.slice(5, -1)] ?? 'ST';
-        t[lineOfRole(r)]++;
+        let { r, y } = role.get(`${g.scorer}|${g.teamName}`) ?? { r: 'ST', y: null };
+        if (r.startsWith('SUB (')) { r = { DEF: 'CB', MID: 'CM', ATT: 'ST', GK: 'GK' }[r.slice(5, -1)] ?? 'ST'; y = null; }
+        t[lineOfRole(r, y)]++;
       }
     }
   }
@@ -362,11 +364,13 @@ export function measureVar(N = 1500) {
       if (e.type === 'VAR_PEN') { c.penChecks++; if (v?.verdict === 'OVERTURNED') c.penOverturned++; if (v?.verdict === 'AWARDED') c.penAwarded++; }
       if (e.type === 'VAR_RED') { c.redChecks++; if (v?.verdict === 'DOWNGRADED') c.redDown++; if (v?.verdict === 'UPGRADED') c.redUp++; }
     }
-    const role = new Map([...m.ratings.home, ...m.ratings.away].map((e) => [`#${e.shirtNumber} ${e.shortName}|${e.teamName}`, e.role]));
+    // v3.24.6: kæden efter pladsens dybde (3-5-2's wingback-mål er midtbanemål)
+    const ent = (e, side) => [`#${e.shirtNumber} ${e.shortName}|${e.teamName}`, { r: e.role, y: e.slot != null ? FORMATIONS[m.startFormations?.[side]]?.[e.slot]?.y : null }];
+    const role = new Map([...m.ratings.home.map((e) => ent(e, 'home')), ...m.ratings.away.map((e) => ent(e, 'away'))]);
     for (const g of m.goalsPool) {
-      let r = role.get(`${g.scorer}|${g.teamName}`) ?? 'ST';
-      if (r.startsWith('SUB (')) r = { DEF: 'CB', MID: 'CM', ATT: 'ST', GK: 'GK' }[r.slice(5, -1)] ?? 'ST';
-      if (lineOfRole(r) === 'ATT') c.attGoals++;
+      let { r, y } = role.get(`${g.scorer}|${g.teamName}`) ?? { r: 'ST', y: null };
+      if (r.startsWith('SUB (')) { r = { DEF: 'CB', MID: 'CM', ATT: 'ST', GK: 'GK' }[r.slice(5, -1)] ?? 'ST'; y = null; }
+      if (lineOfRole(r, y) === 'ATT') c.attGoals++;
       if (g.kind === 'LONGSHOT') c.longshots++;
     }
   }

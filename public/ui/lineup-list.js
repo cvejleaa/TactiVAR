@@ -5,7 +5,7 @@
 import { h, dec, LOCK } from './dom.js';
 import { LINE, POSITION, POSITION_FULL, starsEl, fitCost, FIT_HELP } from './labels.js';
 import { canSeeField } from '../engine/visibility.js';
-import { FORMATIONS, fitOf } from '../engine/formations.js';
+import { FORMATIONS, slotFitOf, slotKindText, slotPosition } from '../engine/formations.js';
 import { matchBenchOf, reservesOf, KEY_SKILLS, keyAvg } from '../engine/career.js';
 import { COLUMNS, heatClass, avgRating } from './matrix.js';
 
@@ -32,6 +32,7 @@ export function listRows({ team, isOwn, ui }) {
 export function renderLineupList({ team, isOwn, ui, onPick, onSort, onBlocked, onLine, onAutoBench, msg = '' }) {
   const { line, cols, ctx, sortCol, starters, bench, reserves, benchAll, reservesAll } = listRows({ team, isOwn, ui });
   const roles = FORMATIONS[team.tactics.baseFormation], slotOf = ctx.slotOf;
+  const kindOf = (s) => (s >= 0 ? slotKindText(roles[s].r, slotPosition(team.tactics, s).y) : null);
   const cell = (c, p) => {
     if (!canSeeField(c.field, isOwn)) return h('td', { class: 'lockcell' }, LOCK);
     if (c.key === 'fresh') return h('td', {}, p.injuryMatchesLeft > 0 ? h('span', { class: 'injury' }, `🚑 ${p.injuryMatchesLeft}`) : `${p.freshness}%`);
@@ -40,11 +41,11 @@ export function renderLineupList({ team, isOwn, ui, onPick, onSort, onBlocked, o
     return h('td', { class: c.heat ? heatClass(v) : '' }, c.fmt ? c.fmt(v) : v);
   };
   const row = (p, kind) => {
-    const s = slotOf(p), place = kind === 'start' ? roles[s].r : kind === 'bench' ? 'Bænk' : 'Res', fit = kind === 'start' ? fitOf(p.position, roles[s].r) : 1;
+    const s = slotOf(p), place = kind === 'start' ? roles[s].r : kind === 'bench' ? 'Bænk' : 'Res', fit = kind === 'start' ? slotFitOf(team.tactics, s, p.position) : 1;
     return h('tr', { class: `lp-row ${kind}-p` + (ui.swapId === p.id ? ' active' : '') + (p.injuryMatchesLeft > 0 ? ' injured' : ''), dataset: { pid: p.id },
       title: isOwn ? (kind === 'reserve' ? 'Reserve – ikke med i kampen. Klik og så en bænkspiller (eller en brik) for at tage ham med.' : 'Klik og så en anden spiller (her eller på banen) for at bytte') : '',
       onclick: () => onPick(p) },
-    h('td', { class: 'lp-place' + (fit < 1 ? ' off-pos' : ''), title: fit < 1 ? `Naturlig: ${POSITION_FULL[p.position]} – på ${place} koster det ${fitCost(fit)} i dueller` : '' }, place, fit < 1 ? ` ⚠ ${fitCost(fit)}` : ''),
+    h('td', { class: 'lp-place' + (fit < 1 ? ' off-pos' : ''), title: fit < 1 ? `Naturlig: ${POSITION_FULL[p.position]} – på ${place}${kindOf(s) ? ` (${kindOf(s)})` : ''} koster det ${fitCost(fit)} i dueller` : '' }, place, fit < 1 ? ` ⚠ ${fitCost(fit)}` : ''),
     h('td', {}, `#${p.shirtNumber} ${p.shortName}`),
     // Kæde · naturlig position i alle tre sektioner (QC B4: så man kan se, hvem på bænken der passer)
     h('td', { title: POSITION_FULL[p.position] ?? '' }, h('span', { class: 'chip' }, LINE[p.line]), ` ${POSITION[p.position] ?? ''}`), cols.map((c) => cell(c, p)));
