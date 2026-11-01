@@ -1417,7 +1417,7 @@ try {
     }
 
     // C) fejl: serveren afviser → synlig fejl, knappen kommer tilbage, intet gemmes som sendt
-    for (const [navn, opt, tekst] of [['Firestore 500', { docStatus: 500 }, '📤 Kampen kunne ikke sendes (500).'], ['anonym login afvist', { signUpStatus: 400 }, '📤 Anonym login fejlede (400)']]) {
+    for (const [navn, opt, tekst] of [['Firestore 500', { docStatus: 500 }, '📤 Kampen kunne ikke sendes (500).'], ['anonym login afvist', { signUpStatus: 400 }, '📤 Kampen kunne ikke sendes lige nu – prøv igen senere (login: 400).']]) {
       const { pg, log, ctx } = await open({ firebase: true, ...opt });
       await playOne(pg); await finish(pg);
       await pg.click('#send-match');

@@ -177,7 +177,7 @@ test('uploadMatch: ødelagt token-felt / lager der kaster → ny bruger, og uplo
 
 test('uploadMatch: anonym login afvist → læsbar fejl med status, intet dokument forsøgt', async () => {
   const f = fakeFetch({ signUp: res(400) });
-  await assert.rejects(() => uploadMatch(CFG, memStorage(), { v: 1, json: '{}' }, { fetchFn: f }), /Anonym login fejlede \(400\)/);
+  await assert.rejects(() => uploadMatch(CFG, memStorage(), { v: 1, json: '{}' }, { fetchFn: f }), /Kampen kunne ikke sendes lige nu – prøv igen senere \(login: 400\)/);
   assert.equal(f.of('doc').length, 0);
 });
 
