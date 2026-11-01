@@ -8,7 +8,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRng } from '../../public/engine/rng.js';
 import { createLeague } from '../../public/engine/generator.js';
-import { simulateMatch as simLive } from '../../public/engine/match.js';
+import { simulateMatch as simLive, SIDE } from '../../public/engine/match.js';
+// v3.26.0: testene her bestemmer kanten med stub-rullet og giver kantspiller og back forskellige evner – "Begge" ville flytte
+// siden efter dem. Angrebssiden måles i side-v3260.test.mjs; her er den slået fra (GAIN 0 = møntkastet som før).
+SIDE.GAIN = 0;
 import { livePositions, ADVANCE, RUNS_PUSH, SHAPE, BALL_PULL, FRONT_LIMIT, RUN_STEP } from '../../public/engine/positions.js';
 // v3.13: friskheden falder i kampen (freshness.js). Denne fils tærskler forudsætter fuld friskhed hele
 // kampen, så friskhed i kampen slås fra her – de nye tests i fatigue.test.mjs prøver den slået TIL.

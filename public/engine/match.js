@@ -1017,13 +1017,13 @@ export function simulateMatch(home, away, rng, opts = {}) {
       st[k(att, 'Shots')]--; st[k(att, 'Xg')] -= xg;
       sheet.adjust(back.id, 0.3); sheet.bump(back.id, 'tacticWins');
       addEv(min, 'INFO', 'PLAY', def.isHome, false, 'Kanten lukket', own(att)
-        ? `❌ Dit cutback-forsøg i ${sd === 'L' ? 'venstre' : 'højre'} side stoppes: ${tag(back)} (${def.team.name}) lukker kanten mod ${tag(winger)}.`
+        ? `❌ Dit cutback-forsøg stoppes: ${tag(back)} (${def.team.name}) lukker kanten mod ${tag(winger)}.`
         : `🛡️ [${def.team.name}] ${tag(back)} lukker kanten mod ${tag(winger)} (${att.team.name}).`);
       if (rng.chance(CROSS_CORNER_P)) corner(att, def, cR, dR, min);
       return;
     }
     const finisher = receiver(att, SPOT.CUTBACK, (p) => p.skills.finishing, winger, { attacking: true, ballX: wx }, SHOT_REACH, notCB(att), true);
-    const lead = own(att) ? `✅ ${tag(winger)} når baglinjen i ${sd === 'L' ? 'venstre' : 'højre'} side og lægger den lavt tilbage til ${tag(finisher)}.` : '';
+    const lead = own(att) ? `✅ ${tag(winger)} når baglinjen og lægger den lavt tilbage til ${tag(finisher)}.` : '';
     if (!lead) addEv(min, 'INFO', 'PLAY', att.isHome, false, 'Mod baglinjen', `↩️ [${att.team.name}] ${tag(winger)} kommer forbi ${tag(back)} og spiller bolden tilbage i feltet.`);
     sheet.adjust(winger.id, 0.15);
     const c = act('cb', att, winger, finisher, 0);

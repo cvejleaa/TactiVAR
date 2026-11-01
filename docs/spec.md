@@ -264,7 +264,7 @@ Tick hvert 3. minut (1..90).
   Højre: 78 % på den side – og forudsigeligt: deres back på den side får +0,5 i kantduellen (`SIDE` i match.js). Samme ene
   rng-træk. Indlæg: siden afgør kun, hvem der slår indlægget (luftduellen er en forsvarer i feltet). Centralt fokus har næsten
   ingen kantangreb, så valget virker der knap. Fuldtidsanalysen: "kantangreb N i venstre mod #x Back (n lukket), …"; Dit felt:
-  "· 6 af 8 kantangreb kom i din højre side (mod #3 …)" ved ≥ 2/3. Referatet: "Dit cutback-forsøg i venstre side stoppes …".
+  "· 6 af 8 kantangreb kom i din højre side (mod #3 …)" ved ≥ 2/3.
   Målt (`tools/measure-side.mjs 140`, 1960 kampe pr. celle, lave cutbacks, ≈ 1 styret kantangreb pr. kamp): andel venstre Begge
   53 % / 57 % (deres højre back −6 PAC+POS), Venstre 80 %, Højre 22 % (før 50 % overalt). Netto mod den svage back: Begge 0,33,
   Venstre 0,33, Højre 0,27 – det forkerte valg koster ≈ 0,06; mod normale backs koster et fast valg ≈ 0,04 (forudsigelighed).

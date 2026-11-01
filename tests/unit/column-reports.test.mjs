@@ -6,10 +6,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRng } from '../../public/engine/rng.js';
 import { createLeague } from '../../public/engine/generator.js';
-import { simulateMatch } from '../../public/engine/match.js';
+import { simulateMatch, oppSideLine } from '../../public/engine/match.js';
 
 const league = (seed) => createLeague(createRng(seed));
-const KEYS = ['build', 'buildWon', 'counterGoalsAgainst', 'countersAgainst', 'crosses', 'crossesWon', 'cutbackGoals', 'cutbacks', 'cutbacksBlocked', 'end', 'headerGoals', 'oppCrosses', 'oppCrossesWon', 'oppCutbacks', 'oppCutbacksBlocked', 'oppTrapWon', 'press', 'pressWon', 'runGoals', 'runs', 'runsWon', 'side', 'start', 'trapWon'];   // v3.16.7: trapWon/oppTrapWon
+const KEYS = ['backL', 'backR', 'build', 'buildWon', 'counterGoalsAgainst', 'countersAgainst', 'crosses', 'crossesWon', 'cutbackGoals', 'cutbacks', 'cutbacksBlocked', 'end', 'headerGoals', 'oppBackL', 'oppBackR', 'oppCrosses', 'oppCrossesWon', 'oppCutbacks', 'oppCutbacksBlocked', 'oppTrapWon', 'oppWideL', 'oppWideR', 'press', 'pressWon', 'runGoals', 'runs', 'runsWon', 'side', 'start', 'trapWon', 'wideL', 'wideLStop', 'wideR', 'wideRStop'];   // v3.16.7: trapWon/oppTrapWon; v3.26.0: kantangreb pr. side (wide*/back*, opp*)
 
 test('endState: faser og trukne positioner gemmes kun for MENNESKESTYREDE sider – hjemme, ude, begge og ingen', () => {
   const mk = (seed, human) => { const L = league(seed); const [A, B] = [L.teams[0], L.teams[1]]; A.isBot = !human.includes('home'); B.isBot = !human.includes('away'); A.tactics.customCoords = { 6: { x: 40, y: 40 } }; B.tactics.customCoords = { 7: { x: 60, y: 30 } }; A.tactics.conditionalRules = [];   /* intet Hvis-Så-skift, der nulstiller positionerne (v3.17.0: hjemme kom bagud) */ return { A, B, m: simulateMatch(A, B, createRng(seed + 1)) }; };
@@ -70,7 +70,9 @@ test('ownReport: modstander-tallene er modstanderens egne (cutbacks og høje bol
     const ft = m.events.find((e) => e.type === 'FULLTIME');
     const ownerRep = ft.isHome ? a : b;
     // v3.16.3-ordlyden: "cutbacks stoppet M af N · luftdueller i åbent spil vundet …"
-    assert.ok(ft.text.includes(`Dit felt: modstanderens cutbacks stoppet ${ownerRep.oppCutbacksBlocked} af ${ownerRep.oppCutbacks} · luftdueller i åbent spil vundet ${ownerRep.oppCrosses - ownerRep.oppCrossesWon} af ${ownerRep.oppCrosses}.`), `${ft.text.slice(-120)} | ${JSON.stringify(ownerRep)}`);
+    assert.ok(ft.text.includes(`Dit felt: modstanderens cutbacks stoppet ${ownerRep.oppCutbacksBlocked} af ${ownerRep.oppCutbacks} · luftdueller i åbent spil vundet ${ownerRep.oppCrosses - ownerRep.oppCrossesWon} af ${ownerRep.oppCrosses}${oppSideLine(ownerRep)}.`), `${ft.text.slice(-120)} | ${JSON.stringify(ownerRep)}`);
+    // v3.26.0: siderne mod mig er modstanderens egne (hans venstre = min højre)
+    assert.deepEqual([a.oppWideL, a.oppWideR, a.oppBackL, a.oppBackR], [b.wideL, b.wideR, b.backL, b.backR], `seed ${seed}: sider`);
     const g = (n) => `${n} ${n === 1 ? 'gang' : 'gange'}`;   // v3.16.7: "af 1 gang"
     // v3.16.7: offside-fælden står for sig – egne offsides i opbygningen, fælde-sejre i presset
     const off = ownerRep.oppTrapWon, trap = ownerRep.trapWon;
