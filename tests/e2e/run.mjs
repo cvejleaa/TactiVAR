@@ -431,7 +431,7 @@ try {
     check('Angrebsside: Fase 1 har feltet mellem Angrebsfokus og Løb uden bold', fields.join() === 'passingStyle,attackFocus,attackSide,offBallRuns', fields.join());
     check('Angrebsside: Venstre (LW/LB) / Begge / Højre (RW/RB), et nyt spil står på Begge', (await g.locator(`${sideSel} option`).allTextContents()).join('|') === 'Venstre (LW/LB)|Begge|Højre (RW/RB)' && (await g.inputValue(sideSel)) === 'BOTH');
     { const help = await g.textContent('#tactics fieldset[data-phase="phase1_buildUp"] .phase-help');   // QC v3.26.0: ærlig om effekten
-    check('Angrebsside: hjælpeteksten nævner ca. 3 af 4, den lille effekt og at deres back læser et fast valg ved cutbacks', /ca\. 3 af 4 kantangreb/.test(help) && help.includes('en lille fordel, ca. ét styret kantangreb pr. kamp') && help.includes('ved cutbacks læser deres back på den side det') && help.includes('kun en fast side mod en tydeligt svag back'), help.slice(-300)); }
+    check('Angrebsside: hjælpeteksten nævner ca. 3 af 4, den lille effekt og at deres back læser et fast valg ved cutbacks', /ca\. 3 af 4 kantangreb/.test(help) && help.includes('en lille fordel, ca. ét styret kantangreb pr. kamp') && help.includes('ved cutbacks læser deres back på den side det') && help.includes('Begge finder selv en svag back – et fast valg er højst lige så godt'), help.slice(-300)); }
     await g.selectOption(sideSel, 'LEFT'); await reload();
     check('Angrebsside: Venstre gemmes straks og overlever F5', (await g.inputValue(sideSel)) === 'LEFT');
     await g.selectOption(sideSel, 'BOTH'); await reload();

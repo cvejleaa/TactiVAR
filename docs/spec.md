@@ -268,7 +268,8 @@ Tick hvert 3. minut (1..90).
   ved mindst 5 og ≥ ¾ (QC: 2 af 3 mod en Begge-bot var støj). Cutbacks fra løb på kanten tælles ikke som kantangreb.
   Målt (`tools/measure-side.mjs 140`, 1960 kampe pr. celle, lave cutbacks, ≈ 1 styret kantangreb pr. kamp): andel venstre Begge
   53 % / 57 % (deres højre back −6 PAC+POS), Venstre 80 %, Højre 22 % (før 50 % overalt). Netto mod den svage back: Begge 0,33,
-  Venstre 0,33, Højre 0,27 – det forkerte valg koster ≈ 0,06; mod normale backs koster et fast valg ≈ 0,04 (forudsigelighed).
+  Venstre 0,33, Højre 0,27 (−10: 0,354/0,354/0,278; −14: 0,367/0,365/0,282 – et fast valg slår aldrig Begge, som selv finder
+  den svage back; hjælpeteksten siger det) – det forkerte valg koster ≈ 0,06; mod normale backs koster et fast valg ≈ 0,04 (forudsigelighed).
   Virkningen er lille, fordi der er ca. ét styret kantangreb pr. kamp (fokusandelen, nr. 6). Siderne er private (ownReports,
   §3); fordelingen under Begge røber en smule om modstanderens skjulte back-evner – accepteret.
 - **Angrebsfokus afgør chancens type (v3.12**, brugeren: "Jeg har sat mit hold til cutbacks, og
