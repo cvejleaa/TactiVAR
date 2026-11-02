@@ -405,7 +405,7 @@ try {
     const s8 = await st();
     check('F2 Taktik: ⓘ åbner panelet med netop ham (✕ har fokus, hans række har omridset)', s8.open === 'ja' && s8.cards === 1 && s8.inApp === 0 && s8.title === nm(byP(slots0[2])) && s8.act === 'card-close' && JSON.stringify(await marked('#lineup-list tr.carded')) === JSON.stringify([slots0[2]]), JSON.stringify(s8));
     await tp.click('#pitch .token[data-slot="5"]');
-    const s9 = await st(), ppm = await tp.textContent('#panel-pick-msg').catch(() => 'mangler');
+    const s9 = await st(), ppm = await tp.textContent('#panel-pick-msg').then((t) => t.replace(' – luk kortet (✕) for at vælge', '')).catch(() => 'mangler');
     check('F2 Taktik: åbent panel + klik på din egen brik → panelet viser stadig samme spiller, og byt-beskeden står også i panelets hoved', s9.open === 'ja' && s9.title === nm(byP(slots0[2])) && ppm.includes(byP(slots0[5]).shortName) && ppm === await tp.textContent('#pick-msg').then((t) => t.replace(' Se kort ›', '')), `${s9.title} | ${ppm}`);
     const benchPid = await tp.evaluate(() => document.querySelector('#bench tr.bench-p')?.dataset.pid);
     await tp.click(`#bench tr.bench-p[data-pid="${benchPid}"] td:first-child`);
@@ -672,8 +672,8 @@ try {
       await seeOther(b1.i, 'trup');
       await tp.click(`#matrix tbody tr[data-pid="${b1.id}"]`); await tp.click('#buy-player');
       const r1 = await receipt(b1.id), want = `💰 ${b1.shortName} er købt og står nu i din trup.`;
-      check('F2 TM køb (Trup): kvitteringen står i panelet – "💰 Købt", teksten, intet kort, ◀ ▶ slået fra, panelet navngivet af kvitteringen, fokus i panelet, spilleren væk fra den gamle trup og et link til ham',
-        r1.open === 'ja' && r1.title === '💰 Købt' && r1.cards === 0 && r1.notice === want && r1.prevD === true && r1.nextD === true && r1.lab === 'cp-title' && r1.labText === '💰 Købt' && r1.body && r1.rowGone && r1.inPanel && r1.toSquad === `Se ${b1.shortName} i din trup ›`, JSON.stringify(r1));
+      check('F2 TM køb (Trup): kvitteringen står i panelet – "💰 Købt", teksten, intet kort, ingen ◀ ▶ (de ville ikke gøre noget), panelet navngivet af kvitteringen, fokus i panelet, spilleren væk fra den gamle trup og et link til ham',
+        r1.open === 'ja' && r1.title === '💰 Købt' && r1.cards === 0 && r1.notice === want && r1.prevD === undefined && r1.nextD === undefined && r1.lab === 'cp-title' && r1.labText === '💰 Købt' && r1.body && r1.rowGone && r1.inPanel && r1.toSquad === `Se ${b1.shortName} i din trup ›`, JSON.stringify(r1));
       await tp.click('#panel-to-squad');
       const me1 = mine(await save(tp)).squad.find((x) => x.id === b1.id);
       const t1 = await tp.evaluate((id) => ({ trup: !!document.querySelector('.tabpane.tab-trup'), scout: document.querySelectorAll('#scout-banner').length, title: document.getElementById('cp-title')?.textContent, cards: document.querySelectorAll('#cardpanel #player-card').length,
@@ -690,7 +690,7 @@ try {
       if (!(await tp.locator(`#lineup-list .lp-info[data-pid="${b2.id}"]`).count())) await tp.locator('#lineup-list .toolbar button', { hasText: 'Alle' }).click();
       await tp.click(`#lineup-list .lp-info[data-pid="${b2.id}"]`); await tp.click('#buy-player');
       const r2 = await receipt(b2.id);
-      check('F2 TM køb (Taktik): samme kvittering i panelet – og et andet holds liste har ikke længere ham', r2.open === 'ja' && r2.title === '💰 Købt' && r2.cards === 0 && r2.notice === `💰 ${b2.shortName} er købt og står nu i din trup.` && r2.prevD && r2.nextD && r2.rowGone && r2.inPanel && r2.toSquad === `Se ${b2.shortName} i din trup ›`, JSON.stringify(r2));
+      check('F2 TM køb (Taktik): samme kvittering i panelet – og et andet holds liste har ikke længere ham', r2.open === 'ja' && r2.title === '💰 Købt' && r2.cards === 0 && r2.notice === `💰 ${b2.shortName} er købt og står nu i din trup.` && r2.prevD === undefined && r2.nextD === undefined && r2.rowGone && r2.inPanel && r2.toSquad === `Se ${b2.shortName} i din trup ›`, JSON.stringify(r2));
       const other = await tp.evaluate(() => document.querySelector('#lineup-list .lp-info').dataset.pid);
       await tp.click(`#lineup-list .lp-info[data-pid="${other}"]`);
       const r3 = await receipt(other);
@@ -779,6 +779,43 @@ try {
       check('F2 TM panelet: rullet 200 px sidder hovedet (✕ ◀ ▶) stadig øverst og kan trykkes; kortets egen h3 er skjult (1 × 1 px, absolut) – navnet står kun i hovedet',
         hd.st > 100 && Math.abs(hd.headTop - hd.panelTop) <= 1.5 && hd.closeHit === 'card-close' && hd.tw <= 2 && hd.th <= 2 && hd.pos === 'absolute', JSON.stringify(hd));
       await c.close();
+    }
+    // (R) Rollernes rettelser før merge (QC forbehold 1, Spilfører UI S1–S3): banens lilla ring følger panelet – byt i gang går forrest;
+    // panelets kopi af byt-beskeden kun hvor listen er dækket (< 1200 px) og lukke-hintet kun på arket (≤ 900 px)
+    {
+      const tp = await fresh();
+      const ring = () => tp.evaluate(() => [...document.querySelectorAll('#pitch .token.selected')].map((t) => t.dataset.slot));
+      // et andet hold: klik brik 4 → ⓘ på plads 6 → ringen står på panelets nye spiller (før: blev på brik 4)
+      await tt(tp, 'liga'); await tp.selectOption('#team-select', '1'); await tp.waitForSelector('#scout-banner'); await tt(tp, 'taktik');
+      await tp.click('#pitch .token[data-slot="4"]');
+      const r0 = await ring();
+      const other = (await save(tp)).league.teams[1].tactics.lineupSlots;
+      await tp.locator('#lineup-list .toolbar button', { hasText: 'Alle' }).click();   // brikken filtrerede listen til hans kæde
+      await tp.click(`#lineup-list .lp-info[data-pid="${other[6]}"]`);
+      const r1 = await tp.evaluate(() => ({ nr: document.getElementById('cp-title').textContent.match(/^#(\d+)/)[1],
+        ring: [...document.querySelectorAll('#pitch .token.selected')].map((x) => x.querySelector('.token-num').textContent) }));
+      check('F2 roller: et andet hold – ringen står på brik 4 ved klikket og FØLGER panelet ved ⓘ på en anden (aldrig to lilla markeringer på to spillere)',
+        JSON.stringify(r0) === '["4"]' && JSON.stringify(r1.ring) === JSON.stringify([r1.nr]), JSON.stringify({ r0, r1 }));
+      // dit hold: byt i gang med A (brik 9) og ⓘ på B → ringen bliver på A (byttet går forrest); byttet afsluttet → ringen på panelets spiller
+      await tp.click('#scout-back'); await tp.waitForSelector('#scout-banner', { state: 'detached' });
+      if (!(await tp.locator('.tabpane.tab-taktik').count())) await tt(tp, 'taktik');
+      const slots = mine(await save(tp)).tactics.lineupSlots;
+      await tp.click('#pitch .token[data-slot="9"]');
+      await tp.click(`#lineup-list .lp-info[data-pid="${slots[10]}"]`);   // brikken filtrerer listen til hans kæde – B er fra samme kæde
+      const a1 = { ring: await ring(), title: await title(tp) };
+      await tp.click('#pitch .token[data-slot="5"]');   // byttet 9 ⇄ 5 afsluttes
+      const a2 = { ring: await ring(), title: await title(tp), swapped: mine(await save(tp)).tactics.lineupSlots[9] === slots[5] };
+      check('F2 roller: dit hold – byt i gang med brik 9 og ⓘ på en anden: ringen bliver på 9 (byttet går forrest); efter byttet står ringen på panelets spiller (plads 10), ikke på den sidst klikkede brik',
+        JSON.stringify(a1.ring) === '["9"]' && a1.title === nm(mine(await save(tp)).squad.find((x) => x.id === slots[10])) && a2.swapped && JSON.stringify(a2.ring) === '["10"]', JSON.stringify({ a1, a2 }));
+      // panelets kopi af byt-beskeden: skjult ved 1400 (listen ses ved siden af), synlig med lukke-hint ved 390; hintet skjult ved 1000
+      await tp.click('#pitch .token[data-slot="7"]');
+      const vis = () => tp.evaluate(() => { const m = document.getElementById('panel-pick-msg'), hnt = m?.querySelector('.cp-close-hint'); return { m: !!m && m.offsetParent !== null, hint: !!hnt && hnt.offsetParent !== null, text: m?.innerText ?? null }; });
+      const w1400 = await vis();
+      await tp.setViewportSize({ width: 1000, height: 900 }); const w1000 = await vis();
+      await tp.setViewportSize({ width: 390, height: 844 }); const w390 = await vis();
+      check('F2 roller: panelets byt-besked er skjult ved 1400 (listens besked ses), vises uden lukke-hint ved 1000 og med "luk kortet (✕) for at vælge" ved 390',
+        !w1400.m && w1000.m && !w1000.hint && w390.m && w390.hint && w390.text.includes('luk kortet (✕) for at vælge'), JSON.stringify({ w1400, w1000, w390 }));
+      await tp.context().close();
     }
   };
   if (process.env.F2_ONLY) { await f2(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun F2-blokken (kortpanelet – hurtig mutationskørsel)

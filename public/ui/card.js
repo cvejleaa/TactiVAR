@@ -60,16 +60,17 @@ export function renderCard({ player: p, team, isOwn, scouting, note, onNote, tea
 // Kortpanelet (v3.29.0, UI-ombygningen F2): ét panel uden for siden – hoved med ◀ ▶ (bladrer i listens rækkefølge, bytter aldrig),
 // navnet og ✕; under det byt-beskeden og kvitteringen (køb) og så kortet. Kortets egen h3 skjules i panelet (CSS) og navngiver dialogen.
 // card = renderCard(...) eller null (kun kvitteringen: spilleren er købt og står ikke længere i holdet)
-export function renderCardPanel({ card, title, onClose, onPrev = null, onNext = null, pickMsg = '', msg = '' }) {
+// nav = false: kvitteringen uden spiller – ingen ◀ ▶, der ikke gør noget (Spilfører UI v3.29.0)
+export function renderCardPanel({ card, title, onClose, nav = true, onPrev = null, onNext = null, pickMsg = '', msg = '' }) {
   const h3 = card?.querySelector?.('.card-head h3');
   if (h3) h3.id = 'card-title';
   return [
     h('div', { class: 'cp-head' },
-      h('button', { class: 'cp-nav', id: 'card-prev', type: 'button', title: 'Forrige spiller i listen', 'aria-label': 'Forrige spiller', disabled: !onPrev, onclick: () => onPrev?.() }, '◀'),
-      h('button', { class: 'cp-nav', id: 'card-next', type: 'button', title: 'Næste spiller i listen', 'aria-label': 'Næste spiller', disabled: !onNext, onclick: () => onNext?.() }, '▶'),
+      nav ? h('button', { class: 'cp-nav', id: 'card-prev', type: 'button', title: 'Forrige spiller i listen', 'aria-label': 'Forrige spiller', disabled: !onPrev, onclick: () => onPrev?.() }, '◀') : null,
+      nav ? h('button', { class: 'cp-nav', id: 'card-next', type: 'button', title: 'Næste spiller i listen', 'aria-label': 'Næste spiller', disabled: !onNext, onclick: () => onNext?.() }, '▶') : null,
       h('strong', { class: 'cp-title', id: 'cp-title' }, title),
       h('button', { class: 'cp-close', id: 'card-close', type: 'button', title: 'Luk spillerkortet (Esc)', 'aria-label': 'Luk spillerkortet', onclick: onClose }, '✕')),
-    pickMsg ? h('div', { class: 'notice cp-msg', id: 'panel-pick-msg' }, pickMsg) : null,
+    pickMsg ? h('div', { class: 'notice cp-msg', id: 'panel-pick-msg' }, pickMsg, h('span', { class: 'cp-close-hint' }, ' – luk kortet (✕) for at vælge')) : null,
     msg ? h('div', { class: 'notice cp-msg', id: 'panel-notice' }, msg) : null,
     card,
   ];

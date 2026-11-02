@@ -501,7 +501,8 @@ function renderNow() {
     onOpenMatch: (hi, ai) => { const i = lr.matches.findIndex((m) => m.homeId === league.teams[hi]?.id && m.awayId === league.teams[ai]?.id); if (i >= 0) openReport(i); } }) : null;
 
   const pitch = h('div', { class: 'panel' }, h('h3', { id: 'pitch-title' }, `${team.name} – ${team.tactics.baseFormation}`), isOwn ? null : h('div', { class: 'muted', id: 'pitch-opp' }, 'Modstanderhold – kun offentlige data'),
-    renderPitch({ team, isOwn, ui: view, pairs: isOwn ? lineupPairs(team, chemRefOf(league)) : null,
+    // Ringen (QC/Spilfører UI v3.29.0): byt i gang, ellers panelets spiller, ellers den gamle markering (fixIssue) – aldrig to lilla på to spillere
+    renderPitch({ team, isOwn, ui: { ...view, selectedPlayerId: view.pitchSwapId ?? sel?.id ?? view.selectedPlayerId }, pairs: isOwn ? lineupPairs(team, chemRefOf(league)) : null,
       // Egen brik: byt som før – panelet åbnes og skifter IKKE (brugerens valg 2026-11-02); et andet hold: klik åbner kortet
       onSelect: (p, own) => { if (own) { view.listLine = p.line; pickForSwap(team, p); } else { view.selectedPlayerId = p.id; view.listLine = p.line; openCard(p.id, `.lp-info[data-pid="${p.id}"]`); } },
       onTokenSwap: (a, b) => { clearSwap(); view.notice = ''; withChem(team, () => change(() => act.swapPlayers(team, a, b))); },
@@ -627,7 +628,7 @@ function drawCardPanel(cs, card, team, isOwn, tab, refocus) {
   const goto = (j) => (j >= 0 && j < ids.length ? () => openCard(ids[j]) : null);
   const toSquad = cs.bought ? h('button', { class: 'linklike', id: 'panel-to-squad', onclick: () => { const id = cs.pid; showTeam(myIdx()); if (tabNow() !== 'trup') showTab('trup'); view.selectedPlayerId = id; openCard(id, `#matrix tr[data-pid="${id}"]`); } }, `Se ${cs.boughtName ?? 'ham'} i din trup ›`) : null;
   cardpanel.replaceChildren(...renderCardPanel({ card: card ?? h('div', { class: 'panel cp-receipt' }, toSquad),
-    title: p ? `#${p.shirtNumber} ${p.name}` : '💰 Købt', onClose: closeCard, onPrev: p ? goto(i - 1) : null, onNext: p ? goto(i + 1) : null,
+    title: p ? `#${p.shirtNumber} ${p.name}` : '💰 Købt', onClose: closeCard, nav: !!p, onPrev: p ? goto(i - 1) : null, onNext: p ? goto(i + 1) : null,
     pickMsg: tab === 'taktik' && isOwn ? view.pickMsg ?? '' : '', msg: cs.msg ?? '' }).filter(Boolean));
   cardpanel.hidden = false; cardpanel.dataset.open = 'ja'; cardpanel.dataset.n = String(cs.n);
   cardpanel.setAttribute('aria-labelledby', card ? 'card-title' : 'cp-title');

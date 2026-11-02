@@ -369,4 +369,7 @@ body.has-bar { padding-bottom: 4.5rem; }
 /* Byt i gang (.pick-live) på smal skærm: beskeden med "Se kort ›" står fast over Spil-bjælken, til byttet er afsluttet (QC/Spilfører UI:
    ved et tryk på den øverste brik lå den bag bjælken – 390 px: top 726 = bjælkens top). Bagefter (🤝-beskeden) står den i listen igen. */
 @media (max-width: 900px) { #pick-msg.pick-live { position: fixed; left: .5rem; right: .5rem; bottom: calc(var(--bar-h, 0px) + 6px); z-index: 22; margin: 0; box-shadow: 0 4px 16px #000c; } }
+/* Panelets kopi af byt-beskeden (Spilfører UI/QC v3.29.0): fra 1200 px står listen ved siden af panelet – kun dér; lukke-hintet kun på arket (≤ 900 px) */
+@media (min-width: 1200px) { #panel-pick-msg { display: none; } }
+@media (min-width: 901px) { .cp-close-hint { display: none; } }
 @media (max-width: 600px) { #pick-msg.pick-live { bottom: calc(57px + env(safe-area-inset-bottom) + var(--bar-h, 0px) + 6px); } }
