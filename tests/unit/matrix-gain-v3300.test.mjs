@@ -76,7 +76,7 @@ test('Træning-tabellen: "Sidste runde" samlet ("+2 Afslutning"), den markerede 
   assert.ok(!byId(t, 'training-next').textContent.includes('Ingen +1'), 'der VAR +1 i runden');
   // tom runde: "Ingen +1 efter runde R" – sæsonens runde (roundLabel), ikke ligaens
   const empty = renderTrainingTable({ team: me, report: { round: 5, gains: [{ id: 'solgt', skill: 'pace' }], injuries: [] }, roundLabel: 2, onLine() {}, onFocus() {}, onFocusMany() {} });
-  assert.ok(byId(empty, 'training-next').textContent.startsWith('Ingen +1 efter runde 2 · nærmest: #'), byId(empty, 'training-next').textContent);
+  assert.ok(byId(empty, 'training-next').textContent.startsWith('Ingen +1 efter runde 2 · nærmest et +1: #'), byId(empty, 'training-next').textContent);
   assert.equal(all(empty, (e) => e.tag === 'tr' && hasClass(e, 'selected')).length, 0);
 });
 
@@ -87,8 +87,8 @@ test('trainingNext: nærmest = den med færrest runder til næste +1 (evnen ved 
   a.trainingFocus = 'FINISH'; a.dev = { finishing: 0.999 }; a.skills.finishing = 10;
   b.trainingFocus = 'GENERAL';
   const txt = trainingNext(me, null, 4);
-  assert.ok(txt.startsWith(`Nærmest: #${a.shirtNumber} ${a.shortName} Afslutning om ~`), txt);
-  assert.ok(txt.endsWith(' · 1 træner Alsidig'), txt);
+  assert.ok(txt.startsWith(`Nærmest et +1: #${a.shirtNumber} ${a.shortName} Afslutning om ~`), txt);
+  assert.ok(txt.endsWith(' · 1 træner stadig Alsidig'), txt);
   assert.ok(!txt.includes('Ingen +1'), 'uden rapport (ingen runde spillet) siges intet om en tom runde');
   // alle hviler: ingen "nærmest" og ingen Alsidig → ingen linje
   b.trainingFocus = 'REST'; a.trainingFocus = 'REST';

@@ -34,7 +34,7 @@ select:disabled, input:disabled { opacity: .55; }
 
 @media (max-width: 900px) { .tactics-layout { grid-template-columns: 1fr; } }
 /* v3.20.1: Taktik – bane | liste øverst, indstillinger | kort under; på smal skærm bane, liste, indstillinger, kort (byt-listen tæt på banen) */
-/* v3.29.0: kortet står i panelet – Taktik er bane | liste over indstillingerne (hele bredden); Trup har træningsoversigten i hele bredden */
+/* v3.29.0: kortet står i panelet – Taktik er bane | liste over indstillingerne (hele bredden); Trup har regnearket i hele bredden (v3.30.0: træningen har sin egen fane) */
 .taktik-layout { grid-template-areas: "pitch list" "tactics tactics"; } .tk-pitch { grid-area: pitch; } .tk-list { grid-area: list; } .tk-tactics { grid-area: tactics; }
 @media (max-width: 900px) { .taktik-layout { grid-template-areas: "pitch" "list" "tactics"; } }
 .trup-help { margin: 0 0 -.5rem; }

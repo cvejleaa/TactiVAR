@@ -297,7 +297,7 @@ export function repairLineup(team, goneLine = new Map()) {
   return changed;
 }
 
-// Træningsestimatet (v3.19.0) – ÉN kilde for kortet og træningsoversigten i Trup: fokus, pris, fremdrift og runder til næste +1
+// Træningsestimatet (v3.19.0) – ÉN kilde for kortet og 🏋️ Træning-fanen: fokus, pris, fremdrift og runder til næste +1
 // pr. trænet evne (kampene tæller med for en starter), og hvorfor det går langsomt.
 export function trainingEstimate(p, starter = false) {
   const key = validFocus(p, p.trainingFocus) ? p.trainingFocus : 'GENERAL', f = FOCUS[key], room = roomOf(p);

@@ -37,8 +37,8 @@ export function trainingNext(team, report, roundLabel) {
   const parts = [
     report && !report.gains.some((g) => known.has(g.id)) ? `Ingen +1 efter runde ${roundLabel}` : null,
     // samme ord som tabellens "Næste +1" (over 14 runder: "> 1 sæson")
-    best ? `nærmest: #${best.p.shirtNumber} ${best.p.shortName} ${SKILL_NAME[best.skill]} ${best.n > 14 ? 'om mere end en sæson' : `om ~${best.n} rd`}` : null,
-    general ? `${general} træner Alsidig` : null,
+    best ? `nærmest et +1: #${best.p.shirtNumber} ${best.p.shortName} ${SKILL_NAME[best.skill]} ${best.n > 14 ? 'om mere end en sæson' : `om ~${best.n} rd`}` : null,
+    general ? `${general} træner stadig Alsidig` : null,
   ].filter(Boolean);
   if (!parts.length) return null;
   const txt = parts.join(' · ');

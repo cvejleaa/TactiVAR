@@ -562,7 +562,10 @@ function renderNow() {
       mc?.playing && seasonJustEnded(league) ? h('div', { class: 'notice', id: 'turnover-booked' }, '🗓 Sæsonen sluttede med denne runde: alle er blevet et år ældre, og sæsonrapporten med ungdomstilbuddene står på Liga, når kampene er spillet.') : null,
       // v3.30.0: træningen står på sin egen fane – her kun "+N" i regnearket og, når der er nogen, hvad de betyder og hvor træningen står
       h('div', { class: 'muted help trup-help', id: 'trup-help' }, 'Klik på en spiller for at åbne spillerkortet',
-        anyGain ? h('span', { id: 'trup-gain-help' }, ` · +1 = steg efter runde ${ownRound} (træning og kampe) · træningen står på `,
+        anyGain ? h('span', { id: 'trup-gain-help' }, ` · +N = antal +1 efter runde ${ownRound} (træning og kampe) · træningen står på `,
+          h('button', { class: 'linklike', id: 'trup-to-training', onclick: () => showTab('traening') }, '🏋️ Træning ›')) : null,
+        // QC v3.30.0: lige efter sæsonslut er alle blevet et år ældre, så tallene kan være faldet – derfor ingen "+N" her, selv om Træning viser rundens +1
+        !anyGain && isOwn && ownRep && seasonJustEnded(league) && gainsByPlayer(ownRep).size ? h('span', { id: 'trup-gain-aged' }, ' · ingen +N lige efter sæsonslut: alle er blevet et år ældre – rundens +1 står på ',
           h('button', { class: 'linklike', id: 'trup-to-training', onclick: () => showTab('traening') }, '🏋️ Træning ›')) : null), matrix],
     // 🏋️ Træning (v3.30.0): altid DIT hold – bygget fra mine, uanset hvilket hold der vises i Trup (ingen scout-bjælke, intet kortpanel).
     // Øverst rundens opsamling (fra Trup), så hele træningsfladen; det ENE sted, fokus sættes

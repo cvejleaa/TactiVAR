@@ -207,7 +207,7 @@ try {
             name: getComputedStyle(document.querySelector(`#matrix tr[data-pid="${p0.id}"] td.player-gain`), '::after').display, help: help?.textContent ?? null }; });
         check('v3.30.0 Trup: "+1" præcis på de 2 evner i rapporten – title "+1 <evne> efter runde 1" (sæsonens runde), et lille grønt mærke (::after viser "+1" fra data-gain), og cellens tekst er stadig tallet',
           gx.n === 2 && gx.title === gx.want && gx.gain === '1' && gx.num === gx.val && gx.content === '"+1"' && gx.bg === 'rgb(11, 51, 38)' && gx.disp === 'inline-block' && gx.name === 'none', JSON.stringify(gx));
-        check('v3.30.0 Trup: hjælpelinjen forklarer "+1" (kun når der er mærker) og linker til Træning', gx.help === ' · +1 = steg efter runde 1 (træning og kampe) · træningen står på 🏋️ Træning ›', JSON.stringify(gx.help));
+        check('v3.30.0 Trup: hjælpelinjen forklarer "+1" (kun når der er mærker) og linker til Træning', gx.help === ' · +N = antal +1 efter runde 1 (træning og kampe) · træningen står på 🏋️ Træning ›', JSON.stringify(gx.help));
         await tp.click('#trup-to-training'); await tp.waitForSelector('.tabpane.tab-traening');
         check('v3.30.0 Trup: "🏋️ Træning ›" i hjælpelinjen åbner Træning', (await tp.textContent('#tabs .tab.active')).includes('Træning') && (await tp.isVisible('#training-table'))); }
       // linkene fører det rigtige sted hen
@@ -2329,6 +2329,8 @@ try {
         return { ended: !!seasonJustEnded(L), n: L.trainingReport[me.id].gains.filter((x) => me.squad.some((p) => p.id === x.id)).length }; });
       await g.reload(); await g.waitForSelector('body[data-klar="ja"]'); await tab('trup');
       const marks = await g.locator('#matrix td.gain, #matrix td.player-gain, #trup-gain-help').count();
+      const aged = (await g.locator('#trup-gain-aged').count()) ? await g.textContent('#trup-gain-aged') : '';
+      check('v3.30.0 Sæsonslut (QC): Trup siger hvorfor der ingen "+N" er, og linker til Træning', aged === ' · ingen +N lige efter sæsonslut: alle er blevet et år ældre – rundens +1 står på 🏋️ Træning ›', JSON.stringify(aged));
       await tab('traening'); const sum = await g.textContent('#training-summary').catch(() => '');
       check('v3.30.0 Sæsonslut: ingen "+N" i Trup lige efter sæsonskiftet – selv om rapporten har +1 for truppen (de står på Træning)', se.ended && se.n >= 2 && marks === 0 && sum.includes('+1'), JSON.stringify({ se, marks, sum })); }
   }
