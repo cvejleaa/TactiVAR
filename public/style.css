@@ -34,9 +34,11 @@ select:disabled, input:disabled { opacity: .55; }
 
 @media (max-width: 900px) { .tactics-layout { grid-template-columns: 1fr; } }
 /* v3.20.1: Taktik – bane | liste øverst, indstillinger | kort under; på smal skærm bane, liste, indstillinger, kort (byt-listen tæt på banen) */
-.taktik-layout { grid-template-areas: "pitch list" "tactics card"; } .tk-pitch { grid-area: pitch; } .tk-list { grid-area: list; } .tk-tactics { grid-area: tactics; } .tk-card { grid-area: card; }
-@media (max-width: 900px) { .taktik-layout { grid-template-areas: "pitch" "list" "tactics" "card"; } }
-.trup-layout { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); } @media (max-width: 900px) { .trup-layout { grid-template-columns: 1fr; } }
+/* v3.29.0: kortet står i panelet – Taktik er bane | liste over indstillingerne (hele bredden); Trup har træningsoversigten i hele bredden */
+.taktik-layout { grid-template-areas: "pitch list" "tactics tactics"; } .tk-pitch { grid-area: pitch; } .tk-list { grid-area: list; } .tk-tactics { grid-area: tactics; }
+@media (max-width: 900px) { .taktik-layout { grid-template-areas: "pitch" "list" "tactics"; } }
+.trup-layout { display: grid; grid-template-columns: minmax(0, 1fr); }
+.trup-help { margin: 0 0 -.5rem; }
 .bench { margin-top: .5rem; display: flex; flex-wrap: wrap; gap: .3rem; align-items: center; } .bench h4 { margin: 0 .3rem 0 0; }
 .bench-p.injured { color: #fda4af; }
 .empty { text-align: center; padding: 2rem; color: var(--dæmpet); }
@@ -333,3 +335,38 @@ body.has-bar { padding-bottom: 4.5rem; }
   .scoutbar { top: 0; flex-wrap: nowrap; padding: .35rem .5rem; } .scout-long { display: none; } .scoutbar select { min-width: 0; flex: 1; }
   .home-last { flex-wrap: wrap; } .home-last .right { text-align: left; } .home-score { font-size: var(--fs-3); }
 }
+
+/* ---------- UI-ombygningen F2 (v3.29.0): spillerkortet som ét panel ---------- */
+/* #cardpanel er rulle-elementet. Computer (> 900 px): fast fra højre under topbaren og scout-bjælken, over Spil-bjælken. ≤ 900 px: et ark
+   fra bunden (højst 70 % af højden) – over Spil-bjælken; ≤ 600 px over den faste navigation og hen over Spil-bjælken. z: playbar 20 < panel 25 < navigation 30 */
+.cardpanel { position: fixed; z-index: 25; right: 0; top: calc(var(--top-h, 6rem) + var(--scout-h, 0px)); bottom: var(--bar-h, 0px); width: min(420px, 40vw);
+  overflow-y: auto; overscroll-behavior: contain; background: var(--bg); border-left: 1px solid var(--kant); box-shadow: -8px 0 24px #0008; padding: 0 .6rem .75rem; }
+.cardpanel[hidden] { display: none; }
+.cardpanel .card { border: none; padding: .25rem .25rem 0; background: transparent; }
+/* kortets egen overskrift står i panelets hoved – h3 bevares (navngiver dialogen) men skjules */
+.cardpanel .card-head h3 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; margin: 0; }
+.cp-head { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: .4rem; background: var(--bg); padding: .5rem 0 .4rem; border-bottom: 1px solid var(--kant); }
+.cp-title { flex: 1; min-width: 0; font-size: var(--fs-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cp-nav, .cp-close { min-width: 32px; min-height: 32px; padding: .2rem .5rem; line-height: 1; }
+.cp-close { order: 9; font-size: var(--fs-3); }
+.cp-msg { margin: .5rem 0 0; }
+.cp-receipt { margin-top: .5rem; }
+/* ≥ 1200 px: siden giver plads til panelet, så listens højre kolonner og 💰 ikke dækkes */
+@media (min-width: 1200px) { body.card-open main { padding-right: calc(min(420px, 40vw) + 1rem); } }
+/* ⓘ forrest i navnecellen på Taktik (tegnet i CSS, så cellens tekst stadig er "#7 Navn") */
+.lp-info { display: inline-grid; place-items: center; width: 28px; height: 28px; padding: 0; margin: -2px .35rem -2px 0; border-radius: 50%; vertical-align: middle; line-height: 1; font-size: var(--fs-2); color: var(--info); }
+.lp-info::before { content: 'ⓘ'; }
+/* panelets spiller: kun et omrids (som det valgte i regnearket), kun mens panelet er åbent – "byt i gang" beholder sin baggrund */
+.lp-table tr.carded { outline: 1px solid var(--lilla); }
+@media (max-width: 900px) {
+  .cardpanel { left: 0; right: 0; top: auto; width: auto; max-height: 70vh; border-left: none; border-top: 1px solid var(--kant); border-radius: .75rem .75rem 0 0; box-shadow: 0 -8px 24px #000a; }
+}
+@media (max-width: 600px) {
+  .cardpanel { bottom: calc(57px + env(safe-area-inset-bottom)); }
+  .cp-nav, .cp-close { min-width: 44px; min-height: 44px; }
+  .lp-info { width: 44px; height: 44px; margin: -8px .25rem -8px -4px; }
+}
+/* Byt i gang (.pick-live) på smal skærm: beskeden med "Se kort ›" står fast over Spil-bjælken, til byttet er afsluttet (QC/Spilfører UI:
+   ved et tryk på den øverste brik lå den bag bjælken – 390 px: top 726 = bjælkens top). Bagefter (🤝-beskeden) står den i listen igen. */
+@media (max-width: 900px) { #pick-msg.pick-live { position: fixed; left: .5rem; right: .5rem; bottom: calc(var(--bar-h, 0px) + 6px); z-index: 22; margin: 0; box-shadow: 0 4px 16px #000c; } }
+@media (max-width: 600px) { #pick-msg.pick-live { bottom: calc(57px + env(safe-area-inset-bottom) + var(--bar-h, 0px) + 6px); } }

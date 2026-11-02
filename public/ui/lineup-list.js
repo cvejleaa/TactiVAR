@@ -29,7 +29,10 @@ export function listRows({ team, isOwn, ui }) {
   return { line, cols, ctx, sortCol, starters: starters.filter(keep), bench: sorted(matchBenchOf(team)).filter(keep), reserves: sorted(reservesOf(team)).filter(keep), benchAll: matchBenchOf(team).length, reservesAll: reservesOf(team).length };
 }
 
-export function renderLineupList({ team, isOwn, ui, onPick, onSort, onBlocked, onLine, onAutoBench, msg = '' }) {
+// v3.29.0 (kortpanelet): onInfo = ⓘ forrest i navnecellen åbner spillerkortet – et klik på rækken er stadig byt (brugerens valg), så ⓘ
+// stopper klikket (som #auto-bench) og rører hverken byttet eller beskeden. ui.cardId = panelets spiller (omrids, kun mens det er åbent);
+// onPickCard = "Se kort ›" i byt-beskeden, kun mens et byt er i gang (ui.swapId).
+export function renderLineupList({ team, isOwn, ui, onPick, onSort, onBlocked, onLine, onAutoBench, msg = '', onInfo = null, onPickCard = null }) {
   const { line, cols, ctx, sortCol, starters, bench, reserves, benchAll, reservesAll } = listRows({ team, isOwn, ui });
   const roles = FORMATIONS[team.tactics.baseFormation], slotOf = ctx.slotOf;
   const kindOf = (s) => (s >= 0 ? slotKindText(roles[s].r, slotPosition(team.tactics, s).y) : null);
@@ -42,11 +45,12 @@ export function renderLineupList({ team, isOwn, ui, onPick, onSort, onBlocked, o
   };
   const row = (p, kind) => {
     const s = slotOf(p), place = kind === 'start' ? roles[s].r : kind === 'bench' ? 'Bænk' : 'Res', fit = kind === 'start' ? slotFitOf(team.tactics, s, p.position) : 1;
-    return h('tr', { class: `lp-row ${kind}-p` + (ui.swapId === p.id ? ' active' : '') + (outLabel(p) ? ' injured' : '') + (p.banMatches > 0 ? ' banned' : ''), dataset: { pid: p.id },
+    return h('tr', { class: `lp-row ${kind}-p` + (ui.swapId === p.id ? ' active' : '') + (ui.cardId === p.id ? ' carded' : '') + (outLabel(p) ? ' injured' : '') + (p.banMatches > 0 ? ' banned' : ''), dataset: { pid: p.id },
       title: isOwn ? (kind === 'reserve' ? 'Reserve – ikke med i kampen. Klik og så en bænkspiller (eller en brik) for at tage ham med.' : 'Klik og så en anden spiller (her eller på banen) for at bytte') : '',
       onclick: () => onPick(p) },
     h('td', { class: 'lp-place' + (fit < 1 ? ' off-pos' : ''), title: fit < 1 ? `Naturlig: ${POSITION_FULL[p.position]} – på ${place}${kindOf(s) ? ` (${kindOf(s)})` : ''} koster det ${fitCost(fit)} i dueller` : '' }, place, fit < 1 ? ` ⚠ ${fitCost(fit)}` : ''),
-    h('td', {}, `#${p.shirtNumber} ${p.shortName}`),
+    // ⓘ: tegnet står i CSS (::before), så cellens tekst stadig er "#7 Navn"
+    h('td', {}, onInfo ? h('button', { class: 'lp-info', type: 'button', dataset: { pid: p.id }, title: 'Åbn spillerkortet', 'aria-label': `Spillerkort: #${p.shirtNumber} ${p.shortName}`, onclick: (e) => { e.stopPropagation(); onInfo(p); } }) : null, `#${p.shirtNumber} ${p.shortName}`),
     // Kæde · naturlig position i alle tre sektioner (QC B4: så man kan se, hvem på bænken der passer)
     h('td', { title: POSITION_FULL[p.position] ?? '' }, h('span', { class: 'chip' }, LINE[p.line]), ` ${POSITION[p.position] ?? ''}`), cols.map((c) => cell(c, p)));
   };
@@ -61,10 +65,11 @@ export function renderLineupList({ team, isOwn, ui, onPick, onSort, onBlocked, o
     team.matchBenchAuto !== false ? '✓ Udtages automatisk før hver runde' : '↺ Udtag automatisk') : null;
   return h('div', { class: 'panel lineup-list', id: 'lineup-list' },
     h('div', { class: 'toolbar' }, LIST_LINES.map(([v, l]) => h('button', { class: 'mini' + (line === v ? ' active' : ''), onclick: () => onLine(v) }, l))),
-    msg ? h('div', { class: 'notice', id: 'pick-msg' }, msg) : null,
+    msg ? h('div', { class: 'notice' + (ui.swapId ? ' pick-live' : ''), id: 'pick-msg' }, msg, onPickCard && ui.swapId ? [' ', h('button', { class: 'linklike', id: 'pick-card', onclick: () => onPickCard(ui.swapId) }, 'Se kort ›')] : null) : null,
     h('div', { class: 'tablewrap' }, h('table', { class: 'matrix lp-table', id: 'lineup-table' }, h('thead', {}, head),
       h('tbody', { id: 'bench' }, [...section('Start-11', starters, 'start'), ...section(`Bænk (${benchAll} udtaget)`, bench, 'bench', auto),
         ...(reservesAll ? section(`Reserver (${reservesAll})`, reserves, 'reserve', null, 'reserves') : [])]))),
-    isOwn ? h('div', { class: 'muted help' }, 'Klik på to spillere (i listen eller på banen) = byt · Bænk og så reserve = tag reserven med i kampen · Træk en brik = justér positionen') : null,
+    isOwn ? h('div', { class: 'muted help', id: 'list-help' }, 'ⓘ ved navnet = spillerkortet · Klik på to spillere (i listen eller på banen) = byt · Bænk og så reserve = tag reserven med i kampen · Træk en brik = justér positionen')
+      : onInfo ? h('div', { class: 'muted help', id: 'list-help' }, 'Klik på en spiller (eller ⓘ) for at åbne spillerkortet') : null,
     h('div', { class: 'muted help', id: 'fit-help' }, FIT_HELP));
 }

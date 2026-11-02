@@ -292,8 +292,234 @@ try {
       await tp.context().close();
     }
   };
+  // v3.29.0 (UI-ombygningen F2): spillerkortet står i et panel og skal åbnes – Trup: et klik på rækken; Taktik: ⓘ (aldrig et klik på rækken –
+  // det er byt og ville forstyrre byt-testene). Uden pid: standardspilleren, som kortet viste før uden klik (dit hold: den 4. i truppen –
+  // startvalget; et andet hold: den første). Venter, til kortet står i panelet.
+  const openCardOn = async (pg, pid = null) => {
+    const t = await pg.evaluate(() => document.querySelector('.tabpane')?.className.match(/tab-(\w+)/)?.[1]);
+    if (pid == null) pid = await pg.evaluate(() => { const L = JSON.parse(localStorage.getItem('tactivar_save')).league, v = document.querySelector('#scout-banner #team-select')?.value;
+      return v != null ? L.teams[Number(v)].squad[0].id : L.teams.find((x) => !x.isBot).squad[3].id; });
+    if (t === 'trup') await pg.click(`#matrix tbody tr[data-pid="${pid}"]`);
+    else {
+      if (!(await pg.locator(`#lineup-list .lp-info[data-pid="${pid}"]`).count())) await pg.locator('#lineup-list .toolbar button', { hasText: 'Alle' }).click();   // listen er filtreret til en anden kæde
+      await pg.click(`#lineup-list .lp-info[data-pid="${pid}"]`);
+    }
+    await pg.waitForSelector('#cardpanel[data-open="ja"] #player-card');
+    return pid;
+  };
+  const f2 = async () => {
+    // ---------- UI-ombygningen F2 (v3.29.0): spillerkortet som ét panel (#cardpanel) – kan køres alene med F2_ONLY=1 ----------
+    // Brugerens valg 2026-11-02: på Taktik er et klik på din egen brik/række stadig byt – kortet åbnes med ⓘ; panelet kun på Trup og Taktik.
+    const tp = await fresh();
+    const tt = async (k) => { await tp.click(`#tab-${k}`); await tp.waitForSelector(`.tabpane.tab-${k}`); };
+    const st = () => tp.evaluate(() => { const pc = document.getElementById('cardpanel'), a = document.activeElement;
+      return { open: pc.dataset.open, hidden: pc.hidden, kids: pc.children.length, cards: document.querySelectorAll('#player-card').length, inApp: document.querySelectorAll('#app #player-card').length,
+        title: document.getElementById('cp-title')?.textContent ?? null, act: a?.id || null, actPid: a?.dataset?.pid ?? null, actCls: a?.className ?? '', y: Math.round(scrollY) }; });
+    const save = () => tp.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')));
+    const mine = (d) => d.league.teams.find((t) => !t.isBot);
+    const nm = (p) => `#${p.shirtNumber} ${p.name}`;
+    const row = (pid) => tp.click(`#matrix tbody tr[data-pid="${pid}"]`);
+    const marked = (sel) => tp.evaluate((s) => [...document.querySelectorAll(s)].map((r) => r.dataset.pid), sel);
+    // (1) starter lukket – også når siden åbner direkte på Trup (ui.tab gemt): standardvalget (squad[3]) åbner IKKE panelet
+    await tp.evaluate(() => { const d = JSON.parse(localStorage.getItem('tactivar_save')); d.ui.tab = 'trup'; localStorage.setItem('tactivar_save', JSON.stringify(d)); });
+    await tp.reload(); await tp.waitForSelector('body[data-klar="ja"]');
+    const s0 = await st();
+    check('F2: panelet starter lukket – også når siden åbner på Trup (hidden, data-open="nej", intet kort)', (await tp.isVisible('.tabpane.tab-trup')) && s0.open === 'nej' && s0.hidden && s0.kids === 0 && s0.cards === 0
+      && (await marked('#matrix tr.selected')).length === 0, JSON.stringify(s0));
+    check('F2 Trup: hjælpelinjen over regnearket siger, at et klik åbner kortet', (await tp.textContent('#trup-help')) === 'Klik på en spiller for at åbne spillerkortet');
+    const P = mine(await save()).squad;
+    // (2) Trup: et klik åbner – ét kort, i panelet; ✕ får fokus; rækken får omridset
+    await row(P[5].id);
+    const s1 = await st();
+    check('F2 Trup: et klik på en række åbner panelet med netop ham – ét kort, i panelet og intet på siden; ✕ har fokus; kun hans række har omridset',
+      s1.open === 'ja' && !s1.hidden && s1.cards === 1 && s1.inApp === 0 && s1.title === nm(P[5]) && (await tp.textContent('#card-title')) === nm(P[5]) && (await tp.getAttribute('#cardpanel', 'aria-labelledby')) === 'card-title'
+      && s1.act === 'card-close' && s1.y === 0 && JSON.stringify(await marked('#matrix tr.selected')) === JSON.stringify([P[5].id]), JSON.stringify(s1));
+    await row(P[6].id);
+    const s1b = await st();
+    check('F2 Trup: et klik på en anden række skifter spiller i det åbne panel (stadig ét kort)', s1b.open === 'ja' && s1b.cards === 1 && s1b.title === nm(P[6]) && JSON.stringify(await marked('#matrix tr.selected')) === JSON.stringify([P[6].id]), JSON.stringify(s1b));
+    // (3) ✕ og Escape lukker – fokus tilbage på den række, der åbnede
+    await tp.click('#card-close');
+    const s2 = await st();
+    check('F2: ✕ lukker – intet kort, fokus tilbage på rækken (fundet igen efter gentegningen), intet omrids', s2.open === 'nej' && s2.hidden && s2.kids === 0 && s2.cards === 0 && s2.actPid === P[6].id && (await marked('#matrix tr.selected')).length === 0, JSON.stringify(s2));
+    await row(P[7].id); await tp.keyboard.press('Escape');
+    const s3 = await st();
+    check('F2: Escape lukker panelet – fokus tilbage på rækken', s3.open === 'nej' && s3.cards === 0 && s3.actPid === P[7].id, JSON.stringify(s3));
+    await row(P[7].id); await tp.click('#note-input'); await tp.keyboard.press('Escape');
+    check('F2: Escape lukker også med fokus i noten', (await st()).open === 'nej');
+    // (4) noten beholder fokus under skrivning: samme felt (onNote tegner aldrig siden om), teksten står og er gemt
+    await row(P[7].id); await tp.click('#note-input'); await tp.evaluate(() => { document.getElementById('note-input').__f2 = 1; });
+    await tp.keyboard.type('Hurtig i ryggen');
+    const nt = await tp.evaluate(() => { const a = document.activeElement; return { id: a.id, same: a.__f2 === 1, v: a.value }; });
+    check('F2: noten i panelet beholder fokus under skrivning – samme felt (ingen gentegning), teksten står og er gemt', nt.id === 'note-input' && nt.same && nt.v === 'Hurtig i ryggen' && (await save()).notes[P[7].id] === 'Hurtig i ryggen', JSON.stringify(nt));
+    // (5) fokus i panelet genskabes efter en gentegning (til salg = change → render)
+    await tp.click('#list-toggle');
+    const lf = await tp.evaluate(() => ({ id: document.activeElement.id, on: document.getElementById('list-toggle').checked }));
+    check('F2: "Til salg" i panelet beholder fokus efter gentegningen (genskabt ud fra id)', lf.id === 'list-toggle' && lf.on && mine(await save()).listed.includes(P[7].id), JSON.stringify(lf));
+    await tp.click('#list-toggle');   // tilbage
+    // (6) rulningen: bevares ved gentegning og ved ◀ ▶ (samme åbning), nulstilles ved en ny åbning
+    const room = await tp.evaluate(() => { const pc = document.getElementById('cardpanel'); return pc.scrollHeight - pc.clientHeight; });
+    const top0 = Math.min(150, room - 120);   // lavt nok til, at næste spillers (kortere) kort også kan stå der
+    await tp.evaluate((t) => { document.getElementById('cardpanel').scrollTop = t; document.getElementById('list-toggle').click(); }, top0);   // DOM-klik: Playwright ruller ellers selv
+    const sc1 = await tp.evaluate(() => document.getElementById('cardpanel').scrollTop);
+    await tp.evaluate(() => document.getElementById('list-toggle').click());
+    await tp.evaluate(() => document.getElementById('card-next').click());
+    const sc2 = await tp.evaluate(() => document.getElementById('cardpanel').scrollTop);
+    await tp.click('#card-close'); await row(P[2].id);
+    const sc3 = await tp.evaluate(() => document.getElementById('cardpanel').scrollTop);
+    check('F2: panelets rulning står stille ved gentegning og ved ▶ (samme åbning) og starter øverst ved en ny åbning', top0 > 100 && Math.abs(sc1 - top0) <= 1 && Math.abs(sc2 - top0) <= 1 && sc3 === 0, JSON.stringify({ room, top0, sc1, sc2, sc3 }));
+    // (7) ◀ ▶ på Trup: regnearkets aktuelle rækkefølge (sorteret på FIN), aldrig byt; fokus bliver på knappen
+    await tp.click('#matrix thead th:nth-child(15)');
+    const order = await tp.evaluate(() => [...document.querySelectorAll('#matrix tbody tr')].map((r) => r.dataset.pid));
+    await tp.click('#card-close'); await row(order[0]);
+    const prev0 = await tp.isDisabled('#card-prev');
+    await tp.click('#card-next'); const t1 = (await st()).title, f1 = (await st()).act;
+    await tp.click('#card-next'); await tp.click('#card-prev'); const t2 = (await st()).title;
+    const byId = (id) => P.find((x) => x.id === id);
+    check('F2 Trup: ◀ ▶ bladrer i regnearkets rækkefølge (sorteret på FIN) – ◀ slået fra på den første, fokus bliver på ▶', prev0 && t1 === nm(byId(order[1])) && t2 === nm(byId(order[1])) && f1 === 'card-next'
+      && JSON.stringify(await marked('#matrix tr.selected')) === JSON.stringify([order[1]]), JSON.stringify({ prev0, t1, t2, f1 }));
+    // (8) faneskift lukker: Trup → Taktik, og Trup → Liga → Trup (panelet må ikke dukke op igen)
+    await tt('taktik');
+    const s4 = await st();
+    await tt('trup');
+    const s5 = await st();
+    await row(P[4].id); await tt('liga'); await tt('trup');
+    const s6 = await st();
+    check('F2: faneskift lukker – Trup → Taktik, tilbage til Trup og Trup → Liga → Trup: panelet dukker ikke op igen', [s4, s5, s6].every((x) => x.open === 'nej' && x.cards === 0), JSON.stringify([s4.open, s5.open, s6.open]));
+    // (9) Taktik, dit hold: ⓘ på hver række; et klik på din egen brik åbner IKKE – det bytter som før
+    await tt('taktik');
+    const D1 = mine(await save()), slots0 = D1.tactics.lineupSlots.slice(), byP = (id) => D1.squad.find((x) => x.id === id);
+    const info = await tp.evaluate(() => ({ rows: document.querySelectorAll('#lineup-list tr.lp-row').length, infos: [...document.querySelectorAll('#lineup-list tr.lp-row .lp-info')].map((b) => [b.dataset.pid, b.getAttribute('aria-label'), b.closest('tr').dataset.pid]),
+      size: (({ width, height }) => [width, height])(document.querySelector('.lp-info').getBoundingClientRect()), cell: document.querySelector('#lineup-list tr.lp-row td:nth-child(2)').textContent, help: document.getElementById('list-help')?.textContent ?? '' }));
+    check('F2 Taktik: ⓘ forrest i navnecellen på hver række (aria-label "Spillerkort: #nr Navn"), mindst 28 px – cellens tekst er stadig "#nr Navn", hjælpeteksten nævner ⓘ',
+      info.rows === 18 && info.infos.length === 18 && info.infos.every(([pid, lbl, rp]) => pid === rp && lbl === `Spillerkort: #${byP(pid).shirtNumber} ${byP(pid).shortName}`) && info.size.every((x) => x >= 28) && /^#\d+ /.test(info.cell) && info.help.startsWith('ⓘ ved navnet = spillerkortet'), JSON.stringify({ ...info, infos: info.infos.length }));
+    await tp.click('#pitch .token[data-slot="9"]');
+    const s7 = await st();
+    check('F2 Taktik: et klik på din egen brik åbner IKKE panelet – det starter et byt som før (beskeden ved listen)', s7.open === 'nej' && s7.cards === 0 && (await tp.textContent('#pick-msg')).includes(byP(slots0[9]).shortName), JSON.stringify(s7));
+    await tp.click('#pitch .token[data-slot="9"]');   // fravælg
+    await tp.locator('#lineup-list .toolbar button', { hasText: 'Alle' }).click();   // brikken filtrerede listen til hans kæde
+    // ⓘ åbner; derefter ændrer et klik på din egen brik eller række IKKE panelets spiller (byttet sker som før)
+    await tp.click(`#lineup-list .lp-info[data-pid="${slots0[2]}"]`);
+    const s8 = await st();
+    check('F2 Taktik: ⓘ åbner panelet med netop ham (✕ har fokus, hans række har omridset)', s8.open === 'ja' && s8.cards === 1 && s8.inApp === 0 && s8.title === nm(byP(slots0[2])) && s8.act === 'card-close' && JSON.stringify(await marked('#lineup-list tr.carded')) === JSON.stringify([slots0[2]]), JSON.stringify(s8));
+    await tp.click('#pitch .token[data-slot="5"]');
+    const s9 = await st(), ppm = await tp.textContent('#panel-pick-msg').catch(() => 'mangler');
+    check('F2 Taktik: åbent panel + klik på din egen brik → panelet viser stadig samme spiller, og byt-beskeden står også i panelets hoved', s9.open === 'ja' && s9.title === nm(byP(slots0[2])) && ppm.includes(byP(slots0[5]).shortName) && ppm === await tp.textContent('#pick-msg').then((t) => t.replace(' Se kort ›', '')), `${s9.title} | ${ppm}`);
+    const benchPid = await tp.evaluate(() => document.querySelector('#bench tr.bench-p')?.dataset.pid);
+    await tp.click(`#bench tr.bench-p[data-pid="${benchPid}"] td:first-child`);
+    const s10 = await st(), slots1 = mine(await save()).tactics.lineupSlots;
+    check('F2 Taktik: …og et klik på din egen række gennemfører byttet uden at skifte panelets spiller ("Se kort ›" væk, når byttet er gjort)', s10.title === nm(byP(slots0[2])) && slots1[5] === benchPid && (await tp.locator('#pick-card').count()) === 0, `${s10.title} | ${slots1[5]} ${benchPid}`);
+    // (10) ⓘ under et byt: åbner kun kortet – byttet og beskeden står urørt (stopPropagation)
+    const slotsA = slots1.slice();
+    await tp.click('#pitch .token[data-slot="3"]');
+    const bench2 = await tp.evaluate(() => document.querySelector('#bench tr.bench-p .lp-info')?.dataset.pid ?? [...document.querySelectorAll('#lineup-list tr.bench-p .lp-info')][0]?.dataset.pid);
+    await tp.click(`#lineup-list .lp-info[data-pid="${bench2}"]`);
+    const s11 = await st(), slots2 = mine(await save()).tactics.lineupSlots, pm11 = await tp.textContent('#pick-msg').catch(() => 'mangler');
+    check('F2 Taktik: ⓘ midt i et byt åbner kun hans kort – opstillingen er uændret, og byt-beskeden står endnu', s11.title === nm(D1.squad.find((x) => x.id === bench2)) && slots2.join() === slotsA.join()
+      && pm11.includes(D1.squad.find((x) => x.id === slotsA[3]).shortName) && (await tp.locator('#lineup-list tr.active').count()) === 1, `${s11.title} | ${pm11}`);
+    // (11) "Se kort ›" i byt-beskeden åbner den valgte spiller
+    await tp.click('#pick-card');
+    check('F2 Taktik: "Se kort ›" i byt-beskeden viser den spiller, der er valgt til byttet – stadig intet byt', (await st()).title === nm(D1.squad.find((x) => x.id === slotsA[3])) && mine(await save()).tactics.lineupSlots.join() === slotsA.join());
+    await tp.click('#pitch .token[data-slot="3"]');   // fravælg
+    // (12) ◀ ▶ på Taktik: listens rækkefølge (start-11 i pladsernes orden …), bytter aldrig
+    await tp.locator('#lineup-list .toolbar button', { hasText: 'Alle' }).click();
+    const D2 = mine(await save()), ids2 = await tp.evaluate(() => [...document.querySelectorAll('#lineup-list tr.lp-row')].map((r) => r.dataset.pid));
+    await tp.click(`#lineup-list .lp-info[data-pid="${ids2[0]}"]`);
+    const pv = await tp.isDisabled('#card-prev');
+    await tp.click('#card-next');
+    const s12 = await st();
+    check('F2 Taktik: ▶ går til næste i listen (start-11 i pladsernes orden) – og bytter aldrig (opstillingen uændret, ingen byt-besked)', pv && ids2[0] === D2.tactics.lineupSlots[0] && s12.title === nm(D2.squad.find((x) => x.id === ids2[1]))
+      && mine(await save()).tactics.lineupSlots.join() === D2.tactics.lineupSlots.join() && (await tp.locator('#pick-msg').count()) === 0, `${s12.title} | ${pv}`);
+    // (13) "Træner: X – ændr i Trup" er et link: Trup med panelet på samme spiller
+    const s13t = s12.title;
+    await tp.click('#card-train-link');
+    const s13 = await st();
+    check('F2: "ændr i Trup" på kortet (Taktik) åbner Trup med panelet på samme spiller og træningsvalget', (await tp.isVisible('.tabpane.tab-trup')) && s13.open === 'ja' && s13.title === s13t && (await tp.locator('#cardpanel #focus-select').count()) === 1, JSON.stringify(s13));
+    // (14) 1400 px: fast til højre under topbaren, over Spil-bjælken, ingen vandret rulning; siden giver plads (listen/regnearket dækkes ikke)
+    const geo = (sel) => tp.evaluate((s) => { const r = (q) => document.querySelector(q)?.getBoundingClientRect(), pc = r('#cardpanel'), bar = r('#playbar'), tb = r('.topbar'), sb = r('#scout-banner');
+      return { l: pc.left, r: pc.right, w: pc.width, t: pc.top, b: pc.bottom, barTop: bar.height ? bar.top : innerHeight, tbB: tb.bottom, sbB: sb ? sb.bottom : null, sw: document.documentElement.scrollWidth, iw: innerWidth, ih: innerHeight, contR: (document.querySelector(s)?.closest('.tablewrap') ?? document.querySelector(s))?.getBoundingClientRect().right }; }, sel);   // regnearket: den synlige ramme (tabellen ruller vandret i den)
+    const g1 = await geo('#matrix');
+    await tt('taktik'); await tp.click(`#lineup-list .lp-info[data-pid="${ids2[4]}"]`);
+    const g2 = await geo('#lineup-list');
+    check('F2 1400 px: panelet står fast til højre (420 px) under topbaren og over Spil-bjælken, uden vandret rulning – regnearket (Trup) og listen (Taktik) står til venstre for det',
+      [g1, g2].every((x) => Math.abs(x.r - 1400) < 1 && Math.abs(x.w - 420) < 1 && x.t >= x.tbB - 1 && x.b <= x.barTop + 1 && x.sw <= x.iw && x.contR <= x.l + 1) && g2.barTop < g2.ih, JSON.stringify({ g1, g2 }));
+    // (15) et andet hold på Taktik: et klik på brik eller række åbner (der er intet byt); holdskift lukker – og panelet kommer ikke igen
+    await tt('liga'); await tp.selectOption('#team-select', '1'); await tp.waitForSelector('.tabpane.tab-trup'); await tt('taktik');
+    const O = (await save()).league.teams[1], oSlots = O.tactics.lineupSlots;
+    await tp.click('#pitch .token[data-slot="4"]');
+    const s15 = await st();
+    await tp.locator('#lineup-list .toolbar button', { hasText: 'Alle' }).click();
+    await tp.click(`#lineup-list tr.lp-row[data-pid="${oSlots[6]}"] td:first-child`);
+    const s16 = await st(), g3 = await geo('#lineup-list');
+    check('F2 Taktik, et andet hold: et klik på hans brik åbner kortet, et klik på en række skifter (intet byt) – panelet står under scout-bjælken',
+      s15.open === 'ja' && s15.title === nm(O.squad.find((x) => x.id === oSlots[4])) && s16.title === nm(O.squad.find((x) => x.id === oSlots[6])) && (await save()).league.teams[1].tactics.lineupSlots.join() === oSlots.join() && g3.t >= g3.sbB - 1, JSON.stringify({ s15: s15.title, s16: s16.title, t: g3.t, sb: g3.sbB }));
+    await tt('trup'); await row(O.squad[2].id);
+    await tp.selectOption('#scout-banner #team-select', '2'); await tp.waitForSelector('.tabpane.tab-trup');
+    const s17 = await st();
+    await tp.selectOption('#scout-banner #team-select', '1'); await tp.waitForSelector('.tabpane.tab-trup');
+    const s18 = await st();
+    await row(O.squad[2].id); await tp.click('#scout-back'); await tp.waitForSelector('.tabpane.tab-trup');
+    const s19 = await st();
+    check('F2: holdskift lukker (scout-bjælkens vælger og "← Dit hold") – data-open="nej", og tilbage på holdet dukker panelet ikke op igen', [s17, s18, s19].every((x) => x.open === 'nej' && x.cards === 0), JSON.stringify([s17.open, s18.open, s19.open]));
+    // (16) vagten: ▶ Spil runde fra Taktik flytter fanen uden showTab – panelet vises ikke på Kamp
+    await tt('taktik'); await tp.click(`#lineup-list .lp-info[data-pid="${ids2[1]}"]`);
+    await tp.click('#play-bar #play-round'); await tp.waitForSelector('#match-center');
+    const s20 = await st();
+    check('F2: panelet vises kun på Trup og Taktik – ▶ Spil runde fra Taktik med åbent panel → Kamp uden panel', s20.open === 'nej' && s20.cards === 0, JSON.stringify(s20));
+    await tp.click('#skip');
+    await tp.context().close();
+    // (17) en fejl i tegningen med åbent panel: fejlsiden tømmer og skjuler panelet (intet halvt kort ved siden af fejlsiden)
+    {
+      const c = await browser.newContext({ viewport: { width: 1400, height: 1000 } }), pg = await c.newPage(); pg.on('pageerror', () => {});
+      await pg.route('**/ui/matrix.js', async (route) => { const r = await route.fetch(); route.fulfill({ response: r, body: (await r.text()).replace('export function renderMatrix({ team, isOwn, ui, notes, onSort, onSelect, onSwap, onFilter, onBlocked }) {', "$&\n  if (window.__boom) throw new Error('boom');") }); });
+      await pg.goto(BASE + '/'); await pg.waitForSelector('body[data-klar="ja"]');
+      await pg.click('#tab-trup'); await pg.waitForSelector('.tabpane.tab-trup'); await pg.locator('#matrix tbody tr').nth(1).click();
+      const before = await pg.getAttribute('#cardpanel', 'data-open');
+      await pg.evaluate(() => { window.__boom = true; }); await pg.evaluate(() => document.querySelector('#matrix tbody tr:nth-child(3)').click()); await pg.waitForSelector('#render-error');
+      const after = await pg.evaluate(() => { const pc = document.getElementById('cardpanel'); return { open: pc.dataset.open, hidden: pc.hidden, kids: pc.children.length, body: document.body.classList.contains('card-open') }; });
+      check('F2: en fejl i tegningen med åbent panel – fejlsiden tømmer og skjuler panelet', before === 'ja' && after.open === 'nej' && after.hidden && after.kids === 0 && !after.body, JSON.stringify({ before, after }));
+      await c.close();
+    }
+    // (18) 768 px: et ark fra bunden over Spil-bjælken (højst 70 %), fuld bredde
+    {
+      const c = await browser.newContext({ viewport: { width: 768, height: 900 } }), pg = await c.newPage();
+      await pg.goto(BASE + '/'); await pg.waitForSelector('body[data-klar="ja"]'); await pg.click('#tab-taktik'); await pg.waitForSelector('.tabpane.tab-taktik');
+      await pg.locator('#lineup-list .lp-info').first().click(); await pg.waitForSelector('#cardpanel[data-open="ja"]');
+      const m = await pg.evaluate(() => { const pc = document.getElementById('cardpanel').getBoundingClientRect(), bar = document.getElementById('playbar').getBoundingClientRect(); return { l: pc.left, r: pc.right, h: pc.height, b: pc.bottom, barTop: bar.top, ih: innerHeight, sw: document.documentElement.scrollWidth, iw: innerWidth }; });
+      check('F2 768 px: arket står fra bunden i fuld bredde over Spil-bjælken, højst 70 % af højden, ingen vandret rulning', m.l === 0 && m.r === 768 && Math.abs(m.b - m.barTop) <= 1 && m.h <= m.ih * 0.7 + 1 && m.sw <= m.iw, JSON.stringify(m));
+      await c.close();
+    }
+    // (19) 390 px: tryk på den øverste brik → "Se kort ›" står synligt over Spil-bjælken; arket over navigationen (hen over Spil-bjælken), højst 70 %,
+    // ✕ ◀ ▶ og ⓘ mindst 44 px, ingen vandret rulning – og kortet ses uden at rulle siden (backlog nr. 5: før 3.400 px nede)
+    {
+      const c = await browser.newContext({ viewport: { width: 390, height: 844 } }), pg = await c.newPage();
+      await pg.goto(BASE + '/'); await pg.waitForSelector('body[data-klar="ja"]'); await pg.click('#tab-taktik'); await pg.waitForSelector('.tabpane.tab-taktik');
+      const topSlot = await pg.evaluate(() => [...document.querySelectorAll('#pitch .token')].sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top)[0].dataset.slot);
+      await pg.click(`#pitch .token[data-slot="${topSlot}"]`);
+      const lk = await pg.evaluate(() => { const r = document.getElementById('pick-card')?.getBoundingClientRect(), bar = document.getElementById('playbar').getBoundingClientRect(); return r ? { t: r.top, b: r.bottom, h: r.height, barTop: bar.top, y: scrollY, hit: document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)?.id } : null; });
+      check('F2 390 px: tryk på den øverste brik → "Se kort ›" står synligt over Spil-bjælken uden at rulle (backlog nr. 5)', !!lk && lk.t >= 0 && lk.b <= lk.barTop && lk.hit === 'pick-card' && lk.y === 0, JSON.stringify(lk));
+      const who = await pg.evaluate((s) => { const d = JSON.parse(localStorage.getItem('tactivar_save')), me = d.league.teams.find((t) => !t.isBot), p = me.squad.find((x) => x.id === me.tactics.lineupSlots[Number(s)]); return `#${p.shirtNumber} ${p.name}`; }, topSlot);
+      await pg.click('#pick-card'); await pg.waitForSelector('#cardpanel[data-open="ja"]');
+      const m = await pg.evaluate(() => { const r = (q) => document.querySelector(q).getBoundingClientRect(), pc = r('#cardpanel'), nav = r('#tabbar'), bar = r('#playbar'), card = r('#player-card');
+        const sz = (q) => [r(q).width, r(q).height];
+        return { b: pc.bottom, navTop: nav.top, h: pc.height, ih: innerHeight, l: pc.left, rr: pc.right, sw: document.documentElement.scrollWidth, iw: innerWidth, y: scrollY, cardTop: card.top,
+          close: sz('#card-close'), prev: sz('#card-prev'), next: sz('#card-next'), info: sz('.lp-info'), barCovered: document.getElementById('cardpanel').contains(document.elementFromPoint(bar.left + bar.width / 2, bar.top + bar.height / 2)),
+          title: document.getElementById('cp-title').textContent }; });
+      check('F2 390 px: "Se kort ›" åbner arket med den valgte spiller – over navigationen (ikke bag den), hen over Spil-bjælken, højst 70 % af højden, ingen vandret rulning',
+        m.title === who && m.b <= m.navTop + 0.5 && m.h <= m.ih * 0.7 + 1 && m.l === 0 && m.rr === 390 && m.sw <= m.iw && m.barCovered, JSON.stringify(m));
+      check('F2 390 px: ✕, ◀, ▶ og ⓘ er mindst 44 × 44 px', [m.close, m.prev, m.next, m.info].every(([w, hh]) => w >= 44 && hh >= 44), JSON.stringify([m.close, m.prev, m.next, m.info]));
+      check('F2 390 px: kortet ses uden at rulle siden (kortets top inden for skærmen; før 3.437 px nede)', m.y === 0 && m.cardTop >= 0 && m.cardTop < m.ih - 200, JSON.stringify({ y: m.y, cardTop: m.cardTop }));
+      await pg.keyboard.press('Escape');
+      await pg.click('#tab-trup'); await pg.waitForSelector('.tabpane.tab-trup');
+      await pg.locator('#matrix tbody tr').nth(4).click(); await pg.waitForSelector('#cardpanel[data-open="ja"]');
+      const t = await pg.evaluate(() => ({ y: scrollY, top: document.getElementById('player-card').getBoundingClientRect().top, ih: innerHeight }));
+      check('F2 390 px, Trup: et tryk på en række åbner arket – siden ruller ikke (før: scrollIntoView ned til kortet under tabellen)', t.y === 0 && t.top > 0 && t.top < t.ih - 200, JSON.stringify(t));
+      await c.close();
+    }
+  };
+  if (process.env.F2_ONLY) { await f2(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun F2-blokken (kortpanelet – hurtig mutationskørsel)
   if (process.env.TM_F1_ONLY) { await f1tm(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun Test Managerens F1-blok (hurtig mutationskørsel)
   let g = await fresh();
+  const openCard = (pid = null, pg = g) => openCardOn(pg, pid);
   const rows = () => g.locator('#matrix tbody tr').count();
   const tab = async (k) => { await g.click(`#tab-${k}`); await g.waitForSelector(`.tabpane.tab-${k}`); };
   // v3.28.0 (UI-ombygningen F1): holdvælgeren står kun på Liga og i scout-bjælken. Hjælperen vælger på Liga og vender tilbage til
@@ -374,6 +600,7 @@ try {
   check('Trup: værdi og løn pr. runde for dine spillere står i regnearket (v3.19.0)', JSON.stringify(ownMoney.last) === JSON.stringify(['💰 Værdi', 'Løn/rd']) && ownMoney.cells.length === 18 && ownMoney.cells.every(([v, w]) => /\d/.test(v) && /^\d{1,3}(\.\d{3})*$/.test(w)), JSON.stringify(ownMoney));
   const modCells = await g.locator('#matrix tbody td.modcell').allTextContents();
   check('Mod-kolonnen viser tre egne værdier, ingen % mod en modstander', modCells.length === 18 && modCells.every((t) => /^\d+ · \d+ · \d+$/.test(t)) && !(await g.textContent('body')).match(/mod-kunnen[^.)]*\d+\s*%|mod [A-ZÆØÅ][^:]*: \d+%/i), modCells[0]);
+  await openCard();   // v3.29.0: kortet åbnes i panelet (før stod standardspilleren under regnearket uden klik)
   const used = await g.textContent('#counter-pool #counter-used');
   const usedN = Number(used.match(/Erfaring brugt: (\d+)\/100/)?.[1]);
   const shown = (await g.textContent('#player-card h3')).match(/^#(\d+)/)[1];
@@ -394,7 +621,7 @@ try {
   const cardHead = await g.textContent('#player-card .card-head');
   check('Spillerkortet: kæde og naturlig position med fuld betegnelse (kun den ene)', cardHead.includes(` • ${FULL_POS[shownPos]} • `) && Object.values(FULL_POS).filter((t) => cardHead.includes(` • ${t} • `)).length === 1 && !cardHead.includes('(('), `${shownPos}: ${cardHead}`);
   // v3.19.0 (brugeren): banen og opstillingen er flyttet til Taktik – Trup er regneark, træning og kort
-  check('Trup-fanen har regneark og spillerkort – men ikke banen, bænken, byt-knapper eller taktikken', (await g.isVisible('#matrix')) && (await g.isVisible('#player-card')) && (await g.locator('#pitch').count()) === 0 && (await g.locator('#bench').count()) === 0 && (await g.locator('#tactics').count()) === 0 && !(await g.locator('#matrix thead').textContent()).includes('Byt'));
+  check('Trup-fanen har regneark og spillerkortet (i panelet, ikke på siden) – men ikke banen, bænken, byt-knapper eller taktikken', (await g.isVisible('#matrix')) && (await g.isVisible('#cardpanel #player-card')) && (await g.locator('#app #player-card').count()) === 0 && (await g.locator('#pitch').count()) === 0 && (await g.locator('#bench').count()) === 0 && (await g.locator('#tactics').count()) === 0 && !(await g.locator('#matrix thead').textContent()).includes('Byt'));
   await tab('taktik');
   // v3.24.0 samspil: én streg pr. par, motoren læser (ikke angriberparret), alle "spillet sammen" ved start; legenden nævner det svageste par
   { const want = await g.evaluate(async () => { const m = await import('/engine/chemistry.js'), d = JSON.parse(localStorage.getItem('tactivar_save')), me = d.league.teams.find((t) => !t.isBot);
@@ -514,8 +741,8 @@ try {
     await p.locator(`#matrix tbody tr[data-pid="${await p.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.teams[1].squad.find((x) => x.position !== 'GK').id)}"]`).click();   // målmanden har ingen købelinje
     check('Samspil: købeboksen på kortet bruger også ligaens snit (84 → ca. 10 kampe)', (await p.textContent('#buy-chem')) === '🤝 Ny i truppen: fremmed for alle – ca. 10 kampe ved siden af de samme, før han har spillet sig ind.', await p.textContent('#card-market'));
     // En modstander: ingen streger, ingen legende, intet samspil i tooltip eller kort
-    await ptab('taktik');
-    check('Samspil: en modstanders bane har ingen streger, ingen legende og ingen 🤝 i brikkernes tooltip', (await p.locator('#chem-lines').count()) === 0 && (await p.locator('#chem-legend').count()) === 0 && (await p.locator('#pitch .token[title*="🤝"]').count()) === 0 && (await p.locator('#card-chem').count()) === 0);
+    await ptab('taktik'); await openCardOn(p);   // v3.29.0: modstanderens kort åbnet (ⓘ), så "intet samspil på kortet" ser et kort
+    check('Samspil: en modstanders bane har ingen streger, ingen legende og ingen 🤝 i brikkernes tooltip', (await p.locator('#chem-lines').count()) === 0 && (await p.locator('#chem-legend').count()) === 0 && (await p.locator('#pitch .token[title*="🤝"]').count()) === 0 && (await p.locator('#cardpanel #player-card').count()) === 1 && (await p.locator('#card-chem').count()) === 0);
   }
   // Ét fælles byt (pickForSwap): bænkspiller i listen → brik på banen
   const tName = async (slot) => g.locator(`#pitch .token[data-slot="${slot}"] .token-name`).textContent();
@@ -557,9 +784,9 @@ try {
   check('Laptop (1366×768): banen begynder højt nok til, at mindst 200 px af den ses i Taktik', smallTop < 768 - 200, `${Math.round(smallTop)}px`);
   const ratio = await g.evaluate(() => { const r = document.getElementById('pitch').getBoundingClientRect(); return r.width / r.height; });
   check('Banen bevarer sit forhold 68:80 (ikke strakt)', Math.abs(ratio - 68 / 80) < 0.02, ratio.toFixed(3));
-  await tab('taktik');
+  await tab('taktik'); await openCard();
   check('Taktik: træning kan ikke sættes her – kortet siger, hvad han træner, og henviser til Trup', (await g.locator('#focus-select').count()) === 0 && (await g.textContent('#card-train-note')).includes('ændr i Trup'));
-  check('Taktik-fanen: bane, spillerliste, spillerkort og taktik – men ikke regnearket', (await g.isVisible('#pitch')) && (await g.isVisible('#lineup-list')) && (await g.isVisible('#player-card')) && (await g.locator('#matrix').count()) === 0);
+  check('Taktik-fanen: bane, spillerliste og taktik – spillerkortet i panelet (ⓘ) – men ikke regnearket', (await g.isVisible('#pitch')) && (await g.isVisible('#lineup-list')) && (await g.isVisible('#cardpanel #player-card')) && (await g.locator('#app #player-card').count()) === 0 && (await g.locator('#matrix').count()) === 0);
   check('Tre fase-paneler og Hvis-Så-regler', (await g.locator('#tactics fieldset[data-phase]').count()) === 3 && (await g.locator('#rules .rule').count()) === 1);
   const bodyText = await g.textContent('body');
   check('Ingen rå skabelon-rester (${, undefined, NaN, null) på siden', !/\$\{|undefined|NaN|\bnull\b/.test(bodyText));
@@ -632,7 +859,7 @@ try {
 
   // Fasevalg, note og bytte – og alt overlever genindlæsning
   await g.selectOption('#tactics select[data-field="pressingHeight"]', 'HIGH_GEGENPRESS');
-  await g.fill('#note-input', 'Stærk i luften');
+  await openCard(); await g.fill('#note-input', 'Stærk i luften');
   await tab('trup');
   const firstName = await g.locator('#matrix tbody tr:first-child td:nth-child(2)').textContent();
   const namesBefore = (await g.locator('#matrix tbody tr td:nth-child(2)').allTextContents()).sort().join();
@@ -643,6 +870,7 @@ try {
   await tab('taktik');
   check('Efter F5: trukket position bevaret', (await g.locator('#pitch .token[data-slot="6"]').textContent()).includes('Ude af zone'));
   check('Efter F5: fasevalg bevaret', (await g.inputValue('#tactics select[data-field="pressingHeight"]')) === 'HIGH_GEGENPRESS');
+  await openCard();   // samme standardspiller som noten blev skrevet på
   check('Efter F5: note bevaret', (await g.inputValue('#note-input')) === 'Stærk i luften');
   void firstName;
 
@@ -848,7 +1076,7 @@ try {
     && (await g.locator('#club-cash').count()) === 0 && (await g.locator('#ledger').count()) === 0 && !pubText.includes(oppCash.toLocaleString('da-DK')) && pubText.includes('Til din klub'), pubText.slice(0, 120));
   await g.click('#back-to-club');
   check('"← Til din klub" viser din egen klub (kasse og regnskab) – og scout-bjælken er væk', (await g.isVisible('#club')) && (await g.isVisible('#club-cash')) && (await g.locator('#scout-banner').count()) === 0);
-  await seeTeam('1'); await tab('trup');
+  await seeTeam('1'); await tab('trup'); await openCard();
   check('Modstander: spillerkortet skjuler evner og kontrakt', (await g.locator('#player-card .bars').count()) === 0 && (await g.textContent('#player-card')).includes('🔒 ??'));
   await tab('taktik');
   check('Modstander: faser, Hvis-Så-regler og udskiftningsgrænse er skjulte', (await g.locator('#tactics fieldset').count()) === 0 && (await g.locator('#subs-limit').count()) === 0 && (await g.textContent('#tactics .lockbox')).includes('udskiftningsgrænse'));
@@ -867,13 +1095,14 @@ try {
   await tab('taktik');
   const colsAt = async (w) => { await g.setViewportSize({ width: w, height: 900 }); return g.evaluate(() => getComputedStyle(document.querySelector('.tactics-layout')).gridTemplateColumns.split(' ').length); };
   check('Layout: Taktik har 2 kolonner ved 1400 px og 1 ved 700 px', (await colsAt(1400)) === 2 && (await colsAt(700)) === 1);
-  // v3.20.1 (brugeren: "langt ned til taktikindstillingerne"): indstillingerne står lige under banen i venstre kolonne – over spillerkortets bund
+  // v3.20.1 (brugeren: "langt ned til taktikindstillingerne"): indstillingerne står lige under banen; v3.29.0 (F2): kortet står i panelet,
+  // så indstillingerne har hele bredden under bane | liste – og der er intet kort på siden
   await g.setViewportSize({ width: 1400, height: 900 });
-  { const r = await g.evaluate(() => { const b = (s) => document.querySelector(s).getBoundingClientRect(); return { pitch: b('#pitch'), tac: b('#tactics'), card: b('#player-card'), list: b('#lineup-list') }; });
-    check('Layout: Taktik-indstillingerne står under banen (venstre), listen og kortet til højre', r.tac.top - r.pitch.bottom < 60 && Math.abs(r.tac.left - r.pitch.left) < 80 && r.list.left > r.tac.right - 1 && r.card.left >= r.tac.right - 1 && r.tac.top < r.card.bottom, JSON.stringify({ gap: Math.round(r.tac.top - r.pitch.bottom), tacL: Math.round(r.tac.left), listL: Math.round(r.list.left) })); }
+  { const r = await g.evaluate(() => { const b = (s) => document.querySelector(s).getBoundingClientRect(); return { pitch: b('#pitch'), tac: b('#tactics'), list: b('#lineup-list'), cards: document.querySelectorAll('#app #player-card, #app .tk-card').length }; });
+    check('Layout: Taktik-indstillingerne står under banen i hele bredden, listen til højre for banen – intet kort på siden (F2: panelet)', r.tac.top - r.pitch.bottom < 60 && Math.abs(r.tac.left - r.pitch.left) < 80 && r.list.left > r.pitch.right - 1 && r.tac.right >= r.list.right - 1 && r.tac.top >= r.list.top && r.cards === 0, JSON.stringify({ gap: Math.round(r.tac.top - r.pitch.bottom), tacL: Math.round(r.tac.left), tacR: Math.round(r.tac.right), listR: Math.round(r.list.right), cards: r.cards })); }
   await g.setViewportSize({ width: 390, height: 844 });
-  { const y = await g.evaluate(() => ['#pitch', '#lineup-list', '#tactics', '#player-card'].map((s) => document.querySelector(s).getBoundingClientRect().top));
-    check('Layout på mobil (390 px): bane, spillerliste, indstillinger, kort – byt-listen lige under banen', y.every((v, i) => i === 0 || v > y[i - 1]), y.map(Math.round).join(' < ')); }
+  { const y = await g.evaluate(() => ['#pitch', '#lineup-list', '#tactics'].map((s) => document.querySelector(s).getBoundingClientRect().top));
+    check('Layout på mobil (390 px): bane, spillerliste, indstillinger – byt-listen lige under banen, intet kort på siden', y.every((v, i) => i === 0 || v > y[i - 1]) && (await g.locator('#app #player-card').count()) === 0, y.map(Math.round).join(' < ')); }
   await g.setViewportSize({ width: 1400, height: 900 });
   await g.setViewportSize({ width: 1400, height: 1000 });
   await tab('trup');
@@ -1642,10 +1871,13 @@ try {
     if (buyable) {
       await seeTeam(String(buyable.i));
       await g.click(`#matrix tbody tr[data-pid="${buyable.id}"]`);
-      const btn = await g.textContent('#buy-player');
+      const btn = await g.textContent('#buy-player'), bName = await g.evaluate((id) => JSON.parse(localStorage.getItem('tactivar_save')).league.teams.flatMap((t) => t.squad).find((p) => p.id === id).shortName, buyable.id);
       await g.click('#buy-player');
       const after = await g.evaluate((id) => { const me = JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((t) => !t.isBot); return { cash: me.cashBalance, n: me.squad.length, has: me.squad.some((p) => p.id === id) }; }, buyable.id);
       check('Transfer: "Køb for X kr." på kortet køber spilleren til netop den pris (gemt)', btn.replace(/\D/g, '') === String(buyable.price) && after.has && after.n === buyable.n + 1 && after.cash === buyable.cash - buyable.price, `${btn} / ${JSON.stringify(after)}`);
+      // v3.29.0 (QC): panelet lukker ikke tavst efter købet – kvitteringen står i panelet (spilleren står ikke længere i holdet), med vejen til ham
+      check('Transfer (F2): kvitteringen står i panelet efter købet – "💰 X er købt …", intet kort og "Se X i din trup ›"', (await g.getAttribute('#cardpanel', 'data-open')) === 'ja'
+        && (await g.textContent('#cardpanel #panel-notice')) === `💰 ${bName} er købt og står nu i din trup.` && (await g.locator('#cardpanel #player-card').count()) === 0 && (await g.textContent('#panel-to-squad')).includes(bName), await g.textContent('#cardpanel'));
       await tab('liga');
       check('Transfer: står i ligaens transferliste', (await g.textContent('#transfer-log')).includes('→'));
       // v3.18.1: listen "Til salg i ligaen" i Klub – Køb i listen køber den første spiller til den viste pris
@@ -1992,6 +2224,7 @@ try {
     await mctx.close();
   }
   await f1tm();
+  await f2();
   check('Ingen sidefejl under hele forløbet', fejl.length === 0, fejl.join(' | '));
 } finally {
   await browser.close();

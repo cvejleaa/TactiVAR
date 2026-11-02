@@ -14,7 +14,8 @@ const bar = (label, v, max = 20) => h('div', { class: 'bar' }, h('span', { class
   h('span', { class: 'bar-track' }, h('span', { class: 'bar-fill', style: { width: `${Math.round((v / max) * 100)}%` } })), h('span', { class: 'bar-val' }, String(v)));
 
 // chem (v3.24.0, kun dit hold): { best, pairs, isNew } fra chemistry.js – samspillet med hans naboer i ord (intet 0–100-tal, QC)
-export function renderCard({ player: p, team, isOwn, scouting, note, onNote, teams = null, latest = null, onOpenMatch = null, onFocus = null, retiring = false, market = null, hideLog = null, season = null, starter = false, trainNote = false, chem = null }) {
+// onTrainLink (v3.29.0): "ændr i Trup" i træningslinjen er et link, der åbner Trup med kortet på samme spiller
+export function renderCard({ player: p, team, isOwn, scouting, note, onNote, teams = null, latest = null, onOpenMatch = null, onFocus = null, retiring = false, market = null, hideLog = null, season = null, starter = false, trainNote = false, chem = null, onTrainLink = null }) {
   if (!p) return h('div', { class: 'panel muted' }, 'Klik på en spiller for at se spillerkortet.');
   const head = h('div', { class: 'card-head' },
     h('h3', {}, `#${p.shirtNumber} ${p.name}`),
@@ -38,7 +39,8 @@ export function renderCard({ player: p, team, isOwn, scouting, note, onNote, tea
       p.archetype ? h('div', { class: 'archbox' }, h('strong', {}, (p.archetype.isUnlocked ? '🌟 ' : '🔒 ') + p.archetype.name), ' – ', p.archetype.description,
         p.archetype.isUnlocked ? null : h('div', { class: 'muted' }, 'Låses op ved: ' + Object.entries(p.archetype.unlockReq).map(([k, v]) => `${k} ${v}`).join(', '))) : null,
       h('div', { class: 'muted', id: 'run-stats' }, run.km90 != null ? `🏃 ${dec(run.km90, 1)} km pr. 90 min · ${run.hiPct != null ? `${run.hiPct} % højintenst` : 'højintenst: kommer efter næste kamp'} · topfart ${dec(p.topSpeedMax, 1)} km/t (alle kampe)` : '🏃 Løbedata kommer efter første kamp'),
-      onFocus ? renderTraining(p, onFocus, starter) : trainNote ? h('div', { class: 'muted', id: 'card-train-note' }, `🏋️ Træner: ${FOCUS[trainingEstimate(p).key].label} – ændr i Trup`) : null,
+      onFocus ? renderTraining(p, onFocus, starter) : trainNote ? h('div', { class: 'muted', id: 'card-train-note' }, `🏋️ Træner: ${FOCUS[trainingEstimate(p).key].label} – `,
+        onTrainLink ? h('button', { class: 'linklike', id: 'card-train-link', onclick: onTrainLink }, 'ændr i Trup') : 'ændr i Trup') : null,
       h('div', { class: 'muted', id: 'card-wage' }, `Løn ${kr(Math.round(p.weeklyWage / 3))} pr. runde · Værdi ${kr(publicValue(p))} (offentlig – ud fra stjerner og alder)`),
       chem ? renderChem(chem) : null,
     ];
@@ -53,6 +55,24 @@ export function renderCard({ player: p, team, isOwn, scouting, note, onNote, tea
     h('div', { class: 'scouting' }, h('h4', {}, '🕵️ Scouting-indtryk'), (scouting?.length ? scouting.slice(0, 8) : ['Ingen indtryk endnu.']).map((s) => h('div', { class: 'clue' }, s))),
     h('label', { class: 'notes' }, h('h4', {}, '📝 Dine private noter'),
       h('textarea', { id: 'note-input', rows: 3, placeholder: 'Skriv hvad du har bemærket …', value: note || '', oninput: (e) => onNote(e.target.value) })));
+}
+
+// Kortpanelet (v3.29.0, UI-ombygningen F2): ét panel uden for siden – hoved med ◀ ▶ (bladrer i listens rækkefølge, bytter aldrig),
+// navnet og ✕; under det byt-beskeden og kvitteringen (køb) og så kortet. Kortets egen h3 skjules i panelet (CSS) og navngiver dialogen.
+// card = renderCard(...) eller null (kun kvitteringen: spilleren er købt og står ikke længere i holdet)
+export function renderCardPanel({ card, title, onClose, onPrev = null, onNext = null, pickMsg = '', msg = '' }) {
+  const h3 = card?.querySelector?.('.card-head h3');
+  if (h3) h3.id = 'card-title';
+  return [
+    h('div', { class: 'cp-head' },
+      h('button', { class: 'cp-nav', id: 'card-prev', type: 'button', title: 'Forrige spiller i listen', 'aria-label': 'Forrige spiller', disabled: !onPrev, onclick: () => onPrev?.() }, '◀'),
+      h('button', { class: 'cp-nav', id: 'card-next', type: 'button', title: 'Næste spiller i listen', 'aria-label': 'Næste spiller', disabled: !onNext, onclick: () => onNext?.() }, '▶'),
+      h('strong', { class: 'cp-title', id: 'cp-title' }, title),
+      h('button', { class: 'cp-close', id: 'card-close', type: 'button', title: 'Luk spillerkortet (Esc)', 'aria-label': 'Luk spillerkortet', onclick: onClose }, '✕')),
+    pickMsg ? h('div', { class: 'notice cp-msg', id: 'panel-pick-msg' }, pickMsg) : null,
+    msg ? h('div', { class: 'notice cp-msg', id: 'panel-notice' }, msg) : null,
+    card,
+  ];
 }
 
 // 🏋️ Træning (v3.18.0): fokus, hvad det træner, fremdrift pr. evne og ejerens skøn i ord (tallet – potentialet – er skjult)

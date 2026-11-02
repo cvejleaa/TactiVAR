@@ -46,10 +46,11 @@ export const FILTERS = [['all', 'Alle'], ['start', 'Start-11'], ['bench', 'Bænk
 
 export const heatClass = (v) => (v >= 15 ? 'heat-4' : v >= 12 ? 'heat-3' : v >= 8 ? 'heat-2' : 'heat-1');
 
-export function renderMatrix({ team, isOwn, ui, notes, onSort, onSelect, onSwap, onFilter, onBlocked }) {
+// Regnearkets rækker i den viste rækkefølge (ren): filter, sortering og synlighedsvagten – også kortpanelets ◀ ▶ (v3.29.0) bladrer
+// i netop denne rækkefølge, så panelet og tabellen aldrig er uenige.
+export function matrixRows({ team, isOwn, ui }) {
   const slotOf = (p) => team.tactics.lineupSlots.indexOf(p.id);
   const ctx = { team, isOwn, slotOf };
-  const roles = FORMATIONS[team.tactics.baseFormation];
   // Vagten mod "sort-spoofing": en skjult kolonne kan aldrig være sorteringsnøgle for en
   // seer, der ikke må se den – uanset hvad UI-tilstanden siger.
   const wanted = COLUMNS.find((c) => c.key === ui.sortCol) || COLUMNS[0];
@@ -72,6 +73,13 @@ export function renderMatrix({ team, isOwn, ui, notes, onSort, onSelect, onSwap,
       const d = col.text ? String(a.v).localeCompare(String(b.v), 'da') : a.v - b.v;
       return (desc ? -d : d) || a.p.shirtNumber - b.p.shirtNumber;
     });
+  return { rows, col, desc, slotOf, ctx, benchIds };
+}
+
+// ui.selectedPlayerId = rækken med lilla omrids: kortpanelets spiller, kun mens panelet er åbent (v3.29.0, app.js sætter det)
+export function renderMatrix({ team, isOwn, ui, notes, onSort, onSelect, onSwap, onFilter, onBlocked }) {
+  const { rows, col, desc, slotOf, ctx, benchIds } = matrixRows({ team, isOwn, ui });
+  const roles = FORMATIONS[team.tactics.baseFormation];
 
   const head = h('tr', {}, COLUMNS.map((c) => {
     const allowed = canSeeField(c.field, isOwn);
@@ -98,7 +106,7 @@ export function renderMatrix({ team, isOwn, ui, notes, onSort, onSelect, onSwap,
     });
     const arch = isOwn && p.archetype ? h('span', { class: p.archetype.isUnlocked ? 'arch on' : 'arch' }, (p.archetype.isUnlocked ? '🌟 ' : '🔒 ') + p.archetype.name) : null;
     const note = notes[p.id]?.trim() ? h('span', { class: 'note-flag', title: 'Du har en note' }, '📝') : null;
-    return h('tr', { class: (ui.selectedPlayerId === p.id ? 'selected ' : '') + (ui.swapId === p.id ? 'swapping' : ''), dataset: { pid: p.id }, onclick: () => onSelect(p) },
+    return h('tr', { class: (ui.selectedPlayerId === p.id ? 'selected ' : '') + (ui.swapId === p.id ? 'swapping' : ''), dataset: { pid: p.id }, tabindex: '-1', onclick: () => onSelect(p) },
       cells, h('td', {}, arch, note),
       isOwn && onSwap ? h('td', {}, h('button', { class: 'mini', title: 'Byt: vælg to spillere', onclick: (e) => { e.stopPropagation(); onSwap(p); } }, '🔁')) : null);
   });
