@@ -1,23 +1,30 @@
 :root {
-  --bg: #0f172a; --panel: #111827; --kant: #1f2937; --tekst: #f8fafc; --dæmpet: #94a3b8;
-  --lilla: #9333ea; --grøn: #10b981; --rød: #ef4444; --blå: #7dd3fc;
+  /* UI-ombygningen F0 (v3.27.1, backlog nr. 0): ÉN palet og fem skriftstørrelser. Lilla = hvor du er (aktiv fane, valgt
+     række); grøn = handling/ok; gul og rød kun til advarsler. Mål før/efter: node tools/measure-ui.mjs (spec §10b). */
+  --bg: #0b1220; --panel: #131c2e; --panel-2: #1c2740; --kant: #263248; --tekst: #f1f5f9; --dæmpet: #94a3b8;
+  --lilla: #9333ea; --grøn: #10b981; --gul: #f59e0b; --rød: #ef4444; --blå: #7dd3fc;
+  --aktiv: var(--lilla); --ok: var(--grøn); --advarsel: var(--gul); --fejl: var(--rød); --info: var(--blå);
+  /* Skriftskalaen: 12 småt/tabeller · 14 brødtekst · 16 overskrift i panel · 20 sideoverskrift · 28 stilling. --fs-graf kun til
+     tal på brikker inde i bane-grafikken (banen, afspilningen, heat map). */
+  --fs-1: 12px; --fs-2: 14px; --fs-3: 16px; --fs-4: 20px; --fs-5: 28px; --fs-graf: 10px;
 }
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--tekst); font-family: system-ui, -apple-system, sans-serif; }
+body { margin: 0; background: var(--bg); color: var(--tekst); font-family: system-ui, -apple-system, sans-serif; font-size: var(--fs-2); line-height: 1.35; }
+h1, h2 { font-size: var(--fs-4); } h3 { font-size: var(--fs-3); } h4 { font-size: var(--fs-1); }
 select option { background: var(--bg); color: var(--tekst); }
 .topbar { display: flex; align-items: center; gap: .75rem; padding: .75rem 1rem; background: var(--panel); border-bottom: 1px solid var(--kant); position: sticky; top: 0; z-index: 10; }
-.topbar h1 { font-size: 1.15rem; margin: 0; }
-.badge { background: var(--lilla); color: #fff; font-weight: 900; padding: .15rem .5rem; border-radius: .25rem; font-size: .8rem; letter-spacing: .05em; }
-.muted { color: var(--dæmpet); font-size: .8rem; }
+.topbar h1 { font-size: var(--fs-4); margin: 0; }
+.badge { background: var(--lilla); color: #fff; font-weight: 900; padding: .15rem .5rem; border-radius: .25rem; font-size: var(--fs-1); letter-spacing: .05em; }
+.muted { color: var(--dæmpet); font-size: var(--fs-1); }
 main { max-width: 120rem; margin: 1rem auto; padding: 0 1rem; }
-.fejlboks { background: #450a0a; color: #fecaca; border: 1px solid var(--rød); padding: .5rem 1rem; font-size: .85rem; }
+.fejlboks { background: #450a0a; color: #fecaca; border: 1px solid var(--rød); padding: .5rem 1rem; font-size: var(--fs-2); }
 .topbar { flex-wrap: wrap; }
 .controls { margin-left: auto; display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
-button, select, input, textarea { font: inherit; color: var(--tekst); background: #1e293b; border: 1px solid #334155; border-radius: .35rem; padding: .3rem .55rem; }
+button, select, input, textarea { font: inherit; color: var(--tekst); background: var(--panel-2); border: 1px solid var(--kant); border-radius: .35rem; padding: .3rem .55rem; }
 button { cursor: pointer; } button:hover { background: #334155; }
-button.mini { padding: .15rem .45rem; font-size: .75rem; } button.active { background: var(--lilla); border-color: var(--lilla); }
+button.mini { padding: .15rem .45rem; font-size: var(--fs-1); } button.active { background: var(--lilla); border-color: var(--lilla); }
 select:disabled, input:disabled { opacity: .55; }
-.savestatus { font-size: .75rem; color: var(--grøn); }
+.savestatus { font-size: var(--fs-1); color: var(--grøn); }
 /* Faner: Trup / Taktik / Kamp / Liga – ét emne ad gangen. */
 .tabs { display: flex; flex-wrap: wrap; gap: .3rem; margin-bottom: 1rem; border-bottom: 1px solid var(--kant); }
 .tab { border: 1px solid transparent; border-bottom: none; border-radius: .5rem .5rem 0 0; background: transparent; padding: .45rem 1rem; font-weight: 700; color: var(--dæmpet); }
@@ -35,15 +42,15 @@ select:disabled, input:disabled { opacity: .55; }
 .empty { text-align: center; padding: 2rem; color: var(--dæmpet); }
 section { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
 .panel { background: var(--panel); border: 1px solid var(--kant); border-radius: .6rem; padding: .75rem 1rem; }
-.panel h2, .panel h3, .panel h4 { margin: 0 0 .4rem; } .panel h3 { font-size: .95rem; } .panel h4 { font-size: .8rem; color: var(--dæmpet); }
+.panel h2, .panel h3, .panel h4 { margin: 0 0 .4rem; } .panel h3 { font-size: var(--fs-3); } .panel h4 { font-size: var(--fs-1); color: var(--dæmpet); }
 .row { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; }
 .clubhead { display: flex; justify-content: space-between; } .clubhead .right { text-align: right; }
-.notice { background: #2e1065; border: 1px solid var(--lilla); padding: .5rem 1rem; border-radius: .5rem; margin-bottom: 1rem; font-size: .85rem; }
+.notice { background: #2e1065; border: 1px solid var(--lilla); padding: .5rem 1rem; border-radius: .5rem; margin-bottom: 1rem; font-size: var(--fs-2); }
 .toolbar { display: flex; flex-wrap: wrap; gap: .3rem; margin-bottom: .5rem; }
 .tablewrap { overflow-x: auto; }   /* v3.20.1 (brugeren): ingen indlejret scroll – siden har pladsen; kun vandret på smal skærm */
 .matrix thead th { position: sticky; top: 0; background: var(--panel); z-index: 1; }
-table { border-collapse: collapse; width: 100%; font-size: .74rem; }
-th, td { padding: .25rem .3rem; border-bottom: 1px solid var(--kant); white-space: nowrap; text-align: center; }
+table { border-collapse: collapse; width: 100%; font-size: var(--fs-1); }
+th, td { padding: .25rem .22rem; border-bottom: 1px solid var(--kant); white-space: nowrap; text-align: center; }
 th { color: var(--dæmpet); user-select: none; } th.sortable { cursor: pointer; } th.locked { cursor: not-allowed; opacity: .6; }
 th.sorted, td.sorted { background: #2e1065aa; }
 td:nth-child(2) { text-align: left; font-weight: 700; }
@@ -51,24 +58,24 @@ tbody tr { cursor: pointer; } tbody tr:hover { background: #1e293b; } tr.selecte
 .starter { color: var(--grøn); font-weight: 700; } .benchnum { color: var(--dæmpet); }
 .heat-4 { color: #34d399; font-weight: 700; } .heat-3 { color: var(--blå); } .heat-2 { color: #f8fafc; } .heat-1 { color: #64748b; }
 .lockcell { color: #64748b; } .chip { background: #1e293b; padding: 0 .3rem; border-radius: .25rem; font-weight: 700; }
-.injury { color: #fda4af; font-weight: 700; } .arch { font-size: .7rem; color: var(--dæmpet); } .arch.on { color: #e9d5ff; }
+.injury { color: #fda4af; font-weight: 700; } .arch { font-size: var(--fs-1); color: var(--dæmpet); } .arch.on { color: #e9d5ff; }
 .card .bars { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: .6rem; margin: .5rem 0; }
-.bar { display: grid; grid-template-columns: 6.5rem 1fr 1.6rem; gap: .35rem; align-items: center; font-size: .75rem; margin-bottom: .2rem; }
+.bar { display: grid; grid-template-columns: 6.5rem 1fr 1.6rem; gap: .35rem; align-items: center; font-size: var(--fs-1); margin-bottom: .2rem; }
 .bar-track { background: #334155; height: .4rem; border-radius: .2rem; overflow: hidden; } .bar-fill { display: block; height: 100%; background: var(--lilla); }
 .bar-val { text-align: right; font-family: ui-monospace, monospace; }
-.aerial, .archbox, .varbox, .lockbox, .scouting { margin: .5rem 0; font-size: .8rem; } .lockbox { color: #94a3b8; }
-.clue { border-left: 2px solid var(--lilla); padding-left: .5rem; margin: .25rem 0; font-size: .78rem; }
+.aerial, .archbox, .varbox, .lockbox, .scouting { margin: .5rem 0; font-size: var(--fs-1); } .lockbox { color: #94a3b8; }
+.clue { border-left: 2px solid var(--lilla); padding-left: .5rem; margin: .25rem 0; font-size: var(--fs-1); }
 .notes textarea { width: 100%; }
 .pitch { position: relative; aspect-ratio: 68 / 80; background: repeating-linear-gradient(0deg, #15803d, #15803d 8%, #166534 8%, #166534 16%); border: 2px solid #ffffffb0; border-radius: .4rem; overflow: hidden; touch-action: none; }
 .pitch-line.mid { position: absolute; left: 0; right: 0; top: 50%; border-top: 2px solid #ffffff80; }
 .pitch-box { position: absolute; left: 30%; width: 40%; height: 12%; border: 2px solid #ffffff80; } .pitch-box.top { top: -2px; } .pitch-box.bottom { bottom: -2px; }
-.token { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; font-size: .65rem; text-shadow: 0 1px 2px #000; }
-.token-num { width: 1.8rem; height: 1.8rem; border-radius: 50%; display: grid; place-items: center; background: var(--bg); border: 2px solid #fff; font-weight: 800; font-size: .8rem; }
+.token { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; font-size: var(--fs-graf); text-shadow: 0 1px 2px #000; }
+.token-num { width: 1.8rem; height: 1.8rem; border-radius: 50%; display: grid; place-items: center; background: var(--bg); border: 2px solid #fff; font-weight: 800; font-size: var(--fs-1); }
 .token.custom .token-num { border-color: var(--grøn); } .token.out .token-num { border-color: var(--rød); background: #450a0a; } .token.selected .token-num { box-shadow: 0 0 0 3px var(--lilla); }
-.token.injured .token-num { background: #881337; } .token.draggable { cursor: grab; } .token-flag { font-size: .6rem; color: #fecaca; } .token-flag.ok { color: #bbf7d0; } .token-flag.pos { color: #fde68a; display: block; }
+.token.injured .token-num { background: #881337; } .token.draggable { cursor: grab; } .token-flag { font-size: var(--fs-1); color: #fecaca; } .token-flag.ok { color: #bbf7d0; } .token-flag.pos { color: #fde68a; display: block; }
 .lp-table .lp-place.off-pos { color: #f59e0b; }
 .anchor-ring { position: absolute; transform: translate(-50%, -50%); border: 2px dashed #e9d5ff; border-radius: 50%; pointer-events: none; }
-fieldset.phase { border: 1px solid var(--kant); border-radius: .4rem; margin: .5rem 0; display: flex; flex-wrap: wrap; gap: .5rem; font-size: .8rem; }
+fieldset.phase { border: 1px solid var(--kant); border-radius: .4rem; margin: .5rem 0; display: flex; flex-wrap: wrap; gap: .5rem; font-size: var(--fs-1); }
 fieldset.phase legend { color: var(--dæmpet); padding: 0 .3rem; }
 .rule { display: flex; flex-wrap: wrap; gap: .3rem; align-items: center; width: 100%; } .rule input { width: 3.5rem; }
 .standings tr.mine td { color: var(--grøn); } .standings tr.viewing { outline: 1px solid var(--lilla); } .standings td:nth-child(2) { text-align: left; } .pts { font-weight: 800; }
@@ -77,30 +84,30 @@ fieldset.phase legend { color: var(--dæmpet); padding: 0 .3rem; }
 
 button.primary { background: var(--grøn); border-color: var(--grøn); color: #052e16; font-weight: 800; }
 button:disabled { opacity: .5; cursor: not-allowed; }
-.help { margin-top: .4rem; font-size: .75rem; }
+.help { margin-top: .4rem; font-size: var(--fs-1); }
 .matchcenter { margin-bottom: 1rem; border-color: var(--lilla); }
 .cards { display: flex; flex-wrap: wrap; gap: .4rem; margin: .5rem 0; }
-.matchcard { font-size: .75rem; } .matchcard.active { background: var(--lilla); border-color: var(--lilla); }
+.matchcard { font-size: var(--fs-1); } .matchcard.active { background: var(--lilla); border-color: var(--lilla); }
 .scoreboard { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 1rem; padding: .5rem 0; }
-.scoreboard .right { text-align: right; } .score { text-align: center; } #score { font-size: 2rem; font-weight: 900; }
+.scoreboard .right { text-align: right; } .score { text-align: center; } #score { font-size: var(--fs-5); font-weight: 900; }
 .timeline { position: relative; height: 1.6rem; background: #1e293b; border-radius: .3rem; margin: .5rem 0; }
 .tl-half { position: absolute; left: 50%; top: 0; bottom: 0; border-left: 1px dashed #64748b; }
-.tl-mark { position: absolute; transform: translateX(-50%); font-size: .9rem; } .tl-mark.home { top: 0; } .tl-mark.away { bottom: 0; }
+.tl-mark { position: absolute; transform: translateX(-50%); font-size: var(--fs-2); } .tl-mark.home { top: 0; } .tl-mark.away { bottom: 0; }
 .varbanner { background: #4c1d95; border: 1px solid var(--lilla); padding: .4rem .8rem; border-radius: .3rem; font-weight: 700; }
 .mc-grid { display: grid; grid-template-columns: 3fr 2fr; gap: 1rem; } @media (max-width: 900px) { .mc-grid { grid-template-columns: 1fr; } }
 .mc-grid.after { grid-template-columns: minmax(18rem, 26rem) minmax(0, 1fr); grid-template-areas: "replay stats" "replay feed"; align-items: start; }
 .mc-grid.after .mc-replay { grid-area: replay; } .mc-grid.after .mc-stats { grid-area: stats; } .mc-grid.after .mc-feed { grid-area: feed; }
 .mc-grid.after .replay { margin-top: 0; } .mc-grid.after > * { min-width: 0; } .mc-grid .mc-stats { overflow-x: auto; }   /* mobil: afspilningens tekst må bryde (390 px: 394 px for bred) */
 @media (max-width: 900px) { .mc-grid.after { grid-template-columns: 1fr; grid-template-areas: "replay" "stats" "feed"; } }
-.feed { max-height: 26rem; overflow-y: auto; font-size: .8rem; }
+.feed { max-height: 26rem; overflow-y: auto; font-size: var(--fs-1); }
 .ev { padding: .3rem 0; border-bottom: 1px solid var(--kant); } .ev-min { display: inline-block; width: 2.4rem; color: var(--dæmpet); font-family: ui-monospace, monospace; }
 .ev.highlight { font-weight: 700; } .ev.tactic { color: #cbd5e1; }
-.ev.minor { color: #94a3b8; font-size: .92em; }   /* halvchancen (v3.17.0): skud uden stor fare, nedtonet */
+.ev.minor { color: #94a3b8; font-size: var(--fs-1); }   /* halvchancen (v3.17.0): skud uden stor fare, nedtonet */
 .mstats td, .mstats th { text-align: center; } .mstats tbody th { color: var(--dæmpet); font-weight: 400; }
 .ratings table td:first-child { text-align: left; } .ratings tr.motm { background: #78350f55; } .rating { font-weight: 800; } .xp { color: #c4b5fd; }
 .gazette { background: #0b1222; }
 
-.stars { font-size: .95rem; letter-spacing: .05em; white-space: nowrap; }
+.stars { font-size: var(--fs-2); letter-spacing: .05em; white-space: nowrap; }
 .star-on { color: #fbbf24; text-shadow: 0 0 1px #000; } .star-off { color: #475569; }
 .tablewrap-x { overflow-x: auto; }
 
@@ -108,25 +115,25 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .legend { margin-top: .5rem; line-height: 1.5; }
 .minipitch-wrap { margin: .3rem 0 .6rem; }
 .minipitch { position: relative; aspect-ratio: 68 / 60; max-width: 26rem; margin: .3rem auto 0; background: repeating-linear-gradient(0deg, #15803d, #15803d 8%, #166534 8%, #166534 16%); border: 1px solid #ffffff90; border-radius: .3rem; }
-.mp-token { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; font-size: .6rem; text-shadow: 0 1px 2px #000; white-space: nowrap; }
-.mp-val { background: var(--bg); border: 1px solid #fff; border-radius: .3rem; padding: 0 .25rem; font-weight: 800; font-size: .72rem; }
-.mp-val .stars { font-size: .62rem; } .mp-token.motm .mp-val { border-color: #fbbf24; box-shadow: 0 0 0 2px #fbbf2488; }
+.mp-token { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; font-size: var(--fs-graf); text-shadow: 0 1px 2px #000; white-space: nowrap; }
+.mp-val { background: var(--bg); border: 1px solid #fff; border-radius: .3rem; padding: 0 .25rem; font-weight: 800; font-size: var(--fs-1); }
+.mp-val .stars { font-size: var(--fs-graf); } .mp-token.motm .mp-val { border-color: #fbbf24; box-shadow: 0 0 0 2px #fbbf2488; }
 .ratings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem 1rem; margin-top: 1rem; } @media (max-width: 900px) { .ratings-grid { grid-template-columns: 1fr; } .ratings-grid > .ratings + .ratings { margin-top: 1rem; } }   /* rækkeafstanden gælder også inde i hvert ark (subgrid) */
 .ratings-grid > .ratings { min-width: 0; overflow-x: auto; display: grid; grid-template-rows: subgrid; grid-row: span 4; align-content: start; }   /* v3.24.6: titel, kort, opstilling og liste i samme højde på begge ark */   /* v3.20.1: et bredt ark ruller selv vandret – siden gør ikke (390 px: 200 px for bred) */
 .fixtures { display: grid; grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr)); gap: .4rem; }
 .fixture { display: grid; grid-template-columns: 1fr auto 1fr auto; gap: .6rem; align-items: center; text-align: left; padding: .45rem .7rem; }
 .fixture.static { background: #1e293b; border: 1px solid #334155; border-radius: .35rem; grid-template-columns: 1fr auto 1fr; }
-.fixture.mine { border-color: var(--grøn); } .fx-team.right { text-align: right; } .fx-score { min-width: 2.6rem; text-align: center; } .fx-link { font-size: .72rem; color: var(--blå); }
+.fixture.mine { border-color: var(--grøn); } .fx-team.right { text-align: right; } .fx-score { min-width: 2.6rem; text-align: center; } .fx-link { font-size: var(--fs-1); color: var(--blå); }
 .lineup-layout .pitch, .tab-taktik .pitch { width: min(100%, calc(72vh * 68 / 80)); margin: 0 auto; }
 /* Lav skærm (laptop): kompakt klubhoved og lavere regneark, så banen kan ses under det. */
 @media (max-height: 850px) {
-  .tab-trup .clubhead { padding: .35rem 1rem; align-items: center; } .tab-trup .clubhead h2 { font-size: 1.1rem; margin: 0; }
+  .tab-trup .clubhead { padding: .35rem 1rem; align-items: center; } .tab-trup .clubhead h2 { font-size: var(--fs-3); margin: 0; }
   .tab-trup .clubhead .muted { display: inline; margin-left: .5rem; } .tab-trup .clubhead > div:first-child { display: flex; align-items: baseline; flex-wrap: wrap; }
   .tabs { margin-bottom: .5rem; } .tabpane { gap: .6rem; }
 }
-.tired { color: #fbbf24; font-size: .8rem; font-weight: 700; cursor: help; }
-.headlines { margin: .2rem 0 .6rem 1rem; padding: 0; font-size: .9rem; } .headlines li { margin: .1rem 0; }
-.ratings td.run { color: var(--blå); white-space: nowrap; font-size: .72rem; }
+.tired { color: #fbbf24; font-size: var(--fs-1); font-weight: 700; cursor: help; }
+.headlines { margin: .2rem 0 .6rem 1rem; padding: 0; font-size: var(--fs-2); } .headlines li { margin: .1rem 0; }
+.ratings td.run { color: var(--blå); white-space: nowrap; font-size: var(--fs-1); }
 .linklike { background: none; border: none; padding: 0; color: var(--blå); text-decoration: underline; cursor: pointer; font: inherit; }
 .ev.focus { background: #78350f66; outline: 1px solid #fbbf24; border-radius: .25rem; }
 
@@ -136,12 +143,12 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(20rem, 100%), 1fr)); gap: .75rem 1.5rem; max-width: 72rem; }
 @media (min-width: 72rem) { .stat-grid { grid-template-columns: repeat(3, 1fr); } }
 .stat-list { background: var(--bg); border: 1px solid var(--kant); border-radius: .5rem; padding: .5rem .75rem; }
-.stat-list h4 { margin: 0 0 .35rem; font-size: .9rem; }
-.stat-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: .85rem; }
+.stat-list h4 { margin: 0 0 .35rem; font-size: var(--fs-2); }
+.stat-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: var(--fs-2); }
 .stat-table td { padding: .2rem .25rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-bottom: 1px solid var(--kant); }
 .stat-table tr:last-child td { border-bottom: 0; }
 .stat-table .st-rank { width: 1.8rem; color: var(--dæmpet); }
-.stat-table .st-team { width: 28%; color: var(--dæmpet); font-size: .78rem; text-align: left; }
+.stat-table .st-team { width: 28%; color: var(--dæmpet); font-size: var(--fs-1); text-align: left; }
 .stat-table .st-name { text-align: left; }
 .stat-table tbody tr { cursor: default; } .stat-table tbody tr:hover { background: none; }
 .stat-table .st-val { width: 2.75rem; text-align: right; font-weight: 700; overflow: visible; }
@@ -150,7 +157,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 #team-stats td, #team-stats th, #my-players td, #my-players th { white-space: nowrap; }
 #team-stats tr.mine td { color: var(--grøn); }
 .round-bars { display: grid; gap: .15rem; max-width: 40rem; }
-.round-bar { display: grid; grid-template-columns: 2.5rem 1fr 2rem; align-items: center; gap: .4rem; font-size: .85rem; }
+.round-bar { display: grid; grid-template-columns: 2.5rem 1fr 2rem; align-items: center; gap: .4rem; font-size: var(--fs-2); }
 .rb-fill { display: block; height: .7rem; background: var(--grøn); border-radius: .2rem; min-width: 2px; }
 /* Kampprogram (v3.11) */
 .my-schedule { border-collapse: collapse; width: 100%; max-width: 32rem; }
@@ -163,14 +170,14 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .ev.snapped { outline: 2px solid var(--grøn); }
 .mp-token.scorer .mp-val { border-color: var(--grøn); box-shadow: 0 0 0 2px #22c55e88; }
 .mp-token.assist .mp-val { border-color: #60a5fa; }
-.mp-ball { position: absolute; transform: translate(-50%, -50%); color: #fff; font-size: .9rem; text-shadow: 0 0 3px #000; pointer-events: none; }
+.mp-ball { position: absolute; transform: translate(-50%, -50%); color: #fff; font-size: var(--fs-2); text-shadow: 0 0 3px #000; pointer-events: none; }
 
 /* v3.13: advarsel i en Hvis-Så-udskiftning, der ikke passer til opstillingen */
 .rule-warn { color: #fbbf24; }
 
 /* v3.14: journalist-klummen */
-.gazette.column .col-title { font-size: 1.25rem; margin: 0.2rem 0 0.6rem; }
-.gazette.column .col-sec h4 { margin: 0.8rem 0 0.2rem; color: #a78bfa; font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.04em; }
+.gazette.column .col-title { font-size: var(--fs-4); margin: 0.2rem 0 0.6rem; }
+.gazette.column .col-sec h4 { margin: 0.8rem 0 0.2rem; color: #a78bfa; font-size: var(--fs-2); text-transform: uppercase; letter-spacing: 0.04em; }
 .gazette.column .col-sec p { margin: 0.25rem 0; }
 .gazette.column .headlines li { margin: 0.2rem 0; }
 .gazette.column .col-box { margin-top: 0.8rem; }
@@ -184,46 +191,48 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 /* Målet (v3.16.2, QC: uden et tegnet mål lignede mål og forbi hinanden) – x 44–56, 3 % dybt */
 .rp-goal { position: absolute; left: 44%; width: 12%; height: 3%; border: 2px solid #fff; background: repeating-linear-gradient(45deg, #ffffff30 0 2px, transparent 2px 5px); }
 .rp-goal.top { top: -2px; border-top: none; } .rp-goal.bottom { bottom: -2px; border-bottom: none; }
-.rp-token { position: absolute; transform: translate(-50%, -50%); width: 1.3rem; height: 1.3rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .6rem; font-weight: 700; transition: left .8s ease-in-out .3s, top .8s ease-in-out .3s; border: 2px solid #0008; }
+.rp-token { position: absolute; transform: translate(-50%, -50%); width: 1.3rem; height: 1.3rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: var(--fs-graf); font-weight: 700; transition: left .8s ease-in-out .3s, top .8s ease-in-out .3s; border: 2px solid #0008; }
 .rp-token[hidden] { display: none; }   /* QC v3.16: display:flex slog [hidden] – udskiftede og udviste stod på tavlen */
 .rp-token.home { background: #e2e8f0; color: #0f172a; } .rp-token.away { background: #f97316; color: #111; }
 .rp-token.own { box-shadow: 0 0 0 2px #a78bfa; }
 .rp-token.actor { border-color: #22c55e; box-shadow: 0 0 0 3px #22c55e99; z-index: 2; } .rp-token.assist { border-color: #60a5fa; }
-.rp-ball { position: absolute; transform: translate(-50%, -50%); color: #fff; font-size: .8rem; text-shadow: 0 0 3px #000; transition: left .4s ease-out, top .4s ease-out; z-index: 3; pointer-events: none; }
+.rp-ball { position: absolute; transform: translate(-50%, -50%); color: #fff; font-size: var(--fs-1); text-shadow: 0 0 3px #000; transition: left .4s ease-out, top .4s ease-out; z-index: 3; pointer-events: none; }
 .rp-ball.over { transform: translate(-50%, -50%) scale(2.2); opacity: 0; }   /* over overliggeren (v3.16.2) */
-.rp-caption { min-height: 2.6em; font-size: .85rem; text-align: center; } .rp-caption.moment { font-weight: 600; }
+.rp-caption { min-height: 2.7em; font-size: var(--fs-2); text-align: center; } .rp-caption.moment { font-weight: 600; }
 .rp-controls { display: flex; gap: .3rem; justify-content: center; flex-wrap: wrap; }
 /* Heat map (v3.16) */
 .minipitch.heat .heat-cell { position: absolute; background: #f97316; pointer-events: none; }
-.heat-shot { position: absolute; transform: translate(-50%, -50%); font-size: .75rem; text-shadow: 0 0 3px #000; }
+.heat-shot { position: absolute; transform: translate(-50%, -50%); font-size: var(--fs-1); text-shadow: 0 0 3px #000; }
 .heat-shot.save { color: #60a5fa; } .heat-shot.miss { color: #e5e7eb; } .heat-shot.offside, .heat-shot.disallowed { color: #a78bfa; }
 tr.heat-sel td { background: #f9731633; } .ratings tr[title] { cursor: pointer; }
 .minipitch.heat { aspect-ratio: 68 / 100; max-width: 16rem; }
-.minipitch.heat.zones .zone-goal { position: absolute; left: 50%; transform: translateX(-50%); font-size: 0.7rem; color: #fff; opacity: 0.85; z-index: 2; pointer-events: none; }
+.minipitch.heat.zones .zone-goal { position: absolute; left: 50%; transform: translateX(-50%); font-size: var(--fs-1); color: #fff; opacity: 0.85; z-index: 2; pointer-events: none; }
 .minipitch.heat.zones .zone-goal.top { top: 2px; }
 .minipitch.heat.zones .zone-goal.bottom { bottom: 2px; }
 .minipitch.heat.zones .zone-cell { position: absolute; display: flex; align-items: center; justify-content: center; border: 1px solid #ffffff22; }
-.zone-pc { font-size: .7rem; color: #fff; text-shadow: 0 1px 2px #000; opacity: 1; }
-.matchlog .log-row { font-size: .9em; padding: .1rem 0; } .matchlog details summary { cursor: pointer; color: #93c5fd; }   /* v3.18.0 📜 Kampe */
+.zone-pc { font-size: var(--fs-1); color: #fff; text-shadow: 0 1px 2px #000; opacity: 1; }
+.matchlog .log-row { font-size: var(--fs-1); padding: .1rem 0; } .matchlog details summary { cursor: pointer; color: #93c5fd; }   /* v3.18.0 📜 Kampe */
 
 /* Træning (v3.18.0) */
 .trainbox { margin-top: .6rem; }
-.trainbox .train-line { display: flex; align-items: center; gap: .4rem; font-size: .9em; margin: .15rem 0; }
+.trainbox .train-line { display: flex; align-items: center; gap: .4rem; font-size: var(--fs-1); margin: .15rem 0; }
 .trainbox .bar-track { width: 6rem; flex: none; }
-.train-summary { font-size: .9em; }
+.train-summary { font-size: var(--fs-1); }
 .traincell { white-space: nowrap; }
 
 /* Klub (v3.18.0) */
-.club-sum th { text-align: left; padding-right: 1rem; font-weight: normal; color: var(--muted, #94a3b8); }
+.club-sum th { text-align: left; padding-right: 1rem; font-weight: normal; color: var(--dæmpet); }
 .club-sum td, .ledger td.num { text-align: right; }
 .club-sum td { text-align: left; }
 .neg { color: #f87171; }
-.ledger { font-size: .9em; }
+.ledger { font-size: var(--fs-1); }
 .club-sum { width: 100%; table-layout: fixed; }
 .club-sum th { width: 32%; vertical-align: top; white-space: normal; }
 .club-sum td { white-space: normal; overflow-wrap: anywhere; }
 /* Massehandlingen i regnearkets værktøjslinje: samme højde som filterknapperne (CI-laptop-tjekket: banen skal stå højt nok) */
-select.mini { padding: .1rem .3rem; font-size: .75rem; height: auto; line-height: 1.2; }
+select.mini { padding: .1rem .3rem; font-size: var(--fs-1); height: auto; line-height: 1.2; }
+/* iOS zoomer ved fokus i felter under 16 px (RM v3.27.1: før arvede de browserens 16 px) – på smal skærm er alle felter 16 px */
+@media (max-width: 900px) { input, select, textarea, select.mini { font-size: var(--fs-3); } }
 @media (max-width: 600px) { #for-sale-table .wide { display: none; } }
 
 /* v3.19.0: fanerne i den faste topbar (anden række) – ⚙ Admin har gem/eksport/import/ny liga */
@@ -236,9 +245,9 @@ button.savestatus.failed { color: var(--rød); font-weight: 700; }
 .admin p { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; }
 @media (max-width: 480px) {
   .tab-txt { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-  .topbar .tab { padding: .3rem .6rem; font-size: 1.1rem; }
+  .topbar .tab { padding: .3rem .6rem; font-size: var(--fs-3); }
   .topbar { gap: .4rem; padding: .5rem .6rem; }
-  .topbar h1 { font-size: 1rem; }
+  .topbar h1 { font-size: var(--fs-3); }
 }
 @media (max-width: 480px) {
   .play-opp { display: none; }          /* modstanderen står på 🔍-knappen ved siden af */
@@ -256,14 +265,14 @@ button.savestatus.failed { color: var(--rød); font-weight: 700; }
 
 /* v3.21.0: duel-tallet i karakterarket brydes ikke */
 .ratings td.duel { white-space: nowrap; }
-.match-numbers { margin: .4rem 0; font-size: .85rem; line-height: 1.45; } .match-numbers > div { margin-bottom: .2rem; }   /* v3.22.0: Kampens tal under spillerens heat map */
+.match-numbers { margin: .4rem 0; font-size: var(--fs-2); line-height: 1.35; } .match-numbers > div { margin-bottom: .2rem; }   /* v3.22.0: Kampens tal under spillerens heat map */
 .mn-list { margin: .2rem 0 .3rem 1.1rem; padding: 0; } .mn-list li { margin: .1rem 0; }
 /* v3.24.0 samspil: streger mellem nabopladser under brikkerne – tykkelse og stiplet bærer båndet, ikke kun farven (Spilfører UI) */
 .chem-lines { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .chem-lines .chem { vector-effect: non-scaling-stroke; stroke-linecap: round; }
 .chem-staerkt { stroke: #facc15; stroke-width: 5; } .chem-sammen { stroke: #e5e7eb88; stroke-width: 2.5; }
 .chem-finder { stroke: #fb923c; stroke-width: 1.5; } .chem-fremmede { stroke: #ef4444; stroke-width: 1.5; stroke-dasharray: 4 3; }
-.chem-legend { font-size: .82rem; margin-top: .35rem; } .chem-legend .chem-key { display: inline-block; width: 1.4rem; height: 0; vertical-align: middle; margin: 0 .2rem; border-top: 2px solid; }
+.chem-legend { font-size: var(--fs-2); margin-top: .35rem; } .chem-legend .chem-key { display: inline-block; width: 1.4rem; height: 0; vertical-align: middle; margin: 0 .2rem; border-top: 2px solid; }
 .chem-key.staerkt { border-top: 5px solid #facc15; } .chem-key.sammen { border-top-color: #e5e7eb88; } .chem-key.finder { border-top: 1.5px solid #fb923c; } .chem-key.fremmede { border-top: 2px dashed #ef4444; }
 
 /* v3.27.0 udelukkelse (⛔) */

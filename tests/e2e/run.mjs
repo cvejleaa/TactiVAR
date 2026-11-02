@@ -55,6 +55,57 @@ try {
   check('Ny liga: dit hold vises med 18 spillere', (await rows()) === 18);
   check('Ny liga: ingen "Nyt i kampene"-besked (den er til dem, der opdaterer et gammelt gem)', (await g.locator('#notice').count()) === 0);
   check('Holdvælgeren har 8 hold', (await g.locator('#team-select option').count()) === 8);
+  // UI-ombygningen F0 (v3.27.1): højst 6 skriftstørrelser pr. fane (12/14/16/20/28 + 10 på brikkerne) – før 7–15 pr. fane
+  // (node tools/measure-ui.mjs). Kun synlig tekst tæller.
+  for (const k of ['trup', 'taktik', 'liga', 'klub']) {
+    await tab(k);
+    const sizes = await g.evaluate(() => [...new Set([...document.querySelectorAll('body *')].filter((e) => e.offsetParent !== null
+      && [...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())).map((e) => getComputedStyle(e).fontSize))]);
+    check(`F0: ${k} bruger højst 6 skriftstørrelser fra skalaen`, sizes.length <= 6 && sizes.every((x) => ['10px', '12px', '14px', '16px', '20px', '28px'].includes(x)), sizes.join(' '));
+  }
+  // F0 (Test Manager): vagten ovenfor ser kun fire faner FØR første runde – Kamp (mest tekst: afspilning, referat, statistik,
+  // karakterark, banegrafik) og Admin er ikke med, og 390 px (media query .topbar h1 / .tab) slet ikke. Her: alle seks faner, live
+  // og efter en runde, på 1400 og 390 px. Højst 6 størrelser pr. fane og i alt, alle fra skalaen; 10 px KUN inde i banegrafikken
+  // (.pitch/.minipitch/.rp-pitch) – ellers kunne en brødtekst sættes til 10 px uden at tælle eller listen bryde; body 14 px / linjehøjde 1,35.
+  {
+    const SKALA = ['10px', '12px', '14px', '16px', '20px', '28px'];
+    const maal = (pg) => pg.evaluate(() => { const set = new Set(), graf = [];
+      for (const e of document.querySelectorAll('body *')) {   // select/input har ingen tekstknude (kun <option>) – de måles for sig
+        if (e.offsetParent === null || !([...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim()) || e.matches('select, input, textarea'))) continue;
+        const s = getComputedStyle(e).fontSize; set.add(s);
+        if (s === '10px' && !e.closest('.pitch, .minipitch, .rp-pitch')) graf.push(e.tagName.toLowerCase() + '.' + [...e.classList].join('.')); }
+      // tallene på brikkerne ER 10 px (--fs-graf) – en --fs-graf sat til 12 px smelter ellers sammen med skalaen og ses ikke
+      const brikker = [...document.querySelectorAll('.token-name, .rp-token, .mp-name')].filter((e) => e.offsetParent !== null).map((e) => getComputedStyle(e).fontSize);
+      return { sizes: [...set], graf, brikker }; });
+    check('F0: fejlboksen (.fejlboks, synlig efter den bevidste testfejl ovenfor) står i brødtekst-størrelse 14 px',
+      (await page.isVisible('#fejlboks')) && (await page.evaluate(() => getComputedStyle(document.getElementById('fejlboks')).fontSize)) === '14px');
+    const alle = new Set();
+    for (const w of [1400, 390]) {
+      const c = await browser.newContext({ viewport: { width: w, height: w < 600 ? 844 : 1000 } }), pg = await c.newPage();
+      await pg.goto(BASE + '/'); await pg.waitForSelector('body[data-klar="ja"]');
+      const body = await pg.evaluate(() => { const s = getComputedStyle(document.body); return [s.fontSize, s.lineHeight]; });
+      check(`F0 ${w} px: brødtekst 14 px med linjehøjde 1,35 (18,9 px)`, body[0] === '14px' && body[1] === '18.9px', body.join(' / '));
+      // RM v3.27.1: iOS zoomer ved fokus i felter under 16 px – på smal skærm er alle synlige felter 16 px (før F0 arvede de 16 px;
+      // uden media-reglen ville de være 14 – og select.mini 12)
+      if (w < 600) { await pg.click('#tab-taktik'); await pg.waitForSelector('.tabpane.tab-taktik');
+        const felter = await pg.evaluate(() => [...document.querySelectorAll('input, select, textarea')].filter((e) => e.offsetParent !== null).map((e) => getComputedStyle(e).fontSize));
+        check('F0 390 px: alle synlige felter (select/input) er 16 px – ingen iOS-zoom', felter.length >= 3 && felter.every((x) => x === '16px'), felter.length + ': ' + [...new Set(felter)].join(' ')); }
+      const mal = async (navn) => { const m = await maal(pg); m.sizes.forEach((x) => alle.add(x));
+        check(`F0 ${w} px ${navn}: højst 6 skriftstørrelser, alle fra skalaen, 10 px kun på banegrafikken`,
+          m.sizes.length <= 6 && m.sizes.every((x) => SKALA.includes(x)) && m.graf.length === 0 && m.brikker.every((x) => x === '10px'), m.sizes.join(' ') + ' | 10px uden for banen: ' + m.graf.join(',')); };
+      const t = async (k) => { await pg.click(`#tab-${k}`); await pg.waitForSelector(`.tabpane.tab-${k}`); };
+      for (const k of ['trup', 'taktik', 'liga', 'klub', 'admin']) { await t(k); await mal(k + ' (ny liga)'); }
+      await t('trup'); const mit = await pg.inputValue('#team-select'); await pg.selectOption('#team-select', mit === '1' ? '2' : '1'); await pg.click('#matrix thead th:nth-child(15)');   // modstander: sortering på FIN afvises → .notice
+      check(`F0 ${w} px: beskeden (.notice) står i brødtekst-størrelse 14 px`, (await pg.locator('#notice').count()) === 1 && (await pg.locator('#notice').evaluate((e) => getComputedStyle(e).fontSize)) === '14px');
+      await mal('trup (modstander, med besked)'); await pg.selectOption('#team-select', mit);
+      await pg.click('#play-round'); await pg.waitForSelector('#match-center'); await mal('kamp (live)');
+      await pg.click('#skip'); await pg.waitForFunction(() => !document.querySelector('#skip') && document.querySelector('#match-center .ratings'));
+      for (const k of ['kamp', 'trup', 'taktik', 'liga', 'klub', 'admin']) { await t(k); await mal(k + ' (efter runden)'); }
+      await c.close();
+    }
+    check('F0: hele appen (alle faner, begge bredder) bruger højst 6 skriftstørrelser – før 20', alle.size <= 6, [...alle].join(' '));
+  }
+  await tab('trup');
   const heads = (await g.locator('#matrix thead th').allTextContents()).map((t) => t.replace(/ [▲▼]$/, ''));
   check('Regnearkets kolonner i rækkefølge (Alder står hvor den skal)', JSON.stringify(heads.slice(0, 21)) === JSON.stringify(['Pos/#', 'Spiller', 'Kæde', 'Natur', 'Alder', 'Frisk/🚑', 'Højde', 'Spring', '✈ Luft', 'PAC', 'STA', 'STR', 'BAL', 'PAS', 'FIN', 'POS', 'INT', 'GK', 'Gns', '⭐ Vurd', '🧠 Mod']), heads.join('|'));
   const ownMoney = await g.evaluate(() => { const hs = [...document.querySelectorAll('#matrix thead th')].map((t) => t.textContent.replace(/ [▲▼]$/, '')); const i = hs.indexOf('💰 Værdi'); return { last: hs.slice(i, i + 2), cells: [...document.querySelectorAll('#matrix tbody tr')].map((tr) => [tr.children[i].textContent, tr.children[i + 1].textContent]) }; });
