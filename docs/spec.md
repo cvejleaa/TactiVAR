@@ -1060,7 +1060,7 @@ grænsen, 🟨 én gult fra udelukkelse – kun startere; en udelukket/skadet st
   "📺 Runden spilles i Kamp-fanen" i stedet for resultat, placering, kasse-ændring, "Før du spiller", minitabel og modstanderform.
 - **Mobil (≤ 600 px)**: topbaren ruller væk; navigationen står fast i bunden (6 knapper 65 × 56 px, ikon over tekst,
   `env(safe-area-inset-bottom)`), Spil-bjælken lige over den; siden får bundluft, så sidste element står over bjælken. I bjælken står modstanderen
-  i knappen ("▶ Spil runde N · X (ude)", 🔍-linket skjules), og ved 3 advarsler én tæller ("⛔ 3 ting") i stedet for tre piller; den
+  i knappen ("▶ Spil runde N · X (ude)", 🔍-linket skjules; er navnet for langt, forkortes kun det med … – v3.29.1), og ved 3 advarsler én tæller ("⛔ 3 ting") i stedet for tre piller; den
   lille ▶ viser "▶ R5".
 Målt (`node tools/measure-ui.mjs`, efter én runde, før → efter): 1366 px Trup 1921 → 1939, Taktik 2087 → 2156, Liga 2560 → 2644,
 Hjem (ny) 900; 390 px Trup 2941 → 2928, Taktik 4598 → 4661, Liga 4169 → 4208, Hjem (ny) 938 (Kamp varierer med runden). Mobil

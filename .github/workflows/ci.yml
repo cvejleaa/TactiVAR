@@ -38,6 +38,14 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
+      # Emulatorernes jar-filer hentes ellers på hver kørsel (firebase-tools' advarsel i loggen). Nøglen følger package-lock.json, så en ny
+      # firebase-tools (= ny emulator-version) giver en ny cache; mangler en version i en gammel cache, henter emulatoren den selv.
+      - name: Cache Firebase-emulatorerne
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: firebase-emulators-${{ runner.os }}-
       - name: Firestore-regler (emulator)
         run: npm run test:rules
       - name: End-to-end
