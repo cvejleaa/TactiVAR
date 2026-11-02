@@ -420,6 +420,8 @@ try {
     // (11) "Se kort ›" i byt-beskeden åbner den valgte spiller
     await tp.click('#pick-card');
     check('F2 Taktik: "Se kort ›" i byt-beskeden viser den spiller, der er valgt til byttet – stadig intet byt', (await st()).title === nm(D1.squad.find((x) => x.id === slotsA[3])) && mine(await save()).tactics.lineupSlots.join() === slotsA.join());
+    await tp.keyboard.press('Escape');
+    check('F2 Taktik: Escape lukker panelet, men afbryder ikke byttet (beskeden og den valgte række står)', (await st()).open === 'nej' && (await tp.locator('#pick-msg').count()) === 1 && (await tp.locator('#lineup-list tr.active').count()) === 1);
     await tp.click('#pitch .token[data-slot="3"]');   // fravælg
     // (12) ◀ ▶ på Taktik: listens rækkefølge (start-11 i pladsernes orden …), bytter aldrig
     await tp.locator('#lineup-list .toolbar button', { hasText: 'Alle' }).click();
