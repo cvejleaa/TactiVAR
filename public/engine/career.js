@@ -96,7 +96,21 @@ export const reservesOf = (team) => { const b = new Set(matchBenchOf(team).map((
 // 1 målmand og mindst 2 forsvarere, 2 midtbanespillere og 1 angriber, så de bedste efter stjerner/tier og friskhed.
 // Med 7 eller færre ikke-startere er det dem alle (18 spillere: uændret fra før v3.18.0).
 // Offentlig styrke til udtagelse (QC B7: kun stjerner, friskhed og skade) – ÉT sted for bænk, reparation og opstilling
-function pubScore(p) { return (p.injuryMatchesLeft > 0 ? -100 : 0) + starsForValue(p) * 10 + (p.freshness ?? 100) / 10; }
+// Udelukkelse (v3.27.0, nr. 64 – brugeren 2026-11-02: "Strengere", hvert 4. gule efter målingen): ÉN vagt for, om en spiller
+// kan spille – skadet ELLER udelukket. Kampen (match.js isAvailable), udtagelsen (pubScore) og UI bruger kun denne.
+// BAN: direkte rødt = 2 kampe, rødt for to gule = 1, hvert YELLOW_EVERY. gule kort i sæsonen = 1 (de to gule bag et rødt
+// kort tæller ikke – UEFA; målt: hvert 3. gule ≈ 7 udelukkede kampe pr. hold pr. sæson, hvert 4. ≈ 4,4–5,4 – tools/measure-bans.mjs).
+export const BAN = Object.freeze({ DIRECT: 2, SECOND_YELLOW: 1, YELLOW_EVERY: 4 });
+export const unavailable = (p) => p.injuryMatchesLeft > 0 || p.banMatches > 0;
+// Udelukkelsen fra én kamps kort: e = karakterarkets post (yellows 0–2, red 'DIRECT'|'SECOND_YELLOW'); før = sæsonens tællende gule.
+// → { matches, yellows (nye tællende gule), why: 'DIRECT'|'SECOND_YELLOW'|'YELLOWS'|null }
+export function banFromCards(e, before = 0) {
+  const y = e.red === 'SECOND_YELLOW' ? 0 : (e.yellows ?? 0);
+  const crossed = Math.floor((before + y) / BAN.YELLOW_EVERY) - Math.floor(before / BAN.YELLOW_EVERY);
+  const red = e.red === 'DIRECT' ? BAN.DIRECT : e.red === 'SECOND_YELLOW' ? BAN.SECOND_YELLOW : 0;
+  return { matches: red + crossed * 1, yellows: before + y, why: e.red ? e.red : crossed > 0 ? 'YELLOWS' : null };
+}
+function pubScore(p) { return (unavailable(p) ? -100 : 0) + starsForValue(p) * 10 + (p.freshness ?? 100) / 10; }
 export function autoMatchBench(team) {
   const on = new Set(team.tactics.lineupSlots), cand = team.squad.filter((p) => !on.has(p.id));
   if (cand.length <= BENCH_SIZE) return (team.matchBench = cand.map((p) => p.id));

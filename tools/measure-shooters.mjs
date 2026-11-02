@@ -10,6 +10,7 @@ import { createLeague } from '../public/engine/generator.js';
 import { simulateMatch } from '../public/engine/match.js';
 
 const CUT = (e) => e && (e.label === 'Mod baglinjen' || /lægger den (lavt )?(tilbage|tværs) til/.test(e.text ?? ''));
+const REORG = /omorganiserer sig|skifter form|flytter rundt/;
 export function measureShooters(N = 400) {
   const out = { teamGames: 0, topShareSum: 0, maxShots: 0, over8: 0, st541: [0, 0], cutbacks: 0, cbCutback: 0 };
   for (let s = 1; s <= N; s++) {
@@ -30,8 +31,14 @@ export function measureShooters(N = 400) {
     }
     m.trace.moments.forEach((mo) => {
       const before = m.events[mo.ev - 1], at = m.events[mo.ev];
-      if (!(CUT(before) || CUT(at)) || mo.shooter == null) return;
-      out.cutbacks++; if (role.get(mo.shooter) === 'CB') out.cbCutback++;
+      // Rollen er STARTrollen: efter et Hvis-Så-formationsskift (fx 5-4-1 → 4-4-2) står en stopper på midtbanen og må gerne
+      // afslutte (v3.27.0: seed 190 – den eneste "CB"-cutback var en rykket stopper). Kun cutbacks FØR holdets omorganisering tæller.
+      const isHome = mo.side === 'h';
+      // Kun et oplæg fra SAMME hold (v3.27.0, seed 365: modstanderens mål med cutback-tekst stod lige før et langskud)
+      const mine = (e) => CUT(e) && e.isHome === isHome;
+      if (!(mine(before) || mine(at)) || mo.shooter == null) return;
+      const moved = m.events.slice(0, mo.ev).some((e) => e.type === 'TRIGGER' && e.isHome === isHome && REORG.test(e.label ?? ''));
+      out.cutbacks++; if (role.get(mo.shooter) === 'CB' && !moved) out.cbCutback++;
     });
   }
   return { topShare: out.topShareSum / Math.max(1, out.teamGames), maxShots: out.maxShots, over8Share: out.over8 / (2 * N), st541: out.st541[0] / Math.max(1, out.st541[1]), cutbacks: out.cutbacks, cbCutback: out.cbCutback / Math.max(1, out.cutbacks) };

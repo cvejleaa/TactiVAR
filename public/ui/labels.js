@@ -1,4 +1,5 @@
 import { FIT } from '../engine/formations.js';
+import { BAN } from '../engine/career.js';
 // Danske visningsnavne for motorens værdier.
 export const LINE = { GK: 'MÅL', DEF: 'FOR', MID: 'MID', ATT: 'ANG' };
 // Naturlig position (v3.8) med tavlens ord; den fulde betegnelse står i title.
@@ -39,3 +40,13 @@ export const kr = (n) => n.toLocaleString('da-DK') + ' kr.';
 // Uden for position (v3.20.0): prisen regnes fra tabellen (formations.js FIT) – aldrig skrevet ind som tal i en tekst
 export const fitCost = (f) => `−${String(Math.round((1 - f) * 1000) / 10).replace('.', ',')} %`;
 export const FIT_HELP = `Uden for position: egen plads 100 %, naboplads (fx DM på CM, back på kant) ${fitCost(FIT.near)}, anden markplads ${fitCost(FIT.other)}, målmand ⇄ markspiller ${fitCost(FIT.keeper)} – i dueller, afslutninger, pres og løb (ikke boldbesiddelsen). Kantpladser (LB/RB/LWB/RWB/LM/RM): dybden afgør – højt på banen er det en kant-plads, dybt en back-plads, imellem passer begge; trækker du en spiller, følger prisen med.`;
+
+// Udelukkelse (v3.27.0, nr. 64): ét sted for ord og tegn. ⛔ – ikke 🟥, som i karakterarket betyder "udvist i kampen" (QC).
+export const BAN_WHY = { DIRECT: 'direkte rødt kort', SECOND_YELLOW: 'rødt kort for to gule', YELLOWS: `${BAN.YELLOW_EVERY}. gule kort i sæsonen` };
+const kampe = (n) => `${n} kamp${n === 1 ? '' : 'e'}`;
+// Kort tegn til lister og banen: "🚑 2", "⛔ 1" eller begge. Tom streng = spilleklar.
+export const outLabel = (p) => [p.injuryMatchesLeft > 0 ? `🚑 ${p.injuryMatchesLeft}` : '', p.banMatches > 0 ? `⛔ ${p.banMatches}` : ''].filter(Boolean).join(' · ');
+export const banText = (p) => (p.banMatches > 0 ? `⛔ udelukket i ${kampe(p.banMatches)}${BAN_WHY[p.banWhy] ? ` (${BAN_WHY[p.banWhy]})` : ''}` : '');
+// Advarslen før det tællende gule kort: "🟨 3 – næste gule kort giver 1 kamps udelukkelse"
+export const yellowWarn = (p) => ((p.banYellows ?? 0) % BAN.YELLOW_EVERY === BAN.YELLOW_EVERY - 1 ? `🟨 ${p.banYellows} – næste gule kort giver 1 kamps udelukkelse` : '');
+export const OUT_TITLE = `🚑 = skadet, ⛔ = udelukket (antal kampe). Udelukket: direkte rødt ${kampe(BAN.DIRECT)}, rødt for to gule ${kampe(BAN.SECOND_YELLOW)}, hvert ${BAN.YELLOW_EVERY}. gule kort i sæsonen 1 kamp`;

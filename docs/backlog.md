@@ -7,6 +7,14 @@ Rangering: brugerens ønsker først, derefter værdi pr. størrelse. Første run
 + 3 sæsoner `measure-lifecycle`).
 
 ## Næste
+0. **Ny brugerflade i trin (brugeren 2026-11-02: "forvirrende og alt for mange informationer klemt sammen")** · UI · L · 5 · bud:
+   https://claude.ai/artifact/EPcztoSQdrk6pK8Bsy3FeS (UI-gennemgang med skærmbilleder, tre designbud, QC-dom). Brugerens valg: seks faner
+   (🏠 Hjem ny · Trup · Taktik · Kamp · Liga · Klub) med underfaner, spillerkortet som ét panel, ▶ Spil runde som bundbjælke på Hjem og
+   Taktik (genvej i topbaren på de andre), holdvælgeren væk fra topbaren (klik på et holdnavn / ⚙ "Se et andet hold" + lilla bjælke),
+   og ombygningen FØR nr. 41/48 (form og udvikling får plads i det nye fra start). Trin, hver for sig udgivet: F0 farver og skrift ·
+   F1 ramme, Hjem-fane og ⚙ · F2 kortpanelet · F3 Hjem-indhold, avisen ét sted · F4 Taktik-underfaner, hjælp bag "Sådan virker det" ·
+   F5 Trup-kolonnesæt og Udvikling, Kamp-opsamling · F6 Liga/Klub-underfaner og markedet (søgning, sortering, sider). Gemmet røres ikke
+   (sidste underfane i view, ikke game.ui). Sidehøjder måles før/efter med et committet værktøj.
 Rundtur 2: 2026-10-28 (v3.24.0, sæson spillet i browseren + `measure-lifecycle` 5 seeds × 3 sæsoner; Spilførernes scripts i
 scratchpad – et tal herfra skal måles igen med et committet værktøj, før det begrunder en ændring).
 1. **Sig det, når et par bliver stærkt** · UI · S · 4 · samspillets belønning er tavs: første gang det nævnes er runde 8
@@ -21,8 +29,6 @@ scratchpad – et tal herfra skal måles igen med et committet værktøj, før d
    (+0,308 net), Normal 1,501 (+0,163), Ekstrem 1,501 (+0,169); fælden afgøres først, når presset har vundet bolden
    (match.js ca. 1339, kun `!== 'OFF'`), Ekstrem ændrer kun erfaringskategorien (counter.js:57). Fælden skal kunne vinde OG
    fejle; Ekstrem fanger oftere, men giver en fri mand.
-4. **"Tacklinger" på Taktik-fanen gør ingenting** · motor · S/M · 4 · `tacklingIntensity` læses ingen steder i motoren (grep 0,
-   igen 2026-10-28); 2000 kampe: samme mål, point og kort. Aggressiv: flere erobringer, men frispark, kort, straffe og skader.
 5. **På mobil ligger spillerkortet 3.400 px under banen** · UI · S · 4 · 390 px: tryk på en brik scroller ikke; kortet (bedste
    makker, parrene) starter 3.437 px nede, Taktik er 4.253 px; parrets bånd står ellers kun i brikkens `title`, som ikke vises
    ved tryk. "Se kortet ↓" i beskeden – eller kortet lige under listen.
@@ -140,7 +146,6 @@ scratchpad – et tal herfra skal måles igen med et committet værktøj, før d
 62. **Tabellen viser bevægelse og form** · UI · S · 2 · F4Football: pil (↑/↔) pr. hold. TactiVAR: #/Hold/K/V/U/T/Mål/VAR/P (ui/standings.js). Pil og form i de seneste 5 – regnes af resultaterne, intet nyt felt.
 63. **Navngivne taktikker** · UI · S/M · 2 · 🗄 · F4Football: Saved Tactics med Gem/Indlæs/Omdøb. TactiVAR: planerne hedder A/B/C (spec §4). Rører Hvis-Så-reglernes mål.
 
-64. **Karantæne for kort** · motor + klub · S/M · 4 · 🗄 · F4Football-reglerne: 3 gule = karantæne næste kamp, igen ved 5 og 7; rødt = næste kamp. TactiVAR har ingen udelukkelse (kortene står kun i karakterarket). Giver "Aggressiv" (nr. 4) en pris ud over kampen og gør bænken vigtigere.
 65. **Udlån for spilletid** · klub · M · 3 · 🗄 ⚖ · F4Football: 2 ud og 2 ind pr. sæson, lejegebyr ≥ 2 % af værdien, den lejende klub betaler lønnen, hjem ved sæsonslut. TactiVAR: reserver får ingen minutter. Med nr. 41 bliver udlån til en bot vejen til at udvikle et talent.
 66. **Hvem går med frem på dødbolde** · motor + UI · S/M · 3 · 🗄 · F4Football: "bliv / gå frem" i angreb og "bliv / kom tilbage" i forsvar pr. spiller. TactiVAR vælger selv hovedstødsspilleren (match.js headerTarget); midtstopperne scorede 102 af 155 hjørnemål (nr. 23). Sammen med nr. 23 og 45.
 67. **Reservekamp i runden** · klub · M · 3 · ⚖ · F4Football: én venskabskamp pr. runde – erfaring (højst 30 pr. sæson), lidt moral og indtægt, koster friskhed. TactiVAR har ingen kampe uden for ligaen; giver minutter til nr. 41/48 uden at risikere point.
@@ -163,6 +168,7 @@ scratchpad – et tal herfra skal måles igen med et committet værktøj, før d
 - "– det holdt ikke mod jer" efter et nederlag kan misforstås (UI) – bevidst valgt i v3.21.2 (QC); kun noteret.
 
 ## Lavet
+- v3.27.0 udelukkelse for kort (nr. 64: direkte rødt 2, rødt for to gule 1, hvert 4. gule 1 – brugeren "Strengere", målt i `tools/measure-bans.mjs`) og tacklinger, der virker (tidl. nr. 4: Forsigtig/Normal/Aggressiv ganger de stille frispark, kortene og presset) · kendte rester til UI-ombygningen: 🟨-varslet kun på kortet, "⛔ #7" uden tekst på 390 px, Hvis-Så-vælgeren advarer ikke om udelukkede, direkte rødt efter 4. gule siger 2 kampe men giver 3
 - v3.24.1 ungdomsspillere, der rykkes op, har karantæne som et køb (salg straks lukket; holdt et år: se nr. 8) ·
   v3.24.0 samspil – virkning og visning (opbygning, løbsduel, streger, kort, køb/salg) · v3.23.0 samspil – data og
   migrering · v3.22.1 afleveringen før afslutningen (onside på linjen) · v3.22.0 Kampens tal · v3.21.2 klummen · v3.21.1 transferlåsen ·

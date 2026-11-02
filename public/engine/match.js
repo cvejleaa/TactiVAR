@@ -2,7 +2,7 @@
 // skader, observationer og karakterer returneres i resultatet og lægges ind af season.js.
 // Rettet ift. v2.5b: auto-indskiftning sker i en kamplokal kopi (ændrede før lineupSlots
 // permanent), og Hvis-Så-reglerne kører for begge hold og skifter reelt formation.
-import { matchBenchOf } from './career.js';
+import { matchBenchOf, unavailable, BAN } from './career.js';
 import { FORMATIONS, lineOfRole, slotLineOf, isOutOfZone, slotPosition, fitOf, slotFitOf, arrangeByFit } from './formations.js';
 import { livePositions as livePos0, coupledPositions as coupled0, kickoffPositions, apartFrom, apartOnLine, ONSIDE_GAP, MIN_APART } from './positions.js';
 import { masteryVs, counterXpForMatch } from './counter.js';
@@ -198,7 +198,7 @@ const YOUR_PASS = { SHORT: 'Dine korte pasninger', BALANCED: 'Din balancerede op
 const YOUR_PRESS = { LOW_BLOCK: 'din lave blok', MID_BLOCK: 'din mellemblok', HIGH_GEGENPRESS: 'dit høje gegenpres' };
 const cap = (t) => t[0].toUpperCase() + t.slice(1);
 const TXT = { SHORT: 'korte pasninger', BALANCED: 'balanceret opbygning', DIRECT_LONG: 'direkte lange bolde', LOW_BLOCK: 'lav blok', MID_BLOCK: 'mellemblok', HIGH_GEGENPRESS: 'højt gegenpress' };
-const isAvailable = (p) => !(p.injuryMatchesLeft > 0);
+const isAvailable = (p) => !unavailable(p);   // v3.27.0: skadet eller udelukket – én vagt (career.js)
 // Bots hviler før kampen en starter, der er under grænsen + ROTATE_MARGIN (han ville ellers skiftes ud tidligt).
 export const ROTATE_MARGIN = 10, ROTATE_SKILL = 2;
 const LINE_WORD = { GK: 'målmand', DEF: 'forsvarsspiller', MID: 'midtbanespiller', ATT: 'angriber' };
@@ -228,9 +228,12 @@ function prepareSide(team, isHome, notes) {
     if (p && isAvailable(p)) return;
     const line = p ? p.line : slotLineOf(tactics, slot);
     const inLine = bench().filter((b) => b.line === line).sort((a, b) => avgSkill(b) - avgSkill(a));   // ved lighed: bedste evner
-    const sub = pickForSlot(inLine, tactics, slot, (b) => b.freshness ?? 100) || bench()[0];
-    if (!sub) return;
-    if (p) notes.push({ isHome, text: `📋 [${team.name}] ${tag(p)} er skadet og erstattes i startopstillingen af ${tag(sub)}.` });
+    // v3.27.0: uden en rask på bænken hentes en reserve (helst samme kæde) – en udelukket eller skadet spiller starter aldrig
+    const reserve = () => { const r = team.squad.filter((b) => !squad.has(b.id) && !used.has(b.id) && isAvailable(b)); return r.find((b) => b.line === line) ?? r[0]; };
+    const sub = pickForSlot(inLine, tactics, slot, (b) => b.freshness ?? 100) || bench()[0] || reserve();
+    const why = p && p.banMatches > 0 && !(p.injuryMatchesLeft > 0) ? 'er udelukket' : 'er skadet';
+    if (!sub) { if (p) { notes.push({ isHome, text: `📋 [${team.name}] ${tag(p)} ${why}, og der er ingen afløser – holdet starter med en mand mindre.` }); starters[slot] = null; } return; }
+    if (p) notes.push({ isHome, text: `📋 [${team.name}] ${tag(p)} ${why} og erstattes i startopstillingen af ${tag(sub)}.` });
     starters[slot] = sub; used.add(sub.id);
   });
   if (team.isBot) starters.forEach((p, slot) => {
@@ -330,6 +333,14 @@ export const CHEM_EFFECT = { build: 0.3, run: 3 };
 // fælde). Venstre/Højre: CHOICE af kantangrebene på den side – og I bliver forudsigelige: deres back på den side får READ i
 // kantduellen. Samme ene rng-træk som før (rækkefølgen bevares). Muterbart objekt kun til måleværktøjet.
 export const SIDE = { GAIN: 0.01, CAP: 0.06, CHOICE: 0.78, READ: 0.5 };
+// Tacklinger (v3.27.0, brugeren 2026-11-02: "kobl dem på" – før læste motoren dem ikke): Aggressiv begår flere stille frispark
+// (foul ×1,3) og får flere gule i dem (card ×1,25), men vinder presset oftere (press, i opbygningsduellen); Forsigtig omvendt
+// (×0,75 / ×0,8). Grundtrækkene (QUIET_FOUL_P, QUIET_CARD_P) er uændrede – forskellen kommer af et ekstra træk (skip = drop et
+// frispark/kort, extra = et ekstra), kun når valget ikke er Normal. Normal = samme træk og samme kamp som før.
+export const TACKLE = { CAUTIOUS: { foul: 0.75, card: 0.8, press: -0.6 }, NORMAL: { foul: 1, card: 1, press: 0 }, AGGRESSIVE: { foul: 1.3, card: 1.25, press: 0.6 } };
+// Ekstra-trækkets sandsynlighed, så P(frispark) = QUIET_FOUL_P·foul og P(kort) = QUIET_CARD_P·card: skip = 1 − m, extra = p(m − 1)/(1 − p)
+const tackleSkip = (m) => (m < 1 ? 1 - m : 0), tackleExtra = (p, m) => (m > 1 ? (p * (m - 1)) / (1 - p) : 0);
+const tackleOf = (side) => TACKLE[side.tactics.phases.phase2_defending.tacklingIntensity] ?? TACKLE.NORMAL;
 export function simulateMatch(home, away, rng, opts = {}) {
   const events = [];
   const lineupNotes = [];
@@ -1143,7 +1154,9 @@ export function simulateMatch(home, away, rng, opts = {}) {
     if (!e || e.red) return;
     if (e.yellows && !force && !rng.chance(CARD_RULES.SECOND_YELLOW_P)) return;   // han holder igen – frisparket, men intet kort
     e.yellows = (e.yellows ?? 0) + 1; e.yellowCard = true; st[k(side, 'Yellows')]++;
-    if (e.yellows === 1) addEv(min, 'FOUL', 'PLAY', side.isHome, false, 'Gult kort', `🟨 [${side.team.name}] ${before} ${tag(p)}${after}.`);
+    // v3.27.0: det tællende gule kort nr. 4, 8 … giver udelukkelse – det står i referatet, når det sker (QC: ellers først runden efter)
+    const nth = (p.banYellows ?? 0) + 1, banNote = nth % BAN.YELLOW_EVERY === 0 ? ` Det er hans ${nth}. gule kort i sæsonen – han er udelukket i næste kamp.` : '';
+    if (e.yellows === 1) addEv(min, 'FOUL', 'PLAY', side.isHome, false, 'Gult kort', `🟨 [${side.team.name}] ${before} ${tag(p)}${after}.${banNote}`);
     else sendOff(side, p, min, 'SECOND_YELLOW');
   }
   const canSendOff = (side, p) => { const e = sheet.entries[p.id]; return !!e && !e.red && side.starters.indexOf(p) >= 1 && side.starters.filter(Boolean).length > MIN_PLAYERS; };
@@ -1159,7 +1172,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
     const left = side.starters.filter(Boolean).length;
     const why = kind === 'DIRECT' ? `Direkte rødt kort til ${tag(p)} for den grove tackling` : `Andet gule kort til ${tag(p)}`;
     observe(p, `Udvist (mod ${other(side).team.name}): ${kind === 'DIRECT' ? 'direkte rødt kort' : 'andet gule kort'}.`);
-    addEv(min, 'RED', 'HIGHLIGHT', side.isHome, true, `🟥 Udvist: ${tag(p)}`, `${kind === 'DIRECT' ? '🟥' : '🟨🟥'} [${side.team.name}] ${why} – han er udvist! ${side.team.name} må spille resten af kampen med ${MEN[left] ?? left} mand.${varNote}`);
+    addEv(min, 'RED', 'HIGHLIGHT', side.isHome, true, `🟥 Udvist: ${tag(p)}`, `${kind === 'DIRECT' ? '🟥' : '🟨🟥'} [${side.team.name}] ${why} – han er udvist! ${side.team.name} må spille resten af kampen med ${MEN[left] ?? left} mand.${varNote} ⛔ Udelukket i ${kind === 'DIRECT' ? `de næste ${BAN.DIRECT} kampe` : 'næste kamp'}.`);
   }
 
   function checkTriggers(side, min) {
@@ -1267,7 +1280,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
     const slot = side.starters.findIndex((p, i) => i > 0 && p?.id === rule.subOut);
     const out = side.team.squad.find((p) => p.id === rule.subOut), inP = side.benchAvailable().find((p) => p.id === rule.subIn);
     const name = (id) => { const p = side.team.squad.find((x) => x.id === id); return p ? tag(p) : 'spilleren'; };
-    const why = slot < 0 ? `${name(rule.subOut)} er ${sheet.entries[rule.subOut]?.red ? 'udvist' : 'ikke på banen'}` : !inP ? `${name(rule.subIn)} er ikke på bænken (skadet, allerede brugt eller i startopstillingen)` : subBlock(side, min);
+    const why = slot < 0 ? `${name(rule.subOut)} er ${sheet.entries[rule.subOut]?.red ? 'udvist' : 'ikke på banen'}` : !inP ? `${name(rule.subIn)} er ikke på bænken (skadet, udelukket, allerede brugt eller i startopstillingen)` : subBlock(side, min);
     if (why) {
       if (own(side)) addEv(min, 'TRIGGER', 'TACTIC', side.isHome, false, 'Hvis-Så-skift ikke udført', `📋 [${side.team.name} • Hvis-Så] Udskiftningen kunne ikke udføres: ${why}.`);
       return;
@@ -1355,6 +1368,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
       if (att.calm) { build += CALM_BUILD_BONUS; att.calm = false; } // "Hold på bolden" efter sidste erobring
       build += CHEM_EFFECT.build * chemAt(att, playmaker);   // samspil (v3.24.0): opspilleren og hans naboer kender hinanden – intet rng
       let press = (presser.skills.intercepting + presser.skills.positioning * 0.85 + presser.skills.stamina * 0.35) * ff(presser) + prM * MASTERY_WEIGHT + rng.next() * 7;
+      press += tackleOf(def).press;   // tacklinger (v3.27.0): aggressiv vinder flere dueller – og får flere kort
       const pass = attPh.phase1_buildUp.passingStyle, focus = attPh.phase1_buildUp.attackFocus, height = defPh.phase2_defending.pressingHeight;
       if (pass === 'SHORT' && height === 'LOW_BLOCK') build += STYLE_BONUS;
       if (pass === 'DIRECT_LONG' && height === 'HIGH_GEGENPRESS') build += STYLE_BONUS;
@@ -1478,10 +1492,12 @@ export function simulateMatch(home, away, rng, opts = {}) {
 
     if (sentOffThisTick) { sentOffThisTick = false; continue; }   // rødt kort: spillet stopper (se nedenfor)
     // "Stille" frispark – kun talt, ingen hændelse (realistisk antal pr. kamp).
-    if (rng.chance(QUIET_FOUL_P)) {
+    // Tacklingerne (v3.27.0) flytter både frisparket og kortet – med et ekstra træk, kun når valget ikke er Normal (TACKLE)
+    const tq = tackleOf(def), tilt = (hit, p, m) => (hit ? !(tackleSkip(m) && rng.chance(tackleSkip(m))) : !!(tackleExtra(p, m) && rng.chance(tackleExtra(p, m))));
+    if (tilt(rng.chance(QUIET_FOUL_P), QUIET_FOUL_P, tq.foul)) {
       st[k(def, 'Fouls')]++;
       // Hvert femte giver gult kort (v3.10, QC: ellers ≈0,5 gule pr. hold – Superligaen ≈2).
-      if (rng.chance(QUIET_CARD_P)) {
+      if (tilt(rng.chance(QUIET_CARD_P), QUIET_CARD_P, tq.card)) {
         const dRq = def === H ? hR : aR, fouler = rng.pick(dRq.defs.concat(dRq.mids));
         sheet.adjust(fouler.id, -0.2); tickFoul = { side: def, p: fouler };
         booking(def, fouler, min, 'Gult kort til', ' for et frispark');

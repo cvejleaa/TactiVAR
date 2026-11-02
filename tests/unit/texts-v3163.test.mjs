@@ -82,7 +82,9 @@ test('ingen gentaget måltekst i en kamp, før typens tre er brugt (Spilfører: 
 });
 test('hovedstødsmålene (HEADER/CORNER/SETPIECE) får også kampens brugte tekster (fund, rettet: describeGoal blev kaldt uden goalTexts i luftduel-grenen)', () => {
   let multi = 0;
-  for (const m of M200) {
+  // v3.27.0: 200 kampe gav kun 2 kampe med to hovedstødsmål af samme type (før 5 – tacklingerne flytter rng-strømmen og
+  // giver færre dødbolde hos de forsigtige botter) – nu 600 kampe, så datavagten har sit gamle niveau
+  for (const m of matches(600)) {
     const per = {};
     // Før stod her !WITH_USED – tom, efter at hovedstødsmålene kom med (grøn uden data). Nu: netop de tre typer, med datavagt.
     for (const g of m.goalsPool) if (['HEADER', 'CORNER', 'SETPIECE'].includes(g.kind)) (per[g.kind] ??= []).push(variantOf(g));
@@ -91,7 +93,7 @@ test('hovedstødsmålene (HEADER/CORNER/SETPIECE) får også kampens brugte teks
       if (js.length >= 2) multi++;
     }
   }
-  assert.ok(multi >= 4, `data: ${multi} kampe med mindst to hovedstødsmål af samme type`);   // 5
+  assert.ok(multi >= 8, `data: ${multi} kampe med mindst to hovedstødsmål af samme type`);
 });
 
 // ---------- Varianter uden rng: vary = pickBy(liste, n, familie, aktør) – n = aktørens n'te brug i kampen ----------

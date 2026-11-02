@@ -265,3 +265,6 @@ button.savestatus.failed { color: var(--rød); font-weight: 700; }
 .chem-finder { stroke: #fb923c; stroke-width: 1.5; } .chem-fremmede { stroke: #ef4444; stroke-width: 1.5; stroke-dasharray: 4 3; }
 .chem-legend { font-size: .82rem; margin-top: .35rem; } .chem-legend .chem-key { display: inline-block; width: 1.4rem; height: 0; vertical-align: middle; margin: 0 .2rem; border-top: 2px solid; }
 .chem-key.staerkt { border-top: 5px solid #facc15; } .chem-key.sammen { border-top-color: #e5e7eb88; } .chem-key.finder { border-top: 1.5px solid #fb923c; } .chem-key.fremmede { border-top: 2px dashed #ef4444; }
+
+/* v3.27.0 udelukkelse (⛔) */
+.token.banned .token-num { background: #7f1d1d; outline: 2px solid #fca5a5; } .lp-row.banned td { color: #fca5a5; } .notice.ban { border-color: #b91c1c; }

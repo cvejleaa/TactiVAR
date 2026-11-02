@@ -10,7 +10,7 @@ import { buildSchedule, isValidSchedule, SEASON_ROUNDS } from './schedule.js';
 import { defaultTactics, defaultStarterIds, emptyStanding, BOT_PROFILES, aerialBreakdown, assignPositions, teamCareerDefaults, generatePlayer, neededPosition } from './generator.js';
 import { initialPotential, publicWage, TIER_STARS, MATCH_LOG_CAP, SQUAD_MIN, SQUAD_MAX, derivedRng, neededLine, freeShirt } from './career.js';
 
-const PLAYER_DEFAULTS = { freshness: 100, injuryMatchesLeft: 0, lastRating: 0, ratingSum: 0, ratingGames: 0, publicStars: 0, seasonAgeCounter: 1, archetype: null, distanceSum: 0, minutesSum: 0, topSpeedMax: 0, hiKmSum: 0, hiDistSum: 0, trainingFocus: 'GENERAL', careerGames: 0 };
+const PLAYER_DEFAULTS = { freshness: 100, injuryMatchesLeft: 0, lastRating: 0, ratingSum: 0, ratingGames: 0, publicStars: 0, seasonAgeCounter: 1, archetype: null, distanceSum: 0, minutesSum: 0, topSpeedMax: 0, hiKmSum: 0, hiDistSum: 0, trainingFocus: 'GENERAL', careerGames: 0, banMatches: 0, banYellows: 0, banWhy: null };   // ban* v3.27.0 (udelukkelse)
 // Truppens størrelse (v3.18.0: 18–25 efter lønbudgettet; før præcis 18)
 export { SQUAD_MIN, SQUAD_MAX };   // ét sted: career.js
 const LOG_CAP = 40;

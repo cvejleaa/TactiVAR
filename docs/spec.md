@@ -162,7 +162,7 @@ Konstanterne står ét sted: `public/engine/career.js` (og `transfers.js`). Bån
   starter på Normal, bots efter profil: gegenpres Mange, lav blok Få, ellers Normal; synlig
   hjælpetekst under Fase 1 og Fase 3) · Fase 2 pressingHeight
   LOW_BLOCK/MID_BLOCK/HIGH_GEGENPRESS, offsideTrap OFF/NORMAL/EXTREME_VAR_LINE,
-  tacklingIntensity CAUTIOUS/NORMAL/AGGRESSIVE · Fase 3 onBallWon
+  tacklingIntensity CAUTIOUS/NORMAL/AGGRESSIVE (fra v3.27.0 virker de: frispark, kort og pres – §5 "Tacklinger") · Fase 3 onBallWon
   FAST_COUNTER/KEEP_POSSESSION, onBallLost COUNTER_PRESS_5S/DROP_BACK.
 - Hvis-Så: maks 8 one-shot (v3.13; før 5). Betingelse "Bagud med mindst N mål", "Foran med
   mindst N mål" (N = 1–5), "Uafgjort" eller (v3.13) "Uanset stilling" (skema 2; skema 1's "Foran med 1"
@@ -250,8 +250,25 @@ Tick hvert 3. minut (1..90).
   uden indskiftning (pladsen er tom; aldrig under 7 mand), karakter −1, og kan ikke blive Kampens/Rundens spiller.
   Ti mand: hver spiller svagere i duellerne (`SHORT_PER_MAN` = 4 % pr. manglende mand – gennemsnit og lodtrækning mærker
   det ellers ikke) og hurtigere træt (`SHORT_DRAIN`). Målt (`measureCards`): ≈ 0,16 røde og ≈ 4,1 gule pr. kamp; ti
-  mand scorer 1,06 og lukker 1,93 ind pr. 90 min (elleve: ≈ 1,4). Ingen karantæne endnu (kommer med trup/økonomi).
+  mand scorer 1,06 og lukker 1,93 ind pr. 90 min (elleve: ≈ 1,4). Udelukkelse fra v3.27.0 (nedenfor).
   Kortene gemmes ét sted (karakterarket: `yellows` 0–2, `red`); kamptal, holdtal og sæsonstatistik (`sRed`) regnes derfra.
+- **Udelukkelse (v3.27.0, nr. 64 – brugeren 2026-11-02: "Strengere", grænsen hvert 4. gule efter målingen):** `career.js` `BAN` –
+  direkte rødt 2 kampe, rødt for to gule 1 kamp (de to gule tæller ikke, som hos UEFA), hvert 4. tællende gule kort i sæsonen
+  1 kamp (`banFromCards`). Felterne `banMatches`/`banYellows`/`banWhy` (offentlige som skader, §3; standard 0 i sanitize – intet
+  skema-bump, fixture `save-v3.26.1.json`). Lægges på i `commitRound` efter skaderne og afsones som dem (én pr. runde, også
+  over sæsonskiftet; de tællende gule nulstilles). ÉN vagt: `unavailable(p)` (skadet eller udelukket) – kampens `isAvailable`,
+  udtagelsens `pubScore` og UI. En udelukket/skadet starter erstattes i samme kæde fra bænken – ellers en reserve – og spiller
+  aldrig. Referatet siger det, når det sker ("⛔ Udelukket i næste kamp" ved rødt, "hans 4. gule kort i sæsonen" ved gult);
+  før runden står ⛔/🚑 #nr ved ▶ Spil runde, i listerne (⛔ N) og på kortet (med årsag; "🟨 3 – næste gule kort giver 1 kamps
+  udelukkelse"). ⛔ – ikke 🟥, der i karakterarket betyder udvist i kampen (QC).
+  Målt (`node tools/measure-bans.mjs 20`): 5,4 udelukkede kampe pr. hold pr. sæson (hvert 3. gule ville give ≈ 7), flest 5 samtidig
+  på ét hold, 0 udelukkede spillede af 30.038. Kendt skævhed: kortene rammer næsten kun forsvar og midtbane (frisparkenes
+  synder trækkes blandt dem – ATT 15 af 857).
+- **Tacklinger (v3.27.0 – før læste motoren dem ikke):** `TACKLE` i match.js – Forsigtig/Normal/Aggressiv ganger frisparkene
+  (0,75/1/1,3: kun de stille frispark – tick-frisparket er uændret), de stille frisparks gule kort (0,8/1/1,25) og giver presset i opbygningsduellen
+  −0,6/0/+0,6. Normal mod Normal = samme træk og kamp som før. Målt for dit hold (20 sæsoner): gule pr. sæson 18,9/29,1/41,5,
+  udelukkede kampe 1,9/4,5/7,8, pres vundet 46/50/55 %, netto mål 0,26/0,30/0,33 pr. kamp (inden for støjen, ca. ±0,1 – ingen målbar måleffekt) – Aggressiv vinder bolden, men betaler
+  med udelukkelser.
 - **Træthedsskift spredes (v3.15**, brugerens valg): højst `FATIGUE_SUBS_AT_ONCE` = 3 ad gangen (også i pausen; flere trætte bruger flere pauser);
   grænsen gælder fortsat uanset minut, og dit hold får besked, når en træt spiller må vente.
 - Chance 30 % (v3.9: Få 26 %, Normal 30 %, Mange 36 %; v3.12.1: Få 28,5 %); xG 0,13–0,35 pr. afslutning.

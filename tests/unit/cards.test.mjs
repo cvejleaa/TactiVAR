@@ -32,7 +32,7 @@ test('kort ét sted: kampstatistikkens gule og røde = karakterarkenes; højst 2
         reds++; if (e.red === 'SECOND_YELLOW') second++;
         const ev = m.events.find((x) => x.type === 'RED' && x.text.includes(`${e.shortName}`));
         assert.ok(ev && ev.min === e.minOut && ev.plot && ev.category === 'HIGHLIGHT', `${e.shortName}: ${ev?.text}`);
-        assert.match(ev.text, e.red === 'SECOND_YELLOW' ? /^🟨🟥 \[.+\] Andet gule kort til .+ – han er udvist! .+ må spille resten af kampen med (ti|ni|otte|syv) mand\.$/ : /^🟥 \[.+\] Direkte rødt kort til .+ for den grove tackling – han er udvist!/);
+        assert.match(ev.text, e.red === 'SECOND_YELLOW' ? /^🟨🟥 \[.+\] Andet gule kort til .+ – han er udvist! .+ må spille resten af kampen med (ti|ni|otte|syv) mand\. ⛔ Udelukket i næste kamp\.$/   /* v3.27.0: udelukkelsen står ved udvisningen */ : /^🟥 \[.+\] Direkte rødt kort til .+ for den grove tackling – han er udvist!/);
       }
     }
   }

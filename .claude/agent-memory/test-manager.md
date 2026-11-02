@@ -157,3 +157,10 @@
 - Forfatteren kørte ikke hele `npm test`: en eksisterende test (schedule.test.mjs:102 "friskhed … bevares" – `some(p.freshness < 100)` efter runde 14) blev rød af ændringen. Kør ALTID de filer, der rører samme felt (grep på feltnavnet i tests/unit), før mutation – en ny regel bryder ofte en gammel antagelse.
 - Nulstilling i seasonTurnover: 12 mutanter (kun eget/botter/99/+20/startere/før træning/skadede/skade nulstillet/ikke sæson 1→2) dræbt af ÉN test; "nulstil midt i sæsonen" (runde 7) dræbes kun af balance/friskheds-tests, ikke af turnover-filen.
 - Fjernet UI: når en boks fjernes, tjek at den fjernede test også dækkede "anden seer" – forfatteren beholdt kun ejeren (B3 "kun for andre" overlevede) -> column-v3261-tm.test.mjs.
+
+## v3.27.0 (udelukkelse for kort + tacklinger koblet på)
+- 103 mutanter: 60 overlevede forfatterens ban-v3270 + cards + texts-v3165, 8 af dem kun dræbt af golden-hash (opaque: tackle-tal, press-fortegn, banNote nth). Lukket i tests/unit/ban-v3270-tm.test.mjs (+3 e2e-checks). Ægte ækvivalente: `banMatches = (… ?? 0) + b.matches` (en udelukket spiller kan ikke få kort), `!squad.has(b.id)` i reserve() (bænk-spillere er allerede brugt/utilgængelige), `(p.banYellows) % 4` uden `?? 0` (NaN === 3 er falsk).
+- Golden/fingerprint-hash på 1 kamp pr. spiller kan ALDRIG se sæsonakkumulerede felter (banYellows ≥ 3 → referat-noten): banNote fjernet = grøn golden. Test med forudsat banYellows.
+- Tacklingernes TAL: forfatterens test pinnede kun rækkefølge (15 %); ±-formler og pres-fortegn kun af hash. Mål frispark/gule-pr-frispark/pressWon (m.ownReports[team].pressWon/press) over 300 kampe med faste seeds: bånd bygges af målte værdier (7,47/9,42/11,87; 0,467/0,503/0,551).
+- app.js-lokale grene (outStarters/out-warning) kan kun e2e: tilføjet skadet+udelukket+bænk-udelukket i ét gem. e2e tager ~90 s (privat PORT), ikke 20 min.
+- Mutér i 2 worktrees parallelt med K/NK-split og fail-fast (ban-filen først, uden tackle-testen) – 103 mutanter på ~25 min ved load 8. `pkill -f "mut.py"` dræbte igen min egen shell – brug `[m]ut.py`.

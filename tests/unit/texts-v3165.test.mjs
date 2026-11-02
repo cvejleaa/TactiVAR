@@ -23,7 +23,7 @@ test('VAR tjekker det røde kort: står det, siger udvisningen det – bliver de
     ev.forEach((e, i) => {
       if (e.type === 'VAR_RED' && e.var?.kind === 'RED') {
         const next = ev.slice(i + 1).find((x) => x.min === e.min && (x.type === 'RED' || x.type === 'VAR_NO_RED'));
-        if (e.var.verdict === 'CONFIRMED') { confirmed++; assert.equal(next?.type, 'RED'); assert.ok(next.text.endsWith(` mand. ${NOTE}`), next.text); }
+        if (e.var.verdict === 'CONFIRMED') { confirmed++; assert.equal(next?.type, 'RED'); assert.ok(next.text.endsWith(` mand. ${NOTE} ⛔ Udelukket i de næste 2 kampe.`), next.text); }   // v3.27.0: udelukkelsen til sidst
         else if (e.var.verdict === 'DOWNGRADED') { downgraded++; assert.equal(next?.type, 'VAR_NO_RED'); }
         else { upgraded++; assert.equal(next?.type, 'RED'); assert.ok(!next.text.includes('VAR'), `opgraderet: kendelsen stod allerede – ${next.text}`); }
       }

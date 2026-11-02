@@ -2,7 +2,7 @@
 // "🔒 ??" og kan ikke sorteres (synlighed afgøres i engine/visibility.js).
 import { POSITIONS } from '../engine/generator.js';
 import { h, dec, LOCK } from './dom.js';
-import { LINE, POSITION, POSITION_FULL, starsEl } from './labels.js';
+import { LINE, POSITION, POSITION_FULL, starsEl, outLabel, OUT_TITLE } from './labels.js';
 import { canSeeField } from '../engine/visibility.js';
 import { FORMATIONS } from '../engine/formations.js';
 import { COUNTER_KEYS } from '../engine/counter.js';
@@ -89,7 +89,7 @@ export function renderMatrix({ team, isOwn, ui, notes, onSort, onSelect, onSwap,
       if (c.key === 'pos') return h('td', { class: cls + (s >= 0 ? ' starter' : ' benchnum') }, s >= 0 ? `${roles[s].r} #${p.shirtNumber}` : `${benchIds.has(p.id) ? 'BÆNK' : 'RES'} #${p.shirtNumber}`);
       if (c.key === 'line') return h('td', { class: cls }, h('span', { class: 'chip' }, LINE[p.line]));
       if (c.key === 'natpos') return h('td', { class: cls, title: POSITION_FULL[p.position] ?? '' }, POSITION[p.position] ?? '–');
-      if (c.key === 'fresh') return h('td', { class: cls }, p.injuryMatchesLeft > 0 ? h('span', { class: 'injury' }, `🚑 ${p.injuryMatchesLeft}`) : `${p.freshness}%`);
+      if (c.key === 'fresh') return h('td', { class: cls }, outLabel(p) ? h('span', { class: 'injury', title: OUT_TITLE }, outLabel(p)) : `${p.freshness}%`);   // v3.27.0: 🚑/⛔
       if (c.key === 'height') return h('td', { class: cls }, `${p.heightCm} cm`);
       if (c.key === 'rating') return h('td', { class: cls }, isOwn ? (avgRating(p) ? dec(avgRating(p), 1) : '–') : starsEl(p.publicStars));
         if (c.key === 'mod') return h('td', { class: cls + ' modcell', title: 'Mod gegenpress / lav blok / VAR-linje & lange bolde' }, COUNTER_KEYS.map((k) => p.counterTactics[k]).join(' · '));
