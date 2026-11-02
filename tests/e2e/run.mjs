@@ -263,7 +263,8 @@ try {
       await tt('trup'); await tp.click('#scout-back');
       check('Trup for DIT hold: ingen "🔒 Skjult" og intet offentligt klublink – klubnavnet står, kassen står på Hjem', (await tp.locator('#public-club-link').count()) === 0 && !(await tp.textContent('.clubhead')).includes('Skjult') && (await tp.textContent('#club-name')) === myName);
       // scout-bjælken sidder fast UNDER den faste topbar (desktop): efter en rulning ned står den lige under topbaren, ikke bag den
-      await tt('liga'); await tp.selectOption('#team-select', '1'); await tp.waitForSelector('#scout-banner');
+      // v3.29.0: på Taktik og 600 px høj – modstanderens Trup er uden kortet ikke længere høj nok til at rulle (y var 0)
+      await tt('liga'); await tp.selectOption('#team-select', '1'); await tp.waitForSelector('#scout-banner'); await tt('taktik'); await tp.setViewportSize({ width: 1400, height: 600 });
       await tp.evaluate(() => window.scrollTo(0, 700)); await tp.waitForTimeout(50);
       const pos = await tp.evaluate(() => ({ top: document.querySelector('.topbar').getBoundingClientRect().bottom, sc: document.querySelector('#scout-banner').getBoundingClientRect().top, y: window.scrollY }));
       check('Desktop: scout-bjælken er sticky lige under topbaren (ikke bag den og ikke et fast tal)', pos.y > 300 && Math.abs(pos.sc - pos.top) <= 1.5, JSON.stringify(pos));
