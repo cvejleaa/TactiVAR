@@ -37,7 +37,6 @@ select:disabled, input:disabled { opacity: .55; }
 /* v3.29.0: kortet står i panelet – Taktik er bane | liste over indstillingerne (hele bredden); Trup har træningsoversigten i hele bredden */
 .taktik-layout { grid-template-areas: "pitch list" "tactics tactics"; } .tk-pitch { grid-area: pitch; } .tk-list { grid-area: list; } .tk-tactics { grid-area: tactics; }
 @media (max-width: 900px) { .taktik-layout { grid-template-areas: "pitch" "list" "tactics"; } }
-.trup-layout { display: grid; grid-template-columns: minmax(0, 1fr); }
 .trup-help { margin: 0 0 -.5rem; }
 .bench { margin-top: .5rem; display: flex; flex-wrap: wrap; gap: .3rem; align-items: center; } .bench h4 { margin: 0 .3rem 0 0; }
 .bench-p.injured { color: #fda4af; }
@@ -58,6 +57,12 @@ th.sorted, td.sorted { background: #2e1065aa; }
 td:nth-child(2) { text-align: left; font-weight: 700; }
 tbody tr { cursor: pointer; } tbody tr:hover { background: #1e293b; } tr.selected { outline: 1px solid var(--lilla); } tr.swapping { background: #78350f66; }
 .starter { color: var(--grøn); font-weight: 700; } .benchnum { color: var(--dæmpet); }
+/* v3.30.0: "+N" ved en evne, der steg efter sidste runde – et lille hævet mærke i .pill-ok-farverne (ikke ▲ – det er sorteringspilene –
+   og ikke grøn tekst på heat-4-grøn). Tallet i cellen er uændret (::after). Mobilen viser summen efter navnet (evnerne er rullet væk) */
+td.gain::after, td.player-gain::after { content: '+' attr(data-gain); display: inline-block; margin-left: .2em; padding: 0 .3em; border-radius: 999px; background: #0b3326; color: #6ee7b7; font-size: var(--fs-1); font-weight: 700; line-height: 1.25; vertical-align: .3em; }
+td.player-gain::after { display: none; }
+@media (max-width: 600px) { td.player-gain::after { display: inline-block; } }
+.train-table tbody tr { cursor: default; }
 .heat-4 { color: #34d399; font-weight: 700; } .heat-3 { color: var(--blå); } .heat-2 { color: #f8fafc; } .heat-1 { color: #64748b; }
 .lockcell { color: #64748b; } .chip { background: #1e293b; padding: 0 .3rem; border-radius: .25rem; font-weight: 700; }
 .injury { color: #fda4af; font-weight: 700; } .arch { font-size: var(--fs-1); color: var(--dæmpet); } .arch.on { color: #e9d5ff; }
@@ -269,6 +274,8 @@ button.savestatus.failed { color: var(--rød); font-weight: 700; }
 .topbar .tab { border: 0; border-bottom: 3px solid transparent; border-radius: 0; background: transparent; padding: .55rem 1rem; font-weight: 600; color: var(--dæmpet); }
 .topbar .tab:hover { color: var(--tekst); background: transparent; }
 .topbar .tab.active { color: var(--tekst); border-bottom-color: var(--aktiv); background: transparent; }
+/* v3.30.0: syv faner – mellem mobil og laptop (601–900 px) gik rækken på to linjer ved 1rem luft; mindre luft holder den på én */
+@media (min-width: 601px) and (max-width: 900px) { .topbar .tab { padding: .55rem .6rem; } }
 button.gear { font-size: var(--fs-3); padding: .2rem .5rem; line-height: 1; } button.gear.active { background: var(--aktiv); border-color: var(--aktiv); }
 button.mini-play { padding: .25rem .6rem; font-size: var(--fs-1); white-space: nowrap; }
 #mini-warn { font-weight: 700; }
@@ -319,6 +326,8 @@ body.has-bar { padding-bottom: 4.5rem; }
   .topbar .tab.active { box-shadow: inset 0 3px 0 var(--aktiv); }
   .topbar .tab .tab-ico { font-size: var(--fs-3); }
   .topbar .tab .tab-txt { position: static; width: auto; height: auto; overflow: visible; clip: auto; }
+  /* v3.30.0: syv faner – ved 320 px er en knap ca. 45 px; en for lang tekst forkortes (…) i stedet for at skubbe naboen */
+  .topbar .tab .tab-txt { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
   .playbar { bottom: calc(57px + env(safe-area-inset-bottom)); }
   .playbar-in { padding: 8px 12px; gap: .5rem; }
   .playbar #play-round { min-height: 44px; padding: .4rem .8rem; }

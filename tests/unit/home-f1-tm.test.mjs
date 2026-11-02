@@ -25,7 +25,7 @@ const byId = (root, id) => all(root, (e) => e.id === id)[0] ?? null;
 const text = (root, id) => byId(root, id)?.textContent ?? null;
 
 const calls = [];
-const on = { kamp: () => calls.push('kamp'), liga: () => calls.push('liga'), klub: () => calls.push('klub'), trup: () => calls.push('trup'), opp: () => calls.push('opp'), fix: (ids) => calls.push(['fix', ids]) };
+const on = { kamp: () => calls.push('kamp'), liga: () => calls.push('liga'), klub: () => calls.push('klub'), traening: () => calls.push('traening'), taktik: () => calls.push('taktik'), opp: () => calls.push('opp'), fix: (ids) => calls.push(['fix', ids]) };
 const base = () => ({
   club: { name: 'Bibamus United', cash: 1234567, delta: 4321 },
   last: { idx: 0, round: 6, text: 'Bibamus United 3 – 1 Lyngby', result: 'won', scorers: ['Kjær', 'Holm (2)'], move: 2 },
@@ -137,14 +137,19 @@ test('Hjem "Før du spiller": rækker pr. advarsel (slags + #numre + tekst), ant
   assert.ok(text(both, 'youth-pending').includes('1 ungdomstilbud') && byId(both, 'home-ready') === null);
 });
 
-test('Hjem: træningsudfaldet i én linje – ental/flertal, kun det der er, og linket til Trup', () => {
+test('Hjem: træningsudfaldet i én linje – ental/flertal, kun det der er, og linket til Træning (kun stærke par: Taktik)', () => {
   const tr = (training) => render({ training });
-  assert.equal(text(tr({ round: 6, gains: 5, injuries: 1, strong: 2 }), 'home-training'), '🏋️Efter runde 6: 5 fremskridt · 1 skadet i træningen · 2 nye stærke parTrup ›');
+  assert.equal(text(tr({ round: 6, gains: 5, injuries: 1, strong: 2 }), 'home-training'), '🏋️Efter runde 6: 5 fremskridt · 1 skadet i træningen · 2 nye stærke parTræning ›');
   assert.ok(text(tr({ round: 3, gains: 0, injuries: 0, strong: 1 }), 'home-training').includes('Efter runde 3: 1 nyt stærkt par') && !text(tr({ round: 3, gains: 0, injuries: 0, strong: 1 }), 'home-training').includes('fremskridt'));
   assert.ok(text(tr({ round: 3, gains: 2, injuries: 0, strong: 0 }), 'home-training').includes('Efter runde 3: 2 fremskridt') && !text(tr({ round: 3, gains: 2, injuries: 0, strong: 0 }), 'home-training').includes('skadet'));
   assert.ok(text(tr({ round: 3, gains: 0, injuries: 4, strong: 0 }), 'home-training').includes('Efter runde 3: 4 skadet i træningen'));
   assert.equal(byId(tr(null), 'home-training'), null);
-  calls.length = 0; all(byId(tr({ round: 1, gains: 1, injuries: 0, strong: 0 }), 'home-training'), (e) => e.tag === 'button')[0].on.click(); assert.deepEqual(calls, ['trup']);
+  calls.length = 0; all(byId(tr({ round: 1, gains: 1, injuries: 0, strong: 0 }), 'home-training'), (e) => e.tag === 'button')[0].on.click(); assert.deepEqual(calls, ['traening']);
+  // v3.30.0 (Spilfører UI): kun skader → stadig Træning; KUN nye stærke par → "Taktik ›" (stregerne står dér), ikke Træning
+  calls.length = 0; all(byId(tr({ round: 1, gains: 0, injuries: 2, strong: 0 }), 'home-training'), (e) => e.tag === 'button')[0].on.click(); assert.deepEqual(calls, ['traening']);
+  const onlyStrong = byId(tr({ round: 1, gains: 0, injuries: 0, strong: 1 }), 'home-training');
+  assert.ok(onlyStrong.textContent.endsWith('1 nyt stærkt parTaktik ›'), onlyStrong.textContent);
+  calls.length = 0; all(onlyStrong, (e) => e.tag === 'button')[0].on.click(); assert.deepEqual(calls, ['taktik']);
 });
 
 test('Hjem: næste kamp – hjemme/ude, modstanderens form (eller "ingen kampe i sæsonen endnu") og 🔍-linket', () => {

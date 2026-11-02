@@ -7,7 +7,7 @@ import { chromium } from 'playwright-core';
 import { startServer } from './serve.mjs';
 
 const kandidater = [process.env.CHROME_PATH, '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', '/opt/pw-browsers/chromium', '/usr/bin/chromium'];
-export const TAB_KEYS = ['hjem', 'trup', 'taktik', 'kamp', 'liga', 'klub', 'admin'];
+export const TAB_KEYS = ['hjem', 'trup', 'traening', 'taktik', 'kamp', 'liga', 'klub', 'admin'];
 
 export async function measureUi({ base, widths = [1366, 390], afterRound = true } = {}) {
   const executablePath = kandidater.find((p) => p && fs.existsSync(p));

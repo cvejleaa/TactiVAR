@@ -7,6 +7,8 @@ import { canSeeField } from '../engine/visibility.js';
 import { FORMATIONS } from '../engine/formations.js';
 import { COUNTER_KEYS } from '../engine/counter.js';
 import { matchBenchOf, publicValue } from '../engine/career.js';
+import { SKILL_NAME } from './card.js';
+import { gainWords } from './training.js';
 
 // Beløb kort: "1,2 mio." / "850.000" (regnearket er bredt nok i forvejen)
 const money = (v) => (v >= 1e6 ? `${dec(v / 1e6, 1)} mio.` : v.toLocaleString('da-DK'));
@@ -31,7 +33,7 @@ export const COLUMNS = [
   { key: 'jump', label: 'Spring', field: 'jumpingPower', value: (p) => p.jumpingPower, num: true, heat: true },
   { key: 'aerial', label: '✈ Luft', title: 'Samlet luftduel/hovedstød', field: 'aerialPower', value: (p) => p.aerialPower, num: true, heat: true },
   ...[['pace', 'PAC', 'Fart'], ['stamina', 'STA', 'Udholdenhed'], ['strength', 'STR', 'Styrke'], ['ballControl', 'BAL', 'Boldkontrol'], ['passing', 'PAS', 'Pasning'], ['finishing', 'FIN', 'Afslutning'], ['positioning', 'POS', 'Positionering'], ['intercepting', 'INT', 'Erobring'], ['goalkeeping', 'GK', 'Målmandsspil']]
-    .map(([k, label, title]) => ({ key: k, label, title, field: 'skills', value: (p) => p.skills[k], num: true, heat: true })),
+    .map(([k, label, title]) => ({ key: k, label, title, field: 'skills', value: (p) => p.skills[k], num: true, heat: true, skill: true })),
   { key: 'avg', label: 'Gns', title: 'Gennemsnit af de 9 kerne-evner', field: 'skills', value: avgSkill, num: true, fmt: (v) => dec(v, 1) },
   { key: 'rating', label: '⭐ Vurd', title: 'Eget hold: gennemsnitlig karakter. Modstandere: stjerner', field: 'publicStars', value: (p, c) => (c.isOwn ? avgRating(p) : p.publicStars), num: true },
   { key: 'mod', label: '🧠 Mod', title: 'Mod-kunnen: mod gegenpress / mod lav blok / mod VAR-linje & lange bolde (sorterer på den bedste)', field: 'counterTactics', value: modBest, num: true },
@@ -77,8 +79,11 @@ export function matrixRows({ team, isOwn, ui }) {
 }
 
 // ui.selectedPlayerId = rækken med lilla omrids: kortpanelets spiller, kun mens panelet er åbent (v3.29.0, app.js sætter det)
+// ui.gains (v3.30.0) = Map(id → [evne, …]) fra gainsByPlayer: evner, der steg efter runde ui.gainRound, får et lille "+N"-mærke (CSS ::after
+// af data-gain – tallet i cellen er uændret, så sortering og aflæsning ikke rører det). app.js afgør, hvornår mærket må vises.
 export function renderMatrix({ team, isOwn, ui, notes, onSort, onSelect, onSwap, onFilter, onBlocked }) {
   const { rows, col, desc, slotOf, ctx, benchIds } = matrixRows({ team, isOwn, ui });
+  const gains = ui.gains ?? new Map(), after = `efter runde ${ui.gainRound}`;
   const roles = FORMATIONS[team.tactics.baseFormation];
 
   const head = h('tr', {}, COLUMNS.map((c) => {
@@ -95,14 +100,16 @@ export function renderMatrix({ team, isOwn, ui, notes, onSort, onSelect, onSwap,
       const cls = c.key === col.key ? 'sorted' : '';
       if (!canSeeField(c.field, isOwn)) return h('td', { class: cls + ' lockcell' }, LOCK);
       if (c.key === 'pos') return h('td', { class: cls + (s >= 0 ? ' starter' : ' benchnum') }, s >= 0 ? `${roles[s].r} #${p.shirtNumber}` : `${benchIds.has(p.id) ? 'BÆNK' : 'RES'} #${p.shirtNumber}`);
+      if (c.key === 'name') { const g = gains.get(p.id) ?? [];   // mobilen: summen efter navnet (evne-kolonnerne er rullet væk)
+        return h('td', g.length ? { class: cls + ' player-gain', dataset: { gain: String(g.length) }, title: `${gainWords(g)} ${after}` } : { class: cls }, p.shortName); }
       if (c.key === 'line') return h('td', { class: cls }, h('span', { class: 'chip' }, LINE[p.line]));
       if (c.key === 'natpos') return h('td', { class: cls, title: POSITION_FULL[p.position] ?? '' }, POSITION[p.position] ?? '–');
       if (c.key === 'fresh') return h('td', { class: cls }, outLabel(p) ? h('span', { class: 'injury', title: OUT_TITLE }, outLabel(p)) : `${p.freshness}%`);   // v3.27.0: 🚑/⛔
       if (c.key === 'height') return h('td', { class: cls }, `${p.heightCm} cm`);
       if (c.key === 'rating') return h('td', { class: cls }, isOwn ? (avgRating(p) ? dec(avgRating(p), 1) : '–') : starsEl(p.publicStars));
         if (c.key === 'mod') return h('td', { class: cls + ' modcell', title: 'Mod gegenpress / lav blok / VAR-linje & lange bolde' }, COUNTER_KEYS.map((k) => p.counterTactics[k]).join(' · '));
-      const v = c.value(p, ctx);
-      return h('td', { class: cls + (c.heat ? ' ' + heatClass(v) : '') }, c.fmt ? c.fmt(v) : v);
+      const v = c.value(p, ctx), n = c.skill ? (gains.get(p.id) ?? []).filter((s) => s === c.key).length : 0;
+      return h('td', { class: cls + (c.heat ? ' ' + heatClass(v) : '') + (n ? ' gain' : ''), ...(n ? { dataset: { gain: String(n) }, title: `+${n} ${SKILL_NAME[c.key]} ${after}` } : {}) }, c.fmt ? c.fmt(v) : v);
     });
     const arch = isOwn && p.archetype ? h('span', { class: p.archetype.isUnlocked ? 'arch on' : 'arch' }, (p.archetype.isUnlocked ? '🌟 ' : '🔒 ') + p.archetype.name) : null;
     const note = notes[p.id]?.trim() ? h('span', { class: 'note-flag', title: 'Du har en note' }, '📝') : null;

@@ -1,8 +1,8 @@
 // Spillerkort: offentlige data for alle, evner og mod-kunnen kun for eget hold, VAR-profilen
 // for ingen. Scouting-indtryk og private noter vises for alle spillere.
-import { publicValue, LOG, stampText, KEY_SKILLS, trainingEstimate, FOCUS, focusSkills, validFocus, ageTrain, roomOf, MATCH_XP, PLAYED_RELIEF, TRAIN_FRESH_FLOOR } from '../engine/career.js';
+import { publicValue, LOG, stampText, KEY_SKILLS, trainingEstimate, FOCUS, focusSkills, ageTrain, roomOf, MATCH_XP, PLAYED_RELIEF, TRAIN_FRESH_FLOOR } from '../engine/career.js';
 import { viewPlayer } from '../engine/visibility.js';
-import { h, dec, LOCK, select } from './dom.js';
+import { h, dec, LOCK } from './dom.js';
 import { LINE, POSITION_FULL, SKILL_LABELS, kr, starsEl, banText, yellowWarn } from './labels.js';
 import { aerialBreakdown } from '../engine/generator.js';
 import { runStats } from '../engine/stats.js';
@@ -14,8 +14,9 @@ const bar = (label, v, max = 20) => h('div', { class: 'bar' }, h('span', { class
   h('span', { class: 'bar-track' }, h('span', { class: 'bar-fill', style: { width: `${Math.round((v / max) * 100)}%` } })), h('span', { class: 'bar-val' }, String(v)));
 
 // chem (v3.24.0, kun dit hold): { best, pairs, isNew } fra chemistry.js – samspillet med hans naboer i ord (intet 0–100-tal, QC)
-// onTrainLink (v3.29.0): "ændr i Trup" i træningslinjen er et link, der åbner Trup med kortet på samme spiller
-export function renderCard({ player: p, team, isOwn, scouting, note, onNote, teams = null, latest = null, onOpenMatch = null, onFocus = null, retiring = false, market = null, hideLog = null, season = null, starter = false, trainNote = false, chem = null, onTrainLink = null }) {
+// onTrainLink (v3.30.0): "ændr i Træning ›" i træningsblokken åbner 🏋️ Træning med spillerens række markeret. Kortet sætter ALDRIG
+// fokus selv (brugeren: træningen sættes ét sted – nu Træning-fanen); det viser fokus, fremdriften og skønnet, ens på Trup og Taktik
+export function renderCard({ player: p, team, isOwn, scouting, note, onNote, teams = null, latest = null, onOpenMatch = null, retiring = false, market = null, hideLog = null, season = null, starter = false, chem = null, onTrainLink = null }) {
   if (!p) return h('div', { class: 'panel muted' }, 'Klik på en spiller for at se spillerkortet.');
   const head = h('div', { class: 'card-head' },
     h('h3', {}, `#${p.shirtNumber} ${p.name}`),
@@ -39,8 +40,7 @@ export function renderCard({ player: p, team, isOwn, scouting, note, onNote, tea
       p.archetype ? h('div', { class: 'archbox' }, h('strong', {}, (p.archetype.isUnlocked ? '🌟 ' : '🔒 ') + p.archetype.name), ' – ', p.archetype.description,
         p.archetype.isUnlocked ? null : h('div', { class: 'muted' }, 'Låses op ved: ' + Object.entries(p.archetype.unlockReq).map(([k, v]) => `${k} ${v}`).join(', '))) : null,
       h('div', { class: 'muted', id: 'run-stats' }, run.km90 != null ? `🏃 ${dec(run.km90, 1)} km pr. 90 min · ${run.hiPct != null ? `${run.hiPct} % højintenst` : 'højintenst: kommer efter næste kamp'} · topfart ${dec(p.topSpeedMax, 1)} km/t (alle kampe)` : '🏃 Løbedata kommer efter første kamp'),
-      onFocus ? renderTraining(p, onFocus, starter) : trainNote ? h('div', { class: 'muted', id: 'card-train-note' }, `🏋️ Træner: ${FOCUS[trainingEstimate(p).key].label} – `,
-        onTrainLink ? h('button', { class: 'linklike', id: 'card-train-link', onclick: onTrainLink }, 'ændr i Trup') : 'ændr i Trup') : null,
+      renderTraining(p, starter, onTrainLink),
       h('div', { class: 'muted', id: 'card-wage' }, `Løn ${kr(Math.round(p.weeklyWage / 3))} pr. runde · Værdi ${kr(publicValue(p))} (offentlig – ud fra stjerner og alder)`),
       chem ? renderChem(chem) : null,
     ];
@@ -82,7 +82,7 @@ export const roomWords = (room) => (room >= 0.6 ? 'har meget mere i sig' : room 
 // Næste +1 i ord – samme tekst på kortet og i træningsoversigten
 export const nextText = (n, why) => (!n || n === Infinity ? '' : n > 14 ? `går langsomt (mere end en sæson: ${why})` : `næste +1 om ca. ${n} runde${n === 1 ? '' : 'r'}`);
 export const priceText = (e) => (e.fresh > 0 ? `+${e.fresh} friskhed pr. runde` : `${e.fresh} friskhed pr. runde (${e.playedFresh} når han har spillet; ikke under ${TRAIN_FRESH_FLOOR} %) · lille skaderisiko`);
-function renderTraining(p, onFocus, starter = false) {
+function renderTraining(p, starter = false, onTrainLink = null) {
   const e = trainingEstimate(p, starter), key = e.key, price = priceText(e);
   const lines = e.lines.map(({ skill: s, dev: d, top, n }) => {
     if (top) return h('div', { class: 'train-line' }, `${SKILL_NAME[s]} 20 – helt i top`);
@@ -91,8 +91,9 @@ function renderTraining(p, onFocus, starter = false) {
   });
   return h('div', { class: 'trainbox', id: 'card-training' },
     h('h4', {}, '🏋️ Træning'),
-    select(key, Object.entries(FOCUS).filter(([k]) => validFocus(p, k)).map(([k, x]) => [k, x.label]), onFocus, { id: 'focus-select' }),
-    h('span', { class: 'muted' }, ` ${price}`),
+    h('div', { id: 'card-train-note' }, `Træner: ${FOCUS[key].label} – `,
+      onTrainLink ? h('button', { class: 'linklike', id: 'card-train-link', onclick: onTrainLink }, 'ændr i Træning ›') : 'ændr i Træning',
+      h('span', { class: 'muted' }, ` · ${price}`)),
     lines,
     h('div', { class: 'muted', id: 'train-estimate' }, `Skøn: ${p.shortName} ${roomWords(roomOf(p))} · ${p.age} år – jo yngre, jo hurtigere. Kampe giver også lidt (${dec(MATCH_XP, 2)} pr. 90 min i kædens nøgle-evner).`));
 }
@@ -120,7 +121,7 @@ function renderMarketBox(p, m) {
     m.reason ? h('div', { class: 'muted', id: 'buy-reason' }, m.reason) : h('button', { id: 'buy-player', onclick: m.onBuy }, `💰 Køb for ${kr(m.price)}`));
 }
 
-// Rundens opsamling i Trup (Spilfører): "M. Jensen +1 Afslutning" og træningsskader – kun dit hold (rapporten findes kun for det)
+// Rundens opsamling – øverst på 🏋️ Træning (v3.30.0; før i Trup, Spilfører): "M. Jensen +1 Afslutning" og træningsskader – kun dit hold (rapporten findes kun for det)
 // roundLabel: sæsonens runde (report.round er ligaens løbende runde – "runde 15" i sæson 2)
 // v3.24.2 (Spilfører UI/QC): øverst de par, der blev stærke i runden (og dem, der holdt op, fordi de ikke spillede sammen) –
 // navne ud fra truppen nu (id'er gemt, ikke pladsens navn); fra 4 par kun antallet; link til stregerne på Taktik.

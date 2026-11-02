@@ -197,12 +197,24 @@ try {
         L.trainingReport = { [me.id]: { round: r, gains: [{ id: me.squad[0].id, skill: Object.keys(me.squad[0].skills)[0] }, { id: me.squad[1].id, skill: Object.keys(me.squad[1].skills)[0] }], injuries: [me.squad[2].id, 'solgt-spiller'], strong: { up: [['a', 'b'], ['c', 'd'], ['e', 'f']], down: [['g', 'h']] } } }; });
       await reloadT(); await tt('hjem');
       check('Hjem: "Sidste runde" og træningslinjen bruger SÆSONENS runde (1, ikke ligaens 2); 2 fremskridt · 1 skadet · 3 nye stærke par (kun op, ikke ned)',
-        (await tp.textContent('#home-last')).includes('Sidste runde · runde 1') && (await tp.textContent('#home-training')) === '🏋️Efter runde 1: 2 fremskridt · 1 skadet i træningen · 3 nye stærke parTrup ›', await tp.textContent('#home-training').catch(() => 'mangler'));
+        (await tp.textContent('#home-last')).includes('Sidste runde · runde 1') && (await tp.textContent('#home-training')) === '🏋️Efter runde 1: 2 fremskridt · 1 skadet i træningen · 3 nye stærke parTræning ›', await tp.textContent('#home-training').catch(() => 'mangler'));
+      // v3.30.0: "+N" i Trup-regnearket – præcis de to evner i rapporten, med antal og evnens navn efter SÆSONENS runde; tallet i cellen er stadig et tal
+      { await tt('trup');
+        const gx = await tp.evaluate(async () => { const { SKILL_NAME } = await import('/ui/card.js'), d = JSON.parse(localStorage.getItem('tactivar_save')), me = d.league.teams.find((t) => !t.isBot), p0 = me.squad[0], k = Object.keys(p0.skills)[0];
+          const cells = [...document.querySelectorAll('#matrix td.gain')], c0 = document.querySelector(`#matrix tr[data-pid="${p0.id}"] td.gain`), a = c0 && getComputedStyle(c0, '::after');
+          const help = document.getElementById('trup-gain-help');
+          return { n: cells.length, title: c0?.title, want: `+1 ${SKILL_NAME[k]} efter runde 1`, gain: c0?.dataset.gain, num: c0 ? Number(c0.textContent) : null, val: p0.skills[k], content: a?.content, bg: a?.backgroundColor, disp: a?.display,
+            name: getComputedStyle(document.querySelector(`#matrix tr[data-pid="${p0.id}"] td.player-gain`), '::after').display, help: help?.textContent ?? null }; });
+        check('v3.30.0 Trup: "+1" præcis på de 2 evner i rapporten – title "+1 <evne> efter runde 1" (sæsonens runde), et lille grønt mærke (::after viser "+1" fra data-gain), og cellens tekst er stadig tallet',
+          gx.n === 2 && gx.title === gx.want && gx.gain === '1' && gx.num === gx.val && gx.content === '"+1"' && gx.bg === 'rgb(11, 51, 38)' && gx.disp === 'inline-block' && gx.name === 'none', JSON.stringify(gx));
+        check('v3.30.0 Trup: hjælpelinjen forklarer "+1" (kun når der er mærker) og linker til Træning', gx.help === ' · +1 = steg efter runde 1 (træning og kampe) · træningen står på 🏋️ Træning ›', JSON.stringify(gx.help));
+        await tp.click('#trup-to-training'); await tp.waitForSelector('.tabpane.tab-traening');
+        check('v3.30.0 Trup: "🏋️ Træning ›" i hjælpelinjen åbner Træning', (await tp.textContent('#tabs .tab.active')).includes('Træning') && (await tp.isVisible('#training-table'))); }
       // linkene fører det rigtige sted hen
       await tt('hjem'); await tp.click('#home-table-link'); await tp.waitForSelector('.tabpane.tab-liga');
       check('Hjem: "Hele tabellen ›" åbner Liga', (await tp.textContent('#tabs .tab.active')).includes('Liga'));
-      await tt('hjem'); await tp.click('#home-training .linklike'); await tp.waitForSelector('.tabpane.tab-trup');
-      check('Hjem: træningslinjens "Trup ›" åbner Trup (dit hold)', (await tp.textContent('#tabs .tab.active')).includes('Trup') && (await tp.locator('#scout-banner').count()) === 0);
+      await tt('hjem'); await tp.click('#home-training .linklike'); await tp.waitForSelector('.tabpane.tab-traening');
+      check('Hjem: træningslinjens "Træning ›" åbner 🏋️ Træning (dit hold, opsamlingen øverst)', (await tp.textContent('#tabs .tab.active')).includes('Træning') && (await tp.locator('#scout-banner').count()) === 0 && (await tp.isVisible('#training-summary')) && (await tp.isVisible('#training-table')));
       await mod((d) => { const L = d.league, me = L.teams.find((t) => !t.isBot); L.trainingReport = { [me.id]: { round: L.lastRound.round, gains: [], injuries: [], strong: { up: [], down: [['g', 'h']] } } }; });
       await reloadT(); await tt('hjem');
       check('Hjem: et træningsudfald uden fremskridt, skader og nye stærke par giver ingen træningslinje (kun et fald i samspil tæller ikke)', (await tp.locator('#home-training').count()) === 0);
@@ -219,7 +231,7 @@ try {
           labels: [...document.querySelectorAll('#tabs .tab')].map((b) => { const t = b.querySelector('.tab-txt').getBoundingClientRect(), i = b.querySelector('.tab-ico').getBoundingClientRect(); return [b.querySelector('.tab-txt').textContent.trim(), Math.round(t.width), t.top >= i.bottom - 1]; }) }; });
       check('390 px, Taktik: Spil-bjælken står FLADT over navigationen (ikke bag den), ▶-knappen er mindst 44 px, "af 14" er skjult, modstanderen står i KNAPPEN (Spilfører UI: 🔍 skjules – før blev navnet skåret ned til to bogstaver) uden at blive skåret, og bjælken løber ikke over',
         Math.abs(m1.gap) <= 1 && m1.btnH >= 44 && m1.of === 'none' && m1.opp !== 'none' && m1.oppLink === 'none' && !m1.btnCut && m1.barOver <= 0 && m1.barH <= 64, JSON.stringify(m1));
-      check('390 px: hver navigationsknap har sin tekst UNDER ikonet (Hjem, Trup, Taktik, Kamp, Liga, Klub)', JSON.stringify(m1.labels.map((x) => x[0])) === JSON.stringify(['Hjem', 'Trup', 'Taktik', 'Kamp', 'Liga', 'Klub']) && m1.labels.every(([, w, under]) => w > 12 && under), JSON.stringify(m1.labels));
+      check('390 px: hver navigationsknap har sin tekst UNDER ikonet (Hjem, Trup, Træning, Taktik, Kamp, Liga, Klub)', JSON.stringify(m1.labels.map((x) => x[0])) === JSON.stringify(['Hjem', 'Trup', 'Træning', 'Taktik', 'Kamp', 'Liga', 'Klub']) && m1.labels.every(([, w, under]) => w > 12 && under), JSON.stringify(m1.labels));
       // v3.29.1 (CI på main var rød: "Nordkysten BK (hjemme)" løb 20 px over – ligaens navne er tilfældige): et langt og et kort navn, hver gang.
       // Knappen må krympe, og KUN modstanderens navn forkortes med …; "▶ Spil runde N" står helt, og navnet beholder mindst 80 px (ikke to bogstaver)
       const longName = async (name) => { await mp.evaluate((name) => { const d = JSON.parse(localStorage.getItem('tactivar_save')); for (const t of d.league.teams) if (t.isBot) t.name = name;
@@ -452,16 +464,18 @@ try {
     const s12 = await st();
     check('F2 Taktik: ▶ går til næste i listen (start-11 i pladsernes orden) – og bytter aldrig (opstillingen uændret, ingen byt-besked)', pv && ids2[0] === D2.tactics.lineupSlots[0] && s12.title === nm(D2.squad.find((x) => x.id === ids2[1]))
       && mine(await save()).tactics.lineupSlots.join() === D2.tactics.lineupSlots.join() && (await tp.locator('#pick-msg').count()) === 0, `${s12.title} | ${pv}`);
-    // (13) "Træner: X – ændr i Trup" er et link: Trup med panelet på samme spiller
-    const s13t = s12.title;
+    // (13) v3.30.0: "Træner: X – ændr i Træning ›" er et link: 🏋️ Træning med HANS række markeret (kortet sætter ikke selv fokus)
     const hasLink = (await tp.locator('#cardpanel #card-train-link').count()) === 1;
-    check('F2: "Træner: X – ændr i Trup" er et link (#card-train-link), ikke ren tekst', hasLink);
+    check('F2: "Træner: X – ændr i Træning ›" er et link (#card-train-link), ikke ren tekst – og kortet har intet fokusvalg', hasLink && (await tp.locator('#cardpanel #focus-select, #cardpanel select').count()) === 0);
     if (hasLink) await tp.click('#card-train-link');
-    const s13 = await st();
-    check('F2: "ændr i Trup" på kortet (Taktik) åbner Trup med panelet på samme spiller og træningsvalget', (await tp.isVisible('.tabpane.tab-trup')) && s13.open === 'ja' && s13.title === s13t && (await tp.locator('#cardpanel #focus-select').count()) === 1, JSON.stringify(s13));
+    await tp.waitForSelector('.tabpane.tab-traening').catch(() => {});
+    const s13 = await st(), sel13 = await tp.evaluate(() => [...document.querySelectorAll('#training-table tr.selected')].map((r) => r.dataset.pid));
+    check('v3.30.0: "ændr i Træning ›" på kortet (Taktik) åbner Træning med præcis hans række markeret, panelet lukket og rækkens fokusvalg synligt',
+      (await tp.isVisible('.tabpane.tab-traening')) && s13.open === 'nej' && JSON.stringify(sel13) === JSON.stringify([ids2[1]]) && (await tp.isVisible(`#training-table tr.selected[data-pid="${ids2[1]}"] select.train-focus`)), JSON.stringify({ s13, sel13, want: ids2[1] }));
     // (14) 1400 px: fast til højre under topbaren, over Spil-bjælken, ingen vandret rulning; siden giver plads (listen/regnearket dækkes ikke)
     const geo = (sel) => tp.evaluate((s) => { const r = (q) => document.querySelector(q)?.getBoundingClientRect(), pc = r('#cardpanel'), bar = r('#playbar'), tb = r('.topbar'), sb = r('#scout-banner');
       return { l: pc.left, r: pc.right, w: pc.width, t: pc.top, b: pc.bottom, barTop: bar.height ? bar.top : innerHeight, tbB: tb.bottom, sbB: sb ? sb.bottom : null, sw: document.documentElement.scrollWidth, iw: innerWidth, ih: innerHeight, contR: (document.querySelector(s)?.closest('.tablewrap') ?? document.querySelector(s))?.getBoundingClientRect().right }; }, sel);   // regnearket: den synlige ramme (tabellen ruller vandret i den)
+    await tt('trup'); await tp.click(`#matrix tbody tr[data-pid="${ids2[1]}"]`);   // v3.30.0: linket ovenfor landede på Træning (uden panel) – kortet åbnes i Trup
     const g1 = await geo('#matrix');
     await tt('taktik'); await tp.click(`#lineup-list .lp-info[data-pid="${ids2[4]}"]`);
     const g2 = await geo('#lineup-list');
@@ -784,10 +798,11 @@ try {
     }
     // (G) Trup: træningsoversigten har hele bredden (ingen kortkolonne); panelets hoved sidder fast øverst, når panelet rulles, og kortets egen overskrift er skjult (hovedet viser navnet)
     {
-      const c = await browser.newContext({ viewport: { width: 1400, height: 700 } }), tp = await c.newPage(); await tp.goto(BASE + '/'); await tp.waitForSelector('body[data-klar="ja"]'); await tt(tp, 'trup');
-      const lay = await tp.evaluate(() => { const l = document.querySelector('.trup-layout'), sec = l.firstElementChild, ms = document.querySelector('#matrix').closest('.panel');
-        return { cols: getComputedStyle(l).gridTemplateColumns.split(' ').length, w: sec.getBoundingClientRect().width, lw: l.getBoundingClientRect().width, mw: ms.getBoundingClientRect().width }; });
-      check('F2 TM Trup: træningsoversigten har hele bredden (én kolonne, lige så bred som regnearket) – ikke 2:3 ved siden af et kort', lay.cols === 1 && Math.abs(lay.w - lay.lw) <= 1 && Math.abs(lay.w - lay.mw) <= 2, JSON.stringify(lay));
+      const c = await browser.newContext({ viewport: { width: 1400, height: 700 } }), tp = await c.newPage(); await tp.goto(BASE + '/'); await tp.waitForSelector('body[data-klar="ja"]'); await tt(tp, 'traening');
+      // v3.30.0: træningsoversigten står på sin egen fane – med fanens fulde bredde (ingen kortkolonne, intet kortpanel på Træning)
+      const lay = await tp.evaluate(() => ({ w: document.getElementById('training').getBoundingClientRect().width, pw: document.querySelector('.tabpane').getBoundingClientRect().width }));
+      check('F2 TM Træning: træningsoversigten har fanens hele bredde – ikke 2:3 ved siden af et kort', lay.w > 600 && Math.abs(lay.w - lay.pw) <= 2, JSON.stringify(lay));
+      await tt(tp, 'trup');
       await tp.locator('#matrix tbody tr').nth(2).click();
       await tp.evaluate(() => { document.getElementById('cardpanel').scrollTop = 200; });
       const hd = await tp.evaluate(() => { const pc = document.getElementById('cardpanel'), h = document.querySelector('.cp-head').getBoundingClientRect(), t = document.getElementById('card-title').getBoundingClientRect(), cs = getComputedStyle(document.getElementById('card-title'));
@@ -849,14 +864,20 @@ try {
     await pg.selectOption('#team-select', String(i)); await pg.waitForSelector('.tabpane.tab-trup');
     if (['taktik', 'klub'].includes(cur)) { await pg.click(`#tab-${cur}`); await pg.waitForSelector(`.tabpane.tab-${cur}`); }
   };
-  check('F1: seks faner (🏠 Hjem først) og ⚙ som ikonknap i topbaren uden for fanerækken – Hjem er åben ved ny liga', (await g.locator('.topbar #tabs .tab').count()) === 6
-    && JSON.stringify((await g.locator('#tabs .tab .tab-txt').allTextContents()).map((t) => t.trim())) === JSON.stringify(['Hjem', 'Trup', 'Taktik', 'Kamp', 'Liga', 'Klub'])
+  check('F1/v3.30.0: syv faner (🏠 Hjem først, 🏋️ Træning efter Trup) og ⚙ som ikonknap i topbaren uden for fanerækken – Hjem er åben ved ny liga', (await g.locator('.topbar #tabs .tab').count()) === 7
+    && JSON.stringify((await g.locator('#tabs .tab .tab-txt').allTextContents()).map((t) => t.trim())) === JSON.stringify(['Hjem', 'Trup', 'Træning', 'Taktik', 'Kamp', 'Liga', 'Klub'])
     && (await g.locator('.topbar #controls #tab-admin').count()) === 1 && (await g.locator('#tabs #tab-admin').count()) === 0 && (await g.textContent('#tabs .tab.active')).includes('Hjem') && (await g.isVisible('#home')));
+  // v3.30.0: syv faner + klub + gem + lille ▶ + ⚙ må ikke gå på to linjer – ved 1024, 768 og 601 px (før rettelsen: 601–690 px gav 129 px i stedet for 87)
+  { await tab('trup'); const tops = {};
+    for (const w of [1400, 1024, 768, 601]) { await g.setViewportSize({ width: w, height: 1000 }); await g.waitForTimeout(50);
+      tops[w] = await g.evaluate(() => ({ h: Math.round(document.querySelector('.topbar').getBoundingClientRect().height), rows: new Set([...document.querySelectorAll('#tabs .tab')].map((t) => Math.round(t.getBoundingClientRect().top))).size })); }
+    await g.setViewportSize({ width: 1400, height: 1000 }); await tab('hjem');
+    check('v3.30.0: topbaren står på samme højde med alle syv faner på én række ved 1400, 1024, 768 og 601 px', Object.values(tops).every((t) => t.rows === 1 && t.h === tops[1400].h && t.h <= 100), JSON.stringify(tops)); }
   check('F1: topbaren har ingen holdvælger og intet ▶ på Hjem – knappen står i Spil-bjælken', (await g.locator('.topbar #team-select').count()) === 0 && (await g.locator('.topbar #play-round').count()) === 0 && (await g.isVisible('#playbar #play-bar #play-round')));
   // Spil-bjælken på Hjem og Taktik, den lille ▶ i topbaren på de andre – på hver fane præcis ét #play-round (positiv tilstedeværelse pr. fane)
   { const where = {};
-    for (const k of ['hjem', 'trup', 'taktik', 'kamp', 'liga', 'klub', 'admin']) { await tab(k); where[k] = await g.evaluate(() => [document.querySelectorAll('#playbar #play-bar').length, document.querySelectorAll('.topbar #play-round').length, document.querySelectorAll('#play-round').length].join('')); }
-    check('F1: Spil-bjælken kun på Hjem og Taktik, den lille ▶ i topbaren på Trup/Kamp/Liga/Klub/⚙ – altid ét #play-round', JSON.stringify(where) === JSON.stringify({ hjem: '101', trup: '011', taktik: '101', kamp: '011', liga: '011', klub: '011', admin: '011' }), JSON.stringify(where)); }
+    for (const k of ['hjem', 'trup', 'traening', 'taktik', 'kamp', 'liga', 'klub', 'admin']) { await tab(k); where[k] = await g.evaluate(() => [document.querySelectorAll('#playbar #play-bar').length, document.querySelectorAll('.topbar #play-round').length, document.querySelectorAll('#play-round').length].join('')); }
+    check('F1: Spil-bjælken kun på Hjem og Taktik, den lille ▶ i topbaren på Trup/Træning/Kamp/Liga/Klub/⚙ – altid ét #play-round', JSON.stringify(where) === JSON.stringify({ hjem: '101', trup: '011', traening: '011', taktik: '101', kamp: '011', liga: '011', klub: '011', admin: '011' }), JSON.stringify(where)); }
   await tab('trup');
   check('Ny liga: dit hold vises med 18 spillere', (await rows()) === 18);
   check('Ny liga: ingen "Nyt i kampene"-besked (den er til dem, der opdaterer et gammelt gem)', (await g.locator('#notice').count()) === 0);
@@ -864,7 +885,7 @@ try {
   check('Holdvælgeren (på Liga, "Se et hold") har 8 hold', (await g.locator('#see-team #team-select option').count()) === 8);
   // UI-ombygningen F0 (v3.27.1): højst 6 skriftstørrelser pr. fane (12/14/16/20/28 + 10 på brikkerne) – før 7–15 pr. fane
   // (node tools/measure-ui.mjs). Kun synlig tekst tæller.
-  for (const k of ['hjem', 'trup', 'taktik', 'liga', 'klub']) {
+  for (const k of ['hjem', 'trup', 'traening', 'taktik', 'liga', 'klub']) {
     await tab(k);
     const sizes = await g.evaluate(() => [...new Set([...document.querySelectorAll('body *')].filter((e) => e.offsetParent !== null
       && [...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())).map((e) => getComputedStyle(e).fontSize))]);
@@ -901,13 +922,13 @@ try {
         check(`F0 ${w} px ${navn}: højst 6 skriftstørrelser, alle fra skalaen, 10 px kun på banegrafikken`,
           m.sizes.length <= 6 && m.sizes.every((x) => SKALA.includes(x)) && m.graf.length === 0 && m.brikker.every((x) => x === '10px'), m.sizes.join(' ') + ' | 10px uden for banen: ' + m.graf.join(',')); };
       const t = async (k) => { await pg.click(`#tab-${k}`); await pg.waitForSelector(`.tabpane.tab-${k}`); };
-      for (const k of ['trup', 'taktik', 'liga', 'klub', 'admin']) { await t(k); await mal(k + ' (ny liga)'); }
+      for (const k of ['trup', 'traening', 'taktik', 'liga', 'klub', 'admin']) { await t(k); await mal(k + ' (ny liga)'); }
       await t('liga'); const mit = await pg.inputValue('#team-select'); await pg.selectOption('#team-select', mit === '1' ? '2' : '1'); await pg.waitForSelector('.tabpane.tab-trup'); await pg.click('#matrix thead th:nth-child(15)');   // modstander: sortering på FIN afvises → .notice
       check(`F0 ${w} px: beskeden (.notice) står i brødtekst-størrelse 14 px`, (await pg.locator('#notice').count()) === 1 && (await pg.locator('#notice').evaluate((e) => getComputedStyle(e).fontSize)) === '14px');
       await mal('trup (modstander, med besked)'); await pg.selectOption('#scout-banner #team-select', mit);   // v3.28.0: holdvælgeren står på Liga og i scout-bjælken (TM: F0-blokken brugte den fra Trup og kastede)
       await pg.click('#play-round'); await pg.waitForSelector('#match-center'); await mal('kamp (live)');
       await pg.click('#skip'); await pg.waitForFunction(() => !document.querySelector('#skip') && document.querySelector('#match-center .ratings'));
-      for (const k of ['kamp', 'trup', 'taktik', 'liga', 'klub', 'admin']) { await t(k); await mal(k + ' (efter runden)'); }
+      for (const k of ['kamp', 'trup', 'traening', 'taktik', 'liga', 'klub', 'admin']) { await t(k); await mal(k + ' (efter runden)'); }
       await c.close();
     }
     check('F0: hele appen (alle faner, begge bredder) bruger højst 6 skriftstørrelser – før 20', alle.size <= 6, [...alle].join(' '));
@@ -925,14 +946,22 @@ try {
   const shown = (await g.textContent('#player-card h3')).match(/^#(\d+)/)[1];
   const expectSum = await g.evaluate((nr) => { const t = JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((x) => !x.isBot); const p = t.squad.find((x) => String(x.shirtNumber) === nr); return p.counterTactics.vsPress + p.counterTactics.vsLowBlock + p.counterTactics.vsTrapLong; }, shown);
   check('Spillerkortet viser puljen: erfaring brugt = summen af de tre værdier /100, og hvad der sker, når den er fuld', usedN === expectSum && used.includes('glemmer'), `${used} (forventet ${expectSum})`);
-  // v3.18.0: træningsfokus vælges på kortet, står i regnearket og gemmes (gælder, til det ændres – 0 klik pr. runde)
-  await g.selectOption('#focus-select', 'FINISH');
+  // v3.30.0: træningsfokus sættes KUN på 🏋️ Træning – kortet viser fokus og linker dertil (v3.18.0–v3.29.x: på kortet i Trup)
   const focusSaved = async () => g.evaluate((nr) => JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((x) => !x.isBot).squad.find((x) => String(x.shirtNumber) === nr).trainingFocus, shown);
-  const focusRow = await g.locator(`#training-table tr[data-pid="${await g.evaluate((nr) => JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((x) => !x.isBot).squad.find((x) => String(x.shirtNumber) === nr).id, shown)}"] select`).evaluate((el) => el.options[el.selectedIndex].text);
-  check('Træning: fokus valgt på kortet står i træningsoversigten og er gemt', focusRow === 'Afslutning' && (await focusSaved()) === 'FINISH' && (await g.textContent('#card-training')).includes('Afslutning') && /næste \+1 om ca\. \d+ runde|går langsomt \(mere end en sæson/.test(await g.textContent('#card-training')), focusRow);
+  const shownId = await g.evaluate((nr) => JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((x) => !x.isBot).squad.find((x) => String(x.shirtNumber) === nr).id, shown);
+  check('Træning: kortet i Trup har intet fokusvalg – "Træner: …" og linket "ændr i Træning ›"', (await g.locator('#cardpanel #focus-select, #cardpanel select').count()) === 0
+    && (await g.textContent('#card-train-note')).startsWith('Træner: ') && (await g.textContent('#card-train-link')) === 'ændr i Træning ›');
+  await g.click('#card-train-link'); await g.waitForSelector('.tabpane.tab-traening');
+  check('Træning: linket fra kortet i Trup åbner Træning med hans række markeret (og kun den)', JSON.stringify(await g.evaluate(() => [...document.querySelectorAll('#training-table tr.selected')].map((r) => r.dataset.pid))) === JSON.stringify([shownId]));
+  await g.selectOption(`#training-table tr[data-pid="${shownId}"] select`, 'FINISH');
+  const focusRow = await g.locator(`#training-table tr[data-pid="${shownId}"] select`).evaluate((el) => el.options[el.selectedIndex].text);
+  await tab('trup'); await openCard(shownId);
+  check('Træning: fokus valgt på Træning er gemt og står på kortet i Trup (med fremdriften)', focusRow === 'Afslutning' && (await focusSaved()) === 'FINISH' && (await g.textContent('#card-training')).includes('Træner: Afslutning') && /næste \+1 om ca\. \d+ runde|går langsomt \(mere end en sæson/.test(await g.textContent('#card-training')), focusRow);
+  await tab('traening');
   await g.selectOption('#focus-many', 'REST');
   check('Træning: massehandlingen i oversigten sætter fokus for alle viste (18) – bekræftelsen står ved tabellen', (await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((x) => !x.isBot).squad.filter((p) => p.trainingFocus === 'REST').length)) === 18 && (await g.textContent('#train-msg')).includes('18 spillere'));
-  await g.selectOption(`#training-table tr[data-pid="${await g.evaluate((nr) => JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((x) => !x.isBot).squad.find((x) => String(x.shirtNumber) === nr).id, shown)}"] select`, 'FINISH');
+  await g.selectOption(`#training-table tr[data-pid="${shownId}"] select`, 'FINISH');
+  await tab('trup'); await openCard(shownId);
   check('Spillerkortet viser 9 evne-barer og luftduel-udregningen', (await g.locator('#player-card .bars .bar').count()) === 9 && (await g.textContent('#aerial-breakdown')).includes('× 0,35'));
   // v3.8 (Test Manager): kortets overskrift viser spillerens EGEN naturlige position med fuld betegnelse
   const FULL_POS = { GK: 'Målmand', CB: 'Midtstopper', FB: 'Back/wingback (dybe kantpladser)', DM: 'Defensiv midtbane (CDM)', CM: 'Central midtbane (CM)', WM: 'Kant (høje kantpladser, LW/RW)', AM: 'Offensiv midtbane (CAM/CF)', ST: 'Angriber (ST)' };
@@ -940,7 +969,7 @@ try {
   const cardHead = await g.textContent('#player-card .card-head');
   check('Spillerkortet: kæde og naturlig position med fuld betegnelse (kun den ene)', cardHead.includes(` • ${FULL_POS[shownPos]} • `) && Object.values(FULL_POS).filter((t) => cardHead.includes(` • ${t} • `)).length === 1 && !cardHead.includes('(('), `${shownPos}: ${cardHead}`);
   // v3.19.0 (brugeren): banen og opstillingen er flyttet til Taktik – Trup er regneark, træning og kort
-  check('Trup-fanen har regneark og spillerkortet (i panelet, ikke på siden) – men ikke banen, bænken, byt-knapper eller taktikken', (await g.isVisible('#matrix')) && (await g.isVisible('#cardpanel #player-card')) && (await g.locator('#app #player-card').count()) === 0 && (await g.locator('#pitch').count()) === 0 && (await g.locator('#bench').count()) === 0 && (await g.locator('#tactics').count()) === 0 && !(await g.locator('#matrix thead').textContent()).includes('Byt'));
+  check('Trup-fanen har regneark og spillerkortet (i panelet, ikke på siden) – men ikke banen, bænken, byt-knapper, taktikken eller træningsoversigten (v3.30.0: på Træning)', (await g.isVisible('#matrix')) && (await g.locator('#training-table, #training').count()) === 0 && (await g.isVisible('#cardpanel #player-card')) && (await g.locator('#app #player-card').count()) === 0 && (await g.locator('#pitch').count()) === 0 && (await g.locator('#bench').count()) === 0 && (await g.locator('#tactics').count()) === 0 && !(await g.locator('#matrix thead').textContent()).includes('Byt'));
   await tab('taktik');
   // v3.24.0 samspil: én streg pr. par, motoren læser (ikke angriberparret), alle "spillet sammen" ved start; legenden nævner det svageste par
   { const want = await g.evaluate(async () => { const m = await import('/engine/chemistry.js'), d = JSON.parse(localStorage.getItem('tactivar_save')), me = d.league.teams.find((t) => !t.isBot);
@@ -958,9 +987,9 @@ try {
     { const nLines = await g.locator('#pitch #chem-lines line.chem').count();
       check('Samspil: legenden tæller de stærke par ("1 af N par spiller stærkt")', (await g.textContent('#chem-weakest')).includes(`Alle par har spillet sig sammen. 1 af ${nLines} par spiller stærkt.`), await g.textContent('#chem-weakest'));
       await g.evaluate((pr) => { const d = JSON.parse(localStorage.getItem('tactivar_save')), me = d.league.teams.find((t) => !t.isBot); d.league.trainingReport = { [me.id]: { round: d.league.leagueMetadata.round || 1, gains: [], injuries: [], strong: { up: [[pr.a.id, pr.b.id]], down: [] } } }; localStorage.setItem('tactivar_save', JSON.stringify(d)); }, pair);
-      await g.reload(); await g.waitForSelector('body[data-klar="ja"]'); await tab('trup');
+      await g.reload(); await g.waitForSelector('body[data-klar="ja"]'); await tab('traening');
       const ts = await g.textContent('#training-strong').catch(() => '');
-      check('Samspil: Trup-panelet siger, at parret nu spiller stærkt sammen – med numre og navne – og linker til Taktik', ts.startsWith(`🤝 #${pair.a.shirtNumber} ${pair.a.shortName} og #${pair.b.shirtNumber} ${pair.b.shortName} spiller nu stærkt sammen.`) && ts.includes('se stregerne på Taktik'), ts);
+      check('Samspil: Træning-panelet (v3.30.0, før Trup) siger, at parret nu spiller stærkt sammen – med numre og navne – og linker til Taktik', ts.startsWith(`🤝 #${pair.a.shirtNumber} ${pair.a.shortName} og #${pair.b.shirtNumber} ${pair.b.shortName} spiller nu stærkt sammen.`) && ts.includes('se stregerne på Taktik'), ts);
       await g.locator('#training-strong button.linklike').click();
       check('Samspil: linket åbner Taktik med stregerne', (await g.locator('#pitch #chem-lines line.chem-staerkt').count()) === 1); }
     await tab('trup');
@@ -1104,7 +1133,7 @@ try {
   const ratio = await g.evaluate(() => { const r = document.getElementById('pitch').getBoundingClientRect(); return r.width / r.height; });
   check('Banen bevarer sit forhold 68:80 (ikke strakt)', Math.abs(ratio - 68 / 80) < 0.02, ratio.toFixed(3));
   await tab('taktik'); await openCard();
-  check('Taktik: træning kan ikke sættes her – kortet siger, hvad han træner, og henviser til Trup', (await g.locator('#focus-select').count()) === 0 && (await g.textContent('#card-train-note')).includes('ændr i Trup'));
+  check('Taktik: træning kan ikke sættes her – kortet siger, hvad han træner, og linker til Træning', (await g.locator('#focus-select').count()) === 0 && (await g.textContent('#card-train-note')).includes('ændr i Træning ›') && (await g.locator('#cardpanel #card-train-link').count()) === 1);
   check('Taktik-fanen: bane, spillerliste og taktik – spillerkortet i panelet (ⓘ) – men ikke regnearket', (await g.isVisible('#pitch')) && (await g.isVisible('#lineup-list')) && (await g.isVisible('#cardpanel #player-card')) && (await g.locator('#app #player-card').count()) === 0 && (await g.locator('#matrix').count()) === 0);
   check('Tre fase-paneler og Hvis-Så-regler', (await g.locator('#tactics fieldset[data-phase]').count()) === 3 && (await g.locator('#rules .rule').count()) === 1);
   const bodyText = await g.textContent('body');
@@ -1371,6 +1400,14 @@ try {
   check('Klik på et hold i ligatabellen åbner holdet i Trup', (await g.textContent('#tabs .tab.active')).includes('Trup') && (await g.isVisible('#matrix')));
   const posCol = await g.locator('#matrix tbody tr td:nth-child(1)').allTextContents();
   check('Modstanderens tabel falder tilbage til opstillingsorden, ikke skjult FIN-orden', posCol[0].startsWith('GK') && !(await g.textContent('#matrix thead')).includes('FIN ▼'));
+  // v3.30.0: 🏋️ Træning er ALTID dit hold – også når Trup viser en modstander (ingen scout-bjælke, ingen af hans spillere, ingen "+N" fra ham)
+  { const other = await g.textContent('#club-name');
+    await tab('traening');
+    const tr = await g.evaluate(() => { const L = JSON.parse(localStorage.getItem('tactivar_save')).league, me = L.teams.find((t) => !t.isBot), ids = [...document.querySelectorAll('#training-table tbody tr[data-pid]')].map((r) => r.dataset.pid);
+      return { n: ids.length, mine: ids.every((id) => me.squad.some((p) => p.id === id)), all: me.squad.length }; });
+    check('v3.30.0: Træning fra en modstander i Trup viser DIT hold – alle rækker er dine, ingen scout-bjælke', tr.n === tr.all && tr.mine && (await g.locator('#scout-banner').count()) === 0, JSON.stringify(tr) + ' | Trup viste ' + other);
+    await tab('trup');
+    check('v3.30.0: tilbage i Trup står den scoutede modstander stadig (Træning skifter ikke holdet)', (await g.textContent('#club-name')) === other && (await g.locator('#scout-banner').count()) === 1); }
   await seeTeam('0');
 
   // Anti-spionage på et modstanderhold
@@ -1428,12 +1465,13 @@ try {
   const sideScroll = await g.evaluate(() => { const w = document.querySelector('.tablewrap'); return w.scrollWidth - w.clientWidth; });
   check('Layout: regnearket kræver ikke sidelæns scroll ved 1400 px', sideScroll <= 1, `${sideScroll}px`);
   { await seeTeam('0'); await tab('trup'); await g.setViewportSize({ width: 1366, height: 768 });
-    const tw = await g.evaluate(() => ['matrix', 'training-table'].map((id) => { const w = document.getElementById(id)?.closest('.tablewrap'); return w ? w.scrollWidth - w.clientWidth : 'mangler'; }));
-    check('Layout (1366 px): ingen tabel i Trup ruller sidelæns – heller ikke træningsoversigten (QC v3.20.1: 758 px i 625)', tw.every((d) => d !== 'mangler' && d <= 1), tw.join(','));
+    const side = (id) => g.evaluate((id) => { const w = document.getElementById(id)?.closest('.tablewrap'); return w ? w.scrollWidth - w.clientWidth : 'mangler'; }, id);
+    const tw = [await side('matrix')]; await tab('traening'); tw.push(await side('training-table')); await tab('trup');
+    check('Layout (1366 px): regnearket i Trup og træningsoversigten på Træning ruller ikke sidelæns (QC v3.20.1: 758 px i 625)', tw.every((d) => d !== 'mangler' && d <= 1), tw.join(','));
     // Ingen indlejret LODRET scroll på nogen fane (brugeren v3.20.1; TM: målingen stod kun på Taktik)
     const vert = {};
-    for (const k of ['trup', 'liga', 'klub']) { await tab(k); vert[k] = await g.evaluate(() => [...document.querySelectorAll('.tablewrap')].map((w) => w.scrollHeight - w.clientHeight)); }
-    check('Layout: ingen tabel på Trup, Liga eller Klub har egen lodret rulning', Object.values(vert).every((l) => l.every((d) => d <= 1)) && vert.trup.length >= 2, JSON.stringify(vert));
+    for (const k of ['trup', 'traening', 'liga', 'klub']) { await tab(k); vert[k] = await g.evaluate(() => [...document.querySelectorAll('.tablewrap')].map((w) => w.scrollHeight - w.clientHeight)); }
+    check('Layout: ingen tabel på Trup, Træning, Liga eller Klub har egen lodret rulning', Object.values(vert).every((l) => l.every((d) => d <= 1)) && vert.trup.length >= 1 && vert.traening.length >= 1, JSON.stringify(vert));
     await tab('trup');
     await g.setViewportSize({ width: 1400, height: 1000 }); }
   check('Layout: siden selv scroller ikke sidelæns', await g.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
@@ -2275,6 +2313,15 @@ try {
     const tieTxt = `${tie.first} er mester på målforskel – ${tie.myPos === 2 ? 'I' : `${tie.first} og ${tie.second}`} endte begge på ${tie.points} point`;
     const tieCol = (await g.locator('#gazette #col-form p').allTextContents()).join(' | '), tieBox = await g.textContent('#gazette #season-end'), tieTable = (await g.locator('#standings-champion').count()) ? await g.textContent('#standings-champion') : '';
     check('Sæsonslut: afgjort på målforskel står der i avisens sæsonboks og slutstillingen (ens tekst) – ikke en tredje gang i Formen (v3.16.7)', !tieCol.includes('er mester') && tieBox.includes(`${tieTxt}.`) && tieTable.includes(`${tieTxt}.`), `${tieCol} | ${tieBox} | ${tieTable}`);
+    // v3.30.0 (QC): lige efter sæsonslut ingen "+N" i Trup – aldersfaldet i sæsonskiftet kan have spist et +1 fra samme runde. Positivt datakrav:
+    // rapporten HAR +1 for truppen (og Træning viser dem), sæsonen er netop slut – men regnearket har ingen mærker
+    { const se = await g.evaluate(async () => { const { seasonJustEnded } = await import('/engine/season.js'), d = JSON.parse(localStorage.getItem('tactivar_save')), L = d.league, me = L.teams.find((t) => !t.isBot);
+        L.trainingReport[me.id].gains.push({ id: me.squad[0].id, skill: 'passing' }, { id: me.squad[1].id, skill: 'pace' }); localStorage.setItem('tactivar_save', JSON.stringify(d));
+        return { ended: !!seasonJustEnded(L), n: L.trainingReport[me.id].gains.filter((x) => me.squad.some((p) => p.id === x.id)).length }; });
+      await g.reload(); await g.waitForSelector('body[data-klar="ja"]'); await tab('trup');
+      const marks = await g.locator('#matrix td.gain, #matrix td.player-gain, #trup-gain-help').count();
+      await tab('traening'); const sum = await g.textContent('#training-summary').catch(() => '');
+      check('v3.30.0 Sæsonslut: ingen "+N" i Trup lige efter sæsonskiftet – selv om rapporten har +1 for truppen (de står på Træning)', se.ended && se.n >= 2 && marks === 0 && sum.includes('+1'), JSON.stringify({ se, marks, sum })); }
   }
 
   // Ødelagt gemt spil: aldrig tom side, data bevaret i backup
@@ -2465,13 +2512,13 @@ try {
     const ptab = async (k) => { await pf.click(`#tab-${k}`); await pf.waitForSelector(`.tabpane.tab-${k}`); };
     const reloadP = async () => { await pf.reload(); await pf.waitForSelector('body[data-klar="ja"]'); };
     // Gamle gem: en gemt fane fra før v3.28.0 åbner den samme (Trup, ⚙ Admin); en ukendt åbner Hjem
-    for (const [saved, want, sel] of [['trup', 'trup', '#matrix'], ['admin', 'admin', '#admin'], ['xyz', 'hjem', '#home']]) {
+    for (const [saved, want, sel] of [['trup', 'trup', '#matrix'], ['traening', 'traening', '#training-table'], ['admin', 'admin', '#admin'], ['xyz', 'hjem', '#home']]) {
       await pf.evaluate((t) => { const d = JSON.parse(localStorage.getItem('tactivar_save')); d.ui.tab = t; localStorage.setItem('tactivar_save', JSON.stringify(d)); }, saved);
       await reloadP();
       const pane = await pf.evaluate(() => document.querySelector('.tabpane').className);
       const marked = want === 'admin' ? (await pf.getAttribute('#tab-admin', 'class')).includes('active') && (await pf.locator('#tabs .tab.active').count()) === 0
         : (await pf.getAttribute('#tabs .tab.active', 'id')) === `tab-${want}`;
-      check(`Gammelt gem med ui.tab = '${saved}' åbner ${want === 'admin' ? '⚙ Admin' : want === 'hjem' ? 'Hjem' : 'Trup'}`, pane.includes(`tab-${want}`) && (await pf.isVisible(sel)) && marked, pane);
+      check(`Gemt ui.tab = '${saved}' åbner ${{ admin: '⚙ Admin', hjem: 'Hjem', trup: 'Trup', traening: 'Træning' }[want]}`, pane.includes(`tab-${want}`) && (await pf.isVisible(sel)) && marked, pane);
     }
     // Afspilningsvagten på Hjem (QC-runde 2): før runde 2 står resultat, placering, kasse-ændring, "Før du spiller", minitabellen og
     // modstanderens placering og form (positiv tilstedeværelse) – under afspilningen af runde 2 ingen af dem (de er bogført og ville afsløre runden)
@@ -2480,7 +2527,10 @@ try {
     check('Efter runde 1: placeringen står på Hjem uden ↑/↓ (først fra sæsonens 2. runde)', (await pf.isVisible('#home-place')) && (await pf.locator('#home-move').count()) === 0, await pf.textContent('#home-place'));
     await pf.evaluate(() => { const d = JSON.parse(localStorage.getItem('tactivar_save')), me = d.league.teams.find((t) => !t.isBot), p = me.squad.find((x) => x.id === me.tactics.lineupSlots[9]);
       for (const x of me.squad) Object.assign(x, { injuryMatchesLeft: 0, banMatches: 0, banYellows: 0, freshness: 100 });   // kun den ene ⛔ (runde 1 kan have givet skader/kort)
-      p.banMatches = 2; p.banWhy = 'DIRECT'; localStorage.setItem('tactivar_save', JSON.stringify(d)); });
+      p.banMatches = 2; p.banWhy = 'DIRECT';
+      // v3.30.0: alle evner under 20 et hår fra +1, så runde 2 med sikkerhed giver +1 (startere får kamp-xp) – afspilningsvagten nedenfor har data
+      for (const x of me.squad) for (const k of Object.keys(x.skills)) if (x.skills[k] < 20) (x.dev ||= {})[k] = 0.995;
+      localStorage.setItem('tactivar_save', JSON.stringify(d)); });
     await reloadP(); await ptab('hjem');
     const HIDDEN = ['#home-last', '#home-place', '#cash-delta', '#home-todo', '#home-table', '#home-opp-form'];
     const present = () => pf.evaluate((ids) => ids.filter((x) => document.querySelector(x)), HIDDEN);
@@ -2488,11 +2538,23 @@ try {
     await ptab('liga'); const miniBefore = (await pf.textContent('#mini-warn', { timeout: 3000 }).catch(() => 'mangler')).trim();
     check('Før runde 2: Hjem viser resultat, placering, kasse-ændring, "Før du spiller", minitabel og modstanderens form – den lille ▶ har ⛔', before.length === HIDDEN.length && /^Nr\. \d · seneste 3: [VUT]$/.test(formBefore) && miniBefore === '⛔1', `${before} | ${formBefore} | ${miniBefore}`);
     await pf.click('#play-round'); await pf.waitForSelector('#skip');
+    let gpRound = null;
+    // v3.30.0: rundens +1 er bogført før afspilningen – under den ingen "+N" i Trup og ingen opsamling på Træning (positivt: gemmet HAR +1)
+    { const gp = await pf.evaluate(() => { const L = JSON.parse(localStorage.getItem('tactivar_save')).league, me = L.teams.find((t) => !t.isBot), g = L.trainingReport?.[me.id]?.gains ?? [];
+        return { n: g.length, distinct: new Set(g.filter((x) => me.squad.some((p) => p.id === x.id)).map((x) => `${x.id}|${x.skill}`)).size, players: new Set(g.filter((x) => me.squad.some((p) => p.id === x.id)).map((x) => x.id)).size }; });
+      await ptab('trup'); const during = await pf.locator('#matrix td.gain, #matrix td.player-gain, #trup-gain-help').count();
+      await ptab('traening'); const sumDuring = await pf.locator('#training-summary').count(), tblDuring = await pf.locator('#training-table').count();
+      check('v3.30.0 Under afspilning: ingen "+N" i Trup og ingen opsamling på Træning (tabellen står) – selv om gemmet har rundens +1', gp.n > 0 && during === 0 && sumDuring === 0 && tblDuring === 1, JSON.stringify({ gp, during, sumDuring }));
+      gpRound = gp; }
     check('Under afspilning: den lille ▶ er slået fra og uden tegn', (await pf.isDisabled('.topbar #play-round')) && (await pf.locator('#mini-warn').count()) === 0);
     await ptab('hjem');
     check('Under afspilning, Hjem: "📺 Runden spilles i Kamp-fanen" – ingen resultat, placering, kasse-ændring, "Før du spiller", minitabel eller modstanderform',
       (await pf.isVisible('#home-playing')) && (await pf.isVisible('#home-next')) && (await pf.isVisible('#club-link')) && (await present()).length === 0 && (await pf.isDisabled('#playbar #play-round')), JSON.stringify(await present()));
-    await ptab('kamp'); await pf.click('#skip'); await ptab('hjem');
+    await ptab('kamp'); await pf.click('#skip');
+    { const gp = gpRound; await ptab('trup');
+      const after = await pf.evaluate(() => ({ cells: document.querySelectorAll('#matrix td.gain').length, names: document.querySelectorAll('#matrix td.player-gain').length }));
+      check('v3.30.0 Efter afspilningen: "+N" på præcis de (spiller, evne), rapporten har – og på navnet for hver spiller med +1', after.cells === gp.distinct && after.names === gp.players && gp.distinct > 0, JSON.stringify({ gp, after })); }
+    await ptab('hjem');
     // ↑/↓ efter runde 2: forventningen regnet her fra gemmet (tabellen før runde 2 = tabellen minus rundens kampe, sorteret point → målforskel → mål)
     const mv = await pf.evaluate(() => { const L = JSON.parse(localStorage.getItem('tactivar_save')).league, me = L.teams.find((t) => !t.isBot).id;
       const sort = (rows) => rows.slice().sort((a, b) => b.p - a.p || (b.f - b.a) - (a.f - a.a) || b.f - a.f);
@@ -2517,7 +2579,7 @@ try {
     const mtab = async (k) => { await mp.click(`#tab-${k}`); await mp.waitForSelector(`.tabpane.tab-${k}`); };
     await mtab('taktik');
     const nav = await mp.evaluate(() => [...document.querySelectorAll('#tabs .tab')].map((b) => { const r = b.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height), Math.round(r.bottom)]; }));
-    check('390×844: seks nav-knapper i bunden af skærmen, hver mindst 44 × 44 px', nav.length === 6 && nav.every(([w, hh, b]) => w >= 44 && hh >= 44 && b === 844), JSON.stringify(nav));
+    check('390×844: syv nav-knapper i bunden af skærmen, hver mindst 44 × 44 px', nav.length === 7 && nav.every(([w, hh, b]) => w >= 44 && hh >= 44 && b === 844), JSON.stringify(nav));
     const chrome = async () => { await mp.evaluate(() => window.scrollTo(0, 400)); return mp.evaluate(() => {
       const bar = document.querySelector('#playbar').getBoundingClientRect(), top = document.querySelector('.topbar').getBoundingClientRect(), sc = document.querySelector('#scout-banner')?.getBoundingClientRect();
       const content = bar.top - Math.max(0, top.bottom, sc ? sc.bottom : 0);
@@ -2534,12 +2596,12 @@ try {
     check('390×844, Taktik med et andet hold: scout-bjælken står fast øverst og tælles med – indholdet stadig ≥ 650 px', (await mp.isVisible('#scout-banner')) && c2.content >= 650 && c2.chrome > c1.chrome, JSON.stringify(c2));
     await mp.click('#scout-back');
     const over = {};
-    for (const k of ['hjem', 'taktik', 'trup', 'liga']) {
+    for (const k of ['hjem', 'taktik', 'trup', 'traening', 'liga']) {
       await mtab(k); await mp.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight)); await mp.waitForTimeout(50);
       over[k] = await mp.evaluate(() => { const pane = document.querySelector('.tabpane').getBoundingClientRect(), bar = document.querySelector('#playbar').getBoundingClientRect(), nav = document.querySelector('#tabbar').getBoundingClientRect();
         const limit = bar.height ? bar.top : nav.top; return [Math.round(limit - pane.bottom), document.documentElement.scrollWidth - innerWidth]; });
     }
-    check('390×844: sidste element står over bjælken/navigationen, og ingen fane ruller vandret (Hjem, Taktik, Trup, Liga)', Object.values(over).every(([gap, x]) => gap >= 0 && x <= 0), JSON.stringify(over));
+    check('390×844: sidste element står over bjælken/navigationen, og ingen fane ruller vandret (Hjem, Taktik, Trup, Træning, Liga)', Object.values(over).every(([gap, x]) => gap >= 0 && x <= 0), JSON.stringify(over));
     await mctx.close();
   }
   await f1tm();
