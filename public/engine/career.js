@@ -99,7 +99,7 @@ export const reservesOf = (team) => { const b = new Set(matchBenchOf(team).map((
 // Udelukkelse (v3.27.0, nr. 64 – brugeren 2026-11-02: "Strengere", hvert 4. gule efter målingen): ÉN vagt for, om en spiller
 // kan spille – skadet ELLER udelukket. Kampen (match.js isAvailable), udtagelsen (pubScore) og UI bruger kun denne.
 // BAN: direkte rødt = 2 kampe, rødt for to gule = 1, hvert YELLOW_EVERY. gule kort i sæsonen = 1 (de to gule bag et rødt
-// kort tæller ikke – UEFA; målt: hvert 3. gule ≈ 7 udelukkede kampe pr. hold pr. sæson, hvert 4. ≈ 4 – tools/measure-bans.mjs).
+// kort tæller ikke – UEFA; målt: hvert 3. gule ≈ 7 udelukkede kampe pr. hold pr. sæson, hvert 4. ≈ 4,4–5,4 – tools/measure-bans.mjs).
 export const BAN = Object.freeze({ DIRECT: 2, SECOND_YELLOW: 1, YELLOW_EVERY: 4 });
 export const unavailable = (p) => p.injuryMatchesLeft > 0 || p.banMatches > 0;
 // Udelukkelsen fra én kamps kort: e = karakterarkets post (yellows 0–2, red 'DIRECT'|'SECOND_YELLOW'); før = sæsonens tællende gule.

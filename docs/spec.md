@@ -265,9 +265,9 @@ Tick hvert 3. minut (1..90).
   på ét hold, 0 udelukkede spillede af 30.038. Kendt skævhed: kortene rammer næsten kun forsvar og midtbane (frisparkenes
   synder trækkes blandt dem – ATT 15 af 857).
 - **Tacklinger (v3.27.0 – før læste motoren dem ikke):** `TACKLE` i match.js – Forsigtig/Normal/Aggressiv ganger frisparkene
-  (0,75/1/1,3: tick-frisparket og de stille), de stille frisparks gule kort (0,8/1/1,25) og giver presset i opbygningsduellen
+  (0,75/1/1,3: kun de stille frispark – tick-frisparket er uændret), de stille frisparks gule kort (0,8/1/1,25) og giver presset i opbygningsduellen
   −0,6/0/+0,6. Normal mod Normal = samme træk og kamp som før. Målt for dit hold (20 sæsoner): gule pr. sæson 18,9/29,1/41,5,
-  udelukkede kampe 1,9/4,5/7,8, pres vundet 46/50/55 %, netto mål 0,26/0,30/0,33 pr. kamp – Aggressiv vinder bolden, men betaler
+  udelukkede kampe 1,9/4,5/7,8, pres vundet 46/50/55 %, netto mål 0,26/0,30/0,33 pr. kamp (inden for støjen, ca. ±0,1 – ingen målbar måleffekt) – Aggressiv vinder bolden, men betaler
   med udelukkelser.
 - **Træthedsskift spredes (v3.15**, brugerens valg): højst `FATIGUE_SUBS_AT_ONCE` = 3 ad gangen (også i pausen; flere trætte bruger flere pauser);
   grænsen gælder fortsat uanset minut, og dit hold får besked, når en træt spiller må vente.
