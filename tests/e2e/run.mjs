@@ -965,8 +965,10 @@ try {
   await tab('kamp');
   await g.click('#skip');
   check('Runden har 4 kampe', (await g.locator('#match-cards .matchcard').count()) === 4);
-  // v3.28.0: efter fløjtet står vejen videre nederst på Kamp – "Næste: runde 2 mod X · Forbered ›" → Hjem
+  // v3.28.0: efter fløjtet står vejen videre ØVERST på Kamp (Spilfører UI: nederst ved y≈3300 blev den ikke fundet) → Hjem
   { const nx2 = await nextOf(), line = await g.locator('.to-home').textContent().catch(() => 'mangler');
+    const above = await g.evaluate(() => { const a = document.querySelector('.to-home'), b = document.querySelector('#match-center'); return !!a && !!b && a.getBoundingClientRect().bottom <= b.getBoundingClientRect().top; });
+    check('Kamp efter fløjtet: "Forbered ›"-linjen står OVER kampcentret (ikke nederst)', above);
     check('Kamp efter fløjtet: "Næste: runde 2 mod X (hjemme/ude) · Forbered ›"', line === `Næste: runde 2 mod ${nx2.opp} (${nx2.home ? 'hjemme' : 'ude'}) · Forbered ›`, line);
     await g.click('#to-home');
     check('"Forbered ›" åbner Hjem', (await g.textContent('#tabs .tab.active')).includes('Hjem') && (await g.isVisible('#home-todo')));
