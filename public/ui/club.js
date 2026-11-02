@@ -99,7 +99,7 @@ export function renderMarket({ league, team, playing, onAccept, onDecline, onUnl
         w != null && !block ? h('div', { class: 'muted market-gain' }, `${o ? 'Salg' : 'Salg eller fritstilling (uden betaling – kan ikke fortrydes)'} ${gain}.`) : null,
         // Samspil (v3.24.0): samme linje som på kortet ved "Til salg" – kun stærke par med hans naboer nu
         (() => { const t = saleChemText(team, chemRefOf(league), p.id); return t ? h('div', { class: 'muted market-chem' }, t) : null; })());
-    }) : h('p', { class: 'muted', id: 'market-empty' }, 'Ingen. Sæt en spiller til salg på hans spillerkort (dit hold).'),
+    }) : h('p', { class: 'muted', id: 'market-empty' }, 'Ingen. Sæt en spiller til salg på hans spillerkort (👥 Trup → klik på spilleren).'),
     w != null && onBuy ? renderForSale(league, team, onBuy, onLine, line, msg) : null);
 }
 

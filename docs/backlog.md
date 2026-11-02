@@ -15,6 +15,8 @@ Rangering: brugerens ønsker først, derefter værdi pr. størrelse. Første run
    F1 ramme, Hjem-fane og ⚙ · F2 kortpanelet · F3 Hjem-indhold, avisen ét sted · F4 Taktik-underfaner, hjælp bag "Sådan virker det" ·
    F5 Trup-kolonnesæt og Udvikling, Kamp-opsamling · F6 Liga/Klub-underfaner og markedet (søgning, sortering, sider). Gemmet røres ikke
    (sidste underfane i view, ikke game.ui). Sidehøjder måles før/efter med et committet værktøj.
+   **Lavet:** F0 (v3.27.1), F1 (v3.28.0), F2 kortpanelet (v3.29.0: ét panel fra højre/bunden på Trup og Taktik, ⓘ på Taktik –
+   et klik er stadig byt; Trup 1922 → 1500 px og Taktik 2156 → 1864 px ved 1366, Taktik 4709 → 3777 ved 390). Næste: F3.
 Rundtur 2: 2026-10-28 (v3.24.0, sæson spillet i browseren + `measure-lifecycle` 5 seeds × 3 sæsoner; Spilførernes scripts i
 scratchpad – et tal herfra skal måles igen med et committet værktøj, før det begrunder en ændring).
 1. **Sig det, når et par bliver stærkt** · UI · S · 4 · samspillets belønning er tavs: første gang det nævnes er runde 8
@@ -29,9 +31,6 @@ scratchpad – et tal herfra skal måles igen med et committet værktøj, før d
    (+0,308 net), Normal 1,501 (+0,163), Ekstrem 1,501 (+0,169); fælden afgøres først, når presset har vundet bolden
    (match.js ca. 1339, kun `!== 'OFF'`), Ekstrem ændrer kun erfaringskategorien (counter.js:57). Fælden skal kunne vinde OG
    fejle; Ekstrem fanger oftere, men giver en fri mand.
-5. **På mobil ligger spillerkortet 3.400 px under banen** · UI · S · 4 · 390 px: tryk på en brik scroller ikke; kortet (bedste
-   makker, parrene) starter 3.437 px nede, Taktik er 4.253 px; parrets bånd står ellers kun i brikkens `title`, som ikke vises
-   ved tryk. "Se kortet ↓" i beskeden – eller kortet lige under listen.
 6. **Lave cutbacks er altid det rigtige valg** · motor · M · 5 · 1120 kampe pr. valg: Cutbacks 1,710 point (+0,499 net),
    Centralt 1,501, Høje indlæg 1,502 – Cutbacks bedst i alle 10 formationer (+0,12 til +0,28 point); en lav blok eller en
    femmandsbagkæde gør intet ved dem (`FOCUS_SHARE` match.js:103, `cutback()`). Mange i feltet dæmper cutbacks, højde belønner
@@ -174,6 +173,7 @@ scratchpad – et tal herfra skal måles igen med et committet værktøj, før d
 - "– det holdt ikke mod jer" efter et nederlag kan misforstås (UI) – bevidst valgt i v3.21.2 (QC); kun noteret.
 
 ## Lavet
+- v3.29.0 nr. 5 (tidl. "På mobil ligger spillerkortet 3.400 px under banen"): kortet er et ark fra bunden – ⓘ eller "Se kort ›" (står over Spil-bjælken efter et tryk på den øverste brik, e2e 390 × 844) viser det uden at rulle · nr. 0 trin F2 kortpanelet
 - v3.27.0 udelukkelse for kort (nr. 64: direkte rødt 2, rødt for to gule 1, hvert 4. gule 1 – brugeren "Strengere", målt i `tools/measure-bans.mjs`) og tacklinger, der virker (tidl. nr. 4: Forsigtig/Normal/Aggressiv ganger de stille frispark, kortene og presset) · kendte rester til UI-ombygningen: 🟨-varslet kun på kortet, "⛔ #7" uden tekst på 390 px, Hvis-Så-vælgeren advarer ikke om udelukkede, direkte rødt efter 4. gule siger 2 kampe men giver 3
 - v3.24.1 ungdomsspillere, der rykkes op, har karantæne som et køb (salg straks lukket; holdt et år: se nr. 8) ·
   v3.24.0 samspil – virkning og visning (opbygning, løbsduel, streger, kort, køb/salg) · v3.23.0 samspil – data og

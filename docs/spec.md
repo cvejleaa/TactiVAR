@@ -1066,15 +1066,48 @@ Målt (`node tools/measure-ui.mjs`, efter én runde, før → efter): 1366 px Tr
 Hjem (ny) 900; 390 px Trup 2941 → 2928, Taktik 4598 → 4661, Liga 4169 → 4208, Hjem (ny) 938 (Kamp varierer med runden). Mobil
 Taktik (e2e, 390 × 844, 3 advarsler): fast chrome 137 px (sticky topbar) → 118 px (bjælke 61 + navigation 57), indholdshøjde
 mellem bjælkerne 707 → 726 px (682 med scout-bjælken). e2e vagter: chrome ≤ 130, indhold ≥ 650, nav ≥ 44 px.
-- **Trup** (v3.19.0; v3.28.0 klubhovedet til Hjem – her en kort linje "X – dit hold", en modstander med 🔒 kasse og 💼 Klubside): regnearket (med 💰 Værdi og Løn/rd sidst; ingen byt-knapper), derunder
-  spillerkort | 🏋️ træningsoversigt (fokus pr. spiller, pris, fremdrift, næste +1, skøn, +1 sidste runde,
-  massehandling for de viste). Træning sættes kun her.
+- **Trup** (v3.19.0; v3.28.0 klubhovedet til Hjem – her en kort linje "X – dit hold", en modstander med 🔒 kasse og 💼 Klubside): "Klik på en
+  spiller for at åbne spillerkortet" (`#trup-help`), regnearket (med 💰 Værdi og Løn/rd sidst; ingen byt-knapper), derunder 🏋️ træningsoversigten
+  i hele bredden (v3.29.0 – før kort | træning 2:3; fokus pr. spiller, pris, fremdrift, næste +1, skøn, +1 sidste runde, massehandling for de
+  viste). Et klik på en række åbner kortpanelet (eller skifter spiller i det). Træning sættes kun her (`#focus-select` på kortet kun på Trup).
 - **Taktik** (v3.19.0 – opstillingen ét sted): bane | spillerliste (Start-11, Bænk med "Udtag automatisk",
   Reserver; klik på en brik filtrerer listen til hans kæde med kædens 3 nøgle-evner; sortering gennem
-  regnearkets kolonner og synlighedsvagt) + spillerkort; formation/planer/faser/Hvis-Så lige under banen i venstre
-  kolonne (v3.20.1, brugeren: "langt ned til taktikindstillingerne"). Ingen tabel har egen lodret rulning (v3.20.1) –
-  siden ruller, og dens position bevares, når den tegnes om. Ét
-  byt-valg (actions.js `swapKind`/`pickForSwap`) på banen og i listen; beskeden står ved listen.
+  regnearkets kolonner og synlighedsvagt); formation/planer/faser/Hvis-Så lige under banen og listen i hele bredden
+  (v3.20.1, brugeren: "langt ned til taktikindstillingerne"; v3.29.0 uden kortkolonne – områderne "pitch list" "tactics tactics", på
+  smal skærm bane, liste, indstillinger). Ingen tabel har egen lodret rulning (v3.20.1) – siden ruller, og dens position bevares, når den
+  tegnes om (eneste undtagelse: kortpanelet herunder). Ét byt-valg (actions.js `swapKind`/`pickForSwap`) på banen og i listen; beskeden
+  står ved listen – på smal skærm (≤ 900 px), mens et byt er i gang, fast over Spil-bjælken (`.pick-live`).
+- **Kortpanelet** (v3.29.0, UI-ombygningen F2 – brugerens valg 2026-11-02): spillerkortet står ÉT sted, `#cardpanel` (fast i index.html
+  ved siden af `#playbar`, uden for `main#app`; `role="dialog"`, ikke-modalt, navngivet af kortets egen h3 `#card-title`, der er skjult i
+  panelet), kun på Trup og Taktik. Tilstanden er `view.card = { pid, teamIdx, tab, … }` (gemmes ikke – panelet starter altid lukket),
+  adskilt fra `selectedPlayerId` (brikkens markering). ÉN vagt (app.js `cardNow`): et åbnet kort for netop den viste fane og det viste
+  hold med en spiller, der står i holdet (eller en købskvittering); ellers `hidden` og `data-open="nej"`. Faneskift (`showTab`) og
+  holdskift (`setViewTeam`) lukker; alt andet, der flytter fanen (▶ Spil runde, links), skjuler det gennem vagten. Fejlsiden tømmer det.
+  - **Åbnes af:** Trup – et klik på en række (dit eller et andet hold). Taktik, dit hold – KUN ⓘ forrest i listens navnecelle
+    (`.lp-info[data-pid]`, aria-label "Spillerkort: #7 Navn", tegnet i CSS, så cellens tekst er "#7 Navn"; stopper klikket, så byttet og
+    beskeden står urørt) og "Se kort ›" (`#pick-card`) i byt-beskeden, kun mens et byt er i gang. Et klik på din egen brik eller række
+    bytter som før og ændrer ikke panelets spiller. Taktik, et andet hold – et klik på brik eller række (der er intet byt). "Træner: X –
+    ændr i Trup" er et link (`#card-train-link`) til Trup med panelet på samme spiller.
+  - **Hoved:** ◀ ▶ (`#card-prev`/`#card-next`) bladrer i den viste listes rækkefølge (Trup: regnearkets sortering og filter; Taktik:
+    start-11, bænk, reserver som listen) og bytter aldrig; "#nr Navn" (`#cp-title`); ✕ (`#card-close`). Mens panelet er åbent på
+    Taktik, står byt-beskeden også i hovedet (`#panel-pick-msg`). Efter et køb lukker panelet ikke tavst: kvitteringen
+    (`#panel-notice`) og "Se X i din trup ›" står, til det lukkes.
+  - **Lukkes af** ✕ og Escape (én handler; virker også med fokus i noten, afbryder ikke et byt). Fokus: ✕ ved åbning; ved lukning
+    tilbage til det, der åbnede (rækken – `#matrix tr` har `tabindex="-1"` – eller ⓘ, fundet igen efter gentegningen). Efter hver
+    gentegning får et fokuseret element i panelet fokus igen ud fra sit id; noten tegnes aldrig om under skrivning (`onNote` kalder kun
+    `renderControls`).
+  - **Rulning:** panelet er rulle-elementet (`overscroll-behavior: contain`); rulningen bevares ved gentegning og ved ◀ ▶ (samme
+    åbning) og nulstilles ved en ny åbning.
+  - **Markering:** panelets spiller får kun et lilla omrids (`tr.selected` i regnearket, `tr.carded` i listen) – kun mens panelet er
+    åbent; "byt i gang" beholder sin baggrund.
+  - **Bredder:** > 900 px fast fra højre, `width: min(420px, 40vw)`, toppen under topbaren og scout-bjælken (`--top-h` + `--scout-h`),
+    bunden over Spil-bjælken (`--bar-h`); ≥ 1200 px får `main` `padding-right` = panelets bredde, mens det er åbent. ≤ 900 px et ark fra
+    bunden i fuld bredde, højst 70vh (601–900 over Spil-bjælken; ≤ 600 over den faste navigation, `57px + env(safe-area-inset-bottom)`,
+    og hen over Spil-bjælken). z: Spil-bjælken 20 < panelet 25 < navigationen 30. ✕ ◀ ▶ og ⓘ er 44 × 44 px på mobil (ⓘ 28 px på computer).
+  Målt (`node tools/measure-ui.mjs`, efter én runde, før → efter): 1366 px Trup 1922 → 1500, Taktik 2156 → 1864; 390 px Trup 3002 →
+  1641, Taktik 4709 → 3777 (Hjem, Kamp, Liga, Klub uændrede inden for ligaens tilfældighed). Listens række på Taktik 25 → 33 px (1366) og
+  25 → 37 px (390) for ⓘ – listen 711 → 851 px og 775 → 988 px. Mobil: kortet stod 3.439 px nede på Taktik (backlog nr. 5) – nu i arket
+  uden at rulle; "Se kort ›" står over Spil-bjælken efter et tryk på den øverste brik. e2e: blokken `f2` (kan køres alene med `F2_ONLY=1`).
 - **Kamp**: Match Center for igangværende eller seneste runde (tom tilstand før
   runde 1). ▶ skifter hertil; efter fløjtet "Næste: … · Forbered ›" → Hjem. Karakterark side om side: opstillingsorden med
   pladsen efter navnet (naturlig kæde i parentes ved afvigelse, indskiftere

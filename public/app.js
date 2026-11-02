@@ -11,10 +11,10 @@ import { buildPayload, uploadMatch } from './state/upload.js';
 import { FIREBASE } from './firebase-config.js';
 import { h, select } from './ui/dom.js';
 import { kr, yellowWarn } from './ui/labels.js';
-import { renderMatrix } from './ui/matrix.js';
-import { renderLineupList } from './ui/lineup-list.js';
+import { renderMatrix, matrixRows } from './ui/matrix.js';
+import { renderLineupList, listRows } from './ui/lineup-list.js';
 import { renderTrainingTable } from './ui/training.js';
-import { renderCard, trainingSummary } from './ui/card.js';
+import { renderCard, renderCardPanel, trainingSummary } from './ui/card.js';
 import { renderClub, shownCash, renderMarket, renderTransferLog, renderPublicClub } from './ui/club.js';
 import { marketInfo, buyPlayer, setListed, acceptOffer, declineOffer, releasePlayer, wageRoom, isStarter, quarantined, nextWindow, quarantineText } from './engine/transfers.js';
 import { renderSeasonReport } from './ui/season-report.js';
@@ -47,14 +47,16 @@ const lastRoundView = (r) => ({ round: r.round, matches: r.matches, gazette: r.g
 function showTab(k) {
   if (k === 'admin' && game.ui.tab !== 'admin') view.prevTab = game.ui.tab;   // ⚙ "Se et andet hold" vender tilbage hertil
   if (k === 'hjem' && view.viewTeamIdx !== myIdx()) setViewTeam(myIdx());       // Hjem er altid dit hold – også Trup bagefter
-  game.ui.tab = k; clearSwap(); view.notice = ''; view.marketMsg = ''; persist(); render(); window.scrollTo(0, 0);
+  game.ui.tab = k; clearSwap(); view.notice = ''; view.marketMsg = ''; view.card = null; persist(); render(); window.scrollTo(0, 0);
 }
 let timer = null;
 
 const storage = window.localStorage;
 let game = null;          // { league, notes, ui } – det der gemmes
 // pitchSwapId = det ene påbegyndte byt, uanset om det startede i regnearket, på banen eller på bænken.
-let view = { viewTeamIdx: 0, sortCol: 'pos', sortDesc: false, filter: 'all', selectedPlayerId: null, pitchSwapId: null, notice: '', savedAt: null };
+// card (v3.29.0) = det åbne spillerkort-panel { pid, teamIdx, tab, origin, n, msg, bought } – adskilt fra selectedPlayerId (brikkens markering
+// og standardvalget); gemmes ikke, så panelet altid starter lukket
+let view = { viewTeamIdx: 0, sortCol: 'pos', sortDesc: false, filter: 'all', selectedPlayerId: null, pitchSwapId: null, notice: '', savedAt: null, card: null };
 
 // Skift af hold/visning afbryder et påbegyndt byt, så et senere klik aldrig bytter uden varsel.
 const clearSwap = () => { view.pitchSwapId = null; view.pickMsg = ''; };
@@ -63,7 +65,7 @@ function seasonAndRound(league, r) {
   const s = (league.seasons ?? []).find((x) => x.programmed !== false && r >= x.fromRound && r <= x.toRound);
   return s ? [s.seasonNumber, r - s.fromRound + 1] : [league.leagueMetadata.seasonNumber ?? 1, r - league.seasonStartRound + 1];
 }
-function setViewTeam(idx) { view.viewTeamIdx = idx; clearSwap(); view.notice = ''; view.marketMsg = ''; view.trainMsg = ''; view.selectedPlayerId = game.league.teams[idx].squad[0].id; }
+function setViewTeam(idx) { view.viewTeamIdx = idx; clearSwap(); view.notice = ''; view.marketMsg = ''; view.trainMsg = ''; view.card = null; view.selectedPlayerId = game.league.teams[idx].squad[0].id; }
 // Et hold vises (v3.28.0): fra Hjem/Kamp/Liga/⚙ i Trup – på Trup, Taktik og Klub bliver man på fanen (Klub viser holdets klubside)
 function showTeam(idx) {
   setViewTeam(idx);
@@ -77,6 +79,46 @@ const app = document.getElementById('app');
 const controls = document.getElementById('controls');
 const tabbar = document.getElementById('tabbar');
 const playbar = document.getElementById('playbar');
+const cardpanel = document.getElementById('cardpanel');
+
+// ---------- Kortpanelet (v3.29.0, UI-ombygningen F2) ----------
+// Spillerkortet står ét sted: #cardpanel uden for siden (fra højre på computer, et ark fra bunden på mobil), kun på Trup og Taktik.
+// ÉN vagt afgør, om det vises: et åbnet kort (view.card) for netop den fane og det hold, der vises, med en spiller, der står i holdet
+// (eller en kvittering for et køb). Faneskift og holdskift lukker (showTab/setViewTeam); alt andet, der flytter fanen, skjuler det her.
+const CARD_TABS = ['trup', 'taktik'];
+let cardSeq = 0;   // hver ny åbning får et nummer: panelets rulning bevares inden for samme åbning og nulstilles ved en ny
+function cardNow() {
+  const c = view.card;
+  if (!c || !game || !CARD_TABS.includes(c.tab) || c.tab !== tabNow() || c.teamIdx !== view.viewTeamIdx) return null;
+  const p = game.league.teams[c.teamIdx]?.squad.find((x) => x.id === c.pid) ?? null;
+  return p || c.bought ? { ...c, p } : null;
+}
+// Åbn – eller skift spiller i et åbent panel (samme åbning: rulningen og det element, fokus går tilbage til, bevares; origin = selector)
+function openCard(pid, origin = null) {
+  const open = cardNow();
+  view.card = { pid, teamIdx: view.viewTeamIdx, tab: tabNow(), origin: origin ?? open?.origin ?? null, n: open ? open.n : ++cardSeq, msg: '', bought: false };
+  render();
+  if (!open) document.getElementById('card-close')?.focus({ preventScroll: true });
+}
+// Luk (✕ og Escape): fokus tilbage til det, der åbnede – fundet igen, for rækken/ⓘ er tegnet om siden
+function closeCard() {
+  const o = view.card?.origin;
+  view.card = null; render();
+  if (o) document.querySelector(o)?.focus({ preventScroll: true });
+}
+// ◀ ▶ bladrer i den viste listes rækkefølge (Trup: regnearkets sortering og filter; Taktik: start-11, bænk, reserver som listen) –
+// står spilleren ikke i den filtrerede liste, bladres i hele truppen
+function cardOrder(team, isOwn, tab, pid) {
+  const ids = (ui) => (tab === 'trup' ? matrixRows({ team, isOwn, ui }).rows.map((r) => r.p.id)
+    : (({ starters, bench, reserves }) => [...starters, ...bench, ...reserves].map((p) => p.id))(listRows({ team, isOwn, ui })));
+  const shown = ids(view);
+  return shown.includes(pid) ? shown : ids({ ...view, filter: 'all', listLine: 'all' });
+}
+// Escape lukker panelet (én handler) – også med fokus i noten; et igangværende byt afbrydes ikke
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape' || e.isComposing || !cardNow()) return;
+  e.preventDefault(); closeCard();
+});
 
 const myIdx = () => game.league.teams.findIndex((t) => !t.isBot);
 const myTeam = () => game.league.teams[myIdx()];
@@ -97,6 +139,7 @@ const NEWS = {
   '3.14.2': 'Rettelse: Ved et VAR-tjek står den tjekkede nu, hvor han stod (forrest), i billedet ved målet – ikke flyttet bag en holdkammerat.',
   '3.14.3': 'Rettelser: Langskud tages fra skudafstand (ikke fra egen banehalvdel) i billedet ved målet, referatet fortæller et oplæg én gang, og efter sæsonens sidste runde viser tabellen slutstillingen og mesteren, til næste sæson går i gang.',
   '3.28.0': '🏠 Andet skridt i den nye brugerflade: en ny Hjem-fane samler sidste runde, din placering, "Før du spiller" (udelukkede, skadede, trætte og 🟨 – med et link til at løse det), næste modstander og tabellen omkring dig. ▶ Spil runde står nu i en bjælke i bunden af Hjem og Taktik (på de andre faner som en lille ▶ øverst med de samme tegn), og modstanderens navn er et separat 🔍-link. Holdvælgeren er flyttet til Liga ("Se et hold"), og ser du et andet hold, siger en lilla bjælke det – med "← Dit hold". ⚙ øverst til højre har gem, eksport, import og versionen. På mobil står fanerne i bunden. Næste skridt: spillerkortet som ét panel.',
+  '3.29.0': '🗂 Tredje skridt i den nye brugerflade: spillerkortet åbnes nu som ét panel – på computer fra højre, på mobil fra bunden – i stedet for at stå nederst på siden. På Trup åbner et klik på en spiller kortet. På Taktik betyder et klik stadig byt; kortet åbnes med ⓘ ved navnet i listen (eller "Se kort ›" i byt-beskeden), og et klik på et andet holds spiller åbner det. ◀ ▶ bladrer i listen, ✕ eller Esc lukker. Næste skridt: Hjem-indholdet og avisen ét sted.',
   '3.27.1': '🎨 Første skridt i den nye brugerflade: roligere farver og fem skriftstørrelser i stedet for tyve – det er stadig de samme sider. Næste skridt: ny ramme med en Hjem-fane og ▶ Spil runde i bunden.',
   '3.27.0': '⛔ Udelukkelse for kort: direkte rødt kort giver 2 kampes udelukkelse, rødt for to gule 1 kamp, og hvert 4. gule kort i sæsonen 1 kamp. Det gælder alle hold, og udelukkelsen afsones over sæsonskiftet. Du ser det før runden (⛔ #nr ved ▶ Spil runde, ⛔ i listerne og på spillerkortet, også 🟨 3 – næste gule giver udelukkelse), og en udelukket starter erstattes automatisk. 🦶 Tacklinger virker nu (Taktik → Fase 2): Aggressiv vinder flere dueller i presset, men begår flere frispark og får flere kort – Forsigtig omvendt.',
   '3.26.1': '🔋 Sommerpausen giver energien tilbage: ved sæsonskiftet er hele truppen 100 % frisk igen (skader løber videre) – og faste startere falder igen over de første runder. Derfor nævner referatet i sæsonens sidste runde ikke længere, hvad udskiftningerne sparede. Og 🏃 "Dit holds løber" er taget ud af avisen – den gav intet at handle på; km, højintenst løb og topfart står stadig i karakterarket.',
@@ -397,6 +440,7 @@ function renderFailed(e) {
   window.tactivarFejl?.(`Fejl: ${e.message}${where ? ` (${where})` : ''}`);
   drawTabs('admin');
   controls.replaceChildren(gearButton('admin')); playbar.replaceChildren(); document.body.classList.remove('has-bar');
+  cardpanel.replaceChildren(); cardpanel.hidden = true; cardpanel.dataset.open = 'nej'; document.body.classList.remove('card-open');   // intet halvt tegnet kort
   app.replaceChildren(h('div', { class: 'notice', id: 'render-error' }, `⚠ Siden kunne ikke tegnes (${e.message}). Dit spil er urørt i browseren – eksportér det som fil herunder, før du prøver andet.`), h('div', { class: 'tabpane tab-admin' }, renderAdmin()));
   document.body.dataset.klar = 'ja';
 }
@@ -409,13 +453,16 @@ function renderNow() {
   const league = game.league;
   const team = league.teams[view.viewTeamIdx];
   const isOwn = !team.isBot;
-  const selected = team.squad.find((p) => p.id === view.selectedPlayerId) || null;
   const mine = myTeam();
+  // Fokus i panelet (v3.29.0, QC): panelets indhold tegnes om, så et fokuseret felt/knap (✕, ◀ ▶, til salg, træning) får fokus igen
+  // ud fra sit id bagefter. Noten tegnes aldrig om, mens man skriver: onNote kalder kun renderControls, aldrig render().
+  const refocus = cardpanel.contains(document.activeElement) ? document.activeElement.id || null : null;
   // Fanen afgøres først: topbaren, bjælken og kortet afhænger af den (træning sættes kun i Trup, v3.19.0)
   // QC v3.28.0: fanen normaliseres HER (ny liga, første besøg og import sætter ingen) – så læser showTeam/showTab aldrig en ukendt værdi
   const tab = (game.ui.tab = tabNow());
   drawTabs(tab);
   renderControls();
+  const cs = cardNow(), sel = cs?.p ?? null;   // kortpanelets spiller (vagten: cardNow)
 
   // Trup (v3.28.0): klubhovedet med kassen er flyttet til Hjem – Trup har en kort linje; en modstanders kasse er skjult
   const header = h('div', { class: 'panel clubhead' },
@@ -423,41 +470,52 @@ function renderNow() {
     isOwn ? null : h('div', { class: 'right' }, h('span', { class: 'muted' }, 'Klubkasse '), h('strong', {}, '🔒 Skjult'), ' ',
       h('button', { class: 'linklike', id: 'public-club-link', title: 'Offentlig klubside: spillere med pris, transfers og pensioner', onclick: () => showTab('klub') }, '💼 Klubside')));
   const matrix = renderMatrix({
-    team, isOwn, ui: { ...view, swapId: view.pitchSwapId }, notes: game.notes,
+    team, isOwn, ui: { ...view, swapId: view.pitchSwapId, selectedPlayerId: sel?.id ?? null }, notes: game.notes,
     onSort: (c) => { if (view.sortCol === c.key) view.sortDesc = !view.sortDesc; else { view.sortCol = c.key; view.sortDesc = !!c.num; } clearSwap(); view.notice = ''; render(); },
     onBlocked: (c) => { view.notice = `🔒 Anti-spionage: du kan ikke sortere ${team.name} på "${c.label}" – det er skjult information.`; render(); },
-    onSelect: (p) => { view.selectedPlayerId = p.id; render(); if (window.innerWidth < 900) document.getElementById('player-card')?.scrollIntoView({ block: 'start' }); },
+    // v3.29.0: et klik på en række åbner kortpanelet (eller skifter spiller i det) – før rullede mobilen ned til kortet under tabellen
+    onSelect: (p) => { view.selectedPlayerId = p.id; openCard(p.id, `#matrix tr[data-pid="${p.id}"]`); },
     onFilter: (f) => { view.filter = f; render(); },
     onSwap: null,   // v3.19.0: opstillingen sker kun på Taktik (Spilfører: ét sted)
   });
 
   // Seneste rundes kampe (kun efter afspilningen): kortets 📺 åbner netop den kamp (hold-indeks og stilling)
   const lr = league.lastRound, latest = lr && !mc?.playing ? lr.matches.map((m) => [league.teams.findIndex((t) => t.id === m.homeId), league.teams.findIndex((t) => t.id === m.awayId), m.homeGoals, m.awayGoals].join('|')) : null;
-  const card = renderCard({ player: selected, team, isOwn, scouting: league.scouting[mine.id]?.[selected?.id], note: selected ? game.notes[selected.id] : '',
-    onNote: (v) => { game.notes[selected.id] = v; persist(); renderControls(); }, teams: league.teams, latest,
-    onFocus: isOwn && tab === 'trup' ? (k) => change(() => act.setFocus(team, selected.id, k)) : null,
+  const card = sel ? renderCard({ player: sel, team, isOwn, scouting: league.scouting[mine.id]?.[sel?.id], note: sel ? game.notes[sel.id] : '',
+    onNote: (v) => { game.notes[sel.id] = v; persist(); renderControls(); }, teams: league.teams, latest,
+    onFocus: isOwn && tab === 'trup' ? (k) => change(() => act.setFocus(team, sel.id, k)) : null,
     trainNote: isOwn && tab !== 'trup',
     // TM: målmanden har ingen par (motoren læser ham ikke) – intet samspil på hans kort, ingen "ca. 8 kampe" ved køb
-    chem: isOwn && selected && selected.position !== 'GK' ? chemCard(team, selected) : null,
-    market: !selected || mc?.playing ? null : isOwn ? { own: true, listed: (team.listed ?? []).includes(selected.id), onList: (on) => change(() => setListed(league, team, selected.id, on)), saleChem: saleChemText(team, chemRefOf(league), selected.id), block: quarantined(selected, nextWindow(league)) ? quarantineText(selected) : null }
-      : { ...marketInfo(league, mine, team, selected), settle: selected.position === 'GK' ? null : gamesToSettle(chemRefOf(league)), starter: isStarter(team, selected), wage: Math.round(publicWage(selected) / 3), room: Math.round(wageRoom(league, mine) / 3), cashAfter: mine.cashBalance - marketInfo(league, mine, team, selected).price, onBuy: () => { const err = buyPlayer(league, mine, selected.id); view.notice = err ? `💰 ${err}` : `💰 ${selected.shortName} er købt og står nu i din trup.`; change(() => {}); } },
+    chem: isOwn && sel && sel.position !== 'GK' ? chemCard(team, sel) : null,
+    market: !sel || mc?.playing ? null : isOwn ? { own: true, listed: (team.listed ?? []).includes(sel.id), onList: (on) => change(() => setListed(league, team, sel.id, on)), saleChem: saleChemText(team, chemRefOf(league), sel.id), block: quarantined(sel, nextWindow(league)) ? quarantineText(sel) : null }
+      : { ...marketInfo(league, mine, team, sel), settle: sel.position === 'GK' ? null : gamesToSettle(chemRefOf(league)), starter: isStarter(team, sel), wage: Math.round(publicWage(sel) / 3), room: Math.round(wageRoom(league, mine) / 3), cashAfter: mine.cashBalance - marketInfo(league, mine, team, sel).price, onBuy: () => {
+        // QC v3.29.0: kvitteringen står også i panelet – efter et køb står spilleren ikke længere i holdet, og panelet viser kvitteringen, til det lukkes
+        const err = buyPlayer(league, mine, sel.id), m = err ? `💰 ${err}` : `💰 ${sel.shortName} er købt og står nu i din trup.`;
+        view.notice = m; if (view.card) Object.assign(view.card, { msg: m, bought: !err, boughtName: sel.shortName }); change(() => {}); } },
     hideLog: mc?.playing && league.lastRound ? seasonAndRound(league, league.lastRound.round) : null,
     // Under afspilningen af sæsonens sidste runde er det stadig den afsluttede sæson, der vises
-    season: mc?.playing && league.lastRound ? seasonAndRound(league, league.lastRound.round)[0] : league.leagueMetadata.seasonNumber ?? 1, starter: !!selected && team.tactics.lineupSlots.includes(selected.id),
-    retiring: !!selected && seasonRoundOf(league, league.leagueMetadata.round) >= RETIRE_WARN_ROUND && willRetire(selected, league.leagueMetadata.seasonNumber ?? 1),
-    onOpenMatch: (hi, ai) => { const i = lr.matches.findIndex((m) => m.homeId === league.teams[hi]?.id && m.awayId === league.teams[ai]?.id); if (i >= 0) openReport(i); } });
+    season: mc?.playing && league.lastRound ? seasonAndRound(league, league.lastRound.round)[0] : league.leagueMetadata.seasonNumber ?? 1, starter: !!sel && team.tactics.lineupSlots.includes(sel.id),
+    retiring: !!sel && seasonRoundOf(league, league.leagueMetadata.round) >= RETIRE_WARN_ROUND && willRetire(sel, league.leagueMetadata.seasonNumber ?? 1),
+    // v3.29.0: "ændr i Trup" åbner Trup med kortet på samme spiller
+    onTrainLink: isOwn && tab !== 'trup' ? () => { const id = sel.id; showTab('trup'); view.selectedPlayerId = id; openCard(id, `#matrix tr[data-pid="${id}"]`); } : null,
+    onOpenMatch: (hi, ai) => { const i = lr.matches.findIndex((m) => m.homeId === league.teams[hi]?.id && m.awayId === league.teams[ai]?.id); if (i >= 0) openReport(i); } }) : null;
 
   const pitch = h('div', { class: 'panel' }, h('h3', { id: 'pitch-title' }, `${team.name} – ${team.tactics.baseFormation}`), isOwn ? null : h('div', { class: 'muted', id: 'pitch-opp' }, 'Modstanderhold – kun offentlige data'),
-    renderPitch({ team, isOwn, ui: view, pairs: isOwn ? lineupPairs(team, chemRefOf(league)) : null,
-      onSelect: (p, own) => { if (own) { view.listLine = p.line; pickForSwap(team, p); } else { view.selectedPlayerId = p.id; view.listLine = p.line; render(); } },
+    // Ringen (QC/Spilfører UI v3.29.0): byt i gang, ellers panelets spiller, ellers den gamle markering (fixIssue) – aldrig to lilla på to spillere
+    renderPitch({ team, isOwn, ui: { ...view, selectedPlayerId: view.pitchSwapId ?? sel?.id ?? view.selectedPlayerId }, pairs: isOwn ? lineupPairs(team, chemRefOf(league)) : null,
+      // Egen brik: byt som før – panelet åbnes og skifter IKKE (brugerens valg 2026-11-02); et andet hold: klik åbner kortet
+      onSelect: (p, own) => { if (own) { view.listLine = p.line; pickForSwap(team, p); } else { view.selectedPlayerId = p.id; view.listLine = p.line; openCard(p.id, `.lp-info[data-pid="${p.id}"]`); } },
       onTokenSwap: (a, b) => { clearSwap(); view.notice = ''; withChem(team, () => change(() => act.swapPlayers(team, a, b))); },
       onMove: (slot, pos) => { clearSwap(); change(() => act.moveSlot(team, slot, pos)); } }),
-    isOwn ? h('div', { class: 'muted help' }, 'Træk = justér position (målmanden står fast) · Klik på en brik = vælg (listen viser hans kæde) · Klik på en anden = byt') : null,
+    isOwn ? h('div', { class: 'muted help' }, 'Træk = justér position (målmanden står fast) · Klik på en brik = vælg (listen viser hans kæde) · Klik på en anden = byt · ⓘ i listen = spillerkortet') : null,
     isOwn ? chemLegend(lineupPairs(team, chemRefOf(league))) : null);
 
   // Spillerlisten ved banen (v3.19.0): opstilling, bænk og reserver ét sted
-  const lineupList = renderLineupList({ team, isOwn, ui: { ...view, swapId: view.pitchSwapId }, msg: isOwn ? view.pickMsg ?? '' : '',
-    onPick: (p) => (isOwn ? pickForSwap(team, p) : (view.selectedPlayerId = p.id, render())),
+  const lineupList = renderLineupList({ team, isOwn, ui: { ...view, swapId: view.pitchSwapId, cardId: sel?.id ?? null }, msg: isOwn ? view.pickMsg ?? '' : '',
+    // v3.29.0: ⓘ og "Se kort ›" åbner kortpanelet; et klik på din egen række er stadig byt (og rører ikke panelet)
+    onInfo: (p) => openCard(p.id, `.lp-info[data-pid="${p.id}"]`),
+    onPickCard: isOwn ? (id) => openCard(id, `.lp-info[data-pid="${id}"]`) : null,
+    onPick: (p) => (isOwn ? pickForSwap(team, p) : (view.selectedPlayerId = p.id, openCard(p.id, `.lp-info[data-pid="${p.id}"]`))),
     onSort: (c) => { if (view.listSort === c.key) view.listSortAsc = !view.listSortAsc; else { view.listSort = c.key; view.listSortAsc = false; } render(); },
     onBlocked: (c) => { view.notice = `🔒 Anti-spionage: du kan ikke sortere ${team.name} på "${c.label}" – det er skjult information.`; render(); },
     onLine: (v) => { view.listLine = v; render(); },
@@ -493,15 +551,16 @@ function renderNow() {
     trup: () => [header,
       // Sæsonslut under afspilning (som bogført-før-afspilning): runden er bogført, og sæsonskiftet er sket
       mc?.playing && seasonJustEnded(league) ? h('div', { class: 'notice', id: 'turnover-booked' }, '🗓 Sæsonen sluttede med denne runde: alle er blevet et år ældre, og sæsonrapporten med ungdomstilbuddene står på Liga, når kampene er spillet.') : null,
-      isOwn && !mc?.playing ? trainingSummary(league.trainingReport?.[team.id], team, league.trainingReport?.[team.id] ? seasonAndRound(league, league.trainingReport[team.id].round)[1] : null, () => showTab('taktik')) : null, matrix,
-      // v3.20.1 (QC): kortet | træningsoversigten 2:3 – træningstabellen skal bruge ≈ 760 px (1366 px: 625 → vandret rulning)
-      h('div', { class: 'tactics-layout trup-layout' }, h('section', {}, card),
+      isOwn && !mc?.playing ? trainingSummary(league.trainingReport?.[team.id], team, league.trainingReport?.[team.id] ? seasonAndRound(league, league.trainingReport[team.id].round)[1] : null, () => showTab('taktik')) : null,
+      h('div', { class: 'muted help trup-help', id: 'trup-help' }, 'Klik på en spiller for at åbne spillerkortet'), matrix,
+      // v3.29.0: kortet står i panelet – træningsoversigten har hele bredden (før kort | træning 2:3)
+      h('div', { class: 'trup-layout' },
         h('section', {}, isOwn ? renderTrainingTable({ team, report: !mc?.playing ? league.trainingReport?.[team.id] : null, line: view.trainLine ?? 'all', onLine: (v) => { view.trainLine = v; view.trainMsg = ''; render(); }, msg: view.trainMsg ?? '',
           onFocus: (id, k) => change(() => act.setFocus(team, id, k)),
           onFocusMany: (ids, k) => { const n = act.setFocusMany(team, ids, k); view.trainMsg = `🏋️ ${n} spiller${n === 1 ? '' : 'e'} træner nu ${FOCUS[k].label}${n < ids.length ? ` (${ids.length - n} kan ikke – Målmand er kun for målmænd)` : ''}.`; change(() => {}); } }) : null))],
-    // Taktik (v3.19.0): banen og spillerlisten side om side – opstillingen ét sted; kortet under listen; faser og Hvis-Så nedenunder
-    // v3.20.1 (brugeren: "langt ned til taktikindstillingerne"): indstillingerne under banen, listen og kortet ved siden af
-    taktik: () => [h('div', { class: 'tactics-layout taktik-layout' }, h('section', { class: 'tk-pitch' }, pitch), h('section', { class: 'tk-list' }, lineupList), h('section', { class: 'tk-tactics' }, tactics), h('section', { class: 'tk-card' }, card))],
+    // Taktik (v3.19.0): banen og spillerlisten side om side – opstillingen ét sted; faser og Hvis-Så nedenunder
+    // v3.20.1 (brugeren: "langt ned til taktikindstillingerne"): indstillingerne under banen; v3.29.0: kortet står i panelet
+    taktik: () => [h('div', { class: 'tactics-layout taktik-layout' }, h('section', { class: 'tk-pitch' }, pitch), h('section', { class: 'tk-list' }, lineupList), h('section', { class: 'tk-tactics' }, tactics))],
     // Efter fløjtet (v3.28.0, Spilfører UI: nederst blev den ikke fundet): vejen videre øverst – kun når den viste runde er den seneste og ikke afspilles
     kamp: () => [shown && !shown.playing && shown.round === league.lastRound?.round ? toHomeLine() : null,
       shown ? renderMatchCenter({ mc: sendState(shown), myTeamId: mine.id, on: mcHandlers, column: !shown.playing && shown.round === league.lastRound?.round ? columnNow() : null }) : h('div', { class: 'panel empty', id: 'no-matches' }, 'Ingen kampe spillet endnu. Tryk ▶ Spil runde på 🏠 Hjem (eller ▶ øverst) – modstanderen følger kampprogrammet på Liga-fanen.'),
@@ -549,7 +608,33 @@ function renderNow() {
     h('div', { class: `tabpane tab-${tab}` }, ...content.filter(Boolean)),
   ].filter(Boolean));
   document.documentElement.style.setProperty('--top-h', `${document.querySelector('.topbar').offsetHeight}px`);   // scout-bjælken står under den faste topbar
+  // Kortpanelet (v3.29.0): under topbaren OG scout-bjælken (med dens afstand), over Spil-bjælken
+  const sb = document.getElementById('scout-banner');
+  document.documentElement.style.setProperty('--scout-h', `${sb ? sb.offsetHeight + 16 : 0}px`);
+  document.documentElement.style.setProperty('--bar-h', `${playbar.offsetHeight}px`);
+  drawCardPanel(cs, card, team, isOwn, tab, refocus);
   document.body.dataset.klar = 'ja';
+}
+// Panelets indhold – #cardpanel er rulle-elementet og står fast i index.html; kun indholdet skiftes. Rulningen bevares inden for samme
+// åbning (også ved ◀ ▶, så evner kan sammenlignes) og nulstilles ved en ny.
+function drawCardPanel(cs, card, team, isOwn, tab, refocus) {
+  const st = cardpanel.scrollTop, sameOpen = !!cs && cardpanel.dataset.n === String(cs.n);
+  if (!cs) {
+    cardpanel.replaceChildren(); cardpanel.hidden = true; cardpanel.dataset.open = 'nej'; cardpanel.dataset.n = '';
+    document.body.classList.remove('card-open');
+    return;
+  }
+  const p = cs.p, ids = p ? cardOrder(team, isOwn, tab, p.id) : [], i = ids.indexOf(p?.id);
+  const goto = (j) => (j >= 0 && j < ids.length ? () => openCard(ids[j]) : null);
+  const toSquad = cs.bought ? h('button', { class: 'linklike', id: 'panel-to-squad', onclick: () => { const id = cs.pid; showTeam(myIdx()); if (tabNow() !== 'trup') showTab('trup'); view.selectedPlayerId = id; openCard(id, `#matrix tr[data-pid="${id}"]`); } }, `Se ${cs.boughtName ?? 'ham'} i din trup ›`) : null;
+  cardpanel.replaceChildren(...renderCardPanel({ card: card ?? h('div', { class: 'panel cp-receipt' }, toSquad),
+    title: p ? `#${p.shirtNumber} ${p.name}` : '💰 Købt', onClose: closeCard, nav: !!p, onPrev: p ? goto(i - 1) : null, onNext: p ? goto(i + 1) : null,
+    pickMsg: tab === 'taktik' && isOwn ? view.pickMsg ?? '' : '', msg: cs.msg ?? '' }).filter(Boolean));
+  cardpanel.hidden = false; cardpanel.dataset.open = 'ja'; cardpanel.dataset.n = String(cs.n);
+  cardpanel.setAttribute('aria-labelledby', card ? 'card-title' : 'cp-title');
+  document.body.classList.add('card-open');
+  cardpanel.scrollTop = sameOpen ? st : 0;
+  if (refocus) { document.getElementById(refocus)?.focus({ preventScroll: true }); if (!cardpanel.contains(document.activeElement)) document.getElementById('card-close')?.focus({ preventScroll: true }); }
 }
 
 // ---------- 🏠 Hjem (v3.28.0) ----------
