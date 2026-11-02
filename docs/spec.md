@@ -1042,9 +1042,10 @@ den lille ▶ (kun på Trup/Kamp/Liga/Klub/⚙: "▶ Runde N" + advarslernes teg
 slået fra og uden tegn under afspilning) · ⚙ (`#tab-admin`, ikonknap – `admin` er stadig en gyldig `ui.tab`). Intet rundetal i
 topbaren og ingen holdvælger. Fanerne 🏠 Hjem · 👥 Trup · 📋 Taktik · 📺 Kamp · 🏆 Liga · 💼 Klub står under topbaren (én nav-DOM).
 Den valgte fane gemmes i `ui.tab`; en ukendt værdi → Hjem (gamle gem: 'trup' → Trup, 'admin' → ⚙). Ny liga og import åbner Hjem;
-efter ▶ lander man på Kamp, hvor "Næste: runde N mod X (ude) · Forbered ›" (`#to-home`) står nederst, når den viste runde er den
-seneste og ikke afspilles. Advarslerne før runden har ÉN kilde (app.js `preMatchIssues`: ⛔ udelukket, 🚑 skadet, ⚠ træt under
-grænsen, 🟨 én gult fra udelukkelse – kun startere), som bjælken, den lille ▶ og Hjem bruger.
+efter ▶ lander man på Kamp, hvor "Næste: runde N mod X (ude) · Forbered ›" (`#to-home`) står ØVERST, når den viste runde er den
+seneste og ikke afspilles. Fanen normaliseres ved hver tegning (`game.ui.tab = tabNow()`), så kode der læser `ui.tab` aldrig ser en
+ukendt værdi (ny liga, første besøg og import sætter ingen). Advarslerne før runden har ÉN kilde (app.js `preMatchIssues`: ⛔ udelukket, 🚑 skadet, ⚠ træt under
+grænsen, 🟨 én gult fra udelukkelse – kun startere; en udelukket/skadet starter er ikke også træt), som bjælken, den lille ▶ og Hjem bruger.
 - **Spil-bjælken** (Hjem og Taktik, fast i bunden, altid én linje): piller (kun Taktik; over 3 → én tæller-pille "⛔ 4 ting" farvet
   efter det værste, klik → Hjem; et tryk på en pille viser dit hold og markerer spilleren), 🔍 X (`#next-opponent`, et separat link
   – før lå navnet i knappen) og "▶ Spil runde N af 14 · X (ude)" (`#play-round`; samme id som den lille ▶, kun én i DOM).
@@ -1055,10 +1056,12 @@ grænsen, 🟨 én gult fra udelukkelse – kun startere), som bjælken, den lil
 - **Hjem**: klubhovedet (`#club-name`, kassen via `shownCash` med ændringen siden sidste runde, `#club-link` → Klub); sidste runde
   (resultat, dine målscorere, placering med ↑/↓ regnet uden sidste runde – fra sæsonens 2. runde – link til kampen); "Før du spiller
   runde N" (advarslerne med "Taktik ›", 🧒 ungdomstilbud `#youth-pending`, træningen i én linje → Trup; tom: "✔ Holdet er klar");
-  næste kamp (modstanderens placering og 3 seneste fra sæsonen, 🔍-link); tabellen 5 rækker omkring dig → Liga. Under afspilning:
+  næste kamp (modstanderens placering – først fra sæsonens 2. runde og ikke efter sæsonslut – og 3 seneste fra sæsonen, 🔍-link); tabellen 5 rækker omkring dig → Liga. Under afspilning:
   "📺 Runden spilles i Kamp-fanen" i stedet for resultat, placering, kasse-ændring, "Før du spiller", minitabel og modstanderform.
 - **Mobil (≤ 600 px)**: topbaren ruller væk; navigationen står fast i bunden (6 knapper 65 × 56 px, ikon over tekst,
-  `env(safe-area-inset-bottom)`), Spil-bjælken lige over den; siden får bundluft, så sidste element står over bjælken.
+  `env(safe-area-inset-bottom)`), Spil-bjælken lige over den; siden får bundluft, så sidste element står over bjælken. I bjælken står modstanderen
+  i knappen ("▶ Spil runde N · X (ude)", 🔍-linket skjules), og ved 3 advarsler én tæller ("⛔ 3 ting") i stedet for tre piller; den
+  lille ▶ viser "▶ R5".
 Målt (`node tools/measure-ui.mjs`, efter én runde, før → efter): 1366 px Trup 1921 → 1939, Taktik 2087 → 2156, Liga 2560 → 2644,
 Hjem (ny) 900; 390 px Trup 2941 → 2928, Taktik 4598 → 4661, Liga 4169 → 4208, Hjem (ny) 938 (Kamp varierer med runden). Mobil
 Taktik (e2e, 390 × 844, 3 advarsler): fast chrome 137 px (sticky topbar) → 118 px (bjælke 61 + navigation 57), indholdshøjde

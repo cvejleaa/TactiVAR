@@ -210,7 +210,7 @@ const tiredLimit = () => myTeam().subsLimit || 70;
 function tiredStarters() {
   const t = myTeam();
   // Målmanden skiftes ikke for træthed – han tælles kun uden grænse (QC v3.13).
-  return t.squad.filter((p) => t.tactics.lineupSlots.slice(t.subsLimit ? 1 : 0).includes(p.id) && p.freshness < tiredLimit());
+  return t.squad.filter((p) => t.tactics.lineupSlots.slice(t.subsLimit ? 1 : 0).includes(p.id) && !unavailable(p) && p.freshness < tiredLimit());
 }
 
 // Dine startere, der ikke kan spille (v3.27.0): skadet eller udelukket – samme vagt som kampen (career.js unavailable)
@@ -234,7 +234,7 @@ function preMatchIssues() {
 function issueGroups(issues = preMatchIssues()) {
   const lim = myTeam().subsLimit, tired = issues.filter((i) => i.kind === 'tired');
   const n = tired.length, st = n === 1 ? 'starter' : 'startere';
-  const tiredText = lim ? `${n} ${st} under din grænse (${lim} %) – skiftes ud tidligt` : `${n} ${n === 1 ? 'træt starter' : 'trætte startere'} – yder mindre (50 % ≈ 12,5 % svagere)`;
+  const tiredText = lim ? `${n} ${st} under din grænse (${lim} %) – skiftes ud tidligt (fra 3. minut, højst 3 ad gangen, hvis en frisk afløser i samme kæde sidder på bænken – det bruger et skift)` : `${n} ${n === 1 ? 'træt starter' : 'trætte startere'} – yder mindre (50 % ≈ 12,5 % svagere)`;
   return ISSUE_ORDER.flatMap((k) => (k === 'tired'
     ? (tired.length ? [{ kind: k, ids: tired.map((i) => i.id), nrs: tired.map((i) => i.nr), pill: `⚠ ${tired.length}`, text: `${tiredText}: ${tired.map((i) => i.text).join(', ')}` }] : [])
     : issues.filter((i) => i.kind === k).map((i) => ({ kind: k, ids: [i.id], nrs: [i.nr], pill: `${ISSUE_ICON[k]} #${i.nr}`, text: i.text }))));
@@ -314,7 +314,7 @@ function renderControls() {
     // Gem-kvitteringen står altid synlig (spec §9 – svaret på "nulstiller ved refresh"); et klik åbner ⚙ Admin (gem, eksport, import)
     h('button', { class: 'savestatus' + (view.saveError ? ' failed' : ''), id: 'save-status', title: 'Gem, eksportér, importér og ny liga står i ⚙ Admin', onclick: () => showTab('admin') }, view.saveError ? '⚠ IKKE gemt' : view.savedAt ? ['✔ ', h('span', { class: 'save-txt' }, 'Gemt kl. '), time(view.savedAt)] : 'Ikke gemt'),
     BAR_TABS.includes(tab) ? null : h('button', { id: 'play-round', class: 'primary mini-play', disabled: playing, onclick: playNextRound, title: [playTitle(next), ...groups.map((g) => g.text)].join('\n') },
-      '▶ ', h('span', { class: 'mini-lbl' }, 'Runde '), String(next.k), counts.length ? h('span', { id: 'mini-warn' }, ' ' + counts.map(([k, n]) => `${ISSUE_ICON[k]}${n}`).join(' ')) : null),
+      '▶ ', h('span', { class: 'mini-lbl' }, 'Runde '), h('span', { class: 'mini-num' }, String(next.k)), counts.length ? h('span', { id: 'mini-warn' }, ' ' + counts.map(([k, n]) => `${ISSUE_ICON[k]}${n}`).join(' ')) : null),
     gearButton(tab)].filter(Boolean));
 }
 const gearButton = (tab) => h('button', { id: 'tab-admin', class: 'gear' + (tab === 'admin' ? ' active' : ''), title: 'Admin: gem, eksportér, importér, ny liga – og se et andet hold', 'aria-label': 'Admin', onclick: () => showTab('admin') }, '⚙');
@@ -330,8 +330,10 @@ function renderPlayBar(tab) {
   const chips = groups.length > 3
     ? [h('button', { class: `pill pill-${worst}`, id: 'issue-count', title: groups.map((g) => g.text).join('\n'), onclick: () => showTab('hjem') }, `${ISSUE_ICON[worst]} ${groups.length} ting`)]
     : [out.length ? h('span', { id: 'out-warning', class: 'pills', title: `${out.map((g) => g.text).join(', ')} – af den bedste i samme kæde på bænken. Stil selv om her på Taktik` }, out.map(pill)) : null, ...groups.filter((g) => !out.includes(g)).map(pill)];
+  // Smal skærm (Spilfører UI): ved præcis 3 piller vises i stedet én tæller (CSS), så knappen kan bære modstanderens navn
+  const mobileCount = groups.length === 3 ? h('button', { class: `pill pill-${worst} count-narrow`, title: groups.map((g) => g.text).join('\n'), onclick: () => showTab('hjem') }, `${ISSUE_ICON[worst]} 3 ting`) : null;
   return h('div', { class: 'playbar-in', id: 'play-bar' },
-    groups.length ? h('span', { class: 'pills', id: 'bar-issues' }, chips) : null,
+    groups.length ? h('span', { class: 'pills' + (mobileCount ? ' wide-only' : ''), id: 'bar-issues' }, chips) : null, mobileCount,
     h('button', { id: 'next-opponent', class: 'linklike opp-link', title: `Se ${next.opp.name} – kun offentlige data`, onclick: () => showTeam(L.teams.indexOf(next.opp)) }, `🔍 ${next.opp.name}`),
     h('button', { id: 'play-round', class: 'primary', disabled: playing, onclick: playNextRound, title: playTitle(next) },
       `▶ Spil runde ${next.k}`, h('span', { class: 'play-of' }, ` af ${L.schedule.length}`), h('span', { class: 'play-opp' }, ` · ${next.opp.name} (${next.home ? 'hjemme' : 'ude'})`)));
@@ -410,7 +412,8 @@ function renderNow() {
   const selected = team.squad.find((p) => p.id === view.selectedPlayerId) || null;
   const mine = myTeam();
   // Fanen afgøres først: topbaren, bjælken og kortet afhænger af den (træning sættes kun i Trup, v3.19.0)
-  const tab = tabNow();
+  // QC v3.28.0: fanen normaliseres HER (ny liga, første besøg og import sætter ingen) – så læser showTeam/showTab aldrig en ukendt værdi
+  const tab = (game.ui.tab = tabNow());
   drawTabs(tab);
   renderControls();
 
@@ -499,9 +502,10 @@ function renderNow() {
     // Taktik (v3.19.0): banen og spillerlisten side om side – opstillingen ét sted; kortet under listen; faser og Hvis-Så nedenunder
     // v3.20.1 (brugeren: "langt ned til taktikindstillingerne"): indstillingerne under banen, listen og kortet ved siden af
     taktik: () => [h('div', { class: 'tactics-layout taktik-layout' }, h('section', { class: 'tk-pitch' }, pitch), h('section', { class: 'tk-list' }, lineupList), h('section', { class: 'tk-tactics' }, tactics), h('section', { class: 'tk-card' }, card))],
-    kamp: () => [shown ? renderMatchCenter({ mc: sendState(shown), myTeamId: mine.id, on: mcHandlers, column: !shown.playing && shown.round === league.lastRound?.round ? columnNow() : null }) : h('div', { class: 'panel empty', id: 'no-matches' }, 'Ingen kampe spillet endnu. Tryk ▶ Spil runde på 🏠 Hjem (eller ▶ øverst) – modstanderen følger kampprogrammet på Liga-fanen.'),
-      // Efter fløjtet (v3.28.0): vejen videre til næste runde – kun når den viste runde er den seneste og ikke afspilles
-      shown && !shown.playing && shown.round === league.lastRound?.round ? toHomeLine() : null],
+    // Efter fløjtet (v3.28.0, Spilfører UI: nederst blev den ikke fundet): vejen videre øverst – kun når den viste runde er den seneste og ikke afspilles
+    kamp: () => [shown && !shown.playing && shown.round === league.lastRound?.round ? toHomeLine() : null,
+      shown ? renderMatchCenter({ mc: sendState(shown), myTeamId: mine.id, on: mcHandlers, column: !shown.playing && shown.round === league.lastRound?.round ? columnNow() : null }) : h('div', { class: 'panel empty', id: 'no-matches' }, 'Ingen kampe spillet endnu. Tryk ▶ Spil runde på 🏠 Hjem (eller ▶ øverst) – modstanderen følger kampprogrammet på Liga-fanen.'),
+      ],
     liga: () => [mc?.playing ? h('div', { class: 'notice', id: 'booked-league' }, '📺 Runden spilles i Kamp-fanen – tabellen herunder er allerede opdateret med den.') : null,
       !mc?.playing ? renderSeasonReport({ league, mine,
         onTake: (id) => { const err = act.takeYouth(mine, id, game.league); view.notice = err ? `🧒 ${err}` : '🧒 Ungdomsspilleren er rykket op i truppen.'; change(() => {}); },

@@ -18,12 +18,12 @@ export function renderHome({ club, last, place, ended, roundsPlayed, next, issue
   const nextCard = h('div', { class: 'panel home-next', id: 'home-next' },
     h('div', { class: 'lbl' }, `Næste kamp · runde ${next.k} af ${next.of}`),
     h('div', { class: 'home-big' }, next.name, h('span', { class: 'muted' }, ` · ${next.home ? 'hjemme' : 'ude'}`)),
-    playing ? null : h('div', { class: 'muted', id: 'home-opp-form' }, `Nr. ${next.place} · seneste 3: ${next.form.length ? next.form.join(' ') : 'ingen kampe i sæsonen endnu'}`),
+    playing ? null : h('div', { class: 'muted', id: 'home-opp-form' }, `${roundsPlayed > 0 && !ended ? `Nr. ${next.place} · ` : ''}seneste 3: ${next.form.length ? next.form.join(' ') : 'ingen kampe i sæsonen endnu'}`),
     h('button', { class: 'linklike', id: 'home-opp-link', onclick: on.opp }, `🔍 Se ${next.name} – kun offentlige data ›`));
 
   if (playing) {
     return h('div', { class: 'home', id: 'home' }, head,
-      h('div', { class: 'notice', id: 'home-playing' }, '📺 Runden spilles i Kamp-fanen – resultatet, tabellen og kassen står her, når kampene er spillet. ',
+      h('div', { class: 'notice', id: 'home-playing' }, '📺 Runden spilles i Kamp-fanen – resultatet, tabellen og kassens ændring står her, når kampene er spillet. ',
         h('button', { class: 'linklike', onclick: on.kamp }, 'Se kampen ›')),
       nextCard);
   }

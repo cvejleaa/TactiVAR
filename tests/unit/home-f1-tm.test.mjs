@@ -153,6 +153,9 @@ test('Hjem: næste kamp – hjemme/ude, modstanderens form (eller "ingen kampe i
   assert.ok(text(n({ home: false }), 'home-next').includes('Esbjerg FC · ude'));
   assert.equal(text(n({ form: [], place: 3 }), 'home-opp-form'), 'Nr. 3 · seneste 3: ingen kampe i sæsonen endnu');
   assert.equal(text(n({ form: ['T'] }), 'home-opp-form'), 'Nr. 9 · seneste 3: T');
+  // QC/Spilfører UI: modstanderens placering først fra sæsonens 2. runde og ikke efter sæsonslut (dér var den sidste sæsons)
+  assert.equal(text(render({ roundsPlayed: 0, next: { ...base().next, form: [] } }), 'home-opp-form'), 'seneste 3: ingen kampe i sæsonen endnu');
+  assert.equal(text(render({ ended: true, next: { ...base().next, form: [] } }), 'home-opp-form'), 'seneste 3: ingen kampe i sæsonen endnu');
   calls.length = 0; byId(render(), 'home-opp-link').on.click(); assert.deepEqual(calls, ['opp']);
 });
 

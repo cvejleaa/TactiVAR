@@ -59,6 +59,10 @@ try {
       const tt = async (k) => { await tp.click(`#tab-${k}`); await tp.waitForSelector(`.tabpane.tab-${k}`); };
       const reloadT = async () => { await tp.reload(); await tp.waitForSelector('body[data-klar="ja"]'); };
       const mod = (f, arg) => tp.evaluate(([src, a]) => { const d = JSON.parse(localStorage.getItem('tactivar_save')); const r = (0, eval)('(' + src + ')')(d, a); localStorage.setItem('tactivar_save', JSON.stringify(d)); return r; }, [f.toString(), arg ?? null]);
+      // QC B1: frisk liga UDEN et fane-klik (ui.tab er ikke sat) – 🔍 på Hjem skal åbne modstanderen i Trup, og Hjem viser bagefter dit hold
+      await tp.click('#home-opp-link'); await tp.waitForSelector('.tabpane.tab-trup');
+      check('Frisk liga, ingen fane valgt: 🔍 på Hjem åbner modstanderen i Trup med scout-bjælken', (await tp.locator('#scout-banner').count()) === 1);
+      await tp.click('#scout-back'); await tp.waitForSelector('.tabpane.tab-trup');
       // (0) ny liga, før første runde: ingen "Sidste runde", sæsonens start og næste kamp med programmets længde (14 runder)
       await tt('hjem');
       const nx0 = await tp.evaluate(() => { const L = JSON.parse(localStorage.getItem('tactivar_save')).league, me = L.teams.find((t) => !t.isBot).id, pr = L.schedule[0].find(([a, b]) => a === me || b === me); return { opp: L.teams.find((t) => t.id === (pr[0] === me ? pr[1] : pr[0])).name, home: pr[0] === me, n: L.schedule.length }; });
@@ -72,7 +76,8 @@ try {
         && (await tp.textContent('#home-next')).startsWith('Næste kamp · runde 1 af 14') && (await tp.locator('#cash-delta').count()) === 0, await tp.textContent('#home-first'));   // ingen regnskabslinje endnu → ingen "±0 kr. siden sidste runde"
       // (1) advarslernes kilder: udelukket MED 3 gule = kun ⛔; 7 gule = 🟨; bænk med 3 gule = intet; grænse 80: 78,6 → "79 % frisk"; to trætte = ét ⚠ 2
       const S = await mod((d) => { const me = d.league.teams.find((t) => !t.isBot), sl = me.tactics.lineupSlots, P = (i) => me.squad.find((x) => x.id === sl[i]);
-        me.subsLimit = 80; Object.assign(P(9), { banMatches: 2, banWhy: 'DIRECT', banYellows: 3 }); P(6).banYellows = 7; P(4).freshness = 78.6; P(5).freshness = 60;
+        me.subsLimit = 80; Object.assign(P(9), { banMatches: 2, banWhy: 'DIRECT', banYellows: 3, freshness: 40 });   // QC: udelukket OG træt = kun ⛔, ikke også ⚠
+        P(6).banYellows = 7; P(4).freshness = 78.6; P(5).freshness = 60;
         const bench = me.squad.find((x) => !sl.includes(x.id)); bench.banYellows = 3; bench.freshness = 10;
         const tiredIds = me.squad.filter((x) => [sl[4], sl[5]].includes(x.id)).map((x) => x.id);   // rækkefølge som truppen (tiredStarters)
         return { ban: P(9).shirtNumber, yel: P(6).shirtNumber, t1: P(4).shirtNumber, t2: P(5).shirtNumber, bench: bench.shirtNumber, first: me.squad.find((x) => x.id === tiredIds[0]).shirtNumber }; });
@@ -80,7 +85,7 @@ try {
       const pills = await tp.locator('#bar-issues .pill').allTextContents(), tiredNrs = (await tp.getAttribute('#tired-warning', 'data-nrs')).split(',').map(Number).sort((a, b) => a - b), tiredTitle = await tp.getAttribute('#tired-warning', 'title');
       check('Advarslernes kilder, Taktik: ⛔ (udelukket med 3 gule: ikke også 🟨), ⚠ 2 (de to trætte) og 🟨 (7 gule) – bænken med 3 gule/træt giver intet',
         JSON.stringify(pills) === JSON.stringify([`⛔ #${S.ban}`, '⚠ 2', `🟨 #${S.yel}`]) && JSON.stringify(tiredNrs) === JSON.stringify([S.t1, S.t2].sort((a, b) => a - b)), pills.join(' | ') + ' | ' + tiredNrs);
-      check('Den trætte gruppes forklaring: grænsen 80 %, "79 % frisk" (rundet, ikke 78) og "60 % frisk" – og ingen bænkspiller', tiredTitle.startsWith('2 startere under din grænse (80 %) – skiftes ud tidligt: ') && tiredTitle.includes(' er 79 % frisk') && tiredTitle.includes(' er 60 % frisk') && !tiredTitle.includes(`#${S.bench} `), tiredTitle);
+      check('Den trætte gruppes forklaring: grænsen 80 %, "79 % frisk" (rundet, ikke 78) og "60 % frisk" – og ingen bænkspiller', tiredTitle.startsWith('2 startere under din grænse (80 %) – skiftes ud tidligt (fra 3. minut, højst 3 ad gangen, hvis en frisk afløser i samme kæde sidder på bænken – det bruger et skift): ') && tiredTitle.includes(' er 79 % frisk') && tiredTitle.includes(' er 60 % frisk') && !tiredTitle.includes(`#${S.bench} `), tiredTitle);
       await tp.click('#tired-warning');
       const selNr = await tp.evaluate(() => [...document.querySelectorAll('#pitch .token.selected')].map((t) => t.querySelector('.token-num')?.textContent));
       check('Et tryk på ⚠-pillen markerer den FØRSTE trætte (i truppens rækkefølge) på banen', JSON.stringify(selNr) === JSON.stringify([String(S.first)]), JSON.stringify(selNr) + ' forventet ' + S.first);
@@ -210,14 +215,14 @@ try {
       await mp.goto(BASE + '/'); await mp.waitForSelector('body[data-klar="ja"]');
       await mp.click('#tab-taktik'); await mp.waitForSelector('.tabpane.tab-taktik');
       const m1 = await mp.evaluate(() => { const rc = (q) => document.querySelector(q).getBoundingClientRect(), bar = rc('#playbar'), nav = rc('#tabbar'), btn = rc('#play-bar #play-round'), disp = (q) => getComputedStyle(document.querySelector(q)).display, pb = document.getElementById('playbar');
-        return { gap: Math.round((nav.top - bar.bottom) * 10) / 10, btnH: Math.round(btn.height), of: disp('.play-of'), opp: disp('.play-opp'), barOver: pb.scrollWidth - pb.clientWidth, barH: Math.round(bar.height),
+        return { gap: Math.round((nav.top - bar.bottom) * 10) / 10, btnH: Math.round(btn.height), of: disp('.play-of'), opp: disp('.play-opp'), oppLink: disp('#play-bar #next-opponent'), btnCut: btn.width < document.querySelector('#play-bar #play-round').scrollWidth - 1, btnTxt: document.querySelector('#play-bar #play-round').textContent, barOver: pb.scrollWidth - pb.clientWidth, barH: Math.round(bar.height),
           labels: [...document.querySelectorAll('#tabs .tab')].map((b) => { const t = b.querySelector('.tab-txt').getBoundingClientRect(), i = b.querySelector('.tab-ico').getBoundingClientRect(); return [b.querySelector('.tab-txt').textContent.trim(), Math.round(t.width), t.top >= i.bottom - 1]; }) }; });
-      check('390 px, Taktik: Spil-bjælken står FLADT over navigationen (ikke bag den), ▶-knappen er mindst 44 px, modstanderen/"af 14" er skjult (står i 🔍), og bjælken løber ikke over',
-        Math.abs(m1.gap) <= 1 && m1.btnH >= 44 && m1.of === 'none' && m1.opp === 'none' && m1.barOver <= 0 && m1.barH <= 64, JSON.stringify(m1));
+      check('390 px, Taktik: Spil-bjælken står FLADT over navigationen (ikke bag den), ▶-knappen er mindst 44 px, "af 14" er skjult, modstanderen står i KNAPPEN (Spilfører UI: 🔍 skjules – før blev navnet skåret ned til to bogstaver) uden at blive skåret, og bjælken løber ikke over',
+        Math.abs(m1.gap) <= 1 && m1.btnH >= 44 && m1.of === 'none' && m1.opp !== 'none' && m1.oppLink === 'none' && !m1.btnCut && m1.barOver <= 0 && m1.barH <= 64, JSON.stringify(m1));
       check('390 px: hver navigationsknap har sin tekst UNDER ikonet (Hjem, Trup, Taktik, Kamp, Liga, Klub)', JSON.stringify(m1.labels.map((x) => x[0])) === JSON.stringify(['Hjem', 'Trup', 'Taktik', 'Kamp', 'Liga', 'Klub']) && m1.labels.every(([, w, under]) => w > 12 && under), JSON.stringify(m1.labels));
       await mp.click('#tab-liga'); await mp.waitForSelector('.tabpane.tab-liga');
-      const m2 = await mp.evaluate(() => ({ lbl: getComputedStyle(document.querySelector('#play-round .mini-lbl')).display, txt: document.querySelector('#play-round').textContent, top: document.querySelector('.topbar').getBoundingClientRect().height, over: document.documentElement.scrollWidth - innerWidth }));
-      check('390 px, Liga: den lille ▶ viser "Runde" skjult (kun ▶ og tallet ses), og topbaren er én linje', m2.lbl === 'none' && m2.txt.trim() === '▶ Runde 1' && m2.top <= 56 && m2.over <= 0, JSON.stringify(m2));
+      const m2 = await mp.evaluate(() => ({ lbl: getComputedStyle(document.querySelector('#play-round .mini-lbl')).display, r: getComputedStyle(document.querySelector('#play-round .mini-num'), '::before').content, txt: document.querySelector('#play-round').textContent, top: document.querySelector('.topbar').getBoundingClientRect().height, over: document.documentElement.scrollWidth - innerWidth }));
+      check('390 px, Liga: den lille ▶ viser "▶ R1" ("Runde" skjult, R foran tallet – Spilfører UI: "▶ 3" lignede "spil 3"), og topbaren er én linje', m2.lbl === 'none' && m2.r === '"R"' && m2.txt.trim() === '▶ Runde 1' && m2.top <= 56 && m2.over <= 0, JSON.stringify(m2));
       await mctx.close();
     }
     {
@@ -1499,9 +1504,9 @@ try {
   const tiredNo = await g.evaluate(() => { const t = JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((x) => !x.isBot); const p = t.squad.find((x) => x.id === t.tactics.lineupSlots[6]); return `#${p.shirtNumber} ${p.shortName}`; });
   const noTired = async () => (await g.isVisible('#playbar #play-bar #play-round')) && (await g.locator('#tired-warning').count()) === 0;
   await setStarterFresh(69);
-  check('Advarsel: én markspiller under din grænse (70 %) – pillen "⚠ 1", forklaringen siger hvem', (await g.textContent('#tired-warning')) === '⚠ 1' && (await g.getAttribute('#tired-warning', 'title')) === `1 starter under din grænse (70 %) – skiftes ud tidligt: ${tiredNo} er 69 % frisk`, await g.getAttribute('#tired-warning', 'title'));
+  check('Advarsel: én markspiller under din grænse (70 %) – pillen "⚠ 1", forklaringen siger hvem', (await g.textContent('#tired-warning')) === '⚠ 1' && (await g.getAttribute('#tired-warning', 'title')) === `1 starter under din grænse (70 %) – skiftes ud tidligt (fra 3. minut, højst 3 ad gangen, hvis en frisk afløser i samme kæde sidder på bænken – det bruger et skift): ${tiredNo} er 69 % frisk`, await g.getAttribute('#tired-warning', 'title'));
   await tab('hjem');
-  check('Hjem: samme linje under "Før du spiller"', (await g.textContent('#home-todo .todo-row[data-kind="tired"] .todo-txt')) === `1 starter under din grænse (70 %) – skiftes ud tidligt: ${tiredNo} er 69 % frisk`);
+  check('Hjem: samme linje under "Før du spiller"', (await g.textContent('#home-todo .todo-row[data-kind="tired"] .todo-txt')) === `1 starter under din grænse (70 %) – skiftes ud tidligt (fra 3. minut, højst 3 ad gangen, hvis en frisk afløser i samme kæde sidder på bænken – det bruger et skift): ${tiredNo} er 69 % frisk`);
   await setStarterFresh(70);
   check('Ingen advarsel ved 70 % (bjælken står der)', await noTired());
   await setStarterFresh(78, 80);
@@ -1965,7 +1970,11 @@ try {
       const content = bar.top - Math.max(0, top.bottom, sc ? sc.bottom : 0);
       return { content: Math.round(content), chrome: Math.round(innerHeight - content), bar: Math.round(bar.height), topGone: top.bottom <= 0, pills: document.querySelectorAll('#bar-issues .pill').length }; }); };
     const c1 = await chrome();
-    check('390×844, Taktik med 3 advarsler: 3 piller på én linje, fast chrome ≤ 130 px (før 137), topbaren rullet væk', c1.pills === 3 && c1.chrome <= 130 && c1.bar <= 64 && c1.topGone, JSON.stringify(c1));
+    const nb = await mp.evaluate(() => { const v = (q) => { const e = document.querySelector(q); return !!e && e.getBoundingClientRect().width > 0; }, b = document.querySelector('#play-bar #play-round');
+      return { count: v('#play-bar .count-narrow') ? document.querySelector('#play-bar .count-narrow').textContent : null, pillsShown: v('#bar-issues'), cut: b.getBoundingClientRect().width < b.scrollWidth - 1, txt: b.textContent }; });
+    const oppM = await mp.evaluate(() => { const L = JSON.parse(localStorage.getItem('tactivar_save')).league, me = L.teams.find((t) => !t.isBot).id, pr = L.schedule[0].find(([a, b]) => a === me || b === me); return L.teams.find((t) => t.id === (pr[0] === me ? pr[1] : pr[0])).name; });
+    check('390×844, Taktik med 3 advarsler (Spilfører UI): én tæller "⛔ 3 ting" i stedet for tre piller, og knappen viser modstanderen helt', nb.count === '⛔ 3 ting' && !nb.pillsShown && !nb.cut && nb.txt.includes(oppM), JSON.stringify(nb) + ' | ' + oppM);
+    check('390×844, Taktik med 3 advarsler: fast chrome ≤ 130 px (før 137), bjælken én linje, topbaren rullet væk', c1.chrome <= 130 && c1.bar <= 64 && c1.topGone, JSON.stringify(c1));
     check('390×844: indholdshøjden på Taktik mellem bjælkerne ≥ 650 px (før 707)', c1.content >= 650, JSON.stringify(c1));
     await seeTeam(1, mp);
     const c2 = await chrome();
