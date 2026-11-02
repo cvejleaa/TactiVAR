@@ -146,19 +146,22 @@ test('skift lige efter hinanden i samme tick står på samme minut; "tages med i
   assert.ok(pairs >= 20 && nearOther >= 1,   // 45'-grenen: tvunget i fatigue-gaps ("samling i 45'")
     `data: ${pairs} skift i samme tick, ${near45} samlet i pausen, ${nearOther} ellers`);
 });
-test('friskheden: "… til næste runde" – i sæsonens sidste runde "… til første runde i næste sæson" (friskheden følger med)', () => {
-  let mid = 0, last = 0;
+// v3.26.1 (QC): sæsonskiftet giver alle 100 % – i sidste runde er der intet sparet, så linjen udelades (før "… til første runde i næste sæson")
+test('friskheden: "… til næste runde" – i sæsonens sidste runde ingen 🔋-linje (sæsonskiftet giver alle 100 %)', () => {
+  let mid = 0, last = 0, subs14 = 0;
   for (const seed of [3, 5, 7, 11]) {
     const rng = createRng(seed * 7919), L = createLeague(rng);
     for (let r = 1; r <= 14; r++) {
       const res = playRound(L, rng);
+      if (r === 14) subs14 += res.matches.flatMap((m) => m.events).filter((x) => x.type === 'SUB').length;   // data: der VAR skift i sidste runde
       for (const e of res.matches.flatMap((m) => m.events).filter((x) => x.label === 'Udskiftninger' && x.text.startsWith('🔋'))) {
-        if (r === 14) { assert.match(e.text, /friskhed til første runde i næste sæson\.$/); last++; } else { assert.match(e.text, /friskhed til næste runde\.$/); mid++; }
+        if (r === 14) last++; else { assert.match(e.text, /friskhed til næste runde\.$/); mid++; }
       }
       commitRound(L, res, rng);
     }
   }
-  assert.ok(mid >= 10 && last >= 1, `data: ${mid} midt i sæsonen, ${last} i sidste runde`);
+  assert.ok(mid >= 10 && subs14 >= 4, `data: ${mid} midt i sæsonen, ${subs14} skift i sidste runde`);
+  assert.equal(last, 0, 'ingen 🔋-linje i sæsonens sidste runde (v3.26.0 gav ≥ 1 her)');
 });
 test('pres (M2): trapWon = referatets offside-fælder for holdet; pressWon tæller dem stadig med; klummen og analysen siger det', () => {
   let traps = 0, offs = 0;

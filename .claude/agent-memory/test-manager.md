@@ -152,3 +152,8 @@
 - Position-straffen (FIT 0,94/0,85) er for lille til at flytte en ff-test; brug freshness 0 (freshFactor 0,75).
 - Observation: løbs-cutbacks (match.js ~1597) tælles i `cutbacks` men ikke i wideL/R/Stop/back, og READ gælder ikke dem -> "kantangreb" er lavere end cutbacks+indlæg.
 - v3.26.0 (2. runde): "flere backs"-testen læste kildeteksten og genimplementerede logikken (selvbekræftende). Adfærdstest er mulig: SUB-regel (action 'SUB', subOut/subIn, minuteTrigger 7) på FORSVARET + stub-rng gennem simulateMatch. NEWS i app.js er kun testbar via e2e (gem fra gammel version -> #notice) – unit-mutanter på NEWS overlever altid. tools/measure-side.mjs eksponerer ikke `weak` på kommandolinjen (−10/−14 kun via programkald).
+
+## v3.26.1 (sæsonskifte: friskhed 100; løberboks fjernet)
+- Forfatteren kørte ikke hele `npm test`: en eksisterende test (schedule.test.mjs:102 "friskhed … bevares" – `some(p.freshness < 100)` efter runde 14) blev rød af ændringen. Kør ALTID de filer, der rører samme felt (grep på feltnavnet i tests/unit), før mutation – en ny regel bryder ofte en gammel antagelse.
+- Nulstilling i seasonTurnover: 12 mutanter (kun eget/botter/99/+20/startere/før træning/skadede/skade nulstillet/ikke sæson 1→2) dræbt af ÉN test; "nulstil midt i sæsonen" (runde 7) dræbes kun af balance/friskheds-tests, ikke af turnover-filen.
+- Fjernet UI: når en boks fjernes, tjek at den fjernede test også dækkede "anden seer" – forfatteren beholdt kun ejeren (B3 "kun for andre" overlevede) -> column-v3261-tm.test.mjs.

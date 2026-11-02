@@ -53,7 +53,7 @@ export function fixedPairs(league, opponentIdx) {
 const forPack = ({ cashBalance, finance, listed, youthOffers, ownerUid, ...t }) => structuredClone(t);
 export function playPairs(league, pairs, rng, { replay = false } = {}) {
   const round = (league.leagueMetadata.round || 0) + 1;
-  // lastOfSeason: friskheden følger med over sæsonskiftet – referatet siger "til første runde i næste sæson" (v3.16.7)
+  // lastOfSeason: i sæsonens sidste runde nævner referatet ingen sparet friskhed – sæsonskiftet giver alle 100 % (v3.26.1; før v3.16.7–v3.26.0 "til første runde i næste sæson")
   const lastOfSeason = seasonRoundOf(league, round) === SEASON_ROUNDS;
   // Kamptruppen (v3.18.0): botterne – og dit hold med "Udtag automatisk" – udtager bænken før runden (intet rng)
   for (const t of league.teams) if (t.isBot || t.matchBenchAuto !== false) autoMatchBench(t);
@@ -262,6 +262,7 @@ export function seasonTurnover(league) {
     p.age += 1; p.seasonAgeCounter = (p.seasonAgeCounter ?? 1) + 1;
     if (declineSkills(p, season, trainedSkills(p, team.isBot)).length) afterSkillChange(p);
     refreshValue(p); p.weeklyWage = publicWage(p);   // lønnen genforhandles ved hvert sæsonslut (QC B6, Spilfører)
+    p.freshness = 100;   // v3.26.1, brugeren: "Truppen skal genvinde energien mellem 2 sæsoner" – sommerpausen giver fuld friskhed (skader løber videre)
   }
   league.retired = [...(league.retired ?? []), ...report.retired.map(({ id, name, teamId, age, games }) => ({ id, name, teamId, age, games, season }))].slice(-RETIRED_CAP);
   // Ungdom
@@ -293,7 +294,7 @@ export function seasonTurnover(league) {
 }
 
 // Sæsonslut (v3.11): tabellen og sæsonopgørelsen arkiveres, og tabel og sæsonstatistik starter
-// forfra. Spillerne, friskheden og ligaens forløb (history) bevares. programmed = false for
+// forfra. Spillerne og ligaens forløb (history) bevares; friskheden sættes til 100 % i seasonTurnover (v3.26.1). programmed = false for
 // sæsonen før kampprogrammet (migreringen fra skema 5).
 export function endSeason(league, toRound, programmed) {
   const md = league.leagueMetadata;
