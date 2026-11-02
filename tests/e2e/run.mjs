@@ -55,6 +55,15 @@ try {
   check('Ny liga: dit hold vises med 18 spillere', (await rows()) === 18);
   check('Ny liga: ingen "Nyt i kampene"-besked (den er til dem, der opdaterer et gammelt gem)', (await g.locator('#notice').count()) === 0);
   check('Holdvælgeren har 8 hold', (await g.locator('#team-select option').count()) === 8);
+  // UI-ombygningen F0 (v3.27.1): højst 6 skriftstørrelser pr. fane (12/14/16/20/28 + 10 på brikkerne) – før 7–15 pr. fane
+  // (node tools/measure-ui.mjs). Kun synlig tekst tæller.
+  for (const k of ['trup', 'taktik', 'liga', 'klub']) {
+    await tab(k);
+    const sizes = await g.evaluate(() => [...new Set([...document.querySelectorAll('body *')].filter((e) => e.offsetParent !== null
+      && [...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())).map((e) => getComputedStyle(e).fontSize))]);
+    check(`F0: ${k} bruger højst 6 skriftstørrelser fra skalaen`, sizes.length <= 6 && sizes.every((x) => ['10px', '12px', '14px', '16px', '20px', '28px'].includes(x)), sizes.join(' '));
+  }
+  await tab('trup');
   const heads = (await g.locator('#matrix thead th').allTextContents()).map((t) => t.replace(/ [▲▼]$/, ''));
   check('Regnearkets kolonner i rækkefølge (Alder står hvor den skal)', JSON.stringify(heads.slice(0, 21)) === JSON.stringify(['Pos/#', 'Spiller', 'Kæde', 'Natur', 'Alder', 'Frisk/🚑', 'Højde', 'Spring', '✈ Luft', 'PAC', 'STA', 'STR', 'BAL', 'PAS', 'FIN', 'POS', 'INT', 'GK', 'Gns', '⭐ Vurd', '🧠 Mod']), heads.join('|'));
   const ownMoney = await g.evaluate(() => { const hs = [...document.querySelectorAll('#matrix thead th')].map((t) => t.textContent.replace(/ [▲▼]$/, '')); const i = hs.indexOf('💰 Værdi'); return { last: hs.slice(i, i + 2), cells: [...document.querySelectorAll('#matrix tbody tr')].map((tr) => [tr.children[i].textContent, tr.children[i + 1].textContent]) }; });
