@@ -918,8 +918,15 @@ try {
   { await tab('trup'); const tops = {};
     for (const w of [1400, 1024, 768, 601]) { await g.setViewportSize({ width: w, height: 1000 }); await g.waitForTimeout(50);
       tops[w] = await g.evaluate(() => ({ h: Math.round(document.querySelector('.topbar').getBoundingClientRect().height), rows: new Set([...document.querySelectorAll('#tabs .tab')].map((t) => Math.round(t.getBoundingClientRect().top))).size })); }
+    // CI's Chrome har bredere skrift end den lokale Chromium (CI: 601 px gav 2 rækker, lokalt 1) – efterlign det med letter-spacing, så testen
+    // ikke afhænger af browserens skrift: fanerne skal krympe (… i teksten), ikke gå på to linjer og ikke give vandret rulning
+    await g.setViewportSize({ width: 601, height: 1000 }); await g.waitForTimeout(50);
+    const wide = await g.evaluate(() => { const st = document.createElement('style'); st.id = 'wide-font'; st.textContent = '.topbar .tab { letter-spacing: .12em; }'; document.head.append(st);
+      const r = { h: Math.round(document.querySelector('.topbar').getBoundingClientRect().height), rows: new Set([...document.querySelectorAll('#tabs .tab')].map((t) => Math.round(t.getBoundingClientRect().top))).size, sw: document.documentElement.scrollWidth };
+      st.remove(); return r; });
     await g.setViewportSize({ width: 1400, height: 1000 }); await tab('hjem');
-    check('v3.30.0: topbaren står på samme højde med alle syv faner på én række ved 1400, 1024, 768 og 601 px', Object.values(tops).every((t) => t.rows === 1 && t.h === tops[1400].h && t.h <= 100), JSON.stringify(tops)); }
+    check('v3.30.0: topbaren står på samme højde med alle syv faner på én række ved 1400, 1024, 768 og 601 px', Object.values(tops).every((t) => t.rows === 1 && t.h === tops[1400].h && t.h <= 100), JSON.stringify(tops));
+    check('v3.30.0 (CI): også med bredere skrift ved 601 px står fanerne på én række uden vandret rulning (før: 2 rækker, 129 px)', wide.rows === 1 && wide.h === tops[1400].h && wide.sw <= 601, JSON.stringify(wide)); }
   check('F1: topbaren har ingen holdvælger og intet ▶ på Hjem – knappen står i Spil-bjælken', (await g.locator('.topbar #team-select').count()) === 0 && (await g.locator('.topbar #play-round').count()) === 0 && (await g.isVisible('#playbar #play-bar #play-round')));
   // Spil-bjælken på Hjem og Taktik, den lille ▶ i topbaren på de andre – på hver fane præcis ét #play-round (positiv tilstedeværelse pr. fane)
   { const where = {};
@@ -2710,7 +2717,7 @@ try {
         inView: !!r && r.left >= 0 && r.right <= innerWidth, help: document.getElementById('trup-gain-help')?.textContent ?? null, over: document.documentElement.scrollWidth - innerWidth }; });
     check('390×844, Trup: "+3" efter navnet (mærke i .pill-ok-farver, synligt i viewporten) med title "+2 Afslutning, +1 Fart efter runde 1" – og hjælpelinjen står',
       mg.names === 1 && mg.cells === 2 && mg.gain === '3' && mg.title === '+2 Afslutning, +1 Fart efter runde 1' && mg.disp === 'inline-block' && mg.content === '"+3"' && mg.bg === 'rgb(11, 51, 38)' && mg.color === 'rgb(110, 231, 183)' && mg.inView && mg.over <= 0
-        && !!mg.help && mg.help.includes('+1 = steg efter runde 1'), JSON.stringify(mg));
+        && !!mg.help && mg.help.includes('+N = antal +1 efter runde 1'), JSON.stringify(mg));
     await mctx.close();
   }
   await f1tm();

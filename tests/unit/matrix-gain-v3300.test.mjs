@@ -126,7 +126,7 @@ test('trainingNext: ved lige mange runder vinder det laveste trøjenummer – ua
     const txt = trainingNext(me, null, 1), nums = [a, b].map((p) => trainingEstimate(p, false).next);
     assert.equal(nums[0], nums[1], 'data: tvillingerne har lige mange runder til næste +1');
     assert.ok(Number.isFinite(nums[0]) && nums[0] <= 14, 'data: et endeligt tal (ikke "mere end en sæson")');
-    assert.ok(txt.startsWith(`Nærmest: #${want} `), `a=#${sa}, b=#${sb}: ${txt}`);
+    assert.ok(txt.startsWith(`Nærmest et +1: #${want} `), `a=#${sa}, b=#${sb}: ${txt}`);
   }
 });
 
@@ -150,7 +150,7 @@ test('trainingNext: "nærmest" nævner den evne, der er nærmest – ikke fokuse
   const a = me.squad.find((p) => p.line !== 'GK' && !me.tactics.lineupSlots.includes(p.id));
   a.trainingFocus = 'TECH'; a.skills.ballControl = 10; a.skills.passing = 10; a.dev = { ballControl: 0, passing: 0.999 };
   const txt = trainingNext(me, null, 4);
-  assert.ok(txt.startsWith(`Nærmest: #${a.shirtNumber} ${a.shortName} Pasning om ~`) && !txt.includes('Boldkontrol'), txt);
+  assert.ok(txt.startsWith(`Nærmest et +1: #${a.shirtNumber} ${a.shortName} Pasning om ~`) && !txt.includes('Boldkontrol'), txt);
   a.dev = { ballControl: 0.999, passing: 0 };
   assert.ok(trainingNext(me, null, 4).includes(' Boldkontrol om ~'), trainingNext(me, null, 4));
 });
