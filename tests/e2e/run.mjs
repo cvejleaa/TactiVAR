@@ -503,8 +503,10 @@ try {
       const other = Object.values(LBL).find((l) => l !== LBL[lastP.line]);
       const v3 = await viaLink(other);
       check('v3.30.0: står han IKKE i det valgte filter, nulstilles det til "Alle" så hans række findes', v3.row && v3.active === 'Alle' && v3.rows === 18 && v3.sel === 1, JSON.stringify(v3));
-      await tp.click('#training .toolbar button:text-is("MID")');
-      check('v3.30.0: et nyt filter-valg fjerner markeringen af rækken fra linket', (await tp.locator('#training-table tr.selected').count()) === 0);
+      // TM: vælg HANS EGEN kæde – så hans række stadig er i listen; ellers skjules den af filteret, og "ingen markering" er sand uanset koden (mutation: view.trainPid = null i onLine fjernet var grøn)
+      const viaOwn = await viaLink('Alle'); await tp.click(`#training .toolbar button:text-is("${LBL[lastP.line]}")`);
+      const after = await tp.evaluate((pid) => ({ row: document.querySelectorAll(`#training-table tr[data-pid="${pid}"]`).length, sel: document.querySelectorAll('#training-table tr.selected').length }), lastP.id);
+      check('v3.30.0: et nyt filter-valg fjerner markeringen af rækken fra linket – også når hans række stadig står i listen', viaOwn.sel === 1 && after.row === 1 && after.sel === 0, JSON.stringify({ viaOwn, after }));
       await tp.click('#training .toolbar button:text-is("Alle")');
       const cur = await tp.evaluate(() => getComputedStyle(document.querySelector('#training-table tbody tr')).cursor);
       await tt('trup'); const curM = await tp.evaluate(() => getComputedStyle(document.querySelector('#matrix tbody tr')).cursor); await tt('traening');
