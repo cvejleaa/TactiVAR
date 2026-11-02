@@ -1037,10 +1037,36 @@ betydninger, som F1–F6 indfører: lilla (--aktiv) = hvor du er, grøn (--ok) =
 advarsler, blå (--info) = links. Endnu IKKE håndhævet: stjerner, stærkt samspil og kampens spiller er gule, mit hold er grønt. Fem skriftstørrelser 12/14/16/20/28 px (+ 10 px kun til navne og tal på brikkerne i banegrafikken; advarslen under en brik er 12 px); felter på smal skærm 16 px (iOS zoomer ellers); brødtekst 14.
 Målt med `node tools/measure-ui.mjs` (1366/390 px, efter én runde): distinkte skriftstørrelser i hele appen 20 → 6, pr. fane
 7–15 → 3–6; sidehøjder (ca. – ligaen er tilfældig) 1366 px Trup 1831 → 1974, Taktik 2068 → 2087, Kamp 3212 → 3261, Liga 2521 → 2619; 390 px Taktik
-4563 → 4602, Liga 3868 → 4182 (lidt luft – højderne tages ned i F4–F6). e2e vagter: højst 6 størrelser, alle fra skalaen. Den faste (sticky) topbar (v3.19.0, brugerens valg): klubvælger, "▶ Spil runde N af 14 mod X (hjemme/ude)"
-(under 480 px kun "Spil runde N af 14" – modstanderen står på 🔍), "🔍 X", gem-kvitteringen (åbner Admin) og
-fanerne som anden række (under 480 px kun ikoner). Den valgte fane gemmes i `ui.tab` (ukendt værdi → Trup):
-- **Trup** (v3.19.0): klubhoved, regnearket (med 💰 Værdi og Løn/rd sidst; ingen byt-knapper), derunder
+4563 → 4602, Liga 3868 → 4182 (lidt luft – højderne tages ned i F4–F6). e2e vagter: højst 6 størrelser, alle fra skalaen. **Rammen (v3.28.0, UI-ombygningen F1):** topbaren er én linje: VAR · dit klubnavn · gem-kvitteringen (åbner ⚙) ·
+den lille ▶ (kun på Trup/Kamp/Liga/Klub/⚙: "▶ Runde N" + advarslernes tegn kompakt, fx "⛔1 🚑1 ⚠2 🟨1", forklaringen i title;
+slået fra og uden tegn under afspilning) · ⚙ (`#tab-admin`, ikonknap – `admin` er stadig en gyldig `ui.tab`). Intet rundetal i
+topbaren og ingen holdvælger. Fanerne 🏠 Hjem · 👥 Trup · 📋 Taktik · 📺 Kamp · 🏆 Liga · 💼 Klub står under topbaren (én nav-DOM).
+Den valgte fane gemmes i `ui.tab`; en ukendt værdi → Hjem (gamle gem: 'trup' → Trup, 'admin' → ⚙). Ny liga og import åbner Hjem;
+efter ▶ lander man på Kamp, hvor "Næste: runde N mod X (ude) · Forbered ›" (`#to-home`) står ØVERST, når den viste runde er den
+seneste og ikke afspilles. Fanen normaliseres ved hver tegning (`game.ui.tab = tabNow()`), så kode der læser `ui.tab` aldrig ser en
+ukendt værdi (ny liga, første besøg og import sætter ingen). Advarslerne før runden har ÉN kilde (app.js `preMatchIssues`: ⛔ udelukket, 🚑 skadet, ⚠ træt under
+grænsen, 🟨 én gult fra udelukkelse – kun startere; en udelukket/skadet starter er ikke også træt), som bjælken, den lille ▶ og Hjem bruger.
+- **Spil-bjælken** (Hjem og Taktik, fast i bunden, altid én linje): piller (kun Taktik; over 3 → én tæller-pille "⛔ 4 ting" farvet
+  efter det værste, klik → Hjem; et tryk på en pille viser dit hold og markerer spilleren), 🔍 X (`#next-opponent`, et separat link
+  – før lå navnet i knappen) og "▶ Spil runde N af 14 · X (ude)" (`#play-round`; samme id som den lille ▶, kun én i DOM).
+- **Scout-bjælken** (`#scout-banner`, lilla, sticky): på Trup, Taktik og Klub, når et andet hold vises – "👁 Du ser X – kun
+  offentlige data", holdvælgeren `#team-select` (skifter hold på fanen) og "← Dit hold". Hovedvejene til et andet hold: Liga-tabellen
+  og "Se et hold" over den, næste modstander på Hjem og i bjælken; ⚙ "Se et andet hold" er reserven (tilbage til fanen, man kom
+  fra, hvis den er Trup/Taktik/Klub – ellers Trup). Fra Hjem/Kamp/Liga/⚙ vises et valgt hold i Trup; Hjem viser altid dit hold.
+- **Hjem**: klubhovedet (`#club-name`, kassen via `shownCash` med ændringen siden sidste runde, `#club-link` → Klub); sidste runde
+  (resultat, dine målscorere, placering med ↑/↓ regnet uden sidste runde – fra sæsonens 2. runde – link til kampen); "Før du spiller
+  runde N" (advarslerne med "Taktik ›", 🧒 ungdomstilbud `#youth-pending`, træningen i én linje → Trup; tom: "✔ Holdet er klar");
+  næste kamp (modstanderens placering – først fra sæsonens 2. runde og ikke efter sæsonslut – og 3 seneste fra sæsonen, 🔍-link); tabellen 5 rækker omkring dig → Liga. Under afspilning:
+  "📺 Runden spilles i Kamp-fanen" i stedet for resultat, placering, kasse-ændring, "Før du spiller", minitabel og modstanderform.
+- **Mobil (≤ 600 px)**: topbaren ruller væk; navigationen står fast i bunden (6 knapper 65 × 56 px, ikon over tekst,
+  `env(safe-area-inset-bottom)`), Spil-bjælken lige over den; siden får bundluft, så sidste element står over bjælken. I bjælken står modstanderen
+  i knappen ("▶ Spil runde N · X (ude)", 🔍-linket skjules), og ved 3 advarsler én tæller ("⛔ 3 ting") i stedet for tre piller; den
+  lille ▶ viser "▶ R5".
+Målt (`node tools/measure-ui.mjs`, efter én runde, før → efter): 1366 px Trup 1921 → 1939, Taktik 2087 → 2156, Liga 2560 → 2644,
+Hjem (ny) 900; 390 px Trup 2941 → 2928, Taktik 4598 → 4661, Liga 4169 → 4208, Hjem (ny) 938 (Kamp varierer med runden). Mobil
+Taktik (e2e, 390 × 844, 3 advarsler): fast chrome 137 px (sticky topbar) → 118 px (bjælke 61 + navigation 57), indholdshøjde
+mellem bjælkerne 707 → 726 px (682 med scout-bjælken). e2e vagter: chrome ≤ 130, indhold ≥ 650, nav ≥ 44 px.
+- **Trup** (v3.19.0; v3.28.0 klubhovedet til Hjem – her en kort linje "X – dit hold", en modstander med 🔒 kasse og 💼 Klubside): regnearket (med 💰 Værdi og Løn/rd sidst; ingen byt-knapper), derunder
   spillerkort | 🏋️ træningsoversigt (fokus pr. spiller, pris, fremdrift, næste +1, skøn, +1 sidste runde,
   massehandling for de viste). Træning sættes kun her.
 - **Taktik** (v3.19.0 – opstillingen ét sted): bane | spillerliste (Start-11, Bænk med "Udtag automatisk",
@@ -1050,18 +1076,18 @@ fanerne som anden række (under 480 px kun ikoner). Den valgte fane gemmes i `ui
   siden ruller, og dens position bevares, når den tegnes om. Ét
   byt-valg (actions.js `swapKind`/`pickForSwap`) på banen og i listen; beskeden står ved listen.
 - **Kamp**: Match Center for igangværende eller seneste runde (tom tilstand før
-  runde 1). ▶ skifter hertil. Karakterark side om side: opstillingsorden med
+  runde 1). ▶ skifter hertil; efter fløjtet "Næste: … · Forbered ›" → Hjem. Karakterark side om side: opstillingsorden med
   pladsen efter navnet (naturlig kæde i parentes ved afvigelse, indskiftere
   "ind på X"), minibane "Startopstilling" med karakter/stjerner, ikoner med
   mouse-over + forklaring under (touch).
 - **Liga**: tabel ("sæson N, efter X af 14 runder"), sidste rundes resultater (klik =
   referatet i Kamp), kampprogrammet (næste runde i den rækkefølge, ▶ spiller den; "Dit
   program" med 14 linjer H/U, modstander og din score først; hele programmet og tidligere
-  sæsoner sammenfoldet) og avis; klik på et hold åbner det i Trup. Under afspilning
+  sæsoner sammenfoldet) og avis; "Se et hold" (`#team-select`) over tabellen, og klik på et hold åbner det i Trup. Under afspilning
   skjules resultater, program, statistik og avis, og det siges, at tabellen allerede er opdateret.
 - **Klub**: dit hold = økonomi og transfermarked; et valgt modstanderhold = "Offentlig klubside" tegnet kun fra
   `viewTeam` (spillere med pris og Køb, transfers, pensioner; kasse/løn/regnskab findes ikke) med "← Til din klub".
-- **⚙ Admin** (v3.19.0): gem nu, eksportér, importér og ny liga.
+- **⚙ Admin** (v3.19.0; v3.28.0 ikonknap i topbaren): versionen (`#version`), gem nu, eksportér, importér, ny liga og "Se et andet hold".
 Modstanderes stjerner: udfyldte i guld, tomme dæmpet.
 
 ## 11. Udeladt / udskudt

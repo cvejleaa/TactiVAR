@@ -108,9 +108,9 @@ try {
   await tab('klub'); extra.push('## Klub', '', (await page.textContent('.tabpane')).trim(), ''); await shot('15-saesonslut-klub.png');
   await tab('trup'); await page.click('#matrix tbody tr:nth-child(9)');
   extra.push('## Eget spillerkort', '', (await page.textContent('#player-card')).trim(), ''); await page.locator('#player-card').screenshot({ path: path.join(OUT, '15-kort-eget.png') });
-  await page.selectOption('#team-select', '2'); await page.click('#matrix tbody tr:nth-child(14)');
+  await tab('liga'); await page.selectOption('#team-select', '2'); await page.click('#matrix tbody tr:nth-child(14)');   // v3.28.0: holdvælgeren står på Liga
   extra.push('## En anden klubs spillerkort', '', (await page.textContent('#player-card')).trim(), ''); await page.locator('#player-card').screenshot({ path: path.join(OUT, '15-kort-bot.png') });
-  await page.selectOption('#team-select', '0');
+  await page.click('#scout-back');
   await page.click('#play-round'); await page.waitForSelector('#skip'); await page.click('#skip');
   await tab('trup'); extra.push('## Trup efter sæson 2, runde 1', '', (await page.textContent('.tabpane')).trim().slice(0, 1500), ''); await shot('16-saeson2-trup.png');
   await tab('klub'); extra.push('## Klub efter sæson 2, runde 1', '', (await page.textContent('.tabpane')).trim(), ''); await shot('16-saeson2-klub.png');

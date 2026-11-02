@@ -10,14 +10,15 @@
   <script type="module" src="app.js"></script>
 </head>
 <body>
+  <!-- v3.28.0: topbaren er én linje (VAR · klub · gem · ▶ · ⚙); fanerne under den – på mobil fast i bunden; Spil-bjælken over dem -->
   <header class="topbar">
-    <span class="badge">VAR</span>
-    <h1>TactiVAR Manager</h1>
-    <span id="version" class="muted"></span>
+    <span class="badge" title="TactiVAR Manager">VAR</span>
+    <h1 id="top-club" class="top-club">TactiVAR Manager</h1>
     <div id="controls" class="controls"></div>
     <div id="tabbar" class="tabbar"></div>
   </header>
   <div id="fejlboks" class="fejlboks" hidden></div>
   <main id="app"><p class="muted">Indlæser…</p></main>
+  <div id="playbar" class="playbar"></div>
 </body>
 </html>

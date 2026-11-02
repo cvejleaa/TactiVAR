@@ -19,5 +19,12 @@ fund der er rettet (så du ikke finder dem igen), hvad brugeren har valgt fra, o
 - "🤝 Holdets samarbejde" (matchcenter.js:168) = kombinationer i kampen, forveksles med 🤝 Samspil.
 - Fuldtid "🛡️ ... luftdueller vundet 0 af 0" i næsten alle runder – tom tilstand; hører under backlog #6.
 
+## F1 (v3.28.0, 2026-11-02) – spillet 5 runder i worktree, scripts scratchpad/ui-f1/play.mjs + chk.mjs
+- Godt: Hjem lander rigtigt efter Forbered (scrollY 0), "Før du spiller"-listen klar, pille på Taktik vælger brikken.
+- Mit fund: `#to-home` står nederst på Kamp (y≈3300 af 3340 på 1366, ≈5800 af 5900 på 390); den synlige næste handling
+  er topbarens lille ▶, der spiller direkte. Foreslået flyttet op under resultatet.
+- Mobil: lille ▶ = "▶ 3 ⛔1" (ordet Runde skjult); med 3 piller bliver 🔍-linket "FC…" og knappen har ingen modstander.
+- Modstander "Nr. 3" før runde 1 (alle 0 point); form "V U T" uden farve/forklaring.
+
 ## Fravalgt
 - "– det holdt ikke mod jer" efter nederlag – valgt i v3.21.2; rejs kun hvis brugeren klager.
