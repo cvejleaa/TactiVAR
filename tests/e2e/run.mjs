@@ -681,7 +681,7 @@ try {
     const byKind = (rs) => Object.fromEntries(['ban', 'injury', 'yellow'].map((k) => [k, rs.filter(([x]) => x === k).flatMap(([, n]) => n.split(',').map(Number)).sort((a, b) => a - b).join()]));
     check('Paritet: Hjem-listen har præcis de fire – ⛔ to, 🚑 én, 🟨 én (ikke bænkspilleren)', rowsHome.length === 4 && JSON.stringify(byKind(rowsHome)) === JSON.stringify(want) && !(await g.textContent('#home-todo')).includes(`#${mixed.bench} `), JSON.stringify(rowsHome));
     await tab('trup');
-    const mini = await g.textContent('#mini-warn'), miniTitle = await g.getAttribute('#play-round', 'title');
+    const mini = await g.textContent('#mini-warn', { timeout: 3000 }).catch(() => 'mangler'), miniTitle = await g.getAttribute('#play-round', 'title');
     check('Paritet: den lille ▶ på Trup viser de samme tegn kompakt ("⛔2 🚑1 🟨1") og de samme #numre i forklaringen', mini.trim() === '⛔2 🚑1 🟨1' && [banned.nr, mixed.both, mixed.inj, mixed.warnNr].every((n) => miniTitle.includes(`#${n} `)) && !miniTitle.includes(`#${mixed.bench} `), `${mini} | ${miniTitle}`);
     await g.click(`#matrix tr[data-pid="${mixed.warn}"]`);
     check('Spillerkortet: "🟨 3 – næste gule kort giver 1 kamps udelukkelse" ved 3 tællende gule – og ingen ⛔-boks', (await g.textContent('#card-yellow')) === '🟨 3 – næste gule kort giver 1 kamps udelukkelse' && (await g.locator('#card-ban').count()) === 0); }
@@ -693,7 +693,7 @@ try {
   { const pills = await g.locator('#bar-issues .pill').allTextContents();
     check('Spil-bjælken, 2 advarsler: to piller "⛔ #nr" og "🟨 #nr" (ingen tæller-pille)', JSON.stringify(pills) === JSON.stringify([`⛔ #${banned.nr}`, `🟨 #${mixed.warnNr}`]) && (await g.locator('#issue-count').count()) === 0, pills.join(' | '));
     await tab('hjem'); const home = await g.evaluate(() => [...document.querySelectorAll('#home-todo .todo-row[data-kind]')].map((r) => `${r.dataset.kind}:${r.dataset.nrs}`).join());
-    await tab('liga'); const mini = (await g.textContent('#mini-warn')).trim();
+    await tab('liga'); const mini = (await g.textContent('#mini-warn', { timeout: 3000 }).catch(() => 'mangler')).trim();
     check('Paritet med 2: Hjem-listen og den lille ▶ siger det samme som pillerne', home === `ban:${banned.nr},yellow:${mixed.warnNr}` && mini === '⛔1 🟨1', `${home} | ${mini}`);
     // Pillen løser noget: den viser altid dit eget hold (også når et andet hold vises på Taktik) og markerer brikken
     await tab('taktik'); await seeTeam(1);
@@ -1481,7 +1481,8 @@ try {
   check('Ødelagt gemt spil: de rå data ligger i backup', backupOk);
   check('Ødelagt gemt spil: knap til at hente backuppen som fil', await g.isVisible('#download-backup'));
   await g.click('#start-new');
-  await g.waitForSelector('#home');   // v3.28.0: en ny liga åbner Hjem
+  await g.waitForSelector('.tabpane');
+  check('Ny liga fra fejlsiden åbner Hjem (v3.28.0)', (await g.getAttribute('#tabs .tab.active', 'id')) === 'tab-hjem' && (await g.isVisible('#home')));
   await tab('trup');
   check('Ny liga fra fejlsiden giver 18 spillere', (await rows()) === 18);
   // Security v3.19.0: en fejl i tegningen (her: regnearket kaster) giver faner og ⚙ Admin med Eksportér – ikke en hvid side
@@ -1680,7 +1681,7 @@ try {
     const HIDDEN = ['#home-last', '#home-place', '#cash-delta', '#home-todo', '#home-table', '#home-opp-form'];
     const present = () => pf.evaluate((ids) => ids.filter((x) => document.querySelector(x)), HIDDEN);
     const before = await present(), formBefore = await pf.textContent('#home-opp-form');
-    await ptab('liga'); const miniBefore = (await pf.textContent('#mini-warn')).trim();
+    await ptab('liga'); const miniBefore = (await pf.textContent('#mini-warn', { timeout: 3000 }).catch(() => 'mangler')).trim();
     check('Før runde 2: Hjem viser resultat, placering, kasse-ændring, "Før du spiller", minitabel og modstanderens form – den lille ▶ har ⛔', before.length === HIDDEN.length && /^Nr\. \d · seneste 3: [VUT]$/.test(formBefore) && miniBefore === '⛔1', `${before} | ${formBefore} | ${miniBefore}`);
     await pf.click('#play-round'); await pf.waitForSelector('#skip');
     check('Under afspilning: den lille ▶ er slået fra og uden tegn', (await pf.isDisabled('.topbar #play-round')) && (await pf.locator('#mini-warn').count()) === 0);
