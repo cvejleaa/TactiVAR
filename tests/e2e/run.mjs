@@ -63,6 +63,36 @@ try {
       && [...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())).map((e) => getComputedStyle(e).fontSize))]);
     check(`F0: ${k} bruger højst 6 skriftstørrelser fra skalaen`, sizes.length <= 6 && sizes.every((x) => ['10px', '12px', '14px', '16px', '20px', '28px'].includes(x)), sizes.join(' '));
   }
+  // F0 (Test Manager): vagten ovenfor ser kun fire faner FØR første runde – Kamp (mest tekst: afspilning, referat, statistik,
+  // karakterark, banegrafik) og Admin er ikke med, og 390 px (media query .topbar h1 / .tab) slet ikke. Her: alle seks faner, live
+  // og efter en runde, på 1400 og 390 px. Højst 6 størrelser pr. fane og i alt, alle fra skalaen; 10 px KUN inde i banegrafikken
+  // (.pitch/.minipitch/.rp-pitch) – ellers kunne en brødtekst sættes til 10 px uden at tælle eller listen bryde; body 14 px / linjehøjde 1,35.
+  {
+    const SKALA = ['10px', '12px', '14px', '16px', '20px', '28px'];
+    const maal = (pg) => pg.evaluate(() => { const set = new Set(), graf = [];
+      for (const e of document.querySelectorAll('body *')) {
+        if (e.offsetParent === null || ![...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())) continue;
+        const s = getComputedStyle(e).fontSize; set.add(s);
+        if (s === '10px' && !e.closest('.pitch, .minipitch, .rp-pitch')) graf.push(e.tagName.toLowerCase() + '.' + [...e.classList].join('.')); }
+      return { sizes: [...set], graf }; });
+    const alle = new Set();
+    for (const w of [1400, 390]) {
+      const c = await browser.newContext({ viewport: { width: w, height: w < 600 ? 844 : 1000 } }), pg = await c.newPage();
+      await pg.goto(BASE + '/'); await pg.waitForSelector('body[data-klar="ja"]');
+      const body = await pg.evaluate(() => { const s = getComputedStyle(document.body); return [s.fontSize, s.lineHeight]; });
+      check(`F0 ${w} px: brødtekst 14 px med linjehøjde 1,35 (18,9 px)`, body[0] === '14px' && body[1] === '18.9px', body.join(' / '));
+      const mal = async (navn) => { const m = await maal(pg); m.sizes.forEach((x) => alle.add(x));
+        check(`F0 ${w} px ${navn}: højst 6 skriftstørrelser, alle fra skalaen, 10 px kun på banegrafikken`,
+          m.sizes.length <= 6 && m.sizes.every((x) => SKALA.includes(x)) && m.graf.length === 0, m.sizes.join(' ') + ' | 10px uden for banen: ' + m.graf.join(',')); };
+      const t = async (k) => { await pg.click(`#tab-${k}`); await pg.waitForSelector(`.tabpane.tab-${k}`); };
+      for (const k of ['trup', 'taktik', 'liga', 'klub', 'admin']) { await t(k); await mal(k + ' (ny liga)'); }
+      await pg.click('#play-round'); await pg.waitForSelector('#match-center'); await mal('kamp (live)');
+      await pg.click('#skip'); await pg.waitForFunction(() => !document.querySelector('#skip') && document.querySelector('#match-center .ratings'));
+      for (const k of ['kamp', 'trup', 'taktik', 'liga', 'klub', 'admin']) { await t(k); await mal(k + ' (efter runden)'); }
+      await c.close();
+    }
+    check('F0: hele appen (alle faner, begge bredder) bruger højst 6 skriftstørrelser – før 20', alle.size <= 6, [...alle].join(' '));
+  }
   await tab('trup');
   const heads = (await g.locator('#matrix thead th').allTextContents()).map((t) => t.replace(/ [▲▼]$/, ''));
   check('Regnearkets kolonner i rækkefølge (Alder står hvor den skal)', JSON.stringify(heads.slice(0, 21)) === JSON.stringify(['Pos/#', 'Spiller', 'Kæde', 'Natur', 'Alder', 'Frisk/🚑', 'Højde', 'Spring', '✈ Luft', 'PAC', 'STA', 'STR', 'BAL', 'PAS', 'FIN', 'POS', 'INT', 'GK', 'Gns', '⭐ Vurd', '🧠 Mod']), heads.join('|'));
