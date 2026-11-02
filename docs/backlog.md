@@ -7,6 +7,14 @@ Rangering: brugerens ønsker først, derefter værdi pr. størrelse. Første run
 + 3 sæsoner `measure-lifecycle`).
 
 ## Næste
+0. **Ny brugerflade i trin (brugeren 2026-11-02: "forvirrende og alt for mange informationer klemt sammen")** · UI · L · 5 · bud:
+   https://claude.ai/artifact/EPcztoSQdrk6pK8Bsy3FeS (UI-gennemgang med skærmbilleder, tre designbud, QC-dom). Brugerens valg: seks faner
+   (🏠 Hjem ny · Trup · Taktik · Kamp · Liga · Klub) med underfaner, spillerkortet som ét panel, ▶ Spil runde som bundbjælke på Hjem og
+   Taktik (genvej i topbaren på de andre), holdvælgeren væk fra topbaren (klik på et holdnavn / ⚙ "Se et andet hold" + lilla bjælke),
+   og ombygningen FØR nr. 41/48 (form og udvikling får plads i det nye fra start). Trin, hver for sig udgivet: F0 farver og skrift ·
+   F1 ramme, Hjem-fane og ⚙ · F2 kortpanelet · F3 Hjem-indhold, avisen ét sted · F4 Taktik-underfaner, hjælp bag "Sådan virker det" ·
+   F5 Trup-kolonnesæt og Udvikling, Kamp-opsamling · F6 Liga/Klub-underfaner og markedet (søgning, sortering, sider). Gemmet røres ikke
+   (sidste underfane i view, ikke game.ui). Sidehøjder måles før/efter med et committet værktøj.
 Rundtur 2: 2026-10-28 (v3.24.0, sæson spillet i browseren + `measure-lifecycle` 5 seeds × 3 sæsoner; Spilførernes scripts i
 scratchpad – et tal herfra skal måles igen med et committet værktøj, før det begrunder en ændring).
 1. **Sig det, når et par bliver stærkt** · UI · S · 4 · samspillets belønning er tavs: første gang det nævnes er runde 8
