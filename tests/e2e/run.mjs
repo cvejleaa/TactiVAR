@@ -189,6 +189,8 @@ try {
         Object.assign(m, { homeId: opp.id, awayId: me.id, homeName: opp.name, awayName: me.name, homeGoals: 1, awayGoals: 2 });
         m.ratings.home = [{ shortName: 'HjemmeM', goals: 1 }]; m.ratings.away = [{ shortName: 'UdeM', goals: 2 }, { shortName: 'UdeN', goals: 1 }, { shortName: 'UdeO', goals: 0 }]; });
       await reloadT(); await tt('hjem'); const lastTxt = await tp.textContent('#home-last');
+      { const want = await tp.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.lastRound.matches[0].att), got = (await tp.locator('#home-att').count()) ? await tp.textContent('#home-att') : null;
+        check('v3.30.0 (QC) Hjem: din kamp i sidste runde viser sit tilskuertal – netop den kamps', Number.isInteger(want) && want >= 4000 && got === `👥 ${want.toLocaleString('da-DK')} tilskuere`, JSON.stringify({ want, got })); }
       check('Hjem, din kamp ude: "Sejr" (udemålene 2 > 1) og målscorerne er udeholdets – "UdeM (2), UdeN" (ikke hjemmeholdets, ikke 0 mål)', lastTxt.includes('Sejr · Mål: UdeM (2), UdeN') && !lastTxt.includes('HjemmeM') && !lastTxt.includes('UdeO'), lastTxt);
       // uafgjort og nederlag (som udehold): 1–1 → "Uafgjort", hjemme 2 – ude 1 → "Nederlag"
       const goalsSet = async (hg, ag) => { await mod((d, g2) => { Object.assign(d.league.lastRound.matches[0], { homeGoals: g2[0], awayGoals: g2[1] }); }, [hg, ag]); await reloadT(); await tt('hjem'); return tp.textContent('#home-last'); };
@@ -1963,7 +1965,7 @@ try {
   await g.locator('#last-round .fixture').nth(2).click();
   check('Klik på et resultat åbner netop den kamps referat i Kamp-fanen', (await g.textContent('#tabs .tab.active')).includes('Kamp') && (await g.locator('#match-cards .matchcard:nth-child(3).active').count()) === 1 && (await g.textContent('#scoreboard')).includes(third) && (await g.locator('#match-center .toolbar button:nth-child(1).active').count()) === 1);
   const att3 = await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.lastRound.matches[2].att);
-  check('Referatet: tilskuerne under resultatet er netop den kamps (v3.30.0)', Number.isInteger(att3) && att3 >= 4000 && (await g.textContent('#scoreboard #attendance')) === `👥 ${att3.toLocaleString('da-DK')}`, String(att3));
+  check('Referatet: tilskuerne under resultatet er netop den kamps (v3.30.0)', Number.isInteger(att3) && att3 >= 4000 && (await g.textContent('#scoreboard #attendance')) === `👥 ${att3.toLocaleString('da-DK')} tilskuere`, String(att3));
   await tab('liga');
   check('Ligatabellen er opdateret efter runde 1', stHead.includes('sæson 1, efter 1 af 14 runder'), stHead);
   await seeTeam('2');

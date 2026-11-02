@@ -10,7 +10,7 @@ import { saveReplay, loadReplay, replayOf, rememberSent, loadSent } from './stat
 import { buildPayload, uploadMatch } from './state/upload.js';
 import { FIREBASE } from './firebase-config.js';
 import { h, select } from './ui/dom.js';
-import { kr, yellowWarn } from './ui/labels.js';
+import { kr, yellowWarn, attText } from './ui/labels.js';
 import { renderMatrix, matrixRows } from './ui/matrix.js';
 import { renderLineupList, listRows } from './ui/lineup-list.js';
 import { renderTrainingTable, gainsByPlayer } from './ui/training.js';
@@ -140,7 +140,7 @@ const NEWS = {
   '3.14.2': 'Rettelse: Ved et VAR-tjek står den tjekkede nu, hvor han stod (forrest), i billedet ved målet – ikke flyttet bag en holdkammerat.',
   '3.14.3': 'Rettelser: Langskud tages fra skudafstand (ikke fra egen banehalvdel) i billedet ved målet, referatet fortæller et oplæg én gang, og efter sæsonens sidste runde viser tabellen slutstillingen og mesteren, til næste sæson går i gang.',
   '3.28.0': '🏠 Andet skridt i den nye brugerflade: en ny Hjem-fane samler sidste runde, din placering, "Før du spiller" (udelukkede, skadede, trætte og 🟨 – med et link til at løse det), næste modstander og tabellen omkring dig. ▶ Spil runde står nu i en bjælke i bunden af Hjem og Taktik (på de andre faner som en lille ▶ øverst med de samme tegn), og modstanderens navn er et separat 🔍-link. Holdvælgeren er flyttet til Liga ("Se et hold"), og ser du et andet hold, siger en lilla bjælke det – med "← Dit hold". ⚙ øverst til højre har gem, eksport, import og versionen. På mobil står fanerne i bunden. Næste skridt: spillerkortet som ét panel.',
-  '3.30.0': '🏋️ Træningen har fået sin egen fane: Hjem · Trup · Træning · Taktik · Kamp · Liga · Klub. Træningsfokus sættes nu på 🏋️ Træning – spillerkortet viser, hvad han træner, og linker dertil ("ændr i Træning ›"). Øverst på Træning står rundens fremskridt, og hvem der er nærmest et +1. I Trup-regnearket får en evne, der steg efter sidste runde, et lille grønt +1 ved tallet (på mobil også efter navnet). 💰 Økonomi: nye spillere starter på de stjerner, de i snit får efter en sæson (fx 2,9 i stedet for 2) – så lønnen ikke fordobles efter de første 3 kampe – og lønnen er 5,5 % af værdien (før 6 %). Tilskuerne følger placeringen mere, så 9.000 kan nås (1. hjemme mod 2. i god form); hver kamp viser nu sit tilskuertal (👥) på Liga og i referatet. Spillere, du har sat til salg, har "💰 Til salg" efter navnet i Trup.',
+  '3.30.0': '🏋️ Træningen har fået sin egen fane: Hjem · Trup · Træning · Taktik · Kamp · Liga · Klub. Træningsfokus sættes nu på 🏋️ Træning – spillerkortet viser, hvad han træner, og linker dertil ("ændr i Træning ›"). Øverst på Træning står rundens fremskridt, og hvem der er nærmest et +1. I Trup-regnearket får en evne, der steg efter sidste runde, et lille grønt +1 ved tallet (på mobil også efter navnet). 💰 Økonomi: spillere med under 3 kampe i karrieren starter på de stjerner, de i snit får efter en sæson (fx 2,9 i stedet for 2) – også i din liga, så deres værdi stiger nu og lønnen ved næste sæsonslut – så lønnen ikke fordobles efter de første 3 kampe – og lønnen er 5,5 % af værdien (før 6 %). Tilskuerne følger placeringen mere, så 9.000 kan nås (1. hjemme mod 2. efter tre sejre i træk); kampene viser nu deres tilskuertal (👥) i referatet, på Liga ved sidste runde og ved din kamp på Hjem. Spillere, du har sat til salg, har "💰 Til salg" efter navnet i Trup.',
   '3.29.1': '📱 Rettelse: på en smal skærm kunne ▶ Spil runde løbe ud over kanten, når modstanderen har et langt navn. Nu forkortes kun navnet (…), og "▶ Spil runde N" står altid helt.',
   '3.29.0': '🗂 Tredje skridt i den nye brugerflade: spillerkortet åbnes nu som ét panel – på computer fra højre, på mobil fra bunden – i stedet for at stå nederst på siden. På Trup åbner et klik på en spiller kortet. På Taktik betyder et klik stadig byt; kortet åbnes med ⓘ ved navnet i listen (eller "Se kort ›" i byt-beskeden), og et klik på et andet holds spiller åbner det. ◀ ▶ bladrer i listen, ✕ eller Esc lukker. Næste skridt: Hjem-indholdet og avisen ét sted.',
   '3.27.1': '🎨 Første skridt i den nye brugerflade: roligere farver og fem skriftstørrelser i stedet for tyve – det er stadig de samme sider. Næste skridt: ny ramme med en Hjem-fane og ▶ Spil runde i bunden.',
@@ -676,7 +676,7 @@ function homeData() {
       move = placeOf(sortStandings(prev), mine.id) - myPos;
     }
     last = { idx: lr.matches.indexOf(m), round: seasonAndRound(L, lr.round)[1], text: `${m.homeName} ${m.homeGoals} – ${m.awayGoals} ${m.awayName}`,
-      result: diff > 0 ? 'won' : diff < 0 ? 'lost' : 'drawn', scorers, move };
+      result: diff > 0 ? 'won' : diff < 0 ? 'lost' : 'drawn', scorers, move, att: attText(m) };
   }
   const next = nextMatch(), opp = next.opp;
   // Modstanderens 3 seneste – kun fra indeværende sæson (QC-runde 2)

@@ -177,3 +177,12 @@ test('Hjem: linkene kalder de rigtige handlere (kasse → klub, kamp, hele tabel
   byId(r, 'club-link').on.click(); byId(r, 'home-kamp').on.click(); byId(r, 'home-table-link').on.click();
   assert.deepEqual(calls, ['klub', 'kamp', 'liga']);
 });
+
+// v3.30.0 (QC): din kamps tilskuertal står på Hjem ved "Sidste runde" – og intet felt, når kampen ikke har et tal (ældre gem)
+test('Hjem: "👥 7.840 tilskuere" ved sidste runde, når kampen har tallet – ellers intet felt', () => {
+  const med = render({ last: { ...base().last, att: '👥 7.840' } });
+  assert.equal(text(med, 'home-att'), '👥 7.840 tilskuere');
+  const uden = render({ last: { ...base().last, att: null } });
+  assert.equal(byId(uden, 'home-att'), null);
+  assert.ok(!/👥|undefined|null/.test(text(uden, 'home-last')), text(uden, 'home-last'));
+});

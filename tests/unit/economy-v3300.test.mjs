@@ -131,8 +131,8 @@ test('referatet: "👥 7.840" i resultatfeltet (#attendance) – også under afs
   const draw = (m, playing = false) => renderMatchCenter({ mc: { round: 1, matches: [m], viewIdx: 0, filter: 'all', shownCount: 99, playing, gazette: null }, myTeamId: 'h', on: {} });
   const a = byId(draw(match({ att: 7840 })), 'attendance');
   assert.ok(a, 'feltet findes');
-  assert.equal(a.textContent, '👥 7.840');
-  assert.equal(byId(draw(match({ att: 7840 }), true), 'attendance')?.textContent, '👥 7.840');
+  assert.equal(a.textContent, '👥 7.840 tilskuere');
+  assert.equal(byId(draw(match({ att: 7840 }), true), 'attendance')?.textContent, '👥 7.840 tilskuere');
   const none = draw(match({}));
   assert.equal(byId(none, 'attendance'), null);
   assert.ok(!/👥|undefined/.test(byId(none, 'scoreboard').textContent));

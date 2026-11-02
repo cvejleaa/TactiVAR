@@ -310,7 +310,7 @@ export function renderMatchCenter({ mc, myTeamId, on, column = null }) {
       h('div', {}, h('strong', {}, m.homeName), h('div', { class: 'muted' }, m.homeTacticStr)),
       h('div', { class: 'score' }, h('div', { id: 'score' }, `${last.hG} - ${last.aG}`), h('div', { class: 'muted', id: 'minute' }, mc.playing ? evMin(last) : 'Slut'),
         // v3.30.0: tilskuerne under resultatet (kendt før kampen – afslører intet under afspilningen); ældre kampe uden tallet: intet
-        attText(m) ? h('div', { class: 'muted', id: 'attendance', title: 'Tilskuere' }, attText(m)) : null),
+        attText(m) ? h('div', { class: 'muted', id: 'attendance', title: 'Tilskuere' }, `${attText(m)} tilskuere`) : null),
       h('div', { class: 'right' }, h('strong', {}, m.awayName), h('div', { class: 'muted' }, m.awayTacticStr))),
     timeline(shown, m.stoppage),
     last.varMsg && mc.playing ? h('div', { class: 'varbanner' }, `📺 VAR: ${last.varMsg}`) : null,
