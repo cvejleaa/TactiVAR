@@ -21,6 +21,7 @@ const { createLeague } = await import('../../public/engine/generator.js');
 const { renderMatrix, COLUMNS } = await import('../../public/ui/matrix.js');
 const { gainsByPlayer, gainWords, renderTrainingTable, trainingNext } = await import('../../public/ui/training.js');
 const { renderCard } = await import('../../public/ui/card.js');
+const { trainingEstimate } = await import('../../public/engine/career.js');
 
 const all = (el, pred, out = []) => { if (el instanceof FakeEl) { if (pred(el)) out.push(el); el.children.forEach((c) => all(c, pred, out)); } return out; };
 const byId = (root, id) => all(root, (e) => e.id === id)[0] ?? null;
@@ -83,15 +84,16 @@ test('Træning-tabellen: "Sidste runde" samlet ("+2 Afslutning"), den markerede 
 test('trainingNext: nærmest = den med færrest runder til næste +1 (evnen ved navn), og hvor mange der træner Alsidig', () => {
   const L = createLeague(createRng(33)), me = own(L);
   for (const p of me.squad) { p.trainingFocus = 'REST'; p.dev = {}; }
-  const [a, b] = me.squad.filter((p) => p.line !== 'GK');
+  const [a, b, c] = me.squad.filter((p) => p.line !== 'GK');
   a.trainingFocus = 'FINISH'; a.dev = { finishing: 0.999 }; a.skills.finishing = 10;
-  b.trainingFocus = 'GENERAL';
+  b.trainingFocus = 'GENERAL'; c.trainingFocus = 'GENERAL';
   const txt = trainingNext(me, null, 4);
   assert.ok(txt.startsWith(`Nærmest et +1: #${a.shirtNumber} ${a.shortName} Afslutning om ~`), txt);
-  assert.ok(txt.endsWith(' · 1 træner stadig Alsidig'), txt);
+  // 2 på Alsidig (b, c) mod 1 på Afslutning (a): optællingen må ikke tælle a med, og ikke kun tælle til 1
+  assert.ok(txt.endsWith(' · 2 træner stadig Alsidig'), txt);
   assert.ok(!txt.includes('Ingen +1'), 'uden rapport (ingen runde spillet) siges intet om en tom runde');
   // alle hviler: ingen "nærmest" og ingen Alsidig → ingen linje
-  b.trainingFocus = 'REST'; a.trainingFocus = 'REST';
+  b.trainingFocus = 'REST'; c.trainingFocus = 'REST'; a.trainingFocus = 'REST';
   assert.equal(trainingNext(me, null, 4), null);
   assert.equal(trainingNext(me, { gains: [] }, 4), 'Ingen +1 efter runde 4');
 });
@@ -111,4 +113,44 @@ test('spillerkortet: træningsblokken sætter IKKE fokus – ingen select, "Træ
   const plain = renderCard({ player: p, team: me, isOwn: true, scouting: [], note: '', onNote() {} });
   assert.equal(byId(plain, 'card-train-link'), null);
   assert.ok(byId(plain, 'card-train-note').textContent.startsWith('Træner: Afslutning – ændr i Træning'));
+});
+
+test('trainingNext: ved lige mange runder vinder det laveste trøjenummer – uanset rækkefølgen i truppen (begge veje)', () => {
+  const L = createLeague(createRng(35)), me = own(L), on = new Set(me.tactics.lineupSlots);
+  for (const p of me.squad) { p.trainingFocus = 'REST'; p.dev = {}; }
+  const [a, b] = me.squad.filter((p) => p.line !== 'GK' && !on.has(p.id));
+  a.trainingFocus = 'FINISH'; a.dev = { finishing: 0.9 }; a.skills.finishing = 10;
+  for (const k of Object.keys(a)) if (!['id', 'shirtNumber', 'name', 'shortName'].includes(k)) b[k] = structuredClone(a[k]);   // b er en tvilling: samme runder til næste +1
+  for (const [sa, sb, want] of [[7, 3, 3], [3, 7, 3]]) {
+    a.shirtNumber = sa; b.shirtNumber = sb;
+    const txt = trainingNext(me, null, 1), nums = [a, b].map((p) => trainingEstimate(p, false).next);
+    assert.equal(nums[0], nums[1], 'data: tvillingerne har lige mange runder til næste +1');
+    assert.ok(Number.isFinite(nums[0]) && nums[0] <= 14, 'data: et endeligt tal (ikke "mere end en sæson")');
+    assert.ok(txt.startsWith(`Nærmest: #${want} `), `a=#${sa}, b=#${sb}: ${txt}`);
+  }
+});
+
+test('trainingNext: over 14 runder står "om mere end en sæson" – præcis 14 står som "om ~14 rd" (grænsen testet på begge sider)', () => {
+  const L = createLeague(createRng(36)), me = own(L);
+  for (const p of me.squad) { p.trainingFocus = 'REST'; p.dev = {}; }
+  const a = me.squad.find((p) => p.line !== 'GK' && !me.tactics.lineupSlots.includes(p.id));
+  a.trainingFocus = 'FINISH'; a.skills.finishing = 10;
+  // find dev så n = 14 og n = 15 (n = ceil((1 − dev) / per), per = tempoet pr. runde)
+  const nOf = (dev) => { a.dev = { finishing: dev }; return trainingEstimate(a, false).next; };
+  let d14 = null, d15 = null;
+  for (let dev = 0; dev <= 0.999; dev += 0.001) { const n = nOf(dev); if (n === 14 && d14 === null) d14 = dev; if (n === 15 && d15 === null) d15 = dev; }
+  assert.ok(d14 !== null && d15 !== null, `data: fixturet rammer både 14 og 15 runder (n(0) = ${nOf(0)})`);
+  a.dev = { finishing: d15 }; assert.ok(trainingNext(me, null, 1).includes('om mere end en sæson'), trainingNext(me, null, 1));
+  a.dev = { finishing: d14 }; assert.ok(trainingNext(me, null, 1).includes('om ~14 rd'), trainingNext(me, null, 1));
+});
+
+test('trainingNext: "nærmest" nævner den evne, der er nærmest – ikke fokusets første (Teknik: Boldkontrol langt væk, Pasning lige ved)', () => {
+  const L = createLeague(createRng(37)), me = own(L);
+  for (const p of me.squad) { p.trainingFocus = 'REST'; p.dev = {}; }
+  const a = me.squad.find((p) => p.line !== 'GK' && !me.tactics.lineupSlots.includes(p.id));
+  a.trainingFocus = 'TECH'; a.skills.ballControl = 10; a.skills.passing = 10; a.dev = { ballControl: 0, passing: 0.999 };
+  const txt = trainingNext(me, null, 4);
+  assert.ok(txt.startsWith(`Nærmest: #${a.shirtNumber} ${a.shortName} Pasning om ~`) && !txt.includes('Boldkontrol'), txt);
+  a.dev = { ballControl: 0.999, passing: 0 };
+  assert.ok(trainingNext(me, null, 4).includes(' Boldkontrol om ~'), trainingNext(me, null, 4));
 });

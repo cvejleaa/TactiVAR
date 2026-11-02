@@ -14,6 +14,8 @@ if (!executablePath) { console.error('❌ Ingen Chrome/Chromium fundet – sæt 
 
 const results = [];
 export const check = (name, ok, extra = '') => { results.push(ok); console.log(ok ? '✅' : '❌', name, extra); };
+// TM v3.30.0: et link, der fører det forkerte sted hen, skal give et NAVNGIVET rødt tjek – ikke 30 s timeout og en stak. Vent kort, og lad checket dømme.
+const soft = (pg, sel) => pg.waitForSelector(sel, { timeout: 4000 }).catch(() => null);
 
 const server = process.env.BASE_URL ? null : await startServer(PORT);
 const browser = await chromium.launch({ executablePath, args: ['--no-sandbox'] });
@@ -208,13 +210,22 @@ try {
         check('v3.30.0 Trup: "+1" præcis på de 2 evner i rapporten – title "+1 <evne> efter runde 1" (sæsonens runde), et lille grønt mærke (::after viser "+1" fra data-gain), og cellens tekst er stadig tallet',
           gx.n === 2 && gx.title === gx.want && gx.gain === '1' && gx.num === gx.val && gx.content === '"+1"' && gx.bg === 'rgb(11, 51, 38)' && gx.disp === 'inline-block' && gx.name === 'none', JSON.stringify(gx));
         check('v3.30.0 Trup: hjælpelinjen forklarer "+1" (kun når der er mærker) og linker til Træning', gx.help === ' · +N = antal +1 efter runde 1 (træning og kampe) · træningen står på 🏋️ Træning ›', JSON.stringify(gx.help));
-        await tp.click('#trup-to-training'); await tp.waitForSelector('.tabpane.tab-traening');
+        await tp.click('#trup-to-training'); await soft(tp, '.tabpane.tab-traening');
         check('v3.30.0 Trup: "🏋️ Træning ›" i hjælpelinjen åbner Træning', (await tp.textContent('#tabs .tab.active')).includes('Træning') && (await tp.isVisible('#training-table'))); }
       // linkene fører det rigtige sted hen
       await tt('hjem'); await tp.click('#home-table-link'); await tp.waitForSelector('.tabpane.tab-liga');
       check('Hjem: "Hele tabellen ›" åbner Liga', (await tp.textContent('#tabs .tab.active')).includes('Liga'));
-      await tt('hjem'); await tp.click('#home-training .linklike'); await tp.waitForSelector('.tabpane.tab-traening');
+      await tt('hjem'); await tp.click('#home-training .linklike'); await soft(tp, '.tabpane.tab-traening');
       check('Hjem: træningslinjens "Træning ›" åbner 🏋️ Træning (dit hold, opsamlingen øverst)', (await tp.textContent('#tabs .tab.active')).includes('Træning') && (await tp.locator('#scout-banner').count()) === 0 && (await tp.isVisible('#training-summary')) && (await tp.isVisible('#training-table')));
+      await mod((d) => { const L = d.league, me = L.teams.find((t) => !t.isBot); L.trainingReport = { [me.id]: { round: L.lastRound.round, gains: [], injuries: [], strong: { up: [], down: [['g', 'h']] } } }; });
+      await reloadT(); await tt('hjem');
+      // v3.30.0 (TM): KUN nye stærke par → knappen hedder "Taktik ›" og åbner Taktik (stregerne står dér), ikke Træning – ledningen (homeHandlers.taktik) var kun set i unit
+      await mod((d) => { const L = d.league, me = L.teams.find((t) => !t.isBot); L.trainingReport = { [me.id]: { round: L.lastRound.round, gains: [], injuries: [], strong: { up: [['a', 'b']], down: [] } } }; });
+      await reloadT(); await tt('hjem');
+      const sLink = await tp.locator('#home-training .linklike').allTextContents();
+      if (sLink.length === 1) await tp.click('#home-training .linklike');
+      await soft(tp, '.tabpane.tab-taktik');
+      check('Hjem: kun nye stærke par → linket hedder "Taktik ›" og åbner Taktik (ikke Træning)', JSON.stringify(sLink) === JSON.stringify(['Taktik ›']) && (await tp.textContent('#tabs .tab.active')).includes('Taktik') && (await tp.locator('.tabpane.tab-traening').count()) === 0, JSON.stringify(sLink));
       await mod((d) => { const L = d.league, me = L.teams.find((t) => !t.isBot); L.trainingReport = { [me.id]: { round: L.lastRound.round, gains: [], injuries: [], strong: { up: [], down: [['g', 'h']] } } }; });
       await reloadT(); await tt('hjem');
       check('Hjem: et træningsudfald uden fremskridt, skader og nye stærke par giver ingen træningslinje (kun et fald i samspil tæller ikke)', (await tp.locator('#home-training').count()) === 0);
@@ -468,10 +479,37 @@ try {
     const hasLink = (await tp.locator('#cardpanel #card-train-link').count()) === 1;
     check('F2: "Træner: X – ændr i Træning ›" er et link (#card-train-link), ikke ren tekst – og kortet har intet fokusvalg', hasLink && (await tp.locator('#cardpanel #focus-select, #cardpanel select').count()) === 0);
     if (hasLink) await tp.click('#card-train-link');
-    await tp.waitForSelector('.tabpane.tab-traening').catch(() => {});
+    await soft(tp, '.tabpane.tab-traening');
     const s13 = await st(), sel13 = await tp.evaluate(() => [...document.querySelectorAll('#training-table tr.selected')].map((r) => r.dataset.pid));
     check('v3.30.0: "ændr i Træning ›" på kortet (Taktik) åbner Træning med præcis hans række markeret, panelet lukket og rækkens fokusvalg synligt',
       (await tp.isVisible('.tabpane.tab-traening')) && s13.open === 'nej' && JSON.stringify(sel13) === JSON.stringify([ids2[1]]) && (await tp.isVisible(`#training-table tr.selected[data-pid="${ids2[1]}"] select.train-focus`)), JSON.stringify({ s13, sel13, want: ids2[1] }));
+    // TM: markeringen (view.trainPid) hænger ikke ved – forlader man Træning og kommer tilbage, er ingen række markeret
+    await tt('trup'); await tt('traening');
+    check('v3.30.0: efter et besøg på en anden fane er ingen række på Træning markeret (markeringen følger linket, ikke fanen)', (await tp.locator('#training-table tr.selected').count()) === 0 && (await tp.locator('#training-table tbody tr').count()) > 0);
+    // TM: linket RULLER rækken frem (lavt vindue, sidste spiller i truppen) og beholder et filter, der allerede er hans kæde; et filter på en anden kæde
+    // nulstilles (mutationer: scrollIntoView fjernet / "altid nulstil" var grønne). Et nyt filter-valg fjerner markeringen.
+    { const LBL = { GK: 'MÅL', DEF: 'FOR', MID: 'MID', ATT: 'ANG' };
+      const lastP = await tp.evaluate(() => { const q = JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((t) => !t.isBot).squad.at(-1); return { id: q.id, line: q.line }; });
+      const viaLink = async (filterLbl) => { await tt('traening'); await tp.click(`#training .toolbar button:text-is("${filterLbl}")`); await tt('trup');
+        await tp.click(`#matrix tbody tr[data-pid="${lastP.id}"]`); if (await tp.locator('#card-train-link').count()) await tp.click('#card-train-link'); await soft(tp, '.tabpane.tab-traening');
+        return tp.evaluate((pid) => { const r = document.querySelector(`#training-table tr[data-pid="${pid}"]`)?.getBoundingClientRect();
+          return { row: !!r, inView: !!r && r.top >= 0 && r.bottom <= innerHeight, active: document.querySelector('#training .toolbar button.active')?.textContent, rows: document.querySelectorAll('#training-table tbody tr').length, sel: document.querySelectorAll('#training-table tr.selected').length }; }, lastP.id); };
+      const vp0 = tp.viewportSize();
+      await tp.setViewportSize({ width: vp0.width, height: 500 });
+      const v1 = await viaLink('Alle');
+      check('v3.30.0: "ændr i Træning ›" for sidste mand i truppen ruller hans række ind i billedet (lavt vindue) og markerer den', v1.row && v1.inView && v1.sel === 1 && v1.active === 'Alle', JSON.stringify(v1));
+      const v2 = await viaLink(LBL[lastP.line]);
+      check('v3.30.0: står kortets spiller allerede i det valgte filter (hans egen kæde), bliver filteret stående – kun hans kæde vises', v2.row && v2.active === LBL[lastP.line] && v2.rows < 18 && v2.rows > 0 && v2.sel === 1, JSON.stringify(v2));
+      const other = Object.values(LBL).find((l) => l !== LBL[lastP.line]);
+      const v3 = await viaLink(other);
+      check('v3.30.0: står han IKKE i det valgte filter, nulstilles det til "Alle" så hans række findes', v3.row && v3.active === 'Alle' && v3.rows === 18 && v3.sel === 1, JSON.stringify(v3));
+      await tp.click('#training .toolbar button:text-is("MID")');
+      check('v3.30.0: et nyt filter-valg fjerner markeringen af rækken fra linket', (await tp.locator('#training-table tr.selected').count()) === 0);
+      await tp.click('#training .toolbar button:text-is("Alle")');
+      const cur = await tp.evaluate(() => getComputedStyle(document.querySelector('#training-table tbody tr')).cursor);
+      await tt('trup'); const curM = await tp.evaluate(() => getComputedStyle(document.querySelector('#matrix tbody tr')).cursor); await tt('traening');
+      check('v3.30.0: rækkerne på Træning er ikke klikbare (cursor: default) mens regnearkets rækker er (pointer) – et klik på en række gør intet her', cur === 'default' && curM === 'pointer', `${cur} / ${curM}`);
+      await tp.setViewportSize(vp0); }
     // (14) 1400 px: fast til højre under topbaren, over Spil-bjælken, ingen vandret rulning; siden giver plads (listen/regnearket dækkes ikke)
     const geo = (sel) => tp.evaluate((s) => { const r = (q) => document.querySelector(q)?.getBoundingClientRect(), pc = r('#cardpanel'), bar = r('#playbar'), tb = r('.topbar'), sb = r('#scout-banner');
       return { l: pc.left, r: pc.right, w: pc.width, t: pc.top, b: pc.bottom, barTop: bar.height ? bar.top : innerHeight, tbB: tb.bottom, sbB: sb ? sb.bottom : null, sw: document.documentElement.scrollWidth, iw: innerWidth, ih: innerHeight, contR: (document.querySelector(s)?.closest('.tablewrap') ?? document.querySelector(s))?.getBoundingClientRect().right }; }, sel);   // regnearket: den synlige ramme (tabellen ruller vandret i den)
@@ -958,7 +996,7 @@ try {
   const shownId = await g.evaluate((nr) => JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((x) => !x.isBot).squad.find((x) => String(x.shirtNumber) === nr).id, shown);
   check('Træning: kortet i Trup har intet fokusvalg – "Træner: …" og linket "ændr i Træning ›"', (await g.locator('#cardpanel #focus-select, #cardpanel select').count()) === 0
     && (await g.textContent('#card-train-note')).startsWith('Træner: ') && (await g.textContent('#card-train-link')) === 'ændr i Træning ›');
-  await g.click('#card-train-link'); await g.waitForSelector('.tabpane.tab-traening');
+  if (await g.locator('#card-train-link').count()) await g.click('#card-train-link'); await soft(g, '.tabpane.tab-traening');
   check('Træning: linket fra kortet i Trup åbner Træning med hans række markeret (og kun den)', JSON.stringify(await g.evaluate(() => [...document.querySelectorAll('#training-table tr.selected')].map((r) => r.dataset.pid))) === JSON.stringify([shownId]));
   await g.selectOption(`#training-table tr[data-pid="${shownId}"] select`, 'FINISH');
   const focusRow = await g.locator(`#training-table tr[data-pid="${shownId}"] select`).evaluate((el) => el.options[el.selectedIndex].text);
@@ -967,6 +1005,9 @@ try {
   await tab('traening');
   await g.selectOption('#focus-many', 'REST');
   check('Træning: massehandlingen i oversigten sætter fokus for alle viste (18) – bekræftelsen står ved tabellen', (await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((x) => !x.isBot).squad.filter((p) => p.trainingFocus === 'REST').length)) === 18 && (await g.textContent('#train-msg')).includes('18 spillere'));
+  // TM: bekræftelsen (view.trainMsg) hører til besøget – efter et besøg på en anden fane står den ikke længere (mutation: nulstillingen i showTab fjernet var grøn)
+  await tab('trup'); await tab('traening');
+  check('Træning: massehandlingens bekræftelse er væk, når man kommer tilbage fra en anden fane (men fokus er stadig gemt)', (await g.locator('#train-msg').count()) === 0 && (await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((x) => !x.isBot).squad.filter((p) => p.trainingFocus === 'REST').length)) === 18);
   await g.selectOption(`#training-table tr[data-pid="${shownId}"] select`, 'FINISH');
   await tab('trup'); await openCard(shownId);
   check('Spillerkortet viser 9 evne-barer og luftduel-udregningen', (await g.locator('#player-card .bars .bar').count()) === 9 && (await g.textContent('#aerial-breakdown')).includes('× 0,35'));
@@ -1415,6 +1456,41 @@ try {
     check('v3.30.0: Træning fra en modstander i Trup viser DIT hold – alle rækker er dine, ingen scout-bjælke', tr.n === tr.all && tr.mine && (await g.locator('#scout-banner').count()) === 0, JSON.stringify(tr) + ' | Trup viste ' + other);
     await tab('trup');
     check('v3.30.0: tilbage i Trup står den scoutede modstander stadig (Træning skifter ikke holdet)', (await g.textContent('#club-name')) === other && (await g.locator('#scout-banner').count()) === 1); }
+  // v3.30.0 (TM): "+N" hører kun til DIT hold. En solgt spillers +1 står stadig i din rapport (sanitize rydder den først ved indlæsning) –
+  // hos botten, der har købt ham, må hans række intet mærke have (mutation: `isOwn &&` fjernet ved gains i app.js var grøn). Positivt: rapporten
+  // HAR hans +1 (gemt), hans række FINDES hos botten, og dit eget hold har stadig sit mærke (den anden spiller) og hjælpelinjen.
+  { const ps = await fresh();
+    const info = await ps.evaluate(() => { const d = JSON.parse(localStorage.getItem('tactivar_save')), L = d.league, me = L.teams.find((t) => !t.isBot), bot = L.teams.find((t) => t.isBot);
+      const sold = me.squad.find((p) => p.line === 'MID' && !me.tactics.lineupSlots.includes(p.id)), kept = me.squad.find((p) => p !== sold && p.line !== 'GK');
+      L.trainingReport = { [me.id]: { round: 1, gains: [{ id: sold.id, skill: 'pace' }, { id: kept.id, skill: 'passing' }], injuries: [], strong: { up: [], down: [] } } };
+      me.listed = [sold.id]; L.offers = [{ playerId: sold.id, from: me.id, to: bot.id, price: 500000, w: (L.leagueMetadata.seasonNumber ?? 1) * 2 }];
+      localStorage.setItem('tactivar_save', JSON.stringify(d)); return { sold: sold.id, kept: kept.id, botIdx: L.teams.indexOf(bot) }; });
+    await ps.reload(); await ps.waitForSelector('body[data-klar="ja"]'); await ps.click('#tab-trup'); await ps.waitForSelector('.tabpane.tab-trup');
+    const before = { cells: await ps.locator('#matrix td.gain').count(), names: await ps.locator('#matrix td.player-gain').count() };
+    await ps.click('#tab-klub'); await ps.waitForSelector('.tabpane.tab-klub');
+    if (await ps.locator('.offer-accept').count()) await ps.locator('.offer-accept').first().click();
+    const moved = await ps.evaluate((i) => { const L = JSON.parse(localStorage.getItem('tactivar_save')).league, me = L.teams.find((t) => !t.isBot);
+      return { inBot: L.teams[i.botIdx].squad.some((p) => p.id === i.sold), inMine: me.squad.some((p) => p.id === i.sold), stillInReport: L.trainingReport[me.id].gains.some((x) => x.id === i.sold) }; }, info);
+    await ps.click('#tab-liga'); await ps.selectOption('#team-select', String(info.botIdx)); await ps.waitForSelector('.tabpane.tab-trup');
+    const bot = { row: await ps.locator(`#matrix tr[data-pid="${info.sold}"]`).count(), cells: await ps.locator('#matrix td.gain').count(), names: await ps.locator('#matrix td.player-gain').count(), help: await ps.locator('#trup-gain-help').count() };
+    // Træning mens Trup viser botten: rapporten (opsamling + "Sidste runde"), fokus-valget og rækkerne er DINE – ikke botten (mutationer: summary/rapport/setFocus
+    // bygget fra det viste hold var grønne, fordi kun tabellens rækker blev målt). Spilleren, du beholdt, har +1 Pasning i rapporten.
+    await ps.click('#tab-traening'); await ps.waitForSelector('.tabpane.tab-traening');
+    await ps.selectOption(`#training-table tr[data-pid="${info.kept}"] select`, 'FINISH');
+    const tn = await ps.evaluate((i) => { const L = JSON.parse(localStorage.getItem('tactivar_save')).league, me = L.teams.find((t) => !t.isBot), q = me.squad.find((p) => p.id === i.kept), row = document.querySelector(`#training-table tr[data-pid="${i.kept}"]`);
+      return { name: q.shortName, focus: q.trainingFocus, lastCol: row.lastElementChild.textContent, summary: document.getElementById('training-summary')?.textContent ?? null, next: document.getElementById('training-next')?.textContent ?? null }; }, info);
+    check('v3.30.0 Træning mens Trup viser en modstander: opsamlingen, "Sidste runde" og fokus-valget er DINE (rapporten for dit hold, fokus gemt på din spiller)',
+      tn.focus === 'FINISH' && tn.lastCol === '+1 Pasning' && !!tn.summary && tn.summary.includes(`${tn.name} +1 Pasning`) && !!tn.next && !tn.next.startsWith('Ingen +1'), JSON.stringify(tn));
+    await ps.selectOption('#focus-many', 'REST');
+    const mass = await ps.evaluate(() => ({ rest: JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((t) => !t.isBot).squad.filter((p) => p.trainingFocus === 'REST').length, msg: document.getElementById('train-msg')?.textContent ?? null }));
+    check('v3.30.0 Træning mens Trup viser en modstander: "Sæt fokus for de viste" gælder dine 18 (gemt), ikke botten', mass.rest === 18 && !!mass.msg && mass.msg.includes('18 spillere'), JSON.stringify(mass));
+    await ps.click('#tab-trup'); await ps.waitForSelector('.tabpane.tab-trup');
+    await ps.click('#scout-back'); await ps.waitForSelector('.tabpane.tab-trup');
+    const mineNow = { cells: await ps.locator('#matrix td.gain').count(), names: await ps.locator('#matrix td.player-gain').count(), help: await ps.locator('#trup-gain-help').count(), soldRow: await ps.locator(`#matrix tr[data-pid="${info.sold}"]`).count() };
+    check('v3.30.0 Trup, modstander: en solgt spillers +1 (stadig i din rapport) giver intet "+N" hos botten, der har ham – hverken i evnen, ved navnet eller i hjælpelinjen',
+      before.cells === 2 && before.names === 2 && moved.inBot && !moved.inMine && moved.stillInReport && bot.row === 1 && bot.cells === 0 && bot.names === 0 && bot.help === 0, JSON.stringify({ before, moved, bot }));
+    check('v3.30.0 Trup, dit hold igen: kun den, du beholdt, har sit "+N" (1 evne, 1 navn) og hjælpelinjen står', mineNow.cells === 1 && mineNow.names === 1 && mineNow.help === 1 && mineNow.soldRow === 0, JSON.stringify(mineNow));
+    await ps.context().close(); }
   await seeTeam('0');
 
   // Anti-spionage på et modstanderhold
@@ -2613,6 +2689,26 @@ try {
         const limit = bar.height ? bar.top : nav.top; return [Math.round(limit - pane.bottom), document.documentElement.scrollWidth - innerWidth]; });
     }
     check('390×844: sidste element står over bjælken/navigationen, og ingen fane ruller vandret (Hjem, Taktik, Trup, Træning, Liga)', Object.values(over).every(([gap, x]) => gap >= 0 && x <= 0), JSON.stringify(over));
+    // v3.30.0 (TM): syv faner ved 320 px (≈ 45 px pr. knap): teksten står på én linje, forkortes med … og bliver inden for sin knap – ingen vandret rulning
+    { await mtab('trup'); await mp.setViewportSize({ width: 320, height: 700 }); await mp.waitForTimeout(50);   // Trup: Liga ruller allerede 33 px vandret ved 320 px (ikke dette)
+      const t320 = await mp.evaluate(() => ({ over: document.documentElement.scrollWidth - innerWidth, btns: [...document.querySelectorAll('#tabs .tab')].map((b) => { const t = b.querySelector('.tab-txt'), br = b.getBoundingClientRect(), tr = t.getBoundingClientRect(), cs = getComputedStyle(t);
+        return { txt: t.textContent.trim(), w: Math.round(br.width), inside: tr.left >= br.left - 0.5 && tr.right <= br.right + 0.5, ws: cs.whiteSpace, to: cs.textOverflow, ov: cs.overflow, h: Math.round(tr.height) }; }) }));
+      check('320×700: syv nav-knapper à ≥ 44 px, hver tekst på én linje (nowrap, …) og inden for sin knap – ingen vandret rulning',
+        t320.over <= 0 && t320.btns.length === 7 && t320.btns.every((b) => b.w >= 44 && b.inside && b.ws === 'nowrap' && b.to === 'ellipsis' && b.ov === 'hidden' && b.h <= 20), JSON.stringify(t320));
+      await mp.setViewportSize({ width: 390, height: 844 }); }
+    // v3.30.0 (TM): på mobil står summen "+N" efter NAVNET (evne-kolonnerne er rullet væk) – ::after er skjult på computer og tegnet her.
+    // Spiller 0 har to +1 (FIN) og ét (PAC) = "+3"; en anden spiller har intet. Mærket skal være synligt i viewporten, i mærkets farver, med title.
+    await mp.evaluate(() => { const d = JSON.parse(localStorage.getItem('tactivar_save')), me = d.league.teams.find((t) => !t.isBot), p0 = me.squad[0];
+      d.league.trainingReport = { [me.id]: { round: 1, gains: [{ id: p0.id, skill: 'finishing' }, { id: p0.id, skill: 'finishing' }, { id: p0.id, skill: 'pace' }], injuries: [], strong: { up: [], down: [] } } };
+      localStorage.setItem('tactivar_save', JSON.stringify(d)); });
+    await mp.reload(); await mp.waitForSelector('body[data-klar="ja"]'); await mtab('trup');
+    const mg = await mp.evaluate(() => { const me = JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((t) => !t.isBot), p0 = me.squad[0], td = document.querySelector(`#matrix tr[data-pid="${p0.id}"] td.player-gain`);
+      const a = td && getComputedStyle(td, '::after'), r = td?.getBoundingClientRect();
+      return { names: document.querySelectorAll('#matrix td.player-gain').length, cells: document.querySelectorAll('#matrix td.gain').length, title: td?.title, gain: td?.dataset.gain, disp: a?.display, content: a?.content, bg: a?.backgroundColor, color: a?.color,
+        inView: !!r && r.left >= 0 && r.right <= innerWidth, help: document.getElementById('trup-gain-help')?.textContent ?? null, over: document.documentElement.scrollWidth - innerWidth }; });
+    check('390×844, Trup: "+3" efter navnet (mærke i .pill-ok-farver, synligt i viewporten) med title "+2 Afslutning, +1 Fart efter runde 1" – og hjælpelinjen står',
+      mg.names === 1 && mg.cells === 2 && mg.gain === '3' && mg.title === '+2 Afslutning, +1 Fart efter runde 1' && mg.disp === 'inline-block' && mg.content === '"+3"' && mg.bg === 'rgb(11, 51, 38)' && mg.color === 'rgb(110, 231, 183)' && mg.inView && mg.over <= 0
+        && !!mg.help && mg.help.includes('+1 = steg efter runde 1'), JSON.stringify(mg));
     await mctx.close();
   }
   await f1tm();
