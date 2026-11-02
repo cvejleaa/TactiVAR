@@ -303,6 +303,8 @@ try {
     if (t === 'trup') await pg.click(`#matrix tbody tr[data-pid="${pid}"]`);
     else {
       if (!(await pg.locator(`#lineup-list .lp-info[data-pid="${pid}"]`).count())) await pg.locator('#lineup-list .toolbar button', { hasText: 'Alle' }).click();   // listen er filtreret til en anden kæde
+      // TM: uden ⓘ kan kortet ikke åbnes på Taktik – et rødt tjek med forklaring i stedet for en 30 s timeout og en stak (kun ⓘ-mutationen faldt tidligere ikke pænt)
+      if (!(await pg.locator(`#lineup-list .lp-info[data-pid="${pid}"]`).count())) { check('F2: ⓘ står på Taktik-listens række – ellers kan spillerkortet ikke åbnes dér (brugerens valg: klik = byt, ⓘ = kort)', false, `ingen .lp-info for ${pid}`); throw new Error('ⓘ mangler på Taktik-listen'); }
       await pg.click(`#lineup-list .lp-info[data-pid="${pid}"]`);
     }
     await pg.waitForSelector('#cardpanel[data-open="ja"] #player-card');
@@ -390,7 +392,7 @@ try {
     await tt('taktik');
     const D1 = mine(await save()), slots0 = D1.tactics.lineupSlots.slice(), byP = (id) => D1.squad.find((x) => x.id === id);
     const info = await tp.evaluate(() => ({ rows: document.querySelectorAll('#lineup-list tr.lp-row').length, infos: [...document.querySelectorAll('#lineup-list tr.lp-row .lp-info')].map((b) => [b.dataset.pid, b.getAttribute('aria-label'), b.closest('tr').dataset.pid]),
-      size: (({ width, height }) => [width, height])(document.querySelector('.lp-info').getBoundingClientRect()), cell: document.querySelector('#lineup-list tr.lp-row td:nth-child(2)').textContent, help: document.getElementById('list-help')?.textContent ?? '' }));
+      size: (({ width, height }) => [width, height])(document.querySelector('.lp-info')?.getBoundingClientRect() ?? { width: 0, height: 0 }), cell: document.querySelector('#lineup-list tr.lp-row td:nth-child(2)').textContent, help: document.getElementById('list-help')?.textContent ?? '' }));
     check('F2 Taktik: ⓘ forrest i navnecellen på hver række (aria-label "Spillerkort: #nr Navn"), mindst 28 px – cellens tekst er stadig "#nr Navn", hjælpeteksten nævner ⓘ',
       info.rows === 18 && info.infos.length === 18 && info.infos.every(([pid, lbl, rp]) => pid === rp && lbl === `Spillerkort: #${byP(pid).shirtNumber} ${byP(pid).shortName}`) && info.size.every((x) => x >= 28) && /^#\d+ /.test(info.cell) && info.help.startsWith('ⓘ ved navnet = spillerkortet'), JSON.stringify({ ...info, infos: info.infos.length }));
     await tp.click('#pitch .token[data-slot="9"]');
@@ -418,7 +420,9 @@ try {
     check('F2 Taktik: ⓘ midt i et byt åbner kun hans kort – opstillingen er uændret, og byt-beskeden står endnu', s11.title === nm(D1.squad.find((x) => x.id === bench2)) && slots2.join() === slotsA.join()
       && pm11.includes(D1.squad.find((x) => x.id === slotsA[3]).shortName) && (await tp.locator('#lineup-list tr.active').count()) === 1, `${s11.title} | ${pm11}`);
     // (11) "Se kort ›" i byt-beskeden åbner den valgte spiller
-    await tp.click('#pick-card');
+    const hasPickCard = (await tp.locator('#pick-card').count()) === 1;
+    check('F2 Taktik: "Se kort ›" (#pick-card) står i byt-beskeden, mens et byt er i gang', hasPickCard);
+    if (hasPickCard) await tp.click('#pick-card');
     check('F2 Taktik: "Se kort ›" i byt-beskeden viser den spiller, der er valgt til byttet – stadig intet byt', (await st()).title === nm(D1.squad.find((x) => x.id === slotsA[3])) && mine(await save()).tactics.lineupSlots.join() === slotsA.join());
     await tp.keyboard.press('Escape');
     check('F2 Taktik: Escape lukker panelet, men afbryder ikke byttet (beskeden og den valgte række står)', (await st()).open === 'nej' && (await tp.locator('#pick-msg').count()) === 1 && (await tp.locator('#lineup-list tr.active').count()) === 1);
@@ -434,7 +438,9 @@ try {
       && mine(await save()).tactics.lineupSlots.join() === D2.tactics.lineupSlots.join() && (await tp.locator('#pick-msg').count()) === 0, `${s12.title} | ${pv}`);
     // (13) "Træner: X – ændr i Trup" er et link: Trup med panelet på samme spiller
     const s13t = s12.title;
-    await tp.click('#card-train-link');
+    const hasLink = (await tp.locator('#cardpanel #card-train-link').count()) === 1;
+    check('F2: "Træner: X – ændr i Trup" er et link (#card-train-link), ikke ren tekst', hasLink);
+    if (hasLink) await tp.click('#card-train-link');
     const s13 = await st();
     check('F2: "ændr i Trup" på kortet (Taktik) åbner Trup med panelet på samme spiller og træningsvalget', (await tp.isVisible('.tabpane.tab-trup')) && s13.open === 'ja' && s13.title === s13t && (await tp.locator('#cardpanel #focus-select').count()) === 1, JSON.stringify(s13));
     // (14) 1400 px: fast til højre under topbaren, over Spil-bjælken, ingen vandret rulning; siden giver plads (listen/regnearket dækkes ikke)
@@ -519,7 +525,264 @@ try {
       await c.close();
     }
   };
+  const f2tm = async () => {
+    // ---------- UI-ombygningen F2, Test Manager (v3.29.0): det forfatterens F2-blok lod overleve – kan køres alene med TM_F2_ONLY=1 ----------
+    // Forfatterens tjek læste ◀ ▶ kun ét skridt fra listens start, Escape kun med tasten Escape (ikke isComposing/andre taster/"lukket"), fokus kun efter ✕ på
+    // Trup, køb-kvitteringen kun i den fulde kørsel (og kun hvis noget kunne købes), og bredderne 768/1400/390 – ikke grænserne 600/601, 900/901, 1199/1200.
+    // ◀ ▶ trykkes kun, når de er til – en mutation, der slår dem fra, skal give et rødt tjek (titlen er forkert), ikke en 30 s timeout
+    const go = async (pg, id) => { if (!(await pg.isDisabled(id))) await pg.click(id); };
+    const tt = async (pg, k) => { await pg.click(`#tab-${k}`); await pg.waitForSelector(`.tabpane.tab-${k}`); };
+    const save = (pg) => pg.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')));
+    const mine = (d) => d.league.teams.find((t) => !t.isBot);
+    const nm = (p) => `#${p.shirtNumber} ${p.name}`;
+    const title = (pg) => pg.evaluate(() => document.getElementById('cp-title')?.textContent ?? null);
+    const act = (pg) => pg.evaluate(() => { const a = document.activeElement; return { id: a?.id || '', pid: a?.dataset?.pid ?? null, tag: a?.tagName ?? '', cls: a?.className ?? '', inPanel: !!a?.closest?.('#cardpanel'), inMatrix: !!a?.closest?.('#matrix') }; });
+    const edit = async (pg, fn, arg = null) => { await pg.evaluate(({ src, arg }) => { const d = JSON.parse(localStorage.getItem('tactivar_save')); new Function('d', 'arg', src)(d, arg); localStorage.setItem('tactivar_save', JSON.stringify(d)); }, { src: fn, arg }); await pg.reload(); await pg.waitForSelector('body[data-klar="ja"]'); };
+    // (A) Trup: ▶ gennem HELE regnearkets rækkefølge, til den sidste (▶ slået fra), og ◀ hele vejen tilbage – aldrig tabt fokus, aldrig byt
+    {
+      const tp = await fresh();
+      await tt(tp, 'trup');
+      const order = await tp.evaluate(() => [...document.querySelectorAll('#matrix tbody tr')].map((r) => r.dataset.pid));
+      const P = mine(await save(tp)).squad, by = (id) => P.find((x) => x.id === id), slots0 = mine(await save(tp)).tactics.lineupSlots.join();
+      await tp.click(`#matrix tbody tr[data-pid="${order[0]}"]`);
+      const seen = [await title(tp)];
+      for (let i = 1; i < order.length; i++) { await go(tp, '#card-next'); seen.push(await title(tp)); }
+      const lastState = { next: await tp.isDisabled('#card-next'), prev: await tp.isDisabled('#card-prev'), a: await act(tp), sel: await tp.evaluate(() => [...document.querySelectorAll('#matrix tr.selected')].map((r) => r.dataset.pid)) };
+      check('F2 TM Trup: ▶ går gennem hele regnearkets rækkefølge (18 skridt) – ▶ er slået fra på den sidste, ◀ er til, og fokus er stadig i panelet (✕), ikke tabt til siden',
+        JSON.stringify(seen) === JSON.stringify(order.map((id) => nm(by(id)))) && lastState.next && !lastState.prev && lastState.a.inPanel && lastState.a.id === 'card-close' && JSON.stringify(lastState.sel) === JSON.stringify([order[17]]), JSON.stringify({ seen: seen.length, lastState }));
+      const back = [await title(tp)];
+      for (let i = order.length - 2; i >= 0; i--) { await go(tp, '#card-prev'); back.push(await title(tp)); }
+      const firstState = { prev: await tp.isDisabled('#card-prev'), next: await tp.isDisabled('#card-next'), a: await act(tp) };
+      check('F2 TM Trup: ◀ går hele vejen tilbage til den første (◀ slået fra, fokus i panelet) – og ingen byt undervejs (opstillingen uændret)',
+        JSON.stringify(back) === JSON.stringify(order.slice().reverse().map((id) => nm(by(id)))) && firstState.prev && !firstState.next && firstState.a.inPanel && mine(await save(tp)).tactics.lineupSlots.join() === slots0, JSON.stringify({ back: back.length, firstState }));
+      // fokus tilbage: åbnet på række 3, bladret to skridt – ✕ giver fokus til regnearkets række (den, der åbnede), ikke til siden
+      await tp.click('#card-close'); await tp.click(`#matrix tbody tr[data-pid="${order[2]}"]`); await go(tp, '#card-next'); await go(tp, '#card-next'); await tp.click('#card-close');
+      const fa = await act(tp);
+      check('F2 TM Trup: åbnet på en række og bladret med ▶ – ✕ lægger fokus på en række i regnearket (den, der åbnede), ikke på siden', fa.tag === 'TR' && fa.inMatrix && fa.pid === order[2], JSON.stringify(fa));
+      // en spiller, filteret skjuler: panelet består, og ◀ ▶ bladrer i hele truppen (i regnearkets rækkefølge) i stedet for at dø
+      const startIds = new Set(slots0.split(','));
+      const benchPid = order.find((id) => !startIds.has(id)), bi = order.indexOf(benchPid);
+      const tb = (t) => tp.locator('.panel:has(> .tablewrap > #matrix) > .toolbar button', { hasText: t }).first();
+      await tp.click(`#matrix tbody tr[data-pid="${benchPid}"]`); await tb('Start-11').click();
+      const hid = { open: await tp.getAttribute('#cardpanel', 'data-open'), rows: await tp.locator('#matrix tbody tr').count(), has: await tp.locator(`#matrix tbody tr[data-pid="${benchPid}"]`).count(), t: await title(tp) };
+      await go(tp, '#card-next'); const tn = await title(tp);
+      await tp.click('#card-close'); await tb('Alle').click(); await tp.click(`#matrix tbody tr[data-pid="${benchPid}"]`); await tb('Start-11').click();
+      await go(tp, '#card-prev'); const tpv = await title(tp);
+      check('F2 TM Trup: spilleren er skjult af filteret (Start-11) – panelet står, og ▶/◀ bladrer i hele truppen i regnearkets rækkefølge (næste/forrige i den ufiltrerede liste)',
+        bi > 0 && hid.open === 'ja' && hid.rows === 11 && hid.has === 0 && hid.t === nm(by(benchPid)) && tn === nm(by(order[bi + 1])) && tpv === nm(by(order[bi - 1])), JSON.stringify({ hid, tn, tpv, want: [nm(by(order[bi + 1])), nm(by(order[bi - 1]))] }));
+      // filteret SKAL følges, når spilleren står i det: Start-11 og en starter, hvis næste række i hele truppen er en bænkspiller → ▶ går til den næste STARTER
+      await tp.click('#card-close'); await tb('Alle').click();
+      // sorteret på navn (derefter andre kolonner, hvis starterne tilfældigvis stod samlet): starterne og bænken blandes, så næste STARTER ≠ næste række
+      const isS = (id) => startIds.has(id);
+      let ord2 = [], k = -1, nextS = null;
+      for (const col of [2, 3, 15, 4, 5, 6, 7]) {
+        await tb('Alle').click(); await tp.click(`#matrix thead th:nth-child(${col})`);
+        ord2 = await tp.evaluate(() => [...document.querySelectorAll('#matrix tbody tr')].map((r) => r.dataset.pid));
+        k = ord2.findIndex((id, i) => isS(id) && i + 1 < ord2.length && !isS(ord2[i + 1]) && ord2.slice(i + 2).some(isS)); if (k >= 0) { nextS = ord2.slice(k + 1).find(isS); break; }
+      }
+      if (k >= 0) { await tp.click(`#matrix tbody tr[data-pid="${ord2[k]}"]`); await tb('Start-11').click(); await go(tp, '#card-next'); }
+      const tf = await title(tp);
+      check('F2 TM Trup: med filteret Start-11 og en starter åben går ▶ til den næste starter i regnearket (springer bænken over) – ikke til næste række i hele truppen', k >= 0 && tf === nm(by(nextS)) && tf !== nm(by(ord2[k + 1])), JSON.stringify({ k, tf, want: nextS && nm(by(nextS)), unfiltered: k >= 0 && nm(by(ord2[k + 1])), flags: ord2.map((id) => (isS(id) ? 'S' : 'b')).join(''), n: ord2.length, same: JSON.stringify(ord2) === JSON.stringify(order) }));
+      await tp.context().close();
+    }
+    // (B) Taktik: ▶ gennem start-11, bænk OG reserver (en 19. spiller lægges ind) – ◀ tilbage; filter-fallback; fokus tilbage til ⓘ
+    {
+      const tp = await fresh();
+      await edit(tp, "const me = d.league.teams.find((t) => !t.isBot), o = d.league.teams.find((t) => t.isBot); const x = o.squad.pop(); x.id = 'plr_tm_res'; x.shirtNumber = 77; x.name = 'Rasmus Reserve'; x.shortName = 'R. Reserve'; me.squad.push(x); delete me.matchBench;");
+      await tt(tp, 'taktik');
+      await tp.locator('#lineup-list .toolbar button', { hasText: 'Alle' }).click();
+      const ids = await tp.evaluate(() => [...document.querySelectorAll('#lineup-list tr.lp-row')].map((r) => r.dataset.pid));
+      const D = mine(await save(tp)), by = (id) => D.squad.find((x) => x.id === id), slots0 = D.tactics.lineupSlots.join();
+      const sect = await tp.evaluate(() => ({ infos: document.querySelectorAll('#lineup-list tr.lp-row .lp-info').length, res: document.querySelectorAll('#lineup-list tr.reserve-p').length, bench: document.querySelectorAll('#lineup-list tr.bench-p').length, start: document.querySelectorAll('#lineup-list tr.start-p').length }));
+      check('F2 TM Taktik: fixturet har alle tre sektioner (11 start-p, 7 bænk, 1 reserve), og ⓘ på alle 19 rækker – ellers måler ◀ ▶-testen under ingenting', sect.start === 11 && sect.bench === 7 && sect.res === 1 && sect.infos === 19 && ids.length === 19 && ids[18] === 'plr_tm_res', JSON.stringify(sect));
+      await tp.click(`#lineup-list .lp-info[data-pid="${ids[0]}"]`);
+      const seen = [await title(tp)];
+      for (let i = 1; i < ids.length; i++) { await go(tp, '#card-next'); seen.push(await title(tp)); }
+      const end = { next: await tp.isDisabled('#card-next'), prev: await tp.isDisabled('#card-prev'), a: await act(tp), carded: await tp.evaluate(() => [...document.querySelectorAll('#lineup-list tr.carded')].map((r) => r.dataset.pid)) };
+      check('F2 TM Taktik: ▶ går gennem start-11, bænk og reserver i listens rækkefølge (19 skridt) – ▶ slået fra på reserven, fokus i panelet, og kun reserven har omridset',
+        JSON.stringify(seen) === JSON.stringify(ids.map((id) => nm(by(id)))) && end.next && !end.prev && end.a.inPanel && JSON.stringify(end.carded) === JSON.stringify(['plr_tm_res']), JSON.stringify({ n: seen.length, end }));
+      const back = [await title(tp)];
+      for (let i = ids.length - 2; i >= 0; i--) { await go(tp, '#card-prev'); back.push(await title(tp)); }
+      check('F2 TM Taktik: ◀ går hele vejen tilbage (◀ slået fra på den første) – og bytter aldrig (opstillingen uændret, ingen byt-besked)',
+        JSON.stringify(back) === JSON.stringify(ids.slice().reverse().map((id) => nm(by(id)))) && (await tp.isDisabled('#card-prev')) && mine(await save(tp)).tactics.lineupSlots.join() === slots0 && (await tp.locator('#pick-msg').count()) === 0, JSON.stringify({ n: back.length }));
+      // fokus tilbage til ⓘ (genfundet efter gentegningen), og omridset forsvinder ved lukning (også på siden)
+      await tp.click('#card-close');
+      await tp.click(`#lineup-list .lp-info[data-pid="${ids[3]}"]`);
+      const ol = await tp.evaluate(() => { const r = document.querySelector('#lineup-list tr.carded'); return r ? { pid: r.dataset.pid, style: getComputedStyle(r).outlineStyle, w: getComputedStyle(r).outlineWidth } : null; });
+      await tp.keyboard.press('Escape');
+      const fx = await act(tp), carded0 = await tp.locator('#lineup-list tr.carded').count();
+      check('F2 TM Taktik: den åbnede spillers række har et synligt omrids (solid, 1 px) – og efter Escape er omridset væk og fokus på hans ⓘ', ol && ol.pid === ids[3] && ol.style === 'solid' && ol.w === '1px' && carded0 === 0 && fx.cls.includes('lp-info') && fx.pid === ids[3], JSON.stringify({ ol, fx, carded0 }));
+      // et klik på din egen række med panelet LUKKET åbner ikke panelet (kun byt)
+      await tp.click(`#lineup-list tr.lp-row[data-pid="${ids[12]}"] td:first-child`);
+      const own = { open: await tp.getAttribute('#cardpanel', 'data-open'), msg: await tp.locator('#pick-msg').count() };
+      check('F2 TM Taktik: et klik på din egen række (panelet lukket) starter et byt og åbner ikke panelet', own.open === 'nej' && own.msg === 1, JSON.stringify(own));
+      await tp.click(`#lineup-list tr.lp-row[data-pid="${ids[12]}"] td:first-child`);   // fravælg
+      // "Se kort ›": lukker man bagefter, går fokus til ⓘ på den valgte (ikke tabt)
+      await tp.click(`#pitch .token[data-slot="3"]`); await tp.click('#pick-card'); await tp.click('#card-close');
+      const sk = await act(tp);
+      check('F2 TM Taktik: "Se kort ›" → ✕ lægger fokus på den valgte spillers ⓘ', sk.cls.includes('lp-info') && sk.pid === D.tactics.lineupSlots[3], JSON.stringify(sk));
+      await tp.click(`#pitch .token[data-slot="3"]`);   // fravælg
+      // listen er filtreret til en anden kæde end panelets spiller → ◀ ▶ bladrer i den ufiltrerede liste (R1)
+      await tp.locator('#lineup-list .toolbar button', { hasText: 'Alle' }).click();
+      const defPid = D.tactics.lineupSlots.find((id) => by(id).line === 'DEF'), attSlot = D.tactics.lineupSlots.findIndex((id) => by(id).line === 'ATT');
+      await tp.click(`#lineup-list .lp-info[data-pid="${defPid}"]`);
+      await tp.click(`#pitch .token[data-slot="${attSlot}"]`);   // brikken filtrerer listen til ANG og starter et byt
+      const shown = await tp.evaluate(() => [...document.querySelectorAll('#lineup-list tr.lp-row')].length), di = ids.indexOf(defPid);
+      await go(tp, '#card-next'); const t1 = await title(tp);
+      await go(tp, '#card-prev'); await go(tp, '#card-prev'); const t2 = await title(tp);
+      check('F2 TM Taktik: listen er filtreret til en anden kæde (ANG) end panelets spiller – ◀ ▶ bladrer alligevel i hele listen (næste/forrige i den ufiltrerede rækkefølge)', shown < 10 && t1 === nm(by(ids[di + 1])) && t2 === nm(by(ids[di - 1])), JSON.stringify({ shown, t1, t2, want: [nm(by(ids[di + 1])), nm(by(ids[di - 1]))] }));
+      // listen filtreret til FOR og en forsvarer åben: ▶ fra den sidste startende forsvarer går til den første forsvarer på bænken (filtrerede liste), ikke til næste starter (midtbane)
+      await tp.click(`#pitch .token[data-slot="${attSlot}"]`); await tp.click('#card-close');   // fravælg byttet og luk
+      await tp.locator('#lineup-list .toolbar button', { hasText: 'FOR' }).click();
+      const dIds = await tp.evaluate(() => [...document.querySelectorAll('#lineup-list tr.lp-row')].map((r) => r.dataset.pid)), nDef = D.tactics.lineupSlots.filter((id) => by(id).line === 'DEF').length;
+      await tp.click(`#lineup-list .lp-info[data-pid="${dIds[nDef - 1]}"]`); await go(tp, '#card-next'); const tdn = await title(tp);
+      const unf = ids[ids.indexOf(dIds[nDef - 1]) + 1];
+      check('F2 TM Taktik: med listen filtreret til FOR går ▶ fra den sidste startende forsvarer til den første forsvarer på bænken (listens rækkefølge) – ikke til næste starter i hele listen', dIds.length > nDef && tdn === nm(by(dIds[nDef])) && dIds[nDef] !== unf, JSON.stringify({ tdn, want: nm(by(dIds[nDef])), unfiltered: nm(by(unf)), nDef, n: dIds.length }));
+      await tp.context().close();
+    }
+    // (C) Escape: kun tasten Escape, ikke under tekstindtastning med IME (isComposing), og kun når panelet er åbent (en lukket side sluger ikke Escape)
+    {
+      const tp = await fresh();
+      await tt(tp, 'trup');
+      const key = (k, init = {}) => tp.evaluate(({ k, init }) => document.body.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true, ...init })), { k, init });
+      const open = () => tp.getAttribute('#cardpanel', 'data-open');
+      const closedFree = await key('Escape');   // lukket: dispatchEvent giver true, hvis ingen har kaldt preventDefault
+      await tp.locator('#matrix tbody tr').nth(2).click();
+      const r1 = await key('Escape', { isComposing: true }), o1 = await open();
+      const r2 = await key('Enter'), o2 = await open();
+      const r3 = await key('a'), o3 = await open();
+      const r4 = await key('Escape'), o4 = await open();
+      check('F2 TM Escape: en lukket side sluger ikke Escape (ikke afbrudt), IME-Escape (isComposing), Enter og et bogstav lader panelet stå – kun et rigtigt Escape lukker, og det afbrydes (preventDefault)',
+        closedFree === true && o1 === 'ja' && r1 === true && o2 === 'ja' && r2 === true && o3 === 'ja' && r3 === true && o4 === 'nej' && r4 === false, JSON.stringify({ closedFree, o1, r1, o2, r2, o3, r3, o4, r4 }));
+      await tp.context().close();
+    }
+    // (D) køb: kvitteringen står i panelet (ikke lukket tavst) – spilleren er ikke længere i holdet, så der er intet kort, kun kvitteringen og vejen til ham
+    {
+      const tp = await fresh();
+      await edit(tp, "const me = d.league.teams.find((t) => !t.isBot); me.cashBalance += 80000000;");
+      const pick = (skip) => tp.evaluate(async (skip) => { const { marketInfo } = await import('/engine/transfers.js'); const l = JSON.parse(localStorage.getItem('tactivar_save')).league, me = l.teams.find((t) => !t.isBot);
+        for (const [i, t] of l.teams.entries()) if (t.isBot) for (const p of t.squad) { if (skip.includes(p.id)) continue; const m = marketInfo(l, me, t, p); if (!m.reason) return { i, id: p.id, shortName: p.shortName }; } return null; }, skip);
+      const seeOther = async (i, tab) => { await tt(tp, 'liga'); await tp.selectOption('#team-select', String(i)); await tp.waitForSelector('.tabpane.tab-trup'); if (tab === 'taktik') await tt(tp, 'taktik'); };
+      const receipt = (id) => tp.evaluate((id) => { const pc = document.getElementById('cardpanel'), a = document.activeElement, lab = pc.getAttribute('aria-labelledby');
+        return { open: pc.dataset.open, title: document.getElementById('cp-title')?.textContent, cards: pc.querySelectorAll('#player-card').length, notice: document.getElementById('panel-notice')?.textContent ?? null,
+          prevD: document.getElementById('card-prev')?.disabled, nextD: document.getElementById('card-next')?.disabled, lab, labText: document.getElementById(lab)?.textContent ?? null, body: document.body.classList.contains('card-open'),
+          rowGone: !document.querySelector(`#matrix tr[data-pid="${id}"], #lineup-list tr[data-pid="${id}"]`), inPanel: !!a?.closest('#cardpanel'), toSquad: document.getElementById('panel-to-squad')?.textContent ?? null }; }, id);
+      const b1 = await pick([]);
+      check('F2 TM køb: fixturet har en spiller, der kan købes (ellers er kvitteringstesten tom)', !!b1, JSON.stringify(b1));
+      await seeOther(b1.i, 'trup');
+      await tp.click(`#matrix tbody tr[data-pid="${b1.id}"]`); await tp.click('#buy-player');
+      const r1 = await receipt(b1.id), want = `💰 ${b1.shortName} er købt og står nu i din trup.`;
+      check('F2 TM køb (Trup): kvitteringen står i panelet – "💰 Købt", teksten, intet kort, ◀ ▶ slået fra, panelet navngivet af kvitteringen, fokus i panelet, spilleren væk fra den gamle trup og et link til ham',
+        r1.open === 'ja' && r1.title === '💰 Købt' && r1.cards === 0 && r1.notice === want && r1.prevD === true && r1.nextD === true && r1.lab === 'cp-title' && r1.labText === '💰 Købt' && r1.body && r1.rowGone && r1.inPanel && r1.toSquad === `Se ${b1.shortName} i din trup ›`, JSON.stringify(r1));
+      await tp.click('#panel-to-squad');
+      const me1 = mine(await save(tp)).squad.find((x) => x.id === b1.id);
+      const t1 = await tp.evaluate((id) => ({ trup: !!document.querySelector('.tabpane.tab-trup'), scout: document.querySelectorAll('#scout-banner').length, title: document.getElementById('cp-title')?.textContent, cards: document.querySelectorAll('#cardpanel #player-card').length,
+        sel: [...document.querySelectorAll('#matrix tr.selected')].map((r) => r.dataset.pid), notice: document.querySelectorAll('#panel-notice').length, lab: document.getElementById('cardpanel').getAttribute('aria-labelledby'), a: document.activeElement.id, open: document.getElementById('cardpanel').dataset.open }), b1.id);
+      check('F2 TM køb: "Se X i din trup ›" åbner Trup for DIT hold (ingen scout-bjælke) med panelet på netop ham – kortet, ikke kvitteringen, rækken markeret og ✕ i fokus',
+        !!me1 && t1.trup && t1.scout === 0 && t1.open === 'ja' && t1.title === nm(me1) && t1.cards === 1 && JSON.stringify(t1.sel) === JSON.stringify([b1.id]) && t1.notice === 0 && t1.lab === 'card-title' && t1.a === 'card-close', JSON.stringify({ t1, want: me1 && nm(me1) }));
+      await tp.keyboard.press('Escape');
+      const f1 = await act(tp);
+      check('F2 TM køb: Escape på kortet lukker, og fokus går til hans række i din trup (den, der åbnede)', (await tp.getAttribute('#cardpanel', 'data-open')) === 'nej' && f1.tag === 'TR' && f1.pid === b1.id, JSON.stringify(f1));
+      // Taktik: samme flow; et klik på en anden spillers ⓘ bagefter erstatter kvitteringen med hans kort (og kvitteringen er væk)
+      const b2 = await pick([b1.id]);
+      check('F2 TM køb: fixturet har endnu en spiller, der kan købes (Taktik)', !!b2, JSON.stringify(b2));
+      await seeOther(b2.i, 'taktik');
+      if (!(await tp.locator(`#lineup-list .lp-info[data-pid="${b2.id}"]`).count())) await tp.locator('#lineup-list .toolbar button', { hasText: 'Alle' }).click();
+      await tp.click(`#lineup-list .lp-info[data-pid="${b2.id}"]`); await tp.click('#buy-player');
+      const r2 = await receipt(b2.id);
+      check('F2 TM køb (Taktik): samme kvittering i panelet – og et andet holds liste har ikke længere ham', r2.open === 'ja' && r2.title === '💰 Købt' && r2.cards === 0 && r2.notice === `💰 ${b2.shortName} er købt og står nu i din trup.` && r2.prevD && r2.nextD && r2.rowGone && r2.inPanel && r2.toSquad === `Se ${b2.shortName} i din trup ›`, JSON.stringify(r2));
+      const other = await tp.evaluate(() => document.querySelector('#lineup-list .lp-info').dataset.pid);
+      await tp.click(`#lineup-list .lp-info[data-pid="${other}"]`);
+      const r3 = await receipt(other);
+      const O = (await save(tp)).league.teams[b2.i].squad.find((x) => x.id === other);
+      check('F2 TM køb: et klik på en anden spillers ⓘ erstatter kvitteringen med hans kort (ingen kvittering, ◀ ▶ virker igen)', r3.open === 'ja' && r3.title === nm(O) && r3.cards === 1 && r3.notice === null && r3.toSquad === null && r3.lab === 'card-title', JSON.stringify(r3));
+      // "Se X i din trup ›" fra TAKTIK (et andet holds liste): fanen skifter til Trup og panelet står på ham dér (ikke et kort på Taktik)
+      const b3 = await pick([b1.id, b2.id]);
+      check('F2 TM køb: fixturet har en tredje spiller, der kan købes (Taktik → "Se X i din trup ›")', !!b3, JSON.stringify(b3));
+      await seeOther(b3.i, 'taktik');
+      if (!(await tp.locator(`#lineup-list .lp-info[data-pid="${b3.id}"]`).count())) await tp.locator('#lineup-list .toolbar button', { hasText: 'Alle' }).click();
+      await tp.click(`#lineup-list .lp-info[data-pid="${b3.id}"]`); await tp.click('#buy-player'); await tp.click('#panel-to-squad');
+      const me3 = mine(await save(tp)).squad.find((x) => x.id === b3.id);
+      const t3 = await tp.evaluate((id) => ({ trup: !!document.querySelector('.tabpane.tab-trup'), taktik: !!document.querySelector('.tabpane.tab-taktik'), scout: document.querySelectorAll('#scout-banner').length, title: document.getElementById('cp-title')?.textContent, cards: document.querySelectorAll('#cardpanel #player-card').length,
+        sel: [...document.querySelectorAll('#matrix tr.selected')].map((r) => r.dataset.pid) }), b3.id);
+      check('F2 TM køb: "Se X i din trup ›" fra et andet holds TAKTIK åbner Trup for dit hold med panelet på ham', !!me3 && t3.trup && !t3.taktik && t3.scout === 0 && t3.title === nm(me3) && t3.cards === 1 && JSON.stringify(t3.sel) === JSON.stringify([b3.id]), JSON.stringify({ t3, want: me3 && nm(me3) }));
+      await tp.context().close();
+    }
+    // (E) bredderne: grænserne for side/ark (900/901), ark over navigationen (600/601), plads til panelet (1199/1200), panelets bredde og lag
+    {
+      const geo = (pg) => pg.evaluate(() => { const r = (q) => document.querySelector(q)?.getBoundingClientRect(), pcEl = document.getElementById('cardpanel'), pc = pcEl.getBoundingClientRect(), bar = r('#playbar'), nav = r('#tabbar'), tb = r('.topbar'), list = r('#lineup-list');
+        const hit = (x, y) => pcEl.contains(document.elementFromPoint(x, y));
+        return { l: pc.left, r: pc.right, w: pc.width, t: pc.top, b: pc.bottom, h: pc.height, barTop: bar.height ? bar.top : innerHeight, navTop: nav.top, tbB: tb.bottom, iw: innerWidth, ih: innerHeight, sw: document.documentElement.scrollWidth,
+          pr: parseFloat(getComputedStyle(document.querySelector('main')).paddingRight), listR: list?.right ?? null, cls: document.body.classList.contains('card-open'), over: getComputedStyle(pcEl).overscrollBehaviorY, ovy: getComputedStyle(pcEl).overflowY,
+          hit: [hit(pc.left + pc.width / 2, pc.top + pc.height / 2), hit(pc.left + 8, pc.top + 8), hit(pc.right - 8, pc.bottom - 8)] }; });
+      const at = async (w, h = 900) => { const c = await browser.newContext({ viewport: { width: w, height: h } }), pg = await c.newPage(); await pg.goto(BASE + '/'); await pg.waitForSelector('body[data-klar="ja"]'); await tt(pg, 'taktik');
+        const closed = await geo(pg); await pg.evaluate(() => document.querySelector('#lineup-list .lp-info').click()); await pg.waitForSelector('#cardpanel[data-open="ja"] #player-card'); const open = await geo(pg); return { c, pg, closed, open }; };
+      const W = {};
+      for (const w of [1199, 1200, 1000, 901, 900, 601, 600]) { const x = await at(w); W[w] = x; }
+      const o = (w) => W[w].open, cl = (w) => W[w].closed, near = (a, b, d = 1.5) => Math.abs(a - b) <= d;
+      check('F2 TM 1200 px: siden giver plads – main har padding-right = panelets bredde (420) + 1 rem, listen står til venstre for panelet, og efter lukning er pladsen og body.card-open væk',
+        near(o(1200).w, 420) && near(o(1200).pr, 436) && o(1200).listR <= o(1200).l + 1 && o(1200).cls && o(1200).sw <= o(1200).iw, JSON.stringify(o(1200)));
+      await W[1200].pg.keyboard.press('Escape'); const after1200 = await geo(W[1200].pg);
+      check('F2 TM 1200 px: efter lukning er main-padding og body.card-open som før', near(after1200.pr, cl(1200).pr) && !after1200.cls && cl(1200).pr < 100, JSON.stringify({ after: after1200.pr, before: cl(1200).pr, cls: after1200.cls }));
+      check('F2 TM 1199 px: under 1200 gives der ikke plads (panelet 420 px står over listens højre kant – kendt) – main-padding uændret, men panelet er stadig en fast side til højre uden vandret rulning',
+        near(o(1199).pr, cl(1199).pr) && near(o(1199).w, 420) && near(o(1199).r, 1199) && o(1199).sw <= o(1199).iw, JSON.stringify({ o: o(1199).pr, c: cl(1199).pr, w: o(1199).w }));
+      check('F2 TM 1000 px: panelets bredde er 40 % af vinduet (400 px), fast til højre under topbaren og over Spil-bjælken', near(o(1000).w, 400) && near(o(1000).l, 600) && o(1000).t >= o(1000).tbB - 1 && o(1000).b <= o(1000).barTop + 1 && o(1000).sw <= o(1000).iw, JSON.stringify(o(1000)));
+      check('F2 TM 901 px: stadig et sidepanel (ikke et ark) – højre kant 901, bredde 40 % (≈ 360), under topbaren', o(901).l > 400 && near(o(901).r, 901) && near(o(901).w, 360.4) && o(901).t >= o(901).tbB - 1, JSON.stringify(o(901)));
+      check('F2 TM 900 px: arket – fuld bredde, højst 70 % af højden, bunden ved Spil-bjælken (601–900: over bjælken, ikke over navigationen)', o(900).l === 0 && o(900).r === 900 && o(900).h <= 900 * 0.7 + 1 && near(o(900).b, o(900).barTop) && o(900).t > o(900).tbB, JSON.stringify(o(900)));
+      check('F2 TM 601 px: arket står over Spil-bjælken (bunden = bjælkens top), ikke bag navigationen – og navigationen er endnu i toppen', near(o(601).b, o(601).barTop) && o(601).navTop < 200, JSON.stringify(o(601)));
+      check('F2 TM 600 px: navigationen står i bunden, og arket står OVER den (bunden ≤ navigationens top) – hen over Spil-bjælken', o(600).navTop > 600 && Math.abs(o(600).b - o(600).navTop) <= 0.6 && o(600).b > o(600).barTop - 1, JSON.stringify(o(600)));
+      check('F2 TM lag og rulning ved alle bredder: intet ligger ovenpå panelet (midte og to hjørner rammer panelet), og det ruller selv uden at give rulningen videre (overflow-y auto, overscroll contain)',
+        Object.keys(W).every((w) => o(w).hit.every(Boolean) && o(w).over === 'contain' && o(w).ovy === 'auto' && o(w).sw <= o(w).iw), JSON.stringify(Object.keys(W).map((w) => [w, o(w).hit, o(w).over, o(w).ovy])));
+      // Trup har ingen Spil-bjælke: arket står i bunden (601) – eller over navigationen (600) – præcis, ikke 57 px for højt
+      for (const w of [601, 600]) { const pg = W[w].pg; await pg.keyboard.press('Escape'); await tt(pg, 'trup'); await pg.locator('#matrix tbody tr').nth(2).click(); await pg.waitForSelector('#cardpanel[data-open="ja"] #player-card'); W[w].trup = await geo(pg); }
+      check('F2 TM Trup (uden Spil-bjælke): 601 px: arkets bund er skærmens bund; 600 px: navigationens top – ikke en fast 57 px for højt', near(W[601].trup.b, W[601].trup.ih, 1) && Math.abs(W[600].trup.b - W[600].trup.navTop) <= 0.6 && W[600].trup.navTop > 600, JSON.stringify({ a: [W[601].trup.b, W[601].trup.ih], b: [W[600].trup.b, W[600].trup.navTop] }));
+      for (const w of Object.keys(W)) await W[w].c.close();
+    }
+    // (F) byt i gang på smal skærm: beskeden med "Se kort ›" er fastgjort over Spil-bjælken (≤ 900 px) – men står i listen på computer og efter byttet,
+    // og arket lægger sig OVER den (beskeden dækker aldrig panelet)
+    {
+      const topTok = (pg) => pg.evaluate(() => [...document.querySelectorAll('#pitch .token')].sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top)[0].dataset.slot);
+      const msg = (pg) => pg.evaluate(() => { const m = document.getElementById('pick-msg'), c = document.getElementById('pick-card'); if (!m) return null; const mr = m.getBoundingClientRect(), cr = c?.getBoundingClientRect(), bar = document.getElementById('playbar').getBoundingClientRect(), nav = document.getElementById('tabbar').getBoundingClientRect();
+        return { pos: getComputedStyle(m).position, live: m.classList.contains('pick-live'), cb: cr?.bottom ?? null, hit: cr ? document.elementFromPoint(cr.left + cr.width / 2, cr.top + cr.height / 2)?.id : null, mb: mr.bottom, mt: mr.top, barTop: bar.top, navTop: nav.top, ih: innerHeight }; });
+      const ctx = async (w, h) => { const c = await browser.newContext({ viewport: { width: w, height: h } }), pg = await c.newPage(); await pg.goto(BASE + '/'); await pg.waitForSelector('body[data-klar="ja"]'); await tt(pg, 'taktik'); return { c, pg }; };
+      // 768: fastgjort over Spil-bjælken
+      { const { c, pg } = await ctx(768, 900); await pg.click(`#pitch .token[data-slot="${await topTok(pg)}"]`); const m = await msg(pg);
+        check('F2 TM 768 px: byt i gang → beskeden med "Se kort ›" er fastgjort over Spil-bjælken (fixed, bunden ved bjælkens top − 6) og kan trykkes', m && m.live && m.pos === 'fixed' && m.mb <= m.barTop && m.mb >= m.barTop - 14 && m.hit === 'pick-card', JSON.stringify(m)); await c.close(); }
+      // 1400: samme besked står i listen (ikke fastgjort)
+      { const { c, pg } = await ctx(1400, 900); await pg.click(`#pitch .token[data-slot="${await topTok(pg)}"]`); const m = await msg(pg);
+        check('F2 TM 1400 px: byt i gang → beskeden står i listen (ikke fixed) og kan trykkes', m && m.pos !== 'fixed' && m.hit === 'pick-card', JSON.stringify(m)); await c.close(); }
+      // 390: fastgjort over Spil-bjælken, arket ovenpå, og efter byttet står kvitteringen i listen igen (ikke fastgjort, ikke pick-live)
+      { const { c, pg } = await ctx(390, 844);
+        await edit(pg, "const me = d.league.teams.find((t) => !t.isBot), o = d.league.teams.find((t) => t.isBot); const x = o.squad.pop(); x.id = 'plr_tm_res'; x.shirtNumber = 77; x.name = 'Rasmus Reserve'; x.shortName = 'R. Reserve'; me.squad.push(x); delete me.matchBench;"); await tt(pg, 'taktik');
+        await pg.click(`#pitch .token[data-slot="${await topTok(pg)}"]`); const m = await msg(pg);
+        check('F2 TM 390 px: byt i gang → beskeden er fastgjort over Spil-bjælken, som står over navigationen (bunden ≤ bjælkens top, bjælkens top ≤ navigationens top)', m && m.live && m.pos === 'fixed' && m.mb <= m.barTop && m.barTop <= m.navTop + 0.5 && m.hit === 'pick-card', JSON.stringify(m));
+        await pg.evaluate(() => document.querySelector('#lineup-list tr.bench-p .lp-info').click()); await pg.waitForSelector('#cardpanel[data-open="ja"] #player-card');
+        const cover = await pg.evaluate(() => { const r = document.getElementById('pick-msg').getBoundingClientRect(); return { inPanel: document.getElementById('cardpanel').contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)), pm: !!document.getElementById('panel-pick-msg') }; });
+        check('F2 TM 390 px: med arket åbent under et byt dækker arket den fastgjorte besked (ikke omvendt), og beskeden står også i arkets hoved', cover.inPanel && cover.pm, JSON.stringify(cover));
+        await pg.keyboard.press('Escape');
+        // byttet gennemføres med en fremmed (reserven): samspillet skifter bånd, og 🤝-beskeden står bagefter – i listen, ikke fastgjort
+        await pg.evaluate(() => [...document.querySelectorAll('#lineup-list .toolbar button')].find((b) => b.textContent === 'Alle').click());
+        await pg.evaluate(() => document.querySelector('#lineup-list tr.reserve-p').click());
+        const m2 = await msg(pg), txt = await pg.evaluate(() => document.getElementById('pick-msg')?.textContent ?? null);
+        check('F2 TM 390 px: efter byttet står 🤝-beskeden i listen – ikke pick-live, ikke fastgjort, uden "Se kort ›" (kun mens et byt er i gang)', m2 && txt.startsWith('🤝') && !m2.live && m2.pos !== 'fixed' && m2.hit == null && (await pg.locator('#pick-card').count()) === 0, JSON.stringify({ m2, txt })); await c.close(); }
+    }
+    // (G) Trup: træningsoversigten har hele bredden (ingen kortkolonne); panelets hoved sidder fast øverst, når panelet rulles, og kortets egen overskrift er skjult (hovedet viser navnet)
+    {
+      const c = await browser.newContext({ viewport: { width: 1400, height: 700 } }), tp = await c.newPage(); await tp.goto(BASE + '/'); await tp.waitForSelector('body[data-klar="ja"]'); await tt(tp, 'trup');
+      const lay = await tp.evaluate(() => { const l = document.querySelector('.trup-layout'), sec = l.firstElementChild, ms = document.querySelector('#matrix').closest('.panel');
+        return { cols: getComputedStyle(l).gridTemplateColumns.split(' ').length, w: sec.getBoundingClientRect().width, lw: l.getBoundingClientRect().width, mw: ms.getBoundingClientRect().width }; });
+      check('F2 TM Trup: træningsoversigten har hele bredden (én kolonne, lige så bred som regnearket) – ikke 2:3 ved siden af et kort', lay.cols === 1 && Math.abs(lay.w - lay.lw) <= 1 && Math.abs(lay.w - lay.mw) <= 2, JSON.stringify(lay));
+      await tp.locator('#matrix tbody tr').nth(2).click();
+      await tp.evaluate(() => { document.getElementById('cardpanel').scrollTop = 200; });
+      const hd = await tp.evaluate(() => { const pc = document.getElementById('cardpanel'), h = document.querySelector('.cp-head').getBoundingClientRect(), t = document.getElementById('card-title').getBoundingClientRect(), cs = getComputedStyle(document.getElementById('card-title'));
+        return { st: pc.scrollTop, headTop: h.top, panelTop: pc.getBoundingClientRect().top, closeHit: document.elementFromPoint(document.getElementById('card-close').getBoundingClientRect().left + 5, document.getElementById('card-close').getBoundingClientRect().top + 5)?.id, tw: t.width, th: t.height, pos: cs.position }; });
+      check('F2 TM panelet: rullet 200 px sidder hovedet (✕ ◀ ▶) stadig øverst og kan trykkes; kortets egen h3 er skjult (1 × 1 px, absolut) – navnet står kun i hovedet',
+        hd.st > 100 && Math.abs(hd.headTop - hd.panelTop) <= 1.5 && hd.closeHit === 'card-close' && hd.tw <= 2 && hd.th <= 2 && hd.pos === 'absolute', JSON.stringify(hd));
+      await c.close();
+    }
+  };
   if (process.env.F2_ONLY) { await f2(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun F2-blokken (kortpanelet – hurtig mutationskørsel)
+  if (process.env.TM_F2_ONLY) { await f2tm(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun F2-blokken (kortpanelet – hurtig mutationskørsel)
   if (process.env.TM_F1_ONLY) { await f1tm(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun Test Managerens F1-blok (hurtig mutationskørsel)
   let g = await fresh();
   const openCard = (pid = null, pg = g) => openCardOn(pg, pid);
@@ -2228,6 +2491,7 @@ try {
   }
   await f1tm();
   await f2();
+  await f2tm();
   check('Ingen sidefejl under hele forløbet', fejl.length === 0, fejl.join(' | '));
 } finally {
   await browser.close();
