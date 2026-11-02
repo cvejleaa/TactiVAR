@@ -566,9 +566,18 @@ try {
     && JSON.stringify(nextFx.slice().sort()) === JSON.stringify(nx.fixtures.slice().sort()) && nextFx[0].includes(nx.me) && (await g.locator('#next-round .fixture.mine').textContent()).includes(nx.opp)
     && (await g.locator('#last-round').count()) === 0 && (await g.locator('#my-schedule tr').count()) === 14 && (await g.locator('#my-schedule tr.next').count()) === 1, nextFx.join(' | '));
   check('Kamp-fanen før første runde: tom tilstand med vejledning', await (async () => { await tab('kamp'); return (await g.textContent('#no-matches')).includes('Spil runde'); })());
-  await tab('trup');
+  // v3.27.0 (nr. 64): en udelukket starter står ved ▶ Spil runde og i Trup FØR runden, spiller ikke, nævnes i referatet og er fri bagefter
+  const banned = await g.evaluate(() => { const d = JSON.parse(localStorage.getItem('tactivar_save')), me = d.league.teams.find((t) => !t.isBot); const p = me.squad.find((x) => x.id === me.tactics.lineupSlots[9]); p.banMatches = 1; p.banWhy = 'YELLOWS'; localStorage.setItem('tactivar_save', JSON.stringify(d)); return { id: p.id, nr: p.shirtNumber, name: p.shortName }; });
+  await reload(); await tab('trup');
+  { const warn = await g.textContent('#out-warning'), cell = await g.locator(`#matrix tr[data-pid="${banned.id}"] .injury`).textContent();
+    check('Udelukkelse før runden: "⛔ #nr" ved ▶ Spil runde og "⛔ 1" i Trup-tabellen', warn.includes(`⛔ #${banned.nr}`) && !warn.includes('🚑') && cell.includes('⛔ 1'), `${warn} | ${cell}`);
+    await g.click(`#matrix tr[data-pid="${banned.id}"]`);
+    check('Spillerkortet: "⛔ udelukket i 1 kamp (4. gule kort i sæsonen)"', (await g.textContent('#card-ban')) === '⛔ udelukket i 1 kamp (4. gule kort i sæsonen)', await g.textContent('#card-ban').catch(() => 'mangler')); }
   await g.click('#play-round');
   await g.waitForSelector('#match-center');
+  { const after = await g.evaluate((id) => { const d = JSON.parse(localStorage.getItem('tactivar_save')), me = d.league.teams.find((t) => !t.isBot), m = d.league.lastRound.matches.find((x) => x.homeId === me.id || x.awayId === me.id);
+      return { played: [...m.ratings.home, ...m.ratings.away].some((e) => e.playerId === id), note: m.events.some((e) => e.text.includes('er udelukket og erstattes')), ban: me.squad.find((x) => x.id === id).banMatches }; }, banned.id);
+    check('Udelukkelse i kampen: han står ikke i karakterarket, referatet siger "er udelukket og erstattes", og han er fri efter runden', !after.played && after.note && after.ban === 0, JSON.stringify(after)); }
   check('▶ Spil runde åbner Kamp-fanen', (await g.textContent('#tabs .tab.active')).includes('Kamp'));
   check('Under afspilning kan runden ikke startes igen', await g.isDisabled('#play-round'));
   check('Under afspilning: kampsiden som før (referat | statistik) – afspilningen kommer først efter slutfløjt', (await g.getAttribute('#mc-main', 'class')) === 'mc-grid' && (await g.locator('#mc-main .mc-replay').count()) === 0);

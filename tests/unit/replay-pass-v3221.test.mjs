@@ -12,7 +12,7 @@ import { MIN_APART, ONSIDE_GAP } from '../../public/engine/positions.js';
 import { isValidTrace } from '../../public/engine/sanitize.js';
 
 const M = Array.from({ length: 200 }, (_, i) => { const s = i + 1, L = createLeague(createRng(s)); return simulateMatch(L.teams[s % 8], L.teams[(s + 3) % 8], createRng(s * 31)); });
-const COMBOS = new Set(['cb', 'run', 'cross', 'long']);
+const COMBOS = new Set(['cb', 'run', 'cross', 'long', 'corner']);   // v3.27.0: også hjørnesparket (tageren er oplægger til en blokeret afslutning – seed 197, 81')
 // Fælles koordinater: hjemme angriber mod y 0, ude mod y 100. "Fremad" for siden = mod modstanderens mål.
 const fwd = (side, y) => (side === 'h' ? -y : y);
 
@@ -24,8 +24,9 @@ test('oplæggeren: målets oplæg, ellers afleveringens spiller i handlingslogge
     assert.ok(o[o.side].some((q) => q[0] === o.from), 'oplæggeren står i billedet');
     if (o.scorer) { assert.equal(o.from, o.assist); goals++; }
     else {
-      const a = m.trace.acts.findLast((e) => e[0] === o.t * 3 && e[2] === o.side && e[4] === o.shooter && COMBOS.has(e[1]));
-      assert.ok(a, `${o.kind} ${o.t * 3}': en kombination i loggen`); assert.equal(o.from, a[3]); shots++;
+      // v3.27.0: flere handlinger i samme tick med samme skytte (lang bold, så hjørnespark – seed 86, 9') – oplæggeren skal være en af dem
+      const acts = m.trace.acts.filter((e) => e[0] === o.t * 3 && e[2] === o.side && e[4] === o.shooter && COMBOS.has(e[1]));
+      assert.ok(acts.length, `${o.kind} ${o.t * 3}': en kombination i loggen`); assert.ok(acts.some((a) => a[3] === o.from), `${o.kind} ${o.t * 3}': ${o.from} ∉ ${acts.map((a) => a[3])}`); shots++;
     }
   }
   assert.ok(goals > 200 && shots > 100, `data: ${goals} mål og ${shots} afslutninger med oplægger`);

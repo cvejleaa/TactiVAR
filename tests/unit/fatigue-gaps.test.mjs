@@ -298,7 +298,7 @@ test('Hvis-Så-udskiftning: fejlmeddelelserne – ude af banen går først, dere
   let m = c.m();
   assert.equal(subs(m).length, 0);
   assert.deepEqual(mins(m), [6]);
-  assert.deepEqual(msg(m), [`📋 [${c.H.name} • Hvis-Så] Udskiftningen kunne ikke udføres: ${tag(bench(c.H).find((p) => p.injuryMatchesLeft))} er ikke på bænken (skadet, allerede brugt eller i startopstillingen).`]);
+  assert.deepEqual(msg(m), [`📋 [${c.H.name} • Hvis-Så] Udskiftningen kunne ikke udføres: ${tag(bench(c.H).find((p) => p.injuryMatchesLeft))} er ikke på bænken (skadet, udelukket, allerede brugt eller i startopstillingen).`]);
   // Begge spillere forkerte: "ikke på banen" går først og nævner UD-spilleren
   c = build(({ b1, b2, r, H }) => { b1.injuryMatchesLeft = 2; return [r({ subOut: bench(H).find((p) => p.line === 'DEF').id })]; });
   m = c.m();

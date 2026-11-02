@@ -2,7 +2,7 @@
 // Rettet ift. v2.5b: alt bogføres FØR der gemmes; skader, der fandtes før runden, heles
 // med én kamp (spilleren missede kampen), og nye skader lægges på bagefter – så en
 // 1-kamps skade ikke forsvinder i samme runde.
-import { autoMatchBench, logMatch, FOCUS, focusSkills, validFocus, ageTrain, roomOf, addXp, KEY_SKILLS, MATCH_XP, TRAIN_FRESH_FLOOR, TRAIN_INJURY_MATCHES, PLAYED_RELIEF, derivedRng,
+import { autoMatchBench, banFromCards, logMatch, FOCUS, focusSkills, validFocus, ageTrain, roomOf, addXp, KEY_SKILLS, MATCH_XP, TRAIN_FRESH_FLOOR, TRAIN_INJURY_MATCHES, PLAYED_RELIEF, derivedRng,
   attendance, wagesPerRound, formOf, bookLedger, TV_PER_ROUND, TICKET_PRICE, PRIZE, NEW_LEAGUE_PLACE,
   willRetire, declineSkills, seasonGrowth, trainedSkills, refreshValue, publicWage, freeShirt, neededLine, botYouthTake, repairLineup, YOUTH_OFFERS, SQUAD_MIN, RETIRED_CAP, LINE_MIN } from './career.js';
 import { aerialBreakdown, isArchetypeUnlocked, generatePlayer, neededPosition } from './generator.js';
@@ -209,10 +209,19 @@ export function commitRound(league, result, rng) {
   }
   for (const p of players.values()) {
     if (!played.has(p.id)) p.freshness = Math.min(100, p.freshness + REST_BENCH);
-    // Skader fra før runden heles én kamp; rundens nye skader lægges på nedenfor.
+    // Skader fra før runden heles én kamp; rundens nye skader lægges på nedenfor. Udelukkelser afsones på samme måde (v3.27.0).
     p.injuryMatchesLeft = Math.max(0, p.injuryMatchesLeft - 1);
+    if (p.banMatches > 0) { p.banMatches--; if (!p.banMatches) p.banWhy = null; }
   }
   for (const m of result.matches) for (const inj of m.injuries) players.get(inj.playerId).injuryMatchesLeft = inj.matches;
+  // Udelukkelse (v3.27.0, nr. 64): rundens kort (karakterarket) – lægges oven i en udelukkelse, han stadig mangler at afsone.
+  for (const m of result.matches) for (const e of [...m.ratings.home, ...m.ratings.away]) {
+    const p = players.get(e.playerId);
+    if (!p || !(e.yellows || e.red)) continue;
+    const b = banFromCards(e, p.banYellows ?? 0);
+    p.banYellows = b.yellows;
+    if (b.matches) { p.banMatches = (p.banMatches ?? 0) + b.matches; p.banWhy = b.why; }
+  }
   for (const t of league.teams) decayChemistry(t, result.round);
   // Træning (v3.18.0) – efter kampene og skaderne, før næste runde
   trainRound(league, result, minutesOf(result));
@@ -324,7 +333,7 @@ export function endSeason(league, toRound, programmed) {
   league.lastSeasonStats = { seasonNumber: md.seasonNumber, players: Object.fromEntries(all.map((p) => [p.id, Object.fromEntries(PLAYER_SEASON_FIELDS.filter((k) => p[k]).map((k) => [k, p[k]]))])
     .filter(([, v]) => Object.keys(v).length).map(([id, v]) => { const p = all.find((x) => x.id === id); return [id, { ...v, t: teamOf.get(id).id, n: p.shortName, nr: p.shirtNumber }]; })) };
   md.standings = league.teams.map(emptyStanding);
-  for (const t of league.teams) for (const p of t.squad) Object.assign(p, PLAYER_SEASON_DEFAULTS);
+  for (const t of league.teams) for (const p of t.squad) { Object.assign(p, PLAYER_SEASON_DEFAULTS); p.banYellows = 0; }   // de gule nulstilles; en udelukkelse afsones videre (v3.27.0)
   md.seasonNumber = (md.seasonNumber || 1) + 1;
   league.statsFromRound = toRound + 1;
   league.seasonStartRound = toRound + 1;

@@ -3,7 +3,7 @@
 import { publicValue, LOG, stampText, KEY_SKILLS, trainingEstimate, FOCUS, focusSkills, validFocus, ageTrain, roomOf, MATCH_XP, PLAYED_RELIEF, TRAIN_FRESH_FLOOR } from '../engine/career.js';
 import { viewPlayer } from '../engine/visibility.js';
 import { h, dec, LOCK, select } from './dom.js';
-import { LINE, POSITION_FULL, SKILL_LABELS, kr, starsEl } from './labels.js';
+import { LINE, POSITION_FULL, SKILL_LABELS, kr, starsEl, banText, yellowWarn } from './labels.js';
 import { aerialBreakdown } from '../engine/generator.js';
 import { runStats } from '../engine/stats.js';
 import { BAND_WORD } from '../engine/chemistry.js';
@@ -19,7 +19,10 @@ export function renderCard({ player: p, team, isOwn, scouting, note, onNote, tea
   const head = h('div', { class: 'card-head' },
     h('h3', {}, `#${p.shirtNumber} ${p.name}`),
     retiring ? h('div', { class: 'notice', id: 'card-retiring' }, `👋 ${p.shortName} overvejer at stoppe efter sæsonen (${p.age} år).`) : null,
-    h('div', { class: 'muted' }, `${team.name} • ${LINE[p.line]}${POSITION_FULL[p.position] ? ` • ${POSITION_FULL[p.position]}` : ''} • ${p.age} år • ${p.heightCm} cm • ${p.injuryMatchesLeft > 0 ? `🚑 skadet i ${p.injuryMatchesLeft} kamp${p.injuryMatchesLeft === 1 ? '' : 'e'}` : `Friskhed ${p.freshness}%`}`));
+    h('div', { class: 'muted' }, `${team.name} • ${LINE[p.line]}${POSITION_FULL[p.position] ? ` • ${POSITION_FULL[p.position]}` : ''} • ${p.age} år • ${p.heightCm} cm • ${p.injuryMatchesLeft > 0 ? `🚑 skadet i ${p.injuryMatchesLeft} kamp${p.injuryMatchesLeft === 1 ? '' : 'e'}` : `Friskhed ${p.freshness}%`}`),
+    // v3.27.0: udelukkelsen (offentlig) og advarslen før det tællende gule kort
+    banText(p) ? h('div', { class: 'notice ban', id: 'card-ban' }, banText(p)) : null,
+    yellowWarn(p) ? h('div', { class: 'muted', id: 'card-yellow' }, yellowWarn(p)) : null);
 
   let body;
   if (isOwn) {

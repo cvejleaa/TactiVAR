@@ -3,7 +3,7 @@ import { renderStats } from './ui/stats.js';
 import { VERSION } from './version.js';
 import { createRng, randomSeed } from './engine/rng.js';
 import { createLeague } from './engine/generator.js';
-import { matchBenchOf, reservesOf, FOCUS, willRetire, RETIRE_WARN_ROUND, publicWage, wageRoomPerRound } from './engine/career.js';
+import { matchBenchOf, reservesOf, unavailable, FOCUS, willRetire, RETIRE_WARN_ROUND, publicWage, wageRoomPerRound } from './engine/career.js';
 import { loadGame, saveGame, resetGame, exportGame, importGame, backupRaw, SAVE_KEY } from './state/storage.js';
 import * as act from './state/actions.js';
 import { saveReplay, loadReplay, replayOf, rememberSent, loadSent } from './state/replay.js';
@@ -83,6 +83,7 @@ const NEWS = {
   '3.14.1': 'Rettelser: VAR tjekker nu offside for den forreste – scorer en spiller længere tilbage, er det hans forreste holdkammerat, der tjekkes, og billedet ved målet viser skytten, hvor han skød fra. Statistikken på Liga-fanen gælder sæsonen.',
   '3.14.2': 'Rettelse: Ved et VAR-tjek står den tjekkede nu, hvor han stod (forrest), i billedet ved målet – ikke flyttet bag en holdkammerat.',
   '3.14.3': 'Rettelser: Langskud tages fra skudafstand (ikke fra egen banehalvdel) i billedet ved målet, referatet fortæller et oplæg én gang, og efter sæsonens sidste runde viser tabellen slutstillingen og mesteren, til næste sæson går i gang.',
+  '3.27.0': '⛔ Udelukkelse for kort: direkte rødt kort giver 2 kampes udelukkelse, rødt for to gule 1 kamp, og hvert 4. gule kort i sæsonen 1 kamp. Det gælder alle hold, og udelukkelsen afsones over sæsonskiftet. Du ser det før runden (⛔ #nr ved ▶ Spil runde, ⛔ i listerne og på spillerkortet, også 🟨 3 – næste gule giver udelukkelse), og en udelukket starter erstattes automatisk. 🦶 Tacklinger virker nu (Taktik → Fase 2): Aggressiv vinder flere dueller i presset, men begår flere frispark og får flere kort – Forsigtig omvendt.',
   '3.26.1': '🔋 Sommerpausen giver energien tilbage: ved sæsonskiftet er hele truppen 100 % frisk igen (skader løber videre) – og faste startere falder igen over de første runder. Derfor nævner referatet i sæsonens sidste runde ikke længere, hvad udskiftningerne sparede. Og 🏃 "Dit holds løber" er taget ud af avisen – den gav intet at handle på; km, højintenst løb og topfart står stadig i karakterarket.',
   '3.26.0': '↔ Angrebsside (Taktik → Fase 1): vælg Venstre, Begge eller Højre for jeres cutbacks og indlæg. Det er en lille fordel – ca. ét styret kantangreb pr. kamp, mest ved Lave cutbacks. Begge læner sig lidt mod den side, hvor jeres kant står stærkest; et fast valg rammer siden ca. 3 af 4 gange, men ved cutbacks læser deres back dér det. Målt: Begge finder selv en svag back, og et fast valg er højst lige så godt. Fuldtidsanalysen viser kantangreb pr. side med deres back – og Dit felt, når de tydeligt gik på den ene af dine sider (mindst 5, ¾).',
   '3.25.0': '⚙ Midtbanen vinder bolden: flere spillere på midten giver nu mere boldbesiddelse (med aftagende udbytte – den femte giver mindre end den fjerde), og kampe med 85–90 % bold er næsten forsvundet. Ved formationen i Taktik står, hvor mange I har på midten.',
@@ -197,6 +198,9 @@ function tiredStarters() {
   return t.squad.filter((p) => t.tactics.lineupSlots.slice(t.subsLimit ? 1 : 0).includes(p.id) && p.freshness < tiredLimit()).length;
 }
 
+// Dine startere, der ikke kan spille (v3.27.0): skadet eller udelukket – samme vagt som kampen (career.js unavailable)
+const outStarters = () => { const t = myTeam(); return t.tactics.lineupSlots.map((id) => t.squad.find((p) => p.id === id)).filter((p) => p && unavailable(p)); };
+
 // Forklaringen på en migrering – både ved indlæsning og ved import af en ældre fil.
 function migrationNotice(from) {
   if (from == null) return '';
@@ -271,6 +275,9 @@ function renderControls() {
       ? `Markspillere under din udskiftningsgrænse (${myTeam().subsLimit} %) skiftes ud fra 3. minut (højst 3 ad gangen), hvis der er en frisk afløser i samme kæde på bænken – det bruger et skift og en pause. Overvej at rotere på Taktik`
       : 'Startere under 70 % friskhed – trætte spillere yder mindre (50 % ≈ 12,5 % svagere). Overvej at rotere på Taktik' },
     '⚠ ', h('span', { class: 'tired-txt' }, myTeam().subsLimit ? `${tiredStarters()} startere under din grænse (${myTeam().subsLimit} %) – skiftes ud tidligt` : `${tiredStarters()} trætte startere`)) : null,
+    // v3.27.0 (QC/Spilfører UI): skadede og udelukkede startere står ved knappen FØR runden – kort tegn, så det ses på mobil
+    outStarters().length ? h('span', { class: 'tired', id: 'out-warning', title: `${outStarters().map((p) => `#${p.shirtNumber} ${p.shortName} ${p.banMatches > 0 ? 'er udelukket' : 'er skadet'}`).join(', ')} – erstattes automatisk af den bedste i samme kæde på bænken. Stil selv om på Taktik` },
+      outStarters().map((p) => `${p.banMatches > 0 ? '⛔' : '🚑'} #${p.shirtNumber}`).join(' '), h('span', { class: 'tired-txt' }, ' erstattes automatisk')) : null,
     // Gem-kvitteringen står altid synlig (spec §9 – svaret på "nulstiller ved refresh"); et klik åbner ⚙ Admin (gem, eksport, import)
     h('button', { class: 'savestatus' + (view.saveError ? ' failed' : ''), id: 'save-status', title: 'Gem, eksportér, importér og ny liga står i ⚙ Admin', onclick: () => showTab('admin') }, view.saveError ? '⚠ IKKE gemt' : view.savedAt ? ['✔ ', h('span', { class: 'save-txt' }, 'Gemt kl. '), time(view.savedAt)] : 'Ikke gemt')].filter(Boolean));
 }
