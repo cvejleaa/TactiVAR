@@ -552,6 +552,13 @@ try {
       await pg.locator('#matrix tbody tr').nth(4).click(); await pg.waitForSelector('#cardpanel[data-open="ja"]');
       const t = await pg.evaluate(() => ({ y: scrollY, top: document.getElementById('player-card').getBoundingClientRect().top, ih: innerHeight }));
       check('F2 390 px, Trup: et tryk på en række åbner arket – siden ruller ikke (før: scrollIntoView ned til kortet under tabellen)', t.y === 0 && t.top > 0 && t.top < t.ih - 200, JSON.stringify(t));
+      // v3.30.0: sat til salg → "💰 Til salg" efter navnet i hans række, helt synligt ved 390 px (inden for skærmen) – kun på ham
+      const salePid = await pg.evaluate(() => document.querySelectorAll('#matrix tbody tr')[4].dataset.pid);
+      await pg.click('#list-toggle'); await pg.keyboard.press('Escape');
+      const sale = await pg.evaluate((pid) => { const tags = [...document.querySelectorAll('#matrix .listed-tag')], r = tags[0]?.getBoundingClientRect();
+        return { n: tags.length, pid: tags[0]?.closest('tr').dataset.pid, txt: tags[0]?.textContent, title: tags[0]?.title, l: r?.left, rr: r?.right, w: r?.width, vis: tags[0] ? getComputedStyle(tags[0]).display : null }; }, salePid);
+      check('390 px, Trup: "💰 Til salg" står efter navnet på netop den spiller, du satte til salg – synligt inden for skærmen',
+        sale.n === 1 && sale.pid === salePid && sale.txt === '💰 Til salg' && sale.title === 'Sat til salg – andre klubber byder, når vinduet er åbent' && sale.vis !== 'none' && sale.w > 20 && sale.l >= 0 && sale.rr <= 390, JSON.stringify(sale));
       await c.close();
     }
   };
@@ -1856,7 +1863,7 @@ try {
   const fromSave = await g.evaluate(async () => {
     const save = JSON.parse(localStorage.getItem('tactivar_save'));
     const L = save.league, me = L.teams.find((t) => !t.isBot).name, name = (id) => L.teams.find((t) => t.id === id).name;
-    return { round: L.lastRound.round, me, results: L.lastRound.matches.map((m) => `${m.homeName}${m.homeGoals}-${m.awayGoals}${m.awayName}📺 Referat`),
+    return { round: L.lastRound.round, me, results: L.lastRound.matches.map((m) => `${m.homeName}${m.homeGoals}-${m.awayGoals}${m.awayName}📺 Referat👥 ${m.att.toLocaleString('da-DK')}`),   // v3.30.0: tilskuerne fra den gemte kamp
       next: L.schedule[1].map(([h, a]) => `${name(h)}–${name(a)}`) };
   });
   check('Liga: resultaterne er sidste rundes kampe med rigtig retning og score', JSON.stringify(res) === JSON.stringify(fromSave.results) && (await g.textContent('#last-round h3')).includes(`runde ${fromSave.round}`), `${res[0]} / ${fromSave.results[0]}`);
@@ -1870,6 +1877,8 @@ try {
   const third = await g.locator('#last-round .fixture').nth(2).locator('.fx-team').first().textContent();
   await g.locator('#last-round .fixture').nth(2).click();
   check('Klik på et resultat åbner netop den kamps referat i Kamp-fanen', (await g.textContent('#tabs .tab.active')).includes('Kamp') && (await g.locator('#match-cards .matchcard:nth-child(3).active').count()) === 1 && (await g.textContent('#scoreboard')).includes(third) && (await g.locator('#match-center .toolbar button:nth-child(1).active').count()) === 1);
+  const att3 = await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.lastRound.matches[2].att);
+  check('Referatet: tilskuerne under resultatet er netop den kamps (v3.30.0)', Number.isInteger(att3) && att3 >= 4000 && (await g.textContent('#scoreboard #attendance')) === `👥 ${att3.toLocaleString('da-DK')}`, String(att3));
   await tab('liga');
   check('Ligatabellen er opdateret efter runde 1', stHead.includes('sæson 1, efter 1 af 14 runder'), stHead);
   await seeTeam('2');

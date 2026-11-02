@@ -12,12 +12,13 @@ import { forecast } from '../../public/ui/club.js';
 const fresh = (s = 5) => createLeague(createRng(s));
 const res = (round, pairs) => ({ round, matches: pairs.map(([h, a, hg, ag]) => ({ homeId: h.id, awayId: a.id, homeGoals: hg, awayGoals: ag })) });
 
-test('tilskuere: 4000 + 300·(8 − hjemmeholdets plads) + 150·(8 − udeholdets) + 120·form, højst 9000', () => {
+// v3.30.0 (brugeren: 9.000 skal kunne nås): 370/185/145 – før 300/150/120 (1. mod 1. med form 9 gav 8.230; nu loftet). economy-v3300.
+test('tilskuere: 4000 + 370·(8 − hjemmeholdets plads) + 185·(8 − udeholdets) + 145·form, højst 9000', () => {
   assert.equal(attendance(8, 8, 0), 4000);
-  assert.equal(attendance(1, 1, 9), 8230);            // 4000 + 2100 + 1050 + 1080
-  assert.equal(attendance(4.5, 4.5, 0), 5575);         // ny liga, runde 1
-  assert.equal(attendance(1, 1, 9 + 10), 9000);        // loftet
-  assert.equal(attendance(2, 7, 3), 4000 + 1800 + 150 + 360);
+  assert.equal(attendance(2, 3, 6), 8015);            // 4000 + 2220 + 925 + 870 (før 7.270)
+  assert.equal(attendance(4.5, 4.5, 0), 5943);         // ny liga, runde 1: 5942,5 → 5943 (før 5.575)
+  assert.equal(attendance(1, 1, 9), 9000);             // loftet (9.190 uden; før 8.230)
+  assert.equal(attendance(2, 7, 3), 4000 + 2220 + 185 + 435);   // før 4000 + 1800 + 150 + 360
 });
 
 test('runden: TV til alle, billetter kun til hjemmeholdet, løn = ugeløn / 3 – og kassen følger regnskabet', () => {
@@ -25,11 +26,11 @@ test('runden: TV til alle, billetter kun til hjemmeholdet, løn = ugeløn / 3 �
   const cash0 = new Map(L.teams.map((t) => [t.id, t.cashBalance]));
   bookRoundFinances(L, res(1, [[A, B, 2, 0], [C, D, 1, 1]]));
   const eA = A.finance.ledger.at(-1), eB = B.finance.ledger.at(-1);
-  assert.equal(eA.att, 5575); assert.equal(eA.gate, 5575 * TICKET_PRICE);
+  assert.equal(eA.att, 5943); assert.equal(eA.gate, 5943 * TICKET_PRICE);   // v3.30.0 (før 5.575)
   assert.equal(eB.att, undefined); assert.equal(eB.gate, undefined, 'udeholdet får ingen billetindtægt');
   assert.equal(eA.tv, TV_PER_ROUND); assert.equal(eB.tv, TV_PER_ROUND);
   assert.equal(eA.wages, -Math.round(weeklyWages(A) / 3));
-  assert.equal(A.cashBalance, cash0.get(A.id) + 5575 * TICKET_PRICE + TV_PER_ROUND - wagesPerRound(A));
+  assert.equal(A.cashBalance, cash0.get(A.id) + 5943 * TICKET_PRICE + TV_PER_ROUND - wagesPerRound(A));
   assert.equal(B.cashBalance, cash0.get(B.id) + TV_PER_ROUND - wagesPerRound(B));
   assert.equal(eA.cash, A.cashBalance);
   // Hold uden kamp i runden (her E–H) får stadig TV og betaler løn
@@ -132,5 +133,5 @@ test('formen, der tæller, er hjemmeholdets – ikke gæsternes', () => {
   const L = fresh(), [A, B] = L.teams;
   A.finance.form = [3, 3, 3]; B.finance.form = [];
   bookRoundFinances(L, res(1, [[A, B, 0, 0]]));
-  assert.equal(A.finance.ledger.at(-1).att, 5575 + 120 * 9);
+  assert.equal(A.finance.ledger.at(-1).att, Math.round(5942.5 + 145 * 9));   // v3.30.0: 7.248 (før 5575 + 120 · 9 = 6.655)
 });

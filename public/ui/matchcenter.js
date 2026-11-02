@@ -2,7 +2,7 @@
 // din kamp, tidslinje, statistik, karakterark og TactiVAR Avisen. Karakterer for
 // modstandere vises kun som stjerner (engine/visibility.js).
 import { h, dec } from './dom.js';
-import { starsEl } from './labels.js';
+import { starsEl, attText } from './labels.js';
 import { viewRatingEntry, viewActs } from '../engine/visibility.js';
 import { GOAL_KIND_LABEL, goalMatchIdx } from '../engine/gazette.js';
 import { championText } from '../engine/season.js';
@@ -308,7 +308,9 @@ export function renderMatchCenter({ mc, myTeamId, on, column = null }) {
       mc.playing ? (i === 0 ? `${x.homeName} ${last.hG}-${last.aG} ${x.awayName}` : `${x.homeName} – ${x.awayName}`) : [`${x.homeName} ${x.homeGoals}-${x.awayGoals} ${x.awayName}`, x.ratings.motm ? h('span', { title: 'Kampens spiller' }, ` 👑 ${x.ratings.motm.shortName}`) : null]))),
     h('div', { class: 'scoreboard', id: 'scoreboard' },
       h('div', {}, h('strong', {}, m.homeName), h('div', { class: 'muted' }, m.homeTacticStr)),
-      h('div', { class: 'score' }, h('div', { id: 'score' }, `${last.hG} - ${last.aG}`), h('div', { class: 'muted', id: 'minute' }, mc.playing ? evMin(last) : 'Slut')),
+      h('div', { class: 'score' }, h('div', { id: 'score' }, `${last.hG} - ${last.aG}`), h('div', { class: 'muted', id: 'minute' }, mc.playing ? evMin(last) : 'Slut'),
+        // v3.30.0: tilskuerne under resultatet (kendt før kampen – afslører intet under afspilningen); ældre kampe uden tallet: intet
+        attText(m) ? h('div', { class: 'muted', id: 'attendance', title: 'Tilskuere' }, attText(m)) : null),
       h('div', { class: 'right' }, h('strong', {}, m.awayName), h('div', { class: 'muted' }, m.awayTacticStr))),
     timeline(shown, m.stoppage),
     last.varMsg && mc.playing ? h('div', { class: 'varbanner' }, `📺 VAR: ${last.varMsg}`) : null,

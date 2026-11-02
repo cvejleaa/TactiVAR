@@ -232,7 +232,10 @@ test('pakkerne er FRYSET ved kampstart: commitRound ændrer dem ikke, og de kan 
   assert.equal(JSON.stringify(r.replay), before, 'commitRound (form, friskhed, kort, løn …) ændrer ikke pakkerne');
   r.replay.packs.forEach((p, i) => {
     const again = simulateMatch(p.home, p.away, createRng(p.rngState), p.opts); again.goalsPool.forEach((g) => { g.matchIdx = i; });
-    assert.equal(JSON.stringify(again), JSON.stringify(r.matches[i]), `kamp ${i} efter commitRound`);
+    // v3.30.0: commitRound skriver tilskuerne på kampen (att – regnskabet, ikke simuleringen); resten er kampen præcis
+    const { att, ...booked } = r.matches[i];
+    assert.ok(Number.isInteger(att) && !('att' in again), `kamp ${i}: att er bogføringens`);
+    assert.equal(JSON.stringify(again), JSON.stringify(booked), `kamp ${i} efter commitRound`);
     assert.notEqual(p.home, L.teams.find((t) => t.id === p.home.id), 'pakkens hold er en kopi, ikke ligaens objekt');
   });
 });
@@ -300,6 +303,9 @@ test('fetch-match: parser feltsvaret (string/integer) og kampen spilles igen ide
     assert.match(seen, /^http:\/\/h:1\/v1\/projects\/demo-tactivar\/databases\/\(default\)\/documents\/matches\/K-7F3Q$/);
     assert.equal(doc.round, 3); assert.equal(doc.season, 1); assert.equal(doc.version, '3.24.3'); assert.equal(doc.score, p.fields.score); assert.equal(doc.id, 'K-7F3Q');
     assert.equal(replayMatch(doc).ok, true, 'identisk');
+    // v3.30.0: en bogført kamp har tilskuerne på sig (commitRound) – den er stadig identisk med simuleringen (e2e "Send kampen")
+    const withAtt = structuredClone(doc); withAtt.body.match.att = 7840;
+    assert.equal(replayMatch(withAtt).ok, true, 'att er bogføring, ikke kampen');
     const tampered = structuredClone(doc); tampered.body.match.homeGoals += 1;
     assert.equal(replayMatch(tampered).ok, false, 'en ændret kamp (motoren gav noget andet) afsløres');
     const wrongState = structuredClone(doc); wrongState.body.replay.rngState += 1;

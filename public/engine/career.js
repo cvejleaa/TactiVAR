@@ -39,16 +39,21 @@ export function initialPotential(p) {
 
 // ---------- Offentlig værdi og løn (afslører ikke evnerne – kun stjerner, tier og alder, spec §3) ----------
 export const VALUE_BY_STARS = [0, 300000, 600000, 1200000, 2400000, 4500000];   // kr. pr. stjerne (0–5)
-export const TIER_STARS = { STAR: 4, STARTER: 3, ROTATION: 2, TALENT: 2, YOUTH: 1 };   // ungdom: ubeprøvet (measure-lifecycle)
+// Startstjerner (v3.30.0, brugeren 2026-11-02 "ærlige startstjerner"): de gennemsnitlige kampstjerner efter sæson 1 pr. tier
+// (tools/measure-star-fit.mjs: STAR 3,40 · STARTER 3,16 · ROTATION 2,89 · TALENT 2,83). Før 4/3/2/2: 59 % af ROTATION/TALENT gik
+// 2★→3★ efter 3 kampe, og lønnen fordobledes ved første genforhandling (tools/measure-star-catchup.mjs). Ungdom: ubeprøvet.
+export const TIER_STARS = { STAR: 3.4, STARTER: 3.2, ROTATION: 2.9, TALENT: 2.8, YOUTH: 1 };
 export const ageFactor = (age) => (age <= 21 ? 1.3 : age <= 27 ? 1 : age <= 30 ? 0.8 : age <= 32 ? 0.55 : 0.35);
-export const WAGE_SHARE = 0.06;   // ugeløn = 6 % af værdien
+export const WAGE_SHARE = 0.055;   // ugeløn = 5,5 % af værdien (v3.30.0; før 6 % – tools/measure-economy.mjs, docs/spec.md §13)
 const round = (v, step) => Math.round(v / step) * step;
 // Stjernerne bag værdien: med mindst 3 kampe i karrieren de offentlige stjerner (valueStars – sat ved vinduerne), ellers tier'ens
 export function starsForValue(p) {
   if ((p.careerGames ?? 0) >= 3 && (p.valueStars ?? p.publicStars) > 0) return clamp(Math.round(p.valueStars ?? p.publicStars), 1, 5);
   return TIER_STARS[p.roleTier] ?? 2;
 }
-export const publicValue = (p) => Math.max(25000, round(VALUE_BY_STARS[starsForValue(p)] * ageFactor(p.age), 25000));
+// Værdien for et ikke-helt stjernetal (startstjernerne, v3.30.0): lineært mellem de to hele stjerner – 2,9★ = 600k + 0,9 · 600k
+export const valueOfStars = (st) => { const i = Math.floor(st), f = st - i; return f ? VALUE_BY_STARS[i] + f * (VALUE_BY_STARS[i + 1] - VALUE_BY_STARS[i]) : VALUE_BY_STARS[i]; };
+export const publicValue = (p) => Math.max(25000, round(valueOfStars(starsForValue(p)) * ageFactor(p.age), 25000));
 // Ugelønnen i hele 3.000 kr., så lønnen pr. runde (÷ 3) går op – ingen afrundingsstøj i regnskabet (Spilfører: "1.256.001 kr.")
 export const publicWage = (p) => Math.max(3000, round(publicValue(p) * WAGE_SHARE, 3000));
 
@@ -110,7 +115,12 @@ export function banFromCards(e, before = 0) {
   const red = e.red === 'DIRECT' ? BAN.DIRECT : e.red === 'SECOND_YELLOW' ? BAN.SECOND_YELLOW : 0;
   return { matches: red + crossed * 1, yellows: before + y, why: e.red ? e.red : crossed > 0 ? 'YELLOWS' : null };
 }
-function pubScore(p) { return (unavailable(p) ? -100 : 0) + starsForValue(p) * 10 + (p.freshness ?? 100) / 10; }
+// Udtagelsens stjerner: som værdiens, men en ubeprøvet spiller rangeres efter sin tier som HELE trin (4/3/2/2/1) – startstjernerne
+// i TIER_STARS (v3.30.0) er et lønsnit, ikke en rangering: STAR 3,4 mod ROTATION 2,9 vejede for lidt mod friskhed og naboplads
+// (bestEleven, bot-rotationen), og alle seedede kampe flyttede sig. Udtagelsen er derfor uændret fra før v3.30.0
+export const TIER_RANK = { STAR: 4, STARTER: 3, ROTATION: 2, TALENT: 2, YOUTH: 1 };
+const pickStars = (p) => ((p.careerGames ?? 0) >= 3 && (p.valueStars ?? p.publicStars) > 0 ? starsForValue(p) : TIER_RANK[p.roleTier] ?? 2);
+function pubScore(p) { return (unavailable(p) ? -100 : 0) + pickStars(p) * 10 + (p.freshness ?? 100) / 10; }
 export function autoMatchBench(team) {
   const on = new Set(team.tactics.lineupSlots), cand = team.squad.filter((p) => !on.has(p.id));
   if (cand.length <= BENCH_SIZE) return (team.matchBench = cand.map((p) => p.id));
@@ -173,7 +183,8 @@ export function addXp(p, skill, xp, onSkill) {
 export const ROUNDS_PER_WEEK = 3, TV_PER_ROUND = 120000, TICKET_PRICE = 90, GATE_BASE = 4000, GATE_MAX = 9000, LEDGER_CAP = 30;
 export const PRIZE = [1500000, 1100000, 800000, 600000, 450000, 300000, 200000, 100000];
 export const NEW_LEAGUE_PLACE = 4.5;
-export const attendance = (placeHome, placeAway, form) => Math.min(GATE_MAX, Math.round(GATE_BASE + 300 * (8 - placeHome) + 150 * (8 - placeAway) + 120 * form));
+// v3.30.0 (brugeren: "9.000 tilskuere kan nås"): 370/185/145 – 1. hjemme mod 2. efter tre sejre = 9.000 (før 300/150/120: højst 8.080)
+export const attendance = (placeHome, placeAway, form) => Math.min(GATE_MAX, Math.round(GATE_BASE + 370 * (8 - placeHome) + 185 * (8 - placeAway) + 145 * form));
 export const weeklyWages = (team) => team.squad.reduce((a, p) => a + (p.weeklyWage ?? 0), 0);
 export const wagesPerRound = (team) => Math.round(weeklyWages(team) / ROUNDS_PER_WEEK);
 // Lønbudget pr. uge: 1,7 mio. + 2 % af kassen – "Du kan bruge X kr. mere pr. runde". 1,35 mio. lå under lønnen efter

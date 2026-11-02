@@ -85,9 +85,11 @@ test('offentlig værdi og løn: kun stjerner (eller tier) og alder – ens for t
   assert.equal(publicValue(a), publicValue(b)); assert.equal(publicWage(a), publicWage(b));
   assert.equal(publicValue(base), 1200000);                           // 3★ · 1,0
   assert.equal(publicValue({ ...base, age: 33 }), 425000);            // 1,2 mio. · 0,35 = 420.000 → 425.000
-  assert.equal(publicValue({ ...base, careerGames: 2 }), 1200000, 'under 3 kampe: tier STARTER = 3★');
-  assert.equal(publicValue({ ...base, careerGames: 2, roleTier: 'STAR' }), 2400000);
-  assert.equal(publicWage(base), 72000);                              // 6 %
+  // v3.30.0: tier-stjernerne er de forventede kampstjerner (STARTER 3,2 / STAR 3,4 – før 3 / 4), værdien lineært imellem:
+  // STARTER 1,2 mio. + 0,2 · 1,2 mio. = 1.440.000 → 1.450.000 (før 1.200.000); STAR 1.680.000 → 1.675.000 (før 2.400.000)
+  assert.equal(publicValue({ ...base, careerGames: 2 }), 1450000, 'under 3 kampe: tier STARTER = 3,2★');
+  assert.equal(publicValue({ ...base, careerGames: 2, roleTier: 'STAR' }), 1675000);
+  assert.equal(publicWage(base), 66000);                              // 5,5 % (v3.30.0; før 6 % = 72.000)
 });
 
 test('synlighed: potentiale er hemmeligt (også for ejeren), træningsfokus kun for ejeren, kamptal offentlige', () => {

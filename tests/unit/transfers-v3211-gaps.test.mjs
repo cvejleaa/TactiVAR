@@ -188,8 +188,9 @@ test('frigør-linjen: lønnen pr. runde (ugeløn / 3), og ungdomsspilleren nævn
   p.weeklyWage = 30000;
   setListed(L, me, p.id, true);
   const gain = (el) => all(rowOf(el, p), (e) => e.className === 'muted market-gain').map((e) => e.textContent);
-  // Netto (QC v3.21.1): 30.000 − akademispillerens 24.000 = 6.000 pr. uge = 2.000 pr. runde; med bud står kun "Salg" (Fritstil skjult)
-  assert.deepEqual(gain(market(L, me).el), [`Salg frigør ${kr(2000)} pr. runde i løn – en ungdomsspiller kommer ind fra akademiet i samme kæde (1★, ${kr(8000)} pr. runde).`]);
+  // Netto (QC v3.21.1): 30.000 − akademispillerens 21.000 = 9.000 pr. uge = 3.000 pr. runde; med bud står kun "Salg" (Fritstil skjult).
+  // v3.30.0 løn 5,5 %: 390.000 · 0,055 = 21.450 → 21.000 (før 6 % = 24.000, netto 2.000 og 8.000 pr. runde)
+  assert.deepEqual(gain(market(L, me).el), [`Salg frigør ${kr(3000)} pr. runde i løn – en ungdomsspiller kommer ind fra akademiet i samme kæde (1★, ${kr(7000)} pr. runde).`]);
   me.squad.push(flat(reserve(me, line)));   // 19 og kæden over minimum: ingen ungdomsspiller
   assert.equal(needsYouth(me, p), false);
   assert.deepEqual(gain(market(L, me).el), [`Salg frigør ${kr(10000)} pr. runde i løn.`]);

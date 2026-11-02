@@ -84,6 +84,9 @@ export function matrixRows({ team, isOwn, ui }) {
 export function renderMatrix({ team, isOwn, ui, notes, onSort, onSelect, onSwap, onFilter, onBlocked }) {
   const { rows, col, desc, slotOf, ctx, benchIds } = matrixRows({ team, isOwn, ui });
   const gains = ui.gains ?? new Map(), after = `efter runde ${ui.gainRound}`;
+  // v3.30.0 (brugeren): "💰 Til salg" efter navnet for spillere på salgslisten. Kun dit eget hold: salgslisten er ejerens
+  // (visibility.js viewTeam – Security v3.19.0), og botterne har ingen liste – de sælger uden om den
+  const listed = new Set(isOwn ? team.listed ?? [] : []);
   const roles = FORMATIONS[team.tactics.baseFormation];
 
   const head = h('tr', {}, COLUMNS.map((c) => {
@@ -101,7 +104,8 @@ export function renderMatrix({ team, isOwn, ui, notes, onSort, onSelect, onSwap,
       if (!canSeeField(c.field, isOwn)) return h('td', { class: cls + ' lockcell' }, LOCK);
       if (c.key === 'pos') return h('td', { class: cls + (s >= 0 ? ' starter' : ' benchnum') }, s >= 0 ? `${roles[s].r} #${p.shirtNumber}` : `${benchIds.has(p.id) ? 'BÆNK' : 'RES'} #${p.shirtNumber}`);
       if (c.key === 'name') { const g = gains.get(p.id) ?? [];   // mobilen: summen efter navnet (evne-kolonnerne er rullet væk)
-        return h('td', g.length ? { class: cls + ' player-gain', dataset: { gain: String(g.length) }, title: `${gainWords(g)} ${after}` } : { class: cls }, p.shortName); }
+        const sale = listed.has(p.id) ? h('span', { class: 'listed-tag', title: 'Sat til salg – andre klubber byder, når vinduet er åbent' }, '💰 Til salg') : null;
+        return h('td', g.length ? { class: cls + ' player-gain', dataset: { gain: String(g.length) }, title: `${gainWords(g)} ${after}` } : { class: cls }, p.shortName, sale); }
       if (c.key === 'line') return h('td', { class: cls }, h('span', { class: 'chip' }, LINE[p.line]));
       if (c.key === 'natpos') return h('td', { class: cls, title: POSITION_FULL[p.position] ?? '' }, POSITION[p.position] ?? '–');
       if (c.key === 'fresh') return h('td', { class: cls }, outLabel(p) ? h('span', { class: 'injury', title: OUT_TITLE }, outLabel(p)) : `${p.freshness}%`);   // v3.27.0: 🚑/⛔
