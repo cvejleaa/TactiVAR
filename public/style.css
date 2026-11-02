@@ -321,11 +321,14 @@ body.has-bar { padding-bottom: 4.5rem; }
   .topbar .tab .tab-txt { position: static; width: auto; height: auto; overflow: visible; clip: auto; }
   .playbar { bottom: calc(57px + env(safe-area-inset-bottom)); }
   .playbar-in { padding: 8px 12px; gap: .5rem; }
-  .playbar #play-round { flex: 1 0 auto; min-height: 44px; padding: .4rem .8rem; }
+  .playbar #play-round { min-height: 44px; padding: .4rem .8rem; }
   .play-of, .save-txt, .mini-lbl { display: none; }
   /* Spilfører UI: modstanderen står i knappen (🔍-linket skjules), ved 3 advarsler én tæller; den lille ▶ hedder "▶ R3" */
   .playbar .opp-link, .playbar .wide-only { display: none; } .playbar .count-narrow { display: inline-block; }
-  .playbar #play-round { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* v3.29.1 (CI på main, 'Nordkysten BK (hjemme)' = 20 px for bredt): knappen må krympe, og KUN modstanderens navn forkortes med … –
+     "▶ Spil runde N" står altid helt (teksten er et anonymt flex-element, der ikke krymper) */
+  .playbar #play-round { display: flex; align-items: center; justify-content: center; flex: 1 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; }
+  .playbar #play-round .play-opp { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: pre; }
   .mini-num::before { content: 'R'; }
   .top-club { font-size: var(--fs-2); flex: 1; } .controls { gap: .35rem; }
   .opp-link { margin-left: 0; }
