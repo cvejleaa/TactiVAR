@@ -72,7 +72,7 @@ tbody tr { cursor: pointer; } tbody tr:hover { background: #1e293b; } tr.selecte
 .token { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; font-size: var(--fs-graf); text-shadow: 0 1px 2px #000; }
 .token-num { width: 1.8rem; height: 1.8rem; border-radius: 50%; display: grid; place-items: center; background: var(--bg); border: 2px solid #fff; font-weight: 800; font-size: var(--fs-1); }
 .token.custom .token-num { border-color: var(--grøn); } .token.out .token-num { border-color: var(--rød); background: #450a0a; } .token.selected .token-num { box-shadow: 0 0 0 3px var(--lilla); }
-.token.injured .token-num { background: #881337; } .token.draggable { cursor: grab; } .token-flag { font-size: var(--fs-graf); color: #fecaca; } .token-flag.ok { color: #bbf7d0; } .token-flag.pos { color: #fde68a; display: block; }
+.token.injured .token-num { background: #881337; } .token.draggable { cursor: grab; } .token-flag { font-size: var(--fs-1); color: #fecaca; } .token-flag.ok { color: #bbf7d0; } .token-flag.pos { color: #fde68a; display: block; }
 .lp-table .lp-place.off-pos { color: #f59e0b; }
 .anchor-ring { position: absolute; transform: translate(-50%, -50%); border: 2px dashed #e9d5ff; border-radius: 50%; pointer-events: none; }
 fieldset.phase { border: 1px solid var(--kant); border-radius: .4rem; margin: .5rem 0; display: flex; flex-wrap: wrap; gap: .5rem; font-size: var(--fs-1); }
@@ -198,7 +198,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .rp-token.actor { border-color: #22c55e; box-shadow: 0 0 0 3px #22c55e99; z-index: 2; } .rp-token.assist { border-color: #60a5fa; }
 .rp-ball { position: absolute; transform: translate(-50%, -50%); color: #fff; font-size: var(--fs-1); text-shadow: 0 0 3px #000; transition: left .4s ease-out, top .4s ease-out; z-index: 3; pointer-events: none; }
 .rp-ball.over { transform: translate(-50%, -50%) scale(2.2); opacity: 0; }   /* over overliggeren (v3.16.2) */
-.rp-caption { min-height: 2.6em; font-size: var(--fs-2); text-align: center; } .rp-caption.moment { font-weight: 600; }
+.rp-caption { min-height: 2.7em; font-size: var(--fs-2); text-align: center; } .rp-caption.moment { font-weight: 600; }
 .rp-controls { display: flex; gap: .3rem; justify-content: center; flex-wrap: wrap; }
 /* Heat map (v3.16) */
 .minipitch.heat .heat-cell { position: absolute; background: #f97316; pointer-events: none; }
@@ -221,7 +221,7 @@ tr.heat-sel td { background: #f9731633; } .ratings tr[title] { cursor: pointer; 
 .traincell { white-space: nowrap; }
 
 /* Klub (v3.18.0) */
-.club-sum th { text-align: left; padding-right: 1rem; font-weight: normal; color: var(--muted, #94a3b8); }
+.club-sum th { text-align: left; padding-right: 1rem; font-weight: normal; color: var(--dæmpet); }
 .club-sum td, .ledger td.num { text-align: right; }
 .club-sum td { text-align: left; }
 .neg { color: #f87171; }
@@ -231,6 +231,8 @@ tr.heat-sel td { background: #f9731633; } .ratings tr[title] { cursor: pointer; 
 .club-sum td { white-space: normal; overflow-wrap: anywhere; }
 /* Massehandlingen i regnearkets værktøjslinje: samme højde som filterknapperne (CI-laptop-tjekket: banen skal stå højt nok) */
 select.mini { padding: .1rem .3rem; font-size: var(--fs-1); height: auto; line-height: 1.2; }
+/* iOS zoomer ved fokus i felter under 16 px (RM v3.27.1: før arvede de browserens 16 px) – på smal skærm er alle felter 16 px */
+@media (max-width: 900px) { input, select, textarea, select.mini { font-size: var(--fs-3); } }
 @media (max-width: 600px) { #for-sale-table .wide { display: none; } }
 
 /* v3.19.0: fanerne i den faste topbar (anden række) – ⚙ Admin har gem/eksport/import/ny liga */

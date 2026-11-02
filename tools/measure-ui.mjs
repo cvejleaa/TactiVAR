@@ -1,7 +1,7 @@
 // Brugerfladens tal (UI-ombygningen F0–F6, backlog nr. 0 – brugeren 2026-11-02: "forvirrende og alt for mange informationer
 // klemt sammen"): pr. fane og bredde – sidehøjde, antal distinkte skriftstørrelser og tekstfarver, knapper, tal og ord.
 // Kør: node tools/measure-ui.mjs [BASE_URL] [--json]   (uden BASE_URL startes en lokal server på public/)
-// Før/efter hvert trin skrives i spec §10b. measureUi() bruges også af tests/unit/ui-tokens-*.test.mjs.
+// Før/efter hvert trin skrives i spec §10b (tallene svinger lidt med den tilfældige liga – derfor "ca.").
 import fs from 'node:fs';
 import { chromium } from 'playwright-core';
 import { startServer } from './serve.mjs';

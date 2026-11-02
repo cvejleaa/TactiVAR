@@ -1032,11 +1032,11 @@ avisens hovedperson altid målmanden.
 
 ## 10b. Layout (skal bevares, selv uden Tailwind)
 Mørkt tema. **Farver og skrift (v3.27.1, UI-ombygningen F0 – backlog nr. 0):** én palet som tokens i `style.css` :root
-(--bg #0b1220, --panel #131c2e, --panel-2 #1c2740, --kant #263248, --tekst #f1f5f9, --dæmpet #94a3b8) med faste
-betydninger: lilla (--aktiv) = hvor du er, grøn (--ok) = handling/godt, gul (--advarsel) og rød (--fejl) kun advarsler,
-blå (--info) = links. Fem skriftstørrelser 12/14/16/20/28 px (+ 10 px kun til tal på brikker i banegrafikken); brødtekst 14.
+(--bg #0b1220, --panel #131c2e, --panel-2 #1c2740, --kant #263248, --tekst #f1f5f9, --dæmpet #94a3b8) med de
+betydninger, som F1–F6 indfører: lilla (--aktiv) = hvor du er, grøn (--ok) = handling/godt, gul (--advarsel) og rød (--fejl)
+advarsler, blå (--info) = links. Endnu IKKE håndhævet: stjerner, stærkt samspil og kampens spiller er gule, mit hold er grønt. Fem skriftstørrelser 12/14/16/20/28 px (+ 10 px kun til navne og tal på brikkerne i banegrafikken; advarslen under en brik er 12 px); felter på smal skærm 16 px (iOS zoomer ellers); brødtekst 14.
 Målt med `node tools/measure-ui.mjs` (1366/390 px, efter én runde): distinkte skriftstørrelser i hele appen 20 → 6, pr. fane
-7–15 → 3–6; sidehøjder 1366 px Trup 1831 → 1974, Taktik 2068 → 2087, Kamp 3212 → 3261, Liga 2521 → 2619; 390 px Taktik
+7–15 → 3–6; sidehøjder (ca. – ligaen er tilfældig) 1366 px Trup 1831 → 1974, Taktik 2068 → 2087, Kamp 3212 → 3261, Liga 2521 → 2619; 390 px Taktik
 4563 → 4602, Liga 3868 → 4182 (lidt luft – højderne tages ned i F4–F6). e2e vagter: højst 6 størrelser, alle fra skalaen. Den faste (sticky) topbar (v3.19.0, brugerens valg): klubvælger, "▶ Spil runde N af 14 mod X (hjemme/ude)"
 (under 480 px kun "Spil runde N af 14" – modstanderen står på 🔍), "🔍 X", gem-kvitteringen (åbner Admin) og
 fanerne som anden række (under 480 px kun ikoner). Den valgte fane gemmes i `ui.tab` (ukendt værdi → Trup):
