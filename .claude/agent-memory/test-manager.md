@@ -193,3 +193,11 @@
 - Fælde: pickStars' `>= 3` er bag starsForValue's egen `>= 3`-vagt – mutanten `>= 2` er kun synlig for en tier, hvor TIER_STARS ≠ TIER_RANK (STAR: 3,4 vs 4) OG med valueStars > 0; ellers falder begge til tier'en og mutanten er ækvivalent.
 - Fælde: valueOfStars(3.2) = 1440000.0000000002 (flydende) – assertér med tolerance på funktionen, præcist først efter round(…, 25000) i publicValue.
 - Harness: kør testfilerne SEKVENTIELT og stop ved første røde (dræbte mutanter på 3 s i stedet for 1 min); kopi af public/tests/tools/docs/firestore.rules i scratchpad (upload-testen læser firestore.rules). Fuld `npm test` = 1356 grønne på 20 min under load 10+.
+
+## v3.31.0 (F3, Hjem-indhold og avisen ét sted; ~55 mutanter, 6 overlevede forfatterens suite, 0 efter f3tm-blokken)
+- Overlevede: formpillernes FARVER (kun "tre forskellige" blev målt, så V↔T-bytte overlevede; måles nu som computed rgb: V grøn, T rød, U grå), `|| 'Rundens avis'`-fallbacken (tom streng skjuler kortet), cachen `columnCache.lr === lr` → `true` (Liga og Hjem bruger SAMME columnNow, så en gammel klumme ser ens ud overalt – oraklet er en genindlæsning: runde 2 uden reload skal give samme titel som efter reload og ≠ runde 1), og kampens spiller fra `lr.matches[0]` (min kamp stod ofte som nr. 1).
+- Mønster: "titel = klummens titel" kan være lig `headlines[0]` i det typiske spil (din kamp er størst) → ombytning af `a || b` overlever, til gemmet får en afvigende `headlines[0]` ('ZZZ …'). Sæt dataene til at ADSKILLE de to kilder, før du asserter ligheden.
+- Mønster: ejerskab "hjemme vs. mit hold" (`teamId === m.homeId`) er 50 % tilfældigt i e2e; spejl min kamp (home↔away + ratings) i gemmet, så begge sider prøves hver gang. Mutant, der kun ændrer BETINGELSEN i en `x ? f(x) : null`, er ofte ækvivalent – mutér hele udtrykket.
+- Ækvivalente: `shown.round === league.lastRound?.round` på Kamp-linjen (mc stammer altid fra lastRound), `head ?` i toHomeLine (head er kun null før runde 1, hvor linjen ikke vises), `paper`-vagten i app.js (home.js' playing-return dominerer).
+- Fælde: to e2e samtidig (mutationskørsel + egen kørsel) gav et usammenhængende ❌ (Fuldtids-analysen) – kør alene, før en rød tolkes.
+- Harness: F3_ONLY=1 (6 s) og TM_F3_ONLY=1; python mut.py (navn, fil, fra, til), unit først (0,2 s) så e2e; kopi af worktree (cp -a) til parallelle kørsler.

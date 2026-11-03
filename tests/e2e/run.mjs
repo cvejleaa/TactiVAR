@@ -964,8 +964,83 @@ try {
       await c.close();
     }
   };
+
+  // ---------- UI-ombygningen F3, Test Manager (v3.31.0): det forfatterens F3-blok lod overleve – kan køres alene med TM_F3_ONLY=1 ----------
+  // Pillernes FARVER (V grøn / T rød / U grå – ikke kun "tre forskellige"), overskriftens rækkefølge (klummens titel FØR den gamle avis),
+  // "Rundens avis"-fallbacken, cachen på tværs af runder (en gammel klumme efter runde 2), kampens spiller fra MIN kamp (ikke den første)
+  // og at Liga ikke har avisen under afspilning. Assertér på det, der IKKE må stå ("ZZZ", runde 1's overskrift) og på indholdet.
+  const f3tm = async () => {
+    const c = await browser.newContext({ viewport: { width: 1366, height: 900 } }), p = await c.newPage();
+    p.on('pageerror', (e) => fejl.push(e.message));
+    const tt = async (k) => { await p.click(`#tab-${k}`); await p.waitForSelector(`.tabpane.tab-${k}`); };
+    const reloadP = async () => { await p.reload(); await p.waitForSelector('body[data-klar="ja"]'); };
+    const setSave = async (fn) => { await p.evaluate((src) => { const d = JSON.parse(localStorage.getItem('tactivar_save')); new Function('d', src)(d); localStorage.setItem('tactivar_save', JSON.stringify(d)); }, `(${fn.toString()})(d)`); };
+    const play = async () => { await tt('hjem'); await p.click('#play-round'); await p.waitForSelector('#skip'); };
+    await p.goto(BASE + '/'); await p.waitForSelector('body[data-klar="ja"]');
+
+    // Pillernes farver (CSS): V grøn, T rød, U grå – bagrund og skrift (et V↔T-bytte eller U = V gør kun "tre forskellige farver" rødt, hvis det ikke er et bytte)
+    const cols = await p.evaluate(() => { const out = {}; for (const k of ['V', 'U', 'T']) { const s = document.createElement('span'); s.className = `form-pill form-${k}`; s.textContent = k; document.body.append(s);
+      const cs = getComputedStyle(s); out[k] = [cs.backgroundColor, cs.color].map((x) => x.match(/\d+/g).slice(0, 3).map(Number)); s.remove(); } return out; });
+    const green = ([r, g, b]) => g - r >= 20 && g >= b, red = ([r, g, b]) => r - g >= 20 && r >= b, grey = (c) => !green(c) && !red(c);
+    check('F3 TM: formpillernes farver – V grøn, T rød, U grå (bagrund og skrift hver for sig)', cols.V.every(green) && cols.T.every(red) && cols.U.every(grey), JSON.stringify(cols));
+
+    // Runde 1 → runde 2 UDEN genindlæsning: overskriften må ikke være runde 1's (cachen er pr. lastRound-objekt)
+    await play(); await p.click('#skip'); await soft(p, '#kamp-paper-link');
+    await tt('liga'); const t1 = await p.textContent('#col-title');
+    await play(); await p.click('#skip'); await soft(p, '#kamp-paper-link');
+    const kamp2 = await p.textContent('#kamp-paper-link').catch(() => 'mangler');
+    await tt('liga'); const t2live = await p.textContent('#col-title');
+    await tt('hjem'); const h2live = await p.textContent('#home-paper-title').catch(() => 'mangler');
+    await reloadP(); await tt('liga'); const t2fresh = await p.textContent('#col-title');
+    check('F3 TM: efter runde 2 (uden genindlæsning) har Liga, Hjem og Kamp runde 2\'s overskrift – ikke runde 1\'s cachede', t1 !== t2fresh && t2live === t2fresh && h2live === t2fresh && kamp2 === `📰 «${t2fresh}» ›`, `r1: ${t1} | r2: ${t2fresh} | live: ${t2live} | ${h2live} | ${kamp2}`);
+
+    // Overskriften = klummens titel, også når den gamle avis har en anden første overskrift (ellers vandt den gamle)
+    await setSave((d) => { d.league.lastRound.gazette.headlines[0] = 'ZZZ gammel avisoverskrift'; });
+    await reloadP(); await tt('liga'); const t3 = await p.textContent('#col-title'); await tt('hjem');
+    const h3 = await p.textContent('#home-paper-title').catch(() => 'mangler'); await tt('kamp'); const k3 = await p.textContent('#kamp-paper-link').catch(() => 'mangler');
+    check('F3 TM: Hjems og Kamps overskrift er klummens titel (= #col-title), ikke den gamle avis\' første overskrift', h3 === t3 && k3 === `📰 «${t3}» ›` && !h3.includes('ZZZ') && !k3.includes('ZZZ') && t3.length > 5, `${t3} | ${h3} | ${k3}`);
+
+    // Kampens spiller fra MIN kamp – også når den ikke er den første (de andre kampe har en anden kampens spiller), og uanset om jeg er
+    // hjemme eller ude: ejerskabet afgøres af motm.teamId = mit hold (ikke af hjemmeholdet) – kampen spejles (hjemme ↔ ude) i gemmet,
+    // så begge sider prøves hver gang, ikke kun den, terningen gav (spejlingen sker én gang, før 3. kørsel). Dit hold: med karakteren; modstanderens: med holdnavn, uden tal.
+    for (const mirror of [false, true]) for (const own of [true, false]) {
+      await p.evaluate(([own, mirror, src]) => { const d = JSON.parse(localStorage.getItem('tactivar_save')); new Function('d', 'own', 'mirror', src)(d, own, mirror); localStorage.setItem('tactivar_save', JSON.stringify(d)); window.__tmInfo = globalThis.__tm; }, [own, mirror && own, `
+        const L = d.league, me = L.teams.find((t) => !t.isBot).id, ms = L.lastRound.matches;
+        let i = ms.findIndex((x) => x.homeId === me || x.awayId === me); if (i === 0) { [ms[0], ms[1]] = [ms[1], ms[0]]; i = 1; }
+        const ok = (x) => typeof x.rating === 'number' && !x.red, top = (a) => a.filter(ok).sort((x, y) => y.rating - x.rating)[0];
+        const m = ms[i]; if (mirror) { for (const [a, b] of [['homeId', 'awayId'], ['homeName', 'awayName'], ['homeGoals', 'awayGoals']]) [m[a], m[b]] = [m[b], m[a]]; [m.ratings.home, m.ratings.away] = [m.ratings.away, m.ratings.home]; }
+        const mineSide = m.homeId === me ? m.ratings.home : m.ratings.away, theirs = m.homeId === me ? m.ratings.away : m.ratings.home;
+        ms.forEach((x, j) => { x.ratings.motm = j === i ? top(own ? mineSide : theirs) : top([...x.ratings.home, ...x.ratings.away]); });
+        globalThis.__tm = { idx: i, home: m.homeId === me, others: ms.filter((x, j) => j !== i).map((x) => '#' + x.ratings.motm.shirtNumber + ' ' + x.ratings.motm.shortName), want: ms[i].ratings.motm };`]);
+      const info = await p.evaluate(() => window.__tmInfo);
+      const e = info.want, who = `#${e.shirtNumber} ${e.shortName}`, r = e.rating.toFixed(1).replace('.', ',');
+      const want = own ? `👑 Kampens spiller: ${who} · karakter ${r}` : `👑 Kampens spiller: ${who} (${e.teamName})`;
+      await reloadP(); await tt('hjem');
+      const motm = await p.textContent('#home-motm').catch(() => 'mangler');
+      check(`F3 TM: 👑 ${own ? 'mit hold' : 'modstanderen'}, jeg er ${info.home ? 'hjemme' : 'ude'}, min kamp er nr. ${info.idx + 1} (de andres: ${info.others.join(', ')}) – "${want}"`,
+        info.idx > 0 && !info.others.includes(who) && motm === want && (own || !/karakter|\d,\d/.test(motm)), `${motm} | ${want}`);
+    }
+
+    // Liga under afspilning: ingen avis (hverken klumme eller gammel) – ville afsløre runden
+    await play(); await tt('liga');
+    check('F3 TM: Liga under afspilning har hverken #gazette eller #col-title (men tabellen og beskeden)', (await p.locator('#gazette, #col-title').count()) === 0 && (await p.locator('#standings').count()) === 1 && (await p.locator('#booked-league').count()) === 1);
+    await tt('kamp'); await p.click('#skip'); await soft(p, '#kamp-paper-link'); await tt('liga');
+    check('F3 TM: Liga efter afspilningen har avisen igen (præcis ét eksemplar)', (await p.locator('#gazette').count()) === 1 && (await p.locator('#col-title').count()) === 1);
+
+    // "Rundens avis": klummen kan ikke bygges, og den gamle avis har ingen overskrifter → Hjem og Kamp falder til sidste udvej – aldrig tomt, "undefined" eller et skjult kort
+    const fixtureV3120 = fs.readFileSync(new URL('../fixtures/save-v3.12.0.json', import.meta.url), 'utf8');
+    const broken = JSON.parse(fixtureV3120); broken.league.lastRound.matches[0].goalsPool = 5; broken.league.lastRound.gazette.headlines = [];
+    await p.evaluate((f) => { for (const k of Object.keys(localStorage)) if (k.startsWith('tactivar_')) localStorage.removeItem(k); localStorage.setItem('tactivar_save', f); }, JSON.stringify(broken));
+    await reloadP(); await tt('hjem');
+    const hf = await p.textContent('#home-paper-title').catch(() => 'mangler'), hcard = await p.textContent('#home-paper').catch(() => 'mangler'); await tt('kamp');
+    const kf = await p.textContent('#kamp-paper-link').catch(() => 'mangler');
+    check('F3 TM: uden klumme og uden gamle overskrifter står "Rundens avis" på Hjem og i Kamps link', hf === 'Rundens avis' && hcard === '📰 AvisenRundens avisLæs hele avisen ›' && kf === '📰 «Rundens avis» ›' && !/undefined|null/.test(hcard + kf), `${hf} | ${hcard} | ${kf}`);
+    await p.evaluate(() => { const b = document.getElementById('fejlboks'); if (b) { b.hidden = true; b.textContent = ''; } });
+    await c.close();
+  };
   if (process.env.F2_ONLY) { await f2(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun F2-blokken (kortpanelet – hurtig mutationskørsel)
   if (process.env.TM_F2_ONLY) { await f2tm(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun F2-blokken (kortpanelet – hurtig mutationskørsel)
+  if (process.env.TM_F3_ONLY) { await f3tm(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun TM's F3-blok (hurtig mutationskørsel)
   if (process.env.F3_ONLY) { await f3(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun F3-blokken (Hjem-indhold og avisen ét sted – hurtig mutationskørsel)
   if (process.env.TM_F1_ONLY) { await f1tm(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun Test Managerens F1-blok (hurtig mutationskørsel)
   let g = await fresh();
@@ -2823,6 +2898,7 @@ try {
   await f2();
   await f2tm();
   await f3();
+  await f3tm();
   check('Ingen sidefejl under hele forløbet', fejl.length === 0, fejl.join(' | '));
 } finally {
   await browser.close();
