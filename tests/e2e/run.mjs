@@ -455,7 +455,7 @@ try {
     await tt('taktik');
     const D1 = mine(await save()), slots0 = D1.tactics.lineupSlots.slice(), byP = (id) => D1.squad.find((x) => x.id === id);
     const info = await tp.evaluate(() => ({ rows: document.querySelectorAll('#lineup-list tr.lp-row').length, infos: [...document.querySelectorAll('#lineup-list tr.lp-row .lp-info')].map((b) => [b.dataset.pid, b.getAttribute('aria-label'), b.closest('tr').dataset.pid]),
-      size: (({ width, height }) => [width, height])(document.querySelector('.lp-info')?.getBoundingClientRect() ?? { width: 0, height: 0 }), cell: document.querySelector('#lineup-list tr.lp-row td:nth-child(2)').textContent, help: document.getElementById('list-help')?.textContent ?? '' }));
+      size: (({ width, height }) => [width, height])(document.querySelector('.lp-info')?.getBoundingClientRect() ?? { width: 0, height: 0 }), cell: document.querySelector('#lineup-list tr.lp-row td:nth-child(2) .lp-name').textContent, help: document.getElementById('list-help')?.textContent ?? '' }));
     check('F2 Taktik: ⓘ forrest i navnecellen på hver række (aria-label "Spillerkort: #nr Navn"), mindst 28 px – cellens tekst er stadig "#nr Navn", hjælpeteksten nævner ⓘ',
       info.rows === 18 && info.infos.length === 18 && info.infos.every(([pid, lbl, rp]) => pid === rp && lbl === `Spillerkort: #${byP(pid).shirtNumber} ${byP(pid).shortName}`) && info.size.every((x) => x >= 28) && /^#\d+ /.test(info.cell) && info.help.startsWith('ⓘ ved navnet = spillerkortet'), JSON.stringify({ ...info, infos: info.infos.length }));
     await tp.click('#pitch .token[data-slot="9"]');
@@ -1312,7 +1312,7 @@ try {
   // Ét fælles byt (pickForSwap): bænkspiller i listen → brik på banen
   const tName = async (slot) => g.locator(`#pitch .token[data-slot="${slot}"] .token-name`).textContent();
   const benchRow = g.locator('#bench tr.bench-p').first();
-  const benchShort = (await benchRow.locator('td:nth-child(2)').textContent()).replace(/^#\d+ /, '').trim();
+  const benchShort = (await benchRow.locator('td:nth-child(2) .lp-name').textContent()).replace(/^#\d+ /, '').trim();
   await benchRow.click();
   // Rullepositionen i listen bevares ved et klik (QC): rul ned, klik en bænkspiller, stå samme sted
   await g.setViewportSize({ width: 1400, height: 600 });
@@ -1475,7 +1475,7 @@ try {
   await g.locator('#bench .bench-p').first().click(); await g.locator('#bench .bench-p').first().click();
   check('Bænken: klik igen på samme bænkspiller fravælger', (await g.locator('#bench .bench-p.active').count()) === 0 && (await g.locator('#pick-msg').count()) === 0);
   const benchBtn = g.locator('#bench .bench-p').first();
-  const benchName = (await benchBtn.locator('td:nth-child(2)').textContent()).replace(/^#\d+ /, '').trim();
+  const benchName = (await benchBtn.locator('td:nth-child(2) .lp-name').textContent()).replace(/^#\d+ /, '').trim();
   await benchBtn.click(); await g.click('#pitch .token[data-slot="4"]');
   check('Bænken: klik bænkspiller og så brik skifter ind', (await nameAt(4)) === benchName && (await g.locator('#bench .bench-p', { hasText: n4 }).count()) === 1, `${benchName} / ${await nameAt(4)}`);
   await g.click('#pitch .token[data-slot="5"]'); await g.locator('#lineup-list .toolbar button', { hasText: 'Alle' }).click(); await g.locator('#bench .bench-p').first().click();

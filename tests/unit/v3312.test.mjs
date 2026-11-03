@@ -63,6 +63,9 @@ test('Taktik-listen: 🔒/🌟 + arketypens navn ved en spiller med arketype (ti
   assert.ok(!seen(cellB).includes('Target Man') && !seen(list).includes('✨'));
   assert.equal(line(cellC), undefined); assert.equal(ico(cellC), undefined);
   assert.equal(cellC.textContent, `#${c.shirtNumber} ${c.shortName}`, 'uden arketype: kun "#nr Navn"');
+  // CI v3.31.2: navnet står i sin egen .lp-name, så det kan læses uden mærket – også MED arketype (e2e læste hele cellen)
+  const nameOf = (cell) => all(cell, (e) => cls(e, 'lp-name'))[0]?.textContent;
+  assert.equal(nameOf(cellA), `#${a.shirtNumber} ${a.shortName}`); assert.equal(nameOf(cellC), `#${c.shirtNumber} ${c.shortName}`);
   // modstanderens liste: hans spillere HAR arketyper, men intet mærke og intet navn
   const withArch = opp.squad.filter((p) => p.archetype);
   assert.ok(withArch.length >= 2, 'data: modstanderen har spillere med arketype');

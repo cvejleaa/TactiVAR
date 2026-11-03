@@ -58,7 +58,7 @@ export function renderLineupList({ team, isOwn, ui, onPick, onSort, onBlocked, o
       onclick: () => onPick(p) },
     h('td', { class: 'lp-place' + (fit < 1 ? ' off-pos' : ''), title: fit < 1 ? `Naturlig: ${POSITION_FULL[p.position]} – på ${place}${kindOf(s) ? ` (${kindOf(s)})` : ''} koster det ${fitCost(fit)} i dueller` : '' }, place, fit < 1 ? ` ⚠ ${fitCost(fit)}` : ''),
     // ⓘ: tegnet står i CSS (::before), så cellens tekst stadig er "#7 Navn"
-    h('td', {}, onInfo ? h('button', { class: 'lp-info', type: 'button', dataset: { pid: p.id }, title: 'Åbn spillerkortet', 'aria-label': `Spillerkort: #${p.shirtNumber} ${p.shortName}`, onclick: (e) => { e.stopPropagation(); onInfo(p); } }) : null, `#${p.shirtNumber} ${p.shortName}`, archMark(p)),
+    h('td', {}, onInfo ? h('button', { class: 'lp-info', type: 'button', dataset: { pid: p.id }, title: 'Åbn spillerkortet', 'aria-label': `Spillerkort: #${p.shirtNumber} ${p.shortName}`, onclick: (e) => { e.stopPropagation(); onInfo(p); } }) : null, h('span', { class: 'lp-name' }, `#${p.shirtNumber} ${p.shortName}`), archMark(p)),
     // Kæde · naturlig position i alle tre sektioner (QC B4: så man kan se, hvem på bænken der passer)
     h('td', { title: POSITION_FULL[p.position] ?? '' }, h('span', { class: 'chip' }, LINE[p.line]), ` ${POSITION[p.position] ?? ''}`), cols.map((c) => cell(c, p)));
   };
