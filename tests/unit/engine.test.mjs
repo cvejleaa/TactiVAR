@@ -350,6 +350,9 @@ test('viewRatingEntry: modstandere ser stjerner, ikke karakter, mod-kunnen eller
 test('andre holds taktiske overvejelser kan ikke læses – kun deres startformation', () => {
   // v3.31.1: stavemåderne fra counter.js/match.js ('gegenpres' med ét s, 'VAR-linje', 'lange bolde') – 'gegenpres' fanger også den gamle 'gegenpress'
   const NAMES = /korte pasninger|balanceret opbygning|direkte lange bolde|lav blok|mellemblok|højt gegenpres|gegenpres|VAR-linje|lange bolde/i;
+  // TM v3.31.1: regexen skal KUNNE fange hvert navn, spillerne ser på sit eget hold (ellers tjekker en udtyndet regex intet): de seks valg fra
+  // referatets TXT og de to stilnavne fra counter.js hver for sig – 'gegenpres' alene dækker 'højt gegenpres', så de to står hver for sig nedenfor
+  for (const t of ['korte pasninger', 'balanceret opbygning', 'direkte lange bolde', 'lav blok', 'mellemblok', 'højt gegenpres', 'Gegenpres', 'VAR-linje', 'Lange bolde']) assert.match(t, NAMES, t);
   const L = league(41), rng = createRng(41);
   for (let i = 1; i < 8; i++) {
     const m = simulateMatch(L.teams[0], L.teams[i], rng);
