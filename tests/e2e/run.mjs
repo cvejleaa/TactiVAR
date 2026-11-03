@@ -1052,6 +1052,7 @@ try {
     await c.close();
   };
   if (process.env.F2_ONLY) { await f2(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun F2-blokken (kortpanelet – hurtig mutationskørsel)
+  if (process.env.TM_V3312_ONLY) { await v3312tm(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); console.log(fejl.join(' | ')); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun Test Managers v3.31.2-blok
   if (process.env.V3312_ONLY) { await v3312(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); console.log(fejl.join(' | ')); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun v3.31.2-blokken
   if (process.env.V3311_ONLY) { await v3311(); await v3311tm(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun v3.31.1-blokken (Spil-bjælken på alle faner – hurtig mutationskørsel)
   if (process.env.TM_F2_ONLY) { await f2tm(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun F2-blokken (kortpanelet – hurtig mutationskørsel)
@@ -3135,6 +3136,56 @@ try {
     check('v3.31.2 Bjælken ved 601/667/700 px med 3 piller, 🔍 og et langt holdnavn: ▶\'s højre kant ≤ bredden, og "▶ Spil runde 1 af 14" står helt (kun navnet forkortes)', Object.values(edge).every((e) => e.right <= e.w && e.pills === 3 && e.opp && e.txt.startsWith('▶ Spil runde 1 af 14 · Nordkysten') && e.ofIn), JSON.stringify(edge));
     await c.close();
   }
+  // ---------- v3.31.2 TM: mutanter, den første blok lod overleve – breakpointet 900 px på kanten, navnets … i bjælken, tabellens højrejustering
+  // og at appen sender hideLog (kortets statistik og 📜 Kampe tæller IKKE den runde, der afspilles). Kan køres alene med TM_V3312_ONLY=1.
+  async function v3312tm() {
+    const c = await browser.newContext({ viewport: { width: 1366, height: 900 } }), p = await c.newPage();
+    p.on('pageerror', (e) => fejl.push(e.message));
+    await p.goto(BASE + '/'); await p.waitForSelector('body[data-klar="ja"]');
+    const tt = async (k) => { await p.click(`#tab-${k}`); await p.waitForSelector(`.tabpane.tab-${k}`); };
+    const mod = (f, arg) => p.evaluate(([src, a]) => { const d = JSON.parse(localStorage.getItem('tactivar_save')); const r = (0, eval)('(' + src + ')')(d, a); localStorage.setItem('tactivar_save', JSON.stringify(d)); return r; }, [f.toString(), arg ?? null]);
+    const S = await mod((d) => {
+      const me = d.league.teams.find((t) => !t.isBot), sl = me.tactics.lineupSlots, P = (i) => me.squad.find((x) => x.id === sl[i]);
+      P(6).archetype = { id: 'REGISTA', name: 'Regista', description: 'gammel', unlockReq: { passing: 13, ballControl: 13 }, isUnlocked: false };
+      const pr = d.league.schedule[0].find(([x, y]) => x === me.id || y === me.id); d.league.teams.find((t) => t.id === (pr[0] === me.id ? pr[1] : pr[0])).name = 'Nordkysten Boldklub af 1921';
+      for (const x of me.squad) Object.assign(x, { injuryMatchesLeft: 0, banMatches: 0, banYellows: 0, freshness: 100 });
+      return { a: P(6).id, st: P(3).id };
+    });
+    await p.reload(); await p.waitForSelector('body[data-klar="ja"]'); await tt('taktik');
+    // Arketype-mærket flytter sig præcis ved 900 px: 899 = kun ikonet, 900 = linjen under navnet
+    const vis = () => p.evaluate((id) => { const tr = document.querySelector(`#lineup-table tr[data-pid="${id}"]`), v = (e) => !!e && e.getBoundingClientRect().width > 0;
+      return { line: v(tr.querySelector('.lp-arch')), ico: v(tr.querySelector('.lp-arch-ico')) }; }, S.a);
+    const bp = {};
+    for (const w of [850, 899, 900, 1000]) { await p.setViewportSize({ width: w, height: 900 }); await p.waitForTimeout(50); bp[w] = await vis(); }
+    check('v3.31.2 TM: arketype-mærket ved 850/899 px kun ikonet, ved 900/1000 px kun linjen (grænsen er præcis 900)',
+      [850, 899].every((w) => bp[w].ico && !bp[w].line) && [900, 1000].every((w) => bp[w].line && !bp[w].ico), JSON.stringify(bp));
+    // Bjælken: navnet forkortes med … ved 601 px (før rettelsen skubbede det ▶ ud), men står helt ved 1366 px
+    const bar = () => p.evaluate(() => { const o = document.querySelector('#play-bar #play-round .play-opp'), cs = getComputedStyle(o), of = document.querySelector('#play-bar #play-round .play-of').getBoundingClientRect();
+      return { cut: o.scrollWidth > o.clientWidth, ellipsis: cs.textOverflow, over: cs.overflow, full: o.textContent, ofH: Math.round(of.height), ofW: Math.round(of.width), btnH: Math.round(document.querySelector('#play-bar #play-round').getBoundingClientRect().height) }; });
+    await p.setViewportSize({ width: 601, height: 900 }); await p.waitForTimeout(50);
+    const b1 = await bar();
+    await p.setViewportSize({ width: 1366, height: 900 }); await p.waitForTimeout(50);
+    const b2 = await bar();
+    check('v3.31.2 TM: bjælkens modstandernavn forkortes med … ved 601 px (afkortet, text-overflow: ellipsis) og står helt ved 1366 px', b1.cut && b1.ellipsis === 'ellipsis' && b1.over === 'hidden' && !b2.cut && b2.full.includes('Nordkysten Boldklub af 1921')
+      && b1.ofH === b2.ofH && b1.ofW === b2.ofW && b1.btnH === b2.btnH, JSON.stringify([b1, b2]));   // " af 14" brydes ikke og krympes ikke: samme højde og bredde som ved 1366
+    // Appen sender hideLog: efter runde 1 har en starter 1 kamp; under afspilningen af runde 2 stadig 1 (kortets statistik og 📜 Kampe), efter fløjtet 2
+    await tt('taktik'); await p.click('#play-round'); await p.waitForSelector('#skip'); await tt('kamp'); await p.click('#skip'); await p.waitForSelector('.to-home');
+    // spilleren vælges efter runde 1: en rask, ikke udelukket starter, der spillede den (så han også er med i runde 2)
+    S.st = await mod((d) => { const me = d.league.teams.find((t) => !t.isBot); return me.tactics.lineupSlots.slice(1, 11).find((id) => { const x = me.squad.find((q) => q.id === id); return x.matchLog.length === 1 && !x.injuryMatchesLeft && !x.banMatches && x.freshness >= 60; }); });
+    check('v3.31.2 TM data: en rask starter fra runde 1', !!S.st);
+    const stats = async () => { await tt('trup'); await p.click(`#matrix tr[data-pid="${S.st}"]`); await p.waitForSelector('#cardpanel[data-open="ja"] #card-stats');
+      return p.evaluate(() => { const t = document.querySelector('#cardpanel #card-stats-table'), g = (k) => [...t.querySelectorAll(`tr[data-k="${k}"] td`)].map((e) => e.textContent), log = document.querySelector('#cardpanel #match-log');
+        return { games: g('games'), motm: g('motm'), yellow: g('yellow'), logRows: log ? log.querySelectorAll('.log-row').length : -1, align: getComputedStyle(t.querySelector('td.num')).textAlign }; }); };
+    const s1 = await stats(); await p.click('#card-close');
+    await tt('taktik'); await p.click('#play-round'); await p.waitForSelector('#skip');
+    const s2 = await stats(); await p.click('#card-close');
+    await tt('kamp'); await p.click('#skip'); await p.waitForSelector('.to-home');
+    const s3 = await stats();
+    check('v3.31.2 TM: kortets statistik tæller ikke runden, der afspilles (Kampe 1 → 1 under afspilning → 2 efter fløjtet), 👑/🟨 er "–" under afspilning, og 📜 Kampe følger med',
+      s1.games[0] === '1' && s2.games[0] === '1' && s3.games[0] === '2' && s2.motm[0] === '–' && s2.yellow[0] === '–' && s3.motm[0] !== '–' && s2.logRows === s1.logRows && s3.logRows === s1.logRows + 1, JSON.stringify([s1, s2, s3]));
+    check('v3.31.2 TM: tallene i statistik-tabellen er højrejusteret', s1.align === 'right' || s1.align === 'end', s1.align);
+    await c.close();
+  }
   await f1tm();
   await f2();
   await f2tm();
@@ -3143,6 +3194,7 @@ try {
   await v3311();
   await v3311tm();
   await v3312();
+  await v3312tm();
   check('Ingen sidefejl under hele forløbet', fejl.length === 0, fejl.join(' | '));
 } finally {
   await browser.close();
