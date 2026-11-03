@@ -69,13 +69,20 @@ try {
       await tt('hjem');
       const nx0 = await tp.evaluate(() => { const L = JSON.parse(localStorage.getItem('tactivar_save')).league, me = L.teams.find((t) => !t.isBot).id, pr = L.schedule[0].find(([a, b]) => a === me || b === me); return { opp: L.teams.find((t) => t.id === (pr[0] === me ? pr[1] : pr[0])).name, home: pr[0] === me, n: L.schedule.length }; });
       const hu = nx0.home ? 'hjemme' : 'ude';
-      check('Spil-bjælken (Hjem): "▶ Spil runde 1 af 14 · X (hjemme/ude)" og modstanderen som separat 🔍-link',
-        (await tp.textContent('#play-bar #play-round')) === `▶ Spil runde 1 af ${nx0.n} · ${nx0.opp} (${hu})` && (await tp.textContent('#play-bar #next-opponent')) === `🔍 ${nx0.opp}` && (await tp.getAttribute('#play-bar #play-round', 'title')) === `Spil runde 1 af ${nx0.n} mod ${nx0.opp} (${hu})`, await tp.textContent('#play-bar'));
+      // v3.31.0 (Spilfører UI på F1): ingen 🔍 i bjælken på Hjem – næste kamp-kortet har linket; på Taktik står den, og ▶ står samme sted på begge
+      const playX = () => tp.evaluate(() => Math.round(document.querySelector('#play-bar #play-round').getBoundingClientRect().right));
+      const xHjem = await playX();
+      check('Spil-bjælken (Hjem): "▶ Spil runde 1 af 14 · X (hjemme/ude)" – og INGEN 🔍-link (næste kamp-kortet har det)',
+        (await tp.textContent('#play-bar #play-round')) === `▶ Spil runde 1 af ${nx0.n} · ${nx0.opp} (${hu})` && (await tp.locator('#play-bar #next-opponent').count()) === 0 && (await tp.getAttribute('#play-bar #play-round', 'title')) === `Spil runde 1 af ${nx0.n} mod ${nx0.opp} (${hu})` && !(await tp.textContent('#play-bar')).includes('🔍'), await tp.textContent('#play-bar'));
+      await tt('taktik');
+      const xTaktik = await playX();
+      check('Spil-bjælken (Taktik): modstanderen som separat 🔍-link – og ▶ står samme sted som på Hjem (højre kant)', (await tp.textContent('#play-bar #next-opponent')) === `🔍 ${nx0.opp}` && xHjem === xTaktik && xHjem > 1000, `Hjem ${xHjem} | Taktik ${xTaktik}`);
       await tt('trup');
       check('Den lille ▶ (Trup, ingen advarsler): "▶ Runde 1" med forklaringen "Spil runde 1 af 14 mod X (hjemme/ude)" – ingen tegn', (await tp.textContent('#play-round')) === '▶ Runde 1' && (await tp.getAttribute('#play-round', 'title')) === `Spil runde 1 af ${nx0.n} mod ${nx0.opp} (${hu})` && (await tp.locator('#mini-warn').count()) === 0);
       await tt('hjem');
       check('Hjem før første runde: "Sæsonen er ikke begyndt" (ikke "Nr. x i tabellen") og "Næste kamp · runde 1 af 14"', (await tp.textContent('#home-first')).includes('Sæsonen er ikke begyndt') && (await tp.locator('#home-last').count()) === 0
-        && (await tp.textContent('#home-next')).startsWith('Næste kamp · runde 1 af 14') && (await tp.locator('#cash-delta').count()) === 0, await tp.textContent('#home-first'));   // ingen regnskabslinje endnu → ingen "±0 kr. siden sidste runde"
+        && (await tp.textContent('#home-next')).startsWith('Næste kamp · runde 1 af 14') && (await tp.locator('#cash-delta').count()) === 0
+        && (await tp.locator('#home-paper, #home-motm').count()) === 0 && (await tp.locator('#home-first').count()) === 1, await tp.textContent('#home-first'));   // v3.31.0: intet 📰-kort og intet 👑 før runde 1 (ingen avis endnu)   // ingen regnskabslinje endnu → ingen "±0 kr. siden sidste runde"
       // (1) advarslernes kilder: udelukket MED 3 gule = kun ⛔; 7 gule = 🟨; bænk med 3 gule = intet; grænse 80: 78,6 → "79 % frisk"; to trætte = ét ⚠ 2
       const S = await mod((d) => { const me = d.league.teams.find((t) => !t.isBot), sl = me.tactics.lineupSlots, P = (i) => me.squad.find((x) => x.id === sl[i]);
         me.subsLimit = 80; Object.assign(P(9), { banMatches: 2, banWhy: 'DIRECT', banYellows: 3, freshness: 40 });   // QC: udelukket OG træt = kun ⛔, ikke også ⚠
@@ -92,8 +99,8 @@ try {
       const selNr = await tp.evaluate(() => [...document.querySelectorAll('#pitch .token.selected')].map((t) => t.querySelector('.token-num')?.textContent));
       check('Et tryk på ⚠-pillen markerer den FØRSTE trætte (i truppens rækkefølge) på banen', JSON.stringify(selNr) === JSON.stringify([String(S.first)]), JSON.stringify(selNr) + ' forventet ' + S.first);
       await tt('hjem');
-      check('Hjem: Spil-bjælken har KUN knappen og modstanderlinket – ingen piller (listen står lige over) selv med advarsler',
-        (await tp.locator('#play-bar #bar-issues, #play-bar #out-warning, #play-bar #tired-warning, #play-bar #issue-count').count()) === 0 && (await tp.locator('#play-bar #play-round').count()) === 1 && (await tp.locator('#play-bar #next-opponent').count()) === 1);
+      check('Hjem: Spil-bjælken har KUN knappen – ingen piller (listen står lige over) selv med advarsler, og ingen 🔍 (v3.31.0)',
+        (await tp.locator('#play-bar #bar-issues, #play-bar #out-warning, #play-bar #tired-warning, #play-bar #issue-count').count()) === 0 && (await tp.locator('#play-bar #play-round').count()) === 1 && (await tp.locator('#play-bar #next-opponent').count()) === 0);
       const rows = await tp.evaluate(() => [...document.querySelectorAll('#home-todo .todo-row[data-kind]')].map((r) => `${r.dataset.kind}:${r.dataset.nrs.split(',').map(Number).sort((a, b) => a - b)}`));
       check('Advarslernes kilder, Hjem: præcis tre rækker – ban, tired (begge #numre), yellow (7 gule, "🟨 7") – ikke en fjerde 🟨 for den udelukkede eller bænken',
         JSON.stringify(rows) === JSON.stringify([`ban:${S.ban}`, `tired:${[S.t1, S.t2].sort((a, b) => a - b)}`, `yellow:${S.yel}`]) && (await tp.textContent('#home-todo .todo-row[data-kind="yellow"] .todo-txt')).includes('🟨 7 – næste gule kort'), rows.join(' | '));
@@ -116,7 +123,9 @@ try {
       await reloadT(); await tt('taktik');
       const cnt = await tp.textContent('#issue-count'), cls = await tp.getAttribute('#issue-count', 'class');
       await tp.click('#issue-count'); await tp.waitForSelector('.tabpane.tab-hjem');
-      check('Tæller-pillen "🚑 4 ting" (farvet efter det værste) fører til Hjem-listen med de fire', cnt === '🚑 4 ting' && cls.includes('pill-injury') && (await tp.locator('#home-todo .todo-row[data-kind]').count()) === 4, cnt + ' | ' + cls);
+      // v3.31.0 (QC på F3): "N ting" er GRUPPER begge steder – Hjems tæller = antal rækker = Taktiks tæller (den lille ▶ tæller med vilje spillere)
+      const homeCnt = await tp.textContent('#home-todo .lbl-row .pill');
+      check('Tæller-pillen "🚑 4 ting" (farvet efter det værste) fører til Hjem-listen med de fire – og Hjem siger også "4 ting" (grupper)', cnt === '🚑 4 ting' && cls.includes('pill-injury') && (await tp.locator('#home-todo .todo-row[data-kind]').count()) === 4 && homeCnt === '4 ting', cnt + ' | ' + cls + ' | ' + homeCnt);
       // tre grupper med både udelukket og skadet: begge ligger i #out-warning (erstattes automatisk), ⚠ udenfor
       await mod((d) => { const me = d.league.teams.find((t) => !t.isBot), P = (i) => me.squad.find((x) => x.id === me.tactics.lineupSlots[i]); P(7).banYellows = 0; P(6).banYellows = 0; P(3).banMatches = 1; P(3).banWhy = 'DIRECT'; });
       await reloadT(); await tt('taktik');
@@ -168,7 +177,7 @@ try {
       }
       check('Minitabellen: 5 rækker omkring dig – plads 1 og 3 → 1–5, 4 → 2–6, 5 → 3–7, 7 → 4–8 (aldrig under 1 eller over 8), dit hold markeret og point som tabellen', Object.values(winOk).every(Boolean), JSON.stringify(winOk));
       // (5) modstanderens form: de 3 SENESTE (ældst → nyest) fra denne sæson, V/T/U set fra HAM (hjemme- og udekampe)
-      const oppName = (await tp.textContent('#next-opponent')).replace('🔍', '').trim();
+      const oppName = (await tp.textContent('#home-opp-link')).replace(/^🔍 Se | – kun offentlige data ›$/g, '');   // v3.31.0: ingen 🔍 i bjælken på Hjem
       const form = async (list) => { await mod((d, a) => { const L = d.league, opp = L.teams.find((t) => t.name === a.opp).id, other = L.teams.find((t) => !t.isBot).id, ss = L.seasonStartRound;
           L.history = a.list.map(([k, home, hG, aG]) => ({ round: ss + k, results: [home ? { h: opp, a: other, hG, aG } : { h: other, a: opp, hG, aG }] })); }, { opp: oppName, list });
         await reloadT(); await tt('hjem'); return tp.textContent('#home-opp-form'); };
@@ -177,13 +186,16 @@ try {
       const oppPlace = await tp.evaluate((n) => { const L = JSON.parse(localStorage.getItem('tactivar_save')).league, id = L.teams.find((t) => t.name === n).id;
         return L.leagueMetadata.standings.slice().sort((x, y) => y.points - x.points || (y.goalsFor - y.goalsAgainst) - (x.goalsFor - x.goalsAgainst) || y.goalsFor - x.goalsFor).findIndex((x) => x.teamId === id) + 1; }, oppName);
       check('Modstanderens placering på Hjem er HAM i tabellen (ikke din)', f1.startsWith(`Nr. ${oppPlace} · `), `${f1} | forventet Nr. ${oppPlace}`);
-      check('Modstanderens form: de 3 seneste i sæsonen, ældst først, set fra ham – uafgjort U, udesejr V (0–2 ude), udenederlag T (3–1 ude)', /^Nr\. \d · seneste 3: U V T$/.test(f1), f1);
+      check('Modstanderens form: de 3 seneste i sæsonen, ældst først, set fra ham – uafgjort U, udesejr V (0–2 ude), udenederlag T (3–1 ude)', /^Nr\. \d · seneste 3 \(ældste → nyeste\): U V T$/.test(f1), f1);
+      // v3.31.0 (Spilfører UI på F1): bogstaverne er piller – grøn/grå/rød efter resultatet og title fra HANS side
+      const pillsF = await tp.evaluate(() => [...document.querySelectorAll('#home-opp-form .form-pill')].map((e) => [e.textContent, e.className, e.title, getComputedStyle(e).backgroundColor]));
+      check('Formpillerne: U V T i rækkefølge, klasse form-U/V/T, title "<modstander>: Uafgjort/Vundet/Tabt" og tre forskellige farver', JSON.stringify(pillsF.map((x) => x.slice(0, 3))) === JSON.stringify([['U', 'form-pill form-U', `${oppName}: Uafgjort`], ['V', 'form-pill form-V', `${oppName}: Vundet`], ['T', 'form-pill form-T', `${oppName}: Tabt`]]) && new Set(pillsF.map((x) => x[3])).size === 3, JSON.stringify(pillsF));
       const f2 = await form([[-1, true, 5, 0], [0, true, 0, 1]]);
-      check('Modstanderens form: kun denne sæson tæller (et resultat før sæsonen er ikke med) – T alene', f2.endsWith('seneste 3: T'), f2);
+      check('Modstanderens form: kun denne sæson tæller (et resultat før sæsonen er ikke med) – T alene', f2.endsWith('seneste 3 (ældste → nyeste): T'), f2);
       const f3 = await form([[-1, true, 5, 0]]);
       check('Modstanderens form: ingen kampe i denne sæson endnu → teksten siger det', f3.endsWith('seneste 3: ingen kampe i sæsonen endnu'), f3);
       const f4 = await form([[0, true, 1, 0], [1, false, 2, 2], [2, true, 0, 0]]);
-      check('Modstanderens form: præcis 3 kampe → alle tre (V U U), også en hjemmekamp uden sejr', f4.endsWith('seneste 3: V U U'), f4);
+      check('Modstanderens form: præcis 3 kampe → alle tre (V U U), også en hjemmekamp uden sejr', f4.endsWith('seneste 3 (ældste → nyeste): V U U'), f4);
       // (6) din kamp ude: resultatet og målscorerne er DINE (udeholdets), ikke hjemmeholdets
       await mod((d) => { const L = d.league, me = L.teams.find((t) => !t.isBot), opp = L.teams.find((t) => t !== me && t.isBot), m = L.lastRound.matches[0];
         Object.assign(m, { homeId: opp.id, awayId: me.id, homeName: opp.name, awayName: me.name, homeGoals: 1, awayGoals: 2 });
@@ -898,8 +910,63 @@ try {
       await tp.context().close();
     }
   };
+  const f3 = async () => {
+    // ---------- UI-ombygningen F3 (v3.31.0): Hjem-indhold og avisen ét sted – kan køres alene med F3_ONLY=1 ----------
+    // Assertér på INDHOLDET (overskriften = Ligas #col-title, 👑 med netop de tal, seeren må se) og på det, der IKKE må stå (modstanderens
+    // karakter, 📰/👑 under afspilning). Ved 1366 og 390.
+    for (const [w, hgt] of [[1366, 900], [390, 844]]) {
+      const c = await browser.newContext({ viewport: { width: w, height: hgt } }), p = await c.newPage();
+      p.on('pageerror', (e) => fejl.push(e.message));
+      const tt = async (k) => { await p.click(`#tab-${k}`); await p.waitForSelector(`.tabpane.tab-${k}`); };
+      const reloadP = async () => { await p.reload(); await p.waitForSelector('body[data-klar="ja"]'); };
+      await p.goto(BASE + '/'); await p.waitForSelector('body[data-klar="ja"]');
+      const playX = () => p.evaluate(() => Math.round(document.querySelector('#play-bar #play-round').getBoundingClientRect().right));
+      await tt('hjem'); const xH = await playX(); await tt('taktik'); const xT = await playX();
+      check(`F3 ${w}: ▶ står samme sted i Spil-bjælken på Hjem (uden 🔍) og Taktik`, xH === xT && (await p.locator('#play-bar #next-opponent').count()) === 1, `${xH} | ${xT}`);
+      await p.click('#play-round'); await p.waitForSelector('#skip');
+      await tt('hjem');
+      check(`F3 ${w}: under afspilning intet 📰-kort og intet 👑 på Hjem – næste kamp står`, (await p.locator('#home-paper, #home-motm').count()) === 0 && (await p.isVisible('#home-next')) && (await p.isVisible('#home-playing')));
+      await tt('kamp');
+      check(`F3 ${w}: under afspilning ingen 📰-link i Kamp`, (await p.locator('#kamp-paper-link').count()) === 0 && (await p.locator('#skip').count()) === 1);
+      await p.click('#skip'); await soft(p, '#kamp-paper-link');
+      await tt('liga');
+      const title = await p.textContent('#col-title');
+      const order = await p.evaluate(() => { const gz = document.getElementById('gazette'), st = document.getElementById('standings')?.closest('.panel'), lr = document.getElementById('last-round');
+        return { next: !!gz && st?.nextElementSibling === gz, before: !!gz && !!lr && !!(gz.compareDocumentPosition(lr) & Node.DOCUMENT_POSITION_FOLLOWING), n: document.querySelectorAll('#gazette').length }; });
+      check(`F3 ${w}: Liga – avisen (ét eksemplar) står lige under tabellen, før sidste runde`, order.next && order.before && order.n === 1, JSON.stringify(order));
+      await tt('hjem');
+      const head = await p.textContent('#home-paper-title').catch(() => 'mangler');
+      const pos = await p.evaluate(() => { const pp = document.getElementById('home-paper'); return { main: !!pp?.parentElement?.classList.contains('home-main'), afterTodo: pp?.previousElementSibling?.id === 'home-todo', txt: pp?.textContent }; });
+      check(`F3 ${w}: Hjems 📰-kort har netop klummens overskrift (= #col-title på Liga) og står i venstre kolonne efter "Før du spiller"`, head === title && title.length > 5 && pos.main && pos.afterTodo && pos.txt === `📰 Avisen${title}Læs hele avisen ›`, `${head} | ${title} | ${JSON.stringify(pos)}`);
+      const landing = async (sel) => { await p.click(sel); await soft(p, '.tabpane.tab-liga'); await p.waitForTimeout(100);
+        return p.evaluate(() => { const top = document.querySelector('.topbar').getBoundingClientRect().bottom, gz = document.querySelector('#gazette'), h3 = gz?.querySelector('h3')?.getBoundingClientRect(), ct = document.querySelector('#col-title')?.getBoundingClientRect();
+          return { tab: document.querySelector('#tabs .tab.active')?.textContent.trim(), edge: Math.round(Math.max(0, top)), h3: h3 ? Math.round(h3.top) : null, ct: ct ? Math.round(ct.top) : null, vh: innerHeight, y: Math.round(scrollY) }; }); };
+      const lands = (l) => l.tab?.includes('Liga') && l.y > 0 && l.h3 >= l.edge && l.h3 <= l.edge + 100 && l.ct > l.h3 && l.ct < l.vh / 2;
+      const fromHome = await landing('#home-paper-link');
+      check(`F3 ${w}: "Læs hele avisen ›" åbner Liga rullet til avisen – toppen lige under topbaren (ikke bag den), overskriften synlig`, lands(fromHome), JSON.stringify(fromHome));
+      await tt('kamp');
+      const kampLink = await p.textContent('#kamp-paper-link').catch(() => 'mangler'), kampGz = await p.locator('.tabpane.tab-kamp #gazette, .tabpane.tab-kamp #col-title').count();
+      check(`F3 ${w}: Kamp efter fløjtet har INGEN avis (hverken #gazette eller klummens overskrift) – kun linket`, kampGz === 0 && kampLink !== 'mangler', `${kampGz} | ${kampLink}`);
+      const fromKamp = await landing('#kamp-paper-link');
+      check(`F3 ${w}: Kamps "📰 «${title.slice(0, 20)}…» ›" har netop overskriften og lander samme sted`, kampLink === `📰 «${title}» ›` && lands(fromKamp), `${kampLink} | ${JSON.stringify(fromKamp)}`);
+      // 👑 kampens spiller: dit hold med karakteren, en modstander med holdnavn og UDEN tal (visibility.js) – sat i gemmet, så begge tilfælde prøves
+      const setMotm = (own) => p.evaluate((own) => { const d = JSON.parse(localStorage.getItem('tactivar_save')), L = d.league, me = L.teams.find((t) => !t.isBot).id;
+        const m = L.lastRound.matches.find((x) => x.homeId === me || x.awayId === me), mine = m.homeId === me ? m.ratings.home : m.ratings.away, theirs = m.homeId === me ? m.ratings.away : m.ratings.home;
+        const e = (own ? mine : theirs).filter((x) => !x.red && typeof x.rating === 'number').sort((a, b) => b.rating - a.rating)[0];
+        m.ratings.motm = e; localStorage.setItem('tactivar_save', JSON.stringify(d));
+        return { nr: e.shirtNumber, name: e.shortName, team: e.teamName, r: e.rating.toFixed(1).replace('.', ',') }; }, own);
+      const own = await setMotm(true); await reloadP(); await tt('hjem');
+      const tOwn = await p.textContent('#home-motm').catch(() => 'mangler');
+      check(`F3 ${w}: 👑 dit hold – "👑 Kampens spiller: #${own.nr} ${own.name} · karakter ${own.r}"`, tOwn === `👑 Kampens spiller: #${own.nr} ${own.name} · karakter ${own.r}`, tOwn);
+      const opp = await setMotm(false); await reloadP(); await tt('hjem');
+      const tOpp = await p.textContent('#home-motm').catch(() => 'mangler');
+      check(`F3 ${w}: 👑 modstanderen – "#${opp.nr} ${opp.name} (${opp.team})" uden karakter (${opp.r}) eller "undefined"`, tOpp === `👑 Kampens spiller: #${opp.nr} ${opp.name} (${opp.team})` && !tOpp.includes('karakter') && !tOpp.includes(opp.r) && !tOpp.includes('undefined'), tOpp);
+      await c.close();
+    }
+  };
   if (process.env.F2_ONLY) { await f2(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun F2-blokken (kortpanelet – hurtig mutationskørsel)
   if (process.env.TM_F2_ONLY) { await f2tm(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun F2-blokken (kortpanelet – hurtig mutationskørsel)
+  if (process.env.F3_ONLY) { await f3(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun F3-blokken (Hjem-indhold og avisen ét sted – hurtig mutationskørsel)
   if (process.env.TM_F1_ONLY) { await f1tm(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun Test Managerens F1-blok (hurtig mutationskørsel)
   let g = await fresh();
   const openCard = (pid = null, pg = g) => openCardOn(pg, pid);
@@ -1649,7 +1716,8 @@ try {
   { const nx2 = await nextOf(), line = await g.locator('.to-home').textContent().catch(() => 'mangler');
     const above = await g.evaluate(() => { const a = document.querySelector('.to-home'), b = document.querySelector('#match-center'); return !!a && !!b && a.getBoundingClientRect().bottom <= b.getBoundingClientRect().top; });
     check('Kamp efter fløjtet: "Forbered ›"-linjen står OVER kampcentret (ikke nederst)', above);
-    check('Kamp efter fløjtet: "Næste: runde 2 mod X (hjemme/ude) · Forbered ›"', line === `Næste: runde 2 mod ${nx2.opp} (${nx2.home ? 'hjemme' : 'ude'}) · Forbered ›`, line);
+    const pre = `Næste: runde 2 mod ${nx2.opp} (${nx2.home ? 'hjemme' : 'ude'}) · Forbered › · 📰 «`;
+    check('Kamp efter fløjtet: "Næste: runde 2 mod X (hjemme/ude) · Forbered › · 📰 «overskrift» ›" (v3.31.0: avisen står på Liga)', line.startsWith(pre) && line.endsWith('» ›') && line.length > pre.length + 5 && !/undefined|null/.test(line), line);
     await g.click('#to-home');
     check('"Forbered ›" åbner Hjem', (await g.textContent('#tabs .tab.active')).includes('Hjem') && (await g.isVisible('#home-todo')));
     await tab('kamp'); }
@@ -1713,6 +1781,15 @@ try {
   const runSum = await g.textContent('#match-center');
   check('Fuldtids-analyse med løb uden bold i din kamp', /📊 \[FULDTIDS-ANALYSE\] (Sejr \d+-\d+ til dig|Nederlag \d+-\d+|Uafgjort \d+-\d+)\. Du havde \d+% af bolden og \d+ afslutning(er)? \(\d+ på mål\)\. ((Din opbygning kom igennem \d+ af \d+ gange?( \((af de \d+ stop var \d+|alle \d+ stop var|stoppet var) offside\))?; d|D)it pres (vandt bolden \d+ af \d+ gange?|stoppede opbygningen \d+ af \d+ gange? \(\d+ erobring(er)?, \d+ på offside\))|Din opbygning kom igennem \d+ af \d+ gange?( \((af de \d+ stop var \d+|alle \d+ stop var|stoppet var) offside\))?)\. Dødbolde: \d+ frispark i skudafstand, \d+ hjørnespark, \d+ straffespark \(\d+ mål\) · frispark begået \d+, tilkendt \d+\. 🎯 Løb uden bold \(Normal\): \d+ løb, \d+ kom fri \(\d+ mål\) · kontraer imod i alt: \d+ \(\d+ mål\)\./.test(runSum), runSum.match(/🎯[^.]*\./)?.[0] ?? 'mangler');
   check('Fuldtids-analysen viser dit angreb (fokus · pasningsstil) og dit felt (v3.12)', /⚔️ Angreb \((Centralt|Høje indlæg|Lave cutbacks) · (korte pasninger|balanceret|direkte lange bolde)\): (ingen cutbacks eller høje bolde|(\d+ cutbacks? \(\d+ mål, \d+ stoppet ved kanten\))?(, )?(\d+ (høje bolde|høj bold) \(\d+ (vundne luftdueller|vundet luftduel) i åbent spil, \d+ hovedstødsmål\))?)\. 🛡️ Dit felt: modstanderens cutbacks stoppet \d+ af \d+ · luftdueller i åbent spil vundet \d+ af \d+\./.test(runSum), runSum.match(/⚔️[^🛡]*🛡️[^.]*\./)?.[0] ?? 'mangler');
+  // v3.31.0 (F3, avisen ét sted): Kamp har INGEN avis – kun linket i .to-home-linjen øverst, med klummens overskrift; det lander på avisen på Liga
+  { const kampHas = await g.locator('#match-center #gazette, .tabpane.tab-kamp #gazette, .tabpane.tab-kamp #col-title, .tabpane.tab-kamp #goal-of-round-match').count();
+    const linkTxt = await g.textContent('.to-home #kamp-paper-link').catch(() => 'mangler');
+    await g.click('.to-home #kamp-paper-link'); await soft(g, '.tabpane.tab-liga');
+    const land = await g.evaluate(() => { const top = document.querySelector('.topbar').getBoundingClientRect().bottom, gz = document.querySelector('#gazette'), h3 = gz?.querySelector('h3')?.getBoundingClientRect(), ct = document.querySelector('#col-title')?.getBoundingClientRect();
+      return { tab: document.querySelector('#tabs .tab.active')?.textContent, top: Math.round(top), h3: h3 ? Math.round(h3.top) : null, ct: ct ? Math.round(ct.top) : null, vh: innerHeight, y: Math.round(scrollY), title: document.querySelector('#col-title')?.textContent }; });
+    check('Kamp: ingen avis i Kamp-fanen (hverken #gazette, klummen eller Rundens mål) – kun 📰-linket', kampHas === 0 && linkTxt !== 'mangler', `${kampHas} | ${linkTxt}`);
+    check('Kamp: 📰-linket bærer netop klummens overskrift (= #col-title på Liga)', linkTxt === `📰 «${land.title}» ›`, `${linkTxt} | ${land.title}`);
+    check('Kamp: 📰-linket åbner Liga rullet til avisen – avisens top lige UNDER topbaren (scroll-margin-top), ikke bag den', land.tab?.includes('Liga') && land.y > 0 && land.h3 >= land.top && land.h3 <= land.top + 40 && land.ct > land.h3 && land.ct < land.vh / 2, JSON.stringify(land)); }
   const gzText = await g.textContent('#gazette');
   // v3.14: avisen er en klumme – overskrift, "Din kamp", de 3 øvrige kampe (fed overskrift, klik = referatet),
   // rundens spiller og mål, næste runde; dit holds løber står stadig som boks.
@@ -1724,12 +1801,13 @@ try {
   const myMatchTxt = await g.textContent('#col-mine');
   const myName = await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((t) => !t.isBot).name);
   check('Klummen, "Din kamp": handler om dit hold (seeren)', myMatchTxt.includes(myName), myMatchTxt.slice(0, 160));
+  const por = await g.textContent('#player-of-round');   // avisens Rundens spiller (Liga) – sammenlignes med karakterarket i Kamp nedenfor
+  await tab('kamp');   // tilbage til kampcentret (karakterarkene nedenfor)
   const iconTitles = await g.evaluate(() => [...document.querySelectorAll('.ratings .ricon')].map((e) => [e.textContent, e.title]));
   check('Ikonerne i karakterarket har mouse-over-tekst', iconTitles.length > 0 && iconTitles.every(([t, ti]) => ti.length > 3 && !ti.includes('undefined')), JSON.stringify(iconTitles.slice(0, 3)));
   const legendTxt = await g.textContent('#icon-legend');
   check('Ikon-forklaring under karakterarket (til touch)', ['⚽ Mål', '🅰 Oplæg', '🧤 Redninger', '👑 Kampens spiller'].every((x) => legendTxt.includes(x)), legendTxt);
   check('Forklaring af "fri", 🤼 og HI (rigtig vej rundt: 2/3 = kom fri 2 af 3 gange)', legendTxt.includes('"2/3 fri" = løb uden bold: kom fri 2 af 3 gange') && legendTxt.includes('HI = andel højintenst løb') && legendTxt.includes('"2/3 🤼" = dueller vundet') && legendTxt.endsWith('alle tre kun dit hold'), legendTxt);
-  const por = await g.textContent('#player-of-round');
   const porIsMine = (await g.locator('.ratings').nth(own).textContent()).includes(por.match(/#\d+ [^ ]+ [^ (]+/)[0]);
   check('Avisen kårer rundens spiller – med karakter kun hvis det er din spiller, ellers "rundens bedste karakter" (v3.16.3, ingen stjerner)', porIsMine ? /karakter \d+,\d/.test(por) : (por.includes('rundens bedste karakter') && !/[★☆]/.test(por) && !/karakter \d/.test(por)), por);
   // v3.16.3: 📍 kun hvor afspilningen ikke har afslutningen (QC: ellers to knapper, én handling) – i en ny kamp har hvert mål med
@@ -2017,10 +2095,11 @@ try {
     // v3.16.4: linjen står på hændelsens ur (e.clock), ikke tick-minuttet (gor.min)
     const gorMin = await g.evaluate((x) => { const e = JSON.parse(localStorage.getItem('tactivar_save')).league.lastRound.matches[x.matchIdx].events.find((v) => /GOAL/.test(v.type) && v.min === x.min && v.text.includes(x.scorer)); return e?.clock ? (e.clock.plus ? `${e.clock.m}+${e.clock.plus}'` : `${e.clock.m}'`) : null; }, gor);
     check('Målet er markeret i referatet og rullet frem', gorMin !== null && focus.startsWith(gorMin) && focus.includes(gor.scorer) && (await g.locator('#goal-focus').isVisible()) && (await g.evaluate(() => { const r = document.getElementById('goal-focus').getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight; })), focus);
-    // Også fra avisen inde i Kamp-fanen (vælg først en anden kamp)
+    // v3.31.0 (F3): Rundens mål findes ikke længere i Kamp-fanen (avisen står kun på Liga) – men linket virker stadig derfra, også efter en anden kamp er valgt
     await g.click(`#match-cards .matchcard:nth-child(${((gor.matchIdx + 1) % 4) + 1})`);
-    await g.click('#match-center #goal-of-round-match');
-    check('Fra avisen i Kamp-fanen: kampen skiftes, og målet markeres', (await g.locator(`#match-cards .matchcard:nth-child(${gor.matchIdx + 1}).active`).count()) === 1 && (await g.locator('#goal-focus').count()) === 1);
+    const inKamp = await g.locator('.tabpane.tab-kamp #goal-of-round-match').count();
+    await tab('liga'); await g.click('#goal-of-round-match');
+    check('Rundens mål: intet link i Kamp (avisen er på Liga) – fra Liga skiftes kampen igen, og målet markeres', inKamp === 0 && (await g.locator(`#match-cards .matchcard:nth-child(${gor.matchIdx + 1}).active`).count()) === 1 && (await g.locator('#goal-focus').count()) === 1, `i Kamp: ${inKamp}`);
   } else check('Runden havde intet mål (intet link at teste)', true);
   await tab('kamp');
   // Hver handling prøves på en frisk side (uden igangværende Match Center).
@@ -2111,8 +2190,11 @@ try {
   check('Migrering fra skema 4: gemt som skema 9, stoppere ≈190 og backs ≈176 cm (botternes startere fik i 7 → 8 den rolle, de spillede – uden for målingen)', pos4.schema === 9 && pos4.cb >= 189 && pos4.cb <= 192 && pos4.fb >= 174.5 && pos4.fb <= 177.5, JSON.stringify(pos4));
   await tab('kamp');
   const old4 = await g.textContent('#match-center');
-  check('Gem fra v3.7.0: karakterark og avis uden "undefined"/"NaN" og uden HI-tal', !/undefined|NaN|% HI/.test(old4) && (await g.locator('.ratings td.run').count()) > 0, old4.slice(0, 120));
-  await g.click('#match-center #goal-of-round-match');
+  check('Gem fra v3.7.0: karakterark uden "undefined"/"NaN" og uden HI-tal – og ingen avis i Kamp (v3.31.0)', !/undefined|NaN|% HI/.test(old4) && (await g.locator('.ratings td.run').count()) > 0 && (await g.locator('#match-center #gazette').count()) === 0, old4.slice(0, 120));
+  await tab('liga');
+  const old4gz = await g.textContent('#gazette');
+  check('Gem fra v3.7.0: avisen på Liga uden "undefined"/"NaN"', old4gz.length > 40 && !/undefined|NaN/.test(old4gz), old4gz.slice(0, 120));
+  await g.click('#goal-of-round-match');
   const g4 = JSON.parse(fixture4).league.lastRound.gazette.goalOfTheRound;
   check('Gem fra v3.7.0: Rundens mål linker til kampen fundet ud fra navnet', (await g.textContent('#scoreboard')).includes(g4.match.split(' - ')[0]) && (await g.locator('#goal-focus').count()) === 1);
   await tab('trup');
@@ -2130,6 +2212,8 @@ try {
   check('Gem fra v3.12.0: holdene får udskiftningsgrænse efter deres profil (dit hold 70, botterne 75/65/75/70/70/65/75)', JSON.stringify(await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.teams.map((t) => t.subsLimit))) === JSON.stringify([70, 75, 65, 75, 70, 70, 65, 75]));
   await tab('kamp');
   check('Gem fra v3.12.0: runde 3 i Kamp-fanen uden 📍, startopstillingen på minibanen og ingen fejl', (await g.textContent('#match-center')).includes('runde 3') && (await g.locator('#feed .snap-btn').count()) === 0 && (await g.locator('#snap-pitch').count()) === 0 && (await g.locator('.minipitch').count()) >= 1 && (await g.isHidden('#fejlboks')));
+  check('Gem fra v3.12.0: Kamp har ingen avis (v3.31.0 – den står på Liga), men 📰-linket', (await g.locator('#match-center #gazette').count()) === 0 && (await g.locator('#kamp-paper-link').count()) === 1);
+  await tab('liga');
   const oldCol = await g.textContent('#gazette');
   check('Gem fra v3.12.0: avisen er en klumme (bygget af de gemte kampe) med "Din kamp" og uden "undefined"', (await g.locator('#gazette #col-mine').count()) === 1 && !/undefined|NaN/.test(oldCol), oldCol.slice(0, 160));
   // Release Manager v3.14: en fejl i klummen tager ikke Liga-fanen med – den gamle avis vises, og fejlen står i fejlboksen
@@ -2137,6 +2221,13 @@ try {
   await g.evaluate((f) => { for (const k of Object.keys(localStorage)) if (k.startsWith('tactivar_')) localStorage.removeItem(k); localStorage.setItem('tactivar_save', f); }, JSON.stringify(broken));
   await reload(); await tab('liga');
   check('Fejl i klummen: Liga-fanen viser den gamle avis (overskrifter, ingen "Din kamp") og fejlen i fejlboksen', (await g.locator('#gazette #headlines li').count()) >= 1 && (await g.locator('#gazette #col-mine').count()) === 0 && (await g.isVisible('#fejlboks')) && (await g.textContent('#fejlboks')).includes('Klummen kunne ikke bygges'), await g.textContent('#fejlboks'));
+  // v3.31.0 (QC på F3): Hjem og Kamp tager også overskriften – fra den gamle avis (= Ligas første overskrift), og fejlboksen får stadig kun ÉN linje
+  { const first = await g.locator('#gazette #headlines li').first().textContent();
+    await tab('hjem'); const homeHead = await g.textContent('#home-paper-title').catch(() => 'mangler');
+    await tab('kamp'); const kampHead = await g.textContent('#kamp-paper-link').catch(() => 'mangler');
+    await tab('liga'); await tab('hjem');
+    const lines = await g.evaluate(() => [...document.querySelectorAll('#fejlboks > div')].filter((d) => d.textContent.includes('Klummen kunne ikke bygges')).length);
+    check('Fejl i klummen: Hjem og Kamp viser den gamle avis\' første overskrift – og fejlboksen har ÉN linje, selv om Liga, Hjem og Kamp er tegnet flere gange', homeHead === first && kampHead === `📰 «${first}» ›` && lines === 1, `${homeHead} | ${kampHead} | ${first} | ${lines} linjer`); }
   await g.evaluate(() => { const b = document.getElementById('fejlboks'); b.hidden = true; b.textContent = ''; });
 
   // v3.10: et gem fra v3.9 (runde 2) – kun v3.11's kampprogram-besked, statistikken starter tom fra runde 3
@@ -2263,10 +2354,13 @@ try {
     await g.waitForSelector('.tabpane.tab-kamp');
     const expectedMatch = (await names()).find(([h1, a1]) => btnTxt.includes(h1) && btnTxt.includes(a1));
     check('Liga-fanen: et klik på en kampoverskrift i klummen åbner DEN kamp i Kamp-fanen', JSON.stringify(await sbTeams()) === JSON.stringify(expectedMatch) && head0.startsWith(btnTxt), `${btnTxt} → ${(await sbTeams()).join(' – ')}`);
-    await g.locator('#gazette #headlines li .col-match').nth(0).click();
+    // v3.31.0 (F3): Kamp har ingen klumme – en anden kampoverskrift vælges fra Liga, og Kamp viser den kamp i stedet
+    const kampGz = await g.locator('.tabpane.tab-kamp #gazette').count();
+    await tab('liga');
     const btn0 = await g.locator('#gazette #headlines li .col-match').nth(0).textContent();
+    await g.locator('#gazette #headlines li .col-match').nth(0).click(); await g.waitForSelector('.tabpane.tab-kamp');
     const exp0 = (await names()).find(([h1, a1]) => btn0.includes(h1) && btn0.includes(a1));
-    check('Kamp-fanen: kampoverskrifterne i klummen skifter den viste kamp (indekset følger overskriften)', JSON.stringify(await sbTeams()) === JSON.stringify(exp0), `${btn0} → ${(await sbTeams()).join(' – ')}`);
+    check('Kampoverskrifterne i klummen (kun på Liga – ikke i Kamp) skifter den viste kamp (indekset følger overskriften)', kampGz === 0 && JSON.stringify(await sbTeams()) === JSON.stringify(exp0), `${kampGz} | ${btn0} → ${(await sbTeams()).join(' – ')}`);
     // Runde 14 = sæsonens sidste
     await tab('trup');
     await g.click('#play-round');
@@ -2392,9 +2486,12 @@ try {
     // v3.16.7: ved sæsonslut står mesteren i banneret og avisens sæsonboks – ikke en tredje gang i Formen; og aldrig "fører" (QC F9)
     const formOk = (t) => p0 !== 0 && !t.includes('er mester') && !/fører med|står lige i toppen/.test(t);
     check('Sæsonslut: Formen gentager ikke mesteren og siger ikke "fører" (den nye sæsons nulstillede tabel)', formOk(colForm), `${colForm} | mester ${t0} ${p0}, ${t1} ${p1}`);
-    await tab('kamp');
-    const kampNext = (await g.locator('#gazette #col-next p').allTextContents()).filter((t) => t.startsWith('Ny sæson: '));
-    check('Sæsonslut, Kamp-fanen: samme klumme (Ny sæson-linjen og tabellen)', kampNext.length === 1 && kampNext[0].includes(sv.opp) && formOk((await g.locator('#gazette #col-form p').allTextContents()).join(' | ')), kampNext.join(' | '));
+    // v3.31.0 (F3): Kamp har ingen avis – Kamps link og Hjems 📰-kort bærer netop klummens overskrift (sæsonslut-klummen)
+    { const colTitle = await g.textContent('#gazette #col-title');
+      await tab('kamp'); const kampLink = await g.textContent('#kamp-paper-link').catch(() => 'mangler'), kampGz = await g.locator('.tabpane.tab-kamp #gazette').count();
+      await tab('hjem'); const homeHead = await g.textContent('#home-paper-title').catch(() => 'mangler');
+      check('Sæsonslut: Kamp har ingen avis, men 📰 «klummens overskrift» ›, og Hjems 📰-kort har samme overskrift', kampGz === 0 && kampLink === `📰 «${colTitle}» ›` && homeHead === colTitle && colTitle.length > 5, `${colTitle} | ${kampLink} | ${homeHead}`);
+      await tab('kamp'); }
     // Test Manager v3.16.3: mesterteksten følger den regel, der afgjorde det — på ALLE tre steder (klummen får champion fra app.js).
     // Et tilfældigt forløb afgøres sjældent på målforskel, så mesteren i det gemte spil sættes til en målforskels-afgørelse (samme point).
     const tie = await g.evaluate(() => {
@@ -2630,11 +2727,11 @@ try {
       for (const x of me.squad) for (const k of Object.keys(x.skills)) if (x.skills[k] < 20) (x.dev ||= {})[k] = 0.995;
       localStorage.setItem('tactivar_save', JSON.stringify(d)); });
     await reloadP(); await ptab('hjem');
-    const HIDDEN = ['#home-last', '#home-place', '#cash-delta', '#home-todo', '#home-table', '#home-opp-form'];
+    const HIDDEN = ['#home-last', '#home-place', '#cash-delta', '#home-todo', '#home-table', '#home-opp-form', '#home-motm', '#home-paper'];   // v3.31.0: 👑 og 📰
     const present = () => pf.evaluate((ids) => ids.filter((x) => document.querySelector(x)), HIDDEN);
     const before = await present(), formBefore = await pf.textContent('#home-opp-form');
     await ptab('liga'); const miniBefore = (await pf.textContent('#mini-warn', { timeout: 3000 }).catch(() => 'mangler')).trim();
-    check('Før runde 2: Hjem viser resultat, placering, kasse-ændring, "Før du spiller", minitabel og modstanderens form – den lille ▶ har ⛔', before.length === HIDDEN.length && /^Nr\. \d · seneste 3: [VUT]$/.test(formBefore) && miniBefore === '⛔1', `${before} | ${formBefore} | ${miniBefore}`);
+    check('Før runde 2: Hjem viser resultat, placering, kasse-ændring, "Før du spiller", minitabel og modstanderens form – den lille ▶ har ⛔', before.length === HIDDEN.length && /^Nr\. \d · seneste 3 \(ældste → nyeste\): [VUT]$/.test(formBefore) && miniBefore === '⛔1', `${before} | ${formBefore} | ${miniBefore}`);
     await pf.click('#play-round'); await pf.waitForSelector('#skip');
     let gpRound = null;
     // v3.30.0: rundens +1 er bogført før afspilningen – under den ingen "+N" i Trup og ingen opsamling på Træning (positivt: gemmet HAR +1)
@@ -2725,6 +2822,7 @@ try {
   await f1tm();
   await f2();
   await f2tm();
+  await f3();
   check('Ingen sidefejl under hele forløbet', fejl.length === 0, fejl.join(' | '));
 } finally {
   await browser.close();

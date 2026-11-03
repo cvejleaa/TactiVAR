@@ -51,8 +51,8 @@ test('Hjem, ikke under afspilning: alle felter står med de rigtige tal (hvert t
   assert.ok(text(r, 'home-last').includes('Bibamus United 3 – 1 Lyngby') && text(r, 'home-last').includes('Sejr · Mål: Kjær, Holm (2)'), text(r, 'home-last'));
   assert.equal(text(r, 'home-place'), 'Nr. 4 ↑2');
   assert.ok(text(r, 'home-last').includes('i tabellen') && !text(r, 'home-last').includes('slutstilling'));
-  assert.equal(text(r, 'home-next'), 'Næste kamp · runde 7 af 14Esbjerg FC · udeNr. 9 · seneste 3: V T U🔍 Se Esbjerg FC – kun offentlige data ›');
-  assert.equal(text(r, 'home-opp-form'), 'Nr. 9 · seneste 3: V T U');
+  assert.equal(text(r, 'home-next'), 'Næste kamp · runde 7 af 14Esbjerg FC · udeNr. 9 · seneste 3 (ældste → nyeste): V T U🔍 Se Esbjerg FC – kun offentlige data ›');
+  assert.equal(text(r, 'home-opp-form'), 'Nr. 9 · seneste 3 (ældste → nyeste): V T U');   // v3.31.0: rækkefølgen står synligt, bogstaverne i piller
   assert.equal(text(r, 'home-table').includes('Tabellen'), true);
   const rows = all(byId(r, 'home-table'), (e) => e.tag === 'tr');
   assert.deepEqual(rows.map((x) => x.textContent), ['2Odense21', '3Vejle19', '4Bibamus United18', '5Aalborg16', '6Randers15']);
@@ -157,7 +157,7 @@ test('Hjem: næste kamp – hjemme/ude, modstanderens form (eller "ingen kampe i
   assert.ok(text(n({ home: true }), 'home-next').includes('Esbjerg FC · hjemme') && !text(n({ home: true }), 'home-next').includes('· ude'));
   assert.ok(text(n({ home: false }), 'home-next').includes('Esbjerg FC · ude'));
   assert.equal(text(n({ form: [], place: 3 }), 'home-opp-form'), 'Nr. 3 · seneste 3: ingen kampe i sæsonen endnu');
-  assert.equal(text(n({ form: ['T'] }), 'home-opp-form'), 'Nr. 9 · seneste 3: T');
+  assert.equal(text(n({ form: ['T'] }), 'home-opp-form'), 'Nr. 9 · seneste 3 (ældste → nyeste): T');
   // QC/Spilfører UI: modstanderens placering først fra sæsonens 2. runde og ikke efter sæsonslut (dér var den sidste sæsons)
   assert.equal(text(render({ roundsPlayed: 0, next: { ...base().next, form: [] } }), 'home-opp-form'), 'seneste 3: ingen kampe i sæsonen endnu');
   assert.equal(text(render({ ended: true, next: { ...base().next, form: [] } }), 'home-opp-form'), 'seneste 3: ingen kampe i sæsonen endnu');
@@ -167,7 +167,7 @@ test('Hjem: næste kamp – hjemme/ude, modstanderens form (eller "ingen kampe i
 test('Hjem: rækkefølgen – klubben øverst, så sidste runde og "Før du spiller" | næste kamp og tabellen', () => {
   const r = render(), ids = (el) => el.children.map((c) => c.id);
   assert.deepEqual(ids(r), ['home-club', undefined, undefined]);
-  assert.deepEqual(ids(r.children[1]), ['home-last', 'home-todo']);
+  assert.deepEqual(ids(r.children[1]), ['home-last', 'home-todo']);   // uden paper (ingen runde spillet): intet 📰-kort – se home-f3.test.mjs
   assert.deepEqual(ids(r.children[2]), ['home-next', 'home-table']);
 });
 

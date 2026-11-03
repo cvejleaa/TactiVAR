@@ -136,22 +136,19 @@ test('klummen: defensiv aktion kun uden mål; overraskelsen er #upset (kun den s
   assert.ok(txt(box).length > 0, 'klummen selv vises stadig');
 });
 
-test('Match Center: klummen kommer med efter afspilningen (ikke under), og kampoverskrifterne åbner via on.view', () => {
+// v3.31.0 (F3, "avisen ét sted"): Match Center tegner INGEN avis – hverken klummen eller den gamle – heller ikke efter fløjtet og med
+// en avis i runden. Avisen står kun på Liga; Kamps .to-home-linje (app.js) linker dertil. Positivt modstykke: resten af kampcentret står.
+test('Match Center (v3.31.0): ingen avis efter afspilningen – ingen #gazette, klumme, overskrifter eller Rundens mål – selv med en avis i runden', () => {
   const st = { hPoss: 60, aPoss: 40, hTacticSuccess: 1, aTacticSuccess: 2, hShots: 11, aShots: 12, hOnTarget: 5, aOnTarget: 6, hXg: 1, aXg: 0.5, hAerialWon: 3, aAerialWon: 4, hVarChecks: 0, aVarChecks: 1, hFouls: 7, aFouls: 8, hInjuries: 1, aInjuries: 2 };
   const ev = { min: 90, hG: 1, aG: 0, text: 'Slut', category: 'PLAY', type: 'FULLTIME', label: 'Slut', plot: false, stats: st };
   const m = { homeId: 'h1', awayId: 'a1', homeName: 'Hjem', awayName: 'Ude', homeTacticStr: '', awayTacticStr: '', homeGoals: 1, awayGoals: 0, events: [ev], stats: st, ratings: { motm: null, home: [], away: [] } };
   const mc = (playing) => ({ round: 1, matches: [m, m, m, m], viewIdx: 0, filter: 'all', shownCount: 1, playing, gazette: G() });
-  const viewed = [], goals = [];
-  const on = { view: (i) => viewed.push(i), openGoal: (i, goal) => goals.push([i, goal]) };
-  const done = renderMatchCenter({ mc: mc(false), myTeamId: 'h1', on, column: COL });
-  assert.equal(txt(byId(done, 'col-title')), 'Hjem kørte over Ude');
-  const btns = all(byId(done, 'headlines'), (e) => e.tag === 'button');
-  btns[1].click(); assert.deepEqual(viewed, [3], 'on.view(indeks), ikke openGoal');
-  byId(done, 'goal-of-round-match').click(); assert.deepEqual(goals.map((x) => x[0]), [1], 'målets link bruger on.openGoal');
-  assert.equal(byId(renderMatchCenter({ mc: mc(true), myTeamId: 'h1', on, column: COL }), 'col-title'), undefined, 'under afspilningen ingen avis (ville afsløre runden)');
-  const old = renderMatchCenter({ mc: mc(false), myTeamId: 'h1', on });
-  assert.equal(byId(old, 'col-title'), undefined, 'uden klumme: den gamle avis');
-  assert.ok(byId(old, 'gazette'));
+  const on = { view: () => {}, openGoal: () => {} };
+  for (const el of [renderMatchCenter({ mc: mc(false), myTeamId: 'h1', on, column: COL }), renderMatchCenter({ mc: mc(false), myTeamId: 'h1', on }), renderMatchCenter({ mc: mc(true), myTeamId: 'h1', on })]) {
+    for (const id of ['gazette', 'col-title', 'headlines', 'goal-of-round', 'goal-of-round-match', 'player-of-round']) assert.equal(byId(el, id), undefined, `#${id} må ikke stå i Kamp`);
+    assert.ok(!txt(el).includes('TactiVAR Avisen') && !txt(el).includes('Gammel overskrift') && !txt(el).includes('Hjem kørte over Ude'), txt(el).slice(-160));
+    assert.equal(el.attrs.id, 'match-center'); assert.ok(byId(el, 'scoreboard') && byId(el, 'match-cards'), 'kampcentret selv står');
+  }
 });
 test('de øvrige kampe (v3.16.7): har overskriften selv en tankestreg, sættes noten med punktum – ingen "A – B – C"-kæde', () => {
   const others = [{ idx: 2, head: 'Beta får klø – Alfa vinder 4-0', note: 'alfa afsluttede 14 gange.' }, { idx: 3, head: 'Alfa slår Beta 2-0', note: 'Alfa havde bolden.' }];
