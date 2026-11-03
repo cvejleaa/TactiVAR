@@ -4,7 +4,7 @@
 import { h, dec, select } from './dom.js';
 import { LINE } from './labels.js';
 import { FOCUS, validFocus, trainingEstimate, roomPoints } from '../engine/career.js';
-import { SKILL_NAME, roomWords, nextText } from './card.js';
+import { SKILL_NAME, roomWords, nextText, ROOM_SCALE } from './card.js';
 
 const SHORT = { pace: 'PAC', stamina: 'STA', strength: 'STR', ballControl: 'BAL', passing: 'PAS', finishing: 'FIN', positioning: 'POS', intercepting: 'INT', goalkeeping: 'GK' };
 
@@ -55,11 +55,12 @@ export function renderTrainingTable({ team, report = null, roundLabel = report?.
     h('h3', {}, '🏋️ Træning'),
     next ? h('div', { id: 'training-next' }, next) : null,
     h('p', { class: 'muted' }, 'Fokus gælder, til du ændrer det. Kampe giver også lidt i kædens nøgle-evner. Prisen er friskhed pr. runde (mindre for den, der har spillet).'),
+    h('p', { class: 'muted', id: 'room-scale' }, ROOM_SCALE + '.'),
     h('div', { class: 'toolbar' }, [['all', 'Alle'], ['GK', 'MÅL'], ['DEF', 'FOR'], ['MID', 'MID'], ['ATT', 'ANG']].map(([v, l]) => h('button', { class: 'mini' + (line === v ? ' active' : ''), onclick: () => onLine(v) }, l)),
       select('', [['', `Sæt fokus for de viste (${rows.length}) …`], ...Object.entries(FOCUS).map(([k, f]) => [k, f.label])], (k) => { if (k) onFocusMany(rows.map((p) => p.id), k); }, { id: 'focus-many', class: 'mini' })),
     msg ? h('div', { class: 'notice', id: 'train-msg' }, msg) : null,
     h('div', { class: 'tablewrap' }, h('table', { class: 'matrix train-table', id: 'training-table' },
-      h('thead', {}, h('tr', {}, [['Spiller'], ['Kæde'], ['Fokus'], ['Friskhed', 'Pr. runde – i parentes, når han har spillet'], ['Fremdrift'], ['Næste +1'], ['Skøn'], ['Sidste runde']].map(([t, title]) => h('th', { title: title ?? '' }, t)))),
+      h('thead', {}, h('tr', {}, [['Spiller'], ['Kæde'], ['Fokus'], ['Friskhed', 'Pr. runde – i parentes, når han har spillet'], ['Fremdrift'], ['Næste +1'], ['Skøn', ROOM_SCALE], ['Sidste runde']].map(([t, title]) => h('th', { title: title ?? '' }, t)))),
       h('tbody', {}, rows.map((p) => {
         const e = trainingEstimate(p, on.has(p.id)), g = gained.get(p.id) ?? [];
         return h('tr', { dataset: { pid: p.id }, class: selectedId === p.id ? 'selected' : null },

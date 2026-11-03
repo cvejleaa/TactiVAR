@@ -1163,8 +1163,8 @@ mellem bjælkerne 707 → 726 px (682 med scout-bjælken). e2e vagter: chrome �
     loggen: sæson N fra s*-felterne, kun når han ikke er skiftet midt i sæsonen (`lastMove` ≤ N·2, sæsonens første vindue) og "–" under
     afspilning; N−1 fra `league.lastSeasonStats`, når øjebliksbilledet er holdet (`t`) og han ikke skiftede midt i N−1; ellers "–" (med en
     forklaring under tabellen). Gemmeformatet er uændret. Tom: "Ingen kampe for <hold> endnu"; karrierekampe uden gemte (migrerede ligaer):
-    "… ikke gemt" – aldrig 0. Modstander: samme tabel uden Snit. **Kendt grænse:** mødte hans gamle klub den nye, tælles kampen for den
-    nye – loggen gemmer ikke hans side. Mobil 390: ingen vandret rul (e2e).
+    "… ikke gemt" – aldrig 0. Modstander: samme tabel uden Snit. Kun kampe EFTER hans skifte til holdet tælles (`lastMove`:
+    vindue 2·S før runde 1, 2·S+1 før runde 8), så kampe mod den nye klub fra før købet står ikke for den. Skøn-skalaen står synligt på Træning. Mobil 390: ingen vandret rul (e2e).
   - **Hoved:** ◀ ▶ (`#card-prev`/`#card-next`) bladrer i den viste listes rækkefølge (Trup: regnearkets sortering og filter; Taktik:
     start-11, bænk, reserver som listen) og bytter aldrig; "#nr Navn" (`#cp-title`); ✕ (`#card-close`). Mens panelet er åbent på
     Taktik, står byt-beskeden også i hovedet (`#panel-pick-msg`). Efter et køb lukker panelet ikke tavst: kvitteringen

@@ -99,9 +99,9 @@ scratchpad – et tal herfra skal måles igen med et committet værktøj, før d
 17. **Stillingen ændrer kampen** · motor · M · 4 · førende efter 60' tager 58 % af skuddene (før 63 %); målene pr. kvarter er
     flade (239/256/234/237/268/244 – i virkeligheden flest til sidst); uafgjort 19,8 % (ca. 25 %). Føreren trækker sig,
     den bagudførende kaster folk frem.
-18. **Ungdomsskønnet skiller ikke – og kampenes værdi er skjult** · klub + UI · S/M · 3 · 39 af 47 tilbud "har meget mere i sig",
-    men potentialet bag ordet er 7,5–14,1 (`roomWords` ser kun på afstand til loftet); 40 % af væksten afhænger af kampe (≈ +2,3
-    evnepoint pr. sæson for en 18-årig med fast plads), kortet siger "kampe giver også lidt". Skøn i tre trin efter loftet.
+18. **Kampenes værdi for udviklingen er skjult** · klub + UI · S · 3 · (skønnet er lavet i v3.31.2: fem trin i point, nøglesnittet
+    i ungdomstilbuddet, skalaen synlig på Træning – `tools/measure-youth-words.mjs`.) Tilbage: 40 % af væksten afhænger af kampe
+    (≈ +2,3 evnepoint pr. sæson for en 18-årig med fast plads), kortet siger "kampe giver også lidt".
 19. **Spillere på 24+ kan udvikle sig lidt** · klub · M · 4 · 🗄 · 45 af 45 på 24+ står ved loftet; sæson 2: 10 af 18 "tæt på
     sit loft". Loft +0,5–1,5 for 24–27-årige, flyttet af træning og minutter.
 20. **Scouting du betaler for** · økonomi + UI · M · 4 · 🗄 (`league.scouting` findes) · en anden klubs kort: "Evner …: 🔒 ??";

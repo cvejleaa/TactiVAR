@@ -111,7 +111,7 @@ test('Skønnet i point på alle tre steder: kortet, 🏋️ Træning og ungdomst
   const rep = renderSeasonReport({ league: L, mine: m2, onTake() {}, onDrop() {} });
   const offer = all(rep, (e) => e.dataset.yid === y.id)[0].textContent;
   const snit = keyAvg(y).toFixed(1).replace('.', ',');
-  assert.ok(offer.includes(` år · snit ${snit} · skøn: har mere i sig · løn `), offer);
+  assert.ok(offer.includes(` år · nøglesnit ${snit} · skøn: har mere i sig · løn `), offer);
   assert.ok(!offer.includes('meget mere') && !offer.includes('tæt på'), offer);
 });
 
@@ -195,6 +195,16 @@ test('📊 Statistik: købt i runde 7 (vindue 2·2+1) – kun det nye holds kamp
   assert.deepEqual(t.rows.Snit, ['6,4', '–']);
   assert.deepEqual([t.rows['👑'][0], t.rows['🟨'][0], t.rows['🟥'][0]], ['–', '–', '–'], 's* rummer den gamle klubs tal');
   assert.ok(byId(statCard(s), 'card-stats-note'), 'forklaringen af "–" står');
+  // QC v3.31.2 (F1): dobbeltturnering – han mødte din klub i runde 3 FOR den gamle klub; den kamp må ikke tælles for dit hold
+  // (før rettelsen: Kampe 3, Mål 3, Min. 250)
+  s.p.matchLog.splice(1, 0, [2, 3, s.M, s.A, 2, 1, 90, 7.5, 4, 2, 0]);
+  const tb = table(statCard(s, { lastSeason: null }));
+  assert.deepEqual([tb.rows.Kampe[0], tb.rows.Mål[0], tb.rows['Min.'][0]], ['2', '1', '160']);
+  // sommerkøb (vindue 2·2): sæson 1's kampe mod din klub (for hans gamle) står ikke under Sæson 1 – kun sæson 2's hos dig
+  const sum = statScene(); sum.p.lastMove = 4;
+  const ts = table(statCard(sum, { lastSeason: null }));
+  assert.deepEqual(ts.rows.Kampe, ['3', '0'], 'Sæson 1: 0 kampe for dit hold (før rettelsen 2)');
+  assert.deepEqual(ts.rows.Mål, ['3', '0']);
   // og købt i vinduet før sæsonen (2·2): hele sæsonen er hos dit hold – s* gælder
   s.p.lastMove = 4;
   assert.deepEqual(table(statCard(s, { lastSeason: null })).rows['👑'], ['2', '–']);
@@ -318,3 +328,17 @@ test('Referatet: kontra-forklaringen og Custom-pos-fejlen bruger de danske plads
 test('lineOfRole er uændret – kun visningen er dansk (de interne nøgler i motoren)', () => {
   assert.equal(lineOfRole('CDM'), 'MID'); assert.equal(lineOfRole('LB'), 'DEF'); assert.equal(FORMATIONS['4-4-2'][1].r, 'LB');
 });
+
+// QC v3.31.2 (F2): skalaen kan læses i rækkefølge – den står synligt på Træning og som title på Skøn-kolonnen
+test('Skønnets skala står synligt på Træning i stigende rækkefølge (ét ord pr. trin, de fem i ROOM_WORDS)', async () => {
+  const { ROOM_SCALE, ROOM_WORDS } = await import('../../public/ui/card.js');
+  assert.equal(ROOM_SCALE, 'Skøn fra lavest til højest: tæt på sit loft → lidt mere i sig → mere i sig → meget mere i sig → langt mere i sig');
+  assert.equal(ROOM_WORDS.length, 5);
+  const { renderTrainingTable } = await import('../../public/ui/training.js');
+  const { me } = fresh();
+  const el = renderTrainingTable({ team: me, report: null, roundLabel: 1, selectedId: null, line: 'all', onLine() {}, msg: '', onFocus() {}, onFocusMany() {} });
+  assert.equal(byId(el, 'room-scale')?.textContent, ROOM_SCALE + '.');
+  const th = all(el, (e) => e.tag === 'th' && e.textContent === 'Skøn')[0];
+  assert.equal(th?.attrs.title, ROOM_SCALE);
+});
+

@@ -6,6 +6,7 @@ import { h, dec, LOCK } from './dom.js';
 import { LINE, POSITION_FULL, SKILL_LABELS, kr, starsEl, banText, yellowWarn, archetypeOf, archIcon, archReqText } from './labels.js';
 import { aerialBreakdown } from '../engine/generator.js';
 import { runStats } from '../engine/stats.js';
+import { WINDOW_ROUNDS } from '../engine/transfers.js';
 import { BAND_WORD } from '../engine/chemistry.js';
 import { COUNTER_KEYS, COUNTER_LABELS, COUNTER_POOL } from '../engine/counter.js';
 
@@ -88,6 +89,8 @@ export const SKILL_NAME = Object.fromEntries(SKILL_LABELS.flatMap(([, list]) => 
 // (roomOf ≤ 0,15). Topordet er relativt og lover ikke et niveau (Spilfører klub: 4,5 point over snit 7 er kun startniveau).
 export const ROOM_WORDS = [[0.45, 'er tæt på sit loft'], [1.5, 'har lidt mere i sig'], [3, 'har mere i sig'], [5.5, 'har meget mere i sig'], [Infinity, 'har langt mere i sig']];
 export const roomWords = (points) => ROOM_WORDS.find(([lim]) => points < lim)[1];
+// QC v3.31.2: rækkefølgen skal kunne læses – "meget mere" og "langt mere" ligner hinanden, så skalaen står synligt på Træning
+export const ROOM_SCALE = `Skøn fra lavest til højest: ${ROOM_WORDS.map(([, w]) => w.replace(/^(er|har) /, '')).join(' → ')}`;
 // Næste +1 i ord – samme tekst på kortet og i træningsoversigten
 export const nextText = (n, why) => (!n || n === Infinity ? '' : n > 14 ? `går langsomt (mere end en sæson: ${why})` : `næste +1 om ca. ${n} runde${n === 1 ? '' : 'r'}`);
 export const priceText = (e) => (e.fresh > 0 ? `+${e.fresh} friskhed pr. runde` : `${e.fresh} friskhed pr. runde (${e.playedFresh} når han har spillet; ikke under ${TRAIN_FRESH_FLOOR} %) · lille skaderisiko`);
@@ -170,12 +173,15 @@ export function trainingSummary(report, team, roundLabel = report?.round, onTakt
 // - 👑/🟨/🟥 (målmand: 🧤 clean sheets) står ikke i loggen: sæson N fra s*-felterne – kun når han ikke er skiftet midt i sæsonen
 //   (lastMove efter sæsonens første vindue, N·2) og ikke under afspilning; N−1 fra league.lastSeasonStats, når øjebliksbilledet er dette
 //   hold (v.t) og han ikke skiftede midt i N−1. Ellers null ("–").
-// Kendt grænse (spec §10b): mødte hans gamle klub den nye, tælles den kamp for den nye – loggen gemmer ikke hans side.
+// Kun kampe efter hans skifte til holdet tælles (lastMove), så kampe mod den nye klub fra før købet står ikke for den.
 // → { rows: [{ s, games, min, goals, assists, avg, motm, yellow, red, cs }], empty: null | 'none' | 'unsaved', gk }
 export function cardStats(p, { isOwn, teamIdx, teamId, season, hideLog = null, lastSeason = null }) {
   const v = viewPlayer(p, isOwn), all = v.matchLog ?? [];
   const log = hideLog ? all.filter((e) => !(e[LOG.S] === hideLog[0] && e[LOG.R] === hideLog[1])) : all;
-  const mine = log.filter((e) => e[LOG.H] === teamIdx || e[LOG.A] === teamIdx);
+  // QC v3.31.2: kun kampe EFTER hans skifte til holdet (lastMove = vinduet: 2·S før runde 1, 2·S+1 før runde 8) – ellers tælles
+  // kampene MOD den nye klub med (dobbeltturnering: alle møder alle, så det skete ved næsten hvert køb)
+  const after = (e) => p.lastMove == null || e[LOG.S] * 2 + (e[LOG.R] >= WINDOW_ROUNDS[1] ? 1 : 0) >= p.lastMove;
+  const mine = log.filter((e) => after(e) && (e[LOG.H] === teamIdx || e[LOG.A] === teamIdx));
   const gk = p.line === 'GK', S = season ?? 1;
   const empty = mine.length ? null : !all.length && (p.careerGames ?? 0) > 0 ? 'unsaved' : 'none';
   const sum = (es, i) => es.reduce((a, e) => a + (e[i] || 0), 0);
@@ -201,14 +207,14 @@ function renderCardStats(st, team) {
   const title = h('h4', {}, `📊 Statistik for ${team.name}`);
   if (st.empty) return h('div', { class: 'card-stats', id: 'card-stats' }, title,
     h('div', { class: 'muted', id: 'card-stats-empty' }, st.empty === 'unsaved' ? 'Kampene før kamphistorikken (v3.18) er ikke gemt' : `Ingen kampe for ${team.name} endnu`));
-  const cell = (v) => (v == null ? '–' : typeof v === 'number' && !Number.isInteger(v) ? dec(v, 1) : String(v));
+  const cell = (v) => (v == null ? '–' : typeof v === 'number' && !Number.isInteger(v) ? dec(v, 1) : typeof v === 'number' ? v.toLocaleString('da-DK') : String(v));
   const ROWS = [['Kampe', 'games'], ['Min.', 'min'], ['Mål', 'goals'], ['Oplæg', 'assists'], ...(st.own ? [['Snit', 'avg', 'Snitkarakter (kun dit hold)']] : []),
     ['👑', 'motm', 'Kampens spiller'], ['🟨', 'yellow', 'Gule kort'], ['🟥', 'red', 'Røde kort'], ...(st.gk ? [['🧤', 'cs', 'Clean sheets']] : [])];
   return h('div', { class: 'card-stats', id: 'card-stats' }, title,
     h('table', { class: 'stats-mini', id: 'card-stats-table' },
       h('thead', {}, h('tr', {}, h('th', {}, ''), st.rows.map((r) => h('th', { class: 'num' }, `Sæson ${r.s}`)))),
       h('tbody', {}, ROWS.map(([label, k, tip]) => h('tr', { dataset: { k } }, h('th', { title: tip ?? '' }, label), st.rows.map((r) => h('td', { class: 'num' }, cell(r[k]))))))),
-    st.rows.some((r) => r.motm == null) ? h('div', { class: 'muted', id: 'card-stats-note' }, '– = ikke opgjort: kortene og 👑 gemmes pr. sæson, ikke pr. kamp (skiftet klub, sæsonen før, eller runden afspilles)') : null);
+    st.rows.some((r) => r.motm == null) ? h('div', { class: 'muted', id: 'card-stats-note' }, '– = ikke opgjort: kortene og 👑 gemmes pr. sæson, ikke pr. kamp (skiftet klub, ikke gemt for sidste sæson, eller runden afspilles)') : null);
 }
 
 // 📜 Kampe (v3.18.0, spec §10.4): de seneste 10 stempler, "Vis alle" og en karrierelinje. Andre hold ser stjerner, ikke karakteren
