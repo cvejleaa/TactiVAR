@@ -330,6 +330,8 @@ body.has-bar { padding-bottom: 4.5rem; }
 .playbar-in.no-opp #play-round { margin-left: auto; }
 .count-narrow { display: none; }
 @media (max-width: 900px) { .home-grid { grid-template-columns: 1fr; } }
+/* v3.31.0 (QC): i én kolonne kommer næste kamp før avisen – beslutningen før læsestoffet (på computer står avisen i venstre kolonne) */
+@media (max-width: 900px) { .home-main, .home-side { display: contents; } .home-last { order: 1; } .home-todo { order: 2; } .home-next { order: 3; } .home-paper { order: 4; } .home-table { order: 5; } }
 /* Mobil: topbaren ruller væk – kun Spil-bjælken og bundnavigationen står fast (og scout-bjælken, når den vises) */
 @media (max-width: 600px) {
   .topbar { position: static; flex-wrap: nowrap; padding: .5rem .75rem; gap: .5rem; }

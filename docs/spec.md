@@ -1046,7 +1046,7 @@ topbaren og ingen holdvælger. Fanerne 🏠 Hjem · 👥 Trup · 🏋️ Trænin
 står under topbaren (én nav-DOM) på én række – også ved 601–900 px, hvor fanerne har mindre luft (`.55rem .6rem`; med 1rem gik
 rækken på to linjer ved 601–690 px). e2e: topbaren er lige høj med én fanerække ved 1400, 1024, 768 og 601 px.
 Den valgte fane gemmes i `ui.tab`; en ukendt værdi → Hjem (gamle gem: 'trup' → Trup, 'admin' → ⚙; 'traening' → Træning – i en ældre version Hjem). Ny liga og import åbner Hjem;
-efter ▶ lander man på Kamp, hvor "Næste: runde N mod X (ude) · Forbered ›" (`#to-home`) står ØVERST, når den viste runde er den
+efter ▶ lander man på Kamp, hvor "Næste: runde N mod X (ude) · Forbered › · 📰 «overskrift» ›" (`#to-home`, `#kamp-paper-link`, v3.31.0) står ØVERST, når den viste runde er den
 seneste og ikke afspilles. Fanen normaliseres ved hver tegning (`game.ui.tab = tabNow()`), så kode der læser `ui.tab` aldrig ser en
 ukendt værdi (ny liga, første besøg og import sætter ingen). Advarslerne før runden har ÉN kilde (app.js `preMatchIssues`: ⛔ udelukket, 🚑 skadet, ⚠ træt under
 grænsen, 🟨 én gult fra udelukkelse – kun startere; en udelukket/skadet starter er ikke også træt), som bjælken, den lille ▶ og Hjem bruger.

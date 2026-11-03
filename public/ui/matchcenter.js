@@ -197,7 +197,7 @@ function thirdsLine(trace, side, gkId, vsMe = false, down = true, stoppage = nul
 
 const legend = (isOwn = true) => h('div', { class: 'muted legend', id: 'icon-legend' }, RATING_ICONS.map(([s, t]) => `${s} ${t}`).join(' · ') + ' · 🧤9 (2 svære) = 9 redninger, heraf 2 svære – de lette (skud lige på ham) løfter karakteren lidt, de svære meget' + ' · 🎬 i referatet = vis afslutningen i afspilningen · 📍 i referatet = se hvor dit hold stod, da målet faldt (kampe fra før afspilningen – ellers viser 🎬 det) · HI = andel højintenst løb (over ca. 20 km/t) · "2/3 fri" = løb uden bold: kom fri 2 af 3 gange · "2/3 🤼" = dueller vundet (pres og dækning – en af de nærmeste tager duellen) – alle tre kun dit hold');
 
-// onOpenMatch(i): åbner referatet af kamp i i runden (Liga: skift til Kamp; Kamp: vis kampen).
+// onOpenMatch(i): åbner referatet af kamp i i runden – avisen står kun på Liga (v3.31.0), så det er altid et skift til Kamp.
 // matches: rundens kampe – bruges til at finde kampen for mål fra før v3.7.1 (uden matchIdx).
 // column (v3.14, column.js): klummen bygget for seeren. Uden den (gamle visninger/tests) den gamle avis.
 // onOpenReport(i): åbner kamp i's referat (kampoverskrifterne i "De øvrige kampe").

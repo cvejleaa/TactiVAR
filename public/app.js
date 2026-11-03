@@ -730,7 +730,7 @@ const homeHandlers = {
 function toHomeLine() {
   const n = nextMatch(), head = paperHeadline();
   return h('div', { class: 'panel to-home' }, `Næste: runde ${n.k} mod ${n.opp.name} (${n.home ? 'hjemme' : 'ude'}) · `, h('button', { class: 'linklike', id: 'to-home', onclick: () => showTab('hjem') }, 'Forbered ›'),
-    head ? [' · ', h('button', { class: 'linklike', id: 'kamp-paper-link', title: 'Rundens avis står på Liga', onclick: homeHandlers.paper }, `📰 «${head}» ›`)] : null);
+    head ? [' · ', h('button', { class: 'linklike', id: 'kamp-paper-link', title: 'Rundens avis står på Liga', onclick: homeHandlers.paper }, head === 'Rundens avis' ? '📰 Rundens avis ›' : `📰 «${head}» ›`)] : null);
 }
 
 // Samspil på spillerkortet (v3.24.0): ingen par i holdets tabel = fremmed for alle (et køb – eller en reserve, hvis par er glemt)

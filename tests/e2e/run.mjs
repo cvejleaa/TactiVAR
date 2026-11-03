@@ -937,6 +937,9 @@ try {
       await tt('hjem');
       const head = await p.textContent('#home-paper-title').catch(() => 'mangler');
       const pos = await p.evaluate(() => { const pp = document.getElementById('home-paper'); return { main: !!pp?.parentElement?.classList.contains('home-main'), afterTodo: pp?.previousElementSibling?.id === 'home-todo', txt: pp?.textContent }; });
+      { const ord = await p.evaluate(() => { const y = (id) => Math.round(document.getElementById(id)?.getBoundingClientRect().top ?? -1); return { last: y('home-last'), todo: y('home-todo'), next: y('home-next'), paper: y('home-paper') }; });
+        check(`F3 ${w} (QC): rækkefølgen på Hjem – ${w < 900 ? 'én kolonne: næste kamp før avisen' : 'avisen i venstre kolonne under Før du spiller'}`,
+          ord.last >= 0 && ord.todo > ord.last && ord.paper > ord.todo && (w < 900 ? ord.next > ord.todo && ord.paper > ord.next : ord.next < ord.todo), JSON.stringify(ord)); }
       check(`F3 ${w}: Hjems 📰-kort har netop klummens overskrift (= #col-title på Liga) og står i venstre kolonne efter "Før du spiller"`, head === title && title.length > 5 && pos.main && pos.afterTodo && pos.txt === `📰 Avisen${title}Læs hele avisen ›`, `${head} | ${title} | ${JSON.stringify(pos)}`);
       const landing = async (sel) => { await p.click(sel); await soft(p, '.tabpane.tab-liga'); await p.waitForTimeout(100);
         return p.evaluate(() => { const top = document.querySelector('.topbar').getBoundingClientRect().bottom, gz = document.querySelector('#gazette'), h3 = gz?.querySelector('h3')?.getBoundingClientRect(), ct = document.querySelector('#col-title')?.getBoundingClientRect();
@@ -1034,7 +1037,7 @@ try {
     await reloadP(); await tt('hjem');
     const hf = await p.textContent('#home-paper-title').catch(() => 'mangler'), hcard = await p.textContent('#home-paper').catch(() => 'mangler'); await tt('kamp');
     const kf = await p.textContent('#kamp-paper-link').catch(() => 'mangler');
-    check('F3 TM: uden klumme og uden gamle overskrifter står "Rundens avis" på Hjem og i Kamps link', hf === 'Rundens avis' && hcard === '📰 AvisenRundens avisLæs hele avisen ›' && kf === '📰 «Rundens avis» ›' && !/undefined|null/.test(hcard + kf), `${hf} | ${hcard} | ${kf}`);
+    check('F3 TM: uden klumme og uden gamle overskrifter står "Rundens avis" på Hjem og i Kamps link', hf === 'Rundens avis' && hcard === '📰 AvisenRundens avisLæs hele avisen ›' && kf === '📰 Rundens avis ›' && !/undefined|null/.test(hcard + kf), `${hf} | ${hcard} | ${kf}`);
     await p.evaluate(() => { const b = document.getElementById('fejlboks'); if (b) { b.hidden = true; b.textContent = ''; } });
     await c.close();
   };
