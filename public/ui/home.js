@@ -33,7 +33,8 @@ export function renderHome({ club, last, place, ended, roundsPlayed, next, issue
       h('div', { class: 'home-last-main' },
         h('div', { class: 'lbl' }, `Sidste runde · runde ${last.round}`),
         h('div', { class: 'home-score' }, last.text),
-        h('div', { class: 'muted' }, `${RESULT_WORD[last.result]} · ${last.scorers.length ? `Mål: ${last.scorers.join(', ')}` : 'ingen af dine mål'}`)),
+        h('div', { class: 'muted' }, `${RESULT_WORD[last.result]} · ${last.scorers.length ? `Mål: ${last.scorers.join(', ')}` : 'ingen af dine mål'}`),
+        last.att ? h('div', { class: 'muted', id: 'home-att' }, `${last.att} tilskuere`) : null),
       h('div', { class: 'right' },
         h('div', { class: 'home-place', id: 'home-place' }, `Nr. ${place}`, last.move ? h('span', { id: 'home-move', class: last.move > 0 ? 'up' : 'down' }, last.move > 0 ? ` ↑${last.move}` : ` ↓${-last.move}`) : null),
         h('div', { class: 'muted' }, ended ? 'slutstilling' : 'i tabellen'),
@@ -51,7 +52,8 @@ export function renderHome({ club, last, place, ended, roundsPlayed, next, issue
       h('button', { class: 'linklike', onclick: on.liga }, 'Liga ›')) : null,
     training ? h('div', { class: 'todo-row', id: 'home-training' }, h('span', { class: 'pill pill-info' }, '🏋️'),
       h('span', { class: 'todo-txt' }, `Efter runde ${training.round}: ` + [training.gains ? `${training.gains} fremskridt` : '', training.injuries ? `${training.injuries} skadet i træningen` : '', training.strong ? `${training.strong} ${training.strong === 1 ? 'nyt stærkt par' : 'nye stærke par'}` : ''].filter(Boolean).join(' · ')),
-      h('button', { class: 'linklike', onclick: on.trup }, 'Trup ›')) : null);
+      // v3.30.0: fremskridt og skader står på 🏋️ Træning; er der KUN nye stærke par, står stregerne på Taktik (Spilfører UI)
+      training.gains || training.injuries ? h('button', { class: 'linklike', onclick: on.traening }, 'Træning ›') : h('button', { class: 'linklike', onclick: on.taktik }, 'Taktik ›')) : null);
 
   const mini = h('div', { class: 'panel home-table', id: 'home-table' },
     h('div', { class: 'lbl' }, ended ? 'Slutstillingen' : 'Tabellen'),

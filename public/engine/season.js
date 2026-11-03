@@ -140,6 +140,7 @@ export function bookRoundFinances(league, result) {
   for (const m of result.matches) {
     const att = attendance(places.get(m.homeId), places.get(m.awayId), formOf(byId.get(m.homeId)));
     Object.assign(entry.get(m.homeId), { att, gate: att * TICKET_PRICE });
+    m.att = att;   // v3.30.0: tilskuerne står på kampen (offentligt – resultatkortene på Liga og referatet viser "👥 7.840")
   }
   for (const t of league.teams) bookLedger(t, entry.get(t.id));
   // Formen: point i de seneste 3 kampe

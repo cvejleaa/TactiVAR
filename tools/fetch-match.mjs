@@ -52,7 +52,8 @@ export async function fetchMatch(id) {
 export function replayMatch(doc) {
   const p = doc.body.replay;
   if (!p) return { ok: false, why: 'kampen blev sendt uden gengivelsespakke' };
-  const again = simulateMatch(p.home, p.away, createRng(p.rngState), p.opts), was = doc.body.match;
+  // v3.30.0: tilskuerne (att) skrives på kampen af bogføringen (commitRound), ikke af simuleringen – de sammenlignes ikke
+  const again = simulateMatch(p.home, p.away, createRng(p.rngState), p.opts), { att, ...was } = doc.body.match;
   again.goalsPool.forEach((g) => { g.matchIdx = was.goalsPool?.[0]?.matchIdx ?? 0; });
   return { ok: JSON.stringify(again) === JSON.stringify(was), again, was };
 }

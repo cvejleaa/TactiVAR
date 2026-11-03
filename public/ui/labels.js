@@ -1,6 +1,8 @@
 import { FIT } from '../engine/formations.js';
 import { BAN } from '../engine/career.js';
 // Danske visningsnavne for motorens værdier.
+// Tilskuerne på en kamp (v3.30.0, match.att – offentligt): "👥 7.840". Ældre kampe uden tallet viser intet (null), aldrig "undefined"/0.
+export const attText = (m) => (Number.isInteger(m?.att) && m.att > 0 ? `👥 ${m.att.toLocaleString('da-DK')}` : null);
 export const LINE = { GK: 'MÅL', DEF: 'FOR', MID: 'MID', ATT: 'ANG' };
 // Naturlig position (v3.8) med tavlens ord; den fulde betegnelse står i title.
 export const POSITION = { GK: 'MV', CB: 'CB', FB: 'Back', DM: 'DM', CM: 'CM', WM: 'Kant', AM: 'OM', ST: 'ANG' };

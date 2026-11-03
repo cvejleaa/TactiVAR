@@ -16,11 +16,14 @@ test('livsløb: evnerne holder niveau (0,95–1,05), snitalderen 23–26 og høj
   assert.ok(r.old33 < 0.08, `seed ${s}: ${r.old33}`);
 }));
 
-test('økonomi: samlet kasse 0,8–1,7 af start, højst 1 hold i minus – og dit hold (passivt) er aldrig i minus i mindst 2 af 3 seeds', () => {
+test('økonomi: samlet kasse 1,8–3,2 af start, højst 1 hold i minus – og dit hold (passivt) er aldrig i minus i mindst 2 af 3 seeds', () => {
   each((r, s) => {
     // v3.25.0 (midtbanen giver bold): seed 2 1,606 – præmiepengene følger andre resultater; loftet 1,6 → 1,7 (båndet fanger en
     // økonomi der eksploderer eller kollapser, ikke ±0,1)
-    assert.ok(r.cashRatio >= 0.8 && r.cashRatio <= 1.7, `seed ${s}: ${r.cashRatio}`);
+    // v3.30.0 (brugeren: ærlige startstjerner, løn 5,5 %, 9.000 tilskuere): seed 1/2/3 = 1,204/1,126/0,983 → 2,627/2,763/2,296 efter
+    // 10 sæsoner – lønnen er lavere fra S2 og billetterne højere (measure-economy: overskud 56 → 71 %). Båndet FLYTTES (0,8–1,7 →
+    // 1,8–3,2), så den gamle økonomi giver rødt; at alle bliver rige fra S7 er backloggens nr. 0b (åbent)
+    assert.ok(r.cashRatio >= 1.8 && r.cashRatio <= 3.2, `seed ${s}: ${r.cashRatio}`);
     assert.ok(r.teamsMinus <= 1, `seed ${s}: ${r.teamsMinus}`);
   });
   // Planens krav (QC): passivt aldrig i minus i 4 af 5 seeds. v3.18.1 (botter sælger og henter ungdom): seed 3 er i minus i 5 runder

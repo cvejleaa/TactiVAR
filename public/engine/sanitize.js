@@ -8,7 +8,7 @@ import { FORMATIONS } from './formations.js';
 import { cleanChemistry, seedChemistry } from './chemistry.js';
 import { buildSchedule, isValidSchedule, SEASON_ROUNDS } from './schedule.js';
 import { defaultTactics, defaultStarterIds, emptyStanding, BOT_PROFILES, aerialBreakdown, assignPositions, teamCareerDefaults, generatePlayer, neededPosition } from './generator.js';
-import { initialPotential, publicWage, TIER_STARS, MATCH_LOG_CAP, SQUAD_MIN, SQUAD_MAX, derivedRng, neededLine, freeShirt } from './career.js';
+import { initialPotential, publicWage, TIER_STARS, GATE_MAX, MATCH_LOG_CAP, SQUAD_MIN, SQUAD_MAX, derivedRng, neededLine, freeShirt } from './career.js';
 
 const PLAYER_DEFAULTS = { freshness: 100, injuryMatchesLeft: 0, lastRating: 0, ratingSum: 0, ratingGames: 0, publicStars: 0, seasonAgeCounter: 1, archetype: null, distanceSum: 0, minutesSum: 0, topSpeedMax: 0, hiKmSum: 0, hiDistSum: 0, trainingFocus: 'GENERAL', careerGames: 0, banMatches: 0, banYellows: 0, banWhy: null };   // ban* v3.27.0 (udelukkelse)
 // Truppens størrelse (v3.18.0: 18–25 efter lønbudgettet; før præcis 18)
@@ -69,6 +69,8 @@ export function normalizeLeague(league) {
   for (const m of league.lastRound?.matches || []) {
     if (!m) continue;
     if (m.stoppage !== undefined && !isValidStoppage(m.stoppage)) delete m.stoppage;
+    // Tilskuerne (v3.30.0, valgfrit felt – ældre kampe har det ikke): kun et helt tal 0–GATE_MAX bliver, ellers slettes det (ingen migrering)
+    if (m.att !== undefined && !(Number.isInteger(m.att) && m.att >= 0 && m.att <= GATE_MAX)) delete m.att;
     for (const e of Array.isArray(m.events) ? m.events : []) if (e && e.clock !== undefined && !isValidClock(e.clock)) delete e.clock;
   }
   // Kampprogrammet (v3.11): et ugyldigt eller manglende program genskabes deterministisk (holdenes

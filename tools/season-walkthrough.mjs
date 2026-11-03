@@ -37,7 +37,7 @@ try {
   const shot = (name) => page.screenshot({ path: path.join(OUT, name), fullPage: true });
   const box = async () => ((await page.locator('#fejlboks').isVisible()) ? fejl.push(`fejlboks: ${await page.textContent('#fejlboks')}`) : 0);
 
-  for (const k of ['trup', 'taktik']) { await tab(k); await shot(`00-${k}.png`); }
+  for (const k of ['trup', 'traening', 'taktik']) { await tab(k); await shot(`00-${k}.png`); }
   const spor = [];
   const league = () => page.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league);
   for (let r = 1; r <= 14; r++) {

@@ -35,3 +35,11 @@ fund der er rettet (så du ikke finder dem igen), hvad brugeren har valgt fra, o
 ## Fravalgt
 - Brugeren 2026-11-02: klik på egen brik/række på Taktik = byt (ikke kort); kortet via ⓘ; panelet kun Trup+Taktik.
 - "– det holdt ikke mod jer" efter nederlag – valgt i v3.21.2; rejs kun hvis brugeren klager.
+
+## Plan v3.30.0 (2026-11-02) – ▲ i Trup + egen Træning-fane; scripts scratchpad/ui-trn/{m,g,f,w}.mjs
+- Målt: Alsidig (standard) = 0 +1 i 12 runder (trainingReport.gains tom hver runde, devTally 0); Teknik for alle: bedste "~9 rd",
+  10/18 "> 1 sæson". ▲ bliver sjælden → Træning-fanen skal have en fremadrettet tom tilstand.
+- ▲ kolliderer med sorteringspilen (matrix.js:89 ' ▲'/' ▼'); foreslog grønt "+1" i stedet. FIN-kolonnen står x=661 i 324 px
+  ved 390 → markér også i Spiller-cellen.
+- 7 faner: "Træning" 48 px i 56 px knap (390), 51 px (360) – passer; < 340 px løber det over.
+- Hjem-linjens indhold var i 3/8 runder KUN "1 nyt stærkt par" → "Træning ›" leder til samspil; foreslog Taktik dér.

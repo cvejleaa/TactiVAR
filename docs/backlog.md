@@ -17,6 +17,23 @@ Rangering: brugerens ønsker først, derefter værdi pr. størrelse. Første run
    (sidste underfane i view, ikke game.ui). Sidehøjder måles før/efter med et committet værktøj.
    **Lavet:** F0 (v3.27.1), F1 (v3.28.0), F2 kortpanelet (v3.29.0: ét panel fra højre/bunden på Trup og Taktik, ⓘ på Taktik –
    et klik er stadig byt; Trup 1922 → 1500 px og Taktik 2156 → 1864 px ved 1366, Taktik 4709 → 3777 ved 390). Næste: F3.
+0b. **Økonomien skal kunne bære en trup til trætheden: sponsor med sikkerhed eller præstation** · økonomi + klub · M · 5 · ⚖ 🗄 ·
+   brugeren 2026-11-02: "Når vi har træthed som vi har, er 18 spillere lige på grænsen … forskellige sponsorater, hvor der er et
+   grundbeløb og noget præstationsbestemt, så man skal vælge sikkerhed eller præstation". Værktøjer: `tools/measure-economy.mjs`,
+   `tools/measure-sponsor.mjs` (+ `tools/tune-sponsor.mjs` på dens DUMP), `tools/measure-squad-depth.mjs`, `tools/measure-star-catchup.mjs`,
+   `tools/measure-star-fit.mjs`. Målt før v3.30.0: indtægten flad på 6,09–6,15 mio. om sæsonen, mens lønnen pr. runde gik 415k → 493k
+   (S3) → 381k (S10); hoppet S1→S2 skyldtes genforhandlingen – 59 % af ROTATION/TALENT gik 2★→3★, og lønnen fordobledes.
+   **Lavet i v3.30.0** (forslag a + to håndtag): ærlige startstjerner STAR 3,4 · STARTER 3,2 · ROTATION 2,9 · TALENT 2,8 (før 4/3/2/2),
+   værdien lineært mellem hele stjerner, løn 5,5 % (før 6 %) og tilskuere 370/185/145 (1. mod 2. efter tre sejre = 9.000, før højst
+   8.080). `measure-economy.mjs 5 10`: overskud 56 → 71 %, S1 60 → 43 %, S2–S4 23–38 → 50–65 %, S7–S10 73–80 → 80–93 % (docs/spec.md §2).
+   **Åbent:** (1) **sponsorvalget** (b): låst før vinduet i runde 1, bonus pr. runde – Tryg 1,0 mio. · Balance 550k + 25k/point ·
+   Præstation 50k/mål + 400k/200k/100k for 1./2./3.; ingen dominerer (43/19/38 % før v3.30.0 – måles igen med `measure-sponsor.mjs`
+   på den nye økonomi), evt. finansieret med TV 120k → 100k/runde. (2) **Alle bliver rige fra S7**: lønnen falder med alderen
+   (ageFactor), så kasserne vokser 6–12 mio. – et lønloft, en dyrere ældre-kurve eller sponsoren skal tage det. (3) ⚖ **Skal dybde
+   være mere værd?** Dybde giver kun point på starterniveau: trætheden koster ca. 3 point (20,2 mod 23,2 frisk), både med 18 og 22
+   mand; billige reserver giver 0 point, lige så gode +2,7 til +4,9; straffen er højst ca. 5 % (match.js:207), og bænken er ca. 20 %
+   svagere – gør dybde mere værd, eller sig det åbent. Andre håndtag: billetpris, trupnorm 18–20, senere løn = fast + kampbonus (M).
+   Forfiner/erstatter nr. 30.
 Rundtur 2: 2026-10-28 (v3.24.0, sæson spillet i browseren + `measure-lifecycle` 5 seeds × 3 sæsoner; Spilførernes scripts i
 scratchpad – et tal herfra skal måles igen med et committet værktøj, før det begrunder en ændring).
 1. **Sig det, når et par bliver stærkt** · UI · S · 4 · samspillets belønning er tavs: første gang det nævnes er runde 8

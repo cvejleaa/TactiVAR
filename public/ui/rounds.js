@@ -1,13 +1,16 @@
 // Liga-siden: sidste rundes resultater (med link til referatet) og kampprogrammet.
 import { h } from './dom.js';
 import { championText } from '../engine/season.js';
+import { attText } from './labels.js';
 
 // Overskriften bruger sæsonens runde (Spilfører v3.18.0: "Resultater – runde 15" i sæson 2) – seasonRound fra app.js
 export function renderLastRound({ round, myTeamId, onOpen, seasonRound = round.round }) {
   return h('div', { class: 'panel', id: 'last-round' }, h('h3', {}, `Resultater – runde ${seasonRound}`),
     h('div', { class: 'fixtures' }, round.matches.map((m, i) => h('button', {
       class: 'fixture' + (m.homeId === myTeamId || m.awayId === myTeamId ? ' mine' : ''), title: 'Åbn referatet i Kamp-fanen', onclick: () => onOpen(i),
-    }, h('span', { class: 'fx-team' }, m.homeName), h('strong', { class: 'fx-score' }, `${m.homeGoals}-${m.awayGoals}`), h('span', { class: 'fx-team right' }, m.awayName), h('span', { class: 'fx-link' }, '📺 Referat')))));
+    }, h('span', { class: 'fx-team' }, m.homeName), h('strong', { class: 'fx-score' }, `${m.homeGoals}-${m.awayGoals}`), h('span', { class: 'fx-team right' }, m.awayName), h('span', { class: 'fx-link' }, '📺 Referat'),
+      // v3.30.0: tilskuerne under resultatet (2. kolonne) – kun når kampen har tallet
+      attText(m) ? h('span', { class: 'fx-att muted', title: 'Tilskuere' }, attText(m)) : null))));
 }
 
 // Kampprogrammet (v3.11): næste runde (præcis de kampe, ▶ spiller – samme retning), dit

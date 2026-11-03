@@ -93,9 +93,10 @@ spillerobjekt; de skal ligge hos den der observerer.
 Konstanterne står ét sted: `public/engine/career.js` (og `transfers.js`). Bånd: `tools/measure-lifecycle.mjs`, `tests/unit/lifecycle-v3180.test.mjs`.
 - **Kamphistorik (§10.4):** én tupel pr. kamp (`matchLog`, højst 28): sæson, runde, hold, resultat, minutter, karakter (kun ejeren), stjerner, mål, oplæg. Kortet: "📜 Kampe", karrierelinje, 📺 kun på seneste rundes kamp.
 - **Unikke kortnavne** i hele ligaen (`uniquifyNames`, egen afledt rng – kampene uændrede); en gemt liga omdøbes ved migreringen, også i tekster.
-- **Træning pr. spiller** (gælder, til det ændres): Alsidig, Kondition, Teknik, Afslutning, Forsvar, Fysik, Målmand (kun MV), Hvile. Fremgang = rate · alder (1,5 … 0,2) · plads til loftet (0,1–1); +1 ved 1,0. Kampe: 0,02 pr. 90 min i kædens nøgle-evner. Pris: −2 … −5 friskhed (gulv 50; den, der spillede, betaler 2 mindre), 0,3–0,7 % træningsskade; Hvile +4. Botterne træner Alsidig (friskheden røber ikke fokus).
+- **Træning pr. spiller** (gælder, til det ændres): Alsidig, Kondition, Teknik, Afslutning, Forsvar, Fysik, Målmand (kun MV), Hvile. Fremgang = rate · alder (1,5 … 0,2) · plads til loftet (0,1–1); +1 ved 1,0. Kampe: 0,02 pr. 90 min i kædens nøgle-evner. Pris: −2 … −5 friskhed (gulv 50; den, der spillede, betaler 2 mindre), 0,3–0,7 % træningsskade; Hvile +4. Botterne træner Alsidig (friskheden røber ikke fokus). Fokus sættes kun på 🏋️ Træning (v3.30.0; kortet viser det og linker dertil).
 - **Sæsonskiftet** (kun `commitRound`, aldrig en migrering): pension fra 31 (MV 33) med ¼ ½ ¾, sikker ved 34 (MV 36), varslet på kortet fra runde 10; alle +1 år og 100 % friske (v3.26.1); fald fra 30 (MV 32) – fart/kondition først, positionering/pasning sidst, træning halverer; vækst for unge til 23 efter alder, loft og spilletid; værdi-stjerner = snit af seneste 5 kampe; lønnen genforhandles; 2 ungdomstilbud pr. hold (16–18 år, potentiale snit + 4 ± 2,5; botterne tager op efter truppens størrelse; dit hold vælger i sæsonrapporten, frist næste runde; under 18 fyldes op); opstillingerne repareres (samme kæde); statistikken for den afsluttede sæson bygger på et øjebliksbillede.
-- **Økonomi** pr. runde: TV 120.000 kr., billetter kun hjemme (min(9000, 4000 + 300·(8 − plads hjemme) + 150·(8 − plads ude) + 120·form) à 90 kr.; runde 1–2: sidste sæsons placering), løn = ugeløn / 3. Præmie 1,5 / 1,1 / 0,8 / 0,6 / 0,45 / 0,3 / 0,2 / 0,1 mio. Lønbudget 1,7 mio. + 2 % af kassen pr. uge (begrænser køb, ikke økonomien). Offentlig værdi = stjerner (eller tier; ungdom 1★) · alder; løn = 6 % af værdien. 💼 Klub viser kasse, løn, budget, prognose og regnskab.
+- **Økonomi** pr. runde: TV 120.000 kr., billetter kun hjemme (min(9000, 4000 + 370·(8 − plads hjemme) + 185·(8 − plads ude) + 145·form) à 90 kr.; runde 1–2: sidste sæsons placering), løn = ugeløn / 3. Præmie 1,5 / 1,1 / 0,8 / 0,6 / 0,45 / 0,3 / 0,2 / 0,1 mio. Lønbudget 1,7 mio. + 2 % af kassen pr. uge (begrænser køb, ikke økonomien). Offentlig værdi = stjerner (eller tier; ungdom 1★) · alder, mellem hele stjerner lineært (`valueOfStars`); løn = 5,5 % af værdien. Tilskuertallet står på hver kamp (`match.att`, offentligt): "👥 7.840" på resultatkortene på Liga og i referatet under resultatet; ældre kampe uden tallet viser intet. 💼 Klub viser kasse, løn, budget, prognose og regnskab.
+- **v3.30.0 (brugeren 2026-11-02: ærlige startstjerner, løn 5,5 %, 9.000 tilskuere kan nås).** Tier-stjernerne (`TIER_STARS`, kun for spillere med under 3 kampe) er de gennemsnitlige kampstjerner efter sæson 1 (`tools/measure-star-fit.mjs`, 8 ligaer: STAR 3,40 · STARTER 3,16 · ROTATION 2,89 · TALENT 2,83): **STAR 3,4 · STARTER 3,2 · ROTATION 2,9 · TALENT 2,8** (før 4 / 3 / 2 / 2; ungdom 1). Før gik 59 % af ROTATION/TALENT 2★→3★ efter 3 kampe, og lønnen fordobledes ved første genforhandling (`tools/measure-star-catchup.mjs`). Tilskuerne: 370 / 185 / 145 (før 300 / 150 / 120) – 1. hjemme mod 2. efter tre sejre = 9.000 (før højst 8.080). `WAGE_SHARE` 0,06 → 0,055. Målt med `node tools/measure-economy.mjs 5 10` (400 hold-sæsoner), før → efter: overskud 56 % → **71 %**; snitresultat 123k → 788k; billetter 3.823k → 4.118k; løn 6.011k → 5.641k pr. sæson; overskud pr. sæson S1 60 → 43 %, S2 38 → 53 %, S3 23 → 50 %, S4 35 → 65 %, S5 40 → 78 %, S6 55 → 75 %, S7–S10 73–80 → 80–93 %; snitløn pr. runde S1 414k → 475k, S2 479k → 453k (hoppet S1→S2 er væk; `tests/unit/economy-v3300.test.mjs`: liga 101 +60.500 → −27.375). Udtagelsen (`pubScore`: bedste 11, bænk, bot-rotation) rangerer stadig en ubeprøvet spiller efter tier i hele trin (`TIER_RANK` 4/3/2/2/1) – startstjernerne er et lønsnit, ikke en rangering; med 3,4 mod 2,9 vejede tier for lidt mod friskhed og naboplads, og alle seedede kampe flyttede sig. Trup-regnearket viser "💰 Til salg" efter navnet på dine spillere til salg – kun på dit eget hold: salgslisten er ejerens (`viewTeam` viser den ikke, §3), og botterne sælger uden om den. Bevidst: S1 er nu den hårde sæson (lønnen er ærlig fra start), og fra S7 bliver alle rige, fordi lønnen falder med alderen – det åbne står i backloggen (nr. 0b: sponsorvalget og ⚖ dybde).
 - **Transfers:** vinduer før runde 1 og 8; fast pris = værdi · 1,3 (starter 1,6); højst 2 salg pr. bot pr. vindue, karantæne i skiftets vindue og det næste; en bot, der sælger under 18 eller under kæde-minimum (MV 2 / FOR 6 / MID 6 / ANG 3), henter selv en ungdomsspiller i samme kæde (v3.18.1 – i v3.18.0 kunne intet købes i sæson 1). Klub → Transfermarked viser "Til salg i ligaen" med Køb. Dine spillere til salg får bud 0,9–1,0 · værdien. Botterne i minus sælger/fritstiller (dine spillere aldrig automatisk); botter under minimum eller med over 2 mio. kr. køber. Transferlisten er offentlig. **v3.21.1** (brugeren: "Jeg kan ikke sælge fordi jeg kun har 18 spillere, men kan heller ikke købe fordi jeg har brugt mit lønbudget. Denne måde låser mig for meget som manager"; valgt: ungdomsspiller ind + køb, der ikke hæver lønnen): dit hold kan sælge ved 18 og ved kæde-minimum – en ungdomsspiller fra akademiet kommer ind i samme kæde (som botterne), og han kan ikke handles videre i dette eller næste vindue (QC: ellers en pengemaskine). **v3.24.1** (Spilfører økonomi): det samme gælder en ungdomsspiller, du tager op ved sæsonslut – og dem, der fyldes op til 18 automatisk (`takeYouth`, `seasonTurnover`): karantæne i det vindue og det næste; før kunne de sælges straks for bud uden løn og kampe. Teksten siger, hvornår karantænen slutter (`quarantineText`), også på kortets "Til salg" og ved ungdomstilbuddet. Dine salg er også højst 2 pr. vindue. **Fritstil** (gratis, kun når du selv trykker – B5 holder; tæller som et salg) er udvejen, når ingen klub byder. **Lønloftet** for et køb er budgettet – eller din løn før vinduets første salg, hvis den var højere (`wageCap`, nulstilles med vinduet): over budgettet kan du købe for den løn, du sparer, men lønnen bliver aldrig højere end før salget. Transfermarkedet viser før klikket, hvad et salg frigør i løn, om en ungdomsspiller kommer ind, og "Salg i vinduet: n af 2". Afviger fra kilden: ingen ugentlig pulje og ingen forhandling (brugerens valg: vinduer + fast pris).
 
 ## 3. Hvem ser hvad (anti-spionage)
@@ -135,7 +136,8 @@ Konstanterne står ét sted: `public/engine/career.js` (og `transfers.js`). Bån
   - `viewTeam` er en tilladelsesliste (v3.19.0, `TEAM_PUBLIC_FIELDS`): id, navn, isBot, truppen (gennem `viewPlayer`), kamptruppen
     (`matchBench`) og taktikkens `baseFormation`, `lineupSlots` og `customCoords` – som kopier. Den offentlige klubside tegnes kun
     fra den. En købt spillers karakterer fra botten ses af den nye ejer.
-  - "Dit hold" afgøres af `isOwn = !team.isBot` (`app.js`): alle ejer-flader (træningsoversigt, Løn/rd, egen klub) hænger på den.
+  - "Dit hold" afgøres af `isOwn = !team.isBot` (`app.js`): alle ejer-flader (Løn/rd, egen klub, "+N" i Trup) hænger på den;
+    🏋️ Træning-fanen (v3.30.0) bygges altid fra dit hold (`myTeam()`), uanset hvilket hold der vises.
     Med to menneskestyrede hold ville hver se den andens data – trin 2 skal afgøre ejerskab ud fra brugeren.
 - Ingen: VAR-profil (kun via clues og VAR-kendelser i referatet – v3.15.1: varPulse, theatre og cynicism afgør VAR's
   kendelser som lodtrækninger, så én kendelse ikke afslører spillerens trin).
@@ -604,7 +606,7 @@ bedre kan kontrollere spil motoren".
   formation en 🤝-besked med de bånd, der skiftede (største fald først, højst 2). Spillerkortet: bedste makker kun ved stærkt, hans
   par med naboerne nu; salgslinjen (kortet og Klub) ved stærkt; købeboksen og "Til salg i ligaen": fremmed for alle, ca. 8 kampe
   (`gamesToSettle`). Fuldtidsanalysen: én sætning om din midtbane ved kampstart (finder hinanden/fremmede eller stærkt).
-  **v3.24.2** (Spilfører UI: "belønningen er tavs"): efter runden står øverst i Trup de par i din opstilling, der blev stærke –
+  **v3.24.2** (Spilfører UI: "belønningen er tavs"): efter runden står øverst i Trup (v3.30.0: øverst på 🏋️ Træning) de par i din opstilling, der blev stærke –
   kun når de spillede sammen i runden – og dem, der holdt op, fordi de ikke spillede sammen (`strongChanges`; før og efter mod
   det NYE snit, så snittet alene aldrig flytter et par; kun par, der fandtes før). Navne fra truppen nu; fra 4 par kun antallet;
   link til Taktik. Legenden tæller de stærke ("3 af 12 par spiller stærkt."). Gemt i `trainingReport[dit hold].strong` (id-par).
@@ -1038,10 +1040,12 @@ advarsler, blå (--info) = links. Endnu IKKE håndhævet: stjerner, stærkt sams
 Målt med `node tools/measure-ui.mjs` (1366/390 px, efter én runde): distinkte skriftstørrelser i hele appen 20 → 6, pr. fane
 7–15 → 3–6; sidehøjder (ca. – ligaen er tilfældig) 1366 px Trup 1831 → 1974, Taktik 2068 → 2087, Kamp 3212 → 3261, Liga 2521 → 2619; 390 px Taktik
 4563 → 4602, Liga 3868 → 4182 (lidt luft – højderne tages ned i F4–F6). e2e vagter: højst 6 størrelser, alle fra skalaen. **Rammen (v3.28.0, UI-ombygningen F1):** topbaren er én linje: VAR · dit klubnavn · gem-kvitteringen (åbner ⚙) ·
-den lille ▶ (kun på Trup/Kamp/Liga/Klub/⚙: "▶ Runde N" + advarslernes tegn kompakt, fx "⛔1 🚑1 ⚠2 🟨1", forklaringen i title;
+den lille ▶ (kun på Trup/Træning/Kamp/Liga/Klub/⚙: "▶ Runde N" + advarslernes tegn kompakt, fx "⛔1 🚑1 ⚠2 🟨1", forklaringen i title;
 slået fra og uden tegn under afspilning) · ⚙ (`#tab-admin`, ikonknap – `admin` er stadig en gyldig `ui.tab`). Intet rundetal i
-topbaren og ingen holdvælger. Fanerne 🏠 Hjem · 👥 Trup · 📋 Taktik · 📺 Kamp · 🏆 Liga · 💼 Klub står under topbaren (én nav-DOM).
-Den valgte fane gemmes i `ui.tab`; en ukendt værdi → Hjem (gamle gem: 'trup' → Trup, 'admin' → ⚙). Ny liga og import åbner Hjem;
+topbaren og ingen holdvælger. Fanerne 🏠 Hjem · 👥 Trup · 🏋️ Træning · 📋 Taktik · 📺 Kamp · 🏆 Liga · 💼 Klub (v3.30.0: syv – Træning efter Trup, nøglen `traening`)
+står under topbaren (én nav-DOM) på én række – også ved 601–900 px, hvor fanerne har mindre luft (`.55rem .6rem`; med 1rem gik
+rækken på to linjer ved 601–690 px). e2e: topbaren er lige høj med én fanerække ved 1400, 1024, 768 og 601 px.
+Den valgte fane gemmes i `ui.tab`; en ukendt værdi → Hjem (gamle gem: 'trup' → Trup, 'admin' → ⚙; 'traening' → Træning – i en ældre version Hjem). Ny liga og import åbner Hjem;
 efter ▶ lander man på Kamp, hvor "Næste: runde N mod X (ude) · Forbered ›" (`#to-home`) står ØVERST, når den viste runde er den
 seneste og ikke afspilles. Fanen normaliseres ved hver tegning (`game.ui.tab = tabNow()`), så kode der læser `ui.tab` aldrig ser en
 ukendt værdi (ny liga, første besøg og import sætter ingen). Advarslerne før runden har ÉN kilde (app.js `preMatchIssues`: ⛔ udelukket, 🚑 skadet, ⚠ træt under
@@ -1052,13 +1056,14 @@ grænsen, 🟨 én gult fra udelukkelse – kun startere; en udelukket/skadet st
 - **Scout-bjælken** (`#scout-banner`, lilla, sticky): på Trup, Taktik og Klub, når et andet hold vises – "👁 Du ser X – kun
   offentlige data", holdvælgeren `#team-select` (skifter hold på fanen) og "← Dit hold". Hovedvejene til et andet hold: Liga-tabellen
   og "Se et hold" over den, næste modstander på Hjem og i bjælken; ⚙ "Se et andet hold" er reserven (tilbage til fanen, man kom
-  fra, hvis den er Trup/Taktik/Klub – ellers Trup). Fra Hjem/Kamp/Liga/⚙ vises et valgt hold i Trup; Hjem viser altid dit hold.
+  fra, hvis den er Trup/Taktik/Klub – ellers Trup). Fra Hjem/Træning/Kamp/Liga/⚙ vises et valgt hold i Trup; Hjem og Træning viser altid dit hold.
 - **Hjem**: klubhovedet (`#club-name`, kassen via `shownCash` med ændringen siden sidste runde, `#club-link` → Klub); sidste runde
   (resultat, dine målscorere, placering med ↑/↓ regnet uden sidste runde – fra sæsonens 2. runde – link til kampen); "Før du spiller
-  runde N" (advarslerne med "Taktik ›", 🧒 ungdomstilbud `#youth-pending`, træningen i én linje → Trup; tom: "✔ Holdet er klar");
+  runde N" (advarslerne med "Taktik ›", 🧒 ungdomstilbud `#youth-pending`, træningen i én linje → "Træning ›" (v3.30.0; er der KUN nye stærke par, "Taktik ›" – stregerne står dér); tom: "✔ Holdet er klar");
   næste kamp (modstanderens placering – først fra sæsonens 2. runde og ikke efter sæsonslut – og 3 seneste fra sæsonen, 🔍-link); tabellen 5 rækker omkring dig → Liga. Under afspilning:
   "📺 Runden spilles i Kamp-fanen" i stedet for resultat, placering, kasse-ændring, "Før du spiller", minitabel og modstanderform.
-- **Mobil (≤ 600 px)**: topbaren ruller væk; navigationen står fast i bunden (6 knapper 65 × 56 px, ikon over tekst,
+- **Mobil (≤ 600 px)**: topbaren ruller væk; navigationen står fast i bunden (v3.30.0: 7 knapper ≈ 55 × 56 px ved 390 px, ≈ 45 px ved 320 px – en for lang tekst
+  forkortes med …; ikon over tekst,
   `env(safe-area-inset-bottom)`), Spil-bjælken lige over den; siden får bundluft, så sidste element står over bjælken. I bjælken står modstanderen
   i knappen ("▶ Spil runde N · X (ude)", 🔍-linket skjules; er navnet for langt, forkortes kun det med … – v3.29.1), og ved 3 advarsler én tæller ("⛔ 3 ting") i stedet for tre piller; den
   lille ▶ viser "▶ R5".
@@ -1067,9 +1072,27 @@ Hjem (ny) 900; 390 px Trup 2941 → 2928, Taktik 4598 → 4661, Liga 4169 → 42
 Taktik (e2e, 390 × 844, 3 advarsler): fast chrome 137 px (sticky topbar) → 118 px (bjælke 61 + navigation 57), indholdshøjde
 mellem bjælkerne 707 → 726 px (682 med scout-bjælken). e2e vagter: chrome ≤ 130, indhold ≥ 650, nav ≥ 44 px.
 - **Trup** (v3.19.0; v3.28.0 klubhovedet til Hjem – her en kort linje "X – dit hold", en modstander med 🔒 kasse og 💼 Klubside): "Klik på en
-  spiller for at åbne spillerkortet" (`#trup-help`), regnearket (med 💰 Værdi og Løn/rd sidst; ingen byt-knapper), derunder 🏋️ træningsoversigten
-  i hele bredden (v3.29.0 – før kort | træning 2:3; fokus pr. spiller, pris, fremdrift, næste +1, skøn, +1 sidste runde, massehandling for de
-  viste). Et klik på en række åbner kortpanelet (eller skifter spiller i det). Træning sættes kun her (`#focus-select` på kortet kun på Trup).
+  spiller for at åbne spillerkortet" (`#trup-help`) og regnearket (med 💰 Værdi og Løn/rd sidst; ingen byt-knapper). Et klik på en række
+  åbner kortpanelet (eller skifter spiller i det). v3.30.0: træningsoversigten og rundens opsamling er flyttet til 🏋️ Træning.
+  **"+N" (v3.30.0, brugerens ønske "markér sidste rundes +1"):** en evne, der steg efter sidste runde (træning OG kamp-xp – rapporten
+  `league.trainingReport[mit id].gains`), får et lille hævet mærke "+N" (N = antal +1 i den evne; `td.gain` med `data-gain`, tegnet som
+  `::after` i .pill-ok-farverne – ikke ▲, der er sorteringspilene, og ikke grøn tekst på heat-4-grøn). Cellens tekst er uændret (tallet),
+  så sortering og aflæsning ikke rører det. title "+2 Afslutning efter runde R" (evnens navn fra `SKILL_NAME`, sæsonens runde). Kun de 9
+  evne-kolonner (ikke Spring/Luft/Gns). På mobil (≤ 600 px) også summen efter navnet (`td.player-gain`, title med alle evnerne), og når
+  der er mærker, siger `#trup-help` " · +1 = steg efter runde R (træning og kampe) · træningen står på 🏋️ Træning ›". ÉN vagt (app.js
+  `renderNow`): rapporten (`ownRep`) skjules under afspilning (den er for den runde, der afspilles); mærkerne kun for dit hold og ikke
+  lige efter sæsonslut (`seasonJustEnded` – aldersfaldet i sæsonskiftet kan have spist et +1 fra samme runde; QC). Én kilde til
+  rapporten pr. spiller: `gainsByPlayer` (training.js) – også træningstabellens "Sidste runde" ("+2 Afslutning, +1 Fart").
+- **🏋️ Træning** (v3.30.0, brugeren: "træningen i en egen topfane"): altid DIT hold (bygget fra `myTeam()`, også når Trup viser en
+  modstander – Trup beholder den scoutede), ingen scout-bjælke og intet kortpanel; den lille ▶ i topbaren. Øverst rundens opsamling
+  (`#training-summary`: +1, træningsskader, 🤝 nye stærke par med link til stregerne på Taktik), så træningsoversigten (`#training`):
+  linjen `#training-next` ("Ingen +1 efter runde R · nærmest: #7 Navn Afslutning om ~3 rd · 5 træner Alsidig" – "Ingen +1 …" kun når
+  rapporten intet har for truppen; nærmest = færrest runder til næste +1 efter `trainingEstimate`), fokus pr. spiller, pris, fremdrift,
+  næste +1, skøn, "Sidste runde" og massehandling for de viste (`#focus-many`, svaret `#train-msg`). **Træning sættes kun her.**
+  "ændr i Træning ›" på kortet lander her med spillerens række markeret (`tr.selected`, `view.trainPid` – gemmes ikke, nulstilles ved
+  faneskift og holdskift) og rullet frem; står han ikke i den valgte kæde, vises alle. Fanen huskes i `ui.tab`.
+  Målt (`node tools/measure-ui.mjs`, efter én runde, før → efter): 1366 px Trup 1500 → 900 (= skærmen), Træning (ny) 900; 390 px Trup
+  1641 → 844 (= skærmen), Træning (ny) 1063 (Hjem, Taktik, Kamp, Liga, Klub uændrede inden for ligaens tilfældighed).
 - **Taktik** (v3.19.0 – opstillingen ét sted): bane | spillerliste (Start-11, Bænk med "Udtag automatisk",
   Reserver; klik på en brik filtrerer listen til hans kæde med kædens 3 nøgle-evner; sortering gennem
   regnearkets kolonner og synlighedsvagt); formation/planer/faser/Hvis-Så lige under banen og listen i hele bredden
@@ -1086,8 +1109,10 @@ mellem bjælkerne 707 → 726 px (682 med scout-bjælken). e2e vagter: chrome �
   - **Åbnes af:** Trup – et klik på en række (dit eller et andet hold). Taktik, dit hold – KUN ⓘ forrest i listens navnecelle
     (`.lp-info[data-pid]`, aria-label "Spillerkort: #7 Navn", tegnet i CSS, så cellens tekst er "#7 Navn"; stopper klikket, så byttet og
     beskeden står urørt) og "Se kort ›" (`#pick-card`) i byt-beskeden, kun mens et byt er i gang. Et klik på din egen brik eller række
-    bytter som før og ændrer ikke panelets spiller. Taktik, et andet hold – et klik på brik eller række (der er intet byt). "Træner: X –
-    ændr i Trup" er et link (`#card-train-link`) til Trup med panelet på samme spiller.
+    bytter som før og ændrer ikke panelets spiller. Taktik, et andet hold – et klik på brik eller række (der er intet byt). Kortets træningsblok
+    (`#card-training`, kun dit hold) er ens på Trup og Taktik (v3.30.0): "Træner: X – ændr i Træning › · pris" (`#card-train-note`, linket
+    `#card-train-link` til 🏋️ Træning med hans række markeret), fremdriften pr. evne og skønnet – kortet har intet fokusvalg (før
+    `#focus-select` på Trup).
   - **Hoved:** ◀ ▶ (`#card-prev`/`#card-next`) bladrer i den viste listes rækkefølge (Trup: regnearkets sortering og filter; Taktik:
     start-11, bænk, reserver som listen) og bytter aldrig; "#nr Navn" (`#cp-title`); ✕ (`#card-close`). Mens panelet er åbent på
     Taktik, står byt-beskeden også i hovedet (`#panel-pick-msg`). Efter et køb lukker panelet ikke tavst: kvitteringen
