@@ -23,6 +23,10 @@ Rangering: brugerens ønsker først, derefter værdi pr. størrelse. Første run
    brugerens valg: Fysik træner Fart, Styrke OG Spring (som Teknik med to evner); Spring som bjælke under "Fysik & luft" på kortet;
    særprægets krav viser "Spring 13/14 – trænes med Fysik". I dag er `jumpingPower` fast fra generatoren og ændres aldrig
    (career.js FOCUS.PHYSICAL, generator.js:182). Mål luftdueller/særpræg over sæsoner (`tools/measure-lifecycle.mjs`) før og efter.
+0c+. **Arketypen på Taktik (brugeren 2026-11-03: "Jeg vil gerne have arketype markeringen med på taktik siden")** · UI · S · 4 ·
+   samme mærke som Trups "Arketype/Note"-kolonne (🔒 låst / ✨ låst op + navn) i Taktik-listen (`public/ui/lineup-list.js`), og
+   navnet i brikkens title på banen. Ét ord overalt: "arketype" (brugerens ord) – v3.31.1 skrev "særpræg" på kortet; rettes med.
+   Lander sammen med 0c (Spring), fordi låsen ofte venter på Spring.
 0d. **📖 Spilguide (brugeren 2026-11-03: "ingen steder hvor vi har en hjælp til spillet … ala den jeg uploadede fra Hattrick")** · UI · M · 5 ·
    brugerens valg: én side "📖 Sådan virker spillet" under ⚙ med afsnit pr. del (kampen, taktik, træning og udvikling, særpræg,
    samspil, form og udelukkelse, økonomi og transfers, sæsonen) skrevet ud fra reglerne i koden (spec.md ⇄ kode), og et lille "?"
