@@ -1,6 +1,6 @@
 // Broadcast Match Center (docs/spec.md §5–6): de 4 kampe i runden, live-afspilning af
-// din kamp, tidslinje, statistik, karakterark og TactiVAR Avisen. Karakterer for
-// modstandere vises kun som stjerner (engine/visibility.js).
+// din kamp, tidslinje, statistik og karakterark. TactiVAR Avisen (renderGazette) bor også her, men tegnes
+// kun på Liga (v3.31.0, F3 – før også sidst i Kamp). Karakterer for modstandere vises kun som stjerner (engine/visibility.js).
 import { h, dec } from './dom.js';
 import { starsEl, attText } from './labels.js';
 import { viewRatingEntry, viewActs } from '../engine/visibility.js';
@@ -197,7 +197,7 @@ function thirdsLine(trace, side, gkId, vsMe = false, down = true, stoppage = nul
 
 const legend = (isOwn = true) => h('div', { class: 'muted legend', id: 'icon-legend' }, RATING_ICONS.map(([s, t]) => `${s} ${t}`).join(' · ') + ' · 🧤9 (2 svære) = 9 redninger, heraf 2 svære – de lette (skud lige på ham) løfter karakteren lidt, de svære meget' + ' · 🎬 i referatet = vis afslutningen i afspilningen · 📍 i referatet = se hvor dit hold stod, da målet faldt (kampe fra før afspilningen – ellers viser 🎬 det) · HI = andel højintenst løb (over ca. 20 km/t) · "2/3 fri" = løb uden bold: kom fri 2 af 3 gange · "2/3 🤼" = dueller vundet (pres og dækning – en af de nærmeste tager duellen) – alle tre kun dit hold');
 
-// onOpenMatch(i): åbner referatet af kamp i i runden (Liga: skift til Kamp; Kamp: vis kampen).
+// onOpenMatch(i): åbner referatet af kamp i i runden – avisen står kun på Liga (v3.31.0), så det er altid et skift til Kamp.
 // matches: rundens kampe – bruges til at finde kampen for mål fra før v3.7.1 (uden matchIdx).
 // column (v3.14, column.js): klummen bygget for seeren. Uden den (gamle visninger/tests) den gamle avis.
 // onOpenReport(i): åbner kamp i's referat (kampoverskrifterne i "De øvrige kampe").
@@ -277,7 +277,7 @@ function sendBox(m, mc, on) {
 const sentList = (sent) => (sent?.length ? h('details', { id: 'sent-list', class: 'muted' }, h('summary', {}, `📤 Sendte kampe (${sent.length})`),
   h('ul', {}, sent.map((x) => h('li', {}, h('strong', {}, x.id), ` – ${x.label}${x.replay === false ? ' (uden gengivelse)' : ''}`)))) : null);
 
-export function renderMatchCenter({ mc, myTeamId, on, column = null }) {
+export function renderMatchCenter({ mc, myTeamId, on }) {
   const m = mc.matches[mc.viewIdx];
   const all = m.events;
   const shown = mc.playing ? all.slice(0, mc.shownCount) : all;
@@ -334,6 +334,5 @@ export function renderMatchCenter({ mc, myTeamId, on, column = null }) {
     mc.playing ? null : h('div', { class: 'ratings-grid' },
       ratingsTable(m.ratings.home, isOwnSide('home'), `${m.homeName} – karakterer`, m.startFormations?.home, snapOf(m, mc), on.snapshot, heatFor('h'), isOwnSide('away'), playerSpan(m.events, m.ratings.home)),
       ratingsTable(m.ratings.away, isOwnSide('away'), `${m.awayName} – karakterer`, m.startFormations?.away, snapOf(m, mc), on.snapshot, heatFor('a'), !isOwnSide('away'), playerSpan(m.events, m.ratings.away))),
-    mc.playing ? null : legend(),
-    mc.playing ? null : renderGazette(mc.gazette, myTeamId, on.openGoal, mc.matches, column, on.view));
+    mc.playing ? null : legend());   // v3.31.0: ingen avis her – den står på Liga (Kamps .to-home-linje linker dertil)
 }

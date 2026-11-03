@@ -2,13 +2,19 @@
 // næste kamp og et udsnit af tabellen. Tallene regnes i app.js (homeData) fra de samme kilder som resten af appen; her tegnes de.
 // Under afspilning (playing) skjules alt, der er bogført og ville afsløre runden – resultat, placering, kassens ændring,
 // "Før du spiller", minitabellen og modstanderens placering og form (som Liga-fanen). Den ENE vagt står i denne funktion.
-import { h } from './dom.js';
+// v3.31.0 (F3): kampens spiller 👑 ved sidste runde (modstanderens uden karakter – visibility.js i homeData) og 📰-kortet med
+// rundens overskrift → avisen på Liga. paper er en funktion, der kun kaldes uden for afspilningen (her), så klummen aldrig bygges
+// for den runde, der afspilles.
+import { h, dec } from './dom.js';
 import { kr } from './labels.js';
 
 const RESULT_WORD = { won: 'Sejr', drawn: 'Uafgjort', lost: 'Nederlag' };
 const signedKr = (n) => (n > 0 ? '+' : n < 0 ? '−' : '±') + kr(Math.abs(n));
+const FORM_WORD = { V: 'Vundet', U: 'Uafgjort', T: 'Tabt' };
+// Modstanderens form som piller (Spilfører UI på F1): V grøn, U grå, T rød – bogstavet er stadig teksten (skærmlæsere og tests), title fra HANS side
+const formPills = (form, name) => form.flatMap((r, i) => [i ? ' ' : null, h('span', { class: `form-pill form-${r}`, title: `${name}: ${FORM_WORD[r]}` }, r)]);
 
-export function renderHome({ club, last, place, ended, roundsPlayed, next, issues, youth, training, table, playing, on }) {
+export function renderHome({ club, last, place, ended, roundsPlayed, next, issues, youth, training, table, playing, paper = null, on }) {
   const head = h('div', { class: 'panel home-club', id: 'home-club' },
     h('div', {}, h('h2', { id: 'club-name' }, club.name), h('div', { class: 'muted' }, 'Dit hold')),
     h('div', { class: 'right' }, h('div', { class: 'muted' }, 'Klubkasse'),
@@ -18,7 +24,8 @@ export function renderHome({ club, last, place, ended, roundsPlayed, next, issue
   const nextCard = h('div', { class: 'panel home-next', id: 'home-next' },
     h('div', { class: 'lbl' }, `Næste kamp · runde ${next.k} af ${next.of}`),
     h('div', { class: 'home-big' }, next.name, h('span', { class: 'muted' }, ` · ${next.home ? 'hjemme' : 'ude'}`)),
-    playing ? null : h('div', { class: 'muted', id: 'home-opp-form' }, `${roundsPlayed > 0 && !ended ? `Nr. ${next.place} · ` : ''}seneste 3: ${next.form.length ? next.form.join(' ') : 'ingen kampe i sæsonen endnu'}`),
+    playing ? null : h('div', { class: 'muted', id: 'home-opp-form' }, `${roundsPlayed > 0 && !ended ? `Nr. ${next.place} · ` : ''}`,
+      next.form.length ? ['seneste 3 (ældste → nyeste): ', formPills(next.form, next.name)] : 'seneste 3: ingen kampe i sæsonen endnu'),
     h('button', { class: 'linklike', id: 'home-opp-link', onclick: on.opp }, `🔍 Se ${next.name} – kun offentlige data ›`));
 
   if (playing) {
@@ -34,6 +41,8 @@ export function renderHome({ club, last, place, ended, roundsPlayed, next, issue
         h('div', { class: 'lbl' }, `Sidste runde · runde ${last.round}`),
         h('div', { class: 'home-score' }, last.text),
         h('div', { class: 'muted' }, `${RESULT_WORD[last.result]} · ${last.scorers.length ? `Mål: ${last.scorers.join(', ')}` : 'ingen af dine mål'}`),
+        // Kampens spiller: dit hold med karakteren, en modstander med sit hold og uden tal (som avisens Rundens spiller)
+        last.motm ? h('div', { id: 'home-motm' }, `👑 Kampens spiller: #${last.motm.shirtNumber} ${last.motm.shortName}`, 'rating' in last.motm ? ` · karakter ${dec(last.motm.rating, 1)}` : ` (${last.motm.teamName})`) : null,
         last.att ? h('div', { class: 'muted', id: 'home-att' }, `${last.att} tilskuere`) : null),
       h('div', { class: 'right' },
         h('div', { class: 'home-place', id: 'home-place' }, `Nr. ${place}`, last.move ? h('span', { id: 'home-move', class: last.move > 0 ? 'up' : 'down' }, last.move > 0 ? ` ↑${last.move}` : ` ↓${-last.move}`) : null),
@@ -60,7 +69,13 @@ export function renderHome({ club, last, place, ended, roundsPlayed, next, issue
     h('table', { class: 'mini-table' }, h('tbody', {}, table.map((r) => h('tr', { class: r.mine ? 'mine' : '' }, h('td', {}, r.pos), h('td', {}, r.name), h('td', { class: 'pts' }, r.points))))),
     h('button', { class: 'linklike', id: 'home-table-link', onclick: on.liga }, 'Hele tabellen ›'));
 
+  // 📰 Avisen (v3.31.0, F3): rundens overskrift og vejen til avisen på Liga – i venstre kolonne, hvor der var tomt; ingen før første runde
+  const headline = paper ? paper() : null;
+  const paperCard = headline ? h('div', { class: 'panel home-paper', id: 'home-paper' },
+    h('div', { class: 'lbl' }, '📰 Avisen'), h('div', { class: 'home-big', id: 'home-paper-title' }, headline),
+    h('button', { class: 'linklike', id: 'home-paper-link', onclick: on.paper }, 'Læs hele avisen ›')) : null;
+
   return h('div', { class: 'home home-grid', id: 'home' }, head,
-    h('div', { class: 'home-main' }, lastCard, todo),
+    h('div', { class: 'home-main' }, lastCard, todo, paperCard),
     h('div', { class: 'home-side' }, nextCard, mini));
 }

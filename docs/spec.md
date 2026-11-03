@@ -1046,13 +1046,16 @@ topbaren og ingen holdvælger. Fanerne 🏠 Hjem · 👥 Trup · 🏋️ Trænin
 står under topbaren (én nav-DOM) på én række – også ved 601–900 px, hvor fanerne har mindre luft (`.55rem .6rem`; med 1rem gik
 rækken på to linjer ved 601–690 px). e2e: topbaren er lige høj med én fanerække ved 1400, 1024, 768 og 601 px.
 Den valgte fane gemmes i `ui.tab`; en ukendt værdi → Hjem (gamle gem: 'trup' → Trup, 'admin' → ⚙; 'traening' → Træning – i en ældre version Hjem). Ny liga og import åbner Hjem;
-efter ▶ lander man på Kamp, hvor "Næste: runde N mod X (ude) · Forbered ›" (`#to-home`) står ØVERST, når den viste runde er den
+efter ▶ lander man på Kamp, hvor "Næste: runde N mod X (ude) · Forbered › · 📰 «overskrift» ›" (`#to-home`, `#kamp-paper-link`, v3.31.0) står ØVERST, når den viste runde er den
 seneste og ikke afspilles. Fanen normaliseres ved hver tegning (`game.ui.tab = tabNow()`), så kode der læser `ui.tab` aldrig ser en
 ukendt værdi (ny liga, første besøg og import sætter ingen). Advarslerne før runden har ÉN kilde (app.js `preMatchIssues`: ⛔ udelukket, 🚑 skadet, ⚠ træt under
 grænsen, 🟨 én gult fra udelukkelse – kun startere; en udelukket/skadet starter er ikke også træt), som bjælken, den lille ▶ og Hjem bruger.
 - **Spil-bjælken** (Hjem og Taktik, fast i bunden, altid én linje): piller (kun Taktik; over 3 → én tæller-pille "⛔ 4 ting" farvet
   efter det værste, klik → Hjem; et tryk på en pille viser dit hold og markerer spilleren), 🔍 X (`#next-opponent`, et separat link
-  – før lå navnet i knappen) og "▶ Spil runde N af 14 · X (ude)" (`#play-round`; samme id som den lille ▶, kun én i DOM).
+  – før lå navnet i knappen; v3.31.0 kun på Taktik – på Hjem har næste kamp-kortet linket, og ▶ står samme sted via `.no-opp`
+  `margin-left: auto`) og "▶ Spil runde N af 14 · X (ude)" (`#play-round`; samme id som den lille ▶, kun én i DOM).
+  "N ting" tæller GRUPPER (én række/pille = ét link – Taktiks `#issue-count` og Hjems tæller er ens), den lille ▶'s tegn tæller med
+  vilje spillere ("⚠2" = to trætte; QC v3.31.0 – bevidst forskellige enheder).
 - **Scout-bjælken** (`#scout-banner`, lilla, sticky): på Trup, Taktik og Klub, når et andet hold vises – "👁 Du ser X – kun
   offentlige data", holdvælgeren `#team-select` (skifter hold på fanen) og "← Dit hold". Hovedvejene til et andet hold: Liga-tabellen
   og "Se et hold" over den, næste modstander på Hjem og i bjælken; ⚙ "Se et andet hold" er reserven (tilbage til fanen, man kom
@@ -1062,6 +1065,19 @@ grænsen, 🟨 én gult fra udelukkelse – kun startere; en udelukket/skadet st
   runde N" (advarslerne med "Taktik ›", 🧒 ungdomstilbud `#youth-pending`, træningen i én linje → "Træning ›" (v3.30.0; er der KUN nye stærke par, "Taktik ›" – stregerne står dér); tom: "✔ Holdet er klar");
   næste kamp (modstanderens placering – først fra sæsonens 2. runde og ikke efter sæsonslut – og 3 seneste fra sæsonen, 🔍-link); tabellen 5 rækker omkring dig → Liga. Under afspilning:
   "📺 Runden spilles i Kamp-fanen" i stedet for resultat, placering, kasse-ændring, "Før du spiller", minitabel og modstanderform.
+  **v3.31.0 (UI-ombygningen F3):** rækkefølgen i venstre kolonne er sidste runde (resultat, ↑↓, 👑) → "Før du spiller" → 📰; højre
+  kolonne uændret (næste kamp, minitabellen).
+  - **👑 Kampens spiller** (`#home-motm`, i `#home-last`) fra `m.ratings.motm` gennem `viewRatingEntry(motm, motm.teamId === mit id)`
+    (som avisens Rundens spiller): dit hold "👑 Kampens spiller: #9 G. Kristensen · karakter 8,1", en modstander "👑 Kampens spiller:
+    #9 G. Kristensen (Brøndby IF)" – uden tal og uden stjerner. Ingen motm → intet felt.
+  - **📰 Avisen** (`#home-paper`): rundens overskrift (`#home-paper-title`) og "Læs hele avisen ›" (`#home-paper-link`) → Liga, rullet til
+    `#gazette`. Overskriften (app.js `paperHeadline`) er klummens `title`, ellers den gamle avis' første overskrift (= Ligas første
+    `#headlines`-punkt), ellers "Rundens avis". Intet kort før runde 1. home.js får overskriften som en funktion (`paper`) og kalder den kun
+    uden for afspilningen – den ENE vagt – så klummen aldrig bygges for den runde, der afspilles.
+  - **Formen** (`#home-opp-form`): "Nr. 4 · seneste 3 (ældste → nyeste): V U T", bogstaverne som piller (`.form-pill.form-V/U/T`: grøn,
+    grå, rød; title fra modstanderens side, "Esbjerg FC: Vundet"). Bogstavet er stadig teksten.
+  - **Klummen bygges én gang pr. runde** (`columnNow`, gemt pr. `lastRound`-objekt – nyt ved hver runde, genindlæsning og import): Liga,
+    Hjem og Kamp deler den, og en fejl i klummen giver ÉN linje i fejlboksen (errors.js fjerner ikke dubletter).
 - **Mobil (≤ 600 px)**: topbaren ruller væk; navigationen står fast i bunden (v3.30.0: 7 knapper ≈ 55 × 56 px ved 390 px, ≈ 45 px ved 320 px – en for lang tekst
   forkortes med …; ikon over tekst,
   `env(safe-area-inset-bottom)`), Spil-bjælken lige over den; siden får bundluft, så sidste element står over bjælken. I bjælken står modstanderen
@@ -1134,15 +1150,21 @@ mellem bjælkerne 707 → 726 px (682 med scout-bjælken). e2e vagter: chrome �
   25 → 37 px (390) for ⓘ – listen 711 → 851 px og 775 → 988 px. Mobil: kortet stod 3.439 px nede på Taktik (backlog nr. 5) – nu i arket
   uden at rulle; "Se kort ›" står over Spil-bjælken efter et tryk på den øverste brik. e2e: blokken `f2` (kan køres alene med `F2_ONLY=1`).
 - **Kamp**: Match Center for igangværende eller seneste runde (tom tilstand før
-  runde 1). ▶ skifter hertil; efter fløjtet "Næste: … · Forbered ›" → Hjem. Karakterark side om side: opstillingsorden med
+  runde 1). ▶ skifter hertil; efter fløjtet "Næste: … · Forbered › · 📰 «overskrift» ›" (`#to-home` → Hjem; `#kamp-paper-link` → avisen
+  på Liga, samme handler og overskrift som Hjems 📰-kort). v3.31.0 (F3): **ingen avis i Kamp** – før stod hele avisen sidst (ca. y 2.700
+  ved 1366); Rundens mål og kampoverskrifterne åbner stadig kampen herinde, men fra Liga. Karakterark side om side: opstillingsorden med
   pladsen efter navnet (naturlig kæde i parentes ved afvigelse, indskiftere
   "ind på X"), minibane "Startopstilling" med karakter/stjerner, ikoner med
   mouse-over + forklaring under (touch).
-- **Liga**: tabel ("sæson N, efter X af 14 runder"), sidste rundes resultater (klik =
-  referatet i Kamp), kampprogrammet (næste runde i den rækkefølge, ▶ spiller den; "Dit
+- **Liga**: tabel ("sæson N, efter X af 14 runder"), **avisen** (v3.31.0: KUN her, lige under tabellen – `#gazette` med
+  `scroll-margin-top: calc(var(--top-h) + .5rem)`, så linkene fra Hjem og Kamp lander med toppen under den faste topbar), sidste rundes
+  resultater (klik = referatet i Kamp), kampprogrammet (næste runde i den rækkefølge, ▶ spiller den; "Dit
   program" med 14 linjer H/U, modstander og din score først; hele programmet og tidligere
-  sæsoner sammenfoldet) og avis; "Se et hold" (`#team-select`) over tabellen, og klik på et hold åbner det i Trup. Under afspilning
+  sæsoner sammenfoldet); "Se et hold" (`#team-select`) over tabellen, og klik på et hold åbner det i Trup. Under afspilning
   skjules resultater, program, statistik og avis, og det siges, at tabellen allerede er opdateret.
+  Målt v3.31.0 (`node tools/measure-ui.mjs`, efter én runde, før → efter, ca. – ligaen er tilfældig): 1366 px Kamp 3267 → 2629
+  (knapper 37 → 32, ord 2211 → 1760, skriftstørrelser 6 → 5), Liga 2681 → 2639, Hjem 900 → 900 (= skærmen; ord 99 → 128); 390 px
+  Kamp 5895 → 4994, Liga 4095 → 4199, Hjem 1011 → 1107. e2e: blokken `f3` (kan køres alene med `F3_ONLY=1`).
 - **Klub**: dit hold = økonomi og transfermarked; et valgt modstanderhold = "Offentlig klubside" tegnet kun fra
   `viewTeam` (spillere med pris og Køb, transfers, pensioner; kasse/løn/regnskab findes ikke) med "← Til din klub".
 - **⚙ Admin** (v3.19.0; v3.28.0 ikonknap i topbaren): versionen (`#version`), gem nu, eksportér, importér, ny liga og "Se et andet hold".

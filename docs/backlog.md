@@ -16,7 +16,9 @@ Rangering: brugerens ønsker først, derefter værdi pr. størrelse. Første run
    F5 Trup-kolonnesæt og Udvikling, Kamp-opsamling · F6 Liga/Klub-underfaner og markedet (søgning, sortering, sider). Gemmet røres ikke
    (sidste underfane i view, ikke game.ui). Sidehøjder måles før/efter med et committet værktøj.
    **Lavet:** F0 (v3.27.1), F1 (v3.28.0), F2 kortpanelet (v3.29.0: ét panel fra højre/bunden på Trup og Taktik, ⓘ på Taktik –
-   et klik er stadig byt; Trup 1922 → 1500 px og Taktik 2156 → 1864 px ved 1366, Taktik 4709 → 3777 ved 390). Næste: F3.
+   et klik er stadig byt; Trup 1922 → 1500 px og Taktik 2156 → 1864 px ved 1366, Taktik 4709 → 3777 ved 390), F3 Hjem-indhold og
+   avisen ét sted (v3.31.0: avisen kun på Liga lige under tabellen, Hjem 👑 + 📰-kort + formpiller, Kamp et 📰-link; Kamp 3267 → 2629 px
+   ved 1366 og 5895 → 4994 ved 390). Næste: F4.
 0b. **Økonomien skal kunne bære en trup til trætheden: sponsor med sikkerhed eller præstation** · økonomi + klub · M · 5 · ⚖ 🗄 ·
    brugeren 2026-11-02: "Når vi har træthed som vi har, er 18 spillere lige på grænsen … forskellige sponsorater, hvor der er et
    grundbeløb og noget præstationsbestemt, så man skal vælge sikkerhed eller præstation". Værktøjer: `tools/measure-economy.mjs`,
@@ -180,16 +182,19 @@ scratchpad – et tal herfra skal måles igen med et committet værktøj, før d
 - F4Football-reglerne (tutorial, 34 sider): nr. 41 – træning giver evner, kun kampe giver erfaring ("Without experience, a player is no good …"); nr. 42 – preview med skader/karantæner og valg af gemt taktik pr. kamp; nr. 44 – regler på tid, stilling, begge eller udvisning, hver kører én gang, op til 3 skift pr. hændelse, "Red Card Action" flytter en ind i hullet; nr. 45 – anføreren kræver lederskab, keeperen tager aldrig frispark, sæt ikke den bedste hovedstødsspiller på hjørnet; nr. 46 – F4's opdækning er kun hel-hold (Hattricks er bedre); nr. 47 – Intensity Easy/Normal/High ("players lose their fitness faster"); nr. 48 – moral op ved sejre man er med i, "unhappy if not selected regularly"; nr. 52 – én udbygning ad gangen, vedligehold stiger med niveauet og reserveres i kassen; nr. 53 – højst 5 ansatte; nr. 56 – første ungdomsoprykning gratis, anden 50 % af værdien, tredje 100 % (modgift mod nr. 8); nr. 57 – bud reserverer penge ("available balance"); nr. 58 – kontraktløse købes for 80 % af værdien, fritstilling giver 30 % (10 % ved pension); nr. 61 – 16 pr. række, 1 op, 4 ned, kval; nr. 63 – en gemt taktik rummer opstilling, formation, instrukser og dødbolde; nr. 3 – fælden kræver forsvarere med bedre positionering og fart end angriberen; nr. 15/30/51 – sponsor vælges ved sæsonstart (forskud, fast pr. runde, sejrsbonus, bonus for den placering, man selv lover – misses den, mistes resten): kan være det fælles tal for bestyrelse, fans og sponsor.
 - Fravalgt fra F4Football-reglerne: budrunder (fast pris), skat på overskud (ligaens kasse falder i forvejen), fyring ved minus/inaktivitet (ender spillet for én spiller – nr. 57 giver minus en pris), coins/chat/forum, ×4-divisioner, frit 26-pladsers gitter (træk og anker dækker), modstanderens moral synlig (§3), 12 evner i stedet for 9, trænerstab med 8 evner × 6 programmer.
 
-   - **Fra Spilfører UI på F1 (v3.28.0), til F2–F6:** form-bogstaverne "seneste 3: T T V" som farvede V/U/T-piller med forklaring ·
-     S · 2; en sejr på Hjem med kampens spiller 👑 og avisens overskrift (hænger sammen med F3) · M · 3; bjælkens 🔍 på Hjem gentager
-     næste kamp-kortet – drop den · S · 1; den lille ▶ skjules under afspilning (viser næste runde, mens man ser denne) · S · 1; Match
-     Center på mobil: "📤 Send kampen" fylder mere end resultatet – flyt/fold · S · 2; Hjem på 1366 har ca. 300 px tomt under kortene
-     (træning/avis, F3). QC: "N ting" (grupper) på Hjem og ▶'s tegn (spillere) tæller forskelligt · S · 1.
+   - **Fra Spilfører UI på F1 (v3.28.0), til F2–F6:** ~~form-bogstaverne "seneste 3: T T V" som farvede V/U/T-piller med forklaring ·
+     S · 2~~ (✔ v3.31.0: piller, "seneste 3 (ældste → nyeste)"); ~~en sejr på Hjem med kampens spiller 👑 og avisens overskrift (hænger
+     sammen med F3) · M · 3~~ (✔ v3.31.0); ~~bjælkens 🔍 på Hjem gentager næste kamp-kortet – drop den · S · 1~~ (✔ v3.31.0); den lille ▶
+     skjules under afspilning (viser næste runde, mens man ser denne) · S · 1; Match Center på mobil: "📤 Send kampen" fylder mere end
+     resultatet – flyt/fold · S · 2; ~~Hjem på 1366 har ca. 300 px tomt under kortene (træning/avis, F3)~~ (✔ v3.31.0: 📰-kortet i venstre
+     kolonne – kravet "uden tomrum" droppet, QC). ~~QC: "N ting" (grupper) på Hjem og ▶'s tegn (spillere) tæller forskelligt · S · 1~~
+     (lukket v3.31.0: bevidst forskellige enheder – "N ting" = grupper/links, ▶ = spillere; e2e holder Hjem = Taktik).
 
 ## Fravalgt / noteret
 - "– det holdt ikke mod jer" efter et nederlag kan misforstås (UI) – bevidst valgt i v3.21.2 (QC); kun noteret.
 
 ## Lavet
+- v3.31.0 nr. 0 trin F3 Hjem-indhold og avisen ét sted: avisen kun på Liga (lige under tabellen), Hjem med 👑 kampens spiller (modstanderens uden karakter), 📰-kort med rundens overskrift og formpiller, Kamp med "📰 «overskrift» ›", ingen 🔍 i bjælken på Hjem · F1-noterne om piller, 👑/avis, 🔍 og "N ting" lukket
 - v3.29.0 nr. 5 (tidl. "På mobil ligger spillerkortet 3.400 px under banen"): kortet er et ark fra bunden – ⓘ eller "Se kort ›" (står over Spil-bjælken efter et tryk på den øverste brik, e2e 390 × 844) viser det uden at rulle · nr. 0 trin F2 kortpanelet
 - v3.27.0 udelukkelse for kort (nr. 64: direkte rødt 2, rødt for to gule 1, hvert 4. gule 1 – brugeren "Strengere", målt i `tools/measure-bans.mjs`) og tacklinger, der virker (tidl. nr. 4: Forsigtig/Normal/Aggressiv ganger de stille frispark, kortene og presset) · kendte rester til UI-ombygningen: 🟨-varslet kun på kortet, "⛔ #7" uden tekst på 390 px, Hvis-Så-vælgeren advarer ikke om udelukkede, direkte rødt efter 4. gule siger 2 kampe men giver 3
 - v3.24.1 ungdomsspillere, der rykkes op, har karantæne som et køb (salg straks lukket; holdt et år: se nr. 8) ·

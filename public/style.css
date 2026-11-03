@@ -321,8 +321,17 @@ body.has-bar { padding-bottom: 4.5rem; }
 .mini-table td { text-align: left; font-size: var(--fs-2); } .mini-table td:first-child { width: 1.8rem; color: var(--dæmpet); } .mini-table td.pts { text-align: right; font-weight: 700; }
 .mini-table tr.mine td { color: var(--ok); } .mini-table tbody tr { cursor: default; }
 .to-home { font-size: var(--fs-2); }
+/* v3.31.0 (F3): modstanderens form som piller – V grøn, U grå, T rød (bogstavet er teksten) */
+.form-pill { display: inline-block; min-width: 1.4rem; text-align: center; border-radius: 999px; padding: 0 .35rem; font-weight: 700; font-size: var(--fs-1); line-height: 1.5; }
+.form-V { background: #0b3326; color: #6ee7b7; } .form-U { background: var(--panel-2); color: var(--dæmpet); } .form-T { background: #451a1a; color: #fca5a5; }
+/* Avisen står på Liga; links fra Hjem og Kamp ruller hertil – toppen lander under den faste topbar */
+#gazette { scroll-margin-top: calc(var(--top-h, 6rem) + .5rem); }
+/* Spil-bjælken på Hjem (ingen 🔍): ▶ står samme sted som på Taktik */
+.playbar-in.no-opp #play-round { margin-left: auto; }
 .count-narrow { display: none; }
 @media (max-width: 900px) { .home-grid { grid-template-columns: 1fr; } }
+/* v3.31.0 (QC): i én kolonne kommer næste kamp før avisen – beslutningen før læsestoffet (på computer står avisen i venstre kolonne) */
+@media (max-width: 900px) { .home-main, .home-side { display: contents; } .home-last { order: 1; } .home-todo { order: 2; } .home-next { order: 3; } .home-paper { order: 4; } .home-table { order: 5; } }
 /* Mobil: topbaren ruller væk – kun Spil-bjælken og bundnavigationen står fast (og scout-bjælken, når den vises) */
 @media (max-width: 600px) {
   .topbar { position: static; flex-wrap: nowrap; padding: .5rem .75rem; gap: .5rem; }
