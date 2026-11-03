@@ -1,9 +1,9 @@
 // Spillerkort: offentlige data for alle, evner og mod-kunnen kun for eget hold, VAR-profilen
-// for ingen. Scouting-indtryk og private noter vises for alle spillere.
+// for ingen. Observationer (scouting) og private noter vises for alle spillere.
 import { publicValue, LOG, stampText, KEY_SKILLS, trainingEstimate, FOCUS, focusSkills, ageTrain, roomOf, MATCH_XP, PLAYED_RELIEF, TRAIN_FRESH_FLOOR } from '../engine/career.js';
 import { viewPlayer } from '../engine/visibility.js';
 import { h, dec, LOCK } from './dom.js';
-import { LINE, POSITION_FULL, SKILL_LABELS, kr, starsEl, banText, yellowWarn } from './labels.js';
+import { LINE, POSITION_FULL, SKILL_LABELS, kr, starsEl, banText, yellowWarn, archetypeOf } from './labels.js';
 import { aerialBreakdown } from '../engine/generator.js';
 import { runStats } from '../engine/stats.js';
 import { BAND_WORD } from '../engine/chemistry.js';
@@ -21,7 +21,7 @@ export function renderCard({ player: p, team, isOwn, scouting, note, onNote, tea
   const head = h('div', { class: 'card-head' },
     h('h3', {}, `#${p.shirtNumber} ${p.name}`),
     retiring ? h('div', { class: 'notice', id: 'card-retiring' }, `👋 ${p.shortName} overvejer at stoppe efter sæsonen (${p.age} år).`) : null,
-    h('div', { class: 'muted' }, `${team.name} • ${LINE[p.line]}${POSITION_FULL[p.position] ? ` • ${POSITION_FULL[p.position]}` : ''} • ${p.age} år • ${p.heightCm} cm • ${p.injuryMatchesLeft > 0 ? `🚑 skadet i ${p.injuryMatchesLeft} kamp${p.injuryMatchesLeft === 1 ? '' : 'e'}` : `Friskhed ${p.freshness}%`}`),
+    h('div', { class: 'muted' }, `${team.name} • ${LINE[p.line]}${POSITION_FULL[p.position] ? ` • ${POSITION_FULL[p.position]}` : ''} • ${p.age} år • ${p.heightCm} cm • ${p.injuryMatchesLeft > 0 ? `🚑 skadet i ${p.injuryMatchesLeft} kamp${p.injuryMatchesLeft === 1 ? '' : 'e'}` : `Friskhed ${p.freshness} %`}`),
     // v3.27.0: udelukkelsen (offentlig) og advarslen før det tællende gule kort
     banText(p) ? h('div', { class: 'notice ban', id: 'card-ban' }, banText(p)) : null,
     yellowWarn(p) ? h('div', { class: 'muted', id: 'card-yellow' }, yellowWarn(p)) : null);
@@ -29,30 +29,31 @@ export function renderCard({ player: p, team, isOwn, scouting, note, onNote, tea
   let body;
   if (isOwn) {
     const a = aerialBreakdown(p.heightCm, p.jumpingPower, p.skills.strength, p.skills.positioning);
-    const run = runStats(p);
+    const run = runStats(p), arch = archetypeOf(p.archetype);
     body = [
       h('div', { class: 'bars' }, SKILL_LABELS.map(([group, list]) => h('div', { class: 'bar-group' }, h('h4', {}, group), list.map(([k, l]) => bar(l, p.skills[k]))))),
       h('div', { class: 'aerial', id: 'aerial-breakdown' },
         h('h4', {}, `✈ Luftduel: ${a.total}/20`),
         h('div', { class: 'muted' }, `Højde-score ${a.heightScore} (${p.heightCm} cm) × 0,35 = ${dk(a.wHeight)} · Spring ${p.jumpingPower} × 0,35 = ${dk(a.wJump)} · Styrke ${p.skills.strength} × 0,15 = ${dk(a.wStr)} · Position ${p.skills.positioning} × 0,15 = ${dk(a.wPos)} → ${dk(a.exact)}`)),
-      h('div', { class: 'bar-group', id: 'counter-pool' }, h('h4', {}, '🧠 Mod-kunnen (erfaring mod modstanderes stilarter)'), COUNTER_KEYS.map((k) => bar(COUNTER_LABELS[k], p.counterTactics[k], 100)),
+      h('div', { class: 'bar-group', id: 'counter-pool' }, h('h4', {}, '🧠 Erfaring mod stilarter'), COUNTER_KEYS.map((k) => bar(COUNTER_LABELS[k], p.counterTactics[k], 100)),
         h('div', { class: 'muted', id: 'counter-used' }, `Erfaring brugt: ${COUNTER_KEYS.reduce((a, k) => a + p.counterTactics[k], 0)}/${COUNTER_POOL} – ved fuld pulje glemmer han lidt af det gamle, når han lærer noget nyt.`)),
-      p.archetype ? h('div', { class: 'archbox' }, h('strong', {}, (p.archetype.isUnlocked ? '🌟 ' : '🔒 ') + p.archetype.name), ' – ', p.archetype.description,
-        p.archetype.isUnlocked ? null : h('div', { class: 'muted' }, 'Låses op ved: ' + Object.entries(p.archetype.unlockReq).map(([k, v]) => `${k} ${v}`).join(', '))) : null,
+      // Særpræget (v3.31.1): navn og beskrivelse fra tabellen efter id, kravene med evnernes danske navne
+      arch ? h('div', { class: 'archbox', id: 'card-arch' }, h('strong', {}, (arch.isUnlocked ? '🌟 ' : '🔒 ') + arch.name), ' – ', arch.description,
+        arch.isUnlocked ? null : h('div', { class: 'muted', id: 'card-arch-req' }, 'Låses op ved: ' + Object.entries(arch.unlockReq).map(([k, v]) => `${REQ_NAME(k)} ${v}`).join(', '))) : null,
       h('div', { class: 'muted', id: 'run-stats' }, run.km90 != null ? `🏃 ${dec(run.km90, 1)} km pr. 90 min · ${run.hiPct != null ? `${run.hiPct} % højintenst` : 'højintenst: kommer efter næste kamp'} · topfart ${dec(p.topSpeedMax, 1)} km/t (alle kampe)` : '🏃 Løbedata kommer efter første kamp'),
       renderTraining(p, starter, onTrainLink),
       h('div', { class: 'muted', id: 'card-wage' }, `Løn ${kr(Math.round(p.weeklyWage / 3))} pr. runde · Værdi ${kr(publicValue(p))} (offentlig – ud fra stjerner og alder)`),
       chem ? renderChem(chem) : null,
     ];
   } else {
-    body = [h('div', { class: 'lockbox' }, `Evner, spring, luftduel, arketype og kontrakt: ${LOCK}`), h('div', {}, 'Offentlig vurdering: ', starsEl(p.publicStars))];
+    body = [h('div', { class: 'lockbox' }, `Evner, spring, luftduel, særpræg og kontrakt: ${LOCK}`), h('div', {}, 'Offentlig vurdering: ', starsEl(p.publicStars))];
   }
 
   return h('div', { class: 'panel card', id: 'player-card' }, head, body,
-    h('div', { class: 'varbox' }, h('strong', {}, 'VAR-profil: '), 'Kynisme ?? · Teater ?? · VAR-Puls ?? – tallene er skjulte; spillerens VAR-kendelser og scouting-indtrykkene herunder giver fingerpeg'),
+    h('div', { class: 'varbox' }, h('strong', {}, 'VAR-profil: '), 'Kynisme ?? · Teater ?? · VAR-puls ?? – tallene er skjulte; spillerens VAR-kendelser og observationerne herunder giver fingerpeg'),
     market ? renderMarketBox(p, market) : null,
     teams ? renderMatchLog(p, isOwn, teams, latest, onOpenMatch, hideLog, season) : null,
-    h('div', { class: 'scouting' }, h('h4', {}, '🕵️ Scouting-indtryk'), (scouting?.length ? scouting.slice(0, 8) : ['Ingen indtryk endnu.']).map((s) => h('div', { class: 'clue' }, s))),
+    h('div', { class: 'scouting' }, h('h4', {}, '🕵️ Observationer'), (scouting?.length ? scouting.slice(0, 8) : ['Ingen indtryk endnu.']).map((s) => h('div', { class: 'clue' }, s))),
     h('label', { class: 'notes' }, h('h4', {}, '📝 Dine private noter'),
       h('textarea', { id: 'note-input', rows: 3, placeholder: 'Skriv hvad du har bemærket …', value: note || '', oninput: (e) => onNote(e.target.value) })));
 }
@@ -78,6 +79,8 @@ export function renderCardPanel({ card, title, onClose, nav = true, onPrev = nul
 
 // 🏋️ Træning (v3.18.0): fokus, hvad det træner, fremdrift pr. evne og ejerens skøn i ord (tallet – potentialet – er skjult)
 export const SKILL_NAME = Object.fromEntries(SKILL_LABELS.flatMap(([, list]) => list));
+// Særprægets krav (v3.31.1): evnens danske navn – spring er ikke en af de 9 evner (kortets luftduel kalder det "Spring")
+const REQ_NAME = (k) => (k === 'jumpingPower' ? 'Spring' : SKILL_NAME[k] ?? k);
 export const roomWords = (room) => (room >= 0.6 ? 'har meget mere i sig' : room >= 0.3 ? 'har mere i sig' : 'er tæt på sit loft');
 // Næste +1 i ord – samme tekst på kortet og i træningsoversigten
 export const nextText = (n, why) => (!n || n === Infinity ? '' : n > 14 ? `går langsomt (mere end en sæson: ${why})` : `næste +1 om ca. ${n} runde${n === 1 ? '' : 'r'}`);
@@ -115,7 +118,7 @@ function renderMarketBox(p, m) {
     // Samspil (v3.24.0, QC/Spilfører UI): prisen ved beslutningen – kun stærke par med hans naboer nu, 🤝 (ikke ⚠ – det er ingen afgift)
     m.saleChem ? h('div', { class: 'muted', id: 'list-chem' }, m.saleChem) : null);
   return h('div', { class: 'marketbox', id: 'card-market' }, h('h4', {}, '💰 Marked'),
-    h('div', {}, `Pris: ${kr(m.price)} (offentlig værdi ${kr(publicValue(p))}${m.starter ? ' · starter: +60 %' : ' · +30 %'})`),
+    h('div', {}, `Pris: ${kr(m.price)} (offentlig værdi ${kr(publicValue(p))}${m.starter ? ' · startspiller: +60 %' : ' · +30 %'})`),
     h('div', { class: 'muted', id: 'buy-terms' }, `Hans løn hos dig: ${kr(m.wage)} pr. runde · du har ${kr(Math.max(0, m.room))} pr. runde til løn (budgettet – efter et salg din løn før salget) · kassen efter købet: ${kr(m.cashAfter)}`),
     m.settle ? h('div', { class: 'muted', id: 'buy-chem' }, `🤝 Ny i truppen: fremmed for alle – ca. ${m.settle} kampe ved siden af de samme, før han har spillet sig ind.`) : null,
     m.reason ? h('div', { class: 'muted', id: 'buy-reason' }, m.reason) : h('button', { id: 'buy-player', onclick: m.onBuy }, `💰 Køb for ${kr(m.price)}`));

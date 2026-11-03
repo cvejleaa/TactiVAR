@@ -19,6 +19,15 @@ Rangering: brugerens ønsker først, derefter værdi pr. størrelse. Første run
    et klik er stadig byt; Trup 1922 → 1500 px og Taktik 2156 → 1864 px ved 1366, Taktik 4709 → 3777 ved 390), F3 Hjem-indhold og
    avisen ét sted (v3.31.0: avisen kun på Liga lige under tabellen, Hjem 👑 + 📰-kort + formpiller, Kamp et 📰-link; Kamp 3267 → 2629 px
    ved 1366 og 5895 → 4994 ved 390). Næste: F4.
+0c. **Spring kan trænes, og kortet viser det (brugeren 2026-11-03: "kræver jumpingpower på 14, men jeg kan ikke se hans jumpingpower … og jeg kan ikke se hvordan jeg kan træne ham i det")** · klub + UI · S · 5 ·
+   brugerens valg: Fysik træner Fart, Styrke OG Spring (som Teknik med to evner); Spring som bjælke under "Fysik & luft" på kortet;
+   særprægets krav viser "Spring 13/14 – trænes med Fysik". I dag er `jumpingPower` fast fra generatoren og ændres aldrig
+   (career.js FOCUS.PHYSICAL, generator.js:182). Mål luftdueller/særpræg over sæsoner (`tools/measure-lifecycle.mjs`) før og efter.
+0d. **📖 Spilguide (brugeren 2026-11-03: "ingen steder hvor vi har en hjælp til spillet … ala den jeg uploadede fra Hattrick")** · UI · M · 5 ·
+   brugerens valg: én side "📖 Sådan virker spillet" under ⚙ med afsnit pr. del (kampen, taktik, træning og udvikling, særpræg,
+   samspil, form og udelukkelse, økonomi og transfers, sæsonen) skrevet ud fra reglerne i koden (spec.md ⇄ kode), og et lille "?"
+   på hver fane, der springer til dens afsnit. Dækker F4's "hjælp bag 'Sådan virker det'". Tal i guiden hentes fra konstanterne
+   (fx FOCUS, BAN, WAGE_SHARE), så den ikke driver fra koden.
 0b. **Økonomien skal kunne bære en trup til trætheden: sponsor med sikkerhed eller præstation** · økonomi + klub · M · 5 · ⚖ 🗄 ·
    brugeren 2026-11-02: "Når vi har træthed som vi har, er 18 spillere lige på grænsen … forskellige sponsorater, hvor der er et
    grundbeløb og noget præstationsbestemt, så man skal vælge sikkerhed eller præstation". Værktøjer: `tools/measure-economy.mjs`,
@@ -184,8 +193,9 @@ scratchpad – et tal herfra skal måles igen med et committet værktøj, før d
 
    - **Fra Spilfører UI på F1 (v3.28.0), til F2–F6:** ~~form-bogstaverne "seneste 3: T T V" som farvede V/U/T-piller med forklaring ·
      S · 2~~ (✔ v3.31.0: piller, "seneste 3 (ældste → nyeste)"); ~~en sejr på Hjem med kampens spiller 👑 og avisens overskrift (hænger
-     sammen med F3) · M · 3~~ (✔ v3.31.0); ~~bjælkens 🔍 på Hjem gentager næste kamp-kortet – drop den · S · 1~~ (✔ v3.31.0); den lille ▶
-     skjules under afspilning (viser næste runde, mens man ser denne) · S · 1; Match Center på mobil: "📤 Send kampen" fylder mere end
+     sammen med F3) · M · 3~~ (✔ v3.31.0); ~~bjælkens 🔍 på Hjem gentager næste kamp-kortet – drop den · S · 1~~ (✔ v3.31.0); ~~den lille ▶
+     skjules under afspilning (viser næste runde, mens man ser denne) · S · 1~~ (✔ v3.31.1: den lille ▶ er væk; bjælken siger "📺 Runde N
+     spilles …" under afspilning); Match Center på mobil: "📤 Send kampen" fylder mere end
      resultatet – flyt/fold · S · 2; ~~Hjem på 1366 har ca. 300 px tomt under kortene (træning/avis, F3)~~ (✔ v3.31.0: 📰-kortet i venstre
      kolonne – kravet "uden tomrum" droppet, QC). ~~QC: "N ting" (grupper) på Hjem og ▶'s tegn (spillere) tæller forskelligt · S · 1~~
      (lukket v3.31.0: bevidst forskellige enheder – "N ting" = grupper/links, ▶ = spillere; e2e holder Hjem = Taktik).
@@ -194,6 +204,7 @@ scratchpad – et tal herfra skal måles igen med et committet værktøj, før d
 - "– det holdt ikke mod jer" efter et nederlag kan misforstås (UI) – bevidst valgt i v3.21.2 (QC); kun noteret.
 
 ## Lavet
+- v3.31.1 brugerens ønske "spil knappen er placeret forskelligt på de enkelte faner": Spil-bjælken i bunden på alle faner (også ⚙) med opstillingens tegn – piller, ved mange en kompakt tæller "⛔2 🚑1 🟨1" → Hjem-listen; den lille ▶ i topbaren er væk; under afspilning "📺 Runde N spilles …" · brugerens "engelske betegnelser" på spillerkortet: danske særpræg (vist fra tabellen efter id, ingen migrering), krav med evnernes navne, danske positionskoder, "gegenpres" med småt, 🕵️ Observationer, 🧠 Erfaring mod stilarter
 - v3.31.0 nr. 0 trin F3 Hjem-indhold og avisen ét sted: avisen kun på Liga (lige under tabellen), Hjem med 👑 kampens spiller (modstanderens uden karakter), 📰-kort med rundens overskrift og formpiller, Kamp med "📰 «overskrift» ›", ingen 🔍 i bjælken på Hjem · F1-noterne om piller, 👑/avis, 🔍 og "N ting" lukket
 - v3.29.0 nr. 5 (tidl. "På mobil ligger spillerkortet 3.400 px under banen"): kortet er et ark fra bunden – ⓘ eller "Se kort ›" (står over Spil-bjælken efter et tryk på den øverste brik, e2e 390 × 844) viser det uden at rulle · nr. 0 trin F2 kortpanelet
 - v3.27.0 udelukkelse for kort (nr. 64: direkte rødt 2, rødt for to gule 1, hvert 4. gule 1 – brugeren "Strengere", målt i `tools/measure-bans.mjs`) og tacklinger, der virker (tidl. nr. 4: Forsigtig/Normal/Aggressiv ganger de stille frispark, kortene og presset) · kendte rester til UI-ombygningen: 🟨-varslet kun på kortet, "⛔ #7" uden tekst på 390 px, Hvis-Så-vælgeren advarer ikke om udelukkede, direkte rødt efter 4. gule siger 2 kampe men giver 3

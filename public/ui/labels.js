@@ -1,18 +1,24 @@
 import { FIT } from '../engine/formations.js';
 import { BAN } from '../engine/career.js';
+import { ARCHETYPES } from '../engine/generator.js';
 // Danske visningsnavne for motorens værdier.
 // Tilskuerne på en kamp (v3.30.0, match.att – offentligt): "👥 7.840". Ældre kampe uden tallet viser intet (null), aldrig "undefined"/0.
 export const attText = (m) => (Number.isInteger(m?.att) && m.att > 0 ? `👥 ${m.att.toLocaleString('da-DK')}` : null);
 export const LINE = { GK: 'MÅL', DEF: 'FOR', MID: 'MID', ATT: 'ANG' };
 // Naturlig position (v3.8) med tavlens ord; den fulde betegnelse står i title.
 export const POSITION = { GK: 'MV', CB: 'CB', FB: 'Back', DM: 'DM', CM: 'CM', WM: 'Kant', AM: 'OM', ST: 'ANG' };
-export const POSITION_FULL = { GK: 'Målmand', CB: 'Midtstopper', FB: 'Back/wingback (dybe kantpladser)', DM: 'Defensiv midtbane (CDM)', CM: 'Central midtbane (CM)', WM: 'Kant (høje kantpladser, LW/RW)', AM: 'Offensiv midtbane (CAM/CF)', ST: 'Angriber (ST)' };
+// v3.31.1 (brugeren: danske positionskoder): parentesen er den korte form fra POSITION – ikke CDM/CAM/ST
+export const POSITION_FULL = { GK: 'Målmand', CB: 'Midtstopper', FB: 'Back/kantback (dybe kantpladser)', DM: 'Defensiv midtbane (DM)', CM: 'Central midtbane (CM)', WM: 'Kant (høje kantpladser)', AM: 'Offensiv midtbane (OM)', ST: 'Angriber (ANG)' };
+// Særpræget, som det vises (v3.31.1): navn og beskrivelse fra ARCHETYPES efter id – spillerens gemte kopi kan have det gamle engelske navn.
+// Låst op og kravene er spillerens egne. Et ukendt id viser kopien.
+const ARCH_BY_ID = Object.fromEntries(Object.values(ARCHETYPES).flat().map((a) => [a.id, a]));
+export const archetypeOf = (a) => (a ? { ...a, name: ARCH_BY_ID[a.id]?.name ?? a.name, description: ARCH_BY_ID[a.id]?.description ?? a.description } : null);
 export const PHASE_OPTIONS = {
   passingStyle: [['SHORT', 'Korte pasninger'], ['BALANCED', 'Balanceret'], ['DIRECT_LONG', 'Direkte lange bolde']],
   attackFocus: [['CENTRAL', 'Centralt'], ['HIGH_CROSSES', 'Høje indlæg'], ['LOW_CUTBACKS', 'Lave cutbacks']],
   offBallRuns: [['FEW', 'Få'], ['NORMAL', 'Normal'], ['MANY', 'Mange']],
   attackSide: [['LEFT', 'Venstre (LW/LB)'], ['BOTH', 'Begge'], ['RIGHT', 'Højre (RW/RB)']],   // v3.26.0 (nr. 39) – set fra jeres eget hold
-  pressingHeight: [['LOW_BLOCK', 'Lav blok'], ['MID_BLOCK', 'Mellemblok'], ['HIGH_GEGENPRESS', 'Højt gegenpress']],
+  pressingHeight: [['LOW_BLOCK', 'Lav blok'], ['MID_BLOCK', 'Mellemblok'], ['HIGH_GEGENPRESS', 'Højt gegenpres']],
   offsideTrap: [['OFF', 'Ingen offside-fælde'], ['NORMAL', 'Normal linje'], ['EXTREME_VAR_LINE', 'Ekstrem VAR-linje']],
   tacklingIntensity: [['CAUTIOUS', 'Forsigtig'], ['NORMAL', 'Normal'], ['AGGRESSIVE', 'Aggressiv']],
   onBallWon: [['FAST_COUNTER', 'Lynkontra'], ['KEEP_POSSESSION', 'Hold på bolden']],

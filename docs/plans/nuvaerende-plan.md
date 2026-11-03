@@ -1,114 +1,72 @@
-# NU (3/11): F3 – Hjem-indhold og avisen ét sted (v3.31.0)
+# NU (3/11): v3.31.1: ▶ Spil runde i bunden på alle faner – med opstillingens tegn
 
 ## Context
-- v3.30.0 er live (e2e mod live 590/590).
-- Brugeren: "Ændringer markeres som nu. Næste er f3". "+N" i Trup bliver altså som i dag.
-- F3 er trin 4 af brugerens UI-ombygning (backlog nr. 0): "F3 Hjem-indhold, avisen ét sted".
-- I det valgte design (artefaktet EPcztoSQdrk6pK8Bsy3FeS):
-  - Hjem viser sidste runde med kampens spiller, placering ↑↓, "Før du spiller runde N", næste kamp, en mini-tabel og "Avisen" med én overskrift og "Læs hele avisen ›". Linket fører til Liga.
-  - Liga har avisen: "Kun her – før to steder".
-- I dag står avisen (`renderGazette`, `#gazette`) både sidst i Kamp (`public/ui/matchcenter.js:338`) og på Liga (`public/app.js:595`).
-- Hjem har det meste allerede (`public/ui/home.js`). Det mangler kampens spiller og avisens overskrift, og ved 1366 px er der ca. 300 px tomt under kortene.
-- Spilfører UI's F1-noter (backlog l.183–187), som hører til her:
-  - Formen som farvede V/U/T-piller.
-  - En sejr på Hjem med kampens spiller 👑 og avisens overskrift.
-  - Drop bjælkens 🔍 på Hjem, fordi den gentager næste kamp-kortet.
-  - QC: "N ting" tæller grupper, mens ▶'s tegn tæller spillere.
-
-## Genbrug, så intet bygges igen
-- `columnNow()` (`app.js:207`) giver klummens `title`. Den falder selv tilbage til den gamle avis, så den er Hjems overskrift. Der skrives ingen ny overskriftsfunktion.
-- `m.ratings.motm` findes allerede og bruges i referatet (`matchcenter.js:306`). Hjem tager navn og karakter derfra.
-- Liste-, link- og fanemønstret i Hjem genbruges: `homeHandlers`/`on.liga`, og `showTab` + scroll til et element som "ændr i Træning ›" (v3.30.0).
-- `tools/measure-ui.mjs` måler Hjem, Kamp og Liga ved 1366 og 390 px. Før- og eftertallene skrives i spec §10b.
+Brugeren (3/11, skærmbilleder af v3.30.0): "spil knappen er placeret forskelligt på de enkelte faner, og det er forvirrende".
+I dag: stor grøn Spil-bjælke i bunden kun på Hjem og Taktik (`BAR_TABS = ['hjem','taktik']`, public/app.js:43); på Trup,
+Træning, Kamp, Liga, Klub og ⚙ en lille ▶ i topbaren (`renderControls`, app.js:372–383) med tegnene "⛔1 ⚠3" (`#mini-warn`).
+Bjælkens piller vises i dag kun på Taktik (`renderPlayBar`, app.js:388–405; Hjem har listen lige over).
+Brugerens valg: "Bunden af alle faner, men med info om problemer i opstillingen som der er på den lille knap".
 
 ## Ændringen
-1. **Hjem (`public/ui/home.js`, `homeData()` i `app.js`):**
-   - `#home-last` får "👑 Kampens spiller: G. Kristensen (8,1)" (`#home-motm`), men kun når kampen har en motm. Han er fra kampen, ikke nødvendigvis fra dit hold, og teksten siger, hvilket hold han spiller for.
-   - Et nyt kort `#home-paper` "📰 Avisen":
-     - Klummens titel efter sidste runde og knappen "Læs hele avisen ›" (`#home-paper-link`). Knappen åbner Liga og ruller til `#gazette`.
-     - Før runde 1 og under afspilning vises kortet ikke, ligesom avisen.
-     - Kortet ligger i højre kolonne (`.home-side`) under mini-tabellen, så de ca. 300 px udnyttes.
-   - `#home-opp-form`: "seneste 3" bliver tre små piller (V grøn, U grå, T rød, med title "Vundet/Uafgjort/Tabt"). Bogstaverne er stadig teksten, så skærmlæsere og tests kan læse dem.
-   - "N ting" i "Før du spiller" tæller det samme som ▶'s tegn (spillere), ikke grupper. Hvilken tæller der er rigtig, afgøres af QC på planen; de skal være ens.
-   - Bjælkens 🔍 skjules på Hjem, fordi næste kamp-kortet allerede har linket. Den bliver på Taktik.
-2. **Avisen ét sted (Liga):**
-   - `renderGazette` fjernes fra Kamp (`matchcenter.js:338`).
-   - I stedet står der én linje sidst i Kamp efter fløjtet: "📰 Rundens avis står på Liga ›" (`#kamp-paper-link`), med samme handler som Hjem.
-   - Klummen bygges kun ét sted for Liga (`app.js:581`), og argumentet til `renderMatchCenter` fjernes.
-   - Mål-of-runden-linket (`#goal-of-round-match`) virker allerede fra Liga, så det følger med uændret.
-   - På Liga flyttes avisen op lige under tabellen, før "sidste runde" og programmet. Det er dér, "Læs hele avisen ›" lander. Liga får først underfaner i F6.
-3. **Tekster og dokumentation:**
-   - Spec §10b: Hjem, Kamp og Liga med før/efter-højder fra `measure-ui`.
-   - NEWS og `public/version.js` 3.31.0.
-   - Backlog nr. 0: F3 flyttes til Lavet, og de fire F1-noter krydses af.
+1. Spil-bjælken på ALLE faner (de 7 + ⚙): `BAR_TABS` fjernes (bjælken altid), den lille ▶ i topbaren fjernes helt
+   (`mini-play`, `#mini-warn`, `.mini-lbl/.mini-num` + CSS).
+2. Bjælkens tegn på alle faner: pillerne (`issueGroups()`) vises på alle faner, ikke kun Taktik – samme regler som i dag
+   (>3 grupper → "N ting"; præcis 3 på smal skærm → tæller). Et klik løser stadig på Taktik (`fixIssue(ids,'taktik')`).
+   Hjem: OGSÅ pillerne i bjælken (brugeren 3/11: "Ja, også på Hjem") – selv om listen står på siden.
+3. 🔍 modstanderen: som i dag (ikke på Hjem; ellers ja). ▶ står altid yderst til højre (samme x på alle faner).
+4. Under afspilning: knappen er slået fra og uden tegn (som i dag på Hjem/Taktik).
+5. Kortpanelet (Trup/Taktik) står over bjælken (bruger allerede `--bar-h`); på ≤600 px dækker arket bjælken som i dag.
+   `body.has-bar` (sidens bundmargen) gælder nu altid.
+6. Spec §10b, NEWS, version 3.31.1.
 
 ## Tests
-- **e2e:**
-  - De ca. 6 Kamp-tjek af `#gazette` (run.mjs:1716, 2022, 2115, 2133, 2396–2397) flyttes til Liga.
-  - Et positivt tjek: `#match-center` har ingen `#gazette`, men har `#kamp-paper-link`, og linket åbner Liga med `#gazette` i synsfeltet.
-  - Hjem:
-    - `#home-paper` viser netop klummens titel. Den er den samme tekst som `#col-title` på Liga.
-    - Linket lander på `#gazette`.
-    - Kortet findes ikke før runde 1 og ikke under afspilning.
-  - `#home-motm` viser netop kampens motm med navn og karakter.
-  - Formpillerne har den rigtige rækkefølge, de rigtige bogstaver og den rigtige klasse.
-  - "N ting" er lig med ▶'s tal.
-  - 🔍 vises ikke på Hjem, men vises på Taktik.
-- **Unit (`home-f1-tm.test.mjs`):**
-  - motm med og uden data, kortet med og uden titel, pillerne og tælleren.
-  - Assertér på indholdet og på det, der ikke må stå ("undefined", tomt kort).
-- **Mutationer, der skal give rødt:**
-  - avisen tilbage i Kamp;
-  - linket lander ikke på `#gazette`;
-  - motm fra det forkerte hold eller felt;
-  - tælleren tilbage til grupper;
-  - kortet vist under afspilning.
+- e2e: på hver af de 7 faner + ⚙ ved 1366 og 390: præcis ét `#play-round` i `#playbar`, intet i topbaren; ▶'s højre kant ens på
+  alle faner; tegnene i bjælken = samme som Taktiks (antal og slags) – med data (en udelukket + trætte); under afspilning slået fra.
+- Tilpas de eksisterende mini-play-tjek (F1-blokken: "den lille ▶ i topbaren på Trup/…", `#mini-warn`) og panel-tjek "Trup (uden
+  Spil-bjælke)".
+- Mutationer: bjælken væk på én fane; piller kun på Taktik; mini-▶ tilbage.
 
-## Arbejdsgang (CLAUDE.md)
-1. QC (opus) og Spilfører UI på denne plan, parallelt. Arkitekten springes over, fordi filerne og genbruget er kortlagt ovenfor. Ret planen efter dem.
-2. Kode → check, unit og e2e → commit.
-3. TM og QC parallelt, derefter RM.
-4. Draft-PR, grøn CI, rapport, merge, live og e2e mod live.
+## RETTET efter QC (opus) og Spilfører UI (afløser planen ovenfor, hvor de er uenige)
+1. Hjem: pillerne også i bjælken (brugeren). Tælleren ("N ting"/smal tæller) på Hjem RULLER til `#home-todo` (i dag `showTab('hjem')`
+   = intet synligt + sletter `view.notice`); fra andre faner: Hjem med listen synlig (e2e: klik fra Liga → `#home-todo` i synsfeltet).
+   Vend e2e run.mjs:103 (Hjem uden piller).
+2. Tælleren (>3 grupper, eller 3 på smal skærm) viser slags kompakt som den lille knap gjorde: "⛔2 🚑1 🟨1" (antal SPILLERE pr. slags,
+   ISSUE_ORDER) – "N ting" står i title. Brugerens krav: "info om problemer som på den lille knap". Mål at modstanderens navn stadig
+   står ved 390 (run.mjs:2864).
+3. Under afspilning: knappen slået fra med "📺 Runde N spilles …" (ingen næste modstander, ingen piller) – lukker backlog l.187–188.
+4. Tekster: pillens title "Stil selv om på 📋 Taktik" (ikke "her på Taktik", app.js:396); app.js:602 "▶ Spil runde nederst".
+   Kommentarer (app.js:42, 283, 369, 386; index.html:13; style.css:273/288/295/350) og spec §10b (1043–1044, 1052–1058, 1084–1085, 1103).
+5. `html { overflow-y: scroll }`, så bjælken (fixed, left/right 0) er lige bred på korte og lange sider (▶ hopper ellers ~15 px på
+   Windows/Linux). `has-bar` sættes stadig i renderNow – fejlsiden er uden bjælke (run.mjs:293).
+6. Kamp efter fløjtet: intet 🔍 i bjælken (toHomeLine har "Forbered ›") – `.no-opp` ligesom Hjem.
+7. Tests: alle mini-▶-referencer (run.mjs:81, 115, 277, 1077–1081, 1753–1754, 1765–1766, 2243, 2811, 2822) skrives om mod `#playbar`
+   – paritetstjekkene ERSTATTES af bjælketjek på Trup og Liga, med fixturet ⛔1 ⚠2 🟨1. run.mjs:829: arkets bund = bjælkens top
+   ved 601 px, arket dækker bjælken ≤600. ▶'s højre kant ens på alle 8 faner × 1366/390 (+ Kamp efter fløjtet, Hjem).
+   Mobil: sidste række i Trup kan rulles fri af bjælken (390×667). CSS fjernes: style.css:286–287, 349, 356.
+8. Accepteret: scout-bjælken viser dine numre i pillerne (som på Taktik i dag); ▶ står sidst i tab-rækkefølgen.
 
-## Verifikation
-- Lokalt og i CI er `npm run check`, `npm test` og `npm run test:e2e` grønne.
-- Mutationerne ovenfor bliver røde.
-- `measure-ui` før og efter: Kamp bliver kortere, og Hjem fylder 1366-højden uden tomrum. Tallene skrives i spec.
-- Live:
-  - Hjem viser 👑 og avisens overskrift.
-  - "Læs hele avisen ›" lander på avisen på Liga.
-  - Kamp har kun linket.
-
-## RETTET efter QC (opus) og Spilfører UI – disse punkter afløser planen ovenfor, hvor de er uenige
-1. **Kampens spiller gennem visibility:** `viewRatingEntry(motm, motm.teamId === mine.id)` (public/engine/visibility.js).
-   Dit hold: "👑 Kampens spiller: #9 G. Kristensen · karakter 8,1". Modstanderen: "👑 Kampens spiller: #9 G. Kristensen (Brøndby IF)" –
-   UDEN tal og uden stjerner (som avisen, matchcenter.js:236,250). Mutation `viewerOwnsTeam=true` skal blive rød (e2e/unit med en
-   modstander-motm).
-2. **Overskriften:** columnNow() returnerer null ved fejl (app.js:209) – det er renderGazette, der falder tilbage. Hjems tekst =
-   klummens title, ellers `lr.gazette.headlines?.[0]` (samme som Ligas første `#headlines li`), ellers "Rundens avis". columnNow må
-   IKKE kaldes under afspilning, og resultatet caches pr. lastRound.round, så fejlboksen (errors.js:6–9 fjerner ikke dubletter) kun
-   får én linje, også når Liga og Hjem begge tegnes. Udvid fejl-scenariet (e2e ~l.2139) til Hjem: overskrift fra den gamle avis, én fejllinje.
-3. **"N ting" forbliver GRUPPER** (QC): én række = én gruppe = ét link; Taktiks `#issue-count` er også grupper. Den lille ▶ tæller med
-   vilje spillere. Ingen ændring – test i stedet at Hjems N = antal `.todo-row[data-kind]` = Taktiks N. Backlog-noten (l.187) lukkes
-   med "bevidst forskellige enheder".
-4. **Avis-linket i Kamp står ØVERST** i `.to-home` (toHomeLine, app.js:704), med overskriften: "… · Forbered › · 📰 «overskrift» ›"
-   (`#kamp-paper-link`), samme betingelse som linjen (ikke under afspilning, kun seneste runde). Ingen linje nederst.
-   `column`-argumentet fjernes både i Kamp-indholdet og i `matchCenterEl` (app.js:831). Ret kommentarerne i matchcenter.js:2 og
-   app.js:207,773. e2e l.2022/2115 (`#match-center #goal-of-round-match`) bliver til: linket findes ikke i Kamp, men på Liga.
-5. **Landing:** `#gazette { scroll-margin-top: calc(var(--top-h) + .5rem) }`; e2e: toppen af `#col-title` ligger under topbarens
-   underkant (ikke kun "synlig"), ved 1366 og 390.
-6. **🔍 skjules på Hjem**, og `#play-round` får `margin-left: auto`, så ▶ står samme sted på Hjem og Taktik. Ret e2e l.96.
-7. **Formpiller:** synlig tekst "seneste 3 (ældste → nyeste)" før pillerne; pille-title fra modstanderens side ("<hold>: Vundet").
-   Bogstaverne V/U/T er stadig tekst.
-8. **`#home-paper` i venstre kolonne** (`.home-main`) under "Før du spiller" – det tomme felt er til venstre (venstre slutter y 408,
-   højre y 537 ved 1366). Rækkefølge: resultat ↑↓ → 👑 → Før du spiller → 📰.
-9. Dropper kravet "Hjem uden tomrum ved 1366". measure-ui før/efter i spec §10b (Kamp, Liga, Hjem ved 1366 og 390).
-10. NEWS: "Avisen står nu kun på Liga – Hjem og Kamp viser rundens overskrift med et link".
-
-## Status (3/11 06:50)
-- Bygget og committet: d7c84e0. Lokalt check, unit 1381/1381 og e2e 618/618 grønne. Alle 8 mutationer gav rødt.
-- PR cvejleaa/TactiVAR#71 er draft. CI er grøn på d7c84e0.
-- TM og QC (opus) kører parallelt (workflow ws3oopqaa). Derefter RM, rapport til brugeren, merge, live og e2e mod live.
+# Del 2 af v3.31.1: dansk på spillerkortet (brugeren 3/11: "nogle gange er der sneget sig engelske betegnelser ind")
+Opgørelse (Explore-agent): engelsk kun i særpræg-tabellen (generator.js:18–31), unlock-nøglerne (card.js:41) og stil-navnene (counter.js:3, 53, 57).
+Brugerens valg: danske positionskoder · "gegenpres" med småt overalt · Observationer + Erfaring mod stilarter.
+1. **Særpræg vises fra tabellen efter id** (`ARCHETYPES` i generator.js), ikke fra den kopi, der er gemt på spilleren (generator.js:210):
+   card.js:40 og matrix.js:118 → eksisterende ligaer får de nye navne UDEN migrering (gemmeformatet uændret; fixture save-schema4 skal
+   vise det nye navn). Navne: Feje-målmand, Straffedræber, Offside-mester, Regista (spilfordeler), Presmonster, VAR-linjens spøgelse,
+   Target Man → "Fyrtårn" (opspilspunkt); beskrivelserne: "50 %", "højt gegenpres".
+2. **Unlock-kravet** gennem `SKILL_NAME` (+ jumpingPower → "Spring"): "Låses op ved: Udholdenhed 14, Erobring 12". Alle 9 nøgler dækket.
+3. **Stilnavne** (counter.js:3, 53, 57; labels.js:15; matrix.js:39, 114): "Mod gegenpres", "Mod lav blok", "Mod VAR-linje og lange bolde";
+   i referatet "Gegenpres + VAR-linje". "gegenpres" (ét s, småt) OVERALT i UI (labels.js:15, app.js:135/178, tactics.js:18, match.js:198-tekster).
+   Kun viste tekster – interne nøgler (fx 'GEGENPRESS') røres ikke.
+4. **Positioner** (labels.js:9): "Offensiv midtbane (OM)", "Defensiv midtbane (DM)", "Central midtbane (CM)", "Kant (…)", "Angriber (ANG)",
+   "Back/kantback (dybe kantpladser)" – samme korte former som `POSITION` (labels.js:8). Følger med i season-report.js:34, pitch.js:38,
+   lineup-list.js:51/55, matrix.js:110 (de bruger tabellen).
+5. **Overskrifter**: "🕵️ Observationer" (card.js:52, 55) og "🧠 Erfaring mod stilarter" (card.js:38, matchcenter.js:74, matrix.js:39).
+6. Småt: "Friskhed 92 %" (card.js:24), "VAR-puls", "startspiller: +60 %" (card.js:118).
+7. Tests: engine.test.mjs:351 (privatlivs-regex) opdateres til de nye stavemåder i SAMME ændring – ellers tjekker den intet;
+   run.mjs:1171 (positionstekst), v3163-gaps.test.mjs:316 (VAR-profil). Ny test: kortet for en spiller med hvert særpræg + en fra
+   save-schema4 – ingen af de gamle engelske ord står (negativ liste: Pressing Monster, Target Man, Sweeper Keeper, Penalty Killer,
+   Offside Maestro, Line Ghost, Playmaker, stamina, intercepting, jumpingPower, ballControl, Gegenpress, CAM, CDM, Scouting).
+   Mutation: særpræget vist fra spillerens kopi → rød på save-schema4-testen.
+8. spec.md (særpræg-listen, stilnavne) ⇄ koden.
 
 ---
 Tidligere planer: [tidligere-planer.md](tidligere-planer.md)

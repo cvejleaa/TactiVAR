@@ -313,7 +313,7 @@ test('spillerkortet: VAR-profilen er skjult for alle – "??" og forklaringen "t
   for (const [team, isOwn] of [[me, true], [opp, false]]) {
     const p = team.squad[0]; p.varProfile = { cynicism: 17, theatre: 13, varPulse: 19 };
     const box = all(renderCard({ player: p, team, isOwn, scouting: [], note: '', onNote() {} }), (e) => e.className === 'varbox')[0].textContent;
-    assert.equal(box, 'VAR-profil: Kynisme ?? · Teater ?? · VAR-Puls ?? – tallene er skjulte; spillerens VAR-kendelser og scouting-indtrykkene herunder giver fingerpeg');
+    assert.equal(box, 'VAR-profil: Kynisme ?? · Teater ?? · VAR-puls ?? – tallene er skjulte; spillerens VAR-kendelser og observationerne herunder giver fingerpeg');
     assert.ok(!/1[739]/.test(box));
   }
 });

@@ -270,7 +270,7 @@ button.savestatus.failed { color: var(--rød); font-weight: 700; }
 .token.banned .token-num { background: #7f1d1d; outline: 2px solid #fca5a5; } .lp-row.banned td { color: #fca5a5; } .notice.ban { border-color: #b91c1c; }
 
 /* ---------- UI-ombygningen F1 (v3.28.0): ramme, Hjem, Spil-bjælken, scout-bjælken ---------- */
-/* Topbaren: én linje (VAR · klub · gem · lille ▶ · ⚙); fanerne som anden række – på mobil fast i bunden */
+/* Topbaren: én linje (VAR · klub · gem · ⚙ – v3.31.1: ▶ kun i Spil-bjælken); fanerne som anden række – på mobil fast i bunden */
 .top-club { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .tabbar { flex-basis: 100%; }
 .topbar .tabs { margin: 0; border-bottom: none; gap: .2rem; }
@@ -283,16 +283,16 @@ button.savestatus.failed { color: var(--rød); font-weight: 700; }
    afkorter teksten med … i stedet for at gå på to linjer */
 @media (min-width: 601px) { .tabbar { min-width: 0; } .topbar .tabs { flex-wrap: nowrap; min-width: 0; } .topbar .tab { flex: 0 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } }
 button.gear { font-size: var(--fs-3); padding: .2rem .5rem; line-height: 1; } button.gear.active { background: var(--aktiv); border-color: var(--aktiv); }
-button.mini-play { padding: .25rem .6rem; font-size: var(--fs-1); white-space: nowrap; }
-#mini-warn { font-weight: 700; }
-/* Piller (advarsler): samme farver i bjælken, ved ▶ og på Hjem */
+/* Piller (advarsler): samme farver i Spil-bjælken og på Hjem */
 .pills { display: inline-flex; gap: .3rem; flex: none; }
 .pill { display: inline-block; border-radius: 999px; padding: .15rem .55rem; font-size: var(--fs-1); font-weight: 700; border: 1px solid transparent; white-space: nowrap; line-height: 1.4; }
 button.pill { cursor: pointer; }
 .pill-ban { background: #451a1a; color: #fca5a5; } .pill-injury { background: #3b1d2e; color: #f9a8d4; }
 .pill-tired, .pill-yellow { background: #3a2a0a; color: #fcd34d; } .pill-ok { background: #0b3326; color: #6ee7b7; } .pill-info { background: var(--panel-2); color: var(--info); }
 button.pill-ban:hover { background: #5b2222; } button.pill-injury:hover { background: #4c2439; } button.pill-tired:hover, button.pill-yellow:hover { background: #4a360d; }
-/* Spil-bjælken (Hjem og Taktik): fast i bunden, altid én linje */
+/* Spil-bjælken (v3.31.1 på alle faner): fast i bunden, altid én linje. html ruller altid lodret, så bjælken er lige bred på korte og lange
+   sider – ellers hopper ▶ en rullebjælkes bredde (~15 px på Windows/Linux) mellem fanerne */
+html { overflow-y: scroll; }
 .playbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; background: var(--panel); border-top: 1px solid var(--kant); }
 .playbar:empty { display: none; }
 .playbar-in { max-width: 120rem; margin: 0 auto; padding: .5rem 1rem; display: flex; align-items: center; gap: .75rem; flex-wrap: nowrap; }
@@ -324,9 +324,9 @@ body.has-bar { padding-bottom: 4.5rem; }
 /* v3.31.0 (F3): modstanderens form som piller – V grøn, U grå, T rød (bogstavet er teksten) */
 .form-pill { display: inline-block; min-width: 1.4rem; text-align: center; border-radius: 999px; padding: 0 .35rem; font-weight: 700; font-size: var(--fs-1); line-height: 1.5; }
 .form-V { background: #0b3326; color: #6ee7b7; } .form-U { background: var(--panel-2); color: var(--dæmpet); } .form-T { background: #451a1a; color: #fca5a5; }
-/* Avisen står på Liga; links fra Hjem og Kamp ruller hertil – toppen lander under den faste topbar */
-#gazette { scroll-margin-top: calc(var(--top-h, 6rem) + .5rem); }
-/* Spil-bjælken på Hjem (ingen 🔍): ▶ står samme sted som på Taktik */
+/* Avisen står på Liga; links fra Hjem og Kamp ruller hertil – toppen lander under den faste topbar (og Hjem-listen fra bjælkens tæller) */
+#gazette, #home-todo { scroll-margin-top: calc(var(--top-h, 6rem) + .5rem); }   /* #home-todo: bjælkens tæller (v3.31.1) */
+/* Spil-bjælken uden 🔍 (Hjem, Kamp efter fløjtet, under afspilning): ▶ står samme sted som på de andre faner */
 .playbar-in.no-opp #play-round { margin-left: auto; }
 .count-narrow { display: none; }
 @media (max-width: 900px) { .home-grid { grid-template-columns: 1fr; } }
@@ -346,14 +346,13 @@ body.has-bar { padding-bottom: 4.5rem; }
   .playbar { bottom: calc(57px + env(safe-area-inset-bottom)); }
   .playbar-in { padding: 8px 12px; gap: .5rem; }
   .playbar #play-round { min-height: 44px; padding: .4rem .8rem; }
-  .play-of, .save-txt, .mini-lbl { display: none; }
-  /* Spilfører UI: modstanderen står i knappen (🔍-linket skjules), ved 3 advarsler én tæller; den lille ▶ hedder "▶ R3" */
+  .play-of, .save-txt { display: none; }
+  /* Spilfører UI: modstanderen står i knappen (🔍-linket skjules), ved 3 advarsler én tæller */
   .playbar .opp-link, .playbar .wide-only { display: none; } .playbar .count-narrow { display: inline-block; }
   /* v3.29.1 (CI på main, 'Nordkysten BK (hjemme)' = 20 px for bredt): knappen må krympe, og KUN modstanderens navn forkortes med … –
      "▶ Spil runde N" står altid helt (teksten er et anonymt flex-element, der ikke krymper) */
   .playbar #play-round { display: flex; align-items: center; justify-content: center; flex: 1 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; }
   .playbar #play-round .play-opp { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: pre; }
-  .mini-num::before { content: 'R'; }
   .top-club { font-size: var(--fs-2); flex: 1; } .controls { gap: .35rem; }
   .opp-link { margin-left: 0; }
   .home-club h2 { font-size: var(--fs-3); }

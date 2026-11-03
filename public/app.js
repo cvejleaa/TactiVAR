@@ -39,8 +39,8 @@ const TABS = [['hjem', '🏠', 'Hjem'], ['trup', '👥', 'Trup'], ['traening', '
 const TAB_KEYS = [...TABS.map(([k]) => k), 'admin'];
 // Den gemte fane (ét sted): en ukendt værdi – også fra et gem før v3.28.0 – åbner Hjem
 const tabNow = () => (TAB_KEYS.includes(game.ui.tab) ? game.ui.tab : 'hjem');
-// Spil-bjælken står på Hjem og Taktik (der forberedes runden); de andre faner har den lille ▶ i topbaren
-const BAR_TABS = ['hjem', 'taktik'];
+// v3.31.1 (brugeren: "spil knappen er placeret forskelligt på de enkelte faner"): Spil-bjælken står i bunden på ALLE faner (også ⚙) –
+// den lille ▶ i topbaren er væk; ▶ står altid yderst til højre (renderPlayBar)
 // Faner, der kan vise et andet hold (scout-bjælken); fra de andre vises holdet i Trup (showTeam)
 const SCOUT_TABS = ['trup', 'taktik', 'klub'];
 // Seneste runde vist færdigspillet (Kamp-fanen uden igangværende afspilning).
@@ -140,6 +140,7 @@ const NEWS = {
   '3.14.2': 'Rettelse: Ved et VAR-tjek står den tjekkede nu, hvor han stod (forrest), i billedet ved målet – ikke flyttet bag en holdkammerat.',
   '3.14.3': 'Rettelser: Langskud tages fra skudafstand (ikke fra egen banehalvdel) i billedet ved målet, referatet fortæller et oplæg én gang, og efter sæsonens sidste runde viser tabellen slutstillingen og mesteren, til næste sæson går i gang.',
   '3.28.0': '🏠 Andet skridt i den nye brugerflade: en ny Hjem-fane samler sidste runde, din placering, "Før du spiller" (udelukkede, skadede, trætte og 🟨 – med et link til at løse det), næste modstander og tabellen omkring dig. ▶ Spil runde står nu i en bjælke i bunden af Hjem og Taktik (på de andre faner som en lille ▶ øverst med de samme tegn), og modstanderens navn er et separat 🔍-link. Holdvælgeren er flyttet til Liga ("Se et hold"), og ser du et andet hold, siger en lilla bjælke det – med "← Dit hold". ⚙ øverst til højre har gem, eksport, import og versionen. På mobil står fanerne i bunden. Næste skridt: spillerkortet som ét panel.',
+  '3.31.1': '▶ Spil runde står nu samme sted på alle faner: i bjælken i bunden – også på Trup, Træning, Kamp, Liga, Klub og ⚙. Den lille ▶ øverst er væk. Bjælken viser opstillingens tegn på alle faner (⛔ udelukket, 🚑 skadet, ⚠ træt, 🟨 ét gult fra udelukkelse) – ved mange som en kort tæller, fx "⛔2 🚑1 🟨1", der viser listen på 🏠 Hjem. Mens runden spilles, står der "📺 Runde N spilles …". Og spillerkortet er nu på dansk: særpræg som Presmonster og Fyrtårn, danske positioner (OM, DM, ANG), "Låses op ved: Udholdenhed 14, Erobring 12", 🕵️ Observationer og 🧠 Erfaring mod stilarter.',
   '3.31.0': '📰 Fjerde skridt i den nye brugerflade: avisen står nu kun på Liga – lige under tabellen. Hjem og Kamp viser rundens overskrift med et link dertil. Hjem viser også kampens spiller 👑 ved sidste runde og modstanderens seneste 3 som farvede piller (V/U/T, ældste først), og 🔍 er væk fra Spil-bjælken på Hjem – næste kamp-kortet har linket.',
   '3.30.0': '🏋️ Træningen har fået sin egen fane: Hjem · Trup · Træning · Taktik · Kamp · Liga · Klub. Træningsfokus sættes nu på 🏋️ Træning – spillerkortet viser, hvad han træner, og linker dertil ("ændr i Træning ›"). Øverst på Træning står rundens fremskridt, og hvem der er nærmest et +1. I Trup-regnearket får en evne, der steg efter sidste runde, et lille grønt +1 ved tallet (på mobil også efter navnet). 💰 Økonomi: spillere med under 3 kampe i karrieren starter på de stjerner, de i snit får efter en sæson (fx 2,9 i stedet for 2) – også i din liga, så deres værdi stiger nu og lønnen ved næste sæsonslut – så lønnen ikke fordobles efter de første 3 kampe – og lønnen er 5,5 % af værdien (før 6 %). Tilskuerne følger placeringen mere, så 9.000 kan nås (1. hjemme mod 2. efter tre sejre i træk); kampene viser nu deres tilskuertal (👥) i referatet, på Liga ved sidste runde og ved din kamp på Hjem. Spillere, du har sat til salg, har "💰 Til salg" efter navnet i Trup.',
   '3.29.1': '📱 Rettelse: på en smal skærm kunne ▶ Spil runde løbe ud over kanten, når modstanderen har et langt navn. Nu forkortes kun navnet (…), og "▶ Spil runde N" står altid helt.',
@@ -280,7 +281,7 @@ function tiredStarters() {
 // Dine startere, der ikke kan spille (v3.27.0): skadet eller udelukket – samme vagt som kampen (career.js unavailable)
 const outStarters = () => { const t = myTeam(); return t.tactics.lineupSlots.map((id) => t.squad.find((p) => p.id === id)).filter((p) => p && unavailable(p)); };
 
-// Før runden (v3.28.0): ÉN kilde til advarslerne – Spil-bjælken, den lille ▶ og Hjem-listen bruger kun denne (e2e: paritet).
+// Før runden (v3.28.0): ÉN kilde til advarslerne – Spil-bjælken (alle faner, v3.31.1) og Hjem-listen bruger kun denne (e2e: paritet).
 // 🟨 kun for startere (labels.js yellowWarn: 1 gult fra udelukkelse, også ved 7).
 const ISSUE_ICON = { ban: '⛔', injury: '🚑', tired: '⚠', yellow: '🟨' };
 const ISSUE_ORDER = ['ban', 'injury', 'tired', 'yellow'];   // det værste først
@@ -366,41 +367,47 @@ function nextMatch() {
   return { k: seasonRoundOf(L, L.leagueMetadata.round + 1), opp: L.teams[pair[0] === mine ? pair[1] : pair[0]], home: pair[0] === mine };
 }
 
-// Topbaren (v3.28.0, én linje): VAR · dit klubnavn · gem-kvitteringen · den lille ▶ (på faner uden Spil-bjælken) · ⚙
+// Topbaren (v3.28.0, én linje): VAR · dit klubnavn · gem-kvitteringen · ⚙ (v3.31.1: ▶ står kun i Spil-bjælken)
 const playTitle = (next) => `Spil runde ${next.k} af ${game.league.schedule.length} mod ${next.opp.name} (${next.home ? 'hjemme' : 'ude'})`;
 function renderControls() {
-  const tab = tabNow(), next = nextMatch(), playing = !!mc?.playing;
+  const tab = tabNow();
   document.getElementById('top-club').textContent = myTeam().name;
-  // Den lille ▶ viser de samme tegn som bjælken (kompakt: antal pr. slags) – under afspilning slået fra og uden tegn
-  const groups = playing ? [] : issueGroups();
-  const counts = ISSUE_ORDER.map((k) => [k, groups.filter((g) => g.kind === k).reduce((a, g) => a + g.ids.length, 0)]).filter(([, n]) => n > 0);
   controls.replaceChildren(...[
     // Gem-kvitteringen står altid synlig (spec §9 – svaret på "nulstiller ved refresh"); et klik åbner ⚙ Admin (gem, eksport, import)
     h('button', { class: 'savestatus' + (view.saveError ? ' failed' : ''), id: 'save-status', title: 'Gem, eksportér, importér og ny liga står i ⚙ Admin', onclick: () => showTab('admin') }, view.saveError ? '⚠ IKKE gemt' : view.savedAt ? ['✔ ', h('span', { class: 'save-txt' }, 'Gemt kl. '), time(view.savedAt)] : 'Ikke gemt'),
-    BAR_TABS.includes(tab) ? null : h('button', { id: 'play-round', class: 'primary mini-play', disabled: playing, onclick: playNextRound, title: [playTitle(next), ...groups.map((g) => g.text)].join('\n') },
-      '▶ ', h('span', { class: 'mini-lbl' }, 'Runde '), h('span', { class: 'mini-num' }, String(next.k)), counts.length ? h('span', { id: 'mini-warn' }, ' ' + counts.map(([k, n]) => `${ISSUE_ICON[k]}${n}`).join(' ')) : null),
     gearButton(tab)].filter(Boolean));
 }
 const gearButton = (tab) => h('button', { id: 'tab-admin', class: 'gear' + (tab === 'admin' ? ' active' : ''), title: 'Admin: gem, eksportér, importér, ny liga – og se et andet hold', 'aria-label': 'Admin', onclick: () => showTab('admin') }, '⚙');
 
-// Spil-bjælken (v3.28.0) på Hjem og Taktik – altid én linje: advarsler som korte piller (kun Taktik; Hjem har listen lige over),
-// modstanderen som SEPARAT link (før lå navnet i knappen, og et klik på navnet spillede runden) og ▶ Spil runde
-function renderPlayBar(tab) {
-  const next = nextMatch(), playing = !!mc?.playing, L = game.league, groups = tab === 'taktik' && !playing ? issueGroups() : [];
+// Spil-bjælken (v3.28.0; v3.31.1 på ALLE faner) – altid én linje: advarsler som korte piller (alle faner, også Hjem – brugeren 3/11),
+// modstanderen som SEPARAT link (før lå navnet i knappen, og et klik på navnet spillede runden) og ▶ Spil runde yderst til højre.
+// noOpp: intet 🔍 – Hjem (næste kamp-kortet har linket) og Kamp efter fløjtet ("Forbered ›" står øverst); ▶ står samme sted (.no-opp)
+// Tælleren (> 3 grupper, eller 3 på smal skærm) viser slags kompakt som den lille ▶ gjorde: "⛔2 🚑1 🟨1" (antal SPILLERE pr. slags) –
+// "N ting" (grupper, som Hjem-listen) står i title; et tryk viser Hjem-listen (på Hjem: ruller dertil)
+const issueCounts = (groups) => ISSUE_ORDER.map((k) => [k, groups.filter((g) => g.kind === k).reduce((a, g) => a + g.ids.length, 0)]).filter(([, n]) => n > 0).map(([k, n]) => `${ISSUE_ICON[k]}${n}`).join(' ');
+function toIssueList() {
+  if (tabNow() !== 'hjem') showTab('hjem');
+  document.getElementById('home-todo')?.scrollIntoView({ block: 'start' });
+}
+function renderPlayBar(noOpp) {
+  const next = nextMatch(), playing = !!mc?.playing, L = game.league, groups = !playing ? issueGroups() : [];
+  // Under afspilning (backlog: "den lille ▶ viser næste runde"): slået fra, uden tegn og uden næste modstander – den runde, der spilles
+  if (playing) return h('div', { class: 'playbar-in no-opp', id: 'play-bar' },
+    h('button', { id: 'play-round', class: 'primary', disabled: true, title: 'Runden spilles i 📺 Kamp – næste runde kan spilles bagefter' }, `📺 Runde ${seasonAndRound(L, mc.round)[1]} spilles …`));
   const worst = groups[0]?.kind;
   const pill = (g) => h('button', { class: `pill pill-${g.kind}`, id: g.kind === 'tired' ? 'tired-warning' : null, dataset: { kind: g.kind, nrs: g.nrs.join(',') }, title: g.text,
     onclick: () => fixIssue(g.ids, 'taktik') }, g.pill);
   const out = groups.filter((g) => g.kind === 'ban' || g.kind === 'injury');
+  const counter = (extra) => h('button', { class: `pill pill-${worst}${extra.cls ?? ''}`, id: extra.id ?? null, title: `${groups.length} ting:\n${groups.map((g) => g.text).join('\n')}`, onclick: toIssueList }, issueCounts(groups));
   const chips = groups.length > 3
-    ? [h('button', { class: `pill pill-${worst}`, id: 'issue-count', title: groups.map((g) => g.text).join('\n'), onclick: () => showTab('hjem') }, `${ISSUE_ICON[worst]} ${groups.length} ting`)]
-    : [out.length ? h('span', { id: 'out-warning', class: 'pills', title: `${out.map((g) => g.text).join(', ')} – af den bedste i samme kæde på bænken. Stil selv om her på Taktik` }, out.map(pill)) : null, ...groups.filter((g) => !out.includes(g)).map(pill)];
+    ? [counter({ id: 'issue-count' })]
+    : [out.length ? h('span', { id: 'out-warning', class: 'pills', title: `${out.map((g) => g.text).join(', ')} – af den bedste i samme kæde på bænken. Stil selv om på 📋 Taktik` }, out.map(pill)) : null, ...groups.filter((g) => !out.includes(g)).map(pill)];
   // Smal skærm (Spilfører UI): ved præcis 3 piller vises i stedet én tæller (CSS), så knappen kan bære modstanderens navn
-  const mobileCount = groups.length === 3 ? h('button', { class: `pill pill-${worst} count-narrow`, title: groups.map((g) => g.text).join('\n'), onclick: () => showTab('hjem') }, `${ISSUE_ICON[worst]} 3 ting`) : null;
-  return h('div', { class: 'playbar-in' + (tab === 'hjem' ? ' no-opp' : ''), id: 'play-bar' },
+  const mobileCount = groups.length === 3 ? counter({ cls: ' count-narrow' }) : null;
+  return h('div', { class: 'playbar-in' + (noOpp ? ' no-opp' : ''), id: 'play-bar' },
     groups.length ? h('span', { class: 'pills' + (mobileCount ? ' wide-only' : ''), id: 'bar-issues' }, chips) : null, mobileCount,
-    // v3.31.0 (Spilfører UI på F1): ingen 🔍 på Hjem – næste kamp-kortet har linket; ▶ står samme sted (.no-opp → margin-left: auto)
-    tab === 'hjem' ? null : h('button', { id: 'next-opponent', class: 'linklike opp-link', title: `Se ${next.opp.name} – kun offentlige data`, onclick: () => showTeam(L.teams.indexOf(next.opp)) }, `🔍 ${next.opp.name}`),
-    h('button', { id: 'play-round', class: 'primary', disabled: playing, onclick: playNextRound, title: playTitle(next) },
+    noOpp ? null : h('button', { id: 'next-opponent', class: 'linklike opp-link', title: `Se ${next.opp.name} – kun offentlige data`, onclick: () => showTeam(L.teams.indexOf(next.opp)) }, `🔍 ${next.opp.name}`),
+    h('button', { id: 'play-round', class: 'primary', onclick: playNextRound, title: playTitle(next) },
       `▶ Spil runde ${next.k}`, h('span', { class: 'play-of' }, ` af ${L.schedule.length}`), h('span', { class: 'play-opp' }, ` · ${next.opp.name} (${next.home ? 'hjemme' : 'ude'})`)));
 }
 // Et link, der skal LØSE noget (Hjem-listen, pillerne), viser altid dit eget hold – og vælger spilleren (brikken markeres)
@@ -571,6 +578,8 @@ function renderNow() {
 
   // Faner: ét emne ad gangen (brugerens ønske: "et noget rodet layout").
   const shown = mc || (league.lastRound ? lastRoundView(league.lastRound) : null);
+  // Kamp efter fløjtet: "Næste … · Forbered ›" øverst (toHomeLine) – og derfor intet 🔍 i Spil-bjælken (v3.31.1)
+  const afterWhistle = tab === 'kamp' && !!shown && !shown.playing && shown.round === league.lastRound?.round;
   // Hver fane bygges kun, når den vises: banen og kortet er ét DOM-element og kan kun stå ét sted.
   const content = {
     // paper er en funktion (v3.31.0): home.js kalder den kun uden for afspilningen – dens ENE vagt – så klummen aldrig bygges for den runde, der afspilles
@@ -598,8 +607,8 @@ function renderNow() {
     taktik: () => [h('div', { class: 'tactics-layout taktik-layout' }, h('section', { class: 'tk-pitch' }, pitch), h('section', { class: 'tk-list' }, lineupList), h('section', { class: 'tk-tactics' }, tactics))],
     // Efter fløjtet (v3.28.0, Spilfører UI: nederst blev den ikke fundet): vejen videre øverst – kun når den viste runde er den seneste og ikke afspilles
     // v3.31.0 (F3): avisen står kun på Liga – linjen her bærer rundens overskrift som link dertil
-    kamp: () => [shown && !shown.playing && shown.round === league.lastRound?.round ? toHomeLine() : null,
-      shown ? renderMatchCenter({ mc: sendState(shown), myTeamId: mine.id, on: mcHandlers }) : h('div', { class: 'panel empty', id: 'no-matches' }, 'Ingen kampe spillet endnu. Tryk ▶ Spil runde på 🏠 Hjem (eller ▶ øverst) – modstanderen følger kampprogrammet på Liga-fanen.'),
+    kamp: () => [afterWhistle ? toHomeLine() : null,
+      shown ? renderMatchCenter({ mc: sendState(shown), myTeamId: mine.id, on: mcHandlers }) : h('div', { class: 'panel empty', id: 'no-matches' }, 'Ingen kampe spillet endnu. Tryk ▶ Spil runde nederst – modstanderen følger kampprogrammet på Liga-fanen.'),
       ],
     liga: () => [mc?.playing ? h('div', { class: 'notice', id: 'booked-league' }, '📺 Runden spilles i Kamp-fanen – tabellen herunder er allerede opdateret med den.') : null,
       !mc?.playing ? renderSeasonReport({ league, mine,
@@ -635,9 +644,9 @@ function renderNow() {
   const scout = !isOwn && SCOUT_TABS.includes(tab) ? h('div', { class: 'scoutbar', id: 'scout-banner' },
     h('span', { id: 'scout-txt' }, '👁 ', h('span', { class: 'scout-long' }, `Du ser ${team.name} – kun offentlige data`)), teamSelect(),
     h('button', { id: 'scout-back', class: 'mini', onclick: () => showTeam(myIdx()) }, '← Dit hold')) : null;
-  const bar = BAR_TABS.includes(tab);
-  playbar.replaceChildren(...(bar ? [renderPlayBar(tab)] : []));
-  document.body.classList.toggle('has-bar', bar);
+  // Spil-bjælken på alle faner (v3.31.1); has-bar sættes her – fejlsiden (renderFailed) er uden bjælke
+  playbar.replaceChildren(renderPlayBar(tab === 'hjem' || afterWhistle));
+  document.body.classList.add('has-bar');
   app.replaceChildren(...[
     scout,
     view.notice ? h('div', { class: 'notice', id: 'notice' }, view.notice,

@@ -348,12 +348,14 @@ test('viewRatingEntry: modstandere ser stjerner, ikke karakter, mod-kunnen eller
 });
 
 test('andre holds taktiske overvejelser kan ikke læses – kun deres startformation', () => {
-  const NAMES = /korte pasninger|balanceret opbygning|direkte lange bolde|lav blok|mellemblok|højt gegenpress|Gegenpress|VAR-Linje|Lange Bolde/i;
+  // v3.31.1: stavemåderne fra counter.js/match.js ('gegenpres' med ét s, 'VAR-linje', 'lange bolde') – 'gegenpres' fanger også den gamle 'gegenpress'
+  const NAMES = /korte pasninger|balanceret opbygning|direkte lange bolde|lav blok|mellemblok|højt gegenpres|gegenpres|VAR-linje|lange bolde/i;
   const L = league(41), rng = createRng(41);
   for (let i = 1; i < 8; i++) {
     const m = simulateMatch(L.teams[0], L.teams[i], rng);
     assert.equal(m.awayTacticStr, L.teams[i].tactics.baseFormation, 'modstander: kun formationen');
     assert.match(m.homeTacticStr, / • /, 'dit eget hold: fuld taktik');
+    assert.match(m.homeTacticStr, NAMES, 'regexen kender stavemåden, dit eget hold bruger (ellers tjekker den intet)');
     const note = m.events.find((e) => e.type === 'TACTIC_NOTE').text;
     assert.doesNotMatch(note.split('møder')[1], NAMES, note);
     for (const e of m.events.filter((x) => !x.isHome && x.type === 'TACTIC_WIN')) assert.doesNotMatch(e.text, /korte pasninger|balanceret opbygning|direkte lange bolde/, e.text);
