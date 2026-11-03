@@ -12,23 +12,25 @@ export const TEAM_NAMES = ['Bibamus United', 'FC Vejleå', 'Ølstykke IF', 'Lyng
 export const FIRST_NAMES = ['Mikkel', 'Kasper', 'Lukas', 'Mathias', 'Frederik', 'Christian', 'Andreas', 'Victor', 'Mads', 'Emil', 'Jonas', 'Nikolaj', 'Oliver', 'William', 'Magnus', 'Sebastian', 'Tobias', 'Rasmus', 'Simon', 'Jakob', 'Anders', 'Martin', 'Søren', 'Peter', 'Jens', 'Gustav', 'Carl', 'Alexander', 'Malthe', 'Noah'];
 export const LAST_NAMES = ['Jensen', 'Nielsen', 'Hansen', 'Pedersen', 'Andersen', 'Christensen', 'Larsen', 'Sørensen', 'Rasmussen', 'Jørgensen', 'Petersen', 'Madsen', 'Kristensen', 'Olsen', 'Thomsen', 'Poulsen', 'Johansen', 'Møller', 'Mortensen', 'Knudsen', 'Jakobsen', 'Holm', 'Lund', 'Schmidt', 'Eriksen', 'Bach', 'Dahl', 'Kjær', 'Vestergaard', 'Lauridsen'];
 
-// Arketyper pr. kæde. Krav-tallene er afskåret i kilden og fastsat her (spec §2).
+// Arketyper (særpræg) pr. kæde. Krav-tallene er afskåret i kilden og fastsat her (spec §2).
+// v3.31.1 (brugeren: "engelske betegnelser"): danske navne. Kortet viser navn og beskrivelse HERFRA efter id (labels.js archetypeOf) –
+// ikke fra kopien på spilleren – så gemte ligaer får de nye navne uden migrering (gemmeformatet er uændret).
 export const ARCHETYPES = {
   GK: [
-    { id: 'SWEEPER_KEEPER', name: 'Sweeper Keeper', description: 'Bryder dybe stikninger uden for feltet ved høj forsvarslinje', unlockReq: { goalkeeping: 12, pace: 11 } },
-    { id: 'PENALTY_KILLER', name: 'Penalty Killer', description: 'Psykisk overtag ved straffe og VAR-straffespark', unlockReq: { goalkeeping: 14, positioning: 12 } },
+    { id: 'SWEEPER_KEEPER', name: 'Feje-målmand', description: 'Bryder dybe stikninger uden for feltet ved høj forsvarslinje', unlockReq: { goalkeeping: 12, pace: 11 } },
+    { id: 'PENALTY_KILLER', name: 'Straffedræber', description: 'Psykisk overtag ved straffe og VAR-straffespark', unlockReq: { goalkeeping: 14, positioning: 12 } },
   ],
   DEF: [
-    { id: 'OFFSIDE_MAESTRO', name: 'Offside Maestro', description: '+20% til hele bagkædens timing ved VAR-offside', unlockReq: { positioning: 13, intercepting: 13 } },
-    { id: 'AERIAL_TOWER', name: 'Luftens Konge', description: '+25% i alle hovedstødsdueller i begge felter', unlockReq: { strength: 13, jumpingPower: 14 } },
+    { id: 'OFFSIDE_MAESTRO', name: 'Offside-mester', description: '+20 % til hele bagkædens timing ved VAR-offside', unlockReq: { positioning: 13, intercepting: 13 } },
+    { id: 'AERIAL_TOWER', name: 'Luftens Konge', description: '+25 % i alle hovedstødsdueller i begge felter', unlockReq: { strength: 13, jumpingPower: 14 } },
   ],
   MID: [
-    { id: 'REGISTA', name: 'Regista (Playmaker)', description: 'Slår pasninger direkte fra Fase 1 til Fase 3', unlockReq: { passing: 13, ballControl: 13 } },
-    { id: 'PRESSING_MONSTER', name: 'Pressing Monster', description: 'Mister 50% mindre energi ved Højt Gegenpress', unlockReq: { stamina: 14, intercepting: 12 } },
+    { id: 'REGISTA', name: 'Regista (spilfordeler)', description: 'Slår pasninger direkte fra Fase 1 til Fase 3', unlockReq: { passing: 13, ballControl: 13 } },
+    { id: 'PRESSING_MONSTER', name: 'Presmonster', description: 'Mister 50 % mindre energi ved højt gegenpres', unlockReq: { stamina: 14, intercepting: 12 } },
   ],
   ATT: [
-    { id: 'VAR_LINE_GHOST', name: 'VAR-Line Ghost', description: 'Vinder 80% af alle millimeter-tætte VAR-offside-kendelser', unlockReq: { pace: 14, positioning: 12 } },
-    { id: 'TARGET_MAN', name: 'Target Man', description: 'Dominerer lange bolde og høje indlæg med hovedet', unlockReq: { strength: 13, jumpingPower: 13 } },
+    { id: 'VAR_LINE_GHOST', name: 'VAR-linjens spøgelse', description: 'Vinder 80 % af alle millimeter-tætte VAR-offside-kendelser', unlockReq: { pace: 14, positioning: 12 } },
+    { id: 'TARGET_MAN', name: 'Fyrtårn', description: 'Opspilspunkt: dominerer lange bolde og høje indlæg med hovedet', unlockReq: { strength: 13, jumpingPower: 13 } },
   ],
 };
 

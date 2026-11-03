@@ -71,7 +71,7 @@ function timeline(events, stoppage = null) {
 export const minutes = (e, s = null) => (e.minIn <= 1 && e.minOut === 90 && !s?.out ? "90'" : `${e.minIn <= 1 ? "0'" : s?.in ? fmtMin(s.in) : `${e.minIn}'`}–${s?.out ? fmtMin(s.out) : `${e.minOut}'`}`);
 
 // Ikonerne i karakterarket. title giver mouse-over; forklaringen under arket dækker touch.
-export const RATING_ICONS = [['⚽', 'Mål'], ['🅰', 'Oplæg'], ['🧤', 'Redninger'], ['✈', 'Vundne luftdueller'], ['🟨', 'Gult kort'], ['🟥', 'Udvist'], ['🚑', 'Skadet'], ['👑', 'Kampens spiller'], ['🧠', 'Mod-kunnen (erfaring) optjent i kampen']];
+export const RATING_ICONS = [['⚽', 'Mål'], ['🅰', 'Oplæg'], ['🧤', 'Redninger'], ['✈', 'Vundne luftdueller'], ['🟨', 'Gult kort'], ['🟥', 'Udvist'], ['🚑', 'Skadet'], ['👑', 'Kampens spiller'], ['🧠', 'Erfaring mod stilarter optjent i kampen']];
 const TIP = Object.fromEntries(RATING_ICONS);
 // Mål og oplæg gentages (⚽⚽); redninger og luftdueller står som tal (🧤4).
 const REPEAT = new Set(['⚽', '🅰']);

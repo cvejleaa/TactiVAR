@@ -2,7 +2,7 @@
 // "🔒 ??" og kan ikke sorteres (synlighed afgøres i engine/visibility.js).
 import { POSITIONS } from '../engine/generator.js';
 import { h, dec, LOCK } from './dom.js';
-import { LINE, POSITION, POSITION_FULL, starsEl, outLabel, OUT_TITLE } from './labels.js';
+import { LINE, POSITION, POSITION_FULL, starsEl, outLabel, OUT_TITLE, archetypeOf } from './labels.js';
 import { canSeeField } from '../engine/visibility.js';
 import { FORMATIONS } from '../engine/formations.js';
 import { COUNTER_KEYS } from '../engine/counter.js';
@@ -36,7 +36,7 @@ export const COLUMNS = [
     .map(([k, label, title]) => ({ key: k, label, title, field: 'skills', value: (p) => p.skills[k], num: true, heat: true, skill: true })),
   { key: 'avg', label: 'Gns', title: 'Gennemsnit af de 9 kerne-evner', field: 'skills', value: avgSkill, num: true, fmt: (v) => dec(v, 1) },
   { key: 'rating', label: '⭐ Vurd', title: 'Eget hold: gennemsnitlig karakter. Modstandere: stjerner', field: 'publicStars', value: (p, c) => (c.isOwn ? avgRating(p) : p.publicStars), num: true },
-  { key: 'mod', label: '🧠 Mod', title: 'Mod-kunnen: mod gegenpress / mod lav blok / mod VAR-linje & lange bolde (sorterer på den bedste)', field: 'counterTactics', value: modBest, num: true },
+  { key: 'mod', label: '🧠 Mod', title: 'Erfaring mod stilarter: mod gegenpres / mod lav blok / mod VAR-linje og lange bolde (sorterer på den bedste)', field: 'counterTactics', value: modBest, num: true },
   // v3.19.0 (brugeren: "Hvor står værdien og lønnen for mine egne spillere?"): sidst, så kolonnernes plads i e2e holder. Værdien er
   // offentlig (stjerner, tier og alder), lønnen kun ejerens (weeklyWage er OWNER → 🔒 for modstandere)
   { key: 'value', label: '💰 Værdi', title: 'Offentlig værdi (stjerner og alder) – en anden klub betaler mere (1,3, en starter 1,6)', field: 'publicStars', value: (p) => publicValue(p), num: true, fmt: money },
@@ -111,11 +111,12 @@ export function renderMatrix({ team, isOwn, ui, notes, onSort, onSelect, onSwap,
       if (c.key === 'fresh') return h('td', { class: cls }, outLabel(p) ? h('span', { class: 'injury', title: OUT_TITLE }, outLabel(p)) : `${p.freshness}%`);   // v3.27.0: 🚑/⛔
       if (c.key === 'height') return h('td', { class: cls }, `${p.heightCm} cm`);
       if (c.key === 'rating') return h('td', { class: cls }, isOwn ? (avgRating(p) ? dec(avgRating(p), 1) : '–') : starsEl(p.publicStars));
-        if (c.key === 'mod') return h('td', { class: cls + ' modcell', title: 'Mod gegenpress / lav blok / VAR-linje & lange bolde' }, COUNTER_KEYS.map((k) => p.counterTactics[k]).join(' · '));
+        if (c.key === 'mod') return h('td', { class: cls + ' modcell', title: 'Mod gegenpres / lav blok / VAR-linje og lange bolde' }, COUNTER_KEYS.map((k) => p.counterTactics[k]).join(' · '));
       const v = c.value(p, ctx), n = c.skill ? (gains.get(p.id) ?? []).filter((s) => s === c.key).length : 0;
       return h('td', { class: cls + (c.heat ? ' ' + heatClass(v) : '') + (n ? ' gain' : ''), ...(n ? { dataset: { gain: String(n) }, title: `+${n} ${SKILL_NAME[c.key]} ${after}` } : {}) }, c.fmt ? c.fmt(v) : v);
     });
-    const arch = isOwn && p.archetype ? h('span', { class: p.archetype.isUnlocked ? 'arch on' : 'arch' }, (p.archetype.isUnlocked ? '🌟 ' : '🔒 ') + p.archetype.name) : null;
+    const ar = isOwn ? archetypeOf(p.archetype) : null;   // v3.31.1: navnet fra tabellen efter id (labels.js)
+    const arch = ar ? h('span', { class: ar.isUnlocked ? 'arch on' : 'arch' }, (ar.isUnlocked ? '🌟 ' : '🔒 ') + ar.name) : null;
     const note = notes[p.id]?.trim() ? h('span', { class: 'note-flag', title: 'Du har en note' }, '📝') : null;
     return h('tr', { class: (ui.selectedPlayerId === p.id ? 'selected ' : '') + (ui.swapId === p.id ? 'swapping' : ''), dataset: { pid: p.id }, tabindex: '-1', onclick: () => onSelect(p) },
       cells, h('td', {}, arch, note),

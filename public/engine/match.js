@@ -197,7 +197,7 @@ export const MASTERY_WEIGHT = 0.05;
 const YOUR_PASS = { SHORT: 'Dine korte pasninger', BALANCED: 'Din balancerede opbygning', DIRECT_LONG: 'Dine direkte lange bolde' };
 const YOUR_PRESS = { LOW_BLOCK: 'din lave blok', MID_BLOCK: 'din mellemblok', HIGH_GEGENPRESS: 'dit høje gegenpres' };
 const cap = (t) => t[0].toUpperCase() + t.slice(1);
-const TXT = { SHORT: 'korte pasninger', BALANCED: 'balanceret opbygning', DIRECT_LONG: 'direkte lange bolde', LOW_BLOCK: 'lav blok', MID_BLOCK: 'mellemblok', HIGH_GEGENPRESS: 'højt gegenpress' };
+const TXT = { SHORT: 'korte pasninger', BALANCED: 'balanceret opbygning', DIRECT_LONG: 'direkte lange bolde', LOW_BLOCK: 'lav blok', MID_BLOCK: 'mellemblok', HIGH_GEGENPRESS: 'højt gegenpres' };
 const isAvailable = (p) => !unavailable(p);   // v3.27.0: skadet eller udelukket – én vagt (career.js)
 // Bots hviler før kampen en starter, der er under grænsen + ROTATE_MARGIN (han ville ellers skiftes ud tidligt).
 export const ROTATE_MARGIN = 10, ROTATE_SKILL = 2;

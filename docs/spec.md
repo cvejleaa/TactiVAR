@@ -41,7 +41,8 @@ begrundelse).
   base+2, andre 1–2; finishing for ikke-ATT 2–9). `rollStat` er
   trekantsfordelt og klemt til 1–20.
 - **Naturlig position (v3.8; DM fra v3.20.0)**, offentlig: MV (GK), CB, Back (FB), DM (CDM), CM, Kant (WM),
-  OM (AM), ANG (ST). Truppen: 2 MV; forsvar 3 CB + 3 Back; midtbane 2 CM + 1 DM + 2 Kant + 1 OM; angreb 3 ANG
+  OM (AM), ANG (ST). Fuld betegnelse (kortet, title; v3.31.1 med de danske korte former): Målmand, Midtstopper, Back/kantback (dybe
+  kantpladser), Defensiv midtbane (DM), Central midtbane (CM), Kant (høje kantpladser), Offensiv midtbane (OM), Angriber (ANG). Truppen: 2 MV; forsvar 3 CB + 3 Back; midtbane 2 CM + 1 DM + 2 Kant + 1 OM; angreb 3 ANG
   + 1 Kant – fordelt pr. trøjenummer, så standard-11'eren passer til 4-4-2 (#2/#5 Back,
   #3/#4 CB, #6/#10 Kant, #7/#8 CM, #9/#11 ANG; bænk #13 CB, #14 Back, #15 DM, #16 OM, #17 ANG,
   #18 Kant). En bot i en anden formation får sine 11 første (efter kæde på formationens pladser) pladsens position,
@@ -69,15 +70,19 @@ begrundelse).
   `ratingSum`, `ratingGames`, `publicStars`, `counterTactics`,
   `matchReportClues[]`.
 
-### Arketyper (låst 🔒 / aktiv 🔓 når alle `unlockReq` er opfyldt)
-GK: Sweeper Keeper ("Bryder dybe stikninger uden for feltet"), Penalty Killer
-("Psykisk overtag ved straffe og VAR-straffespark") · DEF: Offside Maestro
-("+20% til hele bagkædens timing ved VAR-offside"), Luftens Konge ("+25% i
-alle hovedstødsdueller i begge felter") · MID: Regista ("Slår pasninger
-direkte fra Fase 1 til Fase 3"), Pressing Monster ("Mister 50% mindre energi
-ved Højt Gegenpress") · ATT: VAR-Line Ghost ("Vinder 80% af alle
-millimeter-tætte VAR-offside-kendelser"), Target Man ("Dominerer lange bolde
-og høje indlæg med hovedet"). Krav-tallene er afskåret i kilden (synligt:
+### Arketyper – særpræg (låst 🔒 / aktiv 🌟 når alle `unlockReq` er opfyldt)
+v3.31.1 (brugeren: "engelske betegnelser"): danske navne – kildens engelske i parentes.
+GK: Feje-målmand (Sweeper Keeper; "Bryder dybe stikninger uden for feltet ved høj forsvarslinje"), Straffedræber (Penalty Killer;
+"Psykisk overtag ved straffe og VAR-straffespark") · DEF: Offside-mester (Offside Maestro;
+"+20 % til hele bagkædens timing ved VAR-offside"), Luftens Konge ("+25 % i
+alle hovedstødsdueller i begge felter") · MID: Regista (spilfordeler) ("Slår pasninger
+direkte fra Fase 1 til Fase 3"), Presmonster (Pressing Monster; "Mister 50 % mindre energi
+ved højt gegenpres") · ATT: VAR-linjens spøgelse (VAR-Line Ghost; "Vinder 80 % af alle
+millimeter-tætte VAR-offside-kendelser"), Fyrtårn (Target Man; "Opspilspunkt: dominerer lange bolde
+og høje indlæg med hovedet"). **Visning (v3.31.1):** navn og beskrivelse står i `ARCHETYPES` (generator.js) og vises derfra efter
+`id` (labels.js `archetypeOf`) – ikke fra kopien på spilleren – så en gemt liga får de danske navne UDEN migrering (gemmeformatet
+uændret; e2e/unit: save-schema4). Kravene vises med evnernes danske navne (`SKILL_NAME`, `jumpingPower` = "Spring"): "Låses op ved:
+Udholdenhed 14, Erobring 12". Krav-tallene er afskåret i kilden (synligt:
 goalkeeping 12, positioning 13, passing 13, positioning 12) — fastsættes i
 koden og testes. **Status:** med som visning; arketypernes effekt i motoren
 er **udskudt** (v2.5b bruger dem ikke).
@@ -888,10 +893,14 @@ skal styre chancen, alle småfund med. Hvert motortal er målt (`node tools/meas
   efter rang i positionen over hele ligaen (`heightAtQuantile(position)`). Bevidst: en kort
   luftspiller i forsvaret bliver Back og ca. 10 cm lavere.
 - UI (brugerens valg, afviger fra v2.5): kolonne 🧠Mod viser spillerens tre
-  egne værdier "gegenpress · lav blok · VAR-linje" (sorterer på gennemsnittet;
+  egne værdier "gegenpres · lav blok · VAR-linje" (sorterer på gennemsnittet;
   "??" for modstandere) – ingen samlet % mod en bestemt modstander, da den kan
   bruges til at regne modstanderens stil ud. 3 mod-barer på spillerkortet, lilla
   +XP-badge. Motoren bruger stadig mod-kunnen mod modstanderens stil.
+- Navne i UI (v3.31.1, dansk og småt – "gegenpres" med ét s overalt i viste tekster; de interne nøgler som `HIGH_GEGENPRESS` er
+  urørte): barerne "Mod gegenpres", "Mod lav blok", "Mod VAR-linje og lange bolde" (`COUNTER_LABELS`) under overskriften "🧠 Erfaring
+  mod stilarter" (kortet, karakterarkets 🧠, regnearkets title); i referatet modstanderens stil fx "4-4-2 • Gegenpres + VAR-linje"
+  (`opponentTacticKeys`: Gegenpres / Lav blok / Mellemblok + VAR-linje / Lange bolde).
 
 ## 8. Regneark (scouting-matrix)
 21 kolonner: Pos/#, Spiller, Kæde, Natur (naturlig position, v3.8), Alder, Frisk/🚑, Højde (offentlige), Spring, ✈Luft,
@@ -1040,8 +1049,8 @@ advarsler, blå (--info) = links. Endnu IKKE håndhævet: stjerner, stærkt sams
 Målt med `node tools/measure-ui.mjs` (1366/390 px, efter én runde): distinkte skriftstørrelser i hele appen 20 → 6, pr. fane
 7–15 → 3–6; sidehøjder (ca. – ligaen er tilfældig) 1366 px Trup 1831 → 1974, Taktik 2068 → 2087, Kamp 3212 → 3261, Liga 2521 → 2619; 390 px Taktik
 4563 → 4602, Liga 3868 → 4182 (lidt luft – højderne tages ned i F4–F6). e2e vagter: højst 6 størrelser, alle fra skalaen. **Rammen (v3.28.0, UI-ombygningen F1):** topbaren er én linje: VAR · dit klubnavn · gem-kvitteringen (åbner ⚙) ·
-den lille ▶ (kun på Trup/Træning/Kamp/Liga/Klub/⚙: "▶ Runde N" + advarslernes tegn kompakt, fx "⛔1 🚑1 ⚠2 🟨1", forklaringen i title;
-slået fra og uden tegn under afspilning) · ⚙ (`#tab-admin`, ikonknap – `admin` er stadig en gyldig `ui.tab`). Intet rundetal i
+⚙ (`#tab-admin`, ikonknap; v3.31.1: den lille ▶ i topbaren er væk – brugeren: "spil knappen er placeret forskelligt på de enkelte
+faner"; ▶ står kun i Spil-bjælken – `admin` er stadig en gyldig `ui.tab`). Intet rundetal i
 topbaren og ingen holdvælger. Fanerne 🏠 Hjem · 👥 Trup · 🏋️ Træning · 📋 Taktik · 📺 Kamp · 🏆 Liga · 💼 Klub (v3.30.0: syv – Træning efter Trup, nøglen `traening`)
 står under topbaren (én nav-DOM) på én række – også ved 601–900 px, hvor fanerne har mindre luft (`.55rem .6rem`; med 1rem gik
 rækken på to linjer ved 601–690 px). e2e: topbaren er lige høj med én fanerække ved 1400, 1024, 768 og 601 px.
@@ -1049,13 +1058,18 @@ Den valgte fane gemmes i `ui.tab`; en ukendt værdi → Hjem (gamle gem: 'trup' 
 efter ▶ lander man på Kamp, hvor "Næste: runde N mod X (ude) · Forbered › · 📰 «overskrift» ›" (`#to-home`, `#kamp-paper-link`, v3.31.0) står ØVERST, når den viste runde er den
 seneste og ikke afspilles. Fanen normaliseres ved hver tegning (`game.ui.tab = tabNow()`), så kode der læser `ui.tab` aldrig ser en
 ukendt værdi (ny liga, første besøg og import sætter ingen). Advarslerne før runden har ÉN kilde (app.js `preMatchIssues`: ⛔ udelukket, 🚑 skadet, ⚠ træt under
-grænsen, 🟨 én gult fra udelukkelse – kun startere; en udelukket/skadet starter er ikke også træt), som bjælken, den lille ▶ og Hjem bruger.
-- **Spil-bjælken** (Hjem og Taktik, fast i bunden, altid én linje): piller (kun Taktik; over 3 → én tæller-pille "⛔ 4 ting" farvet
-  efter det værste, klik → Hjem; et tryk på en pille viser dit hold og markerer spilleren), 🔍 X (`#next-opponent`, et separat link
-  – før lå navnet i knappen; v3.31.0 kun på Taktik – på Hjem har næste kamp-kortet linket, og ▶ står samme sted via `.no-opp`
-  `margin-left: auto`) og "▶ Spil runde N af 14 · X (ude)" (`#play-round`; samme id som den lille ▶, kun én i DOM).
-  "N ting" tæller GRUPPER (én række/pille = ét link – Taktiks `#issue-count` og Hjems tæller er ens), den lille ▶'s tegn tæller med
-  vilje spillere ("⚠2" = to trætte; QC v3.31.0 – bevidst forskellige enheder).
+grænsen, 🟨 én gult fra udelukkelse – kun startere; en udelukket/skadet starter er ikke også træt), som bjælken og Hjem bruger.
+- **Spil-bjælken** (v3.31.1 på ALLE faner – de 7 + ⚙ – fast i bunden, altid én linje; `body.has-bar` altid, undtagen på fejlsiden):
+  piller på alle faner, også Hjem (brugeren 3/11: "Ja, også på Hjem" – selv om listen står på siden); et tryk på en pille viser dit
+  hold på 📋 Taktik og markerer spilleren (title "… Stil selv om på 📋 Taktik"). Over 3 grupper (eller præcis 3 på smal skærm) én
+  tæller (`#issue-count`, farvet efter det værste), der viser slags kompakt som den gamle lille ▶: "⛔2 🚑1 🟨1" = antal SPILLERE pr.
+  slags i rækkefølgen ⛔ 🚑 ⚠ 🟨; "N ting" (GRUPPER – én række/pille = ét link, som Hjems tæller) og forklaringerne står i title. Et tryk
+  på tælleren viser Hjem-listen (`#home-todo`, rullet frem; på Hjem ruller den kun dertil). 🔍 X (`#next-opponent`, et separat link –
+  før lå navnet i knappen) – ikke på Hjem (næste kamp-kortet har linket) og ikke på Kamp efter fløjtet ("Forbered ›" står øverst);
+  dér står ▶ samme sted via `.no-opp` `margin-left: auto`. "▶ Spil runde N af 14 · X (ude)" (`#play-round`, kun én i DOM) står altid
+  yderst til højre – samme x på alle faner (e2e ved 1366 og 390). `html { overflow-y: scroll }`, så bjælken er lige bred på korte og
+  lange sider (▶ hoppede ellers en rullebjælkes bredde). Under afspilning: knappen er slået fra og siger "📺 Runde N spilles …" – ingen
+  piller og ingen næste modstander (de hører til næste runde).
 - **Scout-bjælken** (`#scout-banner`, lilla, sticky): på Trup, Taktik og Klub, når et andet hold vises – "👁 Du ser X – kun
   offentlige data", holdvælgeren `#team-select` (skifter hold på fanen) og "← Dit hold". Hovedvejene til et andet hold: Liga-tabellen
   og "Se et hold" over den, næste modstander på Hjem og i bjælken; ⚙ "Se et andet hold" er reserven (tilbage til fanen, man kom
@@ -1081,8 +1095,8 @@ grænsen, 🟨 én gult fra udelukkelse – kun startere; en udelukket/skadet st
 - **Mobil (≤ 600 px)**: topbaren ruller væk; navigationen står fast i bunden (v3.30.0: 7 knapper ≈ 55 × 56 px ved 390 px, ≈ 45 px ved 320 px – en for lang tekst
   forkortes med …; ikon over tekst,
   `env(safe-area-inset-bottom)`), Spil-bjælken lige over den; siden får bundluft, så sidste element står over bjælken. I bjælken står modstanderen
-  i knappen ("▶ Spil runde N · X (ude)", 🔍-linket skjules; er navnet for langt, forkortes kun det med … – v3.29.1), og ved 3 advarsler én tæller ("⛔ 3 ting") i stedet for tre piller; den
-  lille ▶ viser "▶ R5".
+  i knappen ("▶ Spil runde N · X (ude)", 🔍-linket skjules; er navnet for langt, forkortes kun det med … – v3.29.1), og ved 3 advarsler én tæller
+  ("⛔1 🚑1 🟨1") i stedet for tre piller.
 Målt (`node tools/measure-ui.mjs`, efter én runde, før → efter): 1366 px Trup 1921 → 1939, Taktik 2087 → 2156, Liga 2560 → 2644,
 Hjem (ny) 900; 390 px Trup 2941 → 2928, Taktik 4598 → 4661, Liga 4169 → 4208, Hjem (ny) 938 (Kamp varierer med runden). Mobil
 Taktik (e2e, 390 × 844, 3 advarsler): fast chrome 137 px (sticky topbar) → 118 px (bjælke 61 + navigation 57), indholdshøjde
@@ -1100,7 +1114,7 @@ mellem bjælkerne 707 → 726 px (682 med scout-bjælken). e2e vagter: chrome �
   lige efter sæsonslut (`seasonJustEnded` – aldersfaldet i sæsonskiftet kan have spist et +1 fra samme runde; QC). Én kilde til
   rapporten pr. spiller: `gainsByPlayer` (training.js) – også træningstabellens "Sidste runde" ("+2 Afslutning, +1 Fart").
 - **🏋️ Træning** (v3.30.0, brugeren: "træningen i en egen topfane"): altid DIT hold (bygget fra `myTeam()`, også når Trup viser en
-  modstander – Trup beholder den scoutede), ingen scout-bjælke og intet kortpanel; den lille ▶ i topbaren. Øverst rundens opsamling
+  modstander – Trup beholder den scoutede), ingen scout-bjælke og intet kortpanel; Spil-bjælken i bunden (v3.31.1). Øverst rundens opsamling
   (`#training-summary`: +1, træningsskader, 🤝 nye stærke par med link til stregerne på Taktik), så træningsoversigten (`#training`):
   linjen `#training-next` ("Ingen +1 efter runde R · nærmest: #7 Navn Afslutning om ~3 rd · 5 træner Alsidig" – "Ingen +1 …" kun når
   rapporten intet har for truppen; nærmest = færrest runder til næste +1 efter `trainingEstimate`), fokus pr. spiller, pris, fremdrift,

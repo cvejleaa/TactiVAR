@@ -1,6 +1,6 @@
 // Taktisk mod-kunnen: spillernes erfaring mod modstanderens stilarter (docs/spec.md §7).
 export const COUNTER_KEYS = ['vsPress', 'vsLowBlock', 'vsTrapLong'];
-export const COUNTER_LABELS = { vsPress: 'Mod Gegenpress', vsLowBlock: 'Mod Lav Blok', vsTrapLong: 'Mod VAR-Linje & Lange Bolde' };
+export const COUNTER_LABELS = { vsPress: 'Mod gegenpres', vsLowBlock: 'Mod lav blok', vsTrapLong: 'Mod VAR-linje og lange bolde' };   // v3.31.1: dansk, småt
 const DEFAULT_MASTERY = 15; // v3.6-skalaen (startværdier ca. 20)
 // Man kan ikke være god mod alt (brugerens ønske, v3.6): de tre værdier deler en pulje.
 export const COUNTER_POOL = 100; // højst ≈33 i snit (brugeren fandt 40–50 for højt); en specialist kan nå 90·5·5
@@ -50,11 +50,11 @@ export function opponentTacticKeys(oppTeam) {
   const longBalls = pass === 'DIRECT_LONG' || focus === 'HIGH_CROSSES';
   const parts = [];
   let primary;
-  if (press === 'HIGH_GEGENPRESS') { primary = 'vsPress'; parts.push('Gegenpress'); }
-  else if (press === 'LOW_BLOCK') { primary = 'vsLowBlock'; parts.push('Lav Blok'); }
+  if (press === 'HIGH_GEGENPRESS') { primary = 'vsPress'; parts.push('Gegenpres'); }
+  else if (press === 'LOW_BLOCK') { primary = 'vsLowBlock'; parts.push('Lav blok'); }
   else { primary = longBalls ? 'vsTrapLong' : 'vsPress'; parts.push('Mellemblok'); }
   let secondary = primary;
-  if (trap === 'EXTREME_VAR_LINE' || longBalls) { secondary = 'vsTrapLong'; parts.push(trap === 'EXTREME_VAR_LINE' ? 'VAR-Linje' : 'Lange Bolde'); }
+  if (trap === 'EXTREME_VAR_LINE' || longBalls) { secondary = 'vsTrapLong'; parts.push(trap === 'EXTREME_VAR_LINE' ? 'VAR-linje' : 'Lange bolde'); }
   else if (press === 'LOW_BLOCK') secondary = 'vsLowBlock';
   return { primary, secondary, label: `${oppTeam.tactics.baseFormation} • ${parts.join(' + ')}` };
 }
