@@ -25,6 +25,7 @@ const { createLeague } = await import('../../public/engine/generator.js');
 const { simulateMatch } = await import('../../public/engine/match.js');
 const { heatGrid } = await import('../../public/engine/heatmap.js');
 const { renderMatchCenter } = await import('../../public/ui/matchcenter.js');
+const { roleLabel } = await import('../../public/engine/formations.js');   // v3.31.2: brikkens title har den danske kode
 const { clearReplays } = await import('../../public/ui/replay.js');
 const { evMin } = await import('../../public/engine/clock.js');
 
@@ -235,7 +236,7 @@ test('modstanderens zone-kort (v3.16.1, QC): "Dit mål" og "din side" KUN i kamp
 // (spejlet: x → 100 − x, y → 100 − y) – og dit hold opad; i en kamp uden dit hold hjemme opad, ude nedad. Tallene i hånden:
 // GK (50, 90): opad 90 → 97, nedad 10 → 3; LB (15, 70): opad (15, 73,5), nedad (85, 30 → 26,5).
 test('startopstillingen (miniPitch) vender som zone-kortet: modstanderen nedad, dit hold opad; neutral kamp hjemme opad, ude nedad', () => {
-  const pos = (table, r) => { const t = all(table, (x) => cls(x, 'mp-token')).find((x) => x.attrs.title?.startsWith(`${r} – `)); return t && [t.style.left, t.style.top]; };
+  const pos = (table, r) => { const t = all(table, (x) => cls(x, 'mp-token')).find((x) => x.attrs.title?.startsWith(`${roleLabel(r)} – `)); return t && [t.style.left, t.style.top]; };
   const UP = { GK: ['50%', '97%'], LB: ['15%', '73.5%'] }, DOWN = { GK: ['50%', '3%'], LB: ['85%', '26.5%'] };
   assert.deepEqual([base.startFormations.home, base.startFormations.away], ['4-4-2', '4-4-2'], 'data: begge i 4-4-2');
   for (const [viewer, home, away] of [[base.homeId, UP, DOWN], [base.awayId, DOWN, UP], ['ingen-af-dem', UP, DOWN]]) {

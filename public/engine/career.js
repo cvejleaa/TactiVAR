@@ -162,6 +162,9 @@ export const MATCH_XP = 0.02, TRAIN_FRESH_FLOOR = 50, TRAIN_INJURY_MATCHES = [1,
 export const ageTrain = (age) => (age <= 19 ? 1.5 : age <= 22 ? 1.2 : age <= 25 ? 1 : age <= 29 ? 0.6 : age <= 32 ? 0.35 : 0.2);
 // Plads til loftet: nøgle-evnernes snit mod potentialet (0,1–1 – en spiller ved sit loft udvikler sig næsten ikke)
 export const roomOf = (p) => clamp(((p.potential ?? keyAvg(p)) - keyAvg(p)) / 3, 0.1, 1);
+// Pladsen i evne-POINT (v3.31.2) – kun til skønnets ord (ui/card.js roomWords). roomOf (0,1–1) er klemt ved 3 point, så ungdommen
+// (potentiale = snit + 4 ± 2,5) lå i ét ord; træningshastigheden bruger stadig roomOf
+export const roomPoints = (p) => (p.potential ?? keyAvg(p)) - keyAvg(p);
 export const focusSkills = (p, f = FOCUS[p.trainingFocus] ?? FOCUS.GENERAL) => f.skills ?? KEY_SKILLS[p.line];
 export const validFocus = (p, key) => !!FOCUS[key] && (!FOCUS[key].gkOnly || p.line === 'GK');
 // Fremgang i én evne (+xp); returnerer de evner, der steg (+1). onSkill: genberegning (luftduel, arketype – QC B4).

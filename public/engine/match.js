@@ -3,7 +3,7 @@
 // Rettet ift. v2.5b: auto-indskiftning sker i en kamplokal kopi (ændrede før lineupSlots
 // permanent), og Hvis-Så-reglerne kører for begge hold og skifter reelt formation.
 import { matchBenchOf, unavailable, BAN } from './career.js';
-import { FORMATIONS, lineOfRole, slotLineOf, isOutOfZone, slotPosition, fitOf, slotFitOf, arrangeByFit } from './formations.js';
+import { FORMATIONS, lineOfRole, slotLineOf, isOutOfZone, slotPosition, fitOf, slotFitOf, arrangeByFit, roleLabel } from './formations.js';
 import { livePositions as livePos0, coupledPositions as coupled0, kickoffPositions, apartFrom, apartOnLine, ONSIDE_GAP, MIN_APART } from './positions.js';
 import { masteryVs, counterXpForMatch } from './counter.js';
 import { chemScale, slotChem, bandOf, BAND_WORD, CHEM_BASE } from './chemistry.js';
@@ -738,7 +738,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
     const fbSlots = own(lose) && lose.tactics.phases.phase1_buildUp.offBallRuns === 'MANY' ? coordsOf(lose.tactics).map((c, i) => i).filter((i) => i > 0 && FB_ROLES.has(coordsOf(lose.tactics)[i].r) && lose.starters[i]) : [];
     const runsOf = (i) => sheet.entries[lose.starters[i].id]?.freeRuns ?? 0;
     const fbSlot = fbSlots.filter((i) => runsOf(i) > 0).sort((x, y) => runsOf(y) - runsOf(x))[0] ?? -1;
-    const why = fbSlot > 0 ? ` Din ${coordsOf(lose.tactics)[fbSlot].r} ${tag(lose.starters[fbSlot])} er højt oppe efter sit løb.` : '';
+    const why = fbSlot > 0 ? ` Din ${roleLabel(coordsOf(lose.tactics)[fbSlot].r)} ${tag(lose.starters[fbSlot])} er højt oppe efter sit løb.` : '';
     if (shooter.skills.finishing * ff(shooter) + rng.next() * 8 + COUNTER_FINISH_BONUS > gk.skills.goalkeeping * ff(gk) + rng.next() * 8) {
       // Oplægsgiveren vælges FØR VAR (v3.16.7): han spillede bolden og tjekkes ikke for offside
       const helper = helperFor(wR, shooter, rng.pick(wR.mids.filter((p) => p !== shooter)));
@@ -1349,7 +1349,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
       if (cp.outOfZone) {
         st[k(def, 'TacticSuccess')]++;
         sheet.adjust(cp.player.id, -0.45); sheet.adjust(presser.id, DUEL_BONUS); sheet.bump(presser.id, 'tacticWins');
-        addEv(min, 'TACTIC_FAIL', 'TACTIC', def.isHome, false, 'Ude af zone', `⚠️ [TAKTIK FEJLER • CUSTOM POS] ${tag(cp.player)} (${att.team.name}) står for langt fra sin ${cp.role}-zone, og ${tag(presser)} udnytter hullet.`);
+        addEv(min, 'TACTIC_FAIL', 'TACTIC', def.isHome, false, 'Ude af zone', `⚠️ [TAKTIK FEJLER • CUSTOM POS] ${tag(cp.player)} (${att.team.name}) står for langt fra sin ${roleLabel(cp.role)}-zone, og ${tag(presser)} udnytter hullet.`);
         frame('press', who);
         continue;
       }

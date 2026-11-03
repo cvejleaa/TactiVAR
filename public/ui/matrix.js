@@ -2,7 +2,7 @@
 // "🔒 ??" og kan ikke sorteres (synlighed afgøres i engine/visibility.js).
 import { POSITIONS } from '../engine/generator.js';
 import { h, dec, LOCK } from './dom.js';
-import { LINE, POSITION, POSITION_FULL, starsEl, outLabel, OUT_TITLE, archetypeOf } from './labels.js';
+import { LINE, POSITION, POSITION_FULL, starsEl, outLabel, OUT_TITLE, archetypeOf, archIcon, roleLabel } from './labels.js';
 import { canSeeField } from '../engine/visibility.js';
 import { FORMATIONS } from '../engine/formations.js';
 import { COUNTER_KEYS } from '../engine/counter.js';
@@ -102,7 +102,7 @@ export function renderMatrix({ team, isOwn, ui, notes, onSort, onSelect, onSwap,
     const cells = COLUMNS.map((c) => {
       const cls = c.key === col.key ? 'sorted' : '';
       if (!canSeeField(c.field, isOwn)) return h('td', { class: cls + ' lockcell' }, LOCK);
-      if (c.key === 'pos') return h('td', { class: cls + (s >= 0 ? ' starter' : ' benchnum') }, s >= 0 ? `${roles[s].r} #${p.shirtNumber}` : `${benchIds.has(p.id) ? 'BÆNK' : 'RES'} #${p.shirtNumber}`);
+      if (c.key === 'pos') return h('td', { class: cls + (s >= 0 ? ' starter' : ' benchnum') }, s >= 0 ? `${roleLabel(roles[s].r)} #${p.shirtNumber}` : `${benchIds.has(p.id) ? 'BÆNK' : 'RES'} #${p.shirtNumber}`);
       if (c.key === 'name') { const g = gains.get(p.id) ?? [];   // mobilen: summen efter navnet (evne-kolonnerne er rullet væk)
         const sale = listed.has(p.id) ? h('span', { class: 'listed-tag', title: 'Sat til salg – andre klubber byder, når vinduet er åbent' }, '💰 Til salg') : null;
         return h('td', g.length ? { class: cls + ' player-gain', dataset: { gain: String(g.length) }, title: `${gainWords(g)} ${after}` } : { class: cls }, p.shortName, sale); }
@@ -116,7 +116,7 @@ export function renderMatrix({ team, isOwn, ui, notes, onSort, onSelect, onSwap,
       return h('td', { class: cls + (c.heat ? ' ' + heatClass(v) : '') + (n ? ' gain' : ''), ...(n ? { dataset: { gain: String(n) }, title: `+${n} ${SKILL_NAME[c.key]} ${after}` } : {}) }, c.fmt ? c.fmt(v) : v);
     });
     const ar = isOwn ? archetypeOf(p.archetype) : null;   // v3.31.1: navnet fra tabellen efter id (labels.js)
-    const arch = ar ? h('span', { class: ar.isUnlocked ? 'arch on' : 'arch' }, (ar.isUnlocked ? '🌟 ' : '🔒 ') + ar.name) : null;
+    const arch = ar ? h('span', { class: ar.isUnlocked ? 'arch on' : 'arch' }, `${archIcon(ar)} ${ar.name}`) : null;
     const note = notes[p.id]?.trim() ? h('span', { class: 'note-flag', title: 'Du har en note' }, '📝') : null;
     return h('tr', { class: (ui.selectedPlayerId === p.id ? 'selected ' : '') + (ui.swapId === p.id ? 'swapping' : ''), dataset: { pid: p.id }, tabindex: '-1', onclick: () => onSelect(p) },
       cells, h('td', {}, arch, note),

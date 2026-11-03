@@ -1,4 +1,6 @@
-import { FIT } from '../engine/formations.js';
+import { FIT, ROLE_LABEL, roleLabel } from '../engine/formations.js';
+// Pladskoderne (v3.31.2): tabellen står i formations.js (motoren bruger den i referatet) – her videre til brugerfladen
+export { ROLE_LABEL, roleLabel };
 import { BAN } from '../engine/career.js';
 import { ARCHETYPES } from '../engine/generator.js';
 // Danske visningsnavne for motorens værdier.
@@ -6,18 +8,24 @@ import { ARCHETYPES } from '../engine/generator.js';
 export const attText = (m) => (Number.isInteger(m?.att) && m.att > 0 ? `👥 ${m.att.toLocaleString('da-DK')}` : null);
 export const LINE = { GK: 'MÅL', DEF: 'FOR', MID: 'MID', ATT: 'ANG' };
 // Naturlig position (v3.8) med tavlens ord; den fulde betegnelse står i title.
-export const POSITION = { GK: 'MV', CB: 'CB', FB: 'Back', DM: 'DM', CM: 'CM', WM: 'Kant', AM: 'OM', ST: 'ANG' };
+// v3.31.2: CB → MS (ellers "MS" som plads og "CB" som position i samme række)
+export const POSITION = { GK: 'MV', CB: 'MS', FB: 'Back', DM: 'DM', CM: 'CM', WM: 'Kant', AM: 'OM', ST: 'ANG' };
 // v3.31.1 (brugeren: danske positionskoder): parentesen er den korte form fra POSITION – ikke CDM/CAM/ST
-export const POSITION_FULL = { GK: 'Målmand', CB: 'Midtstopper', FB: 'Back/kantback (dybe kantpladser)', DM: 'Defensiv midtbane (DM)', CM: 'Central midtbane (CM)', WM: 'Kant (høje kantpladser)', AM: 'Offensiv midtbane (OM)', ST: 'Angriber (ANG)' };
+export const POSITION_FULL = { GK: 'Målmand', CB: 'Midtstopper (MS)', FB: 'Back/kantback (dybe kantpladser)', DM: 'Defensiv midtbane (DM)', CM: 'Central midtbane (CM)', WM: 'Kant (høje kantpladser)', AM: 'Offensiv midtbane (OM)', ST: 'Angriber (ANG)' };
 // Særpræget, som det vises (v3.31.1): navn og beskrivelse fra ARCHETYPES efter id – spillerens gemte kopi kan have det gamle engelske navn.
 // Låst op og kravene er spillerens egne. Et ukendt id viser kopien.
 const ARCH_BY_ID = Object.fromEntries(Object.values(ARCHETYPES).flat().map((a) => [a.id, a]));
 export const archetypeOf = (a) => (a ? { ...a, name: ARCH_BY_ID[a.id]?.name ?? a.name, description: ARCH_BY_ID[a.id]?.description ?? a.description } : null);
+// Arketypens mærke (v3.31.2 – ét sted for kortet, Trup og Taktik): 🌟 låst op / 🔒 låst, og kravene med evnernes danske navne
+// (spring er ikke en af de 9 evner – kortets luftduel kalder det "Spring"). a = archetypeOf(...)
+export const archIcon = (a) => (a.isUnlocked ? '🌟' : '🔒');
+export const archReqText = (a) => { const da = Object.fromEntries(SKILL_LABELS.flatMap(([, list]) => list));   // SKILL_LABELS står længere nede
+  return 'Låses op ved: ' + Object.entries(a.unlockReq ?? {}).map(([k, v]) => `${k === 'jumpingPower' ? 'Spring' : da[k] ?? k} ${v}`).join(', '); };
 export const PHASE_OPTIONS = {
   passingStyle: [['SHORT', 'Korte pasninger'], ['BALANCED', 'Balanceret'], ['DIRECT_LONG', 'Direkte lange bolde']],
   attackFocus: [['CENTRAL', 'Centralt'], ['HIGH_CROSSES', 'Høje indlæg'], ['LOW_CUTBACKS', 'Lave cutbacks']],
   offBallRuns: [['FEW', 'Få'], ['NORMAL', 'Normal'], ['MANY', 'Mange']],
-  attackSide: [['LEFT', 'Venstre (LW/LB)'], ['BOTH', 'Begge'], ['RIGHT', 'Højre (RW/RB)']],   // v3.26.0 (nr. 39) – set fra jeres eget hold
+  attackSide: [['LEFT', `Venstre (${ROLE_LABEL.LW}/${ROLE_LABEL.LB})`], ['BOTH', 'Begge'], ['RIGHT', `Højre (${ROLE_LABEL.RW}/${ROLE_LABEL.RB})`]],   // v3.26.0 (nr. 39) – set fra jeres eget hold
   pressingHeight: [['LOW_BLOCK', 'Lav blok'], ['MID_BLOCK', 'Mellemblok'], ['HIGH_GEGENPRESS', 'Højt gegenpres']],
   offsideTrap: [['OFF', 'Ingen offside-fælde'], ['NORMAL', 'Normal linje'], ['EXTREME_VAR_LINE', 'Ekstrem VAR-linje']],
   tacklingIntensity: [['CAUTIOUS', 'Forsigtig'], ['NORMAL', 'Normal'], ['AGGRESSIVE', 'Aggressiv']],
@@ -47,7 +55,7 @@ export const kr = (n) => n.toLocaleString('da-DK') + ' kr.';
 
 // Uden for position (v3.20.0): prisen regnes fra tabellen (formations.js FIT) – aldrig skrevet ind som tal i en tekst
 export const fitCost = (f) => `−${String(Math.round((1 - f) * 1000) / 10).replace('.', ',')} %`;
-export const FIT_HELP = `Uden for position: egen plads 100 %, naboplads (fx DM på CM, back på kant) ${fitCost(FIT.near)}, anden markplads ${fitCost(FIT.other)}, målmand ⇄ markspiller ${fitCost(FIT.keeper)} – i dueller, afslutninger, pres og løb (ikke boldbesiddelsen). Kantpladser (LB/RB/LWB/RWB/LM/RM): dybden afgør – højt på banen er det en kant-plads, dybt en back-plads, imellem passer begge; trækker du en spiller, følger prisen med.`;
+export const FIT_HELP = `Uden for position: egen plads 100 %, naboplads (fx DM på CM, back på kant) ${fitCost(FIT.near)}, anden markplads ${fitCost(FIT.other)}, målmand ⇄ markspiller ${fitCost(FIT.keeper)} – i dueller, afslutninger, pres og løb (ikke boldbesiddelsen). Kantpladser (${['LB', 'RB', 'LWB', 'RWB', 'LM', 'RM'].map(roleLabel).join('/')}): dybden afgør – højt på banen er det en kant-plads, dybt en back-plads, imellem passer begge; trækker du en spiller, følger prisen med.`;
 
 // Udelukkelse (v3.27.0, nr. 64): ét sted for ord og tegn. ⛔ – ikke 🟥, som i karakterarket betyder "udvist i kampen" (QC).
 export const BAN_WHY = { DIRECT: 'direkte rødt kort', SECOND_YELLOW: 'rødt kort for to gule', YELLOWS: `${BAN.YELLOW_EVERY}. gule kort i sæsonen` };
