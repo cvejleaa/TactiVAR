@@ -299,7 +299,7 @@ test('Taktik-fanen: Angrebsside står i Fase 1 mellem Angrebsfokus og Løb uden 
   const sels = all(fs1, (e) => e.tag === 'select');
   assert.deepEqual(sels.map((s) => s.dataset.field), ['passingStyle', 'attackFocus', 'attackSide', 'offBallRuns']);
   const sel = sels[2];
-  assert.deepEqual(all(sel, (e) => e.tag === 'option').map((o) => [optVal(o), o.textContent]), [['LEFT', 'Venstre (LW/LB)'], ['BOTH', 'Begge'], ['RIGHT', 'Højre (RW/RB)']]);
+  assert.deepEqual(all(sel, (e) => e.tag === 'option').map((o) => [optVal(o), o.textContent]), [['LEFT', 'Venstre (VK/VB)'], ['BOTH', 'Begge'], ['RIGHT', 'Højre (HK/HB)']]);
   assert.deepEqual(all(sel, (e) => e.tag === 'option').filter((o) => o.attrs.selected === '').map(optVal), ['RIGHT']);
   assert.equal(all(fs1, (e) => e.tag === 'label').map((l) => l.textContent.split(' ')[0]).includes('Angrebsside'), true);
   sel.listeners.change({ target: { value: 'LEFT' } });
@@ -314,7 +314,7 @@ test('Taktik-fanen: Angrebsside står i Fase 1 mellem Angrebsfokus og Løb uden 
   // modstanderens hold: faserne (og dermed hans valgte side) vises slet ikke
   const opp = renderTactics({ team: L.teams[1], isOwn: false, ui: { activePresetIndex: 0 }, on });
   assert.equal(all(opp, (e) => e.dataset.field === 'attackSide').length, 0);
-  assert.ok(!opp.textContent.includes('Venstre (LW/LB)'));
+  assert.ok(!opp.textContent.includes('Venstre (VK/VB)') && !opp.textContent.includes('Angrebsside'));   // v3.31.2: den tekst, der vises nu
 });
 
 // QC v3.26.0: "mod #x" må ikke være kun den sidste back – skiftede backen (udskiftning), står der "flere backs".

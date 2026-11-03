@@ -3,7 +3,7 @@
 // kolonnerne er kædens 3 nøgle-evner og kan sorteres. Kolonnerne og synligheden er regnearkets (COLUMNS + canSeeField) –
 // én vagt mod sortering på skjulte data for modstandere (QC).
 import { h, dec, LOCK } from './dom.js';
-import { LINE, POSITION, POSITION_FULL, starsEl, outLabel, OUT_TITLE, fitCost, FIT_HELP } from './labels.js';
+import { LINE, POSITION, POSITION_FULL, starsEl, outLabel, OUT_TITLE, fitCost, FIT_HELP, roleLabel, archetypeOf, archIcon, archReqText } from './labels.js';
 import { canSeeField } from '../engine/visibility.js';
 import { FORMATIONS, slotFitOf, slotKindText, slotPosition } from '../engine/formations.js';
 import { matchBenchOf, reservesOf, KEY_SKILLS, keyAvg } from '../engine/career.js';
@@ -43,14 +43,22 @@ export function renderLineupList({ team, isOwn, ui, onPick, onSort, onBlocked, o
     const v = c.value(p, ctx);
     return h('td', { class: c.heat ? heatClass(v) : '' }, c.fmt ? c.fmt(v) : v);
   };
+  // Arketypen (v3.31.2, brugeren 3/11: "arketype markeringen med på taktik siden"): samme mærke som Trups kolonne – KUN dit hold
+  // (archetype er privat, OWNER_FIELDS; samme vagt som matrix.js). ≥ 900 px en dæmpet linje under navnet, < 900 px kun ikonet (CSS)
+  const archMark = (p) => {
+    const a = isOwn ? archetypeOf(p.archetype) : null;
+    if (!a) return null;
+    const tip = `Arketype: ${a.name} – ${a.description}${a.isUnlocked ? ' (låst op)' : ` · ${archReqText(a)}`}`;
+    return [h('span', { class: 'lp-arch-ico', title: tip, 'aria-label': tip }, ` ${archIcon(a)}`), h('div', { class: 'lp-arch muted', title: tip }, `${archIcon(a)} ${a.name}`)];
+  };
   const row = (p, kind) => {
-    const s = slotOf(p), place = kind === 'start' ? roles[s].r : kind === 'bench' ? 'Bænk' : 'Res', fit = kind === 'start' ? slotFitOf(team.tactics, s, p.position) : 1;
+    const s = slotOf(p), place = kind === 'start' ? roleLabel(roles[s].r) : kind === 'bench' ? 'Bænk' : 'Res', fit = kind === 'start' ? slotFitOf(team.tactics, s, p.position) : 1;
     return h('tr', { class: `lp-row ${kind}-p` + (ui.swapId === p.id ? ' active' : '') + (ui.cardId === p.id ? ' carded' : '') + (outLabel(p) ? ' injured' : '') + (p.banMatches > 0 ? ' banned' : ''), dataset: { pid: p.id },
       title: isOwn ? (kind === 'reserve' ? 'Reserve – ikke med i kampen. Klik og så en bænkspiller (eller en brik) for at tage ham med.' : 'Klik og så en anden spiller (her eller på banen) for at bytte') : '',
       onclick: () => onPick(p) },
     h('td', { class: 'lp-place' + (fit < 1 ? ' off-pos' : ''), title: fit < 1 ? `Naturlig: ${POSITION_FULL[p.position]} – på ${place}${kindOf(s) ? ` (${kindOf(s)})` : ''} koster det ${fitCost(fit)} i dueller` : '' }, place, fit < 1 ? ` ⚠ ${fitCost(fit)}` : ''),
     // ⓘ: tegnet står i CSS (::before), så cellens tekst stadig er "#7 Navn"
-    h('td', {}, onInfo ? h('button', { class: 'lp-info', type: 'button', dataset: { pid: p.id }, title: 'Åbn spillerkortet', 'aria-label': `Spillerkort: #${p.shirtNumber} ${p.shortName}`, onclick: (e) => { e.stopPropagation(); onInfo(p); } }) : null, `#${p.shirtNumber} ${p.shortName}`),
+    h('td', {}, onInfo ? h('button', { class: 'lp-info', type: 'button', dataset: { pid: p.id }, title: 'Åbn spillerkortet', 'aria-label': `Spillerkort: #${p.shirtNumber} ${p.shortName}`, onclick: (e) => { e.stopPropagation(); onInfo(p); } }) : null, `#${p.shirtNumber} ${p.shortName}`, archMark(p)),
     // Kæde · naturlig position i alle tre sektioner (QC B4: så man kan se, hvem på bænken der passer)
     h('td', { title: POSITION_FULL[p.position] ?? '' }, h('span', { class: 'chip' }, LINE[p.line]), ` ${POSITION[p.position] ?? ''}`), cols.map((c) => cell(c, p)));
   };

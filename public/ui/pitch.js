@@ -2,7 +2,7 @@
 // brikker kan ikke trækkes; uden for ankerradius 28 vises "⚠ Ude af zone (-20%)".
 import { h } from './dom.js';
 import { FORMATIONS, MAX_ANCHOR_RADIUS, slotPosition, isOutOfZone, clampPos, slotFitOf, slotKindText } from '../engine/formations.js';
-import { POSITION_FULL, fitCost, outLabel } from './labels.js';
+import { POSITION_FULL, fitCost, outLabel, roleLabel } from './labels.js';
 import { BAND_WORD } from '../engine/chemistry.js';
 
 // pairs (v3.24.0, kun dit hold): samspillet mellem nabopladser (chemistry.js lineupPairs) – streger under brikkerne, og hver brik
@@ -35,7 +35,7 @@ export function renderPitch({ team, isOwn, ui, onMove, onSelect, onTokenSwap, pa
     const fit = p ? slotFitOf(team.tactics, slot, p.position) : 1, kind = slotKindText(coords[slot].r, pos.y);   // v3.24.6: pladsens dybde
     const token = h('div', {
       class: `token${out ? ' out' : custom ? ' custom' : ''}${ui.selectedPlayerId === pid ? ' selected' : ''}${ui.pitchSwapId === pid ? ' swapping' : ''}${p && outLabel(p) ? ' injured' : ''}${p?.banMatches > 0 ? ' banned' : ''}`,
-      style: { left: pos.x + '%', top: pos.y + '%' }, dataset: { slot: String(slot), fit: String(fit) }, title: `${coords[slot].r}${kind ? ` (${kind})` : ''} – ${p ? p.name : '?'}${p ? ` · naturlig: ${POSITION_FULL[p.position] ?? p.position}${fit < 1 ? ` – her ${fitCost(fit)} i dueller` : ''}` : ''}${p && isOwn && pairs?.length && pairText(pid) ? ` · 🤝 ${pairText(pid)}` : ''}`,
+      style: { left: pos.x + '%', top: pos.y + '%' }, dataset: { slot: String(slot), fit: String(fit) }, title: `${roleLabel(coords[slot].r)}${kind ? ` (${kind})` : ''} – ${p ? p.name : '?'}${p ? ` · naturlig: ${POSITION_FULL[p.position] ?? p.position}${fit < 1 ? ` – her ${fitCost(fit)} i dueller` : ''}` : ''}${p && isOwn && pairs?.length && pairText(pid) ? ` · 🤝 ${pairText(pid)}` : ''}`,
     }, h('span', { class: 'token-num' }, p ? String(p.shirtNumber) : '?'), h('span', { class: 'token-name' }, p ? p.shortName : '?'),
       p && p.banMatches > 0 ? h('span', { class: 'token-flag' }, `⛔ udelukket`) : out ? h('span', { class: 'token-flag' }, '⚠ Ude af zone (-20%)') : custom ? h('span', { class: 'token-flag ok' }, '✅ Custom pos') : null,
       fit < 1 ? h('span', { class: 'token-flag pos' }, `⚠ Uden for position${kind && kind !== 'kant-/back-plads' ? ` – ${kind}` : ''} (${fitCost(fit)})`) : null);   // QC v3.24.6: pladstypen synligt (mobil)

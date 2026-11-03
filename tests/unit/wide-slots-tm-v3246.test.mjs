@@ -107,11 +107,11 @@ test('Taktiktavlen: brikkens fit og title følger pladsens dybde (kant 1, back-s
   const { me, l, r } = wingScene();
   let a = tokenOf(me, l);
   const b = tokenOf(me, r);
-  assert.equal(a.dataset.fit, '1'); assert.match(a.attrs.title, /^LWB \(kant-plads\) – /); assert.ok(!a.children.some((c) => /Uden for position/.test(c.textContent)));
-  assert.equal(b.dataset.fit, '0.975'); assert.match(b.attrs.title, /^RWB \(kant-plads\) – /); assert.ok(b.children.some((c) => /Uden for position – kant-plads \(−2,5 %\)/.test(c.textContent)), b.textContent);   // QC v3.24.6: pladstypen i flaget
+  assert.equal(a.dataset.fit, '1'); assert.match(a.attrs.title, /^VKB \(kant-plads\) – /); assert.ok(!a.children.some((c) => /Uden for position/.test(c.textContent)));
+  assert.equal(b.dataset.fit, '0.975'); assert.match(b.attrs.title, /^HKB \(kant-plads\) – /); assert.ok(b.children.some((c) => /Uden for position – kant-plads \(−2,5 %\)/.test(c.textContent)), b.textContent);   // QC v3.24.6: pladstypen i flaget
   moveSlot(me, l, { x: FORMATIONS['3-5-2'][l].x, y: 68 });
   a = tokenOf(me, l);
-  assert.equal(a.dataset.fit, '0.975'); assert.match(a.attrs.title, /^LWB \(back-plads\) – /); assert.ok(a.children.some((c) => /Uden for position/.test(c.textContent)));
+  assert.equal(a.dataset.fit, '0.975'); assert.match(a.attrs.title, /^VKB \(back-plads\) – /); assert.ok(a.children.some((c) => /Uden for position/.test(c.textContent)));
   assert.equal(tokenOf(me, slotOf('3-5-2', 'CAM')).attrs.title.includes('plads)'), false, 'ikke-kantplads: ingen plads-tekst');
 });
 
@@ -119,10 +119,10 @@ test('Spillerlisten: "Plads"-cellen viser straf for backen på kant-pladsen, ikk
   const { me, wm, fb, l } = wingScene();
   const place = (id) => all(renderLineupList({ team: me, isOwn: true, ui: { listLine: 'all' }, onPick() {}, onSort() {}, onBlocked() {}, onLine() {} }),
     (e) => e.tag === 'tr' && e.dataset.pid === id)[0].children[0];
-  assert.ok(!place(wm.id).className.includes('off-pos')); assert.equal(place(wm.id).textContent, 'LWB');
-  assert.ok(place(fb.id).className.includes('off-pos')); assert.equal(place(fb.id).textContent, 'RWB ⚠ −2,5 %');
+  assert.ok(!place(wm.id).className.includes('off-pos')); assert.equal(place(wm.id).textContent, 'VKB');   // v3.31.2: danske pladskoder
+  assert.ok(place(fb.id).className.includes('off-pos')); assert.equal(place(fb.id).textContent, 'HKB ⚠ −2,5 %');
   moveSlot(me, l, { x: FORMATIONS['3-5-2'][l].x, y: 68 });
-  assert.equal(place(wm.id).textContent, 'LWB ⚠ −2,5 %', 'kanten trukket ned til back-dybde');
+  assert.equal(place(wm.id).textContent, 'VKB ⚠ −2,5 %', 'kanten trukket ned til back-dybde');
 });
 
 test('Kamprapporten: hvert karakterark har præcis fire blokke (titel, kort, opstilling, liste) – tomme pladser er sheet-gap', () => {

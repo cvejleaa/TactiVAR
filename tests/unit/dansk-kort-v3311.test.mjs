@@ -95,7 +95,7 @@ test('save-schema4 (kopierne har de engelske navne): kortet og regnearket viser 
 });
 
 test('kortets øvrige tekster: danske positioner, "Friskhed 92 %", 🕵️ Observationer, 🧠 Erfaring mod stilarter, VAR-puls og "startspiller: +60 %"', () => {
-  assert.deepEqual(POSITION_FULL, { GK: 'Målmand', CB: 'Midtstopper', FB: 'Back/kantback (dybe kantpladser)', DM: 'Defensiv midtbane (DM)', CM: 'Central midtbane (CM)', WM: 'Kant (høje kantpladser)', AM: 'Offensiv midtbane (OM)', ST: 'Angriber (ANG)' });
+  assert.deepEqual(POSITION_FULL, { GK: 'Målmand', CB: 'Midtstopper (MS)', FB: 'Back/kantback (dybe kantpladser)', DM: 'Defensiv midtbane (DM)', CM: 'Central midtbane (CM)', WM: 'Kant (høje kantpladser)', AM: 'Offensiv midtbane (OM)', ST: 'Angriber (ANG)' });
   const L = createLeague(createRng(11)), me = L.teams.find((t) => !t.isBot), opp = L.teams.find((t) => t.isBot);
   const p = me.squad.find((x) => x.position === 'AM'); p.freshness = 92; p.injuryMatchesLeft = 0;
   const el = card(p, me), txt = el.textContent, h4 = all(el, (e) => e.tag === 'h4').map((e) => e.textContent);
@@ -114,14 +114,15 @@ test('kortets øvrige tekster: danske positioner, "Friskhed 92 %", 🕵️ Obser
   const m = renderCard({ player: q, team: opp, isOwn: false, scouting: [], note: '', onNote() {}, market: { price: 1000000, starter: true, wage: 1000, room: 5000, cashAfter: 1, reason: 'Vinduet er lukket' } });
   assert.ok(m.textContent.includes(' · startspiller: +60 %)'), m.textContent);
   assert.doesNotMatch(m.textContent, ENGLISH);
-  assert.ok(m.textContent.includes('Evner, spring, luftduel, særpræg og kontrakt'));
+  assert.ok(m.textContent.includes('Evner, spring, luftduel, arketype og kontrakt'));   // v3.31.2: brugerens ord
 });
 
 test('stilnavne: "gegenpres" med småt og ét s, "VAR-linje" og "lange bolde" – i barerne, referatets stil, Taktik og karakterarket', () => {
   assert.deepEqual(COUNTER_LABELS, { vsPress: 'Mod gegenpres', vsLowBlock: 'Mod lav blok', vsTrapLong: 'Mod VAR-linje og lange bolde' });
   const T = (pressingHeight, offsideTrap, passingStyle = 'BALANCED', attackFocus = 'CENTRAL') => ({ tactics: { baseFormation: '4-4-2', phases: { phase1_buildUp: { passingStyle, attackFocus }, phase2_defending: { pressingHeight, offsideTrap } } } });
-  assert.equal(opponentTacticKeys(T('HIGH_GEGENPRESS', 'EXTREME_VAR_LINE')).label, '4-4-2 • Gegenpres + VAR-linje');
-  assert.equal(opponentTacticKeys(T('LOW_BLOCK', 'NORMAL', 'DIRECT_LONG')).label, '4-4-2 • Lav blok + Lange bolde');
+  // v3.31.2 (QC-forbehold): opponentTacticKeys' "label" blev aldrig vist – den er fjernet; kun nøglerne bruges (masteryVs, applyCounterXp)
+  assert.deepEqual(opponentTacticKeys(T('HIGH_GEGENPRESS', 'EXTREME_VAR_LINE')), { primary: 'vsPress', secondary: 'vsTrapLong' });
+  assert.deepEqual(opponentTacticKeys(T('LOW_BLOCK', 'NORMAL', 'DIRECT_LONG')), { primary: 'vsLowBlock', secondary: 'vsTrapLong' });
   assert.equal(PHASE_OPTIONS.pressingHeight.find(([k]) => k === 'HIGH_GEGENPRESS')[1], 'Højt gegenpres');
   assert.equal(RATING_ICONS.find(([s]) => s === '🧠')[1], 'Erfaring mod stilarter optjent i kampen');
 });

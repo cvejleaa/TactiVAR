@@ -886,7 +886,8 @@ test('kontra-teksten: kun DIT holds valg forklares – fire kombinationer; "høj
   const rwb = slot(a.H, 7);
   assert.ok(mm.ratings.home.find((e) => e.playerId === rwb.id).freeRuns > 0);
   const many = mm.events.filter((e) => e.type === 'GOAL' && e.text.includes('KONTRA')).at(-1).text;
-  assert.match(many, new RegExp(`Din RWB #${rwb.shirtNumber} ${rwb.shortName} er højt oppe efter sit løb\\.`));
+  // v3.31.2: den danske pladskode (RWB → HKB, ROLE_LABEL)
+  assert.match(many, new RegExp(`Din HKB #${rwb.shirtNumber} ${rwb.shortName} er højt oppe efter sit løb\\.`));
   const normal = counters({ script: { 0.032: true } }).m.events.find((e) => e.type === 'GOAL').text;
   assert.doesNotMatch(normal, /højt oppe|løb/);
   // Modstanderen på Mange taber bolden til dig: hans indstilling nævnes aldrig

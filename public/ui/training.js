@@ -3,7 +3,7 @@
 // massehandling for de viste. Tallene fra trainingEstimate. Fanen viser altid dit hold (app.js bygger den fra dit hold).
 import { h, dec, select } from './dom.js';
 import { LINE } from './labels.js';
-import { FOCUS, validFocus, trainingEstimate } from '../engine/career.js';
+import { FOCUS, validFocus, trainingEstimate, roomPoints } from '../engine/career.js';
 import { SKILL_NAME, roomWords, nextText } from './card.js';
 
 const SHORT = { pace: 'PAC', stamina: 'STA', strength: 'STR', ballControl: 'BAL', passing: 'PAS', finishing: 'FIN', positioning: 'POS', intercepting: 'INT', goalkeeping: 'GK' };
@@ -68,7 +68,7 @@ export function renderTrainingTable({ team, report = null, roundLabel = report?.
           h('td', { class: 'num' }, e.fresh > 0 ? `+${e.fresh}` : `${e.fresh} (${e.playedFresh})`),
           h('td', { class: 'train-prog' }, e.lines.map((l) => (l.top ? `${SHORT[l.skill]} 20` : `${SHORT[l.skill]} ${dec(l.dev, 1)}`)).join(' · ') || '–'),
           h('td', { title: nextText(e.next, e.why) }, e.key === 'REST' ? 'hviler' : e.next === Infinity ? '–' : e.next > 14 ? '> 1 sæson' : `~${e.next} rd`),
-          h('td', { class: 'muted' }, roomWords(e.room)),
+          h('td', { class: 'muted' }, roomWords(roomPoints(p))),
           h('td', { class: 'num' }, gainWords(g)));
       })))));
 }

@@ -253,6 +253,9 @@ button.savestatus.failed { color: var(--rød); font-weight: 700; }
 .lp-table tr.active td { background: rgba(124, 58, 237, .35); }
 .lp-table tr.lp-sec th { text-align: left; color: var(--dæmpet); font-weight: 700; padding-top: .5rem; }
 .lp-table .lp-place { color: var(--grøn); font-weight: 700; }
+/* Arketypen på Taktik-listen (v3.31.2): ≥ 900 px en dæmpet linje under navnet, smallere kun ikonet efter navnet (title = navn + beskrivelse) */
+.lp-arch { font-size: var(--fs-1); line-height: 1.2; white-space: nowrap; } .lp-arch-ico { display: none; }
+@media (max-width: 899px) { .lp-arch { display: none; } .lp-arch-ico { display: inline; } }
 
 /* v3.21.0: duel-tallet i karakterarket brydes ikke */
 .ratings td.duel { white-space: nowrap; }
@@ -297,6 +300,13 @@ html { overflow-y: scroll; }
 .playbar:empty { display: none; }
 .playbar-in { max-width: 120rem; margin: 0 auto; padding: .5rem 1rem; display: flex; align-items: center; gap: .75rem; flex-wrap: nowrap; }
 .playbar #play-round { padding: .55rem 1.2rem; font-size: var(--fs-3); white-space: nowrap; flex: none; }
+/* v3.31.2 (QC-forbehold fra v3.31.1: ved 601 px skubbede 3 piller + 🔍 + et langt holdnavn ▶ 23 px ud over kanten): over 600 px må knappen
+   også krympe – kun modstanderens navn forkortes med …, "▶ Spil runde N af 14" står altid helt (som ≤ 600 px) */
+@media (min-width: 601px) {
+  .playbar #play-round { display: flex; align-items: center; flex: 0 1 auto; min-width: 0; overflow: hidden; }
+  .playbar #play-round .play-of { white-space: pre; flex: none; }
+  .playbar #play-round .play-opp { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: pre; }
+}
 .opp-link { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 2.5rem; flex: 0 1 auto; margin-left: auto; }
 button.savestatus { white-space: nowrap; }
 body.has-bar { padding-bottom: 4.5rem; }
@@ -376,6 +386,11 @@ body.has-bar { padding-bottom: 4.5rem; }
 .cp-nav, .cp-close { min-width: 32px; min-height: 32px; padding: .2rem .5rem; line-height: 1; }
 .cp-close { order: 9; font-size: var(--fs-3); }
 .cp-msg { margin: .5rem 0 0; }
+/* 📊 Statistik på kortet (v3.31.2): lille tabel med to sæsoner – smal nok til panelet og 390 px (ingen vandret rul) */
+.card-stats { margin: .5rem 0; } .card-stats h4 { margin: .25rem 0; }
+.stats-mini { border-collapse: collapse; width: auto; max-width: 100%; font-size: var(--fs-2); }
+.stats-mini th, .stats-mini td { padding: .1rem .6rem .1rem 0; text-align: left; white-space: nowrap; } .stats-mini td.num, .stats-mini th.num { text-align: right; }
+.stats-mini tbody th { color: var(--dæmpet); font-weight: 600; } .stats-mini td:nth-child(2) { font-weight: 400; } .stats-mini tbody tr { cursor: default; } .stats-mini tbody tr:hover { background: none; }
 .cp-receipt { margin-top: .5rem; }
 /* ≥ 1200 px: siden giver plads til panelet, så listens højre kolonner og 💰 ikke dækkes */
 @media (min-width: 1200px) { body.card-open main { padding-right: calc(min(420px, 40vw) + 1rem); } }

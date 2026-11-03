@@ -19,6 +19,12 @@ export const FORMATIONS = {
   '4-3-1-2': F(GK, ...BACK4, ['CM', 30, 50], ['CDM', 50, 56], ['CM', 70, 50], ['CAM', 50, 34], ['ST', 38, 17], ['ST', 62, 17]),
 };
 export const FORMATION_NAMES = Object.keys(FORMATIONS);
+// Danske pladskoder (v3.31.2, brugeren 3/11: "Position codes only") – ÉN tabel for al visning: Trup, Taktik-listen, banen, Match Center
+// og referatet. Kun visning: de interne rolle-nøgler (LB, CDM …) ligger i gemte data og motoren og røres ikke. Tabellen dækker ALLE
+// roller i FORMATIONS (en test går dem igennem). CF → OM (QC): ROLE_POSITION kobler CF til AM – falder en pladskode sammen med en
+// positionskode (POSITION i labels.js), er det præcis den position, der passer på pladsen. Ingen formation har både CF og CAM.
+export const ROLE_LABEL = Object.freeze({ GK: 'MV', CB: 'MS', LB: 'VB', RB: 'HB', LWB: 'VKB', RWB: 'HKB', CDM: 'DM', CM: 'CM', CAM: 'OM', CF: 'OM', LM: 'VM', RM: 'HM', LW: 'VK', RW: 'HK', ST: 'ANG' });
+export const roleLabel = (r) => ROLE_LABEL[r] ?? '?';
 
 export const MAX_ANCHOR_RADIUS = 28;
 export const PITCH_BOUNDS = { minX: 8, maxX: 92, minY: 8, maxY: 82 };

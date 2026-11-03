@@ -40,8 +40,8 @@ begrundelse).
   positioning, intercepting, goalkeeping`, vægtet efter kæde (GK goalkeeping
   base+2, andre 1–2; finishing for ikke-ATT 2–9). `rollStat` er
   trekantsfordelt og klemt til 1–20.
-- **Naturlig position (v3.8; DM fra v3.20.0)**, offentlig: MV (GK), CB, Back (FB), DM (CDM), CM, Kant (WM),
-  OM (AM), ANG (ST). Fuld betegnelse (kortet, title; v3.31.1 med de danske korte former): Målmand, Midtstopper, Back/kantback (dybe
+- **Naturlig position (v3.8; DM fra v3.20.0)**, offentlig: MV (GK), MS (CB; v3.31.2 – før "CB"), Back (FB), DM (CDM), CM, Kant (WM),
+  OM (AM), ANG (ST). Fuld betegnelse (kortet, title; v3.31.1 med de danske korte former): Målmand, Midtstopper (MS), Back/kantback (dybe
   kantpladser), Defensiv midtbane (DM), Central midtbane (CM), Kant (høje kantpladser), Offensiv midtbane (OM), Angriber (ANG). Truppen: 2 MV; forsvar 3 CB + 3 Back; midtbane 2 CM + 1 DM + 2 Kant + 1 OM; angreb 3 ANG
   + 1 Kant – fordelt pr. trøjenummer, så standard-11'eren passer til 4-4-2 (#2/#5 Back,
   #3/#4 CB, #6/#10 Kant, #7/#8 CM, #9/#11 ANG; bænk #13 CB, #14 Back, #15 DM, #16 OM, #17 ANG,
@@ -70,7 +70,7 @@ begrundelse).
   `ratingSum`, `ratingGames`, `publicStars`, `counterTactics`,
   `matchReportClues[]`.
 
-### Arketyper – særpræg (låst 🔒 / aktiv 🌟 når alle `unlockReq` er opfyldt)
+### Arketyper (låst 🔒 / aktiv 🌟 når alle `unlockReq` er opfyldt; v3.31.2: "arketype" overalt – brugerens ord, før "særpræg" på kortet)
 v3.31.1 (brugeren: "engelske betegnelser"): danske navne – kildens engelske i parentes.
 GK: Feje-målmand (Sweeper Keeper; "Bryder dybe stikninger uden for feltet ved høj forsvarslinje"), Straffedræber (Penalty Killer;
 "Psykisk overtag ved straffe og VAR-straffespark") · DEF: Offside-mester (Offside Maestro;
@@ -82,7 +82,9 @@ millimeter-tætte VAR-offside-kendelser"), Fyrtårn (Target Man; "Opspilspunkt: 
 og høje indlæg med hovedet"). **Visning (v3.31.1):** navn og beskrivelse står i `ARCHETYPES` (generator.js) og vises derfra efter
 `id` (labels.js `archetypeOf`) – ikke fra kopien på spilleren – så en gemt liga får de danske navne UDEN migrering (gemmeformatet
 uændret; e2e/unit: save-schema4). Kravene vises med evnernes danske navne (`SKILL_NAME`, `jumpingPower` = "Spring"): "Låses op ved:
-Udholdenhed 14, Erobring 12". Krav-tallene er afskåret i kilden (synligt:
+Udholdenhed 14, Erobring 12". **Vist (v3.31.2):** kortet, Trups "Arketype/Note" og Taktik-listen (≥ 900 px en dæmpet linje "🔒 Regista
+(spilfordeler)" under navnet, smallere kun ikonet; title = navn, beskrivelse og krav) – kun dit hold (`archetype` er et ejerfelt); mærket
+og kravteksten ét sted (labels.js `archIcon`, `archReqText`). Krav-tallene er afskåret i kilden (synligt:
 goalkeeping 12, positioning 13, passing 13, positioning 12) — fastsættes i
 koden og testes. **Status:** med som visning; arketypernes effekt i motoren
 er **udskudt** (v2.5b bruger dem ikke).
@@ -96,9 +98,15 @@ spillerobjekt; de skal ligge hos den der observerer.
 
 ### Livsløb, økonomi og transfers (v3.18.0)
 Konstanterne står ét sted: `public/engine/career.js` (og `transfers.js`). Bånd: `tools/measure-lifecycle.mjs`, `tests/unit/lifecycle-v3180.test.mjs`.
-- **Kamphistorik (§10.4):** én tupel pr. kamp (`matchLog`, højst 28): sæson, runde, hold, resultat, minutter, karakter (kun ejeren), stjerner, mål, oplæg. Kortet: "📜 Kampe", karrierelinje, 📺 kun på seneste rundes kamp.
+- **Kamphistorik (§10.4):** én tupel pr. kamp (`matchLog`, højst 28): sæson, runde, hold, resultat, minutter, karakter (kun ejeren), stjerner, mål, oplæg. Kortet: "📜 Kampe", karrierelinje, 📺 kun på seneste rundes kamp – og "📊 Statistik" (v3.31.2, §10b).
 - **Unikke kortnavne** i hele ligaen (`uniquifyNames`, egen afledt rng – kampene uændrede); en gemt liga omdøbes ved migreringen, også i tekster.
 - **Træning pr. spiller** (gælder, til det ændres): Alsidig, Kondition, Teknik, Afslutning, Forsvar, Fysik, Målmand (kun MV), Hvile. Fremgang = rate · alder (1,5 … 0,2) · plads til loftet (0,1–1); +1 ved 1,0. Kampe: 0,02 pr. 90 min i kædens nøgle-evner. Pris: −2 … −5 friskhed (gulv 50; den, der spillede, betaler 2 mindre), 0,3–0,7 % træningsskade; Hvile +4. Botterne træner Alsidig (friskheden røber ikke fokus). Fokus sættes kun på 🏋️ Træning (v3.30.0; kortet viser det og linker dertil).
+- **Skønnet i ord (v3.31.2)** – kortet, 🏋️ Træning og ungdomstilbuddet (det viser også nøglesnittet, "snit 6,8 · skøn: …"): efter pladsen i
+  evne-POINT (`roomPoints` = potentiale − nøglesnit), fem trin: < 0,45 "er tæt på sit loft" (= træningsestimatets "tæt på sit loft", roomOf ≤ 0,15)
+  · < 1,5 "har lidt mere i sig" · < 3 "har mere i sig" · < 5,5 "har meget mere i sig" · ≥ 5,5 "har langt mere i sig" (relativt – lover ikke et
+  niveau). Træningshastigheden bruger stadig `roomOf` (0,1–1). Før: roomOf med 0,6/0,3 – ungdom ved første syn 95,6 % "har meget mere i sig";
+  nu højst 55 % ét ord (`tools/measure-youth-words.mjs`, testbånd ≤ 60 %). Ordet kan skifte efter et +1, så det afslører potentialet inden for
+  ca. 1/3 point – accepteret, fordi kun ejeren ser det.
 - **Sæsonskiftet** (kun `commitRound`, aldrig en migrering): pension fra 31 (MV 33) med ¼ ½ ¾, sikker ved 34 (MV 36), varslet på kortet fra runde 10; alle +1 år og 100 % friske (v3.26.1); fald fra 30 (MV 32) – fart/kondition først, positionering/pasning sidst, træning halverer; vækst for unge til 23 efter alder, loft og spilletid; værdi-stjerner = snit af seneste 5 kampe; lønnen genforhandles; 2 ungdomstilbud pr. hold (16–18 år, potentiale snit + 4 ± 2,5; botterne tager op efter truppens størrelse; dit hold vælger i sæsonrapporten, frist næste runde; under 18 fyldes op); opstillingerne repareres (samme kæde); statistikken for den afsluttede sæson bygger på et øjebliksbillede.
 - **Økonomi** pr. runde: TV 120.000 kr., billetter kun hjemme (min(9000, 4000 + 370·(8 − plads hjemme) + 185·(8 − plads ude) + 145·form) à 90 kr.; runde 1–2: sidste sæsons placering), løn = ugeløn / 3. Præmie 1,5 / 1,1 / 0,8 / 0,6 / 0,45 / 0,3 / 0,2 / 0,1 mio. Lønbudget 1,7 mio. + 2 % af kassen pr. uge (begrænser køb, ikke økonomien). Offentlig værdi = stjerner (eller tier; ungdom 1★) · alder, mellem hele stjerner lineært (`valueOfStars`); løn = 5,5 % af værdien. Tilskuertallet står på hver kamp (`match.att`, offentligt): "👥 7.840" på resultatkortene på Liga og i referatet under resultatet; ældre kampe uden tallet viser intet. 💼 Klub viser kasse, løn, budget, prognose og regnskab.
 - **v3.30.0 (brugeren 2026-11-02: ærlige startstjerner, løn 5,5 %, 9.000 tilskuere kan nås).** Tier-stjernerne (`TIER_STARS`, kun for spillere med under 3 kampe) er de gennemsnitlige kampstjerner efter sæson 1 (`tools/measure-star-fit.mjs`, 8 ligaer: STAR 3,40 · STARTER 3,16 · ROTATION 2,89 · TALENT 2,83): **STAR 3,4 · STARTER 3,2 · ROTATION 2,9 · TALENT 2,8** (før 4 / 3 / 2 / 2; ungdom 1). Før gik 59 % af ROTATION/TALENT 2★→3★ efter 3 kampe, og lønnen fordobledes ved første genforhandling (`tools/measure-star-catchup.mjs`). Tilskuerne: 370 / 185 / 145 (før 300 / 150 / 120) – 1. hjemme mod 2. efter tre sejre = 9.000 (før højst 8.080). `WAGE_SHARE` 0,06 → 0,055. Målt med `node tools/measure-economy.mjs 5 10` (400 hold-sæsoner), før → efter: overskud 56 % → **71 %**; snitresultat 123k → 788k; billetter 3.823k → 4.118k; løn 6.011k → 5.641k pr. sæson; overskud pr. sæson S1 60 → 43 %, S2 38 → 53 %, S3 23 → 50 %, S4 35 → 65 %, S5 40 → 78 %, S6 55 → 75 %, S7–S10 73–80 → 80–93 %; snitløn pr. runde S1 414k → 475k, S2 479k → 453k (hoppet S1→S2 er væk; `tests/unit/economy-v3300.test.mjs`: liga 101 +60.500 → −27.375). Udtagelsen (`pubScore`: bedste 11, bænk, bot-rotation) rangerer stadig en ubeprøvet spiller efter tier i hele trin (`TIER_RANK` 4/3/2/2/1) – startstjernerne er et lønsnit, ikke en rangering; med 3,4 mod 2,9 vejede tier for lidt mod friskhed og naboplads, og alle seedede kampe flyttede sig. Trup-regnearket viser "💰 Til salg" efter navnet på dine spillere til salg – kun på dit eget hold: salgslisten er ejerens (`viewTeam` viser den ikke, §3), og botterne sælger uden om den. Bevidst: S1 er nu den hårde sæson (lønnen er ærlig fra start), og fra S7 bliver alle rige, fordi lønnen falder med alderen – det åbne står i backloggen (nr. 0b: sponsorvalget og ⚖ dybde).
@@ -157,6 +165,11 @@ Konstanterne står ét sted: `public/engine/career.js` (og `transfers.js`). Bån
   pladser er fastsat i samme stil i `public/engine/formations.js`.
 - 10 formationer: 4-4-2, 4-3-3, 4-2-3-1, 3-5-2, 3-4-3, 5-3-2, 5-4-1, 4-1-4-1,
   4-4-1-1, 4-3-1-2 (x/y i %, rolle GK/LB/CB/RB/LWB/RWB/CDM/CM/LM/RM/CAM/…).
+- **Pladskoder i brugerfladen (v3.31.2, brugeren: "Position codes only")** – ÉN tabel `ROLE_LABEL` (formations.js, også referatet):
+  GK→MV · CB→MS · LB/RB→VB/HB · LWB/RWB→VKB/HKB · CDM→DM · CM→CM · CAM→OM · CF→OM · LM/RM→VM/HM · LW/RW→VK/HK · ST→ANG. Kun visning –
+  de interne nøgler i gemmet og motoren er de engelske. CF→OM, fordi CF kobles til AM (OM): falder en pladskode sammen med en
+  positionskode, er det præcis den position, der passer på pladsen (ingen formation har både CF og CAM). Kæden i parentes på dansk
+  ("DM (FOR)"). Gamle gemte referater beholder teksten (ingen migrering). Evneforkortelserne (PAC, STA, …, GK) er uændrede.
 - Træk og slip "Rolle-Anker & Frit Træk": GK (slot 0) kan ikke trækkes,
   modstanderens brikker kan ikke flyttes, klem x 8–92 og y 8–82,
   `MAX_ANCHOR_RADIUS = 28` → over det "⚠ Ude af zone (-20%)" (rød), ellers
@@ -899,8 +912,8 @@ skal styre chancen, alle småfund med. Hvert motortal er målt (`node tools/meas
   +XP-badge. Motoren bruger stadig mod-kunnen mod modstanderens stil.
 - Navne i UI (v3.31.1, dansk og småt – "gegenpres" med ét s overalt i viste tekster; de interne nøgler som `HIGH_GEGENPRESS` er
   urørte): barerne "Mod gegenpres", "Mod lav blok", "Mod VAR-linje og lange bolde" (`COUNTER_LABELS`) under overskriften "🧠 Erfaring
-  mod stilarter" (kortet, karakterarkets 🧠, regnearkets title); i referatet modstanderens stil fx "4-4-2 • Gegenpres + VAR-linje"
-  (`opponentTacticKeys`: Gegenpres / Lav blok / Mellemblok + VAR-linje / Lange bolde).
+  mod stilarter" (kortet, karakterarkets 🧠, regnearkets title). `opponentTacticKeys` giver kun nøglerne (primær/sekundær stil);
+  dens tekst "4-4-2 • Gegenpres + VAR-linje" blev aldrig vist og er fjernet (v3.31.2, QC-forbehold fra v3.31.1).
 
 ## 8. Regneark (scouting-matrix)
 21 kolonner: Pos/#, Spiller, Kæde, Natur (naturlig position, v3.8), Alder, Frisk/🚑, Højde (offentlige), Spring, ✈Luft,
@@ -1067,7 +1080,7 @@ grænsen, 🟨 én gult fra udelukkelse – kun startere; en udelukket/skadet st
   på tælleren viser Hjem-listen (`#home-todo`, rullet frem; på Hjem ruller den kun dertil). 🔍 X (`#next-opponent`, et separat link –
   før lå navnet i knappen) – ikke på Hjem (næste kamp-kortet har linket) og ikke på Kamp efter fløjtet ("Forbered ›" står øverst);
   dér står ▶ samme sted via `.no-opp` `margin-left: auto`. "▶ Spil runde N af 14 · X (ude)" (`#play-round`, kun én i DOM) står altid
-  yderst til højre – samme x på alle faner (e2e ved 1366 og 390). `html { overflow-y: scroll }`, så bjælken er lige bred på korte og
+  yderst til højre – samme x på alle faner (e2e ved 1366 og 390); ved 601/667/700 px med 3 piller og 🔍 står ▶ inden for højre kant (e2e v3.31.2). `html { overflow-y: scroll }`, så bjælken er lige bred på korte og
   lange sider (▶ hoppede ellers en rullebjælkes bredde). Under afspilning: knappen er slået fra og siger "📺 Runde N spilles …" – ingen
   piller og ingen næste modstander (de hører til næste runde).
 - **Scout-bjælken** (`#scout-banner`, lilla, sticky): på Trup, Taktik og Klub, når et andet hold vises – "👁 Du ser X – kun
@@ -1143,6 +1156,15 @@ mellem bjælkerne 707 → 726 px (682 med scout-bjælken). e2e vagter: chrome �
     (`#card-training`, kun dit hold) er ens på Trup og Taktik (v3.30.0): "Træner: X – ændr i Træning › · pris" (`#card-train-note`, linket
     `#card-train-link` til 🏋️ Træning med hans række markeret), fremdriften pr. evne og skønnet – kortet har intet fokusvalg (før
     `#focus-select` på Trup).
+  - **📊 Statistik for <hold>** (v3.31.2, brugeren 3/11: "en spillers statistik for holdet opgjort i sidebjælken"; `#card-stats`, ui/card.js
+    `cardStats`): lige efter kortets hoved, før evnerne. To kolonner "Sæson N" / "Sæson N−1" (historikken er 28 kampe = to sæsoner – intet
+    "I alt"; "N kampe i karrieren" står i 📜 Kampe). Kampe, Min., Mål, Oplæg og Snit (kun dit hold – karakteren er privat) fra `matchLog`
+    filtreret på holdets indeks (LOG.H/LOG.A) og sæsonen, med samme `hideLog` som 📜 Kampe. 👑, 🟨, 🟥 (målmand: + 🧤 clean sheets) står ikke i
+    loggen: sæson N fra s*-felterne, kun når han ikke er skiftet midt i sæsonen (`lastMove` ≤ N·2, sæsonens første vindue) og "–" under
+    afspilning; N−1 fra `league.lastSeasonStats`, når øjebliksbilledet er holdet (`t`) og han ikke skiftede midt i N−1; ellers "–" (med en
+    forklaring under tabellen). Gemmeformatet er uændret. Tom: "Ingen kampe for <hold> endnu"; karrierekampe uden gemte (migrerede ligaer):
+    "… ikke gemt" – aldrig 0. Modstander: samme tabel uden Snit. **Kendt grænse:** mødte hans gamle klub den nye, tælles kampen for den
+    nye – loggen gemmer ikke hans side. Mobil 390: ingen vandret rul (e2e).
   - **Hoved:** ◀ ▶ (`#card-prev`/`#card-next`) bladrer i den viste listes rækkefølge (Trup: regnearkets sortering og filter; Taktik:
     start-11, bænk, reserver som listen) og bytter aldrig; "#nr Navn" (`#cp-title`); ✕ (`#card-close`). Mens panelet er åbent på
     Taktik, står byt-beskeden også i hovedet (`#panel-pick-msg`). Efter et køb lukker panelet ikke tavst: kvitteringen

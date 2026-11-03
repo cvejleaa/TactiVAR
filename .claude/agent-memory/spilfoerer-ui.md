@@ -43,3 +43,8 @@ fund der er rettet (så du ikke finder dem igen), hvad brugeren har valgt fra, o
   ved 390 → markér også i Spiller-cellen.
 - 7 faner: "Træning" 48 px i 56 px knap (390), 51 px (360) – passer; < 340 px løber det over.
 - Hjem-linjens indhold var i 3/8 runder KUN "1 nyt stærkt par" → "Træning ›" leder til samspil; foreslog Taktik dér.
+
+## Plan danske pladskoder (2026-11-03) – script scratchpad/pos/m2.mjs (bytter tekst i DOM, måler)
+- Foreslået: MV VB HB MS VKB HKB DM CM VM HM OM VK HK SA ANG (CF=skyggeangriber; ikke "HA" – H=højre). Én tabel i motoren.
+- Målt: plads uændret – Taktik "CDM ⚠ −2,5 %" 89 px → "DM ⚠ −2,5 %" 80 px i 96 px kolonne (390); Kamp ingen overlap.
+- Taktik-brikken viser IKKE koden (kun title, pitch.js:38). Karakterarket viser rå kæde "RWB (DEF)" (lineup.js:14).

@@ -1,8 +1,8 @@
 // 📋 Sæsonrapport (v3.18.0): dit holds sæsonskifte – præmie, ny løn, udvikling, afsked og ungdomstilbuddene (Tag op / Lad gå).
 // Står på Liga fra sæsonslut, til den nye sæsons første runde er spillet (tilbuddene udløber da).
-import { h } from './dom.js';
+import { h, dec } from './dom.js';
 import { kr, LINE, POSITION_FULL } from './labels.js';
-import { roomOf, wagesPerRound } from '../engine/career.js';
+import { roomPoints, keyAvg, wagesPerRound } from '../engine/career.js';
 import { forecast } from './club.js';
 import { roomWords } from './card.js';
 
@@ -31,7 +31,7 @@ export function renderSeasonReport({ league, mine, onTake, onDrop }) {
       h('h4', {}, `🧒 Ungdomstilbud – svar før næste runde, ellers går de (truppen: ${mine.squad.length} af 25)`),
       h('div', { class: 'muted', id: 'youth-note' }, 'En ungdomsspiller, du tager op, kan – som et køb – først sælges ved næste sæsonslut.'),
       offers.map((y) => h('div', { class: 'youth-offer', dataset: { yid: y.id } },
-        h('span', {}, `#${y.shirtNumber} ${y.name} – ${LINE[y.line]}${POSITION_FULL[y.position] ? `, ${POSITION_FULL[y.position]}` : ''}, ${y.age} år · skøn: ${roomWords(roomOf(y))} · løn ${kr(Math.round(y.weeklyWage / 3))} pr. runde `),
+        h('span', {}, `#${y.shirtNumber} ${y.name} – ${LINE[y.line]}${POSITION_FULL[y.position] ? `, ${POSITION_FULL[y.position]}` : ''}, ${y.age} år · snit ${dec(keyAvg(y), 1)} · skøn: ${roomWords(roomPoints(y))} · løn ${kr(Math.round(y.weeklyWage / 3))} pr. runde `),
         h('button', { class: 'mini youth-take', onclick: () => onTake(y.id) }, 'Tag op'),
         h('button', { class: 'mini youth-drop', onclick: () => onDrop(y.id) }, 'Lad gå')))) : null);
 }

@@ -40,23 +40,23 @@ export function fitPool(ct, order, floor, keep = null) {
 }
 
 // Hvilke af modstanderens stilarter, der vejer tungest (kildens getOpponentPrimaryTacticKeys).
+// v3.31.2 (QC-forbehold fra v3.31.1): kildens "label" ("4-4-2 • Gegenpres + VAR-linje") er fjernet – den blev aldrig vist nogen steder.
 export function opponentTacticKeys(oppTeam) {
   const ph = oppTeam?.tactics?.phases;
-  if (!ph) return { primary: 'vsPress', secondary: 'vsTrapLong', label: '4-4-2 • Ukendt' };
+  if (!ph) return { primary: 'vsPress', secondary: 'vsTrapLong' };
   const press = ph.phase2_defending.pressingHeight;
   const trap = ph.phase2_defending.offsideTrap;
   const pass = ph.phase1_buildUp.passingStyle;
   const focus = ph.phase1_buildUp.attackFocus;
   const longBalls = pass === 'DIRECT_LONG' || focus === 'HIGH_CROSSES';
-  const parts = [];
   let primary;
-  if (press === 'HIGH_GEGENPRESS') { primary = 'vsPress'; parts.push('Gegenpres'); }
-  else if (press === 'LOW_BLOCK') { primary = 'vsLowBlock'; parts.push('Lav blok'); }
-  else { primary = longBalls ? 'vsTrapLong' : 'vsPress'; parts.push('Mellemblok'); }
+  if (press === 'HIGH_GEGENPRESS') primary = 'vsPress';
+  else if (press === 'LOW_BLOCK') primary = 'vsLowBlock';
+  else primary = longBalls ? 'vsTrapLong' : 'vsPress';
   let secondary = primary;
-  if (trap === 'EXTREME_VAR_LINE' || longBalls) { secondary = 'vsTrapLong'; parts.push(trap === 'EXTREME_VAR_LINE' ? 'VAR-linje' : 'Lange bolde'); }
+  if (trap === 'EXTREME_VAR_LINE' || longBalls) secondary = 'vsTrapLong';
   else if (press === 'LOW_BLOCK') secondary = 'vsLowBlock';
-  return { primary, secondary, label: `${oppTeam.tactics.baseFormation} • ${parts.join(' + ')}` };
+  return { primary, secondary };
 }
 
 export function masteryVs(player, oppTeam) {

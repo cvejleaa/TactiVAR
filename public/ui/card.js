@@ -1,9 +1,9 @@
 // Spillerkort: offentlige data for alle, evner og mod-kunnen kun for eget hold, VAR-profilen
 // for ingen. Observationer (scouting) og private noter vises for alle spillere.
-import { publicValue, LOG, stampText, KEY_SKILLS, trainingEstimate, FOCUS, focusSkills, ageTrain, roomOf, MATCH_XP, PLAYED_RELIEF, TRAIN_FRESH_FLOOR } from '../engine/career.js';
+import { publicValue, LOG, stampText, KEY_SKILLS, trainingEstimate, FOCUS, focusSkills, ageTrain, roomPoints, MATCH_XP, PLAYED_RELIEF, TRAIN_FRESH_FLOOR } from '../engine/career.js';
 import { viewPlayer } from '../engine/visibility.js';
 import { h, dec, LOCK } from './dom.js';
-import { LINE, POSITION_FULL, SKILL_LABELS, kr, starsEl, banText, yellowWarn, archetypeOf } from './labels.js';
+import { LINE, POSITION_FULL, SKILL_LABELS, kr, starsEl, banText, yellowWarn, archetypeOf, archIcon, archReqText } from './labels.js';
 import { aerialBreakdown } from '../engine/generator.js';
 import { runStats } from '../engine/stats.js';
 import { BAND_WORD } from '../engine/chemistry.js';
@@ -16,7 +16,8 @@ const bar = (label, v, max = 20) => h('div', { class: 'bar' }, h('span', { class
 // chem (v3.24.0, kun dit hold): { best, pairs, isNew } fra chemistry.js – samspillet med hans naboer i ord (intet 0–100-tal, QC)
 // onTrainLink (v3.30.0): "ændr i Træning ›" i træningsblokken åbner 🏋️ Træning med spillerens række markeret. Kortet sætter ALDRIG
 // fokus selv (brugeren: træningen sættes ét sted – nu Træning-fanen); det viser fokus, fremdriften og skønnet, ens på Trup og Taktik
-export function renderCard({ player: p, team, isOwn, scouting, note, onNote, teams = null, latest = null, onOpenMatch = null, retiring = false, market = null, hideLog = null, season = null, starter = false, chem = null, onTrainLink = null }) {
+// lastSeason (v3.31.2) = league.lastSeasonStats – 👑/🟨/🟥 for sidste sæson i 📊 Statistik
+export function renderCard({ player: p, team, isOwn, scouting, note, onNote, teams = null, latest = null, onOpenMatch = null, retiring = false, market = null, hideLog = null, season = null, starter = false, chem = null, onTrainLink = null, lastSeason = null }) {
   if (!p) return h('div', { class: 'panel muted' }, 'Klik på en spiller for at se spillerkortet.');
   const head = h('div', { class: 'card-head' },
     h('h3', {}, `#${p.shirtNumber} ${p.name}`),
@@ -37,19 +38,21 @@ export function renderCard({ player: p, team, isOwn, scouting, note, onNote, tea
         h('div', { class: 'muted' }, `Højde-score ${a.heightScore} (${p.heightCm} cm) × 0,35 = ${dk(a.wHeight)} · Spring ${p.jumpingPower} × 0,35 = ${dk(a.wJump)} · Styrke ${p.skills.strength} × 0,15 = ${dk(a.wStr)} · Position ${p.skills.positioning} × 0,15 = ${dk(a.wPos)} → ${dk(a.exact)}`)),
       h('div', { class: 'bar-group', id: 'counter-pool' }, h('h4', {}, '🧠 Erfaring mod stilarter'), COUNTER_KEYS.map((k) => bar(COUNTER_LABELS[k], p.counterTactics[k], 100)),
         h('div', { class: 'muted', id: 'counter-used' }, `Erfaring brugt: ${COUNTER_KEYS.reduce((a, k) => a + p.counterTactics[k], 0)}/${COUNTER_POOL} – ved fuld pulje glemmer han lidt af det gamle, når han lærer noget nyt.`)),
-      // Særpræget (v3.31.1): navn og beskrivelse fra tabellen efter id, kravene med evnernes danske navne
-      arch ? h('div', { class: 'archbox', id: 'card-arch' }, h('strong', {}, (arch.isUnlocked ? '🌟 ' : '🔒 ') + arch.name), ' – ', arch.description,
-        arch.isUnlocked ? null : h('div', { class: 'muted', id: 'card-arch-req' }, 'Låses op ved: ' + Object.entries(arch.unlockReq).map(([k, v]) => `${REQ_NAME(k)} ${v}`).join(', '))) : null,
+      // Arketypen (v3.31.1; v3.31.2 "arketype" – brugerens ord): navn og beskrivelse fra tabellen efter id, kravene med evnernes danske navne
+      arch ? h('div', { class: 'archbox', id: 'card-arch' }, h('strong', {}, `${archIcon(arch)} ${arch.name}`), ' – ', arch.description,
+        arch.isUnlocked ? null : h('div', { class: 'muted', id: 'card-arch-req' }, archReqText(arch))) : null,
       h('div', { class: 'muted', id: 'run-stats' }, run.km90 != null ? `🏃 ${dec(run.km90, 1)} km pr. 90 min · ${run.hiPct != null ? `${run.hiPct} % højintenst` : 'højintenst: kommer efter næste kamp'} · topfart ${dec(p.topSpeedMax, 1)} km/t (alle kampe)` : '🏃 Løbedata kommer efter første kamp'),
       renderTraining(p, starter, onTrainLink),
       h('div', { class: 'muted', id: 'card-wage' }, `Løn ${kr(Math.round(p.weeklyWage / 3))} pr. runde · Værdi ${kr(publicValue(p))} (offentlig – ud fra stjerner og alder)`),
       chem ? renderChem(chem) : null,
     ];
   } else {
-    body = [h('div', { class: 'lockbox' }, `Evner, spring, luftduel, særpræg og kontrakt: ${LOCK}`), h('div', {}, 'Offentlig vurdering: ', starsEl(p.publicStars))];
+    body = [h('div', { class: 'lockbox' }, `Evner, spring, luftduel, arketype og kontrakt: ${LOCK}`), h('div', {}, 'Offentlig vurdering: ', starsEl(p.publicStars))];
   }
 
-  return h('div', { class: 'panel card', id: 'player-card' }, head, body,
+  // 📊 Statistik (v3.31.2) lige efter hovedet – brugeren leder "i sidebjælken", og 📜 Kampe ligger langt nede
+  const stats = teams ? renderCardStats(cardStats(p, { isOwn, teamIdx: teams.indexOf(team), teamId: team.id, season, hideLog, lastSeason }), team) : null;
+  return h('div', { class: 'panel card', id: 'player-card' }, head, stats, body,
     h('div', { class: 'varbox' }, h('strong', {}, 'VAR-profil: '), 'Kynisme ?? · Teater ?? · VAR-puls ?? – tallene er skjulte; spillerens VAR-kendelser og observationerne herunder giver fingerpeg'),
     market ? renderMarketBox(p, market) : null,
     teams ? renderMatchLog(p, isOwn, teams, latest, onOpenMatch, hideLog, season) : null,
@@ -79,9 +82,12 @@ export function renderCardPanel({ card, title, onClose, nav = true, onPrev = nul
 
 // 🏋️ Træning (v3.18.0): fokus, hvad det træner, fremdrift pr. evne og ejerens skøn i ord (tallet – potentialet – er skjult)
 export const SKILL_NAME = Object.fromEntries(SKILL_LABELS.flatMap(([, list]) => list));
-// Særprægets krav (v3.31.1): evnens danske navn – spring er ikke en af de 9 evner (kortets luftduel kalder det "Spring")
-const REQ_NAME = (k) => (k === 'jumpingPower' ? 'Spring' : SKILL_NAME[k] ?? k);
-export const roomWords = (room) => (room >= 0.6 ? 'har meget mere i sig' : room >= 0.3 ? 'har mere i sig' : 'er tæt på sit loft');
+// Skønnet i ord (v3.31.2, brugeren 3/11: "endnu ikke set en ungdomsspiller der ikke har betegnelsen 'har meget mere i sig'"): efter
+// pladsen i evne-POINT (career.js roomPoints = potentiale − nøglesnit), fem trin. Før: roomOf (0,1–1) med 0,6/0,3 – ungdommen
+// (snit + 4 ± 2,5) lå med ≈ 91 % i "meget mere" (tools/measure-youth-words.mjs). 0,45 = trainingEstimate's "tæt på sit loft"
+// (roomOf ≤ 0,15). Topordet er relativt og lover ikke et niveau (Spilfører klub: 4,5 point over snit 7 er kun startniveau).
+export const ROOM_WORDS = [[0.45, 'er tæt på sit loft'], [1.5, 'har lidt mere i sig'], [3, 'har mere i sig'], [5.5, 'har meget mere i sig'], [Infinity, 'har langt mere i sig']];
+export const roomWords = (points) => ROOM_WORDS.find(([lim]) => points < lim)[1];
 // Næste +1 i ord – samme tekst på kortet og i træningsoversigten
 export const nextText = (n, why) => (!n || n === Infinity ? '' : n > 14 ? `går langsomt (mere end en sæson: ${why})` : `næste +1 om ca. ${n} runde${n === 1 ? '' : 'r'}`);
 export const priceText = (e) => (e.fresh > 0 ? `+${e.fresh} friskhed pr. runde` : `${e.fresh} friskhed pr. runde (${e.playedFresh} når han har spillet; ikke under ${TRAIN_FRESH_FLOOR} %) · lille skaderisiko`);
@@ -98,7 +104,7 @@ function renderTraining(p, starter = false, onTrainLink = null) {
       onTrainLink ? h('button', { class: 'linklike', id: 'card-train-link', onclick: onTrainLink }, 'ændr i Træning ›') : 'ændr i Træning',
       h('span', { class: 'muted' }, ` · ${price}`)),
     lines,
-    h('div', { class: 'muted', id: 'train-estimate' }, `Skøn: ${p.shortName} ${roomWords(roomOf(p))} · ${p.age} år – jo yngre, jo hurtigere. Kampe giver også lidt (${dec(MATCH_XP, 2)} pr. 90 min i kædens nøgle-evner).`));
+    h('div', { class: 'muted', id: 'train-estimate' }, `Skøn: ${p.shortName} ${roomWords(roomPoints(p))} · ${p.age} år – jo yngre, jo hurtigere. Kampe giver også lidt (${dec(MATCH_XP, 2)} pr. 90 min i kædens nøgle-evner).`));
 }
 
 // 🤝 Samspil (v3.24.0): bedste makker kun ved "stærkt" (QC); hans par med de naboer, han står ved lige nu (bænk: ingen)
@@ -155,6 +161,54 @@ export function trainingSummary(report, team, roundLabel = report?.round, onTakt
       sl.up.length ? h('div', { class: 'strong-up' }, sl.up[0], onTaktik ? [' ', h('button', { class: 'linklike', onclick: onTaktik }, 'se stregerne på Taktik')] : null) : null,
       sl.down.length ? h('div', { class: 'muted strong-down' }, sl.down[0]) : null) : null,
     ups.length || inj.length ? h('div', {}, h('strong', {}, `🏋️ Træning og kampe efter runde ${roundLabel}: `), [...ups, ...inj].join(' · ')) : null);
+}
+
+// 📊 Statistik for holdet (v3.31.2, brugeren 3/11: "en spillers statistik for holdet opgjort i sidebjælken"). Ren – unit-testet.
+// To kolonner: sæson N og N−1 (historikken er 28 kampe = to sæsoner – intet "I alt"). Ingen ændring af gemmeformatet:
+// - Kampe, minutter, mål, oplæg og snit (kun dit hold – karakteren er privat) fra matchLog, filtreret på holdets indeks (LOG.H/LOG.A) og
+//   sæsonen, med samme hideLog som 📜 Kampe (runden, der afspilles, står ikke).
+// - 👑/🟨/🟥 (målmand: 🧤 clean sheets) står ikke i loggen: sæson N fra s*-felterne – kun når han ikke er skiftet midt i sæsonen
+//   (lastMove efter sæsonens første vindue, N·2) og ikke under afspilning; N−1 fra league.lastSeasonStats, når øjebliksbilledet er dette
+//   hold (v.t) og han ikke skiftede midt i N−1. Ellers null ("–").
+// Kendt grænse (spec §10b): mødte hans gamle klub den nye, tælles den kamp for den nye – loggen gemmer ikke hans side.
+// → { rows: [{ s, games, min, goals, assists, avg, motm, yellow, red, cs }], empty: null | 'none' | 'unsaved', gk }
+export function cardStats(p, { isOwn, teamIdx, teamId, season, hideLog = null, lastSeason = null }) {
+  const v = viewPlayer(p, isOwn), all = v.matchLog ?? [];
+  const log = hideLog ? all.filter((e) => !(e[LOG.S] === hideLog[0] && e[LOG.R] === hideLog[1])) : all;
+  const mine = log.filter((e) => e[LOG.H] === teamIdx || e[LOG.A] === teamIdx);
+  const gk = p.line === 'GK', S = season ?? 1;
+  const empty = mine.length ? null : !all.length && (p.careerGames ?? 0) > 0 ? 'unsaved' : 'none';
+  const sum = (es, i) => es.reduce((a, e) => a + (e[i] || 0), 0);
+  const cards = (s) => {
+    if (s === S) {
+      if (hideLog || (p.lastMove != null && p.lastMove > S * 2)) return null;
+      return { motm: v.sMotm ?? 0, yellow: v.sYellow ?? 0, red: v.sRed ?? 0, cs: v.sCleanSheets ?? 0 };
+    }
+    if (!lastSeason || lastSeason.seasonNumber !== s || p.lastMove === s * 2 + 1) return null;
+    const st = lastSeason.players?.[p.id];
+    if (!st) return { motm: 0, yellow: 0, red: 0, cs: 0 };   // øjebliksbilledet gemmer kun spillere med tal ≠ 0
+    if (st.t !== teamId) return null;
+    return { motm: st.sMotm ?? 0, yellow: st.sYellow ?? 0, red: st.sRed ?? 0, cs: st.sCleanSheets ?? 0 };
+  };
+  const rows = [S, S - 1].map((s) => {
+    const es = mine.filter((e) => e[LOG.S] === s), rated = isOwn ? es.filter((e) => e[LOG.RT] != null) : [];
+    return { s, games: es.length, min: sum(es, LOG.MIN), goals: sum(es, LOG.G), assists: sum(es, LOG.AS),
+      avg: isOwn ? (rated.length ? Math.round((rated.reduce((a, e) => a + e[LOG.RT], 0) / rated.length) * 10) / 10 : null) : undefined, ...(cards(s) ?? { motm: null, yellow: null, red: null, cs: null }) };
+  }).filter((r) => r.s >= 1);
+  return { rows, empty, gk, own: isOwn };
+}
+function renderCardStats(st, team) {
+  const title = h('h4', {}, `📊 Statistik for ${team.name}`);
+  if (st.empty) return h('div', { class: 'card-stats', id: 'card-stats' }, title,
+    h('div', { class: 'muted', id: 'card-stats-empty' }, st.empty === 'unsaved' ? 'Kampene før kamphistorikken (v3.18) er ikke gemt' : `Ingen kampe for ${team.name} endnu`));
+  const cell = (v) => (v == null ? '–' : typeof v === 'number' && !Number.isInteger(v) ? dec(v, 1) : String(v));
+  const ROWS = [['Kampe', 'games'], ['Min.', 'min'], ['Mål', 'goals'], ['Oplæg', 'assists'], ...(st.own ? [['Snit', 'avg', 'Snitkarakter (kun dit hold)']] : []),
+    ['👑', 'motm', 'Kampens spiller'], ['🟨', 'yellow', 'Gule kort'], ['🟥', 'red', 'Røde kort'], ...(st.gk ? [['🧤', 'cs', 'Clean sheets']] : [])];
+  return h('div', { class: 'card-stats', id: 'card-stats' }, title,
+    h('table', { class: 'stats-mini', id: 'card-stats-table' },
+      h('thead', {}, h('tr', {}, h('th', {}, ''), st.rows.map((r) => h('th', { class: 'num' }, `Sæson ${r.s}`)))),
+      h('tbody', {}, ROWS.map(([label, k, tip]) => h('tr', { dataset: { k } }, h('th', { title: tip ?? '' }, label), st.rows.map((r) => h('td', { class: 'num' }, cell(r[k]))))))),
+    st.rows.some((r) => r.motm == null) ? h('div', { class: 'muted', id: 'card-stats-note' }, '– = ikke opgjort: kortene og 👑 gemmes pr. sæson, ikke pr. kamp (skiftet klub, sæsonen før, eller runden afspilles)') : null);
 }
 
 // 📜 Kampe (v3.18.0, spec §10.4): de seneste 10 stempler, "Vis alle" og en karrierelinje. Andre hold ser stjerner, ikke karakteren
