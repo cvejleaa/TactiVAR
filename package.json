@@ -13,7 +13,7 @@
     "test:rules": "firebase emulators:exec --only auth,firestore --project demo-tactivar \"node tests/rules/run.mjs\""
   },
   "devDependencies": {
-    "firebase-tools": "^15.34.1",
+    "firebase-tools": "^15.34.2",
     "playwright-core": "^1.55.0"
   },
   "engines": {
