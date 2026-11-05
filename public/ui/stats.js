@@ -1,7 +1,7 @@
 // Statistik på Liga-fanen (v3.10, brugeren: "Jeg vil gerne have noget statistik med på liga siden
 // af al mulig slags" – og "mål på hovedstød, straffe eller dødbolde. Antallet af frispark").
 // Fire sammenfoldede sektioner nederst. Hvem ser hvad afgøres i engine/visibility.js.
-import { h, dec } from './dom.js';
+import { h, dec, fold } from './dom.js';
 import { starsEl } from './labels.js';
 import { viewPlayer, viewTeamStats } from '../engine/visibility.js';
 import { runStats, PLAYER_SEASON_DEFAULTS, TEAM_STAT_FIELDS } from '../engine/stats.js';
@@ -41,10 +41,9 @@ const endNote = (league) => { const last = seasonJustEnded(league);
   return last ? h('p', { class: 'muted', id: 'stats-season-over' }, `Sæson ${last.seasonNumber} er slut – slutstillingen står i tabellen ovenfor, og mester, topscorer og din bedste under "Tidligere sæsoner" i kampprogrammet.`) : null; };
 const endedNote = (view) => h('p', { class: 'muted', id: 'stats-season-ended' }, `Sæson ${view.endedSeason.seasonNumber} – afsluttet. Tallene herunder er den afsluttede sæsons; den nye sæsons statistik starter, når dens første runde er spillet.`);
 const gapNote = (league) => statsFromK(league) > 1 ? h('p', { class: 'muted', id: 'stats-gap' }, `Sæsonens runde ${statsFromK(league) === 2 ? '1' : `1–${statsFromK(league) - 1}`} blev spillet, før statistikken fandtes, og kan ikke tælles med. Fra næste sæson tæller hele sæsonen.`) : null;
-// Hvilke sektioner er foldet ud – huskes mellem gen-tegninger (ellers lukkede de ved hvert klik).
-const openSecs = new Set(['stats-players']);
-const section = (id, title, ...body) => h('details', { class: 'stats-sec', id, open: openSecs.has(id),
-  ontoggle: (e) => { if (e.target.open) openSecs.add(id); else openSecs.delete(id); } }, h('summary', {}, title), ...body);
+// Hvilke sektioner er foldet ud – huskes mellem gen-tegninger (ellers lukkede de ved hvert klik). v3.32.1: fælles fold() i dom.js;
+// Spillere er åben fra start
+const section = (id, title, ...body) => fold({ id, summary: title, open: id === 'stats-players', cls: 'stats-sec' }, ...body);
 
 // Holdnavnet uden "FC"/"IF"/"BK" o.l., så en række ikke brydes ("FC Vejleå" → "Vejleå").
 const SHORT_DROP = new Set(['FC', 'IF', 'BK', 'United', 'Boldklub', 'Rovers', 'Tacticians']);
@@ -89,7 +88,7 @@ function playerLists(league, myTeamId) {
 function teamTable(league, myTeamId) {
   const rows = league.leagueMetadata.standings.map((s) => viewTeamStats(s, s.teamId === myTeamId));
   const per = (r, k) => (r.sMatches ? (r[k] / r.sMatches) : 0);
-  return h('div', { class: 'tablewrap-x' }, h('table', { class: 'standings', id: 'team-stats' },
+  return h('div', { class: 'tablewrap' }, h('table', { class: 'standings', id: 'team-stats' },
     h('thead', {}, h('tr', {}, ['Hold', 'Bold %', 'Frispark begået', 'Frispark tilkendt', '🟨', '🟥', 'Straffe for (scoret)', 'Dødboldmål', 'Hovedstødsmål', 'Clean sheets'].map((x) => h('th', {}, x)))),
     h('tbody', {}, rows.map((r) => h('tr', { class: r.teamId === myTeamId ? 'mine' : '' },
       h('td', {}, r.teamName), h('td', {}, r.sMatches ? Math.round(per(r, 'possSum')) : '–'), h('td', {}, r.fouls), h('td', {}, r.foulsWon), h('td', {}, r.yellows), h('td', {}, r.reds ?? 0),
@@ -124,7 +123,7 @@ function myTeam(league, myTeamId) {
     h('p', { id: 'my-team-stats' }, s.sMatches
       ? `${since(league)[0].toUpperCase()}${since(league).slice(1)}, pr. kamp: ${dec((s.shots / n), 1)} afslutninger (${dec((s.onTarget / n), 1)} på mål), xG ${dec((s.xg / n), 2)}, ${dec((s.corners / n), 1)} hjørnespark, ${dec((s.freeKicks / n), 1)} frispark i skudafstand. I alt: kontramål ${s.counterGoals} for / ${s.counterGoalsAgainst} imod, ${s.varChecks} VAR-tjek.`
       : 'Kommer efter første runde.'),
-    h('div', { class: 'tablewrap-x' }, h('table', { class: 'standings', id: 'my-players' },
+    h('div', { class: 'tablewrap' }, h('table', { class: 'standings', id: 'my-players' },
       h('thead', {}, h('tr', {}, ['Spiller', `Kampe (${statsFromK(league) > 1 ? `fra R${statsFromK(league)}` : 'sæson'})`, 'Snit (i alt)', 'km/90 (i alt)', '% HI (i alt)', `Fri (${statsFromK(league) > 1 ? `fra R${statsFromK(league)}` : 'sæson'})`, 'Friskhed'].map((x) => h('th', {}, x)))),
       h('tbody', {}, team.squad.map((p) => { const r = runStats(p); return h('tr', {},
         h('td', {}, `#${p.shirtNumber} ${p.shortName}`), h('td', {}, p.sGames), h('td', {}, p.ratingGames ? dec((p.ratingSum / p.ratingGames), 1) : '–'),

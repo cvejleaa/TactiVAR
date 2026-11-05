@@ -34,7 +34,7 @@ function game(s = 4) {
   const L = createLeague(createRng(s)), me = L.teams.find((t) => !t.isBot);
   return { me, m: simulateMatch(me, L.teams[(s % 7) + 1], createRng(s * 13)) };
 }
-const mcOf = (m, extra = {}) => ({ round: 1, matches: [m], gazette: { goalOfTheRound: null, totalGoals: 0, totalVarChecks: 0 }, viewIdx: 0, filter: 'all', shownCount: Infinity, playing: false, ...extra });
+const mcOf = (m, extra = {}) => ({ round: 1, matches: [m], gazette: { goalOfTheRound: null, totalGoals: 0, totalVarChecks: 0 }, viewIdx: 0, filter: 'all', shownCount: Infinity, playing: false, pane: 'players', ...extra });   // v3.32.1: standard "👥 Spillerne" (referatet: pane 'replay')
 const on = { skip() {}, view() {}, snapshot() {}, openGoal() {}, filter() {}, heat() {}, replay() {} };
 
 // v3.16.2: efter hvert mål/redning/skud forbi et skudtrin med samme hændelse (VAR-tjek, annulleret mål og flag har intet).
@@ -96,11 +96,11 @@ test('Match Center: afspilning og 🎬 kun efter slutfløjt; en kamp uden spor (
   const live = renderMatchCenter({ mc: mcOf(m, { playing: true, shownCount: 5 }), myTeamId: m.homeId, on });
   assert.equal(byId(live, 'replay'), undefined, 'ingen afspilning under live');
   assert.equal(all(live, (x) => x.className.includes('replay-btn')).length, 0);
-  const done = renderMatchCenter({ mc: mcOf(m), myTeamId: m.homeId, on });
+  const done = renderMatchCenter({ mc: mcOf(m, { pane: 'replay' }), myTeamId: m.homeId, on });
   assert.ok(byId(done, 'rp-pitch'));
   assert.equal(all(done, (x) => x.className.includes('replay-btn')).length, m.trace.moments.length);
   const { trace, ...old } = m;
-  const oldEl = renderMatchCenter({ mc: mcOf(old), myTeamId: m.homeId, on });
+  const oldEl = renderMatchCenter({ mc: mcOf(old, { pane: 'replay' }), myTeamId: m.homeId, on });
   assert.match(byId(oldEl, 'replay').textContent, /Ingen afspilning/);
   assert.equal(byId(oldEl, 'heat-btn'), undefined);
 });

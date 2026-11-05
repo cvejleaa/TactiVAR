@@ -20,20 +20,20 @@ const { renderMatchCenter } = await import('../../public/ui/matchcenter.js');
 const all = (el, pred, out = []) => { if (el instanceof FakeEl) { if (pred(el)) out.push(el); el.children.forEach((c) => all(c, pred, out)); } return out; };
 const ST = { hPoss: 60, aPoss: 40, hTacticSuccess: 1, aTacticSuccess: 2, hShots: 11, aShots: 12, hOnTarget: 5, aOnTarget: 6, hXg: 1.234, aXg: 0.5, hAerialWon: 3, aAerialWon: 4, hVarChecks: 0, aVarChecks: 1, hFouls: 7, aFouls: 8, hInjuries: 1, aInjuries: 2 };
 const entry = (id, nr, extra = {}) => ({ playerId: id, shirtNumber: nr, shortName: 'Spiller' + nr, place: 'CM', minIn: 1, minOut: 90, goals: 0, assists: 0, saves: 0, aerialWins: 0, yellowCard: false, injured: false, isMotM: false, rating: 6.5, stars: 3, gainedCounterXp: 0, ...extra });
-function render(stats, { home = [], away = [], events = [] } = {}) {
+function render(stats, { home = [], away = [], events = [], pane = 'players' } = {}) {   // v3.32.1: fanen (statistik/karakterark)
   const ev = { min: 90, hG: 1, aG: 0, text: 'Slut', category: 'PLAY', type: 'FULLTIME', label: 'Slut', plot: false, stats };
   const m = { homeId: 'h', awayId: 'a', homeName: 'Hjemme', awayName: 'Ude', homeTacticStr: '', awayTacticStr: '', homeGoals: 1, awayGoals: 0, events: [...events, ev], ratings: { motm: null, home, away } };
-  return renderMatchCenter({ mc: { round: 1, matches: [m], viewIdx: 0, filter: 'all', shownCount: 99, playing: false, gazette: null }, myTeamId: 'h', on: {} });
+  return renderMatchCenter({ mc: { round: 1, matches: [m], viewIdx: 0, filter: 'all', shownCount: 99, playing: false, gazette: null, pane }, myTeamId: 'h', on: {} });
 }
 const statRows = (root) => Object.fromEntries(all(all(root, (e) => e.attrs.id === 'match-stats')[0], (e) => e.tag === 'tbody')[0].children.map((tr) => [tr.children[1].textContent, [tr.children[0].textContent, tr.children[2].textContent]]));
 
 test('kampstatistik: "Røde kort" står med hjemme- og udeholdets eget tal (hjemme ≠ ude); gamle kampe uden tallet viser –; 0 er et tal', () => {
-  assert.deepEqual(statRows(render({ ...ST, hReds: 2, aReds: 1 }))['Røde kort'], ['2', '1']);
-  assert.deepEqual(statRows(render({ ...ST, hReds: 1, aReds: 3 }))['Røde kort'], ['1', '3']);
-  assert.deepEqual(statRows(render(ST))['Røde kort'], ['–', '–']);
-  assert.deepEqual(statRows(render({ ...ST, hReds: 1 }))['Røde kort'], ['1', '–']);
-  assert.deepEqual(statRows(render({ ...ST, aReds: 1 }))['Røde kort'], ['–', '1']);
-  assert.deepEqual(statRows(render({ ...ST, hReds: 0, aReds: 0 }))['Røde kort'], ['0', '0']);
+  assert.deepEqual(statRows(render({ ...ST, hReds: 2, aReds: 1 }, { pane: 'stats' }))['Røde kort'], ['2', '1']);
+  assert.deepEqual(statRows(render({ ...ST, hReds: 1, aReds: 3 }, { pane: 'stats' }))['Røde kort'], ['1', '3']);
+  assert.deepEqual(statRows(render(ST, { pane: 'stats' }))['Røde kort'], ['–', '–']);
+  assert.deepEqual(statRows(render({ ...ST, hReds: 1 }, { pane: 'stats' }))['Røde kort'], ['1', '–']);
+  assert.deepEqual(statRows(render({ ...ST, aReds: 1 }, { pane: 'stats' }))['Røde kort'], ['–', '1']);
+  assert.deepEqual(statRows(render({ ...ST, hReds: 0, aReds: 0 }, { pane: 'stats' }))['Røde kort'], ['0', '0']);
 });
 
 test('tidslinjen: en udvisning får 🟥 (ikke punktum) på den rigtige side og i det rigtige minut; en almindelig hændelse beholder sit eget tegn', () => {

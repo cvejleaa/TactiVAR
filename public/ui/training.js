@@ -68,11 +68,11 @@ export function renderTrainingTable({ team, report = null, roundLabel = report?.
       select('', [['', `Sæt fokus for de viste (${rows.length}) …`], ...Object.keys(FOCUS).map((k) => [k, focusLabel(k)])], (k) => { if (k) onFocusMany(rows.map((p) => p.id), k); }, { id: 'focus-many', class: 'mini' })),
     msg ? h('div', { class: 'notice', id: 'train-msg' }, msg) : null,
     h('div', { class: 'tablewrap' }, h('table', { class: 'matrix train-table', id: 'training-table' },
-      h('thead', {}, h('tr', {}, [['Spiller'], ['Kæde'], ['Fokus'], ['Friskhed', 'Pr. runde – i parentes, når han har spillet'], ['Fremdrift'], ['Næste +1'], ['Skøn', ROOM_SCALE], ['Sidste runde']].map(([t, title]) => h('th', { title: title ?? '' }, t)))),
+      h('thead', {}, h('tr', {}, [['Spiller'], ['Kæde'], ['Fokus'], ['Friskhed', 'Pr. runde – i parentes, når han har spillet'], ['Fremdrift'], ['Næste +1'], ['Skøn', ROOM_SCALE], ['Sidste runde']].map(([t, title], i) => h('th', { title: title ?? '', class: i === 0 ? 'stick-1' : null }, t)))),
       h('tbody', {}, rows.map((p) => {
         const e = trainingEstimate(p, on.has(p.id)), g = gained.get(p.id) ?? [];
         return h('tr', { dataset: { pid: p.id }, class: selectedId === p.id ? 'selected' : null },
-          h('td', {}, `#${p.shirtNumber} ${p.shortName}`), h('td', {}, h('span', { class: 'chip' }, LINE[p.line])),
+          h('td', { class: 'stick-1' }, `#${p.shirtNumber} ${p.shortName}`), h('td', {}, h('span', { class: 'chip' }, LINE[p.line])),
           h('td', {}, select(e.key, Object.keys(FOCUS).filter((k) => validFocus(p, k)).map((k) => [k, focusLabel(k, p)]), (k) => onFocus(p.id, k), { class: 'mini train-focus' })),
           h('td', { class: 'num' }, e.fresh > 0 ? `+${e.fresh}` : `${e.fresh} (${e.playedFresh})`),
           h('td', { class: 'train-prog' }, e.lines.map((l) => (l.top ? `${SHORT[l.skill]} 20` : `${SHORT[l.skill]} ${dec(l.dev, 1)}`)).join(' · ') || '–'),

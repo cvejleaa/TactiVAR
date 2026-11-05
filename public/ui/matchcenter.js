@@ -1,7 +1,7 @@
 // Broadcast Match Center (docs/spec.md §5–6): de 4 kampe i runden, live-afspilning af
 // din kamp, tidslinje, statistik og karakterark. TactiVAR Avisen (renderGazette) bor også her, men tegnes
 // kun på Liga (v3.31.0, F3 – før også sidst i Kamp). Karakterer for modstandere vises kun som stjerner (engine/visibility.js).
-import { h, dec } from './dom.js';
+import { h, dec, fold } from './dom.js';
 import { starsEl, attText, roleLabel } from './labels.js';
 import { viewRatingEntry, viewActs } from '../engine/visibility.js';
 import { GOAL_KIND_LABEL, goalMatchIdx } from '../engine/gazette.js';
@@ -274,8 +274,21 @@ function sendBox(m, mc, on) {
       : ' Gemmer kampen med et kort id, så den kan spilles igen, når motoren justeres. Kun denne kamp sendes – send før næste runde.'));
 }
 // De sendte id'er (nyeste først) – står også efter næste runde
-const sentList = (sent) => (sent?.length ? h('details', { id: 'sent-list', class: 'muted' }, h('summary', {}, `📤 Sendte kampe (${sent.length})`),
+const sentList = (sent) => (sent?.length ? fold({ id: 'sent-list', summary: `📤 Sendte kampe (${sent.length})`, cls: 'muted' },
   h('ul', {}, sent.map((x) => h('li', {}, h('strong', {}, x.id), ` – ${x.label}${x.replay === false ? ' (uden gengivelse)' : ''}`)))) : null);
+
+// v3.32.1 (R3, designkritikken + QC/Spilfører UI): efter fløjtet tre underfaner – den valgte tegnes alene (mc.pane, ikke i gemmet).
+// Ukendt/undefined (fx openMatchCenter) = den første. Under live-afspilning ingen faner.
+export const MC_PANES = [['replay', '🎬 Afspilning & referat'], ['stats', '📊 Statistik'], ['players', '👥 Spillerne']];
+export const paneOf = (mc) => (MC_PANES.some(([k]) => k === mc.pane) ? mc.pane : MC_PANES[0][0]);
+// Fuldtids-linjen (Spilfører UI): resultatet og den ene vigtigste ting fra fuldtids-analysen (match.js) – fast under stillingen, uanset
+// fane. Kun i kampe med dit hold (analysen findes kun dér) og kun efter fløjtet.
+export function fullTimeLine(events) {
+  const e = events.find((x) => x.type === 'FULLTIME' && typeof x.text === 'string' && x.text.includes('[FULDTIDS-ANALYSE]'));
+  if (!e) return null;
+  const [res, poss] = e.text.replace(/^.*\[FULDTIDS-ANALYSE\]\s*/, '').split(/(?<=\.)\s+/);
+  return poss ? `${res} ${poss}` : res;
+}
 
 export function renderMatchCenter({ mc, myTeamId, on }) {
   const m = mc.matches[mc.viewIdx];
@@ -296,16 +309,34 @@ export function renderMatchCenter({ mc, myTeamId, on }) {
   }
   const moments = new Set((m.trace?.moments ?? []).map((x) => x.ev));
   const heatFor = (side) => (m.trace ? { trace: m.trace, stoppage: m.stoppage ?? null, events: m.events, side, mine: mc.heat ?? null, onHeat: on.heat, vsMe: isOwnSide(side === 'h' ? 'away' : 'home') } : null);
-  return h('div', { class: 'panel matchcenter', id: 'match-center' },
+  const pane = paneOf(mc), after = !mc.playing;
+  // Referatet: filterrækken (id feed-filters – ikke forveksles med underfanerne) og listen
+  const feedEl = h('div', { class: 'mc-feed' }, h('div', { class: 'toolbar', id: 'feed-filters' }, REPORT_FILTERS.map(([v, l]) => h('button', { class: 'mini' + (mc.filter === v ? ' active' : ''), onclick: () => on.filter(v) }, l))),
+    // Et mål åbnet fra avisen markeres i referatet (samme minut, samme målscorer).
+    h('div', { class: 'feed', id: 'feed' }, feed.map((e) => { const focus = mc.focus && /GOAL/.test(e.type) && e.min === mc.focus.min && e.text.includes(mc.focus.scorer);
+      // Mål med øjebliksbillede (kun efter slutfløjt): 📍 viser, hvor dit hold stod.
+      const film = !mc.playing && moments.has(all.indexOf(e)) ? h('button', { class: 'mini replay-btn', title: 'Vis i afspilningen', dataset: { ev: all.indexOf(e) }, onclick: () => on.replay(m, all.indexOf(e)) }, '🎬') : null;
+      // 📍 kun hvor afspilningen ikke har afslutningen (gamle kampe uden spor – QC v3.16.3: ellers to knapper, én handling)
+      const pin = e.snapshot && !mc.playing && !film ? h('button', { class: 'mini snap-btn', title: e.snapshot.attacking ? 'Se hvor dit hold stod, da målet faldt' : 'Se hvor dit forsvar stod, da målet faldt', onclick: () => on.snapshot(all.indexOf(e)) }, '📍') : null;
+      const row = h('div', { class: `ev ${e.category.toLowerCase()} ${e.type.toLowerCase()}${e.minor ? ' minor' : ''}${focus ? ' focus' : ''}${mc.snap === all.indexOf(e) ? ' snapped' : ''}`, id: focus ? 'goal-focus' : null }, h('span', { class: 'ev-min' }, evMin(e)), e.text, film, pin);
+      // Tillægstid (v3.16.4): én linje før halvlegens tillægstid – i referatet (nyeste øverst) lige under ankeret
+      const st = stopAt.get(e);
+      return st ? [row, h('div', { class: 'ev info stoppage', id: `stoppage-${st.h}` }, h('span', { class: 'ev-min' }, st.h ? "90'" : "45'"), `⏱️ Tillægstid: ${st.S} min${st.var ? ` (heraf ${st.var} for VAR)` : ''}.`)] : row; })));
+  const statsEl = () => h('div', { class: 'mc-stats tablewrap' }, statsRows(m, last.stats));
+  // Karakterarkene side om side (stablet på smal skærm) – med opstillingerne, 📍, heat maps og forklaringen
+  const playersEl = () => [h('div', { class: 'ratings-grid' },
+    ratingsTable(m.ratings.home, isOwnSide('home'), `${m.homeName} – karakterer`, m.startFormations?.home, snapOf(m, mc), on.snapshot, heatFor('h'), isOwnSide('away'), playerSpan(m.events, m.ratings.home)),
+    ratingsTable(m.ratings.away, isOwnSide('away'), `${m.awayName} – karakterer`, m.startFormations?.away, snapOf(m, mc), on.snapshot, heatFor('a'), !isOwnSide('away'), playerSpan(m.events, m.ratings.away))),
+    legend()];   // v3.31.0: ingen avis her – den står på Liga (Kamps .to-home-linje linker dertil)
+  const ft = after ? fullTimeLine(all) : null;
+  return h('div', { class: 'panel matchcenter', id: 'match-center', dataset: { pane: after ? pane : null } },
     h('div', { class: 'row' }, h('h3', {}, `📺 Match Center – runde ${mc.round}`),
-      mc.playing ? h('button', { class: 'mini', id: 'skip', onclick: on.skip }, '⚡ Spring til slutfløjt') : null,
-      // v3.24.3 (kamp-id): send den viste kamp, så den kan findes igen med id'et, når motoren justeres
-      !mc.playing && on.send ? sendBox(m, mc, on) : null),
-    !mc.playing ? sentList(mc.sent) : null,
+      mc.playing ? h('button', { class: 'mini', id: 'skip', onclick: on.skip }, '⚡ Spring til slutfløjt') : null),
     mc.playing ? h('div', { class: 'muted', id: 'booked-note' }, 'Runden er allerede bogført og gemt – tabellen og truppen er opdateret, også hvis du lukker siden nu.') : null,
-    h('div', { class: 'cards', id: 'match-cards' }, mc.matches.map((x, i) => h('button', { class: 'matchcard' + (i === mc.viewIdx ? ' active' : ''), disabled: mc.playing && i !== 0, onclick: () => on.view(i) },
+    // v3.32.1 (R2): kampvælgeren på én linje, der ruller vandret (fade i kanten, .tablewrap) – din kamp står forrest (rundens første)
+    h('div', { class: 'tablewrap cards-wrap' }, h('div', { class: 'cards', id: 'match-cards' }, mc.matches.map((x, i) => h('button', { class: 'matchcard' + (i === mc.viewIdx ? ' active' : ''), disabled: mc.playing && i !== 0, onclick: () => on.view(i) },
       // Under afspilning afsløres de andre kampes resultater ikke før slutfløjt.
-      mc.playing ? (i === 0 ? `${x.homeName} ${last.hG}-${last.aG} ${x.awayName}` : `${x.homeName} – ${x.awayName}`) : [`${x.homeName} ${x.homeGoals}-${x.awayGoals} ${x.awayName}`, x.ratings.motm ? h('span', { title: 'Kampens spiller' }, ` 👑 ${x.ratings.motm.shortName}`) : null]))),
+      mc.playing ? (i === 0 ? `${x.homeName} ${last.hG}-${last.aG} ${x.awayName}` : `${x.homeName} – ${x.awayName}`) : [`${x.homeName} ${x.homeGoals}-${x.awayGoals} ${x.awayName}`, x.ratings.motm ? h('span', { title: 'Kampens spiller' }, ` 👑 ${x.ratings.motm.shortName}`) : null])))),
     h('div', { class: 'scoreboard', id: 'scoreboard' },
       h('div', {}, h('strong', {}, m.homeName), h('div', { class: 'muted' }, m.homeTacticStr)),
       h('div', { class: 'score' }, h('div', { id: 'score' }, `${last.hG} - ${last.aG}`), h('div', { class: 'muted', id: 'minute' }, mc.playing ? evMin(last) : 'Slut'),
@@ -314,25 +345,14 @@ export function renderMatchCenter({ mc, myTeamId, on }) {
       h('div', { class: 'right' }, h('strong', {}, m.awayName), h('div', { class: 'muted' }, m.awayTacticStr))),
     timeline(shown, m.stoppage),
     last.varMsg && mc.playing ? h('div', { class: 'varbanner' }, `📺 VAR: ${last.varMsg}`) : null,
-    // v3.20.1 (brugeren: "udnyttelsen af pladsen lige efter en kamp"): efter slutfløjt står afspilningen til venstre og
-    // statistik + referat til højre – før stod banen alene midt på siden med tomme sider
-    h('div', { class: 'mc-grid' + (mc.playing ? '' : ' after'), id: 'mc-main' },
-      mc.playing ? null : h('div', { class: 'mc-replay' }, replayEl(m, isOwnSide('home') ? 'h' : isOwnSide('away') ? 'a' : null)),
-      h('div', { class: 'mc-feed' }, h('div', { class: 'toolbar' }, REPORT_FILTERS.map(([v, l]) => h('button', { class: 'mini' + (mc.filter === v ? ' active' : ''), onclick: () => on.filter(v) }, l))),
-        // Et mål åbnet fra avisen markeres i referatet (samme minut, samme målscorer).
-        h('div', { class: 'feed', id: 'feed' }, feed.map((e) => { const focus = mc.focus && /GOAL/.test(e.type) && e.min === mc.focus.min && e.text.includes(mc.focus.scorer);
-          // Mål med øjebliksbillede (kun efter slutfløjt): 📍 viser, hvor dit hold stod.
-          const film = !mc.playing && moments.has(all.indexOf(e)) ? h('button', { class: 'mini replay-btn', title: 'Vis i afspilningen', dataset: { ev: all.indexOf(e) }, onclick: () => on.replay(m, all.indexOf(e)) }, '🎬') : null;
-          // 📍 kun hvor afspilningen ikke har afslutningen (gamle kampe uden spor – QC v3.16.3: ellers to knapper, én handling)
-          const pin = e.snapshot && !mc.playing && !film ? h('button', { class: 'mini snap-btn', title: e.snapshot.attacking ? 'Se hvor dit hold stod, da målet faldt' : 'Se hvor dit forsvar stod, da målet faldt', onclick: () => on.snapshot(all.indexOf(e)) }, '📍') : null;
-          const row = h('div', { class: `ev ${e.category.toLowerCase()} ${e.type.toLowerCase()}${e.minor ? ' minor' : ''}${focus ? ' focus' : ''}${mc.snap === all.indexOf(e) ? ' snapped' : ''}`, id: focus ? 'goal-focus' : null }, h('span', { class: 'ev-min' }, evMin(e)), e.text, film, pin);
-          // Tillægstid (v3.16.4): én linje før halvlegens tillægstid – i referatet (nyeste øverst) lige under ankeret
-          const st = stopAt.get(e);
-          return st ? [row, h('div', { class: 'ev info stoppage', id: `stoppage-${st.h}` }, h('span', { class: 'ev-min' }, st.h ? "90'" : "45'"), `⏱️ Tillægstid: ${st.S} min${st.var ? ` (heraf ${st.var} for VAR)` : ''}.`)] : row; }))),
-      h('div', { class: 'mc-stats' }, statsRows(m, last.stats))),
-    // Karakterarkene side om side under referatet (stablet på smal skærm).
-    mc.playing ? null : h('div', { class: 'ratings-grid' },
-      ratingsTable(m.ratings.home, isOwnSide('home'), `${m.homeName} – karakterer`, m.startFormations?.home, snapOf(m, mc), on.snapshot, heatFor('h'), isOwnSide('away'), playerSpan(m.events, m.ratings.home)),
-      ratingsTable(m.ratings.away, isOwnSide('away'), `${m.awayName} – karakterer`, m.startFormations?.away, snapOf(m, mc), on.snapshot, heatFor('a'), !isOwnSide('away'), playerSpan(m.events, m.ratings.away))),
-    mc.playing ? null : legend());   // v3.31.0: ingen avis her – den står på Liga (Kamps .to-home-linje linker dertil)
+    ft ? h('div', { class: 'mc-ft', id: 'mc-ft' }, `📊 ${ft}`) : null,
+    // Underfanerne (ikke .toolbar – den er referatets filterrække)
+    after ? h('div', { class: 'mc-tabs', id: 'mc-tabs', role: 'group', 'aria-label': 'Kampens visninger' }, MC_PANES.map(([k, l]) => h('button', { class: 'mini' + (k === pane ? ' active' : ''), id: `mc-tab-${k}`, 'aria-pressed': k === pane ? 'true' : 'false', onclick: () => on.pane?.(k) }, l))) : null,
+    // Under afspilning som før: referat | statistik. Efter fløjtet: den valgte fane – afspilning og referat side om side på ≥ 900 px
+    mc.playing ? h('div', { class: 'mc-grid', id: 'mc-main' }, feedEl, statsEl())
+      : pane === 'replay' ? h('div', { class: 'mc-grid after', id: 'mc-main' }, h('div', { class: 'mc-replay' }, replayEl(m, isOwnSide('home') ? 'h' : isOwnSide('away') ? 'a' : null)), feedEl)
+        : pane === 'stats' ? h('div', { class: 'mc-pane', id: 'mc-main' }, statsEl())
+          : h('div', { class: 'mc-pane', id: 'mc-main' }, playersEl()),
+    // v3.24.3 (kamp-id): "📤 Send kampen" og listen over sendte kampe under "⋯ Mere" (R2: ikke længere ved overskriften)
+    after && (on.send || mc.sent?.length) ? fold({ id: 'mc-more', summary: '⋯ Mere', cls: 'mc-more', label: 'Mere: send kampen' }, on.send ? h('div', { class: 'mc-send' }, sendBox(m, mc, on)) : null, sentList(mc.sent)) : null);
 }

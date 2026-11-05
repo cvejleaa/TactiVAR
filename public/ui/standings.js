@@ -12,7 +12,7 @@ export function renderStandings({ league, onPick, viewTeamId, playing = false })
   if (last) return finalTable(league, last, onPick, viewTeamId, playing);
   const rows = sortStandings(league.leagueMetadata.standings);
   return h('div', { class: 'panel' }, h('h3', { id: 'standings-title' }, `${league.leagueMetadata.name} – sæson ${league.leagueMetadata.seasonNumber}, efter ${league.leagueMetadata.round + 1 - league.seasonStartRound} af ${league.schedule.length} runder`),
-    h('div', { class: 'tablewrap-x' }, h('table', { class: 'standings', id: 'standings' },
+    h('div', { class: 'tablewrap' }, h('table', { class: 'standings', id: 'standings' },
       h('thead', {}, h('tr', {}, ['#', 'Hold', 'K', 'V', 'U', 'T', 'Mål', 'VAR ±', 'P'].map((x) => h('th', {}, x)))),
       h('tbody', {}, rows.map((s, i) => h('tr', { class: (s.isBot ? '' : 'mine ') + (s.teamId === viewTeamId ? 'viewing' : ''), onclick: () => onPick(s.teamId), title: 'Klik for at scoute holdet' },
         h('td', {}, i + 1), h('td', {}, s.teamName), h('td', {}, s.played), h('td', {}, s.won), h('td', {}, s.drawn), h('td', {}, s.lost),
@@ -24,7 +24,7 @@ function finalTable(league, last, onPick, viewTeamId, playing) {
   return h('div', { class: 'panel' }, h('h3', { id: 'standings-title' }, `${league.leagueMetadata.name} – slutstilling, sæson ${last.seasonNumber}`),
     // Mesteren røbes ikke, mens sæsonens sidste runde spilles (QC v3.14.3) – tabellen er allerede bogført.
     last.champion && !playing ? h('p', { id: 'standings-champion' }, `🏆 ${championText(last.champion, last.myPos)}. Sæson ${league.leagueMetadata.seasonNumber} starter med næste runde.`) : null,
-    h('div', { class: 'tablewrap-x' }, h('table', { class: 'standings', id: 'standings' },
+    h('div', { class: 'tablewrap' }, h('table', { class: 'standings', id: 'standings' },
       h('thead', {}, h('tr', {}, ['#', 'Hold', 'K', 'V', 'U', 'T', 'Mål', 'VAR ±', 'P'].map((x) => h('th', {}, x)))),
       h('tbody', {}, last.table.map((s, i) => h('tr', { class: (mine.has(s.teamId) ? 'mine ' : '') + (s.teamId === viewTeamId ? 'viewing' : ''), onclick: () => onPick(s.teamId), title: 'Klik for at scoute holdet' },
         h('td', {}, i + 1), h('td', {}, s.teamName), h('td', {}, s.played), h('td', {}, s.won), h('td', {}, s.drawn), h('td', {}, s.lost),

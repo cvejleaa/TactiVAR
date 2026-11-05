@@ -31,7 +31,7 @@ const all = (el, pred, out = []) => { if (el instanceof FakeEl) { if (pred(el)) 
 const byId = (el, id) => all(el, (e) => e.attrs.id === id);
 const cls = (e, c) => e.className.split(' ').includes(c);
 const on = { skip() {}, view() {}, snapshot() {}, openGoal() {}, filter() {}, heat() {}, replay() {} };
-const render = (m, myTeamId, mc = {}) => { clearReplays(); return renderMatchCenter({ mc: { round: 1, matches: [m], gazette: { goalOfTheRound: null, totalGoals: 0, totalVarChecks: 0 }, viewIdx: 0, filter: 'all', shownCount: Infinity, playing: false, ...mc }, myTeamId, on }); };
+const render = (m, myTeamId, mc = {}) => { clearReplays(); return renderMatchCenter({ mc: { round: 1, matches: [m], gazette: { goalOfTheRound: null, totalGoals: 0, totalVarChecks: 0 }, viewIdx: 0, filter: 'all', shownCount: Infinity, playing: false, pane: 'players', ...mc }, myTeamId, on }); };   // v3.32.1: standard "👥 Spillerne" (referatet: pane 'replay')
 const isEnd = (e) => e.type === 'END' || e.type === 'FULLTIME';
 
 // De samme 200 kampe som tools/measure-clock.mjs. "Rene" = uden Hvis-Så-linjer (minClock skubber dér hændelser ud af vinduet).

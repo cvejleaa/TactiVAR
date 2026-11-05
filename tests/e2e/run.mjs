@@ -392,7 +392,7 @@ try {
     const s0 = await st();
     check('F2: panelet starter lukket – også når siden åbner på Trup (hidden, data-open="nej", intet kort)', (await tp.isVisible('.tabpane.tab-trup')) && s0.open === 'nej' && s0.hidden && s0.kids === 0 && s0.cards === 0
       && (await marked('#matrix tr.selected')).length === 0, JSON.stringify(s0));
-    check('F2 Trup: hjælpelinjen over regnearket siger, at et klik åbner kortet', (await tp.textContent('#trup-help')) === 'Klik på en spiller for at åbne spillerkortet');
+    check('F2 Trup: hjælpelinjen over regnearket siger, at et valg åbner kortet (v3.32.1: "Vælg" – ikke "Klik")', (await tp.textContent('#trup-help')) === 'Vælg en spiller for at åbne spillerkortet');
     const P = mine(await save()).squad;
     // (2) Trup: et klik åbner – ét kort, i panelet; ✕ får fokus; rækken får omridset
     await row(P[5].id);
@@ -1064,6 +1064,8 @@ try {
   const openCard = (pid = null, pg = g) => openCardOn(pg, pid);
   const rows = () => g.locator('#matrix tbody tr').count();
   const tab = async (k) => { await g.click(`#tab-${k}`); await g.waitForSelector(`.tabpane.tab-${k}`); };
+  // v3.32.1 (R3): Kamp-underfanerne efter fløjtet – 'replay' (afspilning & referat), 'stats', 'players'
+  const pane = async (k, pg = g) => { await pg.click(`#mc-tab-${k}`); await pg.waitForSelector(`#mc-tab-${k}.active`); };
   // v3.28.0 (UI-ombygningen F1): holdvælgeren står kun på Liga og i scout-bjælken. Hjælperen vælger på Liga og vender tilbage til
   // fanen, testen stod på, hvis den kan vise et andet hold (Trup/Taktik/Klub) – ellers står man i Trup, som før fra Kamp/Liga/Admin.
   const seeTeam = async (i, pg = g) => {
@@ -1142,8 +1144,10 @@ try {
       check(`F0 ${w} px: beskeden (.notice) står i brødtekst-størrelse 14 px`, (await pg.locator('#notice').count()) === 1 && (await pg.locator('#notice').evaluate((e) => getComputedStyle(e).fontSize)) === '14px');
       await mal('trup (modstander, med besked)'); await pg.selectOption('#scout-banner #team-select', mit);   // v3.28.0: holdvælgeren står på Liga og i scout-bjælken (TM: F0-blokken brugte den fra Trup og kastede)
       await pg.click('#play-round'); await pg.waitForSelector('#match-center'); await mal('kamp (live)');
-      await pg.click('#skip'); await pg.waitForFunction(() => !document.querySelector('#skip') && document.querySelector('#match-center .ratings'));
+      await pg.click('#skip'); await pg.waitForFunction(() => !document.querySelector('#skip') && document.querySelector('#match-center #mc-tabs'));
       for (const k of ['kamp', 'trup', 'traening', 'taktik', 'liga', 'klub', 'admin']) { await t(k); await mal(k + ' (efter runden)'); }
+      // v3.32.1: Kamps andre underfaner (statistik, karakterark) måles også
+      await t('kamp'); for (const k of ['stats', 'players']) { await pg.click(`#mc-tab-${k}`); await pg.waitForSelector(`#mc-tab-${k}.active`); await mal(`kamp – fanen ${k} (efter runden)`); }
       await c.close();
     }
     check('F0: hele appen (alle faner, begge bredder) bruger højst 6 skriftstørrelser – før 20', alle.size <= 6, [...alle].join(' '));
@@ -1730,6 +1734,138 @@ try {
     await g.setViewportSize({ width: 1400, height: 1000 }); }
   check('Layout: siden selv scroller ikke sidelæns', await g.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
 
+  // ---------- v3.32.1: designkritikkens røde (R1–R5) – målt i Chromium ved 390×844, 1366×768 og 1366×900 ----------
+  {
+    const c = await browser.newContext({ viewport: { width: 390, height: 844 } }), p = await c.newPage(), egne = [];
+    p.on('pageerror', (e) => egne.push(e.message));
+    await p.goto(BASE + '/'); await p.waitForSelector('body[data-klar="ja"]');
+    const tt = async (k) => { await p.click(`#tab-${k}`); await p.waitForSelector(`.tabpane.tab-${k}`); };
+    const paneP = async (k) => { await p.click(`#mc-tab-${k}`); await p.waitForSelector(`#mc-tab-${k}.active`); };
+    const settle = () => p.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+    const size = async (w, hh) => { await p.setViewportSize({ width: w, height: hh }); await p.waitForTimeout(250); await settle(); };   // resize-måling er forsinket 120 ms
+    // R1 Taktik (390): præcis 5 ⓘ, alle lukkede; de lange tekster findes (textContent), men står IKKE på skærmen; de korte står på én linje
+    await tt('taktik');
+    const r1 = await p.evaluate(() => {
+      const more = [...document.querySelectorAll('#tactics details.help-more')], vis = (e) => !!e && e.checkVisibility({ visibilityProperty: true });   // lukket <details>: indholdet er skjult (content-visibility), ikke væk
+      const shorts = [...document.querySelectorAll('#tactics .help-short')].map((e) => ({ t: e.textContent, lines: Math.round(e.getBoundingClientRect().height / parseFloat(getComputedStyle(e).lineHeight)) }));
+      return { n: more.length, open: more.filter((d) => d.open).length, labels: more.map((d) => d.querySelector('summary').getAttribute('aria-label')), sumH: more.map((d) => Math.round(d.querySelector('summary').getBoundingClientRect().height)),
+        longVisible: [...document.querySelectorAll('#tactics .phase-help, #subs-help, #tactics .rules-help')].filter(vis).length, longN: document.querySelectorAll('#tactics .phase-help').length,
+        longTxt: document.querySelector('#tactics fieldset[data-phase="phase1_buildUp"] .phase-help')?.textContent ?? '', shorts };
+    });
+    check('R1 Taktik (390): præcis 5 "ⓘ Sådan virker det" – alle lukket, navngivet (Fase 1–3, Hvis-Så, udskiftninger), summary ≥ 44 px høj', r1.n === 5 && r1.open === 0
+      && JSON.stringify(r1.labels) === JSON.stringify(['Sådan virker Fase 1', 'Sådan virker Fase 2', 'Sådan virker Fase 3', 'Sådan virker Hvis-Så-reglerne', 'Sådan virker udskiftningerne']) && r1.sumH.every((x) => x >= 44), JSON.stringify(r1.labels) + ' ' + r1.sumH);
+    check('R1 Taktik (390): de lange forklaringer står IKKE på skærmen, men findes (indholdet intakt) – og hver kort linje står på én linje', r1.longVisible === 0 && r1.longN === 3 && r1.longTxt.startsWith('Angrebsfokus bestemmer') && r1.shorts.length === 5 && r1.shorts.every((x) => x.lines === 1 && x.t.length > 20), JSON.stringify(r1.shorts));
+    // Åbn Fase 2, skift en indstilling (gentegning af hele siden) → Fase 2 er stadig åben, Fase 1 stadig lukket; luk den igen → lukket efter næste gentegning
+    await p.click('#help-phase2_defending > summary');
+    const before = await p.selectOption('#tactics select[data-field="passingStyle"]', { index: 0 }).then(() => p.inputValue('#tactics select[data-field="passingStyle"]'));
+    await p.selectOption('#tactics select[data-field="passingStyle"]', { index: 1 }); await settle();
+    const reOpen = await p.evaluate(() => ({ f2: document.getElementById('help-phase2_defending').open, f1: document.getElementById('help-phase1_buildUp').open, vis: document.querySelector('#help-phase2_defending .phase-help').checkVisibility() }));
+    await p.click('#help-phase2_defending > summary'); await p.selectOption('#tactics select[data-field="passingStyle"]', before); await settle();
+    const reClosed = await p.evaluate(() => document.getElementById('help-phase2_defending').open);
+    check('R1 Taktik: foldet husker åben over en gentegning (skift af indstilling) – og lukket, når det lukkes igen; de andre røres ikke', reOpen.f2 && reOpen.vis && !reOpen.f1 && reClosed === false, JSON.stringify({ reOpen, reClosed }));
+    // R5 Trup: rækkerne ≥ 44 px ved 390 og < 36 ved 1366 (før: ca. 25 ved begge)
+    await tt('trup');
+    const rowsH = () => p.evaluate(() => [...document.querySelectorAll('#matrix tbody tr')].map((r) => Math.round(r.getBoundingClientRect().height)));
+    const h390 = await rowsH();
+    // R4 Trup (390): rammen ruller (data-scroll), kanten toner ud (mask-image), Spiller står fast – og efter rul til enden er fade'et væk
+    const r4 = () => p.evaluate(() => {
+      const w = document.querySelector('#matrix').closest('.tablewrap'), cs = getComputedStyle(w), name = document.querySelector('#matrix tbody td.stick-2'), pos = document.querySelector('#matrix tbody td.stick-1');
+      return { scroll: w.dataset.scroll ?? null, more: w.dataset.more ?? null, stick: w.dataset.stick ?? null, mask: cs.maskImage !== 'none' ? cs.maskImage : cs.webkitMaskImage, namePos: getComputedStyle(name).position, posPos: getComputedStyle(pos).position,
+        nameLeft: Math.round(name.getBoundingClientRect().left - w.getBoundingClientRect().left), before: getComputedStyle(name, '::before').content, dataPos: name.dataset.pos, sw: w.scrollWidth, cw: w.clientWidth };
+    });
+    const a = await r4();
+    await p.evaluate(() => { const w = document.querySelector('#matrix').closest('.tablewrap'); w.scrollLeft = w.scrollWidth; w.dispatchEvent(new Event('scroll')); }); await settle();
+    const b = await r4();
+    check('R5 Trup: hver række er mindst 44 px høj ved 390 (18 rækker – før 25 px)', h390.length === 18 && h390.every((x) => x >= 44), h390.join(','));
+    check('R4 Trup (390): tabellen er bredere end rammen og markeret – fade i højre kant (mask-image) og Spiller låst (sticky)', a.scroll === 'ja' && a.more === 'ja' && /linear-gradient/.test(a.mask ?? '') && a.namePos === 'sticky' && a.sw > a.cw + 100, JSON.stringify(a));
+    check('R4 Trup (390): over 40 % til Pos + Spiller → kun Spiller låst, og pladsen står i samme celle ("VKB "/"BÆNK " før navnet)', a.stick === 'navn' && a.posPos === 'static' && !!a.dataPos && a.before === `"${a.dataPos} "`, JSON.stringify({ stick: a.stick, posPos: a.posPos, before: a.before, dataPos: a.dataPos }));
+    check('R4 Trup (390): rullet til enden er fade\'et væk, og navnet står stadig fast i venstre kant', b.scroll === 'ja' && b.more === null && (b.mask === 'none' || !b.mask) && b.nameLeft >= -1 && b.nameLeft <= 2, JSON.stringify(b));
+    // Uigennemsigtige låste celler: "byt i gang" (🔁) og den sorterede kolonne – ellers skinner de forbirullede tal igennem
+    // (byt startes kun på Taktik siden v3.19.0 og ryddes ved fanebyt – rækken markeres her direkte, så CSS-reglen måles)
+    await p.evaluate(() => document.querySelectorAll('#matrix tbody tr')[2].classList.add('swapping'));
+    const bg = await p.evaluate(() => { const tr = document.querySelector('#matrix tbody tr.swapping'); return tr ? { swap: getComputedStyle(tr.querySelector('td.stick-2')).backgroundColor, n: document.querySelectorAll('#matrix tbody tr.swapping').length } : null; });
+    const bgSorted = await p.evaluate(() => getComputedStyle(document.querySelector('#matrix thead th.stick-1')).backgroundColor);
+    check('R4 Trup: en låst celle er uigennemsigtig i "byt i gang"-rækken (#3b2622) og i den sorterede kolonne (#251453)', bg?.n === 1 && bg.swap === 'rgb(59, 38, 34)' && bgSorted === 'rgb(37, 20, 83)', JSON.stringify({ bg, bgSorted }));
+    await p.evaluate(() => document.querySelector('#matrix tbody tr.swapping').classList.remove('swapping'));
+    // R4 Træning og Klub-regnskabet (390): samme regel (låst første kolonne, fade)
+    await tt('traening');
+    const tr4 = await p.evaluate(() => { const w = document.querySelector('#training-table').closest('.tablewrap'); return { scroll: w.dataset.scroll ?? null, more: w.dataset.more ?? null, first: getComputedStyle(document.querySelector('#training-table tbody td.stick-1')).position }; });
+    check('R4 Træning (390): fade og Spiller låst – samme regel som Trup', tr4.scroll === 'ja' && tr4.more === 'ja' && tr4.first === 'sticky', JSON.stringify(tr4));
+    // R5/R4 ved 1366×768: tætte rækker, ingen sidelæns rul, ingen markering, intet låst
+    await size(1366, 768); await tt('trup');
+    const h1366 = await rowsH(), d = await r4();
+    check('R5 Trup (1366): rækkerne er stadig tætte (< 36 px) – 44 px-reglen lækker ikke til computeren', h1366.length === 18 && h1366.every((x) => x < 36), h1366.join(','));
+    check('R4 Trup (1366): tabellen passer – ingen data-scroll/data-more, ingen fade og intet låst', d.scroll === null && d.more === null && (d.mask === 'none' || !d.mask) && d.namePos === 'static', JSON.stringify(d));
+    // ---------- Kamp: live, så fløjtet ----------
+    await size(390, 844);
+    await p.click('#play-round'); await p.waitForSelector('#skip');
+    check('R3 under live-afspilning: ingen underfaner, ingen fuldtids-linje og intet "⋯ Mere"', (await p.locator('#mc-tabs, #mc-ft, #mc-more').count()) === 0 && (await p.getAttribute('#mc-main', 'class')) === 'mc-grid');
+    await p.click('#skip'); await p.waitForSelector('#mc-tabs'); await p.evaluate(() => window.scrollTo(0, 0)); await settle();
+    // Første skærm (390×844, 1366×768, 1366×900): ▶ over Spil-bjælken, banen begynder på skærmen; knapper → tekst → bane (i den rækkefølge)
+    const first = () => p.evaluate(() => { const b = (s) => document.querySelector(s)?.getBoundingClientRect(); const bar = b('#playbar'), nav = innerWidth <= 600 ? b('.tabbar') : null;
+      const free = Math.min(bar?.height ? bar.top : innerHeight, nav?.height ? nav.top : innerHeight);
+      return { y: Math.round(scrollY), ih: innerHeight, free: Math.round(free), play: Math.round(b('#rp-play').bottom), ctrl: Math.round(b('.rp-controls').bottom), cap: Math.round(b('#rp-caption').top), capB: Math.round(b('#rp-caption').bottom), pitch: Math.round(b('#rp-pitch').top), pitchH: Math.round(b('#rp-pitch').height),
+        send: document.querySelector('#send-match, #send-off')?.checkVisibility() ? 1 : 0, intro: document.querySelector('#replay-help span').checkVisibility() ? 1 : 0, introOpen: document.getElementById('replay-help').open }; });
+    const ys = {};
+    ys['390×844'] = await first();
+    await size(1366, 768); await p.evaluate(() => window.scrollTo(0, 0)); ys['1366×768'] = await first();
+    await size(1366, 900); await p.evaluate(() => window.scrollTo(0, 0)); ys['1366×900'] = await first();
+    const okY = (v) => v.y === 0 && v.play <= v.free && v.pitch < v.ih - 200 && v.ctrl <= v.cap + 1 && v.capB <= v.pitch + 1;
+    check('R2 efter fløjtet: ▶ Afspil over Spil-bjælken (og bundnavigationen), banen begynder mindst 200 px over bunden – ved 390×844, 1366×768 og 1366×900 (før: ▶ ved y 1230/1036/1043)', Object.values(ys).every(okY), JSON.stringify(ys));
+    check('R2 efter fløjtet: knapperne står OVER teksten, teksten over banen; banens højde er clamp(16rem, 100svh − 26rem, 32rem) – 428 / 352 / 484 px', Object.values(ys).every((v) => v.ctrl <= v.cap + 1 && v.capB <= v.pitch + 1) && ys['390×844'].pitchH === 428 && ys['1366×768'].pitchH === 352 && ys['1366×900'].pitchH === 484, JSON.stringify(Object.fromEntries(Object.entries(ys).map(([k, v]) => [k, v.pitchH]))));
+    check('R2 efter fløjtet: "📤 Send kampen" og intro-teksten står IKKE på første skærm (⋯ Mere og ⓘ er lukket)', Object.values(ys).every((v) => v.send === 0 && v.intro === 0 && !v.introOpen) && (await p.getAttribute('#mc-more', 'open')) === null);
+    await size(390, 844);
+    const chips = await p.evaluate(() => { const cs = [...document.querySelectorAll('#match-cards .matchcard')].map((x) => Math.round(x.getBoundingClientRect().top)), w = document.querySelector('#match-cards').closest('.tablewrap'); return { tops: cs, more: w.dataset.more ?? null, mine: document.querySelector('#match-cards .matchcard').classList.contains('active') }; });
+    check('R2 kampvælgeren (390): én linje (4 kampe, samme top), rullelig med fade – din kamp forrest og valgt', chips.tops.length === 4 && new Set(chips.tops).size === 1 && chips.more === 'ja' && chips.mine, JSON.stringify(chips));
+    // Fuldtids-linjen: de to første sætninger af fuldtids-analysen – fast under stillingen i alle tre faner
+    const ftWant = await p.evaluate(() => { const d = JSON.parse(localStorage.getItem('tactivar_save')), m = d.league.lastRound.matches[0]; return '📊 ' + m.events.find((e) => e.type === 'FULLTIME').text.replace(/^📊 \[FULDTIDS-ANALYSE\] /, '').split('. ').slice(0, 2).join('. ') + '.'; });
+    const ft = {};
+    // R3: hver fane viser KUN sit; fokus på fane-knappen bagefter (tastatur); fanen bevares ved skift af kamp
+    const shows = () => p.evaluate(() => ({ feed: document.querySelectorAll('#feed').length, replay: document.querySelectorAll('#replay').length, stats: document.querySelectorAll('#match-stats').length, ratings: document.querySelectorAll('.ratings').length, legend: document.querySelectorAll('#icon-legend').length,
+      active: document.querySelector('#mc-tabs button.active')?.id, pressed: document.querySelector('#mc-tabs button[aria-pressed="true"]')?.id, focus: document.activeElement?.id, ft: document.querySelector('#mc-ft')?.textContent, ftBelowScore: document.querySelector('#mc-ft').getBoundingClientRect().top >= document.querySelector('#timeline').getBoundingClientRect().bottom - 1 }));
+    const sh = { replay: await shows() };
+    await paneP('stats'); sh.stats = await shows();
+    await paneP('players'); sh.players = await shows();
+    for (const [k, v] of Object.entries(sh)) ft[k] = v.ft === ftWant && v.ftBelowScore;
+    const want = { replay: [1, 1, 0, 0, 0], stats: [0, 0, 1, 0, 0], players: [0, 0, 0, 2, 1] };
+    check('R3 underfanerne: 🎬 viser afspilning + referat, 📊 kun statistikken, 👥 kun karakterarkene + forklaringen – intet andet', Object.entries(want).every(([k, w]) => JSON.stringify([sh[k].feed, sh[k].replay, sh[k].stats, sh[k].ratings, sh[k].legend]) === JSON.stringify(w)), JSON.stringify(sh));
+    check('R3 underfanerne: den valgte er aktiv og aria-pressed, og fokus står på dens knap efter skiftet', sh.replay.active === 'mc-tab-replay' && sh.stats.active === 'mc-tab-stats' && sh.stats.pressed === 'mc-tab-stats' && sh.stats.focus === 'mc-tab-stats' && sh.players.focus === 'mc-tab-players', JSON.stringify(sh));
+    check('R3 fuldtids-linjen: "📊 <resultat>. Du havde N% af bolden …" (fuldtids-analysens to første sætninger) står under tidslinjen i alle tre faner', Object.values(ft).every(Boolean) && /^📊 (Sejr|Nederlag|Uafgjort) \d+-\d+.*\. Du havde \d+% af bolden/.test(ftWant) && !ftWant.includes('Dødbolde'), `${ftWant} | ${JSON.stringify(ft)}`);
+    await p.click('#match-cards .matchcard:nth-child(2)');
+    check('R3: fanen bevares, når en anden af rundens kampe vælges', (await p.locator('#mc-tab-players.active').count()) === 1 && (await p.locator('#match-cards .matchcard:nth-child(2).active').count()) === 1 && (await p.locator('.ratings').count()) === 2);
+    // openReport lander rigtigt – altid første fane med netop den kamp, også fra "👥 Spillerne"
+    const land = () => p.evaluate(() => { const f = document.getElementById('feed')?.getBoundingClientRect(), bar = document.querySelector('#playbar').getBoundingClientRect().top, nav = document.querySelector('.tabbar').getBoundingClientRect();
+      const free = innerWidth <= 600 ? Math.min(bar, nav.top) : bar;
+      return { tab: document.querySelector('#tabs .tab.active')?.id, pane: document.querySelector('#mc-tabs button.active')?.id, card: [...document.querySelectorAll('#match-cards .matchcard')].findIndex((x) => x.classList.contains('active')), score: document.querySelector('#scoreboard strong').textContent,
+        feedTop: f ? Math.round(f.top) : null, free: Math.round(free), y: Math.round(scrollY), play: Math.round(document.getElementById('rp-play')?.getBoundingClientRect().bottom ?? -1) }; });
+    const names = await p.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.lastRound.matches.map((m) => m.homeName));
+    await tt('liga'); await p.locator('#last-round .fixture').nth(2).click(); await p.waitForSelector('.tabpane.tab-kamp'); await settle();
+    const fromLiga = await land();
+    await paneP('stats'); await tt('liga'); await p.locator('#col-others .col-match').first().click(); await p.waitForSelector('.tabpane.tab-kamp'); await settle();
+    const fromPaper = await land();
+    const paperIdx = await p.evaluate(() => [...document.querySelectorAll('#match-cards .matchcard')].findIndex((x) => x.classList.contains('active')));
+    await paneP('players'); await tt('hjem'); await p.click('#home-kamp'); await p.waitForSelector('.tabpane.tab-kamp'); await settle();
+    const fromHome = await land();
+    check('openReport fra Liga (390): Kamp, fanen 🎬 Afspilning & referat, netop kamp 3 – og referatet er rullet frem over bjælkerne', fromLiga.tab === 'tab-kamp' && fromLiga.pane === 'mc-tab-replay' && fromLiga.card === 2 && fromLiga.score === names[2] && fromLiga.feedTop >= 0 && fromLiga.feedTop < fromLiga.free - 40, JSON.stringify(fromLiga));
+    check('openReport fra avisen (fra fanen 📊): tilbage i 🎬 Afspilning & referat med avisens kamp (ikke din)', fromPaper.pane === 'mc-tab-replay' && paperIdx > 0 && fromPaper.score === names[paperIdx] && fromPaper.feedTop < fromPaper.free - 40, JSON.stringify({ fromPaper, paperIdx }));
+    check('Hjem "Se kampen ›" (fra fanen 👥): 🎬 Afspilning & referat med din kamp – øverst, ▶ Afspil på første skærm', fromHome.pane === 'mc-tab-replay' && fromHome.card === 0 && fromHome.y === 0 && fromHome.play > 0 && fromHome.play <= fromHome.free, JSON.stringify(fromHome));
+    await size(1366, 768); await paneP('players'); await tt('hjem'); await p.click('#home-kamp'); await p.waitForSelector('.tabpane.tab-kamp'); await settle();
+    const home1366 = await land();
+    check('Hjem "Se kampen ›" (1366×768): ▶ Afspil og referatet står begge på første skærm', home1366.pane === 'mc-tab-replay' && home1366.card === 0 && home1366.play <= home1366.free && home1366.feedTop < home1366.free - 100, JSON.stringify(home1366));
+    // Fra spillerkortets kampe (📺 ved seneste kamp): samme indgang
+    await paneP('stats'); await tt('trup');
+    const pid = await p.evaluate(() => { const d = JSON.parse(localStorage.getItem('tactivar_save')), me = d.league.teams.find((t) => !t.isBot); return me.tactics.lineupSlots[5]; });
+    await p.click(`#matrix tr[data-pid="${pid}"]`); await p.waitForSelector('#cardpanel .log-open');
+    await p.click('#cardpanel .log-open'); await p.waitForSelector('.tabpane.tab-kamp'); await settle();
+    const fromCard = await land();
+    check('openReport fra spillerkortet (📺, fra fanen 📊): 🎬 Afspilning & referat med hans kamp (din)', fromCard.tab === 'tab-kamp' && fromCard.pane === 'mc-tab-replay' && fromCard.card === 0, JSON.stringify(fromCard));
+    // "Statistik"s standard-åbne fold (Liga) husker lukket over gentegning (QC: "husker lukket eksplicit")
+    await tt('liga'); await p.click('#stats-players > summary'); await tt('trup'); await tt('liga');
+    check('Liga-statistikkens "Spillere" (åben fra start) bliver lukket, når den er lukket – også efter fanebyttet', (await p.getAttribute('#stats-players', 'open')) === null);
+    check('v3.32.1-blokken: ingen sidefejl', egne.length === 0, egne.join(' | '));
+    await c.close();
+  }
+
   // ---------- Kampe: Match Center ----------
   await seeTeam('0');
   await seeTeam('3'); // kampknappen findes også, mens man scouter
@@ -1829,12 +1965,15 @@ try {
   await g.click('#club-link');
   check('Klubkassen i Hjem-fanens klubhoved åbner Klub', (await g.textContent('#tabs .tab.active')).includes('Klub'));
   await seeTeam('3'); await tab('kamp');
-  const mcText = await g.textContent('#match-center');
+  // v3.32.1: karakterarket står i "👥 Spillerne" – teksten samles fra begge faner
+  await pane('players'); const mcPlayers = await g.textContent('#match-center'); await pane('replay');
+  const mcText = (await g.textContent('#match-center')) + mcPlayers;
   // v3.16.3: minuttet står ved linjen ("3'"), ikke i teksten
   check('Din Hvis-Så-udskiftning (uanset stilling, fra minut 3) står i referatet i 3. minut, og indskifteren står i karakterarket', /(?<!\d)3'🔄 \[.+ • Hvis-Så\] #\d+ .+ ud – #\d+ .+ ind \(din Hvis-Så-regel\)\./.test(mcText) && /ind på/.test(mcText), (mcText.match(/🔄[^.]*\./) || ['ingen'])[0]);
   // Dit hold kan være hjemme eller ude (programmet) – karakterarkene står hjemme, ude.
   const own = await g.evaluate(() => (JSON.parse(localStorage.getItem('tactivar_save')).league.lastRound.matches[0].ratings.home[0].isUserTeam ? 0 : 1));
-  check('Referatet indeholder slutfløjt, statistik og karakterark', mcText.includes('SLUTFLØJT') && (await g.isVisible('#match-stats')) && (await g.locator('.ratings').count()) === 2);
+  await pane('stats');
+  check('Referatet indeholder slutfløjt, statistik (fanen 📊) og karakterark (fanen 👥)', mcText.includes('SLUTFLØJT') && (await g.isVisible('#match-stats')) && (await g.locator('.ratings').count()) === 0 && mcPlayers.includes('karakterer'));
   // v3.10.1: dødbolde og gule kort i statistikken til højre – tallene = kampens gemte statistik
   const statRows = await g.locator('#match-stats tbody tr').evaluateAll((trs) => trs.map((tr) => [...tr.children].map((c) => c.textContent)));
   const statSaved = await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.lastRound.matches[0].stats);
@@ -1843,11 +1982,11 @@ try {
     rowOf('Hjørnespark')?.[0] === String(statSaved.hCorners) && rowOf('Hjørnespark')?.[2] === String(statSaved.aCorners)
     && rowOf('Frispark i skudafstand')?.[0] === String(statSaved.hFreeKicks) && rowOf('Straffe (mål)')?.[0] === `${statSaved.hPenalties} (${statSaved.hPenaltyGoals})`
     && rowOf('Gule kort')?.[2] === String(statSaved.aYellows) && !!rowOf('Frispark begået / skader'), JSON.stringify(statRows.slice(-5)));
-  const feedText = await g.textContent('#feed');
+  await pane('replay'); const feedText = await g.textContent('#feed');
   check('Referatet: ingen evnetal og ingen interne koder', !/\b(FIN|PAS|POS|INT|STA|STR|BAL|PAC)\s*[:=]?\s*\d/.test(feedText) && !/BALANCED|MID_BLOCK|HIGH_GEGENPRESS/.test(mcText));
   const score = (await g.textContent('#score')).trim();
   check('Resultattavlen svarer til slutfløjtet', mcText.includes(`${score.replace(' - ', ' - ')}`) && /\d+ - \d+/.test(score));
-  const oppRatings = await g.locator('.ratings').nth(1 - own).locator('td.rating').allTextContents();
+  await pane('players'); const oppRatings = await g.locator('.ratings').nth(1 - own).locator('td.rating').allTextContents();
   const ownRatings = await g.locator('.ratings').nth(own).locator('td.rating').allTextContents();
   const starColors = await g.evaluate(() => { const s = document.querySelector('.ratings .star-on'), o = document.querySelector('.ratings .star-off'); return s && o ? [getComputedStyle(s).color, getComputedStyle(o).color] : null; });
   check('Stjerner er læsbare: udfyldte og tomme har forskellig farve', !!starColors && starColors[0] !== starColors[1], String(starColors));
@@ -1871,7 +2010,7 @@ try {
   const duel = await g.locator('.ratings').nth(own).locator('td.duel').allTextContents();
   const duelExpect = await g.evaluate(() => { const m = JSON.parse(localStorage.getItem('tactivar_save')).league.lastRound.matches[0]; const own = [m.ratings.home, m.ratings.away].find((l) => l[0].isUserTeam); return { mine: own.filter((e) => e.duels > 0).map((e) => `${e.duelsWon}/${e.duels} 🤼`), opp: [m.ratings.home, m.ratings.away].find((l) => !l[0].isUserTeam).filter((e) => e.duels > 0).length }; });
   check('Karakterark: 🤼 for dit hold matcher de gemte dueller, modstanderen har ingen kolonne', duel.length >= 11 && duelExpect.mine.length > 0 /* modstanderens tal er gemt (motoren), men vises ikke: */ && JSON.stringify(duel.filter(Boolean).sort()) === JSON.stringify([...duelExpect.mine].sort()) && (await g.locator('.ratings').nth(1 - own).locator('td.duel').count()) === 0, JSON.stringify({ duel, duelExpect }));
-  const runSum = await g.textContent('#match-center');
+  await pane('replay'); const runSum = await g.textContent('#match-center');
   check('Fuldtids-analyse med løb uden bold i din kamp', /📊 \[FULDTIDS-ANALYSE\] (Sejr \d+-\d+ til dig|Nederlag \d+-\d+|Uafgjort \d+-\d+)\. Du havde \d+% af bolden og \d+ afslutning(er)? \(\d+ på mål\)\. ((Din opbygning kom igennem \d+ af \d+ gange?( \((af de \d+ stop var \d+|alle \d+ stop var|stoppet var) offside\))?; d|D)it pres (vandt bolden \d+ af \d+ gange?|stoppede opbygningen \d+ af \d+ gange? \(\d+ erobring(er)?, \d+ på offside\))|Din opbygning kom igennem \d+ af \d+ gange?( \((af de \d+ stop var \d+|alle \d+ stop var|stoppet var) offside\))?)\. Dødbolde: \d+ frispark i skudafstand, \d+ hjørnespark, \d+ straffespark \(\d+ mål\) · frispark begået \d+, tilkendt \d+\. 🎯 Løb uden bold \(Normal\): \d+ løb, \d+ kom fri \(\d+ mål\) · kontraer imod i alt: \d+ \(\d+ mål\)\./.test(runSum), runSum.match(/🎯[^.]*\./)?.[0] ?? 'mangler');
   check('Fuldtids-analysen viser dit angreb (fokus · pasningsstil) og dit felt (v3.12)', /⚔️ Angreb \((Centralt|Høje indlæg|Lave cutbacks) · (korte pasninger|balanceret|direkte lange bolde)\): (ingen cutbacks eller høje bolde|(\d+ cutbacks? \(\d+ mål, \d+ stoppet ved kanten\))?(, )?(\d+ (høje bolde|høj bold) \(\d+ (vundne luftdueller|vundet luftduel) i åbent spil, \d+ hovedstødsmål\))?)\. 🛡️ Dit felt: modstanderens cutbacks stoppet \d+ af \d+ · luftdueller i åbent spil vundet \d+ af \d+\./.test(runSum), runSum.match(/⚔️[^🛡]*🛡️[^.]*\./)?.[0] ?? 'mangler');
   // v3.31.0 (F3, avisen ét sted): Kamp har INGEN avis – kun linket i .to-home-linjen øverst, med klummens overskrift; det lander på avisen på Liga
@@ -1895,7 +2034,7 @@ try {
   const myName = await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((t) => !t.isBot).name);
   check('Klummen, "Din kamp": handler om dit hold (seeren)', myMatchTxt.includes(myName), myMatchTxt.slice(0, 160));
   const por = await g.textContent('#player-of-round');   // avisens Rundens spiller (Liga) – sammenlignes med karakterarket i Kamp nedenfor
-  await tab('kamp');   // tilbage til kampcentret (karakterarkene nedenfor)
+  await tab('kamp'); await pane('players');   // tilbage til kampcentret (karakterarkene nedenfor)
   const iconTitles = await g.evaluate(() => [...document.querySelectorAll('.ratings .ricon')].map((e) => [e.textContent, e.title]));
   check('Ikonerne i karakterarket har mouse-over-tekst', iconTitles.length > 0 && iconTitles.every(([t, ti]) => ti.length > 3 && !ti.includes('undefined')), JSON.stringify(iconTitles.slice(0, 3)));
   const legendTxt = await g.textContent('#icon-legend');
@@ -1906,7 +2045,7 @@ try {
   // v3.16.3: 📍 kun hvor afspilningen ikke har afslutningen (QC: ellers to knapper, én handling) – i en ny kamp har hvert mål med
   // billede en 🎬, så 📍 står kun ved et mål med billede UDEN øjeblik i sporet. 📍-flowet køres længere nede på et gem uden spor.
   const pinWant = await g.evaluate(() => { const m = JSON.parse(localStorage.getItem('tactivar_save')).league.lastRound.matches[0]; const mo = new Set((m.trace?.moments ?? []).map((x) => x.ev)); return { snaps: m.events.filter((e) => e.snapshot).length, noFilm: m.events.filter((e, i) => e.snapshot && !mo.has(i)).length, trace: !!m.trace }; });
-  const pinsLive = await g.locator('#feed .snap-btn').count();
+  await pane('replay'); const pinsLive = await g.locator('#feed .snap-btn').count();
   check('📍 står kun ved mål med gemt øjebliksbillede uden 🎬 (kamp med spor)', pinWant.trace && pinsLive === pinWant.noFilm, `${pinsLive} / ${pinWant.noFilm} (billeder i alt ${pinWant.snaps})`);
   // Med faste data: dit mål (scorer og oplæg markeret) og et mål imod (kun dit forsvar) – uafhængigt af tilfældighed
   const snapT = await g.evaluate(async () => {
@@ -1919,11 +2058,12 @@ try {
       const m = simulateMatch(me, opp, createRng(seed + 1000));
       const mineI = m.events.findIndex((e) => e.snapshot?.attacking && e.snapshot.assist), theirI = m.events.findIndex((e) => e.snapshot && !e.snapshot.attacking);
       if (mineI < 0 || theirI < 0) continue;
-      const draw = (snap) => renderMatchCenter({ mc: { round: 1, matches: [m], gazette: null, viewIdx: 0, filter: 'all', shownCount: 0, playing: false, snap }, myTeamId: me.id, on: { snapshot: () => {}, view: () => {}, filter: () => {}, skip: () => {} } });
+      // v3.32.1: øjebliksbilledet står i "👥 Spillerne", 📍/🎬 i referatet (første fane)
+      const draw = (snap, pane = 'players') => renderMatchCenter({ mc: { round: 1, matches: [m], gazette: null, viewIdx: 0, filter: 'all', shownCount: 0, playing: false, snap, pane }, myTeamId: me.id, on: { snapshot: () => {}, view: () => {}, filter: () => {}, skip: () => {} } });
       const ownIds = new Set(me.squad.map((p) => p.id)), oppNames = opp.squad.map((p) => p.shortName);
       const read = (el) => { const sp = el.querySelector('#snap-pitch'); return sp && { title: sp.querySelector('#snap-title').textContent, n: sp.querySelectorAll('.mp-token').length, scorer: sp.querySelectorAll('.mp-token.scorer').length, assist: sp.querySelectorAll('.mp-token.assist').length, ball: !!sp.querySelector('#snap-ball'), pitches: el.querySelectorAll('#snap-pitch').length, oppName: oppNames.some((n) => sp.textContent.includes(n)), pins: el.querySelectorAll('.snap-btn').length }; };
       const ev = m.events[theirI].snapshot;
-      return { a: read(draw(mineI)), b: read(draw(theirI)), none: (() => { const el = draw(null); const { trace, ...old } = m; const elOld = renderMatchCenter({ mc: { round: 1, matches: [old], gazette: null, viewIdx: 0, filter: 'all', shownCount: 0, playing: false, snap: null }, myTeamId: me.id, on: { snapshot: () => {}, view: () => {}, filter: () => {}, skip: () => {} } }); return { pitches: el.querySelectorAll('#snap-pitch').length, pins: el.querySelectorAll('.snap-btn').length, films: el.querySelectorAll('.replay-btn').length, pinsOld: elOld.querySelectorAll('.snap-btn').length, want: m.events.filter((e) => e.snapshot).length }; })(), ownOnly: ev.pts.every(([id]) => ownIds.has(id)) && ev.scorer === null && ev.pts.length === 11 };
+      return { a: read(draw(mineI)), b: read(draw(theirI)), none: (() => { const el = draw(null), elR = draw(null, 'replay'); const { trace, ...old } = m; const elOld = renderMatchCenter({ mc: { round: 1, matches: [old], gazette: null, viewIdx: 0, filter: 'all', shownCount: 0, playing: false, snap: null }, myTeamId: me.id, on: { snapshot: () => {}, view: () => {}, filter: () => {}, skip: () => {} } }); return { pitches: el.querySelectorAll('#snap-pitch').length, pins: elR.querySelectorAll('.snap-btn').length, films: elR.querySelectorAll('.replay-btn').length, pinsOld: elOld.querySelectorAll('.snap-btn').length, want: m.events.filter((e) => e.snapshot).length }; })(), ownOnly: ev.pts.every(([id]) => ownIds.has(id)) && ev.scorer === null && ev.pts.length === 11 };
     }
     return null;
   });
@@ -1967,13 +2107,16 @@ try {
     const vis = await g.evaluate(() => ['home', 'away'].map((c) => [...document.querySelectorAll(`#rp-pitch .rp-token.${c}`)].filter((t) => getComputedStyle(t).display !== 'none').length));
     const totalTok = await g.evaluate(() => document.querySelectorAll('#rp-pitch .rp-token').length);
     check('Afspilning: højst 11 viste brikker pr. hold i sidste trin (udskiftede skjult – målt som tegnet)', vis.every((n) => n >= 7 && n <= 11) && (totalTok <= 22 || vis[0] + vis[1] < totalTok), `${vis} af ${totalTok} brikker`);
-    // v3.20.1 (brugeren: "udnyttelsen af pladsen lige efter en kamp"): afspilningen til venstre, statistik og referat ved siden af
-    { const r = await g.evaluate(() => { const b = (s) => document.querySelector(s).getBoundingClientRect(); return { rp: b('#replay'), st: b('#match-stats'), feed: b('#feed') }; });
-      check('Efter kampen: statistikken ligger i sin grid-plads (klassen mc-stats)', (await g.evaluate(() => getComputedStyle(document.querySelector('.mc-stats')).gridRowStart)) === 'stats');
-      check('Efter kampen: afspilningen til venstre, statistik og referat til højre ved siden af den', r.st.left >= r.rp.right - 1 && r.feed.left >= r.rp.right - 1 && r.st.top < r.rp.bottom && r.feed.top < r.rp.bottom, JSON.stringify({ rpR: Math.round(r.rp.right), stL: Math.round(r.st.left), feedT: Math.round(r.feed.top), rpB: Math.round(r.rp.bottom) }));
+    // v3.20.1 (brugeren: "udnyttelsen af pladsen lige efter en kamp"): afspilningen til venstre og (v3.32.1) referatet ved siden af – statistikken har sin egen fane
+    { const r = await g.evaluate(() => { const b = (s) => document.querySelector(s).getBoundingClientRect(); return { rp: b('#replay'), feed: b('#feed'), stats: document.querySelectorAll('#match-stats').length }; });
+      check('Efter kampen (1400 px): afspilningen til venstre og referatet til højre ved siden af den – statistikken står ikke her (egen fane)', r.feed.left >= r.rp.right - 1 && r.feed.top < r.rp.bottom && r.stats === 0 && (await g.evaluate(() => getComputedStyle(document.querySelector('.mc-feed')).gridRowStart)) === 'feed', JSON.stringify({ rpR: Math.round(r.rp.right), feedL: Math.round(r.feed.left), feedT: Math.round(r.feed.top), rpB: Math.round(r.rp.bottom), stats: r.stats }));
       await g.setViewportSize({ width: 390, height: 844 }); await g.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));   // vent på layout (TM: race)
-      check('Efter kampen på mobil (390 px): siden ruller ikke sidelæns (karakterarkene ruller selv)', await g.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), String(await g.evaluate(() => { const W = window.innerWidth; return document.documentElement.scrollWidth + ' · ' + [...document.querySelectorAll('#app *')].filter((e) => e.getBoundingClientRect().right > W + 2 && !e.closest('.ratings, .tablewrap')).slice(0, 5).map((e) => e.tagName + '#' + e.id + '.' + e.className).join(' | '); })));
-      await g.setViewportSize({ width: 1400, height: 1000 }); }
+      const overflow = () => g.evaluate(() => { const W = window.innerWidth; return document.documentElement.scrollWidth <= W + 1 ? 'ok' : document.documentElement.scrollWidth + ' · ' + [...document.querySelectorAll('#app *')].filter((e) => e.getBoundingClientRect().right > W + 2 && !e.closest('.ratings, .tablewrap')).slice(0, 5).map((e) => e.tagName + '#' + e.id + '.' + e.className).join(' | '); });
+      const ov = {}; for (const k of ['replay', 'stats', 'players']) { await pane(k); ov[k] = await overflow(); }
+      // R4: kampstatistikken passer i bredden ved 390 (table-layout: fixed) – ingen vandret rul i sin ramme
+      await pane('stats'); const msW = await g.evaluate(() => { const w = document.querySelector('#match-stats').closest('.tablewrap'); return w.scrollWidth - w.clientWidth; });
+      check('Efter kampen på mobil (390 px): ingen af de tre faner ruller siden sidelæns (karakterarkene ruller selv) – og kampstatistikken passer i sin ramme', Object.values(ov).every((v) => v === 'ok') && msW <= 1, JSON.stringify({ ov, msW }));
+      await pane('players'); await g.setViewportSize({ width: 1400, height: 1000 }); }
     // v3.20.0 (brugeren): dit ark viser fra start holdets heat map OG startopstillingen – som modstanderens (zoner + opstilling)
     await g.waitForSelector('#heat-pitch');
     const heat = await g.evaluate(() => ({ cells: document.querySelectorAll('#heat-pitch .heat-cell').length, title: document.querySelector('#heat-title').textContent, thirds: document.querySelector('#heat-thirds')?.textContent ?? '', btn: document.querySelectorAll('#heat-btn').length,
@@ -2005,9 +2148,10 @@ try {
         mn.n === 1 && mn.text.includes(`${mn.won} erobring`) && mn.items === mn.combos && /Samarbejde/.test(mn.text) && (mn.combos > 0 || /ingen cutbacks/.test(mn.text)), JSON.stringify(mn));
       await g.click('#heat-team'); }
     // 📍 erstatter kun startopstillingen; heat map'et bliver stående, og ↩ giver startopstillingen tilbage
+    await pane('replay');
     if (await g.locator('#feed .snap-btn').count()) {
       const view = async () => ({ snap: await g.locator('#snap-pitch').count(), heat: await g.locator('#heat-pitch').count() });
-      await g.locator('#feed .snap-btn').first().click(); const afterPin = await view();
+      await g.locator('#feed .snap-btn').first().click(); await g.waitForSelector('#mc-tab-players.active'); const afterPin = await view();   // v3.32.1: 📍 skifter til "👥 Spillerne"
       await g.click('#snap-back'); const afterBack = await view();
       check('📍 viser øjebliksbilledet i stedet for startopstillingen, heat map\'et står stadig; ↩ giver startopstillingen', afterPin.snap === 1 && afterPin.heat === 1 && afterBack.snap === 0 && afterBack.heat === 1, JSON.stringify([afterPin, afterBack]));
     }
@@ -2017,7 +2161,7 @@ try {
   const savedWithTrace = await g.evaluate(() => localStorage.getItem('tactivar_save'));
   // TM v3.22.0: et spor fra før Kampens tal (v3.14–v3.21: heat map, men ingen trace.acts) viser forklaringen – ikke 0 erobringer / 0 bolde tabt
   { await g.evaluate(() => { const d = JSON.parse(localStorage.getItem('tactivar_save')); for (const m of d.league.lastRound.matches) delete m.trace.acts; localStorage.setItem('tactivar_save', JSON.stringify(d)); });
-    await reload(); await tab('kamp');
+    await reload(); await tab('kamp'); await pane('players');
     await g.locator('.ratings tr[title^="Vis hans heat map"]').nth(5).click(); await g.waitForSelector('#match-numbers');
     const old = await g.evaluate(() => ({ text: document.querySelector('#match-numbers').textContent, n: document.querySelectorAll('#match-numbers').length, balls: document.querySelectorAll('#mn-ball, #mn-combos').length }));
     check('Kampens tal: et spor uden handlingslog (før v3.22.0) forklarer, at tallene findes fra v3.22.0 – ingen 0-tal', old.n === 1 && old.balls === 0 && old.text === '📊 Kampens tal findes for kampe spillet fra v3.22.0.', JSON.stringify(old));
@@ -2035,7 +2179,7 @@ try {
           [15, 'press', opp, Q[1], P[1], null], [16, 'trap', opp, Q[2], P[1], null], [17, 'flank', opp, Q[3], P[1], null], [18, 'tackle', opp, Q[4], P[5], null], [19, 'press', opp, Q[1], P[2], null],
           [40, 'cross', opp, Q[1], Q[2], 2]];
         localStorage.setItem('tactivar_save', JSON.stringify(d)); });
-      await reload(); await tab('kamp');
+      await reload(); await tab('kamp'); await pane('players');
       const labels = { cb: 'cutback', run: 'løb og aflevering', cross: 'indlæg', long: 'lang bold', corner: 'hjørnespark', fk: 'frisparksindlæg' }, outs = { 2: '⚽ mål', 1: 'afslutning, ikke mål', 0: 'clearet' };
       const exp = await g.evaluate(async ({ labels, outs }) => {
         const { evMin, fmtMin, tickClock } = await import('./engine/clock.js');   // referatets ur: linjen i tick'et, der nævner modtageren
@@ -2078,12 +2222,15 @@ try {
     const saved = await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.lastRound.matches[0].events.filter((e) => e.snapshot).map((e) => e.snapshot.pts.map(([id, x, y]) => `${id}@${x},${Math.max(1, Math.min(99, Math.round((50 + (y - 50) * 1.175) * 10) / 10))}`).sort().join('|')));   // v3.16.3: y i banens skala (50 + (y − 50)·1,175), regnet her
     // v3.15: efter et rødt kort har billedet 10 (eller færre) brikker – antallet skal passe med det gemte billede (saved.includes)
     const nTok = await g.locator('#snap-pitch .mp-token').count();
-    check('Klik på 📍: minibanen viser et gemt øjebliksbillede præcist (7–11 brikker på deres gemte pladser, bolden)', nTok >= 7 && nTok <= 11 && nTok === shown.split('|').length && saved.includes(shown) && (await g.locator('#snap-ball').count()) === 1 && (await g.locator('#feed .ev.snapped').count()) === 1, shown.slice(0, 80));
+    const onPlayers = (await g.locator('#mc-tab-players.active').count()) === 1; await pane('replay');   // v3.32.1: 📍 skiftede til "👥 Spillerne"; markeringen står i referatet
+    check('Klik på 📍: "👥 Spillerne" åbnes, og minibanen viser et gemt øjebliksbillede præcist (7–11 brikker på deres gemte pladser, bolden) – linjen er markeret i referatet', onPlayers && nTok >= 7 && nTok <= 11 && nTok === shown.split('|').length && saved.includes(shown) && (await g.locator('#feed .ev.snapped').count()) === 1, shown.slice(0, 80));
+    await pane('players'); const ballN = await g.locator('#snap-ball').count(); check('Klik på 📍: bolden står på minibanen', ballN === 1);
     // Test Manager v3.12.1: et mål IMOD mod mellemblok med bolden midt i banen viser præcis startopstillingen (ingen forskydning) – kun dine egne mål SKAL stå anderledes
     // Test Manager v3.12.1: et nyt valg af kamp (også den aktive) fjerner billedet – ellers hænger et gammelt øjebliksbillede ved
     await g.locator('#match-cards .matchcard.active').click();
-    check('Valg af kamp fjerner øjebliksbilledet (mc.snap nulstilles)', (await g.locator('#snap-pitch').count()) === 0 && (await g.locator('#feed .ev.snapped').count()) === 0);
-    await g.locator('#feed .snap-btn').first().click();
+    const snapGone = (await g.locator('#snap-pitch').count()) === 0 && (await g.locator('#mc-tab-players.active').count()) === 1; await pane('replay');
+    check('Valg af kamp fjerner øjebliksbilledet (mc.snap nulstilles) – fanen bevares', snapGone && (await g.locator('#feed .ev.snapped').count()) === 0);
+    await g.locator('#feed .snap-btn').first().click(); await g.waitForSelector('#snap-pitch');
     await g.click('#snap-back');
     check('↩ Startopstilling går tilbage til minibanen fra kampstart', (await g.locator('#snap-pitch').count()) === 0 && (await g.locator('.ratings').nth(own).locator('.mp-token').count()) === 11);
   }
@@ -2091,7 +2238,7 @@ try {
   await reload(); await tab('kamp');
   check('Gemmet med spor er tilbage: afspilningen findes igen', (await g.locator('#replay #rp-pitch').count()) === 1);
   const allEvents = await g.locator('#feed .ev').count();
-  await g.click('#match-center .toolbar button:nth-child(3)');
+  await g.click('#feed-filters button:nth-child(3)');
   check('Filteret "Kun nøglemomenter" viser færre hændelser', (await g.locator('#feed .ev').count()) < allEvents);
   await g.click('#match-cards .matchcard:nth-child(2)');
   check('De øvrige kampe kan åbnes', (await g.textContent('#scoreboard')).includes((await g.textContent('#match-cards .matchcard:nth-child(2)')).split(' ')[0]));
@@ -2134,7 +2281,7 @@ try {
   check('Liga: præcis én kamp markeret som din – i begge lister', mineRes.length === 1 && mineRes[0].includes(fromSave.me) && mineNext.length === 1 && mineNext[0].includes(fromSave.me) && res.filter((t) => t.includes(fromSave.me)).length === 1);
   const third = await g.locator('#last-round .fixture').nth(2).locator('.fx-team').first().textContent();
   await g.locator('#last-round .fixture').nth(2).click();
-  check('Klik på et resultat åbner netop den kamps referat i Kamp-fanen', (await g.textContent('#tabs .tab.active')).includes('Kamp') && (await g.locator('#match-cards .matchcard:nth-child(3).active').count()) === 1 && (await g.textContent('#scoreboard')).includes(third) && (await g.locator('#match-center .toolbar button:nth-child(1).active').count()) === 1);
+  check('Klik på et resultat åbner netop den kamps referat i Kamp-fanen', (await g.textContent('#tabs .tab.active')).includes('Kamp') && (await g.locator('#match-cards .matchcard:nth-child(3).active').count()) === 1 && (await g.textContent('#scoreboard')).includes(third) && (await g.locator('#feed-filters button:nth-child(1).active').count()) === 1 && (await g.locator('#mc-tab-replay.active').count()) === 1);
   const att3 = await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.lastRound.matches[2].att);
   check('Referatet: tilskuerne under resultatet er netop den kamps (v3.30.0)', Number.isInteger(att3) && att3 >= 4000 && (await g.textContent('#scoreboard #attendance')) === `👥 ${att3.toLocaleString('da-DK')} tilskuere`, String(att3));
   await tab('liga');
@@ -2161,7 +2308,7 @@ try {
       for (const [i, m] of lr.matches.entries()) for (const e of [...m.ratings.home, ...m.ratings.away]) if (e.bigSaves != null && e.bigSaves < e.saves) return { i, saves: e.saves, big: e.bigSaves, name: e.shortName };
       return null; });
     if (hit) {
-      await g.click(`#match-cards .matchcard:nth-child(${hit.i + 1})`);
+      await g.click(`#match-cards .matchcard:nth-child(${hit.i + 1})`); await pane('players');
       const want = `🧤${hit.saves} (${hit.big ? `${hit.big} ${hit.big === 1 ? 'svær' : 'svære'}` : 'alle lette'})`;
       const icons = await g.locator('.ratings td.icons .ricon.nowrap').allTextContents();
       check('Karakterarket: målmandens 🧤 viser de svære for sig, i ét stykke (nowrap)', icons.includes(want), `${want} | ${icons.join(' ')}`);
@@ -2175,7 +2322,7 @@ try {
     const tops = await g.evaluate(() => [...document.querySelectorAll('.ratings-grid > .ratings')].map((r) => [...r.children].map((c) => Math.round(c.getBoundingClientRect().top))));
     check('Kamprapporten: de to karakterark står i samme højde (4 blokke, ens top)', tops.length === 2 && tops[0].length === 4 && tops[1].length === 4 && tops[0].every((t, i) => Math.abs(t - tops[1][i]) <= 1) && tops[0][2] > tops[0][1], JSON.stringify(tops));
   }
-  const evAll = await g.locator('#feed .ev').count();
+ await pane('replay'); const evAll = await g.locator('#feed .ev').count();
   // "Rundens mål" i avisen (Liga-fanen) viser kampen og linker til netop dens referat
   await tab('liga');
   const gor = await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.lastRound.gazette.goalOfTheRound);
@@ -2199,8 +2346,8 @@ try {
   await g.click('#match-cards .matchcard:nth-child(3)');
   const card3 = (await g.locator('#match-cards .matchcard:nth-child(3).active').count()) === 1;
   await reload();
-  await g.click('#match-center .toolbar button:nth-child(3)');
-  check('Efter F5: Kamp-fanen kan skifte kamp og filter', card3 && (await g.locator('#match-center .toolbar button:nth-child(3).active').count()) === 1 && (await g.locator('#feed .ev').count()) < evAll);
+  await g.click('#feed-filters button:nth-child(3)');
+  check('Efter F5: Kamp-fanen kan skifte kamp og filter', card3 && (await g.locator('#feed-filters button:nth-child(3).active').count()) === 1 && (await g.locator('#feed .ev').count()) < evAll);
   await tab('liga'); // runde 2 startes fra en anden fane end Kamp
 
   // Runden er bogført og gemt FØR afspilningen: luk/genindlæs midt i kampen
@@ -2257,7 +2404,7 @@ try {
   check('Migrering: ligaen fra skema 1 er intakt (18 spillere); runde 1 er arkiveret som sæson 1, og sæson 2 starter', migHead.includes('sæson 2, efter 0 af 14 runder') && past.includes('Sæson 1 (uden program) – runde 1–1') && (await rows()) === 18, `${migHead} / ${past.slice(0, 80)}`);
   check('Migrering: ▶ spiller programmets runde 1 i sæson 2', (await g.textContent('#playbar #play-round')).startsWith('▶ Spil runde 1 af 14') && (await g.getAttribute('#playbar #play-round', 'title')).startsWith('Spil runde 1 af 14 mod '));
   // Runden er gemt før v3.5 (uden plads og startformation): Kamp-fanen viser den med listen, uden minibane
-  await tab('kamp');
+  await tab('kamp'); await pane('players');
   const oldRows = await g.locator('.ratings').nth(own).locator('tbody tr td:first-child').allTextContents();
   check('Gammel runde uden plads: karakterark med gemt rolle, ingen minibane', (await g.isVisible('#match-center')) && (await g.locator('.minipitch').count()) === 0 && oldRows.length >= 11 && oldRows.every((t) => / · \S/.test(t) && !/undefined|null/.test(t)), oldRows.slice(0, 2).join(' | '));
   await tab('trup');
@@ -2282,7 +2429,8 @@ try {
   const pos4 = await g.evaluate(() => { const d = JSON.parse(localStorage.getItem('tactivar_save')); const ps = d.league.teams.flatMap((t) => (t.isBot ? t.squad.filter((p) => !t.tactics.lineupSlots.includes(p.id)) : t.squad)); const m = (k) => { const x = ps.filter((p) => p.position === k).map((p) => p.heightCm); return x.reduce((a, b) => a + b) / x.length; }; return { schema: d.schemaVersion, cb: m('CB'), fb: m('FB') }; });
   check('Migrering fra skema 4: gemt som skema 9, stoppere ≈190 og backs ≈176 cm (botternes startere fik i 7 → 8 den rolle, de spillede – uden for målingen)', pos4.schema === 9 && pos4.cb >= 189 && pos4.cb <= 192 && pos4.fb >= 174.5 && pos4.fb <= 177.5, JSON.stringify(pos4));
   await tab('kamp');
-  const old4 = await g.textContent('#match-center');
+  const old4 = (await g.textContent('#match-center')) + (await pane('players'), await g.textContent('#match-center')) + (await pane('stats'), await g.textContent('#match-center'));   // v3.32.1: alle tre faner
+  await pane('players');
   check('Gem fra v3.7.0: karakterark uden "undefined"/"NaN" og uden HI-tal – og ingen avis i Kamp (v3.31.0)', !/undefined|NaN|% HI/.test(old4) && (await g.locator('.ratings td.run').count()) > 0 && (await g.locator('#match-center #gazette').count()) === 0, old4.slice(0, 120));
   await tab('liga');
   const old4gz = await g.textContent('#gazette');
@@ -2304,7 +2452,8 @@ try {
   check('Gem fra v3.12.0: nyheden for 3.13 om udskiftninger kommer efter 3.12.1-nyheden', v3120note.includes('Udskiftninger under kampen: friskheden falder') && v3120note.indexOf('Spillerne rykker nu med') >= 0 && v3120note.indexOf('Spillerne rykker nu med') < v3120note.indexOf('Udskiftninger under kampen: friskheden falder'), v3120note.slice(-200));
   check('Gem fra v3.12.0: holdene får udskiftningsgrænse efter deres profil (dit hold 70, botterne 75/65/75/70/70/65/75)', JSON.stringify(await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.teams.map((t) => t.subsLimit))) === JSON.stringify([70, 75, 65, 75, 70, 70, 65, 75]));
   await tab('kamp');
-  check('Gem fra v3.12.0: runde 3 i Kamp-fanen uden 📍, startopstillingen på minibanen og ingen fejl', (await g.textContent('#match-center')).includes('runde 3') && (await g.locator('#feed .snap-btn').count()) === 0 && (await g.locator('#snap-pitch').count()) === 0 && (await g.locator('.minipitch').count()) >= 1 && (await g.isHidden('#fejlboks')));
+  { const pins = await g.locator('#feed .snap-btn').count(), feedN = await g.locator('#feed').count(); await pane('players');
+    check('Gem fra v3.12.0: runde 3 i Kamp-fanen uden 📍, startopstillingen på minibanen og ingen fejl', feedN === 1 && (await g.textContent('#match-center')).includes('runde 3') && pins === 0 && (await g.locator('#snap-pitch').count()) === 0 && (await g.locator('.minipitch').count()) >= 1 && (await g.isHidden('#fejlboks'))); }
   check('Gem fra v3.12.0: Kamp har ingen avis (v3.31.0 – den står på Liga), men 📰-linket', (await g.locator('#match-center #gazette').count()) === 0 && (await g.locator('#kamp-paper-link').count()) === 1);
   await tab('liga');
   const oldCol = await g.textContent('#gazette');
@@ -2638,6 +2787,8 @@ try {
   // Firebase, heller ikke når testen kører mod live). Uden opsætning: forklaring i stedet for knappen.
   {
     const c = await browser.newContext({ viewport: { width: 1400, height: 1000 }, permissions: ['clipboard-read', 'clipboard-write'] }), pg = await c.newPage(), egne = [], posts = [];
+    // v3.32.1 (R2): "📤 Send kampen" står under "⋯ Mere" – foldet åbnes (og huskes, til siden genindlæses)
+    const more = async () => { await pg.waitForSelector('#mc-more'); if ((await pg.getAttribute('#mc-more', 'open')) === null) await pg.click('#mc-more > summary'); };
     pg.on('pageerror', (e) => egne.push(e.message));
     let cfg = 'export const FIREBASE = null;';
     await pg.route('**/firebase-config.js', (route) => route.fulfill({ contentType: 'text/javascript', body: cfg }));
@@ -2651,7 +2802,8 @@ try {
     await pg.reload(); await pg.waitForSelector('body[data-klar="ja"]'); await pg.click('#tab-kamp');
     const note = await pg.textContent('#send-note');
     check('Kamp-id: knappen har sin forklaring synligt (mobil har ingen hover) – og ingen advarsel, når gengivelsen findes', note.includes('send før næste runde') && !note.includes('Gengivelsen mangler'), note);
-    await pg.click('#send-match'); await pg.waitForSelector('#sent-as');
+    check('Kamp-id (v3.32.1): knappen står foldet ind under "⋯ Mere" – ikke synlig, før foldet åbnes', !(await pg.isVisible('#send-match')) && (await pg.getAttribute('#mc-more', 'open')) === null);
+    await more(); await pg.click('#send-match'); await pg.waitForSelector('#sent-as');
     const sent = await pg.textContent('#sent-as'), id = sent.match(/K-[A-HJ-NP-Z2-9]{4}/)?.[0];
     const f = posts[0]?.body?.fields, body = f ? JSON.parse(f.json.stringValue) : null;
     check('Kamp-id: sendt som K-XXXX med eget uid, kampen og gengivelsespakken (rng-tilstand + to hold)', !!id && !sent.includes('uden gengivelse') && posts.length === 1 && posts[0].url.includes(`documentId=${id}`) && posts[0].auth === 'Bearer tok'
@@ -2664,7 +2816,7 @@ try {
     check('Kamp-id efter F5: den sendte kamp viser stadig sit id', (await pg.textContent('#sent-as')).includes(id));
     await pg.click('#match-cards .matchcard:nth-child(2)');
     check('Kamp-id uden gengivelsespakke: advarsel før afsendelse', (await pg.textContent('#send-note')).includes('Gengivelsen mangler'));
-    await pg.click('#send-match'); await pg.waitForSelector('#sent-as');
+    await more(); await pg.click('#send-match'); await pg.waitForSelector('#sent-as');
     check('Kamp-id uden gengivelsespakke: "uden gengivelse" ved id\'et, og pakken er ikke sendt', (await pg.textContent('#sent-as')).includes('uden gengivelse') && JSON.parse(posts[1].body.fields.json.stringValue).replay === null);
     // næste runde: kampene kan ikke sendes længere, men id'erne står i listen
     await pg.click('#play-round'); await pg.click('#skip');
@@ -2698,7 +2850,9 @@ try {
       return { pg, log, errs, ctx: c };
     };
     const playOne = async (pg) => { await pg.click('#play-round'); await pg.waitForSelector('#match-center'); return pg; };
-    const finish = async (pg) => { await pg.click('#skip'); await pg.waitForSelector('#skip', { state: 'detached' }); };
+    // v3.32.1 (R2): "📤 Send kampen" står under "⋯ Mere" – foldet åbnes efter fløjtet og efter genindlæsning (det huskes inden for siden)
+    const more = async (pg) => { await pg.waitForSelector('#mc-more'); if ((await pg.getAttribute('#mc-more', 'open')) === null) await pg.click('#mc-more > summary'); };
+    const finish = async (pg) => { await pg.click('#skip'); await pg.waitForSelector('#skip', { state: 'detached' }); await more(pg); };
     const saved = (pg) => pg.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.lastRound.matches.map((m) => ({ h: m.homeName, a: m.awayName, hid: m.homeId, hg: m.homeGoals, ag: m.awayGoals, sentAs: m.sentAs ?? null })));
 
     // A) upload ikke sat op: ingen knap, en forklaring – og intet netværk
@@ -2788,7 +2942,7 @@ try {
       await playOne(pg); await finish(pg);
       await pg.evaluate(() => localStorage.removeItem('tactivar_replay'));
       await pg.reload(); await pg.waitForSelector('body[data-klar="ja"]');
-      await pg.click('#send-match'); await pg.waitForSelector('#sent-as');
+      await more(pg); await pg.click('#send-match'); await pg.waitForSelector('#sent-as');
       const b = JSON.parse(log.doc[0].body.fields.json.stringValue);
       check('Send kampen uden gengivelse: kampen sendes med replay = null, og sendt-mærket husker det (replay: false)', b.replay === null && b.match.homeName === (await saved(pg))[0].h && (await saved(pg))[0].sentAs.replay === false);
       await ctx.close();

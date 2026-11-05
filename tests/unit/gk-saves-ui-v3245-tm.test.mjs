@@ -26,7 +26,7 @@ const ST = { hPoss: 60, aPoss: 40, hTacticSuccess: 1, aTacticSuccess: 2, hShots:
 function sheet(home, away) {
   const ev = { min: 90, hG: 1, aG: 0, text: 'Slut', category: 'PLAY', type: 'FULLTIME', label: 'Slut', plot: false, stats: ST };
   const m = { homeId: 'h', awayId: 'a', homeName: 'Hjemme', awayName: 'Ude', homeTacticStr: '', awayTacticStr: '', homeGoals: 1, awayGoals: 0, events: [ev], ratings: { motm: null, home, away } };
-  return renderMatchCenter({ mc: { round: 1, matches: [m], viewIdx: 0, filter: 'all', shownCount: 99, playing: false, gazette: null }, myTeamId: 'h', on: {} });
+  return renderMatchCenter({ mc: { round: 1, matches: [m], viewIdx: 0, filter: 'all', shownCount: 99, playing: false, gazette: null, pane: 'players' }, myTeamId: 'h', on: {} });   // v3.32.1: "👥 Spillerne"
 }
 const saveIcons = (root) => all(root, (e) => e.className.includes('ricon') && e.textContent.startsWith('🧤'));
 

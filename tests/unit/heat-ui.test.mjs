@@ -57,7 +57,7 @@ const trace = () => ({
 });
 const mOf = () => ({ ...base, trace: trace() });
 const C = [1, 2, 3, 4, 5, 7].map((i) => evMin(base.events[i]));   // urene for sporets hændelser (ev 1–7)
-const mcOf = (m, extra = {}) => ({ round: 1, matches: [m], gazette: { goalOfTheRound: null, totalGoals: 0, totalVarChecks: 0 }, viewIdx: 0, filter: 'all', shownCount: Infinity, playing: false, ...extra });
+const mcOf = (m, extra = {}) => ({ round: 1, matches: [m], gazette: { goalOfTheRound: null, totalGoals: 0, totalVarChecks: 0 }, viewIdx: 0, filter: 'all', shownCount: Infinity, playing: false, pane: 'players', ...extra });   // v3.32.1: "👥 Spillerne"
 function render(m, myTeamId, mc = {}) {
   clearReplays();
   const calls = { heat: [], replay: [] };
@@ -184,7 +184,7 @@ test('målmanden i holdets kort: kendes han ikke (ingen række med rollen GK), t
 
 test('🎬 i referatet: en knap ved hver afslutning, og et klik giver (kampen, hændelsens indeks) – og ingen under live', () => {
   const m = mOf();
-  const { el, calls } = render(m, base.homeId);
+  const { el, calls } = render(m, base.homeId, { pane: 'replay' });   // v3.32.1: referatet og tavlen i første fane
   const feed = byId(el, 'feed')[0];
   const rows = all(feed, (r) => cls(r, 'ev'));
   const films = all(feed, (x) => cls(x, 'replay-btn'));
@@ -206,7 +206,7 @@ test('🎬 i referatet: en knap ved hver afslutning, og et klik giver (kampen, h
 
 test('afspilningen kender dit hold: dine brikker er markeret, modstanderens ikke – hjemme og ude, og ingen for en fremmed seer', () => {
   for (const [mine, home, away] of [[base.homeId, true, false], [base.awayId, false, true], ['ingen', false, false]]) {
-    const { el } = render(base, mine);
+    const { el } = render(base, mine, { pane: 'replay' });
     const toks = all(el, (x) => cls(x, 'rp-token'));
     assert.ok(toks.length >= 14);
     assert.equal(toks.filter((x) => cls(x, 'home')).every((x) => cls(x, 'own') === home), true, `hjemme (seer ${mine === base.homeId ? 'hjemme' : mine === base.awayId ? 'ude' : 'fremmed'})`);

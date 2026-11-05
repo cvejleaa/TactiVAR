@@ -1,5 +1,5 @@
 // Liga-siden: sidste rundes resultater (med link til referatet) og kampprogrammet.
-import { h } from './dom.js';
+import { h, fold } from './dom.js';
 import { championText } from '../engine/season.js';
 import { attText } from './labels.js';
 
@@ -37,9 +37,9 @@ export function renderSchedule({ league, pairs, myTeamId }) {
         h('td', {}, `R${k}`), h('td', { title: home ? 'Hjemme' : 'Ude' }, home ? 'H' : 'U'), h('td', {}, name.get(home ? aId : hId)), h('td', { class: 'st-val' }, score));
     }))),
     h('p', { class: 'muted' }, 'H = hjemme, U = ude. Din score står først (i Hele programmet står hjemmeholdets først). Alle møder alle hjemme og ude; der er ingen hjemmebanefordel.'),
-    h('details', { class: 'stats-sec', id: 'full-schedule' }, h('summary', {}, 'Hele programmet'),
+    fold({ id: 'full-schedule', summary: 'Hele programmet', cls: 'stats-sec' },   // v3.32.1: husker åben/lukket over gentegning
       league.schedule.map((ps, i) => h('div', {}, h('h4', {}, `Runde ${i + 1}`), h('div', { class: 'fixtures' }, ps.map(([a, b]) => fixture(a, b, resultOf(i + 1, a, b))))))),
-    league.seasons?.length ? h('details', { class: 'stats-sec', id: 'past-seasons' }, h('summary', {}, 'Tidligere sæsoner'),
+    league.seasons?.length ? fold({ id: 'past-seasons', summary: 'Tidligere sæsoner', cls: 'stats-sec' },
       league.seasons.slice().reverse().map((s) => h('div', { class: 'past-season' },
         h('h4', {}, `Sæson ${s.seasonNumber}${s.programmed ? '' : ' (uden program)'} – runde ${s.fromRound}–${s.toRound}`),
         h('p', {}, [s.champion ? (s.programmed ? `🏆 ${championText(s.champion, s.myPos)}.` : `Førende ved afslutningen: ${s.champion.teamName} (${s.champion.points} point).`) : '', s.myPos ? `Din placering: nr. ${s.myPos}.` : '',

@@ -22,6 +22,8 @@ const avgSkill = (p) => Object.values(p.skills).reduce((a, b) => a + b, 0) / 9;
 export const avgRating = (p) => (p.ratingGames ? p.ratingSum / p.ratingGames : 0);
 
 // field = det felt synligheden afgøres på; num = tal-kolonne (starter faldende ved sortering).
+// v3.32.1 (R4): på en tabel, der ruller vandret, står plads og navn fast (opt-in – style.css .tablewrap[data-scroll])
+const STICK = { pos: 'stick-1', name: 'stick-2' };
 export const COLUMNS = [
   { key: 'pos', label: 'Pos/#', title: 'Plads i opstillingen / rygnummer', field: 'shirtNumber', value: (p, c) => { const s = c.slotOf(p); return s >= 0 ? s : 100 + p.shirtNumber; } },
   { key: 'name', label: 'Spiller', field: 'shortName', value: (p) => p.shortName, text: true },
@@ -92,7 +94,7 @@ export function renderMatrix({ team, isOwn, ui, notes, onSort, onSelect, onSwap,
   const head = h('tr', {}, COLUMNS.map((c) => {
     const allowed = canSeeField(c.field, isOwn);
     return h('th', {
-      title: c.title || c.label, class: (c.key === col.key ? 'sorted ' : '') + (allowed ? 'sortable' : 'locked'),
+      title: c.title || c.label, class: (c.key === col.key ? 'sorted ' : '') + (allowed ? 'sortable' : 'locked') + (STICK[c.key] ? ` ${STICK[c.key]}` : ''),
       onclick: () => (allowed ? onSort(c) : onBlocked(c)),
     }, c.label, c.key === col.key ? (desc ? ' ▼' : ' ▲') : '');
   }), h('th', {}, 'Arketype/Note'), isOwn && onSwap ? h('th', {}, 'Byt') : null);
@@ -100,12 +102,14 @@ export function renderMatrix({ team, isOwn, ui, notes, onSort, onSelect, onSwap,
   const body = rows.map(({ p }) => {
     const s = slotOf(p);
     const cells = COLUMNS.map((c) => {
-      const cls = c.key === col.key ? 'sorted' : '';
+      const cls = (c.key === col.key ? 'sorted' : '') + (STICK[c.key] ? ` ${STICK[c.key]}` : '');
       if (!canSeeField(c.field, isOwn)) return h('td', { class: cls + ' lockcell' }, LOCK);
       if (c.key === 'pos') return h('td', { class: cls + (s >= 0 ? ' starter' : ' benchnum') }, s >= 0 ? `${roleLabel(roles[s].r)} #${p.shirtNumber}` : `${benchIds.has(p.id) ? 'BÆNK' : 'RES'} #${p.shirtNumber}`);
       if (c.key === 'name') { const g = gains.get(p.id) ?? [];   // mobilen: summen efter navnet (evne-kolonnerne er rullet væk)
         const sale = listed.has(p.id) ? h('span', { class: 'listed-tag', title: 'Sat til salg – andre klubber byder, når vinduet er åbent' }, '💰 Til salg') : null;
-        return h('td', g.length ? { class: cls + ' player-gain', dataset: { gain: String(g.length) }, title: `${gainWords(g)} ${after}` } : { class: cls }, p.shortName, sale); }
+        // data-pos (v3.32.1): pladsen står i navnecellen, når kun navnet kan låses (smal skærm – ui/dom.js markScrollable)
+        const pos = s >= 0 ? roleLabel(roles[s].r) : benchIds.has(p.id) ? 'BÆNK' : 'RES';
+        return h('td', g.length ? { class: cls + ' player-gain', dataset: { gain: String(g.length), pos }, title: `${gainWords(g)} ${after}` } : { class: cls, dataset: { pos } }, p.shortName, sale); }
       if (c.key === 'line') return h('td', { class: cls }, h('span', { class: 'chip' }, LINE[p.line]));
       if (c.key === 'natpos') return h('td', { class: cls, title: POSITION_FULL[p.position] ?? '' }, POSITION[p.position] ?? '–');
       if (c.key === 'fresh') return h('td', { class: cls }, outLabel(p) ? h('span', { class: 'injury', title: OUT_TITLE }, outLabel(p)) : `${p.freshness}%`);   // v3.27.0: 🚑/⛔
