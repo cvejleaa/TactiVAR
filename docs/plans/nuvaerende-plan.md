@@ -93,5 +93,17 @@ Målt (klub): 17–23-årige går fra Spring 13 til 14 på median 18 runder, 92 
 - Kravteksten bruger `nextText`, når han træner fokusset: "(går langsomt: tæt på sit loft)".
 - D2 måler også en 24–27-årig tæt på loftet.
 
+## Næste efter v3.32.0 (brugeren 5/11, efter designkritikken `docs/design-kritik-2026-11-05.md`)
+**v3.33.0 = 📖 spilguide + "ⓘ Sådan virker det"** i én udgivelse:
+- Guiden "📖 Sådan virker spillet" ligger i ⚙ og har et afsnit pr. del. Tal kommer fra konstanterne.
+- Forklaringsteksterne på Taktik, Kamp, Træning, Klub og kortet foldes ind. Én kort linje er synlig, resten står bag "ⓘ" og linker til guidens afsnit. Det er kritikkens nr. 1 og F4's hjælpedel.
+
+**Derefter, i hver sin version:**
+- Kamp-underfaner med afspilningen på første skærm og "Send kampen" i en ⋯-menu.
+- Brede tabeller på mobil: sticky første kolonne og fade.
+- Berøringsflader på mindst 44 px ved ≤ 600 px.
+- Farvesemantik (lilla = valgt, grøn = dit hold/handling) og kontrast (heat-1 og ★/☆).
+- Færre gentagelser: klubpanelet, de to lønbudgetter og Klubs nøgletal.
+
 ---
 Tidligere planer: [tidligere-planer.md](tidligere-planer.md)
