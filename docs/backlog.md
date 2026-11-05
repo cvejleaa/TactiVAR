@@ -19,10 +19,6 @@ Rangering: brugerens ønsker først, derefter værdi pr. størrelse. Første run
    et klik er stadig byt; Trup 1922 → 1500 px og Taktik 2156 → 1864 px ved 1366, Taktik 4709 → 3777 ved 390), F3 Hjem-indhold og
    avisen ét sted (v3.31.0: avisen kun på Liga lige under tabellen, Hjem 👑 + 📰-kort + formpiller, Kamp et 📰-link; Kamp 3267 → 2629 px
    ved 1366 og 5895 → 4994 ved 390). Næste: F4.
-0c. **Spring kan trænes, og kortet viser det (brugeren 2026-11-03: "kræver jumpingpower på 14, men jeg kan ikke se hans jumpingpower … og jeg kan ikke se hvordan jeg kan træne ham i det")** · klub + UI · S · 5 ·
-   brugerens valg: Fysik træner Fart, Styrke OG Spring (som Teknik med to evner); Spring som bjælke under "Fysik & luft" på kortet;
-   arketypens krav viser "Spring 13/14 – trænes med Fysik". I dag er `jumpingPower` fast fra generatoren og ændres aldrig
-   (career.js FOCUS.PHYSICAL, generator.js:182). Mål luftdueller/særpræg over sæsoner (`tools/measure-lifecycle.mjs`) før og efter.
 0d. **📖 Spilguide (brugeren 2026-11-03: "ingen steder hvor vi har en hjælp til spillet … ala den jeg uploadede fra Hattrick")** · UI · M · 5 ·
    brugerens valg: én side "📖 Sådan virker spillet" under ⚙ med afsnit pr. del (kampen, taktik, træning og udvikling, arketyper,
    samspil, form og udelukkelse, økonomi og transfers, sæsonen) skrevet ud fra reglerne i koden (spec.md ⇄ kode), og et lille "?"
@@ -204,6 +200,7 @@ scratchpad – et tal herfra skal måles igen med et committet værktøj, før d
 - "– det holdt ikke mod jer" efter et nederlag kan misforstås (UI) – bevidst valgt i v3.21.2 (QC); kun noteret.
 
 ## Lavet
+- v3.32.0 nr. 0c (brugeren 3/11: "kræver jumpingpower på 14 … jeg kan ikke se hvordan jeg kan træne ham i det"): Fysik træner Fart, Styrke og Spring (rate 0,07 pr. evne, `skillOf`/`setSkill`) · Spring-bjælke under "Fysik & luft" på kortet · arketypens krav med nu/krav, ✓ og fokus ("Spring 13/14 – trænes med Fysik") på kortet, Trup og Taktik · fokusvalget på Træning med evnerne · "+N" i Trups Spring-kolonne · `tools/measure-jump.mjs` (17–23 år: første Spring +1 median 18 runder, før aldrig)
 - v3.31.2 brugerens ønsker 3/11 (nr. 0c+ m.fl.): arketypen på Taktik-listen (🔒/🌟 + navn under navnet ≥ 900 px, ikonet på smal skærm – kun dit hold) og "arketype" overalt · skønnets ord i evne-point med fem trin ("er tæt på sit loft" … "har langt mere i sig") på kortet, i Træning og i ungdomstilbuddet (med nøglesnittet) – ungdom ved første syn: 95,6 % ét ord → højst 55 % (`tools/measure-youth-words.mjs`) · 📊 Statistik for holdet øverst på spillerkortet (Sæson N / N−1: kampe, min., mål, oplæg, snit, 👑, 🟨, 🟥, 🧤 – fra kamphistorikken, uden gemmeformat-ændring) · danske positionskoder overalt (MV, MS, VB/HB, VKB/HKB, DM, CM, OM, VM/HM, VK/HK, ANG – én tabel `ROLE_LABEL`) · bjælken ved 601–700 px testet (▶ inden for kanten)
 - v3.31.1 brugerens ønske "spil knappen er placeret forskelligt på de enkelte faner": Spil-bjælken i bunden på alle faner (også ⚙) med opstillingens tegn – piller, ved mange en kompakt tæller "⛔2 🚑1 🟨1" → Hjem-listen; den lille ▶ i topbaren er væk; under afspilning "📺 Runde N spilles …" · brugerens "engelske betegnelser" på spillerkortet: danske særpræg (vist fra tabellen efter id, ingen migrering), krav med evnernes navne, danske positionskoder, "gegenpres" med småt, 🕵️ Observationer, 🧠 Erfaring mod stilarter
 - v3.31.0 nr. 0 trin F3 Hjem-indhold og avisen ét sted: avisen kun på Liga (lige under tabellen), Hjem med 👑 kampens spiller (modstanderens uden karakter), 📰-kort med rundens overskrift og formpiller, Kamp med "📰 «overskrift» ›", ingen 🔍 i bjælken på Hjem · F1-noterne om piller, 👑/avis, 🔍 og "N ting" lukket

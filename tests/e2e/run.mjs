@@ -1179,7 +1179,7 @@ try {
   check('Træning: massehandlingens bekræftelse er væk, når man kommer tilbage fra en anden fane (men fokus er stadig gemt)', (await g.locator('#train-msg').count()) === 0 && (await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((x) => !x.isBot).squad.filter((p) => p.trainingFocus === 'REST').length)) === 18);
   await g.selectOption(`#training-table tr[data-pid="${shownId}"] select`, 'FINISH');
   await tab('trup'); await openCard(shownId);
-  check('Spillerkortet viser 9 evne-barer og luftduel-udregningen', (await g.locator('#player-card .bars .bar').count()) === 9 && (await g.textContent('#aerial-breakdown')).includes('× 0,35'));
+  check('Spillerkortet viser 10 evne-barer (9 evner + Spring, v3.32.0) og luftduel-udregningen', (await g.locator('#player-card .bars .bar').count()) === 10 && (await g.locator('#player-card .bars .bar-label').allTextContents()).filter((t) => t === 'Spring').length === 1 && (await g.textContent('#aerial-breakdown')).includes('× 0,35'));
   // v3.8 (Test Manager): kortets overskrift viser spillerens EGEN naturlige position med fuld betegnelse
   // v3.31.1 (brugeren: danske positionskoder): parentesen er den korte form (DM, OM, ANG) – ikke CDM/CAM/ST
   const FULL_POS = { GK: 'Målmand', CB: 'Midtstopper (MS)', FB: 'Back/kantback (dybe kantpladser)', DM: 'Defensiv midtbane (DM)', CM: 'Central midtbane (CM)', WM: 'Kant (høje kantpladser)', AM: 'Offensiv midtbane (OM)', ST: 'Angriber (ANG)' };
@@ -3063,6 +3063,7 @@ try {
       const A = L.teams.findIndex((t, i) => t.isBot && i !== M), B = L.teams.findIndex((t, i) => t.isBot && i !== M && i !== A);
       const a = P(6), b = P(7), z = P(8), q = L.teams[A].squad.find((x) => x.line === 'MID');
       a.archetype = { id: 'REGISTA', name: 'Regista', description: 'gammel', unlockReq: { passing: 13, ballControl: 13 }, isUnlocked: false };
+      a.skills.passing = 11; a.skills.ballControl = 13; a.trainingFocus = 'GENERAL';   // v3.32.0: kravteksten med nu/krav og fokus
       b.archetype = { id: 'PRESSING_MONSTER', name: 'Pressing Monster', description: 'gammel', unlockReq: { stamina: 14, intercepting: 12 }, isUnlocked: true };
       z.archetype = null;
       L.leagueMetadata.seasonNumber = 2;
@@ -3081,7 +3082,7 @@ try {
     const w1 = await arch();
     check('v3.31.2 Taktik-listen ≥ 900 px: "🔒 Regista (spilfordeler)" / "🌟 Presmonster" som linje under navnet, intet ved en uden arketype; title = beskrivelse + krav',
       w1[S.a].line === '🔒 Regista (spilfordeler)' && w1[S.b].line === '🌟 Presmonster' && !w1[S.a].ico && w1[S.z].line === null && w1[S.z].title === null
-      && w1[S.a].title === 'Arketype: Regista (spilfordeler) – Slår pasninger direkte fra Fase 1 til Fase 3 · Låses op ved: Pasning 13, Boldkontrol 13', JSON.stringify(w1));
+      && w1[S.a].title === 'Arketype: Regista (spilfordeler) – Slår pasninger direkte fra Fase 1 til Fase 3 · Låses op ved: Pasning 11/13 – trænes med Teknik · Boldkontrol 13/13 ✓', JSON.stringify(w1));
     await p.setViewportSize({ width: 800, height: 900 }); await p.waitForTimeout(50);
     const w2 = await arch();
     check('v3.31.2 Taktik-listen < 900 px: kun ikonet efter navnet (🔒/🌟), ingen linje', w2[S.a].ico === '🔒' && w2[S.b].ico === '🌟' && !w2[S.a].line && !w2[S.b].line && w2[S.z].ico === null, JSON.stringify(w2));

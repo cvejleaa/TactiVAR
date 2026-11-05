@@ -4,7 +4,7 @@ import { FORMATIONS, lineOfRole, positionOfRole, slotPositionOf } from './format
 import { TEAM_STAT_DEFAULTS, PLAYER_SEASON_DEFAULTS } from './stats.js';
 import { generateScoutingClues } from './clues.js';
 import { buildSchedule, shuffledIds } from './schedule.js';
-import { initialPotential, publicWage, uniquifyNames, derivedRng, bestEleven } from './career.js';
+import { initialPotential, publicWage, uniquifyNames, derivedRng, bestEleven, skillOf } from './career.js';
 import { seedChemistry } from './chemistry.js';
 
 export const TEAM_NAMES = ['Bibamus United', 'FC Vejleå', 'Ølstykke IF', 'Lyngby Tacticians', 'Nordkysten BK', 'Furesø Boldklub', 'Roskilde Rovers', 'Kronborg United'];
@@ -157,8 +157,7 @@ export function aerialBreakdown(heightCm, jumpingPower, strength, positioning) {
 }
 
 export function isArchetypeUnlocked(arch, player) {
-  const stats = { ...player.skills, jumpingPower: player.jumpingPower };
-  return Object.entries(arch.unlockReq).every(([k, v]) => (stats[k] || 0) >= v);
+  return Object.entries(arch.unlockReq).every(([k, v]) => (skillOf(player, k) || 0) >= v);
 }
 
 // id: en fast id (v3.18.0 – ungdom og nye spillere får `plr_y<seq>`); ellers holdets plads som før

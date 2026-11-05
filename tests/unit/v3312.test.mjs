@@ -49,6 +49,7 @@ test('Taktik-listen: 🔒/🌟 + arketypens navn ved en spiller med arketype (ti
   const { me, opp } = fresh();
   const [a, b, c] = me.tactics.lineupSlots.slice(1, 4).map((id) => me.squad.find((p) => p.id === id));
   a.archetype = { ...ARCH.REGISTA, unlockReq: { passing: 13, ballControl: 13 }, isUnlocked: false };
+  a.skills.passing = 11; a.skills.ballControl = 13; a.trainingFocus = 'GENERAL';   // v3.32.0: kravteksten med nu/krav og fokus
   b.archetype = { ...ARCH.TARGET_MAN, name: 'Target Man', isUnlocked: true };   // gammel engelsk kopi – navnet fra tabellen
   c.archetype = null;
   const list = listOf(me, true);
@@ -56,7 +57,7 @@ test('Taktik-listen: 🔒/🌟 + arketypens navn ved en spiller med arketype (ti
   const line = (cell) => all(cell, (e) => cls(e, 'lp-arch'))[0], ico = (cell) => all(cell, (e) => cls(e, 'lp-arch-ico'))[0];
   assert.equal(line(cellA).textContent, '🔒 Regista (spilfordeler)');
   assert.equal(ico(cellA).textContent.trim(), '🔒');
-  assert.equal(ico(cellA).attrs.title, 'Arketype: Regista (spilfordeler) – Slår pasninger direkte fra Fase 1 til Fase 3 · Låses op ved: Pasning 13, Boldkontrol 13');
+  assert.equal(ico(cellA).attrs.title, 'Arketype: Regista (spilfordeler) – Slår pasninger direkte fra Fase 1 til Fase 3 · Låses op ved: Pasning 11/13 – trænes med Teknik · Boldkontrol 13/13 ✓');
   assert.equal(ico(cellA).attrs['aria-label'], ico(cellA).attrs.title);
   assert.equal(line(cellB).textContent, '🌟 Fyrtårn');
   assert.match(ico(cellB).attrs.title, /^Arketype: Fyrtårn – Opspilspunkt: .* \(låst op\)$/);

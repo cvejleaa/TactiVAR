@@ -57,7 +57,8 @@ begrundelse).
   positionens spænd. Ligasnit målt ≈184,3, spredning i hele truppen ≥6 (brugeren: ikke alle tæt
   på snittet). (v3.7 var pr. kæde: MV 192, FOR 186, MID 179,5, ANG 181.)
   Skema 3→4 brugte v3.7's tabel (frosset i `HEIGHT_V37`); skema 4→5 se §7.
-  Springkraft 1–20.
+  Springkraft 1–20 (`p.jumpingPower`, uden for de 9 evner i `p.skills`); v3.32.0: trænes med Fysik (§2 Livsløb) og vises som bjælke
+  "Spring" i "Fysik & luft" på kortet. Indgår IKKE i nøglesnit, potentiale/loft eller Gns.
 - **Luftduel** `aerialPower = round(heightScore·0,35 + jump·0,35 +
   strength·0,15 + positioning·0,15)`, `heightScore = clamp(1..20,
   round((cm−166)·0,70))` (v3.7: nulpunkt 166 – højde-scoren på niveau med kildens 168 ved
@@ -81,8 +82,12 @@ ved højt gegenpres") · ATT: VAR-linjens spøgelse (VAR-Line Ghost; "Vinder 80 
 millimeter-tætte VAR-offside-kendelser"), Fyrtårn (Target Man; "Opspilspunkt: dominerer lange bolde
 og høje indlæg med hovedet"). **Visning (v3.31.1):** navn og beskrivelse står i `ARCHETYPES` (generator.js) og vises derfra efter
 `id` (labels.js `archetypeOf`) – ikke fra kopien på spilleren – så en gemt liga får de danske navne UDEN migrering (gemmeformatet
-uændret; e2e/unit: save-schema4). Kravene vises med evnernes danske navne (`SKILL_NAME`, `jumpingPower` = "Spring"): "Låses op ved:
-Udholdenhed 14, Erobring 12". **Vist (v3.31.2):** kortet, Trups "Arketype/Note" og Taktik-listen (≥ 900 px en dæmpet linje "🔒 Regista
+uændret; e2e/unit: save-schema4). Kravene vises med evnernes danske navne (`SKILL_NAME`, `jumpingPower` = "Spring"). **v3.32.0** (backlog 0c –
+brugeren: "jeg kan ikke se hans jumpingpower … og jeg kan ikke se hvordan jeg kan træne ham i det"): for ejerens spiller nu/krav pr. evne,
+✓ når kravet er opfyldt, og for det, der mangler, det fokus, der træner det (`focusOfSkill`: det første fokus ud over Alsidig med evnen):
+"Låses op ved: Styrke 13/13 ✓ · Spring 13/14 – trænes med Fysik". To mangler med samme fokus: "Styrke 12/13 · Spring 13/14 – begge trænes
+med Fysik". Træner han fokusset i forvejen: "(det gør han nu; næste +1 om ca. N runder)" eller "(det gør han nu; går langsomt: han er tæt på
+sit loft)" – fra `trainingEstimate`. Samme tekst på kortet, i title på Trups arketypecelle og på Taktik-listen. **Vist (v3.31.2):** kortet, Trups "Arketype/Note" og Taktik-listen (≥ 900 px en dæmpet linje "🔒 Regista
 (spilfordeler)" under navnet, smallere kun ikonet; title = navn, beskrivelse og krav) – kun dit hold (`archetype` er et ejerfelt); mærket
 og kravteksten ét sted (labels.js `archIcon`, `archReqText`). Krav-tallene er afskåret i kilden (synligt:
 goalkeeping 12, positioning 13, passing 13, positioning 12) — fastsættes i
@@ -100,7 +105,7 @@ spillerobjekt; de skal ligge hos den der observerer.
 Konstanterne står ét sted: `public/engine/career.js` (og `transfers.js`). Bånd: `tools/measure-lifecycle.mjs`, `tests/unit/lifecycle-v3180.test.mjs`.
 - **Kamphistorik (§10.4):** én tupel pr. kamp (`matchLog`, højst 28): sæson, runde, hold, resultat, minutter, karakter (kun ejeren), stjerner, mål, oplæg. Kortet: "📜 Kampe", karrierelinje, 📺 kun på seneste rundes kamp – og "📊 Statistik" (v3.31.2, §10b).
 - **Unikke kortnavne** i hele ligaen (`uniquifyNames`, egen afledt rng – kampene uændrede); en gemt liga omdøbes ved migreringen, også i tekster.
-- **Træning pr. spiller** (gælder, til det ændres): Alsidig, Kondition, Teknik, Afslutning, Forsvar, Fysik, Målmand (kun MV), Hvile. Fremgang = rate · alder (1,5 … 0,2) · plads til loftet (0,1–1); +1 ved 1,0. Kampe: 0,02 pr. 90 min i kædens nøgle-evner. Pris: −2 … −5 friskhed (gulv 50; den, der spillede, betaler 2 mindre), 0,3–0,7 % træningsskade; Hvile +4. Botterne træner Alsidig (friskheden røber ikke fokus). Fokus sættes kun på 🏋️ Træning (v3.30.0; kortet viser det og linker dertil).
+- **Træning pr. spiller** (gælder, til det ændres): Alsidig, Kondition, Teknik, Afslutning, Forsvar, Fysik, Målmand (kun MV), Hvile. Fremgang = rate · alder (1,5 … 0,2) · plads til loftet (0,1–1) PR. EVNE i fokusset; +1 ved 1,0. **Fysik (v3.32.0) træner Fart, Styrke og Spring** med rate 0,07 pr. evne – Fart og Styrke går som før, og Fysik er nu det største fokus (samlet 0,21), betalt med friskhed −4 og skaderisiko 0,7 %. Spring (`p.jumpingPower`) læses og skrives gennem `skillOf`/`setSkill` (career.js); luftduellen regnes om ved hvert +1 (`afterSkillChange`). Spring indgår ikke i nøglesnit, potentiale, sæsonvækst eller Gns, og botterne træner ikke Spring (Alsidig). Målt (`node tools/measure-jump.mjs 8 5`, dit hold ≤ 25 år på Fysik): de 17–23-årige får første Spring +1 på median 18 runder (før: aldrig), 79 % inden for to sæsoner; luftduel mig/botter efter 5 sæsoner 1,032 → 1,065; en 24–27-årig tæt på loftet (roomOf 0,1) når det ikke inden for 5 sæsoner (≈ 0,007 pr. runde) – kravteksten siger "går langsomt". Kampe: 0,02 pr. 90 min i kædens nøgle-evner. Pris: −2 … −5 friskhed (gulv 50; den, der spillede, betaler 2 mindre), 0,3–0,7 % træningsskade; Hvile +4. Botterne træner Alsidig (friskheden røber ikke fokus). Fokus sættes kun på 🏋️ Træning (v3.30.0; kortet viser det og linker dertil).
 - **Skønnet i ord (v3.31.2)** – kortet, 🏋️ Træning og ungdomstilbuddet (det viser også nøglesnittet, "snit 6,8 · skøn: …"): efter pladsen i
   evne-POINT (`roomPoints` = potentiale − nøglesnit), fem trin: < 0,45 "er tæt på sit loft" (= træningsestimatets "tæt på sit loft", roomOf ≤ 0,15)
   · < 1,5 "har lidt mere i sig" · < 3 "har mere i sig" · < 5,5 "har meget mere i sig" · ≥ 5,5 "har langt mere i sig" (relativt – lover ikke et
@@ -1120,8 +1125,8 @@ mellem bjælkerne 707 → 726 px (682 med scout-bjælken). e2e vagter: chrome �
   **"+N" (v3.30.0, brugerens ønske "markér sidste rundes +1"):** en evne, der steg efter sidste runde (træning OG kamp-xp – rapporten
   `league.trainingReport[mit id].gains`), får et lille hævet mærke "+N" (N = antal +1 i den evne; `td.gain` med `data-gain`, tegnet som
   `::after` i .pill-ok-farverne – ikke ▲, der er sorteringspilene, og ikke grøn tekst på heat-4-grøn). Cellens tekst er uændret (tallet),
-  så sortering og aflæsning ikke rører det. title "+2 Afslutning efter runde R" (evnens navn fra `SKILL_NAME`, sæsonens runde). Kun de 9
-  evne-kolonner (ikke Spring/Luft/Gns). På mobil (≤ 600 px) også summen efter navnet (`td.player-gain`, title med alle evnerne), og når
+  så sortering og aflæsning ikke rører det. title "+2 Afslutning efter runde R" (evnens navn fra `SKILL_NAME`, sæsonens runde). De 9
+  evne-kolonner og (v3.32.0) Spring – ikke Luft/Gns. På mobil (≤ 600 px) også summen efter navnet (`td.player-gain`, title med alle evnerne), og når
   der er mærker, siger `#trup-help` " · +1 = steg efter runde R (træning og kampe) · træningen står på 🏋️ Træning ›". ÉN vagt (app.js
   `renderNow`): rapporten (`ownRep`) skjules under afspilning (den er for den runde, der afspilles); mærkerne kun for dit hold og ikke
   lige efter sæsonslut (`seasonJustEnded` – aldersfaldet i sæsonskiftet kan have spist et +1 fra samme runde; QC). Én kilde til
@@ -1240,7 +1245,8 @@ mod v2.5b-koden:
    14-runders Berger-program ("Runde 1 af 14 (Tirsdag): Bibamus United vs. FC
    Vejleå"), fredagstræning af valgt evne pr. kæde, talenters udvikling,
    arketype-unlock med rapport, tilskuerindtægt minus ugeløn, sæsonskift og
-   aldring (+1 år pr. 2 sæsoner). **Med i v3.18.0** – aldring +1 år pr. sæson og træning pr. spiller (brugerens valg).
+   aldring (+1 år pr. 2 sæsoner). **Med i v3.18.0** – aldring +1 år pr. sæson og træning pr. spiller (brugerens valg). **v3.32.0:** Spring trænes med
+   Fysik (sammen med Fart og Styrke) og indgår ikke i nøglesnit eller Gns.
 2. **Transfermarked & talent-akademi**: ugentlig pulje, kun offentlige data +
    clues, bud fra dig og bots, salg fra bænken. **Med i v3.18.0** som vinduer med fast pris (brugerens valg) og ungdomstilbud.
 3. **Login & bot-overtagelse** (trin 2): Firebase Auth, "Fair-Start", kamp-

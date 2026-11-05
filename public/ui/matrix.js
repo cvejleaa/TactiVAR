@@ -2,7 +2,7 @@
 // "🔒 ??" og kan ikke sorteres (synlighed afgøres i engine/visibility.js).
 import { POSITIONS } from '../engine/generator.js';
 import { h, dec, LOCK } from './dom.js';
-import { LINE, POSITION, POSITION_FULL, starsEl, outLabel, OUT_TITLE, archetypeOf, archIcon, roleLabel } from './labels.js';
+import { LINE, POSITION, POSITION_FULL, starsEl, outLabel, OUT_TITLE, archetypeOf, archIcon, archReqText, roleLabel } from './labels.js';
 import { canSeeField } from '../engine/visibility.js';
 import { FORMATIONS } from '../engine/formations.js';
 import { COUNTER_KEYS } from '../engine/counter.js';
@@ -30,11 +30,11 @@ export const COLUMNS = [
   { key: 'age', label: 'Alder', field: 'age', value: (p) => p.age, num: true },
   { key: 'fresh', label: 'Frisk/🚑', title: 'Friskhed i % – en træt spiller yder mindre (75 % ≈ 6 %, 50 % ≈ 12,5 % svagere i dueller, afslutninger og luftdueller). En kamp koster efter løbet distance; man kommer sig hurtigere, jo mere træt man er; bænken +15 ekstra – 🚑 = skadet (antal kampe)', field: 'freshness', value: (p) => (p.injuryMatchesLeft > 0 ? -p.injuryMatchesLeft : p.freshness), num: true },
   { key: 'height', label: 'Højde', field: 'heightCm', value: (p) => p.heightCm, num: true },
-  { key: 'jump', label: 'Spring', field: 'jumpingPower', value: (p) => p.jumpingPower, num: true, heat: true },
+  { key: 'jump', label: 'Spring', title: 'Spring – trænes med Fysik (indgår i luftduellen)', field: 'jumpingPower', value: (p) => p.jumpingPower, num: true, heat: true, gain: 'jumpingPower' },   // v3.32.0: +N-mærket som evnerne
   { key: 'aerial', label: '✈ Luft', title: 'Samlet luftduel/hovedstød', field: 'aerialPower', value: (p) => p.aerialPower, num: true, heat: true },
   ...[['pace', 'PAC', 'Fart'], ['stamina', 'STA', 'Udholdenhed'], ['strength', 'STR', 'Styrke'], ['ballControl', 'BAL', 'Boldkontrol'], ['passing', 'PAS', 'Pasning'], ['finishing', 'FIN', 'Afslutning'], ['positioning', 'POS', 'Positionering'], ['intercepting', 'INT', 'Erobring'], ['goalkeeping', 'GK', 'Målmandsspil']]
-    .map(([k, label, title]) => ({ key: k, label, title, field: 'skills', value: (p) => p.skills[k], num: true, heat: true, skill: true })),
-  { key: 'avg', label: 'Gns', title: 'Gennemsnit af de 9 kerne-evner', field: 'skills', value: avgSkill, num: true, fmt: (v) => dec(v, 1) },
+    .map(([k, label, title]) => ({ key: k, label, title, field: 'skills', value: (p) => p.skills[k], num: true, heat: true, skill: true, gain: k })),
+  { key: 'avg', label: 'Gns', title: 'Gennemsnit af de 9 kerne-evner – Spring tæller ikke med', field: 'skills', value: avgSkill, num: true, fmt: (v) => dec(v, 1) },
   { key: 'rating', label: '⭐ Vurd', title: 'Eget hold: gennemsnitlig karakter. Modstandere: stjerner', field: 'publicStars', value: (p, c) => (c.isOwn ? avgRating(p) : p.publicStars), num: true },
   { key: 'mod', label: '🧠 Mod', title: 'Erfaring mod stilarter: mod gegenpres / mod lav blok / mod VAR-linje og lange bolde (sorterer på den bedste)', field: 'counterTactics', value: modBest, num: true },
   // v3.19.0 (brugeren: "Hvor står værdien og lønnen for mine egne spillere?"): sidst, så kolonnernes plads i e2e holder. Værdien er
@@ -112,11 +112,11 @@ export function renderMatrix({ team, isOwn, ui, notes, onSort, onSelect, onSwap,
       if (c.key === 'height') return h('td', { class: cls }, `${p.heightCm} cm`);
       if (c.key === 'rating') return h('td', { class: cls }, isOwn ? (avgRating(p) ? dec(avgRating(p), 1) : '–') : starsEl(p.publicStars));
         if (c.key === 'mod') return h('td', { class: cls + ' modcell', title: 'Mod gegenpres / lav blok / VAR-linje og lange bolde' }, COUNTER_KEYS.map((k) => p.counterTactics[k]).join(' · '));
-      const v = c.value(p, ctx), n = c.skill ? (gains.get(p.id) ?? []).filter((s) => s === c.key).length : 0;
-      return h('td', { class: cls + (c.heat ? ' ' + heatClass(v) : '') + (n ? ' gain' : ''), ...(n ? { dataset: { gain: String(n) }, title: `+${n} ${SKILL_NAME[c.key]} ${after}` } : {}) }, c.fmt ? c.fmt(v) : v);
+      const v = c.value(p, ctx), n = c.gain ? (gains.get(p.id) ?? []).filter((s) => s === c.gain).length : 0;
+      return h('td', { class: cls + (c.heat ? ' ' + heatClass(v) : '') + (n ? ' gain' : ''), ...(n ? { dataset: { gain: String(n) }, title: `+${n} ${SKILL_NAME[c.gain]} ${after}` } : {}) }, c.fmt ? c.fmt(v) : v);
     });
     const ar = isOwn ? archetypeOf(p.archetype) : null;   // v3.31.1: navnet fra tabellen efter id (labels.js)
-    const arch = ar ? h('span', { class: ar.isUnlocked ? 'arch on' : 'arch' }, `${archIcon(ar)} ${ar.name}`) : null;
+    const arch = ar ? h('span', { class: ar.isUnlocked ? 'arch on' : 'arch', title: ar.isUnlocked ? `${ar.name} – låst op` : archReqText(ar, p) }, `${archIcon(ar)} ${ar.name}`) : null;   // v3.32.0: kravet i title
     const note = notes[p.id]?.trim() ? h('span', { class: 'note-flag', title: 'Du har en note' }, '📝') : null;
     return h('tr', { class: (ui.selectedPlayerId === p.id ? 'selected ' : '') + (ui.swapId === p.id ? 'swapping' : ''), dataset: { pid: p.id }, tabindex: '-1', onclick: () => onSelect(p) },
       cells, h('td', {}, arch, note),
