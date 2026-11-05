@@ -41,7 +41,7 @@ export function renderCard({ player: p, team, isOwn, scouting, note, onNote, tea
         h('div', { class: 'muted', id: 'counter-used' }, `Erfaring brugt: ${COUNTER_KEYS.reduce((a, k) => a + p.counterTactics[k], 0)}/${COUNTER_POOL} – ved fuld pulje glemmer han lidt af det gamle, når han lærer noget nyt.`)),
       // Arketypen (v3.31.1; v3.31.2 "arketype" – brugerens ord): navn og beskrivelse fra tabellen efter id, kravene med evnernes danske navne
       arch ? h('div', { class: 'archbox', id: 'card-arch' }, h('strong', {}, `${archIcon(arch)} ${arch.name}`), ' – ', arch.description,
-        arch.isUnlocked ? null : h('div', { class: 'muted', id: 'card-arch-req' }, archReqText(arch, p))) : null,
+        arch.isUnlocked ? null : h('div', { class: 'muted', id: 'card-arch-req' }, archReqText(arch, p, starter))) : null,
       h('div', { class: 'muted', id: 'run-stats' }, run.km90 != null ? `🏃 ${dec(run.km90, 1)} km pr. 90 min · ${run.hiPct != null ? `${run.hiPct} % højintenst` : 'højintenst: kommer efter næste kamp'} · topfart ${dec(p.topSpeedMax, 1)} km/t (alle kampe)` : '🏃 Løbedata kommer efter første kamp'),
       renderTraining(p, starter, onTrainLink),
       h('div', { class: 'muted', id: 'card-wage' }, `Løn ${kr(Math.round(p.weeklyWage / 3))} pr. runde · Værdi ${kr(publicValue(p))} (offentlig – ud fra stjerner og alder)`),

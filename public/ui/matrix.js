@@ -116,7 +116,7 @@ export function renderMatrix({ team, isOwn, ui, notes, onSort, onSelect, onSwap,
       return h('td', { class: cls + (c.heat ? ' ' + heatClass(v) : '') + (n ? ' gain' : ''), ...(n ? { dataset: { gain: String(n) }, title: `+${n} ${SKILL_NAME[c.gain]} ${after}` } : {}) }, c.fmt ? c.fmt(v) : v);
     });
     const ar = isOwn ? archetypeOf(p.archetype) : null;   // v3.31.1: navnet fra tabellen efter id (labels.js)
-    const arch = ar ? h('span', { class: ar.isUnlocked ? 'arch on' : 'arch', title: ar.isUnlocked ? `${ar.name} – låst op` : archReqText(ar, p) }, `${archIcon(ar)} ${ar.name}`) : null;   // v3.32.0: kravet i title
+    const arch = ar ? h('span', { class: ar.isUnlocked ? 'arch on' : 'arch', title: ar.isUnlocked ? `${ar.name} – låst op` : archReqText(ar, p, team.tactics.lineupSlots.includes(p.id)) }, `${archIcon(ar)} ${ar.name}`) : null;   // v3.32.0: kravet i title
     const note = notes[p.id]?.trim() ? h('span', { class: 'note-flag', title: 'Du har en note' }, '📝') : null;
     return h('tr', { class: (ui.selectedPlayerId === p.id ? 'selected ' : '') + (ui.swapId === p.id ? 'swapping' : ''), dataset: { pid: p.id }, tabindex: '-1', onclick: () => onSelect(p) },
       cells, h('td', {}, arch, note),

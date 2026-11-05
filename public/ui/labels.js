@@ -23,7 +23,7 @@ export const archIcon = (a) => (a.isUnlocked ? '🌟' : '🔒');
 // "Låses op ved: Styrke 13/13 ✓ · Spring 13/14 – trænes med Fysik". Træner han fokusset i forvejen: "(det gør han nu; …)" med
 // skønnet for næste +1 (trainingEstimate – går det langsomt, står hvorfor). To mangler med samme fokus: "– begge trænes med Fysik".
 // KUN ejerens spiller (evnerne er private – vagterne i card.js, lineup-list.js og matrix.js). Uden p: kun kravene.
-export const archReqText = (a, p = null) => {
+export const archReqText = (a, p = null, starter = false) => {   // QC v3.32.0: starter = samme skøn som kortets træningsboks
   const da = Object.fromEntries(SKILL_LABELS.flatMap(([, list]) => list));   // SKILL_LABELS står længere nede
   const req = Object.entries(a.unlockReq ?? {});
   if (!p) return 'Låses op ved: ' + req.map(([k, v]) => `${da[k] ?? k} ${v}`).join(', ');
@@ -35,8 +35,8 @@ export const archReqText = (a, p = null) => {
     if (!focus) return '';
     let now = '';
     if (cur === focus) {
-      const e = trainingEstimate(p), n = Math.min(...e.lines.filter((l) => skills.includes(l.skill)).map((l) => l.n ?? Infinity));
-      now = ` (det gør han nu${n === Infinity ? '' : n > 14 ? `; går langsomt: ${e.why}` : `; næste +1 om ca. ${n} runde${n === 1 ? '' : 'r'}`})`;
+      const e = trainingEstimate(p, starter), n = Math.min(...e.lines.filter((l) => skills.includes(l.skill)).map((l) => l.n ?? Infinity));
+      now = ` (det gør han nu${n === Infinity ? '' : n > 14 ? `; går langsomt${e.why === 'fokus og alder' ? '' : ` – ${e.why}`}` : `; næste +1 om ca. ${n} runde${n === 1 ? '' : 'r'}`})`;
     }
     return ` – ${many}trænes med ${FOCUS[focus].label}${now}`;
   };

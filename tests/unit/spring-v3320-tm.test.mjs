@@ -111,7 +111,7 @@ test('kravteksten: "(det gør han nu; næste +1 om ca. N runde/r)" – ental ved
   assert.equal(at(1), base + 'næste +1 om ca. 1 runde)');
   assert.equal(at(2), base + 'næste +1 om ca. 2 runder)');
   assert.equal(at(14), base + 'næste +1 om ca. 14 runder)');
-  assert.equal(at(15), base + 'går langsomt: fokus og alder)');
+  assert.equal(at(15), base + 'går langsomt)');
   assert.equal(trainingEstimate(p).lines.find((l) => l.skill === 'jumpingPower').n, 15, 'data: 15 er også estimatets tal');
 });
 

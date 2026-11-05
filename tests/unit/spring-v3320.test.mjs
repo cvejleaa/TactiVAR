@@ -143,7 +143,7 @@ test('kravteksten: nu/krav, ✓ for opfyldt, fokus for det, der mangler – "det
   assert.equal(archReqText(a, p), 'Låses op ved: Styrke 12/13 · Spring 13/14 – begge trænes med Fysik');
   // Tæt på loftet (roomOf klemt til 0,1 – Tobias' profil, ikke snittet): langsomt, og hvorfor
   p.potential = keyAvg(p); p.age = 25; p.trainingFocus = 'PHYSICAL';
-  assert.equal(archReqText(a, p), 'Låses op ved: Styrke 12/13 · Spring 13/14 – begge trænes med Fysik (det gør han nu; går langsomt: han er tæt på sit loft)');
+  assert.equal(archReqText(a, p), 'Låses op ved: Styrke 12/13 · Spring 13/14 – begge trænes med Fysik (det gør han nu; går langsomt – han er tæt på sit loft)');
   // To mangler med HVER sit fokus: hver sit hint; det opfyldte uden fokus
   p.trainingFocus = 'GENERAL'; p.skills.stamina = 10; p.skills.intercepting = 12;
   assert.equal(archReqText({ unlockReq: { stamina: 14, intercepting: 12 } }, p), 'Låses op ved: Udholdenhed 10/14 – trænes med Kondition · Erobring 12/12 ✓');
@@ -279,4 +279,23 @@ test('sæsonskiftet: en 31-årigs Spring kan falde, og luftduellen regnes om med
     assert.equal(p.jumpingPower, 14);
     assert.equal(p.aerialPower, aerialBreakdown(p.heightCm, p.jumpingPower, p.skills.strength, p.skills.positioning).total, p.id);
   }
+});
+
+// QC v3.32.0: kravteksten og kortets træningsboks giver SAMME "næste +1" – også for en starter, hvor kampenes xp i
+// nøgle-evnerne tæller (før: kravteksten regnede uden starter og kunne sige 9 runder, mens boksen sagde 7)
+test('Kravteksten bruger samme skøn som kortet: en DEF-starter, der mangler Styrke på Fysik', async () => {
+  const { archReqText } = await import('../../public/ui/labels.js');
+  const { trainingEstimate, KEY_SKILLS } = await import('../../public/engine/career.js');
+  const { createLeague } = await import('../../public/engine/generator.js');
+  const { createRng } = await import('../../public/engine/rng.js');
+  const L = createLeague(createRng(31)), me = L.teams.find((t) => !t.isBot);
+  const p = me.squad.find((x) => x.line === 'DEF' && KEY_SKILLS.DEF.includes('strength')) ?? me.squad.find((x) => x.line === 'DEF');
+  p.trainingFocus = 'PHYSICAL'; p.skills.strength = 12; p.dev = { strength: 0.5 }; p.age = 21; p.potential = 18;
+  const a = { id: 'AERIAL_TOWER', unlockReq: { strength: 13 } };
+  const want = (st) => trainingEstimate(p, st).lines.find((l) => l.skill === 'strength').n;
+  for (const st of [false, true]) {
+    const n = want(st), txt = archReqText(a, p, st);
+    assert.ok(txt.includes(n > 14 ? 'går langsomt' : `næste +1 om ca. ${n} runde`), `${st}: ${txt} (skøn ${n})`);
+  }
+  if (KEY_SKILLS.DEF.includes('strength')) assert.notEqual(want(true), want(false), 'data: starteren skal give et andet skøn, ellers tester vi intet');
 });

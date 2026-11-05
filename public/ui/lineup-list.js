@@ -48,7 +48,7 @@ export function renderLineupList({ team, isOwn, ui, onPick, onSort, onBlocked, o
   const archMark = (p) => {
     const a = isOwn ? archetypeOf(p.archetype) : null;
     if (!a) return null;
-    const tip = `Arketype: ${a.name} – ${a.description}${a.isUnlocked ? ' (låst op)' : ` · ${archReqText(a, p)}`}`;
+    const tip = `Arketype: ${a.name} – ${a.description}${a.isUnlocked ? ' (låst op)' : ` · ${archReqText(a, p, team.tactics.lineupSlots.includes(p.id))}`}`;
     return [h('span', { class: 'lp-arch-ico', title: tip, 'aria-label': tip }, ` ${archIcon(a)}`), h('div', { class: 'lp-arch muted', title: tip }, `${archIcon(a)} ${a.name}`)];
   };
   const row = (p, kind) => {
