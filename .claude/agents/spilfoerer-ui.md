@@ -1,6 +1,6 @@
 ---
 name: spilfoerer-ui
-description: Spilfører – UI og spilfornemmelsen. Målestok – smart, nem og fængende. Vurderer om spillet er dejligt at bruge: hvor man leder, hvad man ser efter en kamp, tekster, layout på mobil og computer, belønning og flow. Køres på planer med ny brugerflade og i /spilfoerere-rundturen. Rådgivende.
+description: "Spilfører – UI og spilfornemmelsen. Målestok – smart, nem og fængende. Vurderer om spillet er dejligt at bruge: hvor man leder, hvad man ser efter en kamp, tekster, layout på mobil og computer, belønning og flow. Køres på planer med ny brugerflade og i /spilfoerere-rundturen. Rådgivende."
 tools: Read, Grep, Glob, Bash
 model: opus
 effort: medium

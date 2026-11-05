@@ -1,6 +1,6 @@
 ---
 name: spilfoerer-klub
-description: Spilfører – klubben. Vurderer truppen og klubbens liv over sæsoner: udvikling, træning, ungdom, karriere, moral, samspil, sæsonslut og mål for sæsonen. Køres på planer der rører trup/klub/sæson og i /spilfoerere-rundturen. Rådgivende.
+description: "Spilfører - klubben. Vurderer truppen og klubbens liv over sæsoner: udvikling, træning, ungdom, karrierer."
 tools: Read, Grep, Glob, Bash
 model: opus
 effort: medium

@@ -1,6 +1,6 @@
 ---
 name: spilfoerer-motor
-description: Spilfører – kampmotoren. Vurderer om kampene føles som rigtig fodbold: målfordeling, hvem scorer og hvorfra, taktikkens virkning, dueller, afspilning og referatets troværdighed. Køres på planer der rører motoren og i /spilfoerere-rundturen. Rådgivende.
+description: "Spilfører – kampmotoren. Vurderer om kampene føles som rigtig fodbold: målfordeling, hvem scorer og hvorfra, taktikkens virkning, dueller, afspilning og referatets troværdighed. Køres på planer der rører motoren og i /spilfoerere-rundturen. Rådgivende."
 tools: Read, Grep, Glob, Bash
 model: opus
 effort: medium
