@@ -224,15 +224,17 @@ export function retireChance(p) {
 }
 export const willRetire = (p, season) => { const c = retireChance(p); return c >= 1 || (c > 0 && derivedRng('retire', season, p.id).next() < c); };
 // Aldersfald fra 30 år (MV 32): fart og kondition først, positionering og pasning sidst. Træning halverer faldet i de trænede evner.
+// v3.32.0: Spring falder som Styrke (tier 2) – en evne, der kan trænes op, skal også kunne falde; Fysik halverer faldet (trainedSkills).
 export const DECLINE_FROM = { field: 30, GK: 32 };
-export const DECLINE = [[['pace', 'stamina'], 0.35, 0.15], [['strength', 'ballControl', 'finishing', 'intercepting', 'goalkeeping'], 0.2, 0.1], [['positioning', 'passing'], 0.08, 0.07]];
+// Spring står SIDST med Styrkes sats (0,2 + 0,1/år): den afledte rng trækker i listens rækkefølge, så de 9 evners fald er de samme som før.
+export const DECLINE = [[['pace', 'stamina'], 0.35, 0.15], [['strength', 'ballControl', 'finishing', 'intercepting', 'goalkeeping'], 0.2, 0.1], [['positioning', 'passing'], 0.08, 0.07], [['jumpingPower'], 0.2, 0.1]];
 export function declineSkills(p, season, trained = new Set()) {
   const from = DECLINE_FROM[p.line === 'GK' ? 'GK' : 'field'];
   if (p.age < from) return [];
   const r = derivedRng('decline', season, p.id), y = p.age - from, fell = [];
   for (const [skills, base, step] of DECLINE) for (const s of skills) {
     const c = Math.min(0.9, base + step * y) * (trained.has(s) ? 0.5 : 1);
-    if (r.next() < c && p.skills[s] > 1) { p.skills[s] -= 1; fell.push(s); }
+    if (r.next() < c && skillOf(p, s) > 1) { setSkill(p, s, skillOf(p, s) - 1); fell.push(s); }
   }
   return fell;
 }

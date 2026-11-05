@@ -240,3 +240,43 @@ test('measure-jump (tools/measure-jump.mjs): de 17–23-årige på Fysik når Sp
   const share = young.filter((n) => n <= 28).length / young.length;
   assert.ok(share >= 0.5, `andel ${share}`);
 });
+
+// ---------- D5: aldersfaldet tager Spring med (egen commit – den eneste del, der må flytte golden-hashes over sæsoner) ----------
+const { declineSkills, trainedSkills, DECLINE } = await import('../../public/engine/career.js');
+const { seasonTurnover } = await import('../../public/engine/season.js');
+
+test('aldersfald: Spring falder med Styrkes sats fra 30 år, Fysik halverer faldet; ingen før 30 – og Spring står sidst i DECLINE', () => {
+  const mk = (age, id) => ({ id, age, line: 'DEF', jumpingPower: 14, skills: { pace: 12, stamina: 12, strength: 12, ballControl: 12, passing: 12, finishing: 12, positioning: 12, intercepting: 12, goalkeeping: 2 } });
+  assert.deepEqual(DECLINE.at(-1), [['jumpingPower'], 0.2, 0.1], 'sidst: de 9 evners træk i den afledte rng er de samme som før v3.32.0');
+  let free = 0, trained = 0, young = 0;
+  for (let i = 0; i < 400; i++) {
+    const a = mk(33, `j${i}`), b = mk(33, `j${i}`), c = mk(29, `j${i}`);
+    if (declineSkills(a, 1).includes('jumpingPower')) { free++; assert.equal(a.jumpingPower, 13); assert.equal('jumpingPower' in a.skills, false); }
+    if (declineSkills(b, 1, trainedSkills({ line: 'DEF', trainingFocus: 'PHYSICAL' }, false)).includes('jumpingPower')) trained++;
+    if (declineSkills(c, 1).includes('jumpingPower')) young++;
+  }
+  // 33 år: 0,2 + 3 · 0,1 = 0,5 → ≈ 200 af 400 (før v3.32.0: 0 – Spring faldt aldrig); trænet med Fysik ≈ 100
+  assert.ok(free > 160 && free < 240, String(free));
+  assert.ok(trained > 70 && trained < 130, String(trained));
+  assert.equal(young, 0);
+  assert.ok(trainedSkills({ line: 'DEF', trainingFocus: 'PHYSICAL' }, false).has('jumpingPower'));
+  // Spring 1 falder ikke under 1
+  const low = mk(36, 'low'); low.jumpingPower = 1;
+  for (let s = 1; s < 30; s++) declineSkills(low, s);
+  assert.equal(low.jumpingPower, 1);
+});
+
+test('sæsonskiftet: en 31-årigs Spring kan falde, og luftduellen regnes om med den nye værdi', () => {
+  const L = createLeague(createRng(51)), me = own(L);
+  for (const p of me.squad) { p.age = 31; p.jumpingPower = 15; p.trainingFocus = 'GENERAL'; afterSkillChange(p); }
+  const before = new Map(me.squad.map((p) => [p.id, p.jumpingPower]));
+  seasonTurnover(L);   // 31 → 32 år: Spring falder med 0,2 + 0,1 · 2 = 0,4 (pension ¼)
+  const stay = own(L).squad.filter((p) => before.has(p.id));
+  const fell = stay.filter((p) => p.jumpingPower < before.get(p.id));
+  assert.ok(stay.length >= 1, 'data: nogen er stadig i truppen');
+  assert.ok(fell.length >= 1, `data: mindst én faldt i Spring (${fell.length}/${stay.length})`);
+  for (const p of fell) {
+    assert.equal(p.jumpingPower, 14);
+    assert.equal(p.aerialPower, aerialBreakdown(p.heightCm, p.jumpingPower, p.skills.strength, p.skills.positioning).total, p.id);
+  }
+});
