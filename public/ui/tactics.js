@@ -1,5 +1,5 @@
 // Formation, Plan A/B/C, de tre kampfaser og Hvis-Så-reglerne (docs/spec.md §4).
-import { h, select } from './dom.js';
+import { h, select, help as help_ } from './dom.js';
 import { PHASE_OPTIONS, CONDITIONS, MARGINS, POSITION } from './labels.js';
 import { FORMATION_NAMES, FORMATIONS, lineOfRole } from '../engine/formations.js';
 // "5 på midten · mere bold" (v3.25.0, nr. 38): formationens midtbanepladser efter ankrets dybde – samme tælling som motoren
@@ -20,6 +20,15 @@ const PHASES = [
     'Ved erobring: Lynkontra giver flere kontraer, når I vinder bolden; Hold på bolden giver færre, men styrker jeres næste opbygning. Ved boldtab: Genpres dæmper modstanderens kontraer, men koster løb (friskhed); Fald tilbage koster intet.'],
 ];
 
+// v3.32.1 (R1, designkritikken: "forklaringstekst kvæler kontrollerne"): én kort linje pr. fase synlig (QC: ca. 70 tegn – målt i Chromium står
+// højst ca. 48 tegn på én linje ved 390 px, så de er kortere), den lange forklaring bag "ⓘ Sådan virker det" (ui/dom.js help – husker åben/lukket over gentegning)
+export const PHASE_SHORT = {
+  phase1_buildUp: 'Fokus: chancetypen · mange løb: flere i feltet',   // QC: før "Fokus giver chancetypen, løb flere i feltet" (læstes som en opfordring)
+  phase2_defending: 'Lav blok: luftdueller · Aggressiv: flere kort',   // QC: samme ord som valget (Aggressiv)
+  phase3_transition: 'Lynkontra: flere kontraer · genpres: mere slid',
+};
+export const RULES_SHORT = 'Skift plan, formation eller spiller undervejs';
+const PHASE_NAME = { phase1_buildUp: 'Fase 1', phase2_defending: 'Fase 2', phase3_transition: 'Fase 3' };
 const PLAN_NAMES = ['Plan A', 'Plan B', 'Plan C'];
 
 export function renderTactics({ team, isOwn, ui, on }) {
@@ -64,7 +73,7 @@ export function renderTactics({ team, isOwn, ui, on }) {
     !isOwn ? h('div', { class: 'lockbox' }, 'Du ser kun modstanderens startopstilling. 🔒 Deres faser, planer, Hvis-Så-regler og udskiftningsgrænse er skjulte.') : null,
     !isOwn ? null : PHASES.map(([phase, title, fields, help]) => h('fieldset', { class: 'phase', dataset: { phase } }, h('legend', {}, title),
       fields.map(([f, label]) => h('label', {}, label + ' ', select(t.phases[phase][f], PHASE_OPTIONS[f], (v) => on.phase(phase, f, v), { disabled, dataset: { field: f } }))),
-      help ? h('p', { class: 'muted phase-help' }, help) : null)),
+      help ? help_({ id: `help-${phase}`, short: PHASE_SHORT[phase], label: PHASE_NAME[phase], long: h('p', { class: 'muted phase-help' }, help) }) : null)),
     !isOwn ? null : h('fieldset', { class: 'phase rules', id: 'rules' }, h('legend', {}, `Hvis-Så-regler (maks ${MAX_RULES}, hver udløses højst én gang pr. kamp)`),
       t.conditionalRules.map((r, i) => h('div', { class: 'rule' },
         'Fra minut ', h('input', { type: 'number', min: 1, max: 89, value: String(r.minuteTrigger), disabled, onchange: (e) => on.rule(i, { minuteTrigger: Math.max(1, Math.min(89, Number(e.target.value) || 1)) }) }),
@@ -74,10 +83,11 @@ export function renderTactics({ team, isOwn, ui, on }) {
         r.action === 'SUB' ? subPicker(r, i) : null,
         isOwn ? h('button', { class: 'mini', title: 'Slet regel', onclick: () => on.removeRule(i) }, '✕') : null)),
       isOwn && t.conditionalRules.length < MAX_RULES ? h('button', { class: 'mini', id: 'add-rule', onclick: on.addRule }, '+ Tilføj regel') : null,
-      h('div', { class: 'muted help' }, 'Skift til en plan eller formation tager formationen (og planens trukne positioner og faser) med – de 11 på banen fordeles efter deres naturlige position, og det er DISSE regler, der gælder resten af kampen (planens egne Hvis-Så-regler bruges ikke midt i en kamp). En udskiftning: indskifteren overtager pladsen; den sker i første tick fra minuttet (der spilles i 3-minutters ryk), tæller med i udskiftningerne og pauserne, og bænkspilleren bruges ikke til træthedsskift. Reglerne hører til planen – skifter du plan, gælder den plans regler.')),
+      help_({ id: 'help-rules', short: RULES_SHORT, label: 'Hvis-Så-reglerne', long: h('div', { class: 'muted help rules-help' }, 'Skift til en plan eller formation tager formationen (og planens trukne positioner og faser) med – de 11 på banen fordeles efter deres naturlige position, og det er DISSE regler, der gælder resten af kampen (planens egne Hvis-Så-regler bruges ikke midt i en kamp). En udskiftning: indskifteren overtager pladsen; den sker i første tick fra minuttet (der spilles i 3-minutters ryk), tæller med i udskiftningerne og pauserne, og bænkspilleren bruges ikke til træthedsskift. Reglerne hører til planen – skifter du plan, gælder den plans regler.') })),
     // Udskiftninger under kampen (v3.13): holdets grænse – gælder alle planer, hele kampen.
     !isOwn ? null : h('fieldset', { class: 'phase subs', id: 'subs' }, h('legend', {}, 'Udskiftninger under kampen'),
       h('label', {}, 'Skift en træt spiller ud, når hans friskhed i kampen er under ',
         select(String(team.subsLimit ?? 0), [['0', 'Fra – kun skadesskift'], ...Array.from({ length: (SUBS_LIMIT.max - SUBS_LIMIT.min) / 5 + 1 }, (_, i) => SUBS_LIMIT.min + i * 5).map((v) => [String(v), `${v} %`])], (v) => on.subs(Number(v)), { id: 'subs-limit', disabled })),
-      h('p', { class: 'muted subs-help', id: 'subs-help' }, `Friskheden falder i løbet af kampen efter pladsens løb, dit pres og spillerens udholdenhed (STA): en central midtbane med STA 6 taber ca. 20 point på 90 minutter, med STA 10 ca. 16, med STA 16 ca. 11 – og en træt spiller yder mindre (20 tabte point ≈ 12 % svagere). Eksempel: en midtbane med STA 10, der starter på 80 %, rammer 70 % efter ca. 55 minutter. Grænsen gælder i hele kampen og for alle planer; der skiftes ind fra bænken i samme kæde. Bruges en pause, tages også dem med, der er tæt på grænsen. Reglerne: højst ${MATCH_RULES.maxSubs} udskiftninger i højst ${MATCH_RULES.maxWindows} pauser (halvlegen tæller ikke) – skadesskift tæller med. Målmanden skiftes kun ved skade.`)));
+      help_({ id: 'help-subs', short: `Træt spiller ud under grænsen · højst ${MATCH_RULES.maxSubs} skift`, label: 'udskiftningerne',
+        long: h('p', { class: 'muted subs-help', id: 'subs-help' }, `Friskheden falder i løbet af kampen efter pladsens løb, dit pres og spillerens udholdenhed (STA): en central midtbane med STA 6 taber ca. 20 point på 90 minutter, med STA 10 ca. 16, med STA 16 ca. 11 – og en træt spiller yder mindre (20 tabte point ≈ 12 % svagere). Eksempel: en midtbane med STA 10, der starter på 80 %, rammer 70 % efter ca. 55 minutter. Grænsen gælder i hele kampen og for alle planer; der skiftes ind fra bænken i samme kæde. Bruges en pause, tages også dem med, der er tæt på grænsen. Reglerne: højst ${MATCH_RULES.maxSubs} udskiftninger i højst ${MATCH_RULES.maxWindows} pauser (halvlegen tæller ikke) – skadesskift tæller med. Målmanden skiftes kun ved skade.`) })));
 }

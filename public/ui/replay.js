@@ -5,7 +5,7 @@
 // og elementet genbruges mellem tegningerne (renderMc erstatter Match Center – QC B4). Ingen opfundne mellembilleder:
 // grundbilledet pr. tick (hvert 3. minut) og afslutningernes øjeblikke fra sporet (match.js "Kampens spor"). Ét tegnet trin
 // (v3.16.2): efter et mål, en redning eller et skud forbi går bolden derhen, referatet siger – tegnet ud fra udfaldet, ikke motoren.
-import { h } from './dom.js';
+import { h, fold } from './dom.js';
 import { evMin, fmtMin, tickClock } from '../engine/clock.js';
 import { apartOnLine, ONSIDE_GAP } from '../engine/positions.js';
 
@@ -117,15 +117,17 @@ export function replayEl(m, ownSide) {
     r.i = at >= 0 ? at : ev != null ? Math.max(0, r.steps.findIndex((s) => s.ev > ev)) : 0; flag(hlBtn, 'active', r.highlights); show();
     // Kører afspilningen, fortsætter den fra det nye trin (RM v3.16.2: ryddet timer uden ny standsede den tavst med "⏸ Pause")
     if (r.playing) r.timer = setTimeout(tick, STEP_MS[r.steps[r.i].kind] / r.speed); } }, '⭐ Højdepunkter');
+  // v3.32.1 (R2, designkritikken: "afspilningen ligger under folden"): knapperne OVER banen, så teksten, så banen – og intro-teksten bag ⓘ
   const el = h('div', { class: 'replay', id: 'replay' },
-    h('div', { class: 'row' }, h('strong', {}, '🎬 Afspilning'),
-      h('span', { class: 'muted' }, ` – taktiktavle ud fra ${m.trace.frames.length} øjebliksbilleder (hvert 3. minut) og afslutningerne i åbent spil (dødbolde – straffe, frispark, hjørnespark – har intet billede). ${flip ? m.awayName : m.homeName} angriber opad.`)),
-    pitch, caption,
+    h('div', { class: 'row rp-head' }, h('strong', {}, '🎬 Afspilning'),
+      fold({ id: 'replay-help', summary: 'ⓘ Om tavlen', cls: 'rp-help', label: 'Om tavlen – afspilningen' },
+        h('span', { class: 'muted' }, `Taktiktavle ud fra ${m.trace.frames.length} øjebliksbilleder (hvert 3. minut) og afslutningerne i åbent spil (dødbolde – straffe, frispark, hjørnespark – har intet billede). ${flip ? m.awayName : m.homeName} angriber opad.`))),
     h('div', { class: 'rp-controls' },
       h('button', { class: 'mini', id: 'rp-prev', title: 'Et trin tilbage', onclick: () => { pause(); r.i = Math.max(0, r.i - 1); show(); } }, '⏮'),
       playBtn,
       h('button', { class: 'mini', id: 'rp-next', title: 'Et trin frem', onclick: () => { pause(); r.i = Math.min(r.steps.length - 1, r.i + 1); show(); } }, '⏭'),
-      speedBtn, hlBtn));
+      speedBtn, hlBtn),
+    caption, pitch);
 
   function token(id, side) {
     if (r.tokens.has(id)) return r.tokens.get(id);

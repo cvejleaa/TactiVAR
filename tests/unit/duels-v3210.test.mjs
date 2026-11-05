@@ -154,7 +154,7 @@ function renderWith(myTeamId, fn) {
   const { home, away, m } = G[0];
   const ratings = { ...m.ratings, home: m.ratings.home.map(fn), away: m.ratings.away.map((e, i) => fn(e, i + 20)) };
   clearReplays();
-  const mc = { round: 1, matches: [{ ...m, ratings }], gazette: { goalOfTheRound: null, totalGoals: 0, totalVarChecks: 0 }, viewIdx: 0, filter: 'all', shownCount: Infinity, playing: false };
+  const mc = { round: 1, matches: [{ ...m, ratings }], gazette: { goalOfTheRound: null, totalGoals: 0, totalVarChecks: 0 }, viewIdx: 0, filter: 'all', shownCount: Infinity, playing: false, pane: 'players' };   // v3.32.1: "👥 Spillerne"
   const el = renderMatchCenter({ mc, myTeamId, on: { skip() {}, view() {}, snapshot() {}, openGoal() {}, filter() {}, heat() {}, replay() {} } });
   return { tables: all(el, (e) => cls(e, 'ratings')), home, away, ratings };
 }

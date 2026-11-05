@@ -34,7 +34,7 @@ const { measureClock } = await import('../../tools/measure-clock.mjs');
 const all = (el, pred, out = []) => { if (el instanceof FakeEl) { if (pred(el)) out.push(el); el.children.forEach((c) => all(c, pred, out)); } return out; };
 const byId = (el, id) => all(el, (e) => e.attrs.id === id);
 const cls = (e, c) => e.className.split(' ').includes(c);
-const mcOf = (m, extra = {}) => ({ round: 1, matches: [m], gazette: { goalOfTheRound: null, totalGoals: 0, totalVarChecks: 0 }, viewIdx: 0, filter: 'all', shownCount: Infinity, playing: false, ...extra });
+const mcOf = (m, extra = {}) => ({ round: 1, matches: [m], gazette: { goalOfTheRound: null, totalGoals: 0, totalVarChecks: 0 }, viewIdx: 0, filter: 'all', shownCount: Infinity, playing: false, pane: 'players', ...extra });   // v3.32.1: standard "👥 Spillerne" (referatet: pane 'replay')
 const on = { skip() {}, view() {}, snapshot() {}, openGoal() {}, filter() {}, heat() {}, replay() {} };
 const render = (m, myTeamId, mc = {}) => { clearReplays(); return renderMatchCenter({ mc: mcOf(m, mc), myTeamId, on }); };
 const isEnd = (e) => e.type === 'END' || e.type === 'FULLTIME';
@@ -266,7 +266,7 @@ const M4 = (() => {
 test('tillægstidslinjen i referatet: "⏱️ Tillægstid: S min (heraf X for VAR)." lige under halvlegens første hændelse i tillægstid (nyeste øverst)', () => {
   assert.ok(M4, 'data: en kamp med VAR i første halvleg, ingen i anden');
   const [{ S: S1, var: V1 }, { S: S2 }] = M4.stoppage;
-  const el = render(M4, M4.homeId), feed = byId(el, 'feed')[0].children;
+  const el = render(M4, M4.homeId, { pane: 'replay' }), feed = byId(el, 'feed')[0].children;
   const s0 = byId(el, 'stoppage-0'), s1 = byId(el, 'stoppage-1');
   assert.equal(s0.length, 1); assert.equal(s1.length, 1);
   assert.equal(s0[0].textContent, `45'⏱️ Tillægstid: ${S1} min (heraf ${V1} for VAR).`);
@@ -298,7 +298,7 @@ const SG = stoppageGoal();
 test('tillægstidslinjen: kom der en hændelse i tillægstiden (et mål i 90+x), står linjen under DEN – ikke under slutfløjtet', () => {
   assert.ok(SG, 'data: et hjemmemål i 90+x før slutfløjtet');
   const { m, goal } = SG;
-  const el = render(m, m.homeId), feed = byId(el, 'feed')[0].children, row = byId(el, 'stoppage-1')[0];
+  const el = render(m, m.homeId, { pane: 'replay' }), feed = byId(el, 'feed')[0].children, row = byId(el, 'stoppage-1')[0];
   const i = feed.indexOf(row);
   assert.equal(row.textContent, `90'⏱️ Tillægstid: ${m.stoppage[1].S} min${m.stoppage[1].var ? ` (heraf ${m.stoppage[1].var} for VAR)` : ''}.`);
   // Linjen står under halvlegens FØRSTE tillægsminut-hændelse (nyeste øverst) – målet eller en hændelse før det
@@ -391,8 +391,10 @@ test('gem fra v3.16.2 (uden clock/stoppage): Kamp-fanen viser tick-minutterne ud
     const tl = byId(el, 'timeline')[0];
     assert.equal(all(tl, (x) => cls(x, 'tl-half'))[0].style.left, '50.0%');
     for (const x of all(tl, (y) => cls(y, 'tl-mark'))) assert.match(x.attrs.title, /^\d+' /);
-    // Karakterarket: tick-minutter (ind–ud uden ur)
-    for (const side of ['home', 'away']) for (const e of m.ratings[side]) if (e.minIn > 1 && e.minOut === 90) assert.ok(el.textContent.includes(`${e.minIn}'–90'`), `${e.shortName} ${e.minIn}'–90'`);
+    // Karakterarket: tick-minutter (ind–ud uden ur) – v3.32.1 i "👥 Spillerne"
+    clearReplays(); const sheetEl = renderMatchCenter({ mc: { round: lr.round, matches: lr.matches, gazette: lr.gazette, viewIdx: i, filter: 'all', shownCount: Infinity, playing: false, pane: 'players' }, myTeamId: me.id, on });
+    assert.ok(!/undefined|NaN|null/.test(sheetEl.textContent));
+    for (const side of ['home', 'away']) for (const e of m.ratings[side]) if (e.minIn > 1 && e.minOut === 90) assert.ok(sheetEl.textContent.includes(`${e.minIn}'–90'`), `${e.shortName} ${e.minIn}'–90'`);
   });
 });
 

@@ -61,7 +61,7 @@ test('dit mål: 11 brikker på (x%, y%) fra billedet, scorer ⚽ og oplæg 🅰 
   const { m, me } = played({ youAttack: true });
   const i = goalIdx(m), snap = m.events[i].snapshot;
   assert.equal(snap.attacking, true);
-  const root = draw(m, me, { snap: i });
+  const root = draw(m, me, { snap: i, pane: 'players' });   // v3.32.1: billedet står i "👥 Spillerne"
   const pitches = byId(root, 'snap-pitch');
   assert.equal(pitches.length, 1, 'præcis ét billede');
   const toks = all(pitches[0], (e) => cls(e, 'mp-token'));
@@ -86,8 +86,9 @@ test('dit mål: 11 brikker på (x%, y%) fra billedet, scorer ⚽ og oplæg 🅰 
   const ratings = all(root, (e) => cls(e, 'ratings'));
   assert.equal(ratings.length, 2);
   assert.equal(all(ratings[0], (e) => e.attrs.id === 'snap-pitch').length, 1); assert.equal(all(ratings[1], (e) => e.attrs.id === 'snap-pitch').length, 0);
-  // Hændelsen er markeret; de andre ikke
-  const marked = all(root, (e) => cls(e, 'ev') && cls(e, 'snapped'));
+  // Hændelsen er markeret i referatet (v3.32.1: i første fane – "👥 Spillerne" har intet referat); de andre ikke
+  assert.equal(all(root, (e) => e.attrs.id === 'feed').length, 0, 'intet referat i "👥 Spillerne"');
+  const marked = all(draw(m, me, { snap: i }), (e) => cls(e, 'ev') && cls(e, 'snapped'));
   assert.equal(marked.length, 1);
   // Forklaringen under banen (v3.16, koblede linjer): angrebet står til modstanderens offside-linje, og løberen er sluppet igennem
   const note = all(pitches[0], (e) => cls(e, 'muted')).map((e) => e.textContent);
@@ -97,7 +98,7 @@ test('mål imod: ingen scorer/oplæg-mærker, bolden spejlet på (50 %, 72 %), o
   const { m, me } = played({ youAttack: false });
   const i = goalIdx(m), snap = m.events[i].snapshot;
   assert.equal(snap.attacking, false);
-  const root = draw(m, me, { snap: i });
+  const root = draw(m, me, { snap: i, pane: 'players' });   // v3.32.1: billedet står i "👥 Spillerne"
   const pitch = byId(root, 'snap-pitch')[0];
   const toks = all(pitch, (e) => cls(e, 'mp-token'));
   assert.equal(toks.length, 11);
@@ -120,9 +121,9 @@ test('uden valgt mål, eller et valgt indeks uden billede: ingen bane med billed
   assert.ok(want >= 25, 'testen har data');
   for (const snap of [null, 0, undefined]) {
     assert.equal(m.events[0].snapshot, undefined);
-    const root = draw(m, me, { snap });
+    const root = draw(m, me, { snap, pane: 'players' });
     assert.equal(byId(root, 'snap-pitch').length, 0, String(snap));
-    assert.equal(all(root, (e) => cls(e, 'snap-btn')).length, want);
+    assert.equal(all(draw(m, me, { snap }), (e) => cls(e, 'snap-btn')).length, want);   // 📍 i referatet (første fane)
   }
 });
 test('📍 findes ikke under afspilning; i et filtreret referat peger den på hændelsens plads i HELE kampen (ikke i den filtrerede liste) – kamp uden spor', () => {

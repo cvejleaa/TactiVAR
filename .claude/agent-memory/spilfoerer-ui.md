@@ -48,3 +48,10 @@ fund der er rettet (så du ikke finder dem igen), hvad brugeren har valgt fra, o
 - Foreslået: MV VB HB MS VKB HKB DM CM VM HM OM VK HK SA ANG (CF=skyggeangriber; ikke "HA" – H=højre). Én tabel i motoren.
 - Målt: plads uændret – Taktik "CDM ⚠ −2,5 %" 89 px → "DM ⚠ −2,5 %" 80 px i 96 px kolonne (390); Kamp ingen overlap.
 - Taktik-brikken viser IKKE koden (kun title, pitch.js:38). Karakterarket viser rå kæde "RWB (DEF)" (lineup.js:14).
+
+## Efter-gennemgang v3.32.1 (2026-11-05) – scripts scratchpad/ui3321/{play,t2}.mjs, billeder ui3321/shots
+- Godt (gå ikke efter igen): Kamp 390 5058 → 1760 px, 1366 2706 → 1169; ▶-rækken y 560/456 (før under folden); Send kampen i ⋯ Mere;
+  fanerne 44 px ved 390; Trup 44 px rækker, sticky + fade virker; Hjem "Se kampen ›" → scrollY 0, fane replay.
+- Fundet: #rp-play og referatfiltre 23 px ved 390; banen skæres af bjælken (1366×900: 1012 vs 851; 390: 122 af 428 px synlige);
+  #mc-ft = resultat+boldbesiddelse, neutral farve, gentager analysen ved siden af; Taktik første select y 1699 (390) / 1024 (1366),
+  fit-help 113 px + list-help + pitch-help står stadig åbne.

@@ -52,7 +52,7 @@ const trace = () => ({
 });
 const render = (myTeamId) => {
   clearReplays();
-  const mc = { round: 1, matches: [{ ...base, trace: trace() }], gazette: { goalOfTheRound: null, totalGoals: 0, totalVarChecks: 0 }, viewIdx: 0, filter: 'all', shownCount: Infinity, playing: false };
+  const mc = { round: 1, matches: [{ ...base, trace: trace() }], gazette: { goalOfTheRound: null, totalGoals: 0, totalVarChecks: 0 }, viewIdx: 0, filter: 'all', shownCount: Infinity, playing: false, pane: 'players' };   // v3.32.1: zone-kortene står i "👥 Spillerne"
   return renderMatchCenter({ mc, myTeamId, on: { skip() {}, view() {}, snapshot() {}, openGoal() {}, filter() {}, heat() {}, replay() {} } });
 };
 const ratingTables = (el) => all(el, (e) => cls(e, 'ratings'));
@@ -102,7 +102,7 @@ test('neutral kamp: hjemmeholdets zone-kort vendt opad (felter, prikker, mærker
   const skew = () => ({ v: 1,
     frames: [{ t: 1, poss: 'h', ball: [50, 50], h: [P(hGk, 50, 90), P(hA, 80, 90), P(hB, 80, 50)], a: trace().frames[0].a }],
     moments: [...trace().moments, { t: 5, ev: 3, kind: 'MISS', side: 'h', ball: [30, 15], h: [P(hA, 30, 15)], a: [], shooter: hA.playerId }] });
-  const view = (myTeamId) => { clearReplays(); return renderMatchCenter({ mc: { round: 1, matches: [{ ...base, trace: skew() }], gazette: { goalOfTheRound: null, totalGoals: 0, totalVarChecks: 0 }, viewIdx: 0, filter: 'all', shownCount: Infinity, playing: false }, myTeamId, on: { skip() {}, view() {}, snapshot() {}, openGoal() {}, filter() {}, heat() {}, replay() {} } }); };
+  const view = (myTeamId) => { clearReplays(); return renderMatchCenter({ mc: { round: 1, matches: [{ ...base, trace: skew() }], gazette: { goalOfTheRound: null, totalGoals: 0, totalVarChecks: 0 }, viewIdx: 0, filter: 'all', shownCount: Infinity, playing: false, pane: 'players' }, myTeamId, on: { skip() {}, view() {}, snapshot() {}, openGoal() {}, filter() {}, heat() {}, replay() {} } }); };
   const homeCard = (el) => byId(ratingTables(el)[0], 'heat-opp')[0];
   const nonzero = (card) => cellsOf(card).filter((x) => x[5] !== '0 %');
   const dots = (card) => all(card, (x) => cls(x, 'heat-shot')).map((d) => [d.style.left, d.style.top]);

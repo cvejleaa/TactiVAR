@@ -9,7 +9,7 @@ import * as act from './state/actions.js';
 import { saveReplay, loadReplay, replayOf, rememberSent, loadSent } from './state/replay.js';
 import { buildPayload, uploadMatch } from './state/upload.js';
 import { FIREBASE } from './firebase-config.js';
-import { h, select } from './ui/dom.js';
+import { h, select, markScrollable, remarkScrollable } from './ui/dom.js';
 import { kr, yellowWarn, attText } from './ui/labels.js';
 import { renderMatrix, matrixRows } from './ui/matrix.js';
 import { renderLineupList, listRows } from './ui/lineup-list.js';
@@ -44,7 +44,8 @@ const tabNow = () => (TAB_KEYS.includes(game.ui.tab) ? game.ui.tab : 'hjem');
 // Faner, der kan vise et andet hold (scout-bjælken); fra de andre vises holdet i Trup (showTeam)
 const SCOUT_TABS = ['trup', 'taktik', 'klub'];
 // Seneste runde vist færdigspillet (Kamp-fanen uden igangværende afspilning).
-const lastRoundView = (r) => ({ round: r.round, matches: r.matches, gazette: r.gazette, viewIdx: 0, filter: 'all', shownCount: Infinity, playing: false });
+// v3.32.1 (R3): pane = Kamp-underfanen efter fløjtet ('replay' | 'stats' | 'players' – matchcenter.js MC_PANES); ikke i gemmet
+const lastRoundView = (r) => ({ round: r.round, matches: r.matches, gazette: r.gazette, viewIdx: 0, filter: 'all', shownCount: Infinity, playing: false, pane: 'replay' });
 function showTab(k) {
   if (k === 'admin' && game.ui.tab !== 'admin') view.prevTab = game.ui.tab;   // ⚙ "Se et andet hold" vender tilbage hertil
   if (k === 'hjem' && view.viewTeamIdx !== myIdx()) setViewTeam(myIdx());       // Hjem er altid dit hold – også Trup bagefter
@@ -141,6 +142,7 @@ const NEWS = {
   '3.14.3': 'Rettelser: Langskud tages fra skudafstand (ikke fra egen banehalvdel) i billedet ved målet, referatet fortæller et oplæg én gang, og efter sæsonens sidste runde viser tabellen slutstillingen og mesteren, til næste sæson går i gang.',
   '3.28.0': '🏠 Andet skridt i den nye brugerflade: en ny Hjem-fane samler sidste runde, din placering, "Før du spiller" (udelukkede, skadede, trætte og 🟨 – med et link til at løse det), næste modstander og tabellen omkring dig. ▶ Spil runde står nu i en bjælke i bunden af Hjem og Taktik (på de andre faner som en lille ▶ øverst med de samme tegn), og modstanderens navn er et separat 🔍-link. Holdvælgeren er flyttet til Liga ("Se et hold"), og ser du et andet hold, siger en lilla bjælke det – med "← Dit hold". ⚙ øverst til højre har gem, eksport, import og versionen. På mobil står fanerne i bunden. Næste skridt: spillerkortet som ét panel.',
   '3.31.2': '📊 Spillerkortet viser nu spillerens statistik for holdet øverst: kampe, minutter, mål, oplæg, snitkarakter, 👑, 🟨 og 🟥 for denne og sidste sæson. Taktik-listen viser arketypen (🔒 låst / 🌟 låst op) ved dine spillere. Skønnet af en spillers udvikling har nu fem trin – fra "er tæt på sit loft" til "har langt mere i sig" – så ungdomsspillerne ikke alle hedder det samme, og ungdomstilbuddet viser nøglesnittet. Og positionerne er danske overalt: MV, MS, VB/HB, VKB/HKB, DM, CM, OM, VM/HM, VK/HK og ANG.',
+  '3.32.1': '🧹 Mindre klemt sammen (designgennemgangen): På Kamp står afspilningen og ▶ Afspil nu på første skærm – kampene på én linje, og efter fløjtet tre faner: 🎬 Afspilning & referat · 📊 Statistik · 👥 Spillerne, med kampens resultat og boldbesiddelse fast øverst. "📤 Send kampen" ligger under "⋯ Mere". På Taktik står én kort linje under hver fase – forklaringen bag "ⓘ Sådan virker det". Brede tabeller (Trup, Træning, Klub) toner ud i kanten, når der er mere at rulle, og navnet (på Klub: runden) står fast; på mobil er Trups rækker højere, så de er lette at trykke på.',
   '3.32.0': '✈ Spring kan nu trænes: Fysik træner Fart, Styrke og Spring, og spillerkortet viser Spring som en bjælke under "Fysik & luft". Arketypens krav viser, hvor langt han er, og hvad der træner det – fx "Låses op ved: Styrke 13/13 ✓ · Spring 13/14 – trænes med Fysik". Fokusvalget på 🏋️ Træning viser, hvilke evner hvert fokus træner, og Trup markerer et +1 i Spring som i de andre evner. Fra 30 år kan Spring falde som Styrke – træning med Fysik halverer faldet.',
   '3.31.1': '▶ Spil runde står nu samme sted på alle faner: i bjælken i bunden – også på Trup, Træning, Kamp, Liga, Klub og ⚙. Den lille ▶ øverst er væk. Bjælken viser opstillingens tegn på alle faner (⛔ udelukket, 🚑 skadet, ⚠ træt, 🟨 ét gult fra udelukkelse) – ved mange som en kort tæller, fx "⛔2 🚑1 🟨1", der viser listen på 🏠 Hjem. Mens runden spilles, står der "📺 Runde N spilles …". Og spillerkortet er nu på dansk: særpræg som Presmonster og Fyrtårn, danske positioner (OM, DM, ANG), "Låses op ved: Udholdenhed 14, Erobring 12", 🕵️ Observationer og 🧠 Erfaring mod stilarter.',
   '3.31.0': '📰 Fjerde skridt i den nye brugerflade: avisen står nu kun på Liga – lige under tabellen. Hjem og Kamp viser rundens overskrift med et link dertil. Hjem viser også kampens spiller 👑 ved sidste runde og modstanderens seneste 3 som farvede piller (V/U/T, ældste først), og 🔍 er væk fra Spil-bjælken på Hjem – næste kamp-kortet har linket.',
@@ -244,6 +246,8 @@ function buildColumnNow() {
 function change(fn) { fn(); act.syncActivePreset(myTeam(), game.ui.activePresetIndex); persist(); render(); }
 
 function start() {
+  // v3.32.1 (R4): en ændret bredde (drej telefonen, vindue) måler de brede tabeller igen – ingen gentegning
+  let rz = null; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => remarkScrollable(), 120); });
   const r = loadGame(storage);
   if (r.status === 'error') return renderLoadError(r);
   if (r.status === 'empty') { game = newGame(); persist(); }
@@ -592,7 +596,7 @@ function renderNow() {
       // Sæsonslut under afspilning (som bogført-før-afspilning): runden er bogført, og sæsonskiftet er sket
       mc?.playing && seasonJustEnded(league) ? h('div', { class: 'notice', id: 'turnover-booked' }, '🗓 Sæsonen sluttede med denne runde: alle er blevet et år ældre, og sæsonrapporten med ungdomstilbuddene står på Liga, når kampene er spillet.') : null,
       // v3.30.0: træningen står på sin egen fane – her kun "+N" i regnearket og, når der er nogen, hvad de betyder og hvor træningen står
-      h('div', { class: 'muted help trup-help', id: 'trup-help' }, 'Klik på en spiller for at åbne spillerkortet',
+      h('div', { class: 'muted help trup-help', id: 'trup-help' }, 'Vælg en spiller for at åbne spillerkortet',   // v3.32.1 (R5): neutralt ord – mus og finger
         anyGain ? h('span', { id: 'trup-gain-help' }, ` · +N = antal +1 efter runde ${ownRound} (træning og kampe) · træningen står på `,
           h('button', { class: 'linklike', id: 'trup-to-training', onclick: () => showTab('traening') }, '🏋️ Træning ›')) : null,
         // QC v3.30.0: lige efter sæsonslut er alle blevet et år ældre, så tallene kan være faldet – derfor ingen "+N" her, selv om Træning viser rundens +1
@@ -661,6 +665,7 @@ function renderNow() {
   document.documentElement.style.setProperty('--scout-h', `${sb ? sb.offsetHeight + 16 : 0}px`);
   document.documentElement.style.setProperty('--bar-h', `${playbar.offsetHeight}px`);
   drawCardPanel(cs, card, team, isOwn, tab, refocus);
+  markScrollable();   // v3.32.1 (R4): til sidst – efter kortpanelet, så bredderne er de endelige
   document.body.dataset.klar = 'ja';
 }
 // Panelets indhold – #cardpanel er rulle-elementet og står fast i index.html; kun indholdet skiftes. Rulningen bevares inden for samme
@@ -730,7 +735,7 @@ function homeData() {
   };
 }
 const homeHandlers = {
-  kamp: () => { const L = game.league, i = L.lastRound?.matches.findIndex((x) => x.homeId === myTeam().id || x.awayId === myTeam().id); if (!mc?.playing && L.lastRound && i >= 0) openReport(i); else showTab('kamp'); },
+  kamp: () => { const L = game.league, i = L.lastRound?.matches.findIndex((x) => x.homeId === myTeam().id || x.awayId === myTeam().id); if (!mc?.playing && L.lastRound && i >= 0) openReport(i, { toFeed: false }); else showTab('kamp'); },
   liga: () => showTab('liga'), klub: () => showTab('klub'), traening: () => fixIssue(null, 'traening'), taktik: () => fixIssue(null, 'taktik'),
   // "Læs hele avisen ›" (Hjem) og "📰 «overskrift» ›" (Kamp): Liga, rullet til avisen (#gazette har scroll-margin-top under topbaren)
   paper: () => { showTab('liga'); document.getElementById('gazette')?.scrollIntoView({ block: 'start' }); },
@@ -810,7 +815,7 @@ function openMatchCenter(result, live) {
 
 // Link fra avisens "Rundens mål" (Liga-fanen – v3.31.0 står avisen kun dér): åbn kampen, markér målet og rul til det.
 function openGoal(i, goal) {
-  mc = lastRoundView(game.league.lastRound); mc.viewIdx = i;
+  mc = lastRoundView(game.league.lastRound); mc.viewIdx = i;   // første fane (lastRoundView) – dér står referatet
   mc.focus = { min: goal.min, scorer: goal.scorer };
   game.ui.tab = 'kamp'; clearSwap(); view.notice = ''; persist(); render();
   (document.getElementById('goal-focus') || document.getElementById('match-center'))?.scrollIntoView({ block: 'center' });
@@ -818,9 +823,13 @@ function openGoal(i, goal) {
 
 // Link fra Liga-siden til referatet af én kamp i seneste runde. Under afspilning vises
 // resultaterne slet ikke (vagten står ét sted: i liga-fanens render).
-function openReport(i) {
-  mc = lastRoundView(game.league.lastRound); mc.viewIdx = i;
+// v3.32.1 (QC): fælles indgang for Hjems "Se kampen ›" og alle "Referat"-links (Liga, avisen, spillerkortets kampe) – altid første fane
+// (afspilning & referat) med netop den kamp. toFeed: rul referatet frem (block 'nearest' – på ≥ 900 px står det ved siden af tavlen, så
+// den bliver på skærmen); "Se kampen" lander øverst med tavlen og ▶.
+function openReport(i, { toFeed = true } = {}) {
+  mc = lastRoundView(game.league.lastRound); mc.viewIdx = i;   // pane 'replay' fra lastRoundView – ét sted
   showTab('kamp');
+  if (toFeed) document.getElementById('feed')?.scrollIntoView({ block: 'nearest' });
 }
 
 function finishPlayback() { clearInterval(timer); timer = null; mc.playing = false; mc.shownCount = Infinity; render(); }
@@ -835,8 +844,11 @@ const mcHandlers = {
   heat: (v) => { mc ||= lastRoundView(game.league.lastRound); mc.heat = v; renderMc(); },
   // 2D-afspilningen springer til hændelsen (referatets 🎬).
   replay: (m, i) => replayJump(m, i),
-  snapshot: (i) => { mc ||= lastRoundView(game.league.lastRound); mc.snap = i; renderMc(); if (i != null) document.getElementById('snap-pitch')?.scrollIntoView({ block: 'center' }); },
+  // v3.32.1: øjebliksbilledet står i "👥 Spillerne" – 📍 i referatet skifter derhen (ellers skete intet synligt)
+  snapshot: (i) => { mc ||= lastRoundView(game.league.lastRound); mc.snap = i; if (i != null) mc.pane = 'players'; renderMc(); if (i != null) document.getElementById('snap-pitch')?.scrollIntoView({ block: 'center' }); },
   filter: (f) => { mc ||= lastRoundView(game.league.lastRound); mc.filter = f; renderMc(); },
+  // Kamp-underfanerne (v3.32.1, R3) – som filteret; valget bevares ved skift af kamp (view) og fokus vender tilbage til knappen (tastatur)
+  pane: (p) => { mc ||= lastRoundView(game.league.lastRound); mc.pane = p; renderMc(); document.getElementById(`mc-tab-${p}`)?.focus({ preventScroll: true }); },
   // v3.24.3 (kamp-id): send den viste kamp (kun seneste runde – ældre kampe gemmes ikke)
   send: async (i) => {
     mc ||= lastRoundView(game.league.lastRound);
@@ -867,6 +879,6 @@ const sendState = (v = mc) => {
 };
 const matchCenterEl = () => (sendState(), renderMatchCenter({ mc, myTeamId: myTeam().id, on: mcHandlers }));
 // Under afspilning tegnes kun Match Center om (ikke hele siden).
-function renderMc() { const el = document.getElementById('match-center'); if (el) el.replaceWith(matchCenterEl()); }
+function renderMc() { const el = document.getElementById('match-center'); if (el) { const nu = matchCenterEl(); el.replaceWith(nu); markScrollable(nu); } }
 
 start();

@@ -321,7 +321,7 @@ test('spillerkortet: VAR-profilen er skjult for alle – "??" og forklaringen "t
 // ---------- forklaringen under karakterarkene ----------
 test('forklaringen: 🎬 viser afslutningen i afspilningen; 📍 hører til kampe fra før afspilningen (ellers viser 🎬 det)', () => {
   const L = createLeague(createRng(1)), m = simulateMatch(L.teams[0], L.teams[1], createRng(5));
-  const root = renderMatchCenter({ mc: { round: 1, matches: [m], gazette: null, viewIdx: 0, filter: 'all', shownCount: 0, playing: false, snap: null }, myTeamId: L.teams[0].id,
+  const root = renderMatchCenter({ mc: { round: 1, matches: [m], gazette: null, viewIdx: 0, filter: 'all', shownCount: 0, playing: false, snap: null, pane: 'players' }, myTeamId: L.teams[0].id,   // v3.32.1: forklaringen står i "👥 Spillerne"
     on: { snapshot() {}, view() {}, filter() {}, skip() {}, replay() {}, heat() {}, openGoal() {} } });
   const legend = all(root, (e) => e.attrs.id === 'icon-legend')[0].textContent;
   assert.ok(legend.includes(' · 🎬 i referatet = vis afslutningen i afspilningen · 📍 i referatet = se hvor dit hold stod, da målet faldt (kampe fra før afspilningen – ellers viser 🎬 det) · HI = '), legend);

@@ -49,6 +49,22 @@ section { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
 .notice { background: #2e1065; border: 1px solid var(--lilla); padding: .5rem 1rem; border-radius: .5rem; margin-bottom: 1rem; font-size: var(--fs-2); }
 .toolbar { display: flex; flex-wrap: wrap; gap: .3rem; margin-bottom: .5rem; }
 .tablewrap { overflow-x: auto; }   /* v3.20.1 (brugeren): ingen indlejret scroll – siden har pladsen; kun vandret på smal skærm */
+/* v3.32.1 (R4, designkritikken): ÉN regel for brede tabeller. markScrollable (ui/dom.js) sætter data-scroll="ja", når tabellen er bredere end
+   rammen, og data-more="ja", så længe der er mere til højre: kanten toner ud (mask-image – en inset-skygge skjules af celler med baggrund).
+   Låste kolonner er opt-in (stick-1/stick-2, kun #matrix, #training-table og #ledger) og kun mens tabellen faktisk ruller. Låste celler
+   er uigennemsigtige – også i de valgte, sorterede og "byt i gang"-rækker (ellers skinner de forbirullede tal igennem). */
+.tablewrap[data-more="ja"] { -webkit-mask-image: linear-gradient(to left, transparent 0, #000 2.5rem); mask-image: linear-gradient(to left, transparent 0, #000 2.5rem); }
+.tablewrap[data-scroll="ja"] :is(th, td):is(.stick-1, .stick-2) { position: sticky; z-index: 2; background: var(--panel); }
+.tablewrap[data-scroll="ja"] thead :is(.stick-1, .stick-2) { z-index: 3; }
+.tablewrap[data-scroll="ja"] .stick-1 { left: 0; }
+.tablewrap[data-scroll="ja"] .stick-2 { left: var(--stick1-w, 0px); box-shadow: inset -1px 0 0 var(--kant); }
+.tablewrap[data-scroll="ja"][data-stick="navn"] .stick-1 { position: static; }
+.tablewrap[data-scroll="ja"][data-stick="navn"] .stick-2 { left: 0; }
+.tablewrap[data-scroll="ja"][data-stick="navn"] td.stick-2[data-pos]::before { content: attr(data-pos) ' '; color: var(--dæmpet); font-weight: 400; }
+.tablewrap[data-scroll="ja"] tbody tr:hover > :is(.stick-1, .stick-2) { background: #1e293b; }
+.tablewrap[data-scroll="ja"] :is(th, td).sorted:is(.stick-1, .stick-2) { background: #251453; }   /* #2e1065aa på panelet, uigennemsigtig */
+.tablewrap[data-scroll="ja"] tr.swapping > :is(.stick-1, .stick-2) { background: #3b2622; }   /* #78350f66 på panelet */
+.tablewrap[data-scroll="ja"] tr.selected > :is(.stick-1, .stick-2) { box-shadow: inset 0 1px 0 var(--lilla), inset 0 -1px 0 var(--lilla); }
 .matrix thead th { position: sticky; top: 0; background: var(--panel); z-index: 1; }
 table { border-collapse: collapse; width: 100%; font-size: var(--fs-1); }
 th, td { padding: .25rem .22rem; border-bottom: 1px solid var(--kant); white-space: nowrap; text-align: center; }
@@ -87,6 +103,12 @@ td.player-gain::after { display: none; }
 fieldset.phase { border: 1px solid var(--kant); border-radius: .4rem; margin: .5rem 0; display: flex; flex-wrap: wrap; gap: .5rem; font-size: var(--fs-1); }
 fieldset.phase legend { color: var(--dæmpet); padding: 0 .3rem; }
 .rule { display: flex; flex-wrap: wrap; gap: .3rem; align-items: center; width: 100%; } .rule input { width: 3.5rem; }
+/* v3.32.1 (R1): "ⓘ Sådan virker det" – én kort linje synlig, forklaringen foldet ind (ui/dom.js help) */
+.help-short { flex-basis: 100%; width: 100%; margin: .1rem 0 0; }
+.help-more { flex-basis: 100%; width: 100%; font-size: var(--fs-1); }
+.help-more > summary { cursor: pointer; color: var(--info); display: inline-flex; align-items: center; width: fit-content; padding: .1rem 0; }
+.help-more > :not(summary) { margin: .3rem 0 0; }
+@media (max-width: 600px) { .help-more > summary, .mc-more > summary, #replay-help > summary { min-height: 44px; } }
 .standings tr.mine td { color: var(--grøn); } .standings tr.viewing { outline: 1px solid var(--lilla); } .standings td:nth-child(2) { text-align: left; } .pts { font-weight: 800; }
 .errorpanel { border-color: var(--rød); }
 .savestatus.failed { color: var(--rød); font-weight: 800; }
@@ -104,21 +126,38 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .tl-mark { position: absolute; transform: translateX(-50%); font-size: var(--fs-2); } .tl-mark.home { top: 0; } .tl-mark.away { bottom: 0; }
 .varbanner { background: #4c1d95; border: 1px solid var(--lilla); padding: .4rem .8rem; border-radius: .3rem; font-weight: 700; }
 .mc-grid { display: grid; grid-template-columns: 3fr 2fr; gap: 1rem; } @media (max-width: 900px) { .mc-grid { grid-template-columns: 1fr; } }
-.mc-grid.after { grid-template-columns: minmax(18rem, 26rem) minmax(0, 1fr); grid-template-areas: "replay stats" "replay feed"; align-items: start; }
-.mc-grid.after .mc-replay { grid-area: replay; } .mc-grid.after .mc-stats { grid-area: stats; } .mc-grid.after .mc-feed { grid-area: feed; }
-.mc-grid.after .replay { margin-top: 0; } .mc-grid.after > * { min-width: 0; } .mc-grid .mc-stats { overflow-x: auto; }   /* mobil: afspilningens tekst må bryde (390 px: 394 px for bred) */
-@media (max-width: 900px) { .mc-grid.after { grid-template-columns: 1fr; grid-template-areas: "replay" "stats" "feed"; } }
+/* v3.32.1 (R3): efter fløjtet tre underfaner; i "🎬 Afspilning & referat" står tavlen til venstre og referatet til højre (≥ 900 px), under 900 px
+   referatet under tavlen. Statistikken har sin egen fane. */
+.mc-grid.after { grid-template-columns: minmax(18rem, 26rem) minmax(0, 1fr); grid-template-areas: "replay feed"; align-items: start; }
+.mc-grid.after .mc-replay { grid-area: replay; } .mc-grid.after .mc-feed { grid-area: feed; }
+.mc-grid.after .replay { margin-top: 0; } .mc-grid.after > * { min-width: 0; }   /* mobil: afspilningens tekst må bryde (390 px: 394 px for bred) */
+@media (max-width: 900px) { .mc-grid.after { grid-template-columns: 1fr; grid-template-areas: "replay" "feed"; } }
+.mc-tabs { display: flex; flex-wrap: wrap; gap: .3rem; margin: .5rem 0; }
+.mc-tabs button.active { background: var(--aktiv); border-color: var(--aktiv); color: #fff; }
+.mc-pane { min-width: 0; }
+.mc-ft { font-size: var(--fs-2); margin: .2rem 0 .3rem; } .mc-ft.ft-win { color: #4ade80; } .mc-ft.ft-loss { color: #f87171; } .mc-ft-tom { visibility: hidden; }   /* fuldtids-linjen: fast under stillingen, uanset fane (Spilfører UI) */
+.mc-more { margin-top: .75rem; } .mc-more > summary { cursor: pointer; color: var(--dæmpet); display: inline-flex; align-items: center; }
+.mc-more .mc-send { margin: .4rem 0; }
+/* Kampvælgeren på én linje (R2): ruller vandret med fade i kanten (.tablewrap) i stedet for fire knapper stablet (≈ 200 px på mobil) */
+.cards-wrap { overflow-y: hidden; } .cards-wrap .cards { flex-wrap: nowrap; width: max-content; min-width: 100%; } .cards-wrap .matchcard { white-space: nowrap; flex: none; }
+#feed { scroll-margin-top: calc(var(--top-h, 6rem) + .5rem); scroll-margin-bottom: calc(var(--bar-h, 0px) + .5rem); }
+@media (max-width: 600px) {
+  #feed { scroll-margin-top: .5rem; scroll-margin-bottom: calc(57px + var(--bar-h, 0px) + .5rem); }
+  .mc-tabs button { min-height: 44px; flex: 1 1 auto; }
+  .rp-controls button, #feed-filters button { min-height: 44px; }   /* Spilfører UI: ▶ og filtrene er handlingen – også 44 px */
+}
 .feed { max-height: 26rem; overflow-y: auto; font-size: var(--fs-1); }
 .ev { padding: .3rem 0; border-bottom: 1px solid var(--kant); } .ev-min { display: inline-block; width: 2.4rem; color: var(--dæmpet); font-family: ui-monospace, monospace; }
 .ev.highlight { font-weight: 700; } .ev.tactic { color: #cbd5e1; }
 .ev.minor { color: #94a3b8; font-size: var(--fs-1); }   /* halvchancen (v3.17.0): skud uden stor fare, nedtonet */
 .mstats td, .mstats th { text-align: center; } .mstats tbody th { color: var(--dæmpet); font-weight: 400; }
+/* v3.32.1 (R4): kampstatistikken passer i bredden – også ved 390 (holdnavnene brydes i stedet for at skubbe tabellen ud) */
+#match-stats { table-layout: fixed; } #match-stats th, #match-stats td { white-space: normal; overflow-wrap: anywhere; } #match-stats thead th:nth-child(2) { width: 40%; }
 .ratings table td:first-child { text-align: left; } .ratings tr.motm { background: #78350f55; } .rating { font-weight: 800; } .xp { color: #c4b5fd; }
 .gazette { background: #0b1222; }
 
 .stars { font-size: var(--fs-2); letter-spacing: .05em; white-space: nowrap; }
 .star-on { color: #fbbf24; text-shadow: 0 0 1px #000; } .star-off { color: #475569; }
-.tablewrap-x { overflow-x: auto; }
 
 .ratings .place { color: var(--dæmpet); font-weight: 400; } .ratings td.icons { text-align: left; } .ricon { cursor: help; margin-right: .15rem; } .ricon.nowrap { white-space: nowrap; }
 .legend { margin-top: .5rem; line-height: 1.5; }
@@ -194,7 +233,8 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 
 /* 2D-afspilning (v3.16) – taktiktavle; brikkerne er faste noder, så overgangene virker (bolden først, så spillerne). */
 .replay { margin: .6rem 0; }
-.rp-pitch { position: relative; aspect-ratio: 68 / 100; max-width: 22rem; margin: .4rem auto; background: repeating-linear-gradient(0deg, #15803d, #15803d 6%, #166534 6%, #166534 12%); border: 1px solid #ffffff90; border-radius: .3rem; overflow: hidden; }
+/* v3.32.1 (R2, QC): banen må ikke fylde en skærm – højden clamp(16rem, 100svh − 26rem, 32rem); bredden følger af højden (aspect-ratio) */
+.rp-pitch { position: relative; aspect-ratio: 68 / 100; max-width: 22rem; width: min(100%, 22rem, calc(clamp(16rem, 100svh - 26rem, 32rem) * 68 / 100)); max-height: clamp(16rem, 100svh - 26rem, 32rem); margin: .4rem auto; background: repeating-linear-gradient(0deg, #15803d, #15803d 6%, #166534 6%, #166534 12%); border: 1px solid #ffffff90; border-radius: .3rem; overflow: hidden; }
 .rp-half { position: absolute; left: 0; right: 0; top: 50%; border-top: 1px solid #ffffff70; }
 .rp-box { position: absolute; left: 25%; width: 50%; height: 14%; border: 1px solid #ffffff70; }
 .rp-box.top { top: -1px; } .rp-box.bottom { bottom: -1px; }
@@ -209,7 +249,9 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .rp-ball { position: absolute; transform: translate(-50%, -50%); color: #fff; font-size: var(--fs-1); text-shadow: 0 0 3px #000; transition: left .4s ease-out, top .4s ease-out; z-index: 3; pointer-events: none; }
 .rp-ball.over { transform: translate(-50%, -50%) scale(2.2); opacity: 0; }   /* over overliggeren (v3.16.2) */
 .rp-caption { min-height: 2.7em; font-size: var(--fs-2); text-align: center; } .rp-caption.moment { font-weight: 600; }
-.rp-controls { display: flex; gap: .3rem; justify-content: center; flex-wrap: wrap; }
+.rp-controls { display: flex; gap: .3rem; justify-content: center; flex-wrap: wrap; margin: .3rem 0; }
+.rp-head { justify-content: space-between; } .rp-help { font-size: var(--fs-1); } .rp-help > summary { cursor: pointer; color: var(--info); }
+.rp-help[open] { flex-basis: 100%; }
 /* Heat map (v3.16) */
 .minipitch.heat .heat-cell { position: absolute; background: #f97316; pointer-events: none; }
 .heat-shot { position: absolute; transform: translate(-50%, -50%); font-size: var(--fs-1); text-shadow: 0 0 3px #000; }
@@ -244,6 +286,9 @@ select.mini { padding: .1rem .3rem; font-size: var(--fs-1); height: auto; line-h
 /* iOS zoomer ved fokus i felter under 16 px (RM v3.27.1: før arvede de browserens 16 px) – på smal skærm er alle felter 16 px */
 @media (max-width: 900px) { input, select, textarea, select.mini { font-size: var(--fs-3); } }
 @media (max-width: 600px) { #for-sale-table .wide { display: none; } }
+/* v3.32.1 (R5): en trup-række er eneste vej til spillerkortet – 44 px berøringsflade på smal skærm og på berøringsskærme (td-højden er
+   tabellens min-højde; computeren beholder de tætte rækker, e2e: < 36 px ved 1366) */
+@media (max-width: 600px), (pointer: coarse) { #matrix tbody td { height: 44px; } }
 
 button.savestatus { background: none; border: none; padding: 0; cursor: pointer; }
 button.savestatus.failed { color: var(--rød); font-weight: 700; }
@@ -331,6 +376,15 @@ body.has-bar { padding-bottom: 4.5rem; }
 .mini-table td { text-align: left; font-size: var(--fs-2); } .mini-table td:first-child { width: 1.8rem; color: var(--dæmpet); } .mini-table td.pts { text-align: right; font-weight: 700; }
 .mini-table tr.mine td { color: var(--ok); } .mini-table tbody tr { cursor: default; }
 .to-home { font-size: var(--fs-2); }
+/* v3.32.1 (CI ved 390 px: lange holdnavn og bredere skrift skubbede banen ned til y 665 af 726): på mobil fylder Kamps hoved mindre –
+   avisens overskrift på én linje med …, taktiklinjerne under holdnavnene på én linje med …, og "🎬 Afspilning" står kun i fanen */
+@media (max-width: 600px) {
+  .to-home #kamp-paper-link { display: block; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+  .scoreboard > div:not(.score) > .muted { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .scoreboard > div:not(.score) { min-width: 0; }
+  #match-center:has(#mc-tabs) .rp-head > strong { display: none; }
+  #mc-tabs { flex-wrap: nowrap; } #mc-tabs > button { flex: 0 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+}
 /* v3.31.0 (F3): modstanderens form som piller – V grøn, U grå, T rød (bogstavet er teksten) */
 .form-pill { display: inline-block; min-width: 1.4rem; text-align: center; border-radius: 999px; padding: 0 .35rem; font-weight: 700; font-size: var(--fs-1); line-height: 1.5; }
 .form-V { background: #0b3326; color: #6ee7b7; } .form-U { background: var(--panel-2); color: var(--dæmpet); } .form-T { background: #451a1a; color: #fca5a5; }
