@@ -1,6 +1,6 @@
 // Spillerkort: offentlige data for alle, evner og mod-kunnen kun for eget hold, VAR-profilen
 // for ingen. Observationer (scouting) og private noter vises for alle spillere.
-import { publicValue, LOG, stampText, KEY_SKILLS, trainingEstimate, FOCUS, focusSkills, ageTrain, roomPoints, MATCH_XP, PLAYED_RELIEF, TRAIN_FRESH_FLOOR } from '../engine/career.js';
+import { publicValue, LOG, stampText, KEY_SKILLS, trainingEstimate, skillOf, FOCUS, focusSkills, ageTrain, roomPoints, MATCH_XP, PLAYED_RELIEF, TRAIN_FRESH_FLOOR } from '../engine/career.js';
 import { viewPlayer } from '../engine/visibility.js';
 import { h, dec, LOCK } from './dom.js';
 import { LINE, POSITION_FULL, SKILL_LABELS, kr, starsEl, banText, yellowWarn, archetypeOf, archIcon, archReqText } from './labels.js';
@@ -33,7 +33,7 @@ export function renderCard({ player: p, team, isOwn, scouting, note, onNote, tea
     const a = aerialBreakdown(p.heightCm, p.jumpingPower, p.skills.strength, p.skills.positioning);
     const run = runStats(p), arch = archetypeOf(p.archetype);
     body = [
-      h('div', { class: 'bars' }, SKILL_LABELS.map(([group, list]) => h('div', { class: 'bar-group' }, h('h4', {}, group), list.map(([k, l]) => bar(l, p.skills[k]))))),
+      h('div', { class: 'bars' }, SKILL_LABELS.map(([group, list]) => h('div', { class: 'bar-group' }, h('h4', {}, group), list.map(([k, l]) => bar(l, skillOf(p, k)))))),
       h('div', { class: 'aerial', id: 'aerial-breakdown' },
         h('h4', {}, `✈ Luftduel: ${a.total}/20`),
         h('div', { class: 'muted' }, `Højde-score ${a.heightScore} (${p.heightCm} cm) × 0,35 = ${dk(a.wHeight)} · Spring ${p.jumpingPower} × 0,35 = ${dk(a.wJump)} · Styrke ${p.skills.strength} × 0,15 = ${dk(a.wStr)} · Position ${p.skills.positioning} × 0,15 = ${dk(a.wPos)} → ${dk(a.exact)}`)),
@@ -41,7 +41,7 @@ export function renderCard({ player: p, team, isOwn, scouting, note, onNote, tea
         h('div', { class: 'muted', id: 'counter-used' }, `Erfaring brugt: ${COUNTER_KEYS.reduce((a, k) => a + p.counterTactics[k], 0)}/${COUNTER_POOL} – ved fuld pulje glemmer han lidt af det gamle, når han lærer noget nyt.`)),
       // Arketypen (v3.31.1; v3.31.2 "arketype" – brugerens ord): navn og beskrivelse fra tabellen efter id, kravene med evnernes danske navne
       arch ? h('div', { class: 'archbox', id: 'card-arch' }, h('strong', {}, `${archIcon(arch)} ${arch.name}`), ' – ', arch.description,
-        arch.isUnlocked ? null : h('div', { class: 'muted', id: 'card-arch-req' }, archReqText(arch))) : null,
+        arch.isUnlocked ? null : h('div', { class: 'muted', id: 'card-arch-req' }, archReqText(arch, p, starter))) : null,
       h('div', { class: 'muted', id: 'run-stats' }, run.km90 != null ? `🏃 ${dec(run.km90, 1)} km pr. 90 min · ${run.hiPct != null ? `${run.hiPct} % højintenst` : 'højintenst: kommer efter næste kamp'} · topfart ${dec(p.topSpeedMax, 1)} km/t (alle kampe)` : '🏃 Løbedata kommer efter første kamp'),
       renderTraining(p, starter, onTrainLink),
       h('div', { class: 'muted', id: 'card-wage' }, `Løn ${kr(Math.round(p.weeklyWage / 3))} pr. runde · Værdi ${kr(publicValue(p))} (offentlig – ud fra stjerner og alder)`),

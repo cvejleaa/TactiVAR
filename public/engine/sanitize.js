@@ -149,7 +149,8 @@ export function normalizeLeague(league) {
   else if (tr) for (const [id, r] of Object.entries(tr)) {
     if (!r || typeof r !== 'object' || !Number.isInteger(r.round) || !Array.isArray(r.gains) || !Array.isArray(r.injuries)) { delete tr[id]; continue; }
     const byId = new Map((league.teams.find((t) => t.id === id)?.squad ?? []).map((q) => [q.id, q]));
-    r.gains = r.gains.filter((g) => g && byId.get(g.id)?.skills && typeof g.skill === 'string' && Object.hasOwn(byId.get(g.id).skills, g.skill));
+    // Spring (v3.32.0) står i p.jumpingPower, ikke i p.skills – uden undtagelsen forsvandt "+1 Spring" ved hver genindlæsning
+    r.gains = r.gains.filter((g) => g && byId.get(g.id)?.skills && typeof g.skill === 'string' && (Object.hasOwn(byId.get(g.id).skills, g.skill) || g.skill === 'jumpingPower'));
     r.injuries = r.injuries.filter((pid) => typeof pid === 'string');
     // v3.24.2 (QC): de stærke par { up, down: [[idA, idB]] } – forkert form slettes, ellers kun par af to strenge
     if (r.strong !== undefined) {

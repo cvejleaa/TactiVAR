@@ -58,9 +58,14 @@ test('Trup-regnearket: "+N" præcis på de evner, der steg – antal og fuldt ev
   assert.ok(hasClass(name0, 'player-gain') && name0.dataset.gain === '2' && name0.attrs.title === '+2 Afslutning efter runde 3', JSON.stringify(name0.attrs));
   assert.ok(!hasClass(name2, 'player-gain') && name2.dataset.gain === undefined && name2.textContent === p2.shortName);
   assert.ok(!hasClass(name0, 'gain'), 'navnecellen tæller ikke som en evne-celle');
-  // Spring/Luft/Gns har også heat – de får aldrig et mærke, selv med en "evne" af samme navn i rapporten
+  // Spring/Luft/Gns har også heat – kolonnenøglerne ('jump', 'aerial', 'avg') giver aldrig et mærke. v3.32.0 (vendt): Spring-kolonnen
+  // får "+N" for evnen 'jumpingPower' (Spring trænes med Fysik) – Luft og Gns stadig aldrig
   const odd = draw(me, { gains: new Map([[p0.id, ['jump', 'aerial', 'avg']]]), gainRound: 3 });
   assert.equal(all(odd, (e) => e.tag === 'td' && hasClass(e, 'gain')).length, 0);
+  const jmp = draw(me, { gains: new Map([[p0.id, ['jumpingPower']]]), gainRound: 3 }), jc = all(jmp, (e) => e.tag === 'td' && hasClass(e, 'gain'));
+  assert.equal(jc.length, 1);
+  assert.equal(jc[0], rowOf(jmp, p0.id).children[col('jump')]);
+  assert.equal(jc[0].attrs.title, '+1 Spring efter runde 3');
   // uden gains: ingen mærker overhovedet
   const none = draw(me, {});
   assert.equal(all(none, (e) => e.tag === 'td' && (hasClass(e, 'gain') || hasClass(e, 'player-gain'))).length, 0);

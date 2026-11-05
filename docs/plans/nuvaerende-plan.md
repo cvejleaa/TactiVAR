@@ -1,122 +1,109 @@
-# NU (3/11): v3.31.2: arketypen på Taktik, ærlige skøn for ungdommen og spillerens statistik på kortet (brugerens ønsker 3/11)
+# NU (5/11): v3.32.0 – Spring kan trænes (backlog 0c), derefter 📖 spilguide (0d)
 
 ## Context
-1. "Jeg vil gerne have arketype markeringen med på taktik siden" (skærmbillede: Trups "Arketype/Note" viser 🔒/✨ + navn; Taktik-listen intet).
-2. "jeg har endnu ikke set en ungdomsspiller der ikke har betegnelsen 'har meget mere i sig'". Årsag (kode): `roomWords` (ui/card.js:84)
-   bruger `roomOf` (career.js:164) = (potentiale − nøglesnit)/3 klemt til 0,1–1, med grænserne 0,6/0,3. Ungdom får
-   potentiale = snit + 4 ± 2,5 (career.js:36) → roomOf 0,5–1 → ca. 94 % lander i "meget mere". Ordet skelner ikke.
-3. "Jeg vil gerne have en spillers statistik for holdet opgjort i sidebjælken" (kortpanelet).
+- v3.31.2 er live (e2e mod live 677/677). Brugeren 5/11: "Lad os fortsætte nu"; valgte "Spring, then the guide".
+- **0c, brugeren 3/11:** "Tobias kan blive luftens konge, men det kræver jumpingpower på 14, men jeg kan ikke se hans jumpingpower i sidebjælken. Og jeg kan ikke se hvordan jeg kan træne ham i det."
+- I dag sættes `p.jumpingPower` i generatoren (generator.js:182) og ændres ALDRIG. Den er ikke i `p.skills`, så den udvikles hverken gennem `addXp` (career.js:171), sæsonvækst (career.js:234) eller aldersfald (career.js:228). Kortet viser den kun inde i luftduel-linjen (card.js:39). Trup har kolonnen "Spring" (matrix.js:33).
+- **Brugerens valg:** Fysik træner Fart, Styrke OG Spring (som Teknik med to evner). Spring får en bjælke under "Fysik & luft". Kravet viser "Spring 13/14 – trænes med Fysik".
 
-## Ændringen
-1. **Arketype på Taktik** (ui/lineup-list.js): samme mærke som Trups kolonne (🔒 låst / ✨ låst op + navn fra `archetypeOf`, title =
-   beskrivelse + krav) i spiller-cellen; brikkens title på banen nævner den. Ét ord overalt: "arketype" (brugerens ord) – v3.31.1's
-   "særpræg" på kortet rettes tilbage. Kun dit hold (privat – OWNER_FIELDS 'archetype').
-2. **Ungdommens skøn**: ordene efter plads i evne-POINT (potentiale − nøglesnit), fem trin så ungdommen spredes:
-   < 0,5 "er tæt på sit loft" · < 1,5 "har lidt mere i sig" · < 3 "har mere i sig" · < 4,5 "har meget mere i sig" · ≥ 4,5 "kan blive
-   meget god". Træningshastigheden (`roomOf`) røres ikke – kun ordet. Måling (committet script `tools/measure-youth-words.mjs`):
-   fordelingen af ordene for ungdom/≤19/≤23/øvrige over 5 ligaer, før og efter; båndet skrives så den gamle (≈94 % ét ord) giver rødt.
-   Ordene står samme sted som i dag (kort, Træning, sæsonrapportens ungdomstilbud).
-3. **📊 Statistik for <hold> på kortet**: lille tabel øverst i "📜 Kampe"-afsnittet: Denne sæson · Sidste sæson · I alt (gemt historik):
-   kampe, minutter, mål, assists, snitkarakter, 👑, 🟨/🟥 (målmand: + clean sheets). Kilde: `matchLog` filtreret på holdet (LOG.H/LOG.A)
-   og sæson + s*-felterne (stats.js PLAYER_SEASON_FIELDS) for denne sæson. Modstanderens spiller: samme tabel UDEN karakter (viewPlayer
-   – rating er privat). "I alt" siger tydeligt, hvor langt tilbage den går ("de sidste 2 sæsoner"), og careerGames som "kampe i karrieren".
-4. NEWS, version 3.31.2, spec (§10b kortet, §5 skøn), backlog (0c+ → Lavet; ungdom/statistik som Lavet).
+## Ændringen (v3.32.0)
+1. **Motor (career.js):**
+   - `FOCUS.PHYSICAL.skills = ['pace', 'strength', 'jumpingPower']`.
+   - `addXp`, `trainingEstimate` og `focusSkills` håndterer `jumpingPower` ved at læse og skrive `p.jumpingPower` gennem én lille accessor (`skillVal`/`setSkill`), så der ikke spredes særtilfælde.
+   - `rate` for Fysik afstemmes, så den samlede Fysik-fremgang pr. evne ikke bliver hurtigere end i dag. Det måles med `tools/measure-lifecycle.mjs` før og efter, plus en ny `tools/measure-jump.mjs`: Spring-fordelingen og luftduel-styrken (aerialPower) efter 0, 1, 3 og 5 sæsoner, passiv og aktiv profil, samt hvor mange der låser Luftens Konge og Fyrtårn op.
+   - `aerialPower` regnes om efter træning. Det sker allerede i season.js:96 – efterprøv, at det sker efter træningen.
+   - Aldersfaldet (career.js:228) tager Spring med som de øvrige fysiske evner, hvis de falder med alderen. Ellers ikke. Arkitekten afgør det ud fra koden.
+2. **Kortet (card.js):** "Spring" som bjælke i "Fysik & luft" (samme bjælke og samme værdi som de andre).
+   - Arketypens krav viser "Spring 13/14 – trænes med Fysik", altså nuværende/krav plus fokus for hver evne i kravet. Det gælder alle evner, ikke kun Spring, via én hjælper i labels.js `archReqText`.
+   - Gælder samme sted på Trup og Taktik (title).
+3. **Træning (training.js):** Fysik-rækkens fremdrift viser "Spring" sammen med Fart og Styrke, og skønnet for næste +1 tager Spring med.
+4. **Gemmeformatet ændres IKKE**: `jumpingPower` findes allerede, og `dev.jumpingPower` er bare en ny nøgle i `dev`. Sanitize skal tillade nøglen, så efterprøv `PLAYER_DEFAULTS` og dev-rensningen. Et fixture fra v3.31.2 skal indlæses.
+5. Golden/fingeraftryk: friske ligaer ændrer ikke kampe. Træning flytter først noget efter runder, så golden-hashes over sæsoner kan skifte, og ændringen forklares i testen.
+6. Spec §5 (træning), §2 (arketyper), NEWS, version 3.32.0 og backlog (0c → Lavet).
 
-## Tests
-- e2e: Taktik-listen viser 🔒/✨ + navn for en spiller med arketype (data), intet for en uden; ikke på et andet holds liste.
-- unit: roomWords-grænserne (alle fem + kanterne); måletestens bånd (gammel fordeling rød).
-- unit + e2e: statistik-tabellen med data (kendt matchLog: 2 sæsoner, to hold – kun dette holds kampe tælles), modstander uden snit.
-- Mutationer: arketype vist for modstander; ordene tilbage til roomOf-grænserne; statistik der tæller kampe for et andet hold; snit vist
-  for modstander.
+## Arbejdsgang
+1. **Plan-gennemgang** (parallelt): Arkitekt (genbrug, rækkefølge, aldersfald), Spilfører klub (rate og balance, mål før og efter) og QC (opus) på planen. Ret planen efter dem.
+2. Byggeagent: kode, målinger, unit og e2e, commit.
+3. TM og QC parallelt, derefter RM.
+4. Draft-PR, grøn CI, rapport til brugeren, merge.
+5. Live og e2e mod live.
+6. **Derefter 0d** (spilguide: "📖 Sådan virker spillet" i ⚙ + "?" pr. fane) med egen plan, gennemgået af QC og Spilfører UI.
 
-## RETTET efter QC (opus), Spilfører UI og Spilfører klub – afløser planen ovenfor, hvor de er uenige
-**Arketype på Taktik**
-- Ikonerne er 🔒 låst / 🌟 låst op (som matrix.js:119 og card.js), IKKE ✨.
-- ≥ 900 px: en lille dæmpet linje under navnet i spiller-cellen (lineup-list.js:53), fx "🔒 Regista (spilfordeler)".
-  < 900 px: kun ikonet efter navnet (title/aria-label = navn + beskrivelse). Ingen ny kolonne og intet på banens brikker.
-- Kun dit hold (samme vagt som matrix.js:118). e2e tjekker også et andet holds liste.
-- "særpræg" → "arketype" på kortet (card.js:42, låseboksen card.js:49), i spec.md:73 og i testen dansk-kort-v3311.test.mjs:117.
+## Verifikation
+- check, unit og e2e grønne lokalt og i CI.
+- Mutationer, der skal give rødt:
+  - Spring ude af `FOCUS.PHYSICAL`;
+  - `addXp` skriver i `p.skills.jumpingPower` i stedet for `p.jumpingPower`;
+  - kortet uden Spring-bjælke;
+  - kravteksten uden nuværende værdi;
+  - `aerialPower` ikke regnet om.
+- Målingen viser, at en ung spiller på Fysik kan gå fra 13 til 14 i Spring inden for en sæson eller to, og at luftduel-balancen mellem holdene (myVsBots) ligger inden for ±0,05.
+- Live: Tobias' kort viser Spring-bjælken og "Spring 13/14 – trænes med Fysik".
 
-**Skøn-ordene**
-- `roomPoints(p) = potential − keyAvg` (career.js ved siden af `roomOf`). `roomWords(points)` bruges af ALLE tre kaldesteder:
-  card.js:101, training.js:71 (i dag `e.room` = roomOf 0–1!) og season-report.js:34. Mutation: ét kaldested sender `roomOf`.
-- Grænser i point: < 0,45 "er tæt på sit loft" (samme grænse som trainingEstimate's room ≤ 0,15, career.js:310) · < 1,5 "har lidt
-  mere i sig" · < 3 "har mere i sig" · < 5,5 "har meget mere i sig" · ≥ 5,5 "har langt mere i sig". Topordet er relativt og lover ikke
-  et niveau (klub: 4,5 gav 43 % topord, og 4,5 point over snit 7 er kun startniveau).
-- Ungdomstilbuddet (season-report.js:34) viser også nøglesnittet ("snit 6,8 · skøn: har meget mere i sig"), så tilbuddene kan rangeres.
-- Måling `tools/measure-youth-words.mjs` (committet): fordeling og potentialets spænd pr. ord for AL ungdom ved første syn (n ≈ 420,
-  20 seeds) og for ≤19/≤23/øvrige efter 0/14/28 runder. Testbånd: intet ord over 60 % for ungdom ved første syn. Den gamle ≈ 91 %
-  giver rødt.
-- spec §5: ordet kan skifte efter et +1, så det afslører potentialet inden for ca. 1/3 point. Det er accepteret, fordi kun ejeren ser det.
+## RETTET efter Arkitekt, Spilfører klub og QC (opus) – afløser planen ovenfor, hvor de er uenige
+**Rate:** Fysik beholder **0,07**. Raten gælder PR. EVNE (season.js:117), så Fart og Styrke går præcis som i dag, og Fysik giver
+nu tre evner (samlet 0,21 – det største fokus, betalt med friskhed −4 og skaderisiko 0,007). Det skrives i spec §5.
+Målt (klub): 17–23-årige går fra Spring 13 til 14 på median 18 runder, 92 % inden for to sæsoner (0,0467 ville give 54 %).
 
-**📊 Statistik på kortet**
-- Placering: lige efter kortets hoved, før evne-bjælkerne (card.js:28–34). Brugeren leder "i sidebjælken"; 📜 Kampe ligger 784 px nede.
-  📜 Kampe beholder stemplerne og karrierelinjen.
-- To kolonner med sæsonnumre: "Sæson N" og "Sæson N−1". INGEN "I alt" (historikken er 28 kampe = to sæsoner). "N kampe i karrieren"
-  står allerede.
-- Rækker:
-  - Kampe, Min., Mål, Oplæg og Snit (kun dit hold) fra `matchLog` filtreret på holdets indeks (LOG.H/LOG.A, `league.teams.indexOf`)
-    og sæson, med samme `hideLog`-filter som 📜 Kampe, så runden der afspilles ikke spoiles.
-  - 👑, 🟨 og 🟥 (målmand: clean sheets) findes ikke i matchLog:
-    - Sæson N fra s*-felterne, kun når han ikke er skiftet i sæsonen (`lastMove` før sæsonens vindue), og "–" under afspilning.
-    - Sæson N−1 fra `league.lastSeasonStats` filtreret på holdet (v.t; season.js:334, stats.js:36).
-    - Ellers "–". Gemmeformatet ændres IKKE.
-- Tom tilstand: "Ingen kampe for <hold> endnu". `careerGames > 0` men ingen gemte kampe (migrerede ligaer): "ikke gemt" – ikke 0.
-- Modstander: samme tabel uden Snit (rating er privat).
-- Kendt grænse (spec): mødte hans gamle klub den nye, kan en kamp tælles for den nye, fordi loggen ikke gemmer hans side.
-  Det er med i testens data.
-- Mobil 390: korte rækketekster og ingen vandret rul i panelet (e2e).
+**Hvad der IKKE bygges:**
+- Spring kommer IKKE i `p.skills`, `KEY_SKILLS`, potentiale/loft (roomOf/keyAvg) eller `seasonGrowth`.
+- Ingen bot-træning af Spring.
+- Ingen sanitize- eller migreringskode. `dev` har ingen whitelist (sanitize.js:103); det tjekkes med et fixture fra v3.31.2.
+- Ingen ny aerialPower-genberegning. `afterSkillChange` (season.js:95) kaldes allerede via `onSkill`.
 
-**Tests (tilføjet)**
-- Paritet: for en spiller der ikke er skiftet, er tabellens kampe/mål for sæsonen = sGames/sGoals.
-- Spoiler: med hideLog står rundens mål, 🟥 og 👑 ikke.
-- Købt i runde 7: kun det nye holds kampe tælles, og 👑/🟨 er "–".
-- Migreret liga: "ikke gemt".
-- Mutationer: arketype vist for modstander; et kaldested med roomOf; tabellen uden holdfilter; Snit vist for modstander; s* vist for en
-  købt spiller.
+**Delopgaver (Arkitekten):**
+- **D1 Motor:**
+  - `skillOf(p, k)` og `setSkill(p, k, v)` i career.js, brugt i `addXp`, `trainingEstimate` og generator.js:160.
+  - `FOCUS.PHYSICAL.skills = ['pace', 'strength', 'jumpingPower']` med rate 0,07.
+  - `focusOfSkill(k)`: første fokus, der ikke er Alsidig og har evnen.
+- **D2 Måling:** `tools/measure-jump.mjs` bygget på measure-lifecycle's løkke.
+  - Mål før og efter med en profil, hvor alle på dit hold til og med 25 år træner Fysik.
+  - Tal: Spring-fordeling, aerialPower mig mod botter, hovedstødsmål pr. kamp og antal oplåste Luftens Konge/Fyrtårn efter 0, 1, 3 og 5 sæsoner.
+  - Båndet skrives med begge tal, så den gamle værdi giver rødt. Klub målte 1,033 → 1,064.
+  - myVsBots kan ikke se Spring og bruges IKKE som mål.
+- **D3 UI:**
+  - `['jumpingPower', 'Spring']` i `SKILL_LABELS` "Fysik & luft" (labels.js:38). Så kommer `SKILL_NAME` med automatisk: rapport, gainWords, "nærmest et +1" og Trup-mærket. Særtilfældet i labels.js:23 fjernes.
+  - Kortets bjælke: `bar(l, skillOf(p, k))` (card.js:36).
+  - Træning:
+    - `SHORT.jumpingPower = 'SPR'`.
+    - Hvert fokusvalg viser sine evner fra `FOCUS[k].skills`, fx "Fysik – Fart, Styrke, Spring" (training.js:60/68).
+  - Trup:
+    - Spring-kolonnen (key 'jump' beholdes) får "+N"-mærket for 'jumpingPower'. matrix-gain-v3300.test.mjs:61–63 vendes.
+    - Arketypecellen (matrix.js:118) får title med kravteksten.
+  - Gns-kolonnens title: "Spring tæller ikke med".
+- **D3 Kravteksten** `archReqText(a, p)` (labels.js). Kun ejerens spiller (vagterne card.js:32, lineup-list.js:49 og matrix):
+  - Format: "Låses op ved: Styrke 13/13 ✓ · Spring 13/14 – trænes med Fysik".
+  - Opfyldt krav: "Navn nu/krav ✓", uden fokus.
+  - Træner han fokusset i forvejen: "– trænes med Fysik (det gør han nu)".
+  - To mangler med samme fokus: "Styrke 12/13 · Spring 13/14 – begge trænes med Fysik".
+  - Paritetstest: hver `unlockReq`-nøgle i alle ARCHETYPES har et fokus.
+- **D4:**
+  - Fixture `tests/fixtures/save-v3.31.2.json` (lavet med 3ad5949) og en indlæsningstest med `dev.jumpingPower`.
+  - Spec §2, §5 og §13 (Spring trænes med Fysik og indgår ikke i nøglesnit eller Gns), NEWS, version 3.32.0 og backlog 0c → Lavet.
+  - Ret de forventede tekster i e2e run.mjs:1182 (9 → 10 bjælker) og dansk-kort-v3311.test.mjs:41/45.
+- **D5 Aldersfald, egen commit i samme PR:**
+  - 'jumpingPower' i tier 2 sammen med 'strength' (career.js:221). `declineSkills` og `trainedSkills` læser via skillOf/setSkill. Faldet halveres for den, der træner Fysik.
+  - Det er den ENESTE del, der må flytte golden-hashes over sæsoner. Ændringen forklares i testen.
+  - Kør D2 og lifecycle-båndene igen.
 
-## PAUSE (brugeren 3/11): "vi holder pause med udviklingen efter 3.31.2 indtil jeg siger til"
-Efter v3.31.2 er live (og e2e mod live er grønt) startes INTET nyt: ikke 0c (Spring), 0d (spilguide), F4 eller /spilfoerere –
-heller ikke backlog-reglen "tag det øverste punkt". Kun svar på brugerens spørgsmål og fejlrettelser i det, der er udgivet, hvis
-brugeren beder om det.
+**Golden:** D1–D4 må IKKE flytte nogen hash, fordi en frisk liga kun bruger Alsidig. Flytter en sig, er det en fejl.
 
-## TILLÆG: danske positionskoder overalt (brugeren 3/11: "Position codes only"). Evneforkortelserne PAC/STA/…/GK bliver som i dag.
-Kodesæt (QC opus + Spilfører UI, kun visning – interne rolle-nøgler røres IKKE; de ligger i gemte data og motoren):
-| GK→MV | CB→MS | LB/RB→VB/HB | LWB/RWB→VKB/HKB | CDM→DM | CM→CM | CAM→OM | CF→OM | LM/RM→VM/HM | LW/RW→VK/HK | ST→ANG |
-- CF→OM (QC): ROLE_POSITION kobler CF til AM, så en angriber dér får "⚠" – pladskoden skal betyde netop den position. Ingen formation
-  har både CF og CAM. Regel: falder en pladskode sammen med en positionskode, er det præcis den position, der passer på pladsen.
-- Én tabel `ROLE_LABEL` i public/engine/formations.js (motoren bruger den i referatet), eksporteret videre af labels.js. Den dækker
-  ALLE roller i FORMATIONS uden fallback til den engelske kode; en test går alle roller igennem.
-- `POSITION.CB` 'CB'→'MS' og `POSITION_FULL.CB` → 'Midtstopper (MS)' (ellers "MS" og "FOR CB" i samme række, lineup-list.js:51/55,
-  tactics.js Hvis-Så-valgene).
-- Visningssteder:
-  - ui/matrix.js:105 (Trup Pos/#);
-  - ui/lineup-list.js:47/51 (Plads + title);
-  - ui/pitch.js:38 (brikkens title – koden tilføjes IKKE på brikken);
-  - ui/matchcenter.js:120–121 (minibanen);
-  - ui/lineup.js:12–14 (placeLabel). Kæden går gennem LINE, så "DM (FOR)" og ikke "CDM (DEF)". Fallback for gamle runder (e.role, "SUB (DEF)") går også gennem tabellen;
-  - engine/match.js:741 og :1352 (referatteksterne "Din LB …", "sin CDM-zone"). Gamle gemte referater beholder teksten – ingen migrering;
-  - labels.js:20 "Venstre (VK/VB)" / "Højre (HK/HB)";
-  - labels.js:50 FIT_HELP "(VB/HB/VKB/HKB/VM/HM)".
+**Efterprøv på Tobias' profil, ikke snittet:**
+- `roomOf` klemmes til mindst 0,1, så en spiller tæt på sit loft får ca. 0,007/runde, altså over 100 runder.
+- Kravteksten bruger `nextText`, når han træner fokusset: "(går langsomt: tæt på sit loft)".
+- D2 måler også en 24–27-årig tæt på loftet.
 
-  Gamle NEWS-tekster står som historik.
-- Tests, der asserter de engelske koder, rettes:
-  - lineup.test.mjs:10–25;
-  - wide-slots-tm-v3246:110–125;
-  - heat-ui:238–245;
-  - side-v3260-tm:302 og :317. Linje 317 er en FRAVÆRS-assertion – den skal flyttes til den nye tekst, ellers tester den intet;
-  - run.mjs:1183, 1402, 1408, 1452, 1522–1538, 1558, 1618, 2278.
+## Næste efter v3.32.0 (brugeren 5/11, efter designkritikken `docs/design-kritik-2026-11-05.md`)
+**v3.33.0 = 📖 spilguide + "ⓘ Sådan virker det"** i én udgivelse:
+- Guiden "📖 Sådan virker spillet" ligger i ⚙ og har et afsnit pr. del. Tal kommer fra konstanterne.
+- Forklaringsteksterne på Taktik, Kamp, Træning, Klub og kortet foldes ind. Én kort linje er synlig, resten står bag "ⓘ" og linker til guidens afsnit. Det er kritikkens nr. 1 og F4's hjælpedel.
 
-  Trace-golden kan skifte, hvis en gylden kamp har teksten fra match.js:1352. Forklar ændringen i testen.
-- Ny test:
-  - Render Trup, Taktik-listen, banens titler og Match Center for alle 10 formationer.
-  - De danske koder skal stå, og `\b(LB|RB|LWB|RWB|CDM|CAM|LM|RM|LW|RW|ST|CF|CB)\b` må ikke stå nogen steder. GK er undtaget som evnekolonne.
-  - Mutation: én kode tilbage til engelsk → rød.
-
-## TILLÆG: QC-forbehold fra v3.31.1
-- Bjælken ved 601–700 px: ▶ må ikke skubbes ud over højre kant med 3 piller + 🔍. e2e ved 601 og 667 px: ▶'s højre kant ≤ bredden.
-  Ret, hvis rød (knappen må krympe/afkorte modstanderens navn som ≤600).
-- Testen af `opponentTacticKeys().label` (dansk-kort-v3311.test.mjs:123–124) skal teste en tekst, der faktisk vises, eller fjernes.
+**Derefter, i hver sin version:**
+- Kamp-underfaner med afspilningen på første skærm og "Send kampen" i en ⋯-menu.
+- Brede tabeller på mobil: sticky første kolonne og fade.
+- Berøringsflader på mindst 44 px ved ≤ 600 px.
+- Farvesemantik (lilla = valgt, grøn = dit hold/handling) og kontrast (heat-1 og ★/☆).
+- Færre gentagelser: klubpanelet, de to lønbudgetter og Klubs nøgletal.
 
 ---
 Tidligere planer: [tidligere-planer.md](tidligere-planer.md)

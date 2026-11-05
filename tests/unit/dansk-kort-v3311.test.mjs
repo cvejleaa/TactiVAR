@@ -33,16 +33,18 @@ const byId = (el, id) => all(el, (e) => e.attrs.id === id)[0];
 const ENGLISH = /Pressing Monster|Target Man|Sweeper Keeper|Penalty Killer|Offside Maestro|Line Ghost|Playmaker|stamina|intercepting|jumpingPower|ballControl|Gegenpress|\bCAM\b|\bCDM\b|Scouting/i;
 const card = (p, team, extra = {}) => renderCard({ player: p, team, isOwn: true, scouting: ['En observation.'], note: '', onNote() {}, ...extra });
 
-// De danske navne og beskrivelser – bogstaveligt (spec §2 "Arketyper – særpræg")
+// De danske navne og beskrivelser – bogstaveligt (spec §2 "Arketyper – særpræg"); kravene som [nøgle, dansk navn, krav].
+// v3.32.0: kravteksten viser nu/krav (labels.js archReqText) – "Låses op ved: Styrke 20/13 ✓ · Spring 20/13 ✓" for en spiller med 20 overalt
+const reqAll20 = (req) => 'Låses op ved: ' + req.map(([, n, v]) => `${n} 20/${v} ✓`).join(' · ');
 const DANSK = {
-  SWEEPER_KEEPER: ['Feje-målmand', 'Bryder dybe stikninger uden for feltet ved høj forsvarslinje', 'Låses op ved: Målmandsspil 12, Fart 11'],
-  PENALTY_KILLER: ['Straffedræber', 'Psykisk overtag ved straffe og VAR-straffespark', 'Låses op ved: Målmandsspil 14, Positionering 12'],
-  OFFSIDE_MAESTRO: ['Offside-mester', '+20 % til hele bagkædens timing ved VAR-offside', 'Låses op ved: Positionering 13, Erobring 13'],
-  AERIAL_TOWER: ['Luftens Konge', '+25 % i alle hovedstødsdueller i begge felter', 'Låses op ved: Styrke 13, Spring 14'],
-  REGISTA: ['Regista (spilfordeler)', 'Slår pasninger direkte fra Fase 1 til Fase 3', 'Låses op ved: Pasning 13, Boldkontrol 13'],
-  PRESSING_MONSTER: ['Presmonster', 'Mister 50 % mindre energi ved højt gegenpres', 'Låses op ved: Udholdenhed 14, Erobring 12'],
-  VAR_LINE_GHOST: ['VAR-linjens spøgelse', 'Vinder 80 % af alle millimeter-tætte VAR-offside-kendelser', 'Låses op ved: Fart 14, Positionering 12'],
-  TARGET_MAN: ['Fyrtårn', 'Opspilspunkt: dominerer lange bolde og høje indlæg med hovedet', 'Låses op ved: Styrke 13, Spring 13'],
+  SWEEPER_KEEPER: ['Feje-målmand', 'Bryder dybe stikninger uden for feltet ved høj forsvarslinje', [['goalkeeping', 'Målmandsspil', 12], ['pace', 'Fart', 11]]],
+  PENALTY_KILLER: ['Straffedræber', 'Psykisk overtag ved straffe og VAR-straffespark', [['goalkeeping', 'Målmandsspil', 14], ['positioning', 'Positionering', 12]]],
+  OFFSIDE_MAESTRO: ['Offside-mester', '+20 % til hele bagkædens timing ved VAR-offside', [['positioning', 'Positionering', 13], ['intercepting', 'Erobring', 13]]],
+  AERIAL_TOWER: ['Luftens Konge', '+25 % i alle hovedstødsdueller i begge felter', [['strength', 'Styrke', 13], ['jumpingPower', 'Spring', 14]]],
+  REGISTA: ['Regista (spilfordeler)', 'Slår pasninger direkte fra Fase 1 til Fase 3', [['passing', 'Pasning', 13], ['ballControl', 'Boldkontrol', 13]]],
+  PRESSING_MONSTER: ['Presmonster', 'Mister 50 % mindre energi ved højt gegenpres', [['stamina', 'Udholdenhed', 14], ['intercepting', 'Erobring', 12]]],
+  VAR_LINE_GHOST: ['VAR-linjens spøgelse', 'Vinder 80 % af alle millimeter-tætte VAR-offside-kendelser', [['pace', 'Fart', 14], ['positioning', 'Positionering', 12]]],
+  TARGET_MAN: ['Fyrtårn', 'Opspilspunkt: dominerer lange bolde og høje indlæg med hovedet', [['strength', 'Styrke', 13], ['jumpingPower', 'Spring', 13]]],
 };
 
 test('særpræg: alle 8 i tabellen har et dansk navn – kortet viser navn, beskrivelse og krav på dansk, også når spillerens kopi har det gamle engelske navn', () => {
@@ -52,7 +54,10 @@ test('særpræg: alle 8 i tabellen har et dansk navn – kortet viser navn, besk
   // de 9 forskellige krav-nøgler (alle evner, der står i et krav) er dækket af testen
   assert.equal(new Set(Object.values(ARCHETYPES).flat().flatMap((a) => Object.keys(a.unlockReq))).size, 9);
   for (const a of Object.values(ARCHETYPES).flat()) {
-    const [name, desc, req] = DANSK[a.id];
+    const [name, desc, reqList] = DANSK[a.id], req = reqAll20(reqList);
+    for (const k of Object.keys(p.skills)) p.skills[k] = 20;
+    p.jumpingPower = 20;
+    assert.deepEqual(reqList.map(([k, , v]) => [k, v]), Object.entries(a.unlockReq), `${a.id}: kravene i tabellens rækkefølge`);
     // kopien som i et gem fra før v3.31.1: engelsk navn og gammel beskrivelse
     p.archetype = { id: a.id, name: 'Pressing Monster', description: 'Mister 50% mindre energi ved Højt Gegenpress', unlockReq: { ...a.unlockReq }, isUnlocked: false };
     const el = card(p, me), box = byId(el, 'card-arch');
@@ -84,8 +89,15 @@ test('save-schema4 (kopierne har de engelske navne): kortet og regnearket viser 
   assert.equal(P('plr_t0_11').archetype.name, 'Target Man');
   const want = { plr_t0_4: 'OFFSIDE_MAESTRO', plr_t0_6: 'PRESSING_MONSTER', plr_t0_8: 'REGISTA', plr_t0_10: 'REGISTA', plr_t0_11: 'TARGET_MAN', plr_t0_14: 'OFFSIDE_MAESTRO' };
   for (const [id, k] of Object.entries(want)) {
-    const el = card(P(id), me), [name, desc, req] = DANSK[k];
-    assert.equal(byId(el, 'card-arch').textContent, `${P(id).archetype.isUnlocked ? '🌟' : '🔒'} ${name} – ${desc}${P(id).archetype.isUnlocked ? '' : req}`, id);
+    const el = card(P(id), me), [name, desc, reqList] = DANSK[k], pl = P(id), now = (key) => (key === 'jumpingPower' ? pl.jumpingPower : pl.skills[key]);
+    const box = byId(el, 'card-arch').textContent;
+    assert.ok(box.startsWith(`${pl.archetype.isUnlocked ? '🌟' : '🔒'} ${name} – ${desc}`), id);
+    if (pl.archetype.isUnlocked) assert.equal(byId(el, 'card-arch-req'), undefined, id);
+    else {
+      const req = byId(el, 'card-arch-req').textContent;
+      assert.ok(req.startsWith('Låses op ved: '), req);
+      for (const [key, n, v] of reqList) assert.ok(req.includes(`${n} ${now(key)}/${v}`), `${id}: ${req}`);
+    }
     assert.doesNotMatch(el.textContent, ENGLISH, id);
   }
   const mx = renderMatrix({ team: me, isOwn: true, ui: { sortCol: 'pos', sortDesc: false, filter: 'all' }, notes: {}, onSort() {}, onSelect() {}, onSwap() {}, onFilter() {}, onBlocked() {} });

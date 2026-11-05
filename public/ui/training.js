@@ -3,10 +3,18 @@
 // massehandling for de viste. Tallene fra trainingEstimate. Fanen viser altid dit hold (app.js bygger den fra dit hold).
 import { h, dec, select } from './dom.js';
 import { LINE } from './labels.js';
-import { FOCUS, validFocus, trainingEstimate, roomPoints } from '../engine/career.js';
+import { FOCUS, validFocus, trainingEstimate, roomPoints, focusSkills } from '../engine/career.js';
 import { SKILL_NAME, roomWords, nextText, ROOM_SCALE } from './card.js';
 
-const SHORT = { pace: 'PAC', stamina: 'STA', strength: 'STR', ballControl: 'BAL', passing: 'PAS', finishing: 'FIN', positioning: 'POS', intercepting: 'INT', goalkeeping: 'GK' };
+const SHORT = { pace: 'PAC', stamina: 'STA', strength: 'STR', ballControl: 'BAL', passing: 'PAS', finishing: 'FIN', positioning: 'POS', intercepting: 'INT', goalkeeping: 'GK', jumpingPower: 'SPR' };
+// Fokusvalget med sine evner (v3.32.0): "Fysik – Fart, Styrke, Spring". Ét-evne-fokus med samme navn som evnen (Afslutning) står alene;
+// Alsidig viser spillerens kædes nøgle-evner (p) eller "kædens nøgle-evner" (massehandlingen)
+export const focusLabel = (k, p = null) => {
+  const f = FOCUS[k], skills = f.skills ?? (p ? focusSkills(p, f) : null);
+  if (!skills) return `${f.label} – kædens nøgle-evner`;
+  const names = skills.map((s) => SKILL_NAME[s]);
+  return !names.length || (names.length === 1 && names[0] === f.label) ? f.label : `${f.label} – ${names.join(', ')}`;
+};
 
 // Rapportens +1 pr. spiller (v3.30.0, én kilde for træningstabellen og Trup-regnearkets "+N"): Map(id → [evne, …]). Samme (id, evne)
 // kan stå flere gange (addXp giver alle +1 i en runde), så listen tælles – den er ikke et ja/nej.
@@ -57,7 +65,7 @@ export function renderTrainingTable({ team, report = null, roundLabel = report?.
     h('p', { class: 'muted' }, 'Fokus gælder, til du ændrer det. Kampe giver også lidt i kædens nøgle-evner. Prisen er friskhed pr. runde (mindre for den, der har spillet).'),
     h('p', { class: 'muted', id: 'room-scale' }, ROOM_SCALE + '.'),
     h('div', { class: 'toolbar' }, [['all', 'Alle'], ['GK', 'MÅL'], ['DEF', 'FOR'], ['MID', 'MID'], ['ATT', 'ANG']].map(([v, l]) => h('button', { class: 'mini' + (line === v ? ' active' : ''), onclick: () => onLine(v) }, l)),
-      select('', [['', `Sæt fokus for de viste (${rows.length}) …`], ...Object.entries(FOCUS).map(([k, f]) => [k, f.label])], (k) => { if (k) onFocusMany(rows.map((p) => p.id), k); }, { id: 'focus-many', class: 'mini' })),
+      select('', [['', `Sæt fokus for de viste (${rows.length}) …`], ...Object.keys(FOCUS).map((k) => [k, focusLabel(k)])], (k) => { if (k) onFocusMany(rows.map((p) => p.id), k); }, { id: 'focus-many', class: 'mini' })),
     msg ? h('div', { class: 'notice', id: 'train-msg' }, msg) : null,
     h('div', { class: 'tablewrap' }, h('table', { class: 'matrix train-table', id: 'training-table' },
       h('thead', {}, h('tr', {}, [['Spiller'], ['Kæde'], ['Fokus'], ['Friskhed', 'Pr. runde – i parentes, når han har spillet'], ['Fremdrift'], ['Næste +1'], ['Skøn', ROOM_SCALE], ['Sidste runde']].map(([t, title]) => h('th', { title: title ?? '' }, t)))),
@@ -65,7 +73,7 @@ export function renderTrainingTable({ team, report = null, roundLabel = report?.
         const e = trainingEstimate(p, on.has(p.id)), g = gained.get(p.id) ?? [];
         return h('tr', { dataset: { pid: p.id }, class: selectedId === p.id ? 'selected' : null },
           h('td', {}, `#${p.shirtNumber} ${p.shortName}`), h('td', {}, h('span', { class: 'chip' }, LINE[p.line])),
-          h('td', {}, select(e.key, Object.entries(FOCUS).filter(([k]) => validFocus(p, k)).map(([k, f]) => [k, f.label]), (k) => onFocus(p.id, k), { class: 'mini train-focus' })),
+          h('td', {}, select(e.key, Object.keys(FOCUS).filter((k) => validFocus(p, k)).map((k) => [k, focusLabel(k, p)]), (k) => onFocus(p.id, k), { class: 'mini train-focus' })),
           h('td', { class: 'num' }, e.fresh > 0 ? `+${e.fresh}` : `${e.fresh} (${e.playedFresh})`),
           h('td', { class: 'train-prog' }, e.lines.map((l) => (l.top ? `${SHORT[l.skill]} 20` : `${SHORT[l.skill]} ${dec(l.dev, 1)}`)).join(' · ') || '–'),
           h('td', { title: nextText(e.next, e.why) }, e.key === 'REST' ? 'hviler' : e.next === Infinity ? '–' : e.next > 14 ? '> 1 sæson' : `~${e.next} rd`),

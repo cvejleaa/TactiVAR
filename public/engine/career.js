@@ -154,10 +154,17 @@ export const FOCUS = {
   TECH: { label: 'Teknik', skills: ['ballControl', 'passing'], rate: 0.07, fresh: -3, inj: 0.005 },
   FINISH: { label: 'Afslutning', skills: ['finishing'], rate: 0.12, fresh: -3, inj: 0.005 },
   DEFENCE: { label: 'Forsvar', skills: ['intercepting', 'positioning'], rate: 0.07, fresh: -3, inj: 0.005 },
-  PHYSICAL: { label: 'Fysik', skills: ['pace', 'strength'], rate: 0.07, fresh: -4, inj: 0.007 },
+  PHYSICAL: { label: 'Fysik', skills: ['pace', 'strength', 'jumpingPower'], rate: 0.07, fresh: -4, inj: 0.007 },
   KEEPER: { label: 'Målmand', skills: ['goalkeeping'], rate: 0.12, fresh: -2, inj: 0.003, gkOnly: true },
   REST: { label: 'Hvile', skills: [], rate: 0, fresh: 4, inj: 0 },
 };
+// Spring (v3.32.0, backlog 0c – brugeren: "jeg kan ikke se hvordan jeg kan træne ham i det"): p.jumpingPower står uden for p.skills
+// (den er ikke en af de 9 evner og indgår hverken i nøglesnit, potentiale eller Gns). Træning og alder læser og skriver evnerne
+// gennem skillOf/setSkill, så Spring ikke bliver et særtilfælde hvert sted.
+export const skillOf = (p, k) => (k === 'jumpingPower' ? p.jumpingPower : p.skills?.[k]);
+export function setSkill(p, k, v) { if (k === 'jumpingPower') p.jumpingPower = v; else p.skills[k] = v; }
+// Det fokus, der træner en evne (kravteksten "– trænes med Fysik"): det første, der ikke er Alsidig og har evnen
+export const focusOfSkill = (k) => Object.keys(FOCUS).find((f) => f !== 'GENERAL' && FOCUS[f].skills?.includes(k)) ?? null;
 export const MATCH_XP = 0.02, TRAIN_FRESH_FLOOR = 50, TRAIN_INJURY_MATCHES = [1, 2], PLAYED_RELIEF = 2;
 export const ageTrain = (age) => (age <= 19 ? 1.5 : age <= 22 ? 1.2 : age <= 25 ? 1 : age <= 29 ? 0.6 : age <= 32 ? 0.35 : 0.2);
 // Plads til loftet: nøgle-evnernes snit mod potentialet (0,1–1 – en spiller ved sit loft udvikler sig næsten ikke)
@@ -172,8 +179,8 @@ export function addXp(p, skill, xp, onSkill) {
   p.dev ||= {};
   p.dev[skill] = (p.dev[skill] ?? 0) + xp;
   const up = [];
-  while (p.dev[skill] >= 1 && (p.skills[skill] ?? 0) < 20) { p.dev[skill] -= 1; p.skills[skill] += 1; up.push(skill); }
-  if ((p.skills[skill] ?? 0) >= 20) p.dev[skill] = Math.min(p.dev[skill], 0.99);
+  while (p.dev[skill] >= 1 && (skillOf(p, skill) ?? 0) < 20) { p.dev[skill] -= 1; setSkill(p, skill, skillOf(p, skill) + 1); up.push(skill); }
+  if ((skillOf(p, skill) ?? 0) >= 20) p.dev[skill] = Math.min(p.dev[skill], 0.99);
   p.dev[skill] = Math.round(p.dev[skill] * 1000) / 1000;
   if (up.length) onSkill?.(p);
   return up;
@@ -217,15 +224,17 @@ export function retireChance(p) {
 }
 export const willRetire = (p, season) => { const c = retireChance(p); return c >= 1 || (c > 0 && derivedRng('retire', season, p.id).next() < c); };
 // Aldersfald fra 30 år (MV 32): fart og kondition først, positionering og pasning sidst. Træning halverer faldet i de trænede evner.
+// v3.32.0: Spring falder som Styrke (tier 2) – en evne, der kan trænes op, skal også kunne falde; Fysik halverer faldet (trainedSkills).
 export const DECLINE_FROM = { field: 30, GK: 32 };
-export const DECLINE = [[['pace', 'stamina'], 0.35, 0.15], [['strength', 'ballControl', 'finishing', 'intercepting', 'goalkeeping'], 0.2, 0.1], [['positioning', 'passing'], 0.08, 0.07]];
+// Spring står SIDST med Styrkes sats (0,2 + 0,1/år): den afledte rng trækker i listens rækkefølge, så de 9 evners fald er de samme som før.
+export const DECLINE = [[['pace', 'stamina'], 0.35, 0.15], [['strength', 'ballControl', 'finishing', 'intercepting', 'goalkeeping'], 0.2, 0.1], [['positioning', 'passing'], 0.08, 0.07], [['jumpingPower'], 0.2, 0.1]];
 export function declineSkills(p, season, trained = new Set()) {
   const from = DECLINE_FROM[p.line === 'GK' ? 'GK' : 'field'];
   if (p.age < from) return [];
   const r = derivedRng('decline', season, p.id), y = p.age - from, fell = [];
   for (const [skills, base, step] of DECLINE) for (const s of skills) {
     const c = Math.min(0.9, base + step * y) * (trained.has(s) ? 0.5 : 1);
-    if (r.next() < c && p.skills[s] > 1) { p.skills[s] -= 1; fell.push(s); }
+    if (r.next() < c && skillOf(p, s) > 1) { setSkill(p, s, skillOf(p, s) - 1); fell.push(s); }
   }
   return fell;
 }
@@ -306,7 +315,7 @@ export function trainingEstimate(p, starter = false) {
   const key = validFocus(p, p.trainingFocus) ? p.trainingFocus : 'GENERAL', f = FOCUS[key], room = roomOf(p);
   const train = f.rate * ageTrain(p.age) * room;
   const lines = focusSkills(p, f).map((skill) => {
-    const dev = p.dev?.[skill] ?? 0, top = (p.skills[skill] ?? 0) >= 20;
+    const dev = p.dev?.[skill] ?? 0, top = (skillOf(p, skill) ?? 0) >= 20;
     const per = train + (starter && KEY_SKILLS[p.line].includes(skill) ? MATCH_XP : 0);
     return { skill, dev, top, n: top || per <= 0 ? null : Math.ceil((1 - dev) / per) };
   });

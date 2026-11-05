@@ -1052,6 +1052,7 @@ try {
     await c.close();
   };
   if (process.env.F2_ONLY) { await f2(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun F2-blokken (kortpanelet – hurtig mutationskørsel)
+  if (process.env.TM_V3320_ONLY) { await v3320tm(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); console.log(fejl.join(' | ')); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun Test Managers v3.32.0-blok
   if (process.env.TM_V3312_ONLY) { await v3312tm(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); console.log(fejl.join(' | ')); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun Test Managers v3.31.2-blok
   if (process.env.V3312_ONLY) { await v3312(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); console.log(fejl.join(' | ')); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun v3.31.2-blokken
   if (process.env.V3311_ONLY) { await v3311(); await v3311tm(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun v3.31.1-blokken (Spil-bjælken på alle faner – hurtig mutationskørsel)
@@ -1179,7 +1180,7 @@ try {
   check('Træning: massehandlingens bekræftelse er væk, når man kommer tilbage fra en anden fane (men fokus er stadig gemt)', (await g.locator('#train-msg').count()) === 0 && (await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((x) => !x.isBot).squad.filter((p) => p.trainingFocus === 'REST').length)) === 18);
   await g.selectOption(`#training-table tr[data-pid="${shownId}"] select`, 'FINISH');
   await tab('trup'); await openCard(shownId);
-  check('Spillerkortet viser 9 evne-barer og luftduel-udregningen', (await g.locator('#player-card .bars .bar').count()) === 9 && (await g.textContent('#aerial-breakdown')).includes('× 0,35'));
+  check('Spillerkortet viser 10 evne-barer (9 evner + Spring, v3.32.0) og luftduel-udregningen', (await g.locator('#player-card .bars .bar').count()) === 10 && (await g.locator('#player-card .bars .bar-label').allTextContents()).filter((t) => t === 'Spring').length === 1 && (await g.textContent('#aerial-breakdown')).includes('× 0,35'));
   // v3.8 (Test Manager): kortets overskrift viser spillerens EGEN naturlige position med fuld betegnelse
   // v3.31.1 (brugeren: danske positionskoder): parentesen er den korte form (DM, OM, ANG) – ikke CDM/CAM/ST
   const FULL_POS = { GK: 'Målmand', CB: 'Midtstopper (MS)', FB: 'Back/kantback (dybe kantpladser)', DM: 'Defensiv midtbane (DM)', CM: 'Central midtbane (CM)', WM: 'Kant (høje kantpladser)', AM: 'Offensiv midtbane (OM)', ST: 'Angriber (ANG)' };
@@ -3063,6 +3064,7 @@ try {
       const A = L.teams.findIndex((t, i) => t.isBot && i !== M), B = L.teams.findIndex((t, i) => t.isBot && i !== M && i !== A);
       const a = P(6), b = P(7), z = P(8), q = L.teams[A].squad.find((x) => x.line === 'MID');
       a.archetype = { id: 'REGISTA', name: 'Regista', description: 'gammel', unlockReq: { passing: 13, ballControl: 13 }, isUnlocked: false };
+      a.skills.passing = 11; a.skills.ballControl = 13; a.trainingFocus = 'GENERAL';   // v3.32.0: kravteksten med nu/krav og fokus
       b.archetype = { id: 'PRESSING_MONSTER', name: 'Pressing Monster', description: 'gammel', unlockReq: { stamina: 14, intercepting: 12 }, isUnlocked: true };
       z.archetype = null;
       L.leagueMetadata.seasonNumber = 2;
@@ -3081,7 +3083,7 @@ try {
     const w1 = await arch();
     check('v3.31.2 Taktik-listen ≥ 900 px: "🔒 Regista (spilfordeler)" / "🌟 Presmonster" som linje under navnet, intet ved en uden arketype; title = beskrivelse + krav',
       w1[S.a].line === '🔒 Regista (spilfordeler)' && w1[S.b].line === '🌟 Presmonster' && !w1[S.a].ico && w1[S.z].line === null && w1[S.z].title === null
-      && w1[S.a].title === 'Arketype: Regista (spilfordeler) – Slår pasninger direkte fra Fase 1 til Fase 3 · Låses op ved: Pasning 13, Boldkontrol 13', JSON.stringify(w1));
+      && w1[S.a].title === 'Arketype: Regista (spilfordeler) – Slår pasninger direkte fra Fase 1 til Fase 3 · Låses op ved: Pasning 11/13 – trænes med Teknik · Boldkontrol 13/13 ✓', JSON.stringify(w1));
     await p.setViewportSize({ width: 800, height: 900 }); await p.waitForTimeout(50);
     const w2 = await arch();
     check('v3.31.2 Taktik-listen < 900 px: kun ikonet efter navnet (🔒/🌟), ingen linje', w2[S.a].ico === '🔒' && w2[S.b].ico === '🌟' && !w2[S.a].line && !w2[S.b].line && w2[S.z].ico === null, JSON.stringify(w2));
@@ -3186,6 +3188,47 @@ try {
     check('v3.31.2 TM: tallene i statistik-tabellen er højrejusteret', s1.align === 'right' || s1.align === 'end', s1.align);
     await c.close();
   }
+  // ---------- v3.32.0, Test Manager (Spring kan trænes med Fysik): appens LEDNING – nyheden i NEWS, fokusvalget på Træning og "+1 Spring" i rapporten,
+  // Træning-fanen og Trup, før OG efter en genindlæsning (sanitize.js droppede Spring-gains). Kan køres alene med TM_V3320_ONLY=1.
+  async function v3320tm() {
+    const c = await browser.newContext({ viewport: { width: 1366, height: 900 } }), p = await c.newPage();
+    p.on('pageerror', (e) => fejl.push(e.message));
+    await p.goto(BASE + '/'); await p.waitForSelector('body[data-klar="ja"]');
+    const tt = async (k) => { await p.click(`#tab-${k}`); await p.waitForSelector(`.tabpane.tab-${k}`); };
+    const mod = (f, arg) => p.evaluate(([src, a]) => { const d = JSON.parse(localStorage.getItem('tactivar_save')); const r = (0, eval)('(' + src + ')')(d, a); localStorage.setItem('tactivar_save', JSON.stringify(d)); return r; }, [f.toString(), arg ?? null]);
+    const S = await mod((d) => {
+      const me = d.league.teams.find((t) => !t.isBot), on = new Set(me.tactics.lineupSlots);
+      for (const x of me.squad) Object.assign(x, { injuryMatchesLeft: 0, banMatches: 0, banYellows: 0, freshness: 100 });
+      const q = me.squad.find((x) => x.line === 'DEF' && !on.has(x.id));   // en reserve: spiller ingen kamp, kan ikke blive skadet i den
+      Object.assign(q, { age: 20, jumpingPower: 13, trainingFocus: 'PHYSICAL', dev: { jumpingPower: 0.999 } });
+      q.potential = 20;
+      d.ui.seenVersion = '3.31.2';   // NEWS: nyheden om 3.32.0 står som besked på Hjem ved næste indlæsning
+      return { q: q.id, j: q.jumpingPower };
+    });
+    await p.reload(); await p.waitForSelector('body[data-klar="ja"]');
+    const note = (await p.textContent('#notice', { timeout: 3000 }).catch(() => '')) ?? '';
+    check('v3.32.0 TM: nyheden for 3.32.0 står i NEWS og vises som besked ved opdatering (Fysik træner Fart, Styrke og Spring)', note.includes('Spring kan nu trænes') && note.includes('Fysik træner Fart, Styrke og Spring'), note.slice(0, 120));
+    await tt('traening');
+    const opts = await p.$$eval(`#training-table tr[data-pid="${S.q}"] select option`, (os) => os.map((o) => o.textContent));
+    const many = await p.$$eval('#focus-many option', (os) => os.map((o) => o.textContent));
+    check('v3.32.0 TM: Træning-fanen viser "Fysik – Fart, Styrke, Spring" pr. spiller og i massehandlingen, og Alsidig med spillerens egne evner',
+      opts.includes('Fysik – Fart, Styrke, Spring') && many.includes('Fysik – Fart, Styrke, Spring') && many.includes('Alsidig – kædens nøgle-evner') && opts.some((o) => /^Alsidig – \w/.test(o) && !o.includes('kædens')), JSON.stringify([opts, many]));
+    check('v3.32.0 TM: fremdriften viser SPR for Fysik-spilleren', /SPR 1,0|SPR 0,9|SPR 1\.0/.test(await p.textContent(`#training-table tr[data-pid="${S.q}"] td.train-prog`)), await p.textContent(`#training-table tr[data-pid="${S.q}"] td.train-prog`));
+    await tt('taktik'); await p.click('#play-round'); await p.waitForSelector('#skip');
+    await tt('kamp'); await p.click('#skip'); await p.waitForSelector('.to-home');
+    const seen = async (where) => {
+      await tt('traening');
+      const last = await p.textContent(`#training-table tr[data-pid="${S.q}"] td:last-child`);
+      await tt('trup');
+      const cell = await p.evaluate((id) => { const td = [...document.querySelectorAll(`#matrix tr[data-pid="${id}"] td.gain`)].find((e) => /Spring/.test(e.title)); return td ? { title: td.title, val: td.textContent } : null; }, S.q);
+      check(`v3.32.0 TM ${where}: Træning "Sidste runde" siger +1 Spring, og Trup-cellen i Spring-kolonnen er mærket (+1 Spring efter runde 1, værdi ${S.j + 1})`,
+        last.includes('+1 Spring') && cell !== null && cell.title === '+1 Spring efter runde 1' && cell.val === String(S.j + 1), JSON.stringify({ last, cell }));
+    };
+    await seen('efter runden');
+    await p.reload(); await p.waitForSelector('body[data-klar="ja"]');
+    await seen('efter genindlæsning');
+    await c.close();
+  }
   await f1tm();
   await f2();
   await f2tm();
@@ -3195,6 +3238,7 @@ try {
   await v3311tm();
   await v3312();
   await v3312tm();
+  await v3320tm();
   check('Ingen sidefejl under hele forløbet', fejl.length === 0, fejl.join(' | '));
 } finally {
   await browser.close();

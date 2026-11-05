@@ -1,7 +1,7 @@
 import { FIT, ROLE_LABEL, roleLabel } from '../engine/formations.js';
 // Pladskoderne (v3.31.2): tabellen står i formations.js (motoren bruger den i referatet) – her videre til brugerfladen
 export { ROLE_LABEL, roleLabel };
-import { BAN } from '../engine/career.js';
+import { BAN, FOCUS, skillOf, focusOfSkill, validFocus, trainingEstimate } from '../engine/career.js';
 import { ARCHETYPES } from '../engine/generator.js';
 // Danske visningsnavne for motorens værdier.
 // Tilskuerne på en kamp (v3.30.0, match.att – offentligt): "👥 7.840". Ældre kampe uden tallet viser intet (null), aldrig "undefined"/0.
@@ -16,11 +16,34 @@ export const POSITION_FULL = { GK: 'Målmand', CB: 'Midtstopper (MS)', FB: 'Back
 // Låst op og kravene er spillerens egne. Et ukendt id viser kopien.
 const ARCH_BY_ID = Object.fromEntries(Object.values(ARCHETYPES).flat().map((a) => [a.id, a]));
 export const archetypeOf = (a) => (a ? { ...a, name: ARCH_BY_ID[a.id]?.name ?? a.name, description: ARCH_BY_ID[a.id]?.description ?? a.description } : null);
-// Arketypens mærke (v3.31.2 – ét sted for kortet, Trup og Taktik): 🌟 låst op / 🔒 låst, og kravene med evnernes danske navne
-// (spring er ikke en af de 9 evner – kortets luftduel kalder det "Spring"). a = archetypeOf(...)
+// Arketypens mærke (v3.31.2 – ét sted for kortet, Trup og Taktik): 🌟 låst op / 🔒 låst, og kravene med evnernes danske navne. a = archetypeOf(...)
 export const archIcon = (a) => (a.isUnlocked ? '🌟' : '🔒');
-export const archReqText = (a) => { const da = Object.fromEntries(SKILL_LABELS.flatMap(([, list]) => list));   // SKILL_LABELS står længere nede
-  return 'Låses op ved: ' + Object.entries(a.unlockReq ?? {}).map(([k, v]) => `${k === 'jumpingPower' ? 'Spring' : da[k] ?? k} ${v}`).join(', '); };
+// Kravteksten (v3.32.0, backlog 0c – brugeren: "jeg kan ikke se hans jumpingpower … og hvordan jeg kan træne ham i det"): for
+// ejerens spiller p nu/krav pr. evne, ✓ ved opfyldt, og for det, der mangler, hvilket fokus der træner det – fx
+// "Låses op ved: Styrke 13/13 ✓ · Spring 13/14 – trænes med Fysik". Træner han fokusset i forvejen: "(det gør han nu; …)" med
+// skønnet for næste +1 (trainingEstimate – går det langsomt, står hvorfor). To mangler med samme fokus: "– begge trænes med Fysik".
+// KUN ejerens spiller (evnerne er private – vagterne i card.js, lineup-list.js og matrix.js). Uden p: kun kravene.
+export const archReqText = (a, p = null, starter = false) => {   // QC v3.32.0: starter = samme skøn som kortets træningsboks
+  const da = Object.fromEntries(SKILL_LABELS.flatMap(([, list]) => list));   // SKILL_LABELS står længere nede
+  const req = Object.entries(a.unlockReq ?? {});
+  if (!p) return 'Låses op ved: ' + req.map(([k, v]) => `${da[k] ?? k} ${v}`).join(', ');
+  const items = req.map(([k, v]) => { const now = skillOf(p, k) ?? 0; return { k, v, now, ok: now >= v, focus: focusOfSkill(k) }; });
+  const miss = items.filter((i) => !i.ok);
+  const shared = miss.length >= 2 && miss.every((i) => i.focus && i.focus === miss[0].focus) ? miss[0].focus : null;
+  const cur = validFocus(p, p.trainingFocus) ? p.trainingFocus : 'GENERAL';
+  const hint = (focus, skills, many = '') => {
+    if (!focus) return '';
+    let now = '';
+    if (cur === focus) {
+      const e = trainingEstimate(p, starter), n = Math.min(...e.lines.filter((l) => skills.includes(l.skill)).map((l) => l.n ?? Infinity));
+      now = ` (det gør han nu${n === Infinity ? '' : n > 14 ? `; går langsomt${e.why === 'fokus og alder' ? '' : ` – ${e.why}`}` : `; næste +1 om ca. ${n} runde${n === 1 ? '' : 'r'}`})`;
+    }
+    return ` – ${many}trænes med ${FOCUS[focus].label}${now}`;
+  };
+  const parts = items.map((i) => `${da[i.k] ?? i.k} ${i.now}/${i.v}${i.ok ? ' ✓' : shared ? '' : hint(i.focus, [i.k])}`);
+  return 'Låses op ved: ' + parts.join(' · ') + (shared ? hint(shared, miss.map((i) => i.k), miss.length === 2 ? 'begge ' : 'alle ') : '');
+};
+
 export const PHASE_OPTIONS = {
   passingStyle: [['SHORT', 'Korte pasninger'], ['BALANCED', 'Balanceret'], ['DIRECT_LONG', 'Direkte lange bolde']],
   attackFocus: [['CENTRAL', 'Centralt'], ['HIGH_CROSSES', 'Høje indlæg'], ['LOW_CUTBACKS', 'Lave cutbacks']],
@@ -35,7 +58,7 @@ export const PHASE_OPTIONS = {
 export const CONDITIONS = [['TRAILING', 'Bagud med mindst'], ['LEADING', 'Foran med mindst'], ['DRAW', 'Uafgjort'], ['ANY', 'Uanset stilling']];
 export const MARGINS = [1, 2, 3, 4, 5].map((n) => [String(n), `${n} mål`]);
 export const SKILL_LABELS = [
-  ['Fysik & luft', [['pace', 'Fart'], ['stamina', 'Udholdenhed'], ['strength', 'Styrke']]],
+  ['Fysik & luft', [['pace', 'Fart'], ['stamina', 'Udholdenhed'], ['strength', 'Styrke'], ['jumpingPower', 'Spring']]],   // Spring: p.jumpingPower (career.js skillOf)
   ['Teknik', [['ballControl', 'Boldkontrol'], ['passing', 'Pasning'], ['finishing', 'Afslutning']]],
   ['Taktik & defensiv', [['positioning', 'Positionering'], ['intercepting', 'Erobring'], ['goalkeeping', 'Målmandsspil']]],
 ];
