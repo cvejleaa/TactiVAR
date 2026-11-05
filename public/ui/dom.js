@@ -45,10 +45,11 @@ export function fold({ id, summary, open = false, cls = '', label = null }, ...b
   return d;
 }
 // "ⓘ Sådan virker det" (R1): én kort linje synlig, forklaringen bag ⓘ. long er et færdigt element (det beholder sin klasse/sit id, så
-// tekst-tjekkene læser det, også lukket). link er slottet til spilguiden (v3.33.0): { text, onClick }.
+// tekst-tjekkene læser det, også lukket). link er slottet til spilguiden (v3.33.0): { text, onClick }. label er emnet: skærmlæseren hører
+// "Sådan virker det – Fase 2" – navnet begynder med den synlige tekst (QC, WCAG 2.5.3: talestyring siger det, den ser).
 export function help({ id, short, long, label = null, link = null }) {
   return [short ? h('p', { class: 'muted help-short' }, short) : null,
-    fold({ id, summary: 'ⓘ Sådan virker det', cls: 'help-more', label }, long, link ? h('button', { class: 'linklike help-link', onclick: link.onClick }, link.text) : null)];
+    fold({ id, summary: 'ⓘ Sådan virker det', cls: 'help-more', label: label ? `Sådan virker det – ${label}` : null }, long, link ? h('button', { class: 'linklike help-link', onclick: link.onClick }, link.text) : null)];
 }
 // Brede tabeller (R4): hver .tablewrap får data-scroll="ja", når indholdet er bredere end rammen (så låses de opt-in stick-1/stick-2-
 // kolonner), og data-more="ja", så længe der er mere at rulle mod højre (fade i kanten, style.css). Den låste første kolonnes bredde

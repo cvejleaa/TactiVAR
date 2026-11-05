@@ -135,7 +135,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .mc-tabs { display: flex; flex-wrap: wrap; gap: .3rem; margin: .5rem 0; }
 .mc-tabs button.active { background: var(--aktiv); border-color: var(--aktiv); color: #fff; }
 .mc-pane { min-width: 0; }
-.mc-ft { font-size: var(--fs-2); margin: .2rem 0 .3rem; }   /* fuldtids-linjen: fast under stillingen, uanset fane (Spilfører UI) */
+.mc-ft { font-size: var(--fs-2); margin: .2rem 0 .3rem; } .mc-ft.ft-win { color: #4ade80; } .mc-ft.ft-loss { color: #f87171; } .mc-ft-tom { visibility: hidden; }   /* fuldtids-linjen: fast under stillingen, uanset fane (Spilfører UI) */
 .mc-more { margin-top: .75rem; } .mc-more > summary { cursor: pointer; color: var(--dæmpet); display: inline-flex; align-items: center; }
 .mc-more .mc-send { margin: .4rem 0; }
 /* Kampvælgeren på én linje (R2): ruller vandret med fade i kanten (.tablewrap) i stedet for fire knapper stablet (≈ 200 px på mobil) */
@@ -144,6 +144,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 @media (max-width: 600px) {
   #feed { scroll-margin-top: .5rem; scroll-margin-bottom: calc(57px + var(--bar-h, 0px) + .5rem); }
   .mc-tabs button { min-height: 44px; flex: 1 1 auto; }
+  .rp-controls button, #feed-filters button { min-height: 44px; }   /* Spilfører UI: ▶ og filtrene er handlingen – også 44 px */
 }
 .feed { max-height: 26rem; overflow-y: auto; font-size: var(--fs-1); }
 .ev { padding: .3rem 0; border-bottom: 1px solid var(--kant); } .ev-min { display: inline-block; width: 2.4rem; color: var(--dæmpet); font-family: ui-monospace, monospace; }

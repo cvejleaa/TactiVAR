@@ -282,13 +282,18 @@ const sentList = (sent) => (sent?.length ? fold({ id: 'sent-list', summary: `�
 export const MC_PANES = [['replay', '🎬 Afspilning & referat'], ['stats', '📊 Statistik'], ['players', '👥 Spillerne']];
 export const paneOf = (mc) => (MC_PANES.some(([k]) => k === mc.pane) ? mc.pane : MC_PANES[0][0]);
 // Fuldtids-linjen (Spilfører UI): resultatet og den ene vigtigste ting fra fuldtids-analysen (match.js) – fast under stillingen, uanset
-// fane. Kun i kampe med dit hold (analysen findes kun dér) og kun efter fløjtet.
+// fane. Kun i kampe med dit hold (analysen findes kun dér) og kun efter fløjtet. Den vigtigste ting er den taktiske dom – 3. sætning,
+// duelText: "Din opbygning kom igennem 5 af 12 gange; dit pres …" (Spilfører UI v3.32.1: boldbesiddelsen står under 📊 og sagde ikke,
+// om valgene virkede). Mangler den, boldbesiddelsen. Motorens egen tekst – ingen ny påstand.
 export function fullTimeLine(events) {
   const e = events.find((x) => x.type === 'FULLTIME' && typeof x.text === 'string' && x.text.includes('[FULDTIDS-ANALYSE]'));
   if (!e) return null;
-  const [res, poss] = e.text.replace(/^.*\[FULDTIDS-ANALYSE\]\s*/, '').split(/(?<=\.)\s+/);
-  return poss ? `${res} ${poss}` : res;
+  const [res, poss, duel] = e.text.replace(/^.*\[FULDTIDS-ANALYSE\]\s*/, '').split(/(?<=\.)\s+/);
+  const more = duel ?? poss;
+  return more ? `${res} ${more}` : res;
 }
+// Linjens farve følger udfaldet (fængende: en sejr skal ligne en sejr) – læst af resultatet, som motoren skrev det
+export const ftTone = (line) => (/^Sejr /.test(line) ? 'ft-win' : /^Nederlag /.test(line) ? 'ft-loss' : 'ft-draw');
 
 export function renderMatchCenter({ mc, myTeamId, on }) {
   const m = mc.matches[mc.viewIdx];
@@ -345,7 +350,9 @@ export function renderMatchCenter({ mc, myTeamId, on }) {
       h('div', { class: 'right' }, h('strong', {}, m.awayName), h('div', { class: 'muted' }, m.awayTacticStr))),
     timeline(shown, m.stoppage),
     last.varMsg && mc.playing ? h('div', { class: 'varbanner' }, `📺 VAR: ${last.varMsg}`) : null,
-    ft ? h('div', { class: 'mc-ft', id: 'mc-ft' }, `📊 ${ft}`) : null,
+    ft ? h('div', { class: `mc-ft ${ftTone(ft)}`, id: 'mc-ft' }, `📊 ${ft}`)
+      // Kampe uden dit hold har ingen analyse: en tom linje af samme højde, så fanerne ikke hopper ved kampskift (QC)
+      : after ? h('div', { class: 'mc-ft mc-ft-tom', 'aria-hidden': 'true' }, '\u00a0') : null,
     // Underfanerne (ikke .toolbar – den er referatets filterrække)
     after ? h('div', { class: 'mc-tabs', id: 'mc-tabs', role: 'group', 'aria-label': 'Kampens visninger' }, MC_PANES.map(([k, l]) => h('button', { class: 'mini' + (k === pane ? ' active' : ''), id: `mc-tab-${k}`, 'aria-pressed': k === pane ? 'true' : 'false', onclick: () => on.pane?.(k) }, l))) : null,
     // Under afspilning som før: referat | statistik. Efter fløjtet: den valgte fane – afspilning og referat side om side på ≥ 900 px

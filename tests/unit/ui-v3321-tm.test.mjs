@@ -19,7 +19,7 @@ globalThis.Node = FakeNode;
 globalThis.document = { createElement: (t) => new FakeEl(t), createTextNode: (t) => new FakeText(t) };
 
 const { fold, markScrollable, remarkScrollable } = await import('../../public/ui/dom.js');
-const { renderMatchCenter, fullTimeLine } = await import('../../public/ui/matchcenter.js');
+const { renderMatchCenter, fullTimeLine, ftTone } = await import('../../public/ui/matchcenter.js');
 const { renderMatrix, COLUMNS } = await import('../../public/ui/matrix.js');
 const { renderTrainingTable } = await import('../../public/ui/training.js');
 const { clearReplays } = await import('../../public/ui/replay.js');
@@ -157,9 +157,11 @@ test('statistik-fanen viser kampens egne tal – hjemme i 1. kolonne, ude i 3. (
   assert.equal(Object.keys(rows).length, 14);
 });
 
-test('fuldtids-linjen: kun "<resultat>. <boldbesiddelse>." – bundet til FULLTIME-hændelsen og analysens to første sætninger', () => {
-  const text = '📊 [FULDTIDS-ANALYSE] Sejr 2-1 til dig. Du havde 55% af bolden og 7 afslutninger. Dødbolde: 3 hjørnespark. Slut.';
-  assert.equal(fullTimeLine([{ type: 'GOAL', text: 'x' }, { type: 'FULLTIME', text }]), 'Sejr 2-1 til dig. Du havde 55% af bolden og 7 afslutninger.');
+test('fuldtids-linjen: "<resultat>. <taktisk dom>." (3. sætning) – ellers boldbesiddelsen; bundet til FULLTIME-hændelsen', () => {
+  const text = '📊 [FULDTIDS-ANALYSE] Sejr 2-1 til dig. Du havde 55% af bolden og 7 afslutninger. Din opbygning kom igennem 5 af 12 gange; dit pres vandt bolden 2 af 4 gange. Dødbolde: 3 hjørnespark. Slut.';
+  assert.equal(fullTimeLine([{ type: 'GOAL', text: 'x' }, { type: 'FULLTIME', text }]), 'Sejr 2-1 til dig. Din opbygning kom igennem 5 af 12 gange; dit pres vandt bolden 2 af 4 gange.');
+  assert.equal(fullTimeLine([{ type: 'FULLTIME', text: '📊 [FULDTIDS-ANALYSE] Nederlag 0-1. Du havde 40% af bolden.' }]), 'Nederlag 0-1. Du havde 40% af bolden.', 'uden dom: boldbesiddelsen');
+  assert.deepEqual(['Sejr 2-1 til dig.', 'Nederlag 0-1.', 'Uafgjort 1-1.'].map(ftTone), ['ft-win', 'ft-loss', 'ft-draw']);
   assert.equal(fullTimeLine([{ type: 'FULLTIME', text: '📊 [FULDTIDS-ANALYSE] Uafgjort 0-0.' }]), 'Uafgjort 0-0.', 'kun én sætning: ingen hængende mellemrum');
   assert.equal(fullTimeLine([{ type: 'GOAL', text }]), null, 'kun FULLTIME-hændelsen tæller');
   assert.equal(fullTimeLine([{ type: 'FULLTIME', text: 'Slutfløjt' }]), null, 'uden analyse-mærket ingen linje');

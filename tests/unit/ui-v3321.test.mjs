@@ -51,10 +51,10 @@ test('fold: husker åben OG lukket over gentegning (pr. id) – et standard-åbe
 
 test('help: kort linje synlig + "ⓘ Sådan virker det" med aria-label – det lange element står uændret (klasse/id) inde i foldet, og linket er slottet til guiden', () => {
   const long = document.createElement('p'); long.className = 'muted phase-help'; long.textContent = 'Den lange forklaring';
-  const [short, more] = help({ id: 'u-help', short: 'Kort linje', long, label: 'Sådan virker Fase 9' });
+  const [short, more] = help({ id: 'u-help', short: 'Kort linje', long, label: 'Fase 9' });
   assert.equal(short.className, 'muted help-short'); assert.equal(short.textContent, 'Kort linje');
   assert.equal(more.tag, 'details'); assert.equal(more.className, 'help-more'); assert.equal(more.attrs.id, 'u-help');
-  assert.equal(more.children[0].textContent, 'ⓘ Sådan virker det'); assert.equal(more.children[0].attrs['aria-label'], 'Sådan virker Fase 9');
+  assert.equal(more.children[0].textContent, 'ⓘ Sådan virker det'); assert.equal(more.children[0].attrs['aria-label'], 'Sådan virker det – Fase 9');   // navnet begynder med den synlige tekst (WCAG 2.5.3)
   assert.equal(more.children[1], long); assert.equal(isOpen(more), false);
   assert.equal(more.children.length, 2, 'intet link uden link');
   const withLink = help({ id: 'u-help2', short: '', long, link: { text: '📖 Læs mere i guiden ›', onClick: () => {} } });
@@ -156,22 +156,29 @@ test('under live-afspilning: ingen faner, ingen fuldtids-linje og intet "⋯ Mer
   assert.equal(byId(live, 'mc-main')[0].className, 'mc-grid');
 });
 
-test('fuldtids-linjen: resultatet og boldbesiddelsen fra fuldtids-analysen – fast i alle tre faner, kun i din kamp, uden resten af analysen', () => {
+test('fuldtids-linjen: resultatet og den taktiske dom (duelText) fra fuldtids-analysen – fast i alle tre faner, kun i din kamp, uden resten af analysen', () => {
   const { me, m, other } = played();
   const ft = m.events.find((e) => e.type === 'FULLTIME').text;
-  const [res, poss] = ft.replace(/^📊 \[FULDTIDS-ANALYSE\] /, '').split('. ');
+  const [res] = ft.replace(/^📊 \[FULDTIDS-ANALYSE\] /, '').split('. ');
   assert.match(res, /^(Sejr \d+-\d+ til dig|Nederlag \d+-\d+|Uafgjort \d+-\d+)$/);
-  const want = `${res}. ${poss}.`;
-  assert.equal(fullTimeLine(m.events), want);
-  assert.match(want, /Du havde \d+% af bolden og \d+ afslutning/);
+  const want = fullTimeLine(m.events);
+  assert.ok(want.startsWith(`${res}. `), want);
+  // den taktiske dom – og IKKE boldbesiddelsen (v3.32.1-udkastet viste "Du havde 47% af bolden …")
+  assert.match(want, /(Din opbygning (kom|er kommet) igennem \d+ af|Dit pres (vandt|stoppede))/);
+  assert.ok(!want.includes('af bolden') && !want.includes('Dødbolde'), want);
+  const tone = /^Sejr/.test(res) ? 'ft-win' : /^Nederlag/.test(res) ? 'ft-loss' : 'ft-draw';
   for (const k of ['replay', 'stats', 'players']) {
     const line = byId(draw(m, me, { pane: k }), 'mc-ft');
-    assert.equal(line.length, 1, k); assert.equal(line[0].textContent, `📊 ${want}`);
+    assert.equal(line.length, 1, k); assert.equal(line[0].textContent, `📊 ${want}`); assert.equal(line[0].className, `mc-ft ${tone}`, k);
     assert.ok(!line[0].textContent.includes('Dødbolde') && !line[0].textContent.includes('[FULDTIDS-ANALYSE]'), 'kun den korte linje');
   }
-  // en kamp uden dit hold har ingen analyse – og ingen linje
+  // en kamp uden dit hold har ingen analyse – og ingen linje, men en usynlig pladsholder af samme højde (fanerne hopper ikke, QC)
   assert.equal(fullTimeLine(other.events), null);
-  assert.equal(byId(draw(other, me, {}), 'mc-ft').length, 0);
+  const o = draw(other, me, {});
+  assert.equal(byId(o, 'mc-ft').length, 0);
+  const all = []; (function walk(n) { if (n && typeof n === 'object') { all.push(n); (n.children || []).forEach(walk); } })(o);
+  const ph = all.filter((n) => typeof n.className === 'string' && n.className.split(' ').includes('mc-ft-tom'));
+  assert.equal(ph.length, 1); assert.equal(ph[0].attrs['aria-hidden'], 'true');
 });
 
 test('"⋯ Mere": send-boksen og listen over sendte kampe er foldet ind nederst – ikke ved overskriften', () => {
@@ -202,7 +209,7 @@ test('Taktik: præcis 5 "ⓘ Sådan virker det" (3 faser, Hvis-Så, udskiftninge
   const more = all(root, (e) => e.tag === 'details' && hasCls(e, 'help-more'));
   assert.equal(more.length, 5);
   assert.deepEqual(more.map((d) => d.attrs.id), ['help-phase1_buildUp', 'help-phase2_defending', 'help-phase3_transition', 'help-rules', 'help-subs']);
-  assert.deepEqual(more.map((d) => d.children[0].attrs['aria-label']), ['Sådan virker Fase 1', 'Sådan virker Fase 2', 'Sådan virker Fase 3', 'Sådan virker Hvis-Så-reglerne', 'Sådan virker udskiftningerne']);
+  assert.deepEqual(more.map((d) => d.children[0].attrs['aria-label']), ['Sådan virker det – Fase 1', 'Sådan virker det – Fase 2', 'Sådan virker det – Fase 3', 'Sådan virker det – Hvis-Så-reglerne', 'Sådan virker det – udskiftningerne']);
   assert.ok(more.every((d) => !isOpen(d)), 'lukket fra start');
   // det lange står INDE i foldet (ikke ved siden af) – og intet .phase-help/#subs-help uden for et fold
   const phaseHelp = all(root, (e) => hasCls(e, 'phase-help'));

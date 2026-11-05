@@ -1753,7 +1753,7 @@ try {
         longTxt: document.querySelector('#tactics fieldset[data-phase="phase1_buildUp"] .phase-help')?.textContent ?? '', shorts };
     });
     check('R1 Taktik (390): præcis 5 "ⓘ Sådan virker det" – alle lukket, navngivet (Fase 1–3, Hvis-Så, udskiftninger), summary ≥ 44 px høj', r1.n === 5 && r1.open === 0
-      && JSON.stringify(r1.labels) === JSON.stringify(['Sådan virker Fase 1', 'Sådan virker Fase 2', 'Sådan virker Fase 3', 'Sådan virker Hvis-Så-reglerne', 'Sådan virker udskiftningerne']) && r1.sumH.every((x) => x >= 44), JSON.stringify(r1.labels) + ' ' + r1.sumH);
+      && JSON.stringify(r1.labels) === JSON.stringify(['Sådan virker det – Fase 1', 'Sådan virker det – Fase 2', 'Sådan virker det – Fase 3', 'Sådan virker det – Hvis-Så-reglerne', 'Sådan virker det – udskiftningerne']) && r1.sumH.every((x) => x >= 44), JSON.stringify(r1.labels) + ' ' + r1.sumH);
     check('R1 Taktik (390): de lange forklaringer står IKKE på skærmen, men findes (indholdet intakt) – og hver kort linje står på én linje', r1.longVisible === 0 && r1.longN === 3 && r1.longTxt.startsWith('Angrebsfokus bestemmer') && r1.shorts.length === 5 && r1.shorts.every((x) => x.lines === 1 && x.t.length > 20), JSON.stringify(r1.shorts));
     const wid = await p.evaluate(() => [...document.querySelectorAll('#tactics fieldset.phase')].map((f) => { const fw = f.getBoundingClientRect().width, s = f.querySelector('.help-short'), d = f.querySelector('details.help-more');
       return s && d ? [Math.round(s.getBoundingClientRect().width / fw * 100), Math.round(d.getBoundingClientRect().width / fw * 100)] : null; }).filter(Boolean));
@@ -1868,9 +1868,15 @@ try {
     const chips = await p.evaluate(() => { const cs = [...document.querySelectorAll('#match-cards .matchcard')].map((x) => Math.round(x.getBoundingClientRect().top)), w = document.querySelector('#match-cards').closest('.tablewrap'); return { tops: cs, more: w.dataset.more ?? null, mine: document.querySelector('#match-cards .matchcard').classList.contains('active') }; });
     check('R2 kampvælgeren (390): én linje (4 kampe, samme top), rullelig med fade – din kamp forrest og valgt', chips.tops.length === 4 && new Set(chips.tops).size === 1 && chips.more === 'ja' && chips.mine, JSON.stringify(chips));
     // Test Manager: 44 px-flader på Kamp (390) – underfanerne, "⋯ Mere" og "ⓘ Om tavlen"; på computeren er "⋯ Mere" lav (< 36 px)
-    const tap = () => p.evaluate(() => { const hh = (s) => Math.round(document.querySelector(s).getBoundingClientRect().height); return { tabs: [...document.querySelectorAll('#mc-tabs button')].map((b) => Math.round(b.getBoundingClientRect().height)), more: hh('#mc-more > summary'), tavle: hh('#replay-help > summary') }; });
+    const tap = () => p.evaluate(() => { const hh = (s) => Math.round(document.querySelector(s).getBoundingClientRect().height); return { tabs: [...document.querySelectorAll('#mc-tabs button')].map((b) => Math.round(b.getBoundingClientRect().height)), more: hh('#mc-more > summary'), tavle: hh('#replay-help > summary'), play: hh('#rp-play'), filters: [...document.querySelectorAll('#feed-filters button')].map((b) => Math.round(b.getBoundingClientRect().height)),
+      ft: (() => { const f = document.querySelector('#mc-ft'); return f ? { cls: f.className, color: getComputedStyle(f).color, parent: getComputedStyle(f.parentElement).color } : null; })() }; });
     const tap390 = await tap();
     check('Kamp (390) TM: underfanerne, "⋯ Mere" og "ⓘ Om tavlen" er mindst 44 px høje', tap390.tabs.length === 3 && tap390.tabs.every((x) => x >= 44) && tap390.more >= 44 && tap390.tavle >= 44, JSON.stringify(tap390));
+    // Spilfører UI (v3.32.1): ▶ Afspil og referatets filtre er selve handlingen – også 44 px (før 23 px)
+    check('Kamp (390): ▶ Afspil og referatets filtre er mindst 44 px høje', tap390.play >= 44 && tap390.filters.length >= 3 && tap390.filters.every((x) => x >= 44), JSON.stringify(tap390));
+    // Fuldtids-linjen farves efter udfaldet: sejr grøn (#4ade80), nederlag rød (#f87171), uafgjort som teksten omkring
+    const ftCol = { 'mc-ft ft-win': 'rgb(74, 222, 128)', 'mc-ft ft-loss': 'rgb(248, 113, 113)' };
+    check('Kamp: fuldtids-linjen har udfaldets farve (sejr grøn, nederlag rød, uafgjort neutral)', !!tap390.ft && (ftCol[tap390.ft.cls] ? tap390.ft.color === ftCol[tap390.ft.cls] : tap390.ft.cls === 'mc-ft ft-draw' && tap390.ft.color === tap390.ft.parent), JSON.stringify(tap390.ft));
     const head390 = await p.evaluate(() => { const one = (e) => !!e && e.getBoundingClientRect().height < parseFloat(getComputedStyle(e).fontSize) * 1.9;
       return { link: document.querySelector('.to-home #kamp-paper-link') ? one(document.querySelector('.to-home #kamp-paper-link')) : null, muted: [...document.querySelectorAll('#scoreboard > div:not(.score) > .muted')].map(one),
         rpTitle: getComputedStyle(document.querySelector('#replay .rp-head > strong')).display, tabRows: new Set([...document.querySelectorAll('#mc-tabs > button')].map((b) => Math.round(b.getBoundingClientRect().top))).size }; });
@@ -1884,7 +1890,7 @@ try {
     check('Kamp (390) TM: den aktive underfane er farvet anderledes end de to andre', tabBg.length === 3 && tabBg[1] === tabBg[2] && tabBg[0] !== tabBg[1], tabBg.join(' | '));
     await size(1366, 768);
     const tap1366 = await tap();
-    check('Kamp (1366) TM: 44 px-reglen lækker ikke til computeren – "⋯ Mere", "ⓘ Om tavlen" og fanerne er lavere end 36 px', tap1366.more < 36 && tap1366.tavle < 36 && tap1366.tabs.every((x) => x < 36), JSON.stringify(tap1366));
+    check('Kamp (1366) TM: 44 px-reglen lækker ikke til computeren – "⋯ Mere", "ⓘ Om tavlen" og fanerne er lavere end 36 px', tap1366.more < 36 && tap1366.tavle < 36 && tap1366.tabs.every((x) => x < 36) && tap1366.play < 36 && tap1366.filters.every((x) => x < 36), JSON.stringify(tap1366));
     // Test Manager: afspilning og referat side om side fra 901 px, under hinanden til og med 899 px (breakpointet er 900)
     const gridAt = async (w) => { await size(w, 900); return p.evaluate(() => { const r = document.querySelector('#replay').getBoundingClientRect(), f = document.querySelector('#feed').getBoundingClientRect(); return { side: f.left >= r.right - 1 && f.top < r.bottom, stacked: f.top >= r.bottom - 1 }; }); };
     const g899 = await gridAt(899), g901 = await gridAt(901);
@@ -1895,7 +1901,7 @@ try {
     check('R2 banen TM: gulv 16 rem = 256 px høj og 174 px bred ved 844×390 (liggende telefon), loft 32 rem = 512 px høj og 348 px bred ved 1366×1000', pl.h === 256 && Math.abs(pl.w - 174) <= 1 && pt.h === 512 && Math.abs(pt.w - 348) <= 1, JSON.stringify({ pl, pt }));
     await size(390, 844); await p.evaluate(() => window.scrollTo(0, 0));
     // Fuldtids-linjen: de to første sætninger af fuldtids-analysen – fast under stillingen i alle tre faner
-    const ftWant = await p.evaluate(() => { const d = JSON.parse(localStorage.getItem('tactivar_save')), m = d.league.lastRound.matches[0]; return '📊 ' + m.events.find((e) => e.type === 'FULLTIME').text.replace(/^📊 \[FULDTIDS-ANALYSE\] /, '').split('. ').slice(0, 2).join('. ') + '.'; });
+    const ftWant = await p.evaluate(() => { const d = JSON.parse(localStorage.getItem('tactivar_save')), m = d.league.lastRound.matches[0], t = m.events.find((e) => e.type === 'FULLTIME').text.replace(/^📊 \[FULDTIDS-ANALYSE\] /, '').split(/(?<=\.)\s+/); return `📊 ${t[0]} ${t[2] ?? t[1]}`; });   // resultatet + den taktiske dom (3. sætning)
     const ft = {};
     // R3: hver fane viser KUN sit; fokus på fane-knappen bagefter (tastatur); fanen bevares ved skift af kamp
     const shows = () => p.evaluate(() => ({ feed: document.querySelectorAll('#feed').length, replay: document.querySelectorAll('#replay').length, stats: document.querySelectorAll('#match-stats').length, ratings: document.querySelectorAll('.ratings').length, legend: document.querySelectorAll('#icon-legend').length,

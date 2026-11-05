@@ -23,6 +23,14 @@ Rangering: brugerens ønsker først, derefter værdi pr. størrelse. Første run
    ("Lynkontra: flere kontraer", "Lav blok: flere luftdueller, plads til cutbacks") i stedet for/ud over fasens faste korte linje. Teksterne
    skal godkendes af Motor-Spilføreren (de må ikke love mere, end motoren gør – fx "Ekstrem = Normal"). Bygger på `help()` (ui/dom.js).
    Taktik er stadig 3117 px ved 390 og 1817 ved 1366 efter v3.32.1 – resten tages med Taktik-underfanerne (nr. 0, F4).
+0f. **Kamp/Taktik efter v3.32.1 (Spilfører UI + QC på v3.32.1)** · UI · S hver · 3–4 ·
+   - Banen skæres af bundbjælken på første skærm: ved 1366×900 er 161 px skjult (bane 528–1012, bjælke fra 851), ved 390 er kun 122 af
+     428 px synlige. Formlen `clamp(16rem, 100svh - 26rem, 32rem)` (style.css .rp-pitch) regner med en top ved 26rem; den er 33–38rem.
+     Afvejning: en mindre bane (16rem-gulvet) mod en hel bane – afgøres med Spilfører UI, og e2e skal så måle `pitch.bottom ≤ bar.top`.
+   - Taktik: tre forklaringer står stadig åbne (hjælpen under banen, `#list-help`, `#fit-help` – ca. 210 px ved 390) – bag samme `help()`-ⓘ.
+   - Afspilningen starter på 0' med en tom tavle: lad ⭐ Højdepunkter stå som det foreslåede næste skridt, når kampen har mål (replay.js).
+   - Pladsen står to gange ved 390, når kun navnet er låst (matrix.js), og Kamps karakterark (`.ratings`) toner ikke ud som de andre brede
+     tabeller (hører til F5).
 0d. **📖 Spilguide (brugeren 2026-11-03: "ingen steder hvor vi har en hjælp til spillet … ala den jeg uploadede fra Hattrick")** · UI · M · 5 ·
    brugerens valg: én side "📖 Sådan virker spillet" under ⚙ med afsnit pr. del (kampen, taktik, træning og udvikling, arketyper,
    samspil, form og udelukkelse, økonomi og transfers, sæsonen) skrevet ud fra reglerne i koden (spec.md ⇄ kode), og et lille "?"

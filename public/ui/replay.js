@@ -120,7 +120,7 @@ export function replayEl(m, ownSide) {
   // v3.32.1 (R2, designkritikken: "afspilningen ligger under folden"): knapperne OVER banen, så teksten, så banen – og intro-teksten bag ⓘ
   const el = h('div', { class: 'replay', id: 'replay' },
     h('div', { class: 'row rp-head' }, h('strong', {}, '🎬 Afspilning'),
-      fold({ id: 'replay-help', summary: 'ⓘ Om tavlen', cls: 'rp-help', label: 'Om afspilningen' },
+      fold({ id: 'replay-help', summary: 'ⓘ Om tavlen', cls: 'rp-help', label: 'Om tavlen – afspilningen' },
         h('span', { class: 'muted' }, `Taktiktavle ud fra ${m.trace.frames.length} øjebliksbilleder (hvert 3. minut) og afslutningerne i åbent spil (dødbolde – straffe, frispark, hjørnespark – har intet billede). ${flip ? m.awayName : m.homeName} angriber opad.`))),
     h('div', { class: 'rp-controls' },
       h('button', { class: 'mini', id: 'rp-prev', title: 'Et trin tilbage', onclick: () => { pause(); r.i = Math.max(0, r.i - 1); show(); } }, '⏮'),
