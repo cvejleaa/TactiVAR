@@ -40,5 +40,58 @@
 - Målingen viser, at en ung spiller på Fysik kan gå fra 13 til 14 i Spring inden for en sæson eller to, og at luftduel-balancen mellem holdene (myVsBots) ligger inden for ±0,05.
 - Live: Tobias' kort viser Spring-bjælken og "Spring 13/14 – trænes med Fysik".
 
+## RETTET efter Arkitekt, Spilfører klub og QC (opus) – afløser planen ovenfor, hvor de er uenige
+**Rate:** Fysik beholder **0,07**. Raten gælder PR. EVNE (season.js:117), så Fart og Styrke går præcis som i dag, og Fysik giver
+nu tre evner (samlet 0,21 – det største fokus, betalt med friskhed −4 og skaderisiko 0,007). Det skrives i spec §5.
+Målt (klub): 17–23-årige går fra Spring 13 til 14 på median 18 runder, 92 % inden for to sæsoner (0,0467 ville give 54 %).
+
+**Hvad der IKKE bygges:**
+- Spring kommer IKKE i `p.skills`, `KEY_SKILLS`, potentiale/loft (roomOf/keyAvg) eller `seasonGrowth`.
+- Ingen bot-træning af Spring.
+- Ingen sanitize- eller migreringskode. `dev` har ingen whitelist (sanitize.js:103); det tjekkes med et fixture fra v3.31.2.
+- Ingen ny aerialPower-genberegning. `afterSkillChange` (season.js:95) kaldes allerede via `onSkill`.
+
+**Delopgaver (Arkitekten):**
+- **D1 Motor:**
+  - `skillOf(p, k)` og `setSkill(p, k, v)` i career.js, brugt i `addXp`, `trainingEstimate` og generator.js:160.
+  - `FOCUS.PHYSICAL.skills = ['pace', 'strength', 'jumpingPower']` med rate 0,07.
+  - `focusOfSkill(k)`: første fokus, der ikke er Alsidig og har evnen.
+- **D2 Måling:** `tools/measure-jump.mjs` bygget på measure-lifecycle's løkke.
+  - Mål før og efter med en profil, hvor alle på dit hold til og med 25 år træner Fysik.
+  - Tal: Spring-fordeling, aerialPower mig mod botter, hovedstødsmål pr. kamp og antal oplåste Luftens Konge/Fyrtårn efter 0, 1, 3 og 5 sæsoner.
+  - Båndet skrives med begge tal, så den gamle værdi giver rødt. Klub målte 1,033 → 1,064.
+  - myVsBots kan ikke se Spring og bruges IKKE som mål.
+- **D3 UI:**
+  - `['jumpingPower', 'Spring']` i `SKILL_LABELS` "Fysik & luft" (labels.js:38). Så kommer `SKILL_NAME` med automatisk: rapport, gainWords, "nærmest et +1" og Trup-mærket. Særtilfældet i labels.js:23 fjernes.
+  - Kortets bjælke: `bar(l, skillOf(p, k))` (card.js:36).
+  - Træning:
+    - `SHORT.jumpingPower = 'SPR'`.
+    - Hvert fokusvalg viser sine evner fra `FOCUS[k].skills`, fx "Fysik – Fart, Styrke, Spring" (training.js:60/68).
+  - Trup:
+    - Spring-kolonnen (key 'jump' beholdes) får "+N"-mærket for 'jumpingPower'. matrix-gain-v3300.test.mjs:61–63 vendes.
+    - Arketypecellen (matrix.js:118) får title med kravteksten.
+  - Gns-kolonnens title: "Spring tæller ikke med".
+- **D3 Kravteksten** `archReqText(a, p)` (labels.js). Kun ejerens spiller (vagterne card.js:32, lineup-list.js:49 og matrix):
+  - Format: "Låses op ved: Styrke 13/13 ✓ · Spring 13/14 – trænes med Fysik".
+  - Opfyldt krav: "Navn nu/krav ✓", uden fokus.
+  - Træner han fokusset i forvejen: "– trænes med Fysik (det gør han nu)".
+  - To mangler med samme fokus: "Styrke 12/13 · Spring 13/14 – begge trænes med Fysik".
+  - Paritetstest: hver `unlockReq`-nøgle i alle ARCHETYPES har et fokus.
+- **D4:**
+  - Fixture `tests/fixtures/save-v3.31.2.json` (lavet med 3ad5949) og en indlæsningstest med `dev.jumpingPower`.
+  - Spec §2, §5 og §13 (Spring trænes med Fysik og indgår ikke i nøglesnit eller Gns), NEWS, version 3.32.0 og backlog 0c → Lavet.
+  - Ret de forventede tekster i e2e run.mjs:1182 (9 → 10 bjælker) og dansk-kort-v3311.test.mjs:41/45.
+- **D5 Aldersfald, egen commit i samme PR:**
+  - 'jumpingPower' i tier 2 sammen med 'strength' (career.js:221). `declineSkills` og `trainedSkills` læser via skillOf/setSkill. Faldet halveres for den, der træner Fysik.
+  - Det er den ENESTE del, der må flytte golden-hashes over sæsoner. Ændringen forklares i testen.
+  - Kør D2 og lifecycle-båndene igen.
+
+**Golden:** D1–D4 må IKKE flytte nogen hash, fordi en frisk liga kun bruger Alsidig. Flytter en sig, er det en fejl.
+
+**Efterprøv på Tobias' profil, ikke snittet:**
+- `roomOf` klemmes til mindst 0,1, så en spiller tæt på sit loft får ca. 0,007/runde, altså over 100 runder.
+- Kravteksten bruger `nextText`, når han træner fokusset: "(går langsomt: tæt på sit loft)".
+- D2 måler også en 24–27-årig tæt på loftet.
+
 ---
 Tidligere planer: [tidligere-planer.md](tidligere-planer.md)
