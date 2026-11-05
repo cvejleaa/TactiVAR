@@ -1119,8 +1119,8 @@ Målt (`node tools/measure-ui.mjs`, efter én runde, før → efter): 1366 px Tr
 Hjem (ny) 900; 390 px Trup 2941 → 2928, Taktik 4598 → 4661, Liga 4169 → 4208, Hjem (ny) 938 (Kamp varierer med runden). Mobil
 Taktik (e2e, 390 × 844, 3 advarsler): fast chrome 137 px (sticky topbar) → 118 px (bjælke 61 + navigation 57), indholdshøjde
 mellem bjælkerne 707 → 726 px (682 med scout-bjælken). e2e vagter: chrome ≤ 130, indhold ≥ 650, nav ≥ 44 px.
-- **Trup** (v3.19.0; v3.28.0 klubhovedet til Hjem – her en kort linje "X – dit hold", en modstander med 🔒 kasse og 💼 Klubside): "Klik på en
-  spiller for at åbne spillerkortet" (`#trup-help`) og regnearket (med 💰 Værdi og Løn/rd sidst; ingen byt-knapper). Et klik på en række
+- **Trup** (v3.19.0; v3.28.0 klubhovedet til Hjem – her en kort linje "X – dit hold", en modstander med 🔒 kasse og 💼 Klubside): "Vælg en
+  spiller for at åbne spillerkortet" (`#trup-help`; v3.32.1 "Vælg" – neutralt for mus og finger, før "Klik") og regnearket (med 💰 Værdi og Løn/rd sidst; ingen byt-knapper). Et klik på en række
   åbner kortpanelet (eller skifter spiller i det). v3.30.0: træningsoversigten og rundens opsamling er flyttet til 🏋️ Træning.
   **"+N" (v3.30.0, brugerens ønske "markér sidste rundes +1"):** en evne, der steg efter sidste runde (træning OG kamp-xp – rapporten
   `league.trainingReport[mit id].gains`), får et lille hævet mærke "+N" (N = antal +1 i den evne; `td.gain` med `data-gain`, tegnet som
@@ -1148,6 +1148,13 @@ mellem bjælkerne 707 → 726 px (682 med scout-bjælken). e2e vagter: chrome �
   smal skærm bane, liste, indstillinger). Ingen tabel har egen lodret rulning (v3.20.1) – siden ruller, og dens position bevares, når den
   tegnes om (eneste undtagelse: kortpanelet herunder). Ét byt-valg (actions.js `swapKind`/`pickForSwap`) på banen og i listen; beskeden
   står ved listen – på smal skærm (≤ 900 px), mens et byt er i gang, fast over Spil-bjælken (`.pick-live`).
+  **ⓘ Sådan virker det (v3.32.1, R1 – designkritikken 5/11: "forklaringstekst kvæler kontrollerne"):** under hver af de tre faser, Hvis-Så
+  og Udskiftninger står én kort linje (`.help-short`, højst ca. 48 tegn – målt én linje ved 390 px; `tactics.js` `PHASE_SHORT`/
+  `RULES_SHORT`) og den lange forklaring bag "ⓘ Sådan virker det" (`details.help-more`, id `help-<fase>`/`help-rules`/`help-subs`,
+  `aria-label` "Sådan virker Fase 2" osv., summary ≥ 44 px ved ≤ 600 px) – præcis 5 på Taktik. De lange elementer beholder klasse/id
+  (`.phase-help`, `#subs-help`). Fælles hjælpere i `ui/dom.js`: `fold()` (husker åben OG lukket pr. id over gentegning i et modul-Map –
+  ved klikket på summary, ikke i `toggle`, som Chromium sender forsinket) og `help({ id, short, long, label, link })` (link = slottet til
+  spilguiden, v3.33.0). Statistikkens fire sektioner, "Hele programmet", "Tidligere sæsoner" og "📤 Sendte kampe" bruger samme `fold()`.
 - **Kortpanelet** (v3.29.0, UI-ombygningen F2 – brugerens valg 2026-11-02): spillerkortet står ÉT sted, `#cardpanel` (fast i index.html
   ved siden af `#playbar`, uden for `main#app`; `role="dialog"`, ikke-modalt, navngivet af kortets egen h3 `#card-title`, der er skjult i
   panelet), kun på Trup og Taktik. Tilstanden er `view.card = { pid, teamIdx, tab, … }` (gemmes ikke – panelet starter altid lukket),
@@ -1206,6 +1213,37 @@ mellem bjælkerne 707 → 726 px (682 med scout-bjælken). e2e vagter: chrome �
   Målt v3.31.0 (`node tools/measure-ui.mjs`, efter én runde, før → efter, ca. – ligaen er tilfældig): 1366 px Kamp 3267 → 2629
   (knapper 37 → 32, ord 2211 → 1760, skriftstørrelser 6 → 5), Liga 2681 → 2639, Hjem 900 → 900 (= skærmen; ord 99 → 128); 390 px
   Kamp 5895 → 4994, Liga 4095 → 4199, Hjem 1011 → 1107. e2e: blokken `f3` (kan køres alene med `F3_ONLY=1`).
+  **v3.32.1 (R2/R3, designkritikken 5/11 + QC og Spilfører UI):** Match Center efter fløjtet: overskrift · kampvælgeren på ÉN linje
+  (`.tablewrap.cards-wrap` – ruller vandret med fade; din kamp er rundens første) · stillingen · tidslinjen · **fuldtids-linjen** `#mc-ft`
+  (fuldtids-analysens to første sætninger: "📊 Sejr 2-1 til dig. Du havde 55% af bolden og 12 afslutninger (5 på mål)." – kun i kampe med
+  dit hold, fast i alle faner) · **tre underfaner** `#mc-tabs` (`#mc-tab-replay` "🎬 Afspilning & referat" | `#mc-tab-stats` "📊 Statistik" |
+  `#mc-tab-players` "👥 Spillerne"; `button.mini.active` + `aria-pressed`, IKKE `.toolbar` – referatets filterrække er `#feed-filters`) ·
+  den valgte fane alene (`#mc-main`) · "⋯ Mere" (`#mc-more`, lukket) med "📤 Send kampen" og "📤 Sendte kampe" (id'erne uændrede). Fanen
+  er `mc.pane` (app.js – ikke i gemmet; ukendt/undefined = første, `matchcenter.js paneOf`), bevares ved skift af kamp, og fokus står
+  på fane-knappen bagefter. 🎬 Afspilning & referat: tavlen til venstre og referatet til højre (`.mc-grid.after`, areas "replay feed")
+  ≥ 900 px, under 900 px referatet under tavlen. 📊: `#match-stats` (`table-layout: fixed`, passer ved 390). 👥: karakterarkene side om
+  side med opstillingerne, heat maps, 📍-billedet og ikon-forklaringen – 📍 i referatet skifter hertil. Under live-afspilning: ingen faner,
+  ingen fuldtids-linje, intet "⋯ Mere" (referat | statistik som før). **Afspilningen:** "🎬 Afspilning" + "ⓘ Om tavlen" (intro-teksten,
+  `#replay-help`) · knapperne (`.rp-controls`) · teksten (`#rp-caption`) · banen; banens højde `clamp(16rem, 100svh − 26rem, 32rem)`
+  (bredden følger: 428 / 352 / 484 px høj ved 390×844 / 1366×768 / 1366×900). **openReport** (app.js) er fælles indgang for Hjems "Se
+  kampen ›", Ligas resultater, avisens kampoverskrifter og kortets 📺: altid første fane med netop den kamp; "Referat"-linkene ruller
+  `#feed` frem (`block: 'nearest'`, `scroll-margin` over bjælkerne), "Se kampen ›" lander øverst med ▶ på første skærm. e2e (blokken
+  "v3.32.1"): ▶ Afspil over Spil-bjælken og banen ≥ 200 px over bunden ved 390×844, 1366×768 og 1366×900 og via Hjem; knapper → tekst
+  → bane; hver fane viser kun sit.
+  Målt v3.32.1 (`node tools/measure-ui.mjs`, efter én runde, før → efter, ca.): 1366 px Kamp 2702 → 1169 (ord 1972 → 1043), 390 px Kamp
+  5095 → 1760 (ord 2170 → 1126, knapper 37 → 29); ▶ Afspil (`#rp-play`, bund) efter fløjtet 1230 → 583 (390×844, bjælken ved 726), 1036 → 472
+  (1366×768), 1043 → 479 (1366×900). Taktik 1994 → 1817 (1366) og 3777 → 3117 (390; ord 1070 → 651 og 1057 → 643) – banen og listen
+  over faserne står uændret (ca. 1.800 px ved 390), så målet ≤ 2600 / ≤ 1500 nås først med Taktik-underfanerne (F4).
+- **Brede tabeller og berøringsflader (v3.32.1, R4/R5):** ÉN regel `.tablewrap` (`.tablewrap-x` er væk; Liga-tabellen og statistikken
+  bruger den også). `markScrollable` (ui/dom.js – kaldt til sidst i `render()` efter kortpanelet, i `renderMc`, ved `resize` og når et
+  fold skifter) sætter `data-scroll="ja"`, når tabellen er bredere end rammen, og `data-more="ja"`, så længe der er mere til højre: kanten
+  toner ud med `mask-image` (ikke inset-skygge – den skjules af celler med baggrund). Låste kolonner er opt-in: `stick-1`/`stick-2` på
+  `#matrix` (Pos + Spiller), `#training-table` (Spiller) og `#ledger` (Runde) – kun mens `data-scroll` er sat (ikke ≤ 600 px-styret).
+  Den låste 1. kolonnes bredde måles og sættes som `--stick1-w`; fylder Pos + Spiller over 40 % af rammen (390 px: 68 + 93 af 324),
+  låses kun Spiller, og pladsen står i samme celle (`data-stick="navn"`, `td[data-pos]::before`). Låste celler er uigennemsigtige, også
+  sorteret (#251453), "byt i gang" (#3b2622), hover og valgt (lilla kant). Trup-rækkerne er 44 px høje ved ≤ 600 px og på berøringsskærme
+  (`(pointer: coarse)`), og computeren beholder de tætte rækker (e2e: ≥ 44 ved 390, < 36 ved 1366 – før 25 begge steder). Trup ved 390
+  bliver derfor højere: 844 → 1170 px.
 - **Klub**: dit hold = økonomi og transfermarked; et valgt modstanderhold = "Offentlig klubside" tegnet kun fra
   `viewTeam` (spillere med pris og Køb, transfers, pensioner; kasse/løn/regnskab findes ikke) med "← Til din klub".
 - **⚙ Admin** (v3.19.0; v3.28.0 ikonknap i topbaren): versionen (`#version`), gem nu, eksportér, importér, ny liga og "Se et andet hold".
