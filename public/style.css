@@ -375,6 +375,15 @@ body.has-bar { padding-bottom: 4.5rem; }
 .mini-table td { text-align: left; font-size: var(--fs-2); } .mini-table td:first-child { width: 1.8rem; color: var(--dæmpet); } .mini-table td.pts { text-align: right; font-weight: 700; }
 .mini-table tr.mine td { color: var(--ok); } .mini-table tbody tr { cursor: default; }
 .to-home { font-size: var(--fs-2); }
+/* v3.32.1 (CI ved 390 px: lange holdnavn og bredere skrift skubbede banen ned til y 665 af 726): på mobil fylder Kamps hoved mindre –
+   avisens overskrift på én linje med …, taktiklinjerne under holdnavnene på én linje med …, og "🎬 Afspilning" står kun i fanen */
+@media (max-width: 600px) {
+  .to-home #kamp-paper-link { display: block; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+  .scoreboard > div:not(.score) > .muted { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .scoreboard > div:not(.score) { min-width: 0; }
+  #match-center:has(#mc-tabs) .rp-head > strong { display: none; }
+  #mc-tabs { flex-wrap: nowrap; } #mc-tabs > button { flex: 0 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+}
 /* v3.31.0 (F3): modstanderens form som piller – V grøn, U grå, T rød (bogstavet er teksten) */
 .form-pill { display: inline-block; min-width: 1.4rem; text-align: center; border-radius: 999px; padding: 0 .35rem; font-weight: 700; font-size: var(--fs-1); line-height: 1.5; }
 .form-V { background: #0b3326; color: #6ee7b7; } .form-U { background: var(--panel-2); color: var(--dæmpet); } .form-T { background: #451a1a; color: #fca5a5; }

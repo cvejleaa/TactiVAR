@@ -1797,6 +1797,9 @@ try {
     check('R5 Trup (1366): rækkerne er stadig tætte (< 36 px) – 44 px-reglen lækker ikke til computeren', h1366.length === 18 && h1366.every((x) => x < 36), h1366.join(','));
     check('R4 Trup (1366): tabellen passer – ingen data-scroll/data-more, ingen fade og intet låst', d.scroll === null && d.more === null && (d.mask === 'none' || !d.mask) && d.namePos === 'static', JSON.stringify(d));
     // ---------- Kamp: live, så fløjtet ----------
+    // CI v3.32.1: lange holdnavne (de tilfældige navne gav grønt lokalt og rødt i CI) – testen måler det værste tilfælde, ikke ligaens lodtrækning
+    await p.evaluate(() => { const d = JSON.parse(localStorage.getItem('tactivar_save')); d.league.teams.forEach((t, i) => { t.name = ['Nordkysten Boldklub', 'Lyngby Tacticians FC', 'Roskilde Rovers United', 'Kronborg United IF'][i % 4]; }); localStorage.setItem('tactivar_save', JSON.stringify(d)); });
+    await p.reload(); await p.waitForSelector('body[data-klar="ja"]');
     await size(390, 844);
     await p.click('#play-round'); await p.waitForSelector('#skip');
     check('R3 under live-afspilning: ingen underfaner, ingen fuldtids-linje og intet "⋯ Mere"', (await p.locator('#mc-tabs, #mc-ft, #mc-more').count()) === 0 && (await p.getAttribute('#mc-main', 'class')) === 'mc-grid');
@@ -1811,7 +1814,9 @@ try {
     await size(1366, 768); await p.evaluate(() => window.scrollTo(0, 0)); ys['1366×768'] = await first();
     await size(1366, 900); await p.evaluate(() => window.scrollTo(0, 0)); ys['1366×900'] = await first();
     const okY = (v) => v.y === 0 && v.play <= v.free && v.pitch < v.ih - 200 && v.ctrl <= v.cap + 1 && v.capB <= v.pitch + 1;
+    const tabs = await p.evaluate(() => [...document.querySelectorAll('#mc-tabs > button')].map((b) => [Math.round(b.getBoundingClientRect().top), b.scrollWidth <= b.clientWidth + 1]));
     check('R2 efter fløjtet: ▶ Afspil over Spil-bjælken (og bundnavigationen), banen begynder mindst 200 px over bunden – ved 390×844, 1366×768 og 1366×900 (før: ▶ ved y 1230/1036/1043)', Object.values(ys).every(okY), JSON.stringify(ys));
+    check('R3 (CI v3.32.1): ved 1366 står de tre underfaner på én række med hele teksten', new Set(tabs.map(([y]) => y)).size === 1 && tabs.length === 3 && tabs.every(([, full]) => full), JSON.stringify(tabs));
     check('R2 efter fløjtet: knapperne står OVER teksten, teksten over banen; banens højde er clamp(16rem, 100svh − 26rem, 32rem) – 428 / 352 / 484 px', Object.values(ys).every((v) => v.ctrl <= v.cap + 1 && v.capB <= v.pitch + 1) && ys['390×844'].pitchH === 428 && ys['1366×768'].pitchH === 352 && ys['1366×900'].pitchH === 484, JSON.stringify(Object.fromEntries(Object.entries(ys).map(([k, v]) => [k, v.pitchH]))));
     check('R2 efter fløjtet: "📤 Send kampen" og intro-teksten står IKKE på første skærm (⋯ Mere og ⓘ er lukket)', Object.values(ys).every((v) => v.send === 0 && v.intro === 0 && !v.introOpen) && (await p.getAttribute('#mc-more', 'open')) === null);
     await size(390, 844);
