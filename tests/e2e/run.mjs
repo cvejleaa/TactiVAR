@@ -1755,6 +1755,9 @@ try {
     check('R1 Taktik (390): præcis 5 "ⓘ Sådan virker det" – alle lukket, navngivet (Fase 1–3, Hvis-Så, udskiftninger), summary ≥ 44 px høj', r1.n === 5 && r1.open === 0
       && JSON.stringify(r1.labels) === JSON.stringify(['Sådan virker Fase 1', 'Sådan virker Fase 2', 'Sådan virker Fase 3', 'Sådan virker Hvis-Så-reglerne', 'Sådan virker udskiftningerne']) && r1.sumH.every((x) => x >= 44), JSON.stringify(r1.labels) + ' ' + r1.sumH);
     check('R1 Taktik (390): de lange forklaringer står IKKE på skærmen, men findes (indholdet intakt) – og hver kort linje står på én linje', r1.longVisible === 0 && r1.longN === 3 && r1.longTxt.startsWith('Angrebsfokus bestemmer') && r1.shorts.length === 5 && r1.shorts.every((x) => x.lines === 1 && x.t.length > 20), JSON.stringify(r1.shorts));
+    const wid = await p.evaluate(() => [...document.querySelectorAll('#tactics fieldset.phase')].map((f) => { const fw = f.getBoundingClientRect().width, s = f.querySelector('.help-short'), d = f.querySelector('details.help-more');
+      return s && d ? [Math.round(s.getBoundingClientRect().width / fw * 100), Math.round(d.getBoundingClientRect().width / fw * 100)] : null; }).filter(Boolean));
+    check('R1 Taktik (390) TM: den korte linje og ⓘ-folden fylder hver fases fulde bredde (egen linje under valgene, ikke klemt ind ved siden af en select)', wid.length >= 3 && wid.every(([a, b]) => a >= 85 && b >= 85), JSON.stringify(wid));
     // Åbn Fase 2, skift en indstilling (gentegning af hele siden) → Fase 2 er stadig åben, Fase 1 stadig lukket; luk den igen → lukket efter næste gentegning
     await p.click('#help-phase2_defending > summary');
     const before = await p.selectOption('#tactics select[data-field="passingStyle"]', { index: 0 }).then(() => p.inputValue('#tactics select[data-field="passingStyle"]'));
@@ -1787,10 +1790,52 @@ try {
     const bgSorted = await p.evaluate(() => getComputedStyle(document.querySelector('#matrix thead th.stick-1')).backgroundColor);
     check('R4 Trup: en låst celle er uigennemsigtig i "byt i gang"-rækken (#3b2622) og i den sorterede kolonne (#251453)', bg?.n === 1 && bg.swap === 'rgb(59, 38, 34)' && bgSorted === 'rgb(37, 20, 83)', JSON.stringify({ bg, bgSorted }));
     await p.evaluate(() => document.querySelector('#matrix tbody tr.swapping').classList.remove('swapping'));
+    // ---- Test Manager (v3.32.1): fade-retningen, låste cellers udseende og position i begge tilstande, Træning rullet til enden ----
+    const maskA = a.mask ?? '';
+    check('R4 Trup (390) TM: kanten toner ud mod HØJRE (gradient "to left", 40 px = 2,5 rem) – ikke venstre/andet', /to left/.test(maskA) && /\b40px\b/.test(maskA), maskA);
+    const lockS = await p.evaluate(() => {
+      const nm = (n) => document.querySelector(`#matrix tbody tr:nth-child(${n}) td.stick-2`), cs = (e) => getComputedStyle(e);
+      const sel = document.querySelector('#matrix tbody tr:nth-child(6)'); sel.classList.add('selected');
+      const selShadow = cs(sel.querySelector('td.stick-2')).boxShadow; sel.classList.remove('selected');
+      return { bg: cs(nm(1)).backgroundColor, bgPos: cs(document.querySelector('#matrix tbody tr:nth-child(1) td.stick-1')).backgroundColor, divider: cs(nm(1)).boxShadow, selShadow };
+    });
+    await p.hover('#matrix tbody tr:nth-child(4)');
+    const hoverBg = await p.evaluate(() => getComputedStyle(document.querySelector('#matrix tbody tr:nth-child(4) td.stick-2')).backgroundColor);
+    await p.mouse.move(0, 0);
+    check('R4 Trup (390) TM: den låste navne-celle er uigennemsigtig (ellers skinner de forbirullede tal igennem) og har en delelinje mod højre', lockS.bg !== 'rgba(0, 0, 0, 0)' && /inset/.test(lockS.divider) && /-1px 0px 0px 0px/.test(lockS.divider), JSON.stringify(lockS));
+    check('R4 Trup (390) TM: den valgte række har lilla over- og underkant også i den låste celle, og hover farver den låste celle med resten af rækken (#1e293b)', /0px 1px 0px 0px inset/.test(lockS.selShadow) && /0px -1px 0px 0px inset/.test(lockS.selShadow) && hoverBg === 'rgb(30, 41, 59)', JSON.stringify({ sel: lockS.selShadow, hoverBg }));
     // R4 Træning og Klub-regnskabet (390): samme regel (låst første kolonne, fade)
     await tt('traening');
     const tr4 = await p.evaluate(() => { const w = document.querySelector('#training-table').closest('.tablewrap'); return { scroll: w.dataset.scroll ?? null, more: w.dataset.more ?? null, first: getComputedStyle(document.querySelector('#training-table tbody td.stick-1')).position }; });
     check('R4 Træning (390): fade og Spiller låst – samme regel som Trup', tr4.scroll === 'ja' && tr4.more === 'ja' && tr4.first === 'sticky', JSON.stringify(tr4));
+    // Test Manager: Træning rullet til enden – Spiller (krop og overskrift) står stadig i venstre kant (left: 0), fade'et er væk, cellen er uigennemsigtig
+    await p.evaluate(() => { const w = document.querySelector('#training-table').closest('.tablewrap'); w.scrollLeft = w.scrollWidth; w.dispatchEvent(new Event('scroll')); }); await settle();
+    const tr4e = await p.evaluate(() => { const w = document.querySelector('#training-table').closest('.tablewrap'), l = w.getBoundingClientRect().left, td = document.querySelector('#training-table tbody td.stick-1'), th = document.querySelector('#training-table thead th.stick-1');
+      return { more: w.dataset.more ?? null, td: Math.round(td.getBoundingClientRect().left - l), th: Math.round(th.getBoundingClientRect().left - l), thPos: getComputedStyle(th).position, bg: getComputedStyle(td).backgroundColor, sw: w.scrollWidth, cw: w.clientWidth }; });
+    check('R4 Træning (390) TM: rullet til enden står Spiller (krop OG overskrift) stadig i venstre kant og er uigennemsigtig – fade\'et er væk', tr4e.more === null && Math.abs(tr4e.td) <= 2 && Math.abs(tr4e.th) <= 2 && tr4e.thPos === 'sticky' && tr4e.bg !== 'rgba(0, 0, 0, 0)' && tr4e.sw > tr4e.cw + 100, JSON.stringify(tr4e));
+    // Test Manager: 600 px er stadig "smal" (44 px-rækker), 601 er det ikke; ved 600 er Pos + Spiller under 40 % → BEGGE låst (data-stick="alle"), navnet efter Pos
+    // (resize UDEN gentegning: Trup står åben ved 390 med data-stick="navn"; drejes/ændres vinduet til 600, måles forfra → "alle")
+    await tt('trup'); const before600 = await p.evaluate(() => document.querySelector('#matrix').closest('.tablewrap').dataset.stick ?? null);
+    await size(600, 900);
+    const h600 = await rowsH(), s600 = await p.evaluate(() => { const w = document.querySelector('#matrix').closest('.tablewrap'); w.scrollLeft = w.scrollWidth; w.dispatchEvent(new Event('scroll'));
+      return new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(() => { const l = w.getBoundingClientRect().left, pos = document.querySelector('#matrix tbody td.stick-1'), nm = document.querySelector('#matrix tbody td.stick-2');
+        res({ stick: w.dataset.stick ?? null, scroll: w.dataset.scroll ?? null, posPos: getComputedStyle(pos).position, pos: Math.round(pos.getBoundingClientRect().left - l), name: Math.round(nm.getBoundingClientRect().left - l), posW: Math.round(pos.getBoundingClientRect().width), var: w.style.getPropertyValue('--stick1-w') }); }))); });
+    check('R4 Trup (390→600, uden gentegning): vinduet ændres, og de brede tabeller måles forfra – "navn" (smal) bliver til "alle"', before600 === 'navn' && s600.stick === 'alle', JSON.stringify({ before600, s600 }));
+    check('R5 Trup (600): rækkerne er stadig mindst 44 px (grænsen er 600 px, ikke 400)', h600.length === 18 && h600.every((x) => x >= 44), h600.join(','));
+    check('R4 Trup (600): Pos + Spiller under 40 % af rammen → begge står fast (data-stick="alle"), navnet lige efter Pos (left = Pos-bredden), også rullet til enden', s600.scroll === 'ja' && s600.stick === 'alle' && s600.posPos === 'sticky' && Math.abs(s600.pos) <= 2 && Math.abs(s600.name - s600.posW) <= 2 && s600.var === `${s600.posW}px`, JSON.stringify(s600));
+    await size(601, 900); await tt('trup');
+    const h601 = await rowsH(), s601 = await p.evaluate(() => { const w = document.querySelector('#matrix').closest('.tablewrap'); return { scroll: w.dataset.scroll ?? null, stick: w.dataset.stick ?? null, pos: getComputedStyle(document.querySelector('#matrix tbody td.stick-1')).position, name: getComputedStyle(document.querySelector('#matrix tbody td.stick-2')).position }; });
+    check('R5 Trup (601): rækkerne er tætte igen (< 36 px) – grænsen for de høje rækker er 600 px', h601.length === 18 && h601.every((x) => x < 36), h601.join(','));
+    check('R4 Trup (601): de låste kolonner gælder også over 600 px, så snart tabellen ruller (ikke en mobil-regel)', s601.scroll === 'ja' && s601.stick === 'alle' && s601.pos === 'sticky' && s601.name === 'sticky', JSON.stringify(s601));
+    // Test Manager: (pointer: coarse) – en berøringsskærm uden smal bredde (tablet, 1000 px) får også 44 px-rækker; en mus ved samme bredde gør ikke
+    { const cc = await browser.newContext({ viewport: { width: 1000, height: 800 }, hasTouch: true }), pc = await cc.newPage();
+      await pc.goto(BASE + '/'); await pc.waitForSelector('body[data-klar="ja"]'); await pc.click('#tab-trup'); await pc.waitForSelector('.tabpane.tab-trup');
+      const co = await pc.evaluate(() => ({ coarse: matchMedia('(pointer: coarse)').matches, rows: [...document.querySelectorAll('#matrix tbody tr')].map((r) => Math.round(r.getBoundingClientRect().height)) }));
+      const cm = await browser.newContext({ viewport: { width: 1000, height: 800 } }), pm = await cm.newPage();
+      await pm.goto(BASE + '/'); await pm.waitForSelector('body[data-klar="ja"]'); await pm.click('#tab-trup'); await pm.waitForSelector('.tabpane.tab-trup');
+      const mo = await pm.evaluate(() => ({ coarse: matchMedia('(pointer: coarse)').matches, rows: [...document.querySelectorAll('#matrix tbody tr')].map((r) => Math.round(r.getBoundingClientRect().height)) }));
+      check('R5 Trup (1000 px, berøring): (pointer: coarse) giver 44 px-rækker – og samme bredde med mus gør ikke (< 36 px)', co.coarse && !mo.coarse && co.rows.length === 18 && co.rows.every((x) => x >= 44) && mo.rows.every((x) => x < 36), JSON.stringify({ co, mo }));
+      await cc.close(); await cm.close(); }
     // R5/R4 ved 1366×768: tætte rækker, ingen sidelæns rul, ingen markering, intet låst
     await size(1366, 768); await tt('trup');
     const h1366 = await rowsH(), d = await r4();
@@ -1822,6 +1867,33 @@ try {
     await size(390, 844);
     const chips = await p.evaluate(() => { const cs = [...document.querySelectorAll('#match-cards .matchcard')].map((x) => Math.round(x.getBoundingClientRect().top)), w = document.querySelector('#match-cards').closest('.tablewrap'); return { tops: cs, more: w.dataset.more ?? null, mine: document.querySelector('#match-cards .matchcard').classList.contains('active') }; });
     check('R2 kampvælgeren (390): én linje (4 kampe, samme top), rullelig med fade – din kamp forrest og valgt', chips.tops.length === 4 && new Set(chips.tops).size === 1 && chips.more === 'ja' && chips.mine, JSON.stringify(chips));
+    // Test Manager: 44 px-flader på Kamp (390) – underfanerne, "⋯ Mere" og "ⓘ Om tavlen"; på computeren er "⋯ Mere" lav (< 36 px)
+    const tap = () => p.evaluate(() => { const hh = (s) => Math.round(document.querySelector(s).getBoundingClientRect().height); return { tabs: [...document.querySelectorAll('#mc-tabs button')].map((b) => Math.round(b.getBoundingClientRect().height)), more: hh('#mc-more > summary'), tavle: hh('#replay-help > summary') }; });
+    const tap390 = await tap();
+    check('Kamp (390) TM: underfanerne, "⋯ Mere" og "ⓘ Om tavlen" er mindst 44 px høje', tap390.tabs.length === 3 && tap390.tabs.every((x) => x >= 44) && tap390.more >= 44 && tap390.tavle >= 44, JSON.stringify(tap390));
+    const head390 = await p.evaluate(() => { const one = (e) => !!e && e.getBoundingClientRect().height < parseFloat(getComputedStyle(e).fontSize) * 1.9;
+      return { link: document.querySelector('.to-home #kamp-paper-link') ? one(document.querySelector('.to-home #kamp-paper-link')) : null, muted: [...document.querySelectorAll('#scoreboard > div:not(.score) > .muted')].map(one),
+        rpTitle: getComputedStyle(document.querySelector('#replay .rp-head > strong')).display, tabRows: new Set([...document.querySelectorAll('#mc-tabs > button')].map((b) => Math.round(b.getBoundingClientRect().top))).size }; });
+    check('Kamp (390) TM: lange holdnavne – avisens link og taktiklinjerne under holdnavnene står på én linje, "🎬 Afspilning"-titlen skjules (fanen siger det), og underfanerne står på én række', head390.link === true && head390.muted.length === 2 && head390.muted.every(Boolean) && head390.rpTitle === 'none' && head390.tabRows === 1, JSON.stringify(head390));
+    await paneP('stats');
+    const ms = await p.evaluate(() => { const t = document.querySelector('#match-stats'), w = t.closest('.tablewrap'), tw = t.getBoundingClientRect().width;
+      return { over: w.scrollWidth - w.clientWidth, clipped: [...t.querySelectorAll('th, td')].filter((c) => c.scrollWidth > c.clientWidth + 1).length, labelShare: Math.round(t.querySelector('tbody th').getBoundingClientRect().width / tw * 100), names: [...t.querySelectorAll('thead th')].map((x) => x.textContent).filter(Boolean) }; });
+    await paneP('replay');
+    check('Kamp-statistikken (390) TM: med lange holdnavne passer tabellen i rammen, ingen celle er klippet, og etiketten får ca. 40 % af bredden', ms.names.length === 2 && ms.names.every((x) => x.length >= 15) && ms.over <= 1 && ms.clipped === 0 && ms.labelShare >= 35 && ms.labelShare <= 45, JSON.stringify(ms));
+    const tabBg = await p.evaluate(() => [...document.querySelectorAll('#mc-tabs button')].map((x) => getComputedStyle(x).backgroundColor));
+    check('Kamp (390) TM: den aktive underfane er farvet anderledes end de to andre', tabBg.length === 3 && tabBg[1] === tabBg[2] && tabBg[0] !== tabBg[1], tabBg.join(' | '));
+    await size(1366, 768);
+    const tap1366 = await tap();
+    check('Kamp (1366) TM: 44 px-reglen lækker ikke til computeren – "⋯ Mere", "ⓘ Om tavlen" og fanerne er lavere end 36 px', tap1366.more < 36 && tap1366.tavle < 36 && tap1366.tabs.every((x) => x < 36), JSON.stringify(tap1366));
+    // Test Manager: afspilning og referat side om side fra 901 px, under hinanden til og med 899 px (breakpointet er 900)
+    const gridAt = async (w) => { await size(w, 900); return p.evaluate(() => { const r = document.querySelector('#replay').getBoundingClientRect(), f = document.querySelector('#feed').getBoundingClientRect(); return { side: f.left >= r.right - 1 && f.top < r.bottom, stacked: f.top >= r.bottom - 1 }; }); };
+    const g899 = await gridAt(899), g901 = await gridAt(901);
+    check('Kamp TM: referatet står under tavlen ved 899 px og ved siden af den ved 901 px (breakpointet 900)', g899.stacked && !g899.side && g901.side && !g901.stacked, JSON.stringify({ g899, g901 }));
+    // Test Manager: banens højde er clamp(16rem, 100svh − 26rem, 32rem) – de tre målte størrelser ligger alle i midten; her gulvet (844×390, liggende telefon) og loftet (1366×1000)
+    const pitchAt = async (w, hh) => { await size(w, hh); return p.evaluate(() => { const r = document.querySelector('#rp-pitch').getBoundingClientRect(); return { h: Math.round(r.height), w: Math.round(r.width) }; }); };
+    const pl = await pitchAt(844, 390), pt = await pitchAt(1366, 1000);
+    check('R2 banen TM: gulv 16 rem = 256 px høj og 174 px bred ved 844×390 (liggende telefon), loft 32 rem = 512 px høj og 348 px bred ved 1366×1000', pl.h === 256 && Math.abs(pl.w - 174) <= 1 && pt.h === 512 && Math.abs(pt.w - 348) <= 1, JSON.stringify({ pl, pt }));
+    await size(390, 844); await p.evaluate(() => window.scrollTo(0, 0));
     // Fuldtids-linjen: de to første sætninger af fuldtids-analysen – fast under stillingen i alle tre faner
     const ftWant = await p.evaluate(() => { const d = JSON.parse(localStorage.getItem('tactivar_save')), m = d.league.lastRound.matches[0]; return '📊 ' + m.events.find((e) => e.type === 'FULLTIME').text.replace(/^📊 \[FULDTIDS-ANALYSE\] /, '').split('. ').slice(0, 2).join('. ') + '.'; });
     const ft = {};
@@ -1836,8 +1908,10 @@ try {
     check('R3 underfanerne: 🎬 viser afspilning + referat, 📊 kun statistikken, 👥 kun karakterarkene + forklaringen – intet andet', Object.entries(want).every(([k, w]) => JSON.stringify([sh[k].feed, sh[k].replay, sh[k].stats, sh[k].ratings, sh[k].legend]) === JSON.stringify(w)), JSON.stringify(sh));
     check('R3 underfanerne: den valgte er aktiv og aria-pressed, og fokus står på dens knap efter skiftet', sh.replay.active === 'mc-tab-replay' && sh.stats.active === 'mc-tab-stats' && sh.stats.pressed === 'mc-tab-stats' && sh.stats.focus === 'mc-tab-stats' && sh.players.focus === 'mc-tab-players', JSON.stringify(sh));
     check('R3 fuldtids-linjen: "📊 <resultat>. Du havde N% af bolden …" (fuldtids-analysens to første sætninger) står under tidslinjen i alle tre faner', Object.values(ft).every(Boolean) && /^📊 (Sejr|Nederlag|Uafgjort) \d+-\d+.*\. Du havde \d+% af bolden/.test(ftWant) && !ftWant.includes('Dødbolde'), `${ftWant} | ${JSON.stringify(ft)}`);
+    check('R4 kampvælgeren (390) TM: fade\'et står stadig efter fanebyt (renderMc måler de nye tabeller forfra)', await p.evaluate(() => document.querySelector('#match-cards').closest('.tablewrap').dataset.more === 'ja'));
     await p.click('#match-cards .matchcard:nth-child(2)');
     check('R3: fanen bevares, når en anden af rundens kampe vælges', (await p.locator('#mc-tab-players.active').count()) === 1 && (await p.locator('#match-cards .matchcard:nth-child(2).active').count()) === 1 && (await p.locator('.ratings').count()) === 2);
+    check('R4 kampvælgeren (390) TM: ... og efter valg af en anden kamp', await p.evaluate(() => document.querySelector('#match-cards').closest('.tablewrap').dataset.more === 'ja'));
     // openReport lander rigtigt – altid første fane med netop den kamp, også fra "👥 Spillerne"
     const land = () => p.evaluate(() => { const f = document.getElementById('feed')?.getBoundingClientRect(), bar = document.querySelector('#playbar').getBoundingClientRect().top, nav = document.querySelector('.tabbar').getBoundingClientRect();
       const free = innerWidth <= 600 ? Math.min(bar, nav.top) : bar;
@@ -1846,6 +1920,8 @@ try {
     const names = await p.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.lastRound.matches.map((m) => m.homeName));
     await tt('liga'); await p.locator('#last-round .fixture').nth(2).click(); await p.waitForSelector('.tabpane.tab-kamp'); await settle();
     const fromLiga = await land();
+    const ligaFeed = await p.evaluate(() => { const f = document.getElementById('feed').getBoundingClientRect(), bar = document.querySelector('#playbar').getBoundingClientRect().top, nav = document.querySelector('.tabbar').getBoundingClientRect().top; return { top: Math.round(f.top), bottom: Math.round(f.bottom), free: Math.round(Math.min(bar, nav)) }; });
+    check('openReport fra Liga (390) TM: referatet rulles helt frem OVER Spil-bjælken og bundnavigationen (scroll-margin) – ikke skjult bag dem', ligaFeed.top >= 0 && ligaFeed.bottom <= ligaFeed.free + 1, JSON.stringify(ligaFeed));
     await paneP('stats'); await tt('liga'); await p.locator('#col-others .col-match').first().click(); await p.waitForSelector('.tabpane.tab-kamp'); await settle();
     const fromPaper = await land();
     const paperIdx = await p.evaluate(() => [...document.querySelectorAll('#match-cards .matchcard')].findIndex((x) => x.classList.contains('active')));
@@ -1857,6 +1933,17 @@ try {
     await size(1366, 768); await paneP('players'); await tt('hjem'); await p.click('#home-kamp'); await p.waitForSelector('.tabpane.tab-kamp'); await settle();
     const home1366 = await land();
     check('Hjem "Se kampen ›" (1366×768): ▶ Afspil og referatet står begge på første skærm', home1366.pane === 'mc-tab-replay' && home1366.card === 0 && home1366.play <= home1366.free && home1366.feedTop < home1366.free - 100, JSON.stringify(home1366));
+    // Test Manager: openReport ved 1366×768 (Liga → kamp 3) ruller kun lige nok ('nearest') – tavlen og ▶ bliver på skærmen, siden hopper ikke til referatets top
+    await size(1366, 768); await tt('liga'); await p.evaluate(() => window.scrollTo(0, 0)); await p.locator('#last-round .fixture').nth(2).click(); await p.waitForSelector('.tabpane.tab-kamp'); await settle();
+    const lig1366 = await land();
+    check('openReport fra Liga (1366×768) TM: kun lige nok rulning – ▶ Afspil og referatet står begge på skærmen (ikke rullet til referatets top)', lig1366.card === 2 && lig1366.pane === 'mc-tab-replay' && lig1366.play > 0 && lig1366.play <= lig1366.free && lig1366.feedTop >= 0 && lig1366.feedTop < lig1366.free - 100 && lig1366.y < 150, JSON.stringify(lig1366));
+    // Test Manager: fanen sætter fokus på sin knap UDEN at rulle siden (preventScroll) – også når knappen står under folden (390×360)
+    await size(390, 360); await p.evaluate(() => window.scrollTo(0, 0)); await settle();
+    const fo0 = await p.evaluate(() => ({ y: scrollY, tabTop: Math.round(document.querySelector('#mc-tab-stats').getBoundingClientRect().top), ih: innerHeight }));
+    await p.evaluate(() => document.querySelector('#mc-tab-stats').click()); await p.waitForSelector('#mc-tab-stats.active'); await settle();
+    const fo1 = await p.evaluate(() => ({ y: scrollY, focus: document.activeElement?.id }));
+    check('R3 fokus TM: et klik på underfanen (nede under folden ved 390×360) flytter fokus til knappen uden at rulle siden', fo0.y === 0 && fo0.tabTop > fo0.ih - 120 && fo1.focus === 'mc-tab-stats' && fo1.y === 0, JSON.stringify({ fo0, fo1 }));
+    await paneP('replay'); await size(1366, 768);
     // Fra spillerkortets kampe (📺 ved seneste kamp): samme indgang
     await paneP('stats'); await tt('trup');
     const pid = await p.evaluate(() => { const d = JSON.parse(localStorage.getItem('tactivar_save')), me = d.league.teams.find((t) => !t.isBot); return me.tactics.lineupSlots[5]; });
@@ -1867,6 +1954,12 @@ try {
     // "Statistik"s standard-åbne fold (Liga) husker lukket over gentegning (QC: "husker lukket eksplicit")
     await tt('liga'); await p.click('#stats-players > summary'); await tt('trup'); await tt('liga');
     check('Liga-statistikkens "Spillere" (åben fra start) bliver lukket, når den er lukket – også efter fanebyttet', (await p.getAttribute('#stats-players', 'open')) === null);
+    // Test Manager: Klub-regnskabet (390) – Runde står fast i venstre kant (krop og overskrift), også rullet til enden
+    await size(390, 844); await tt('klub');
+    const led = await p.evaluate(() => { const w = document.querySelector('#ledger').closest('.tablewrap'); w.scrollLeft = w.scrollWidth; w.dispatchEvent(new Event('scroll'));
+      return new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(() => { const l = w.getBoundingClientRect().left, td = document.querySelector('#ledger tbody td.stick-1'), th = document.querySelector('#ledger thead th.stick-1');
+        res({ scroll: w.dataset.scroll ?? null, stick: w.dataset.stick ?? null, more: w.dataset.more ?? null, td: Math.round(td.getBoundingClientRect().left - l), th: Math.round(th.getBoundingClientRect().left - l), tdPos: getComputedStyle(td).position, thPos: getComputedStyle(th).position, rows: document.querySelectorAll('#ledger tbody tr').length, sw: w.scrollWidth, cw: w.clientWidth }); }))); });
+    check('R4 Klub-regnskabet (390): Runde står fast i venstre kant (krop og overskrift), også rullet til enden – og fade\'et er væk', led.scroll === 'ja' && led.stick === 'alle' && led.more === null && led.rows >= 1 && led.tdPos === 'sticky' && led.thPos === 'sticky' && Math.abs(led.td) <= 2 && Math.abs(led.th) <= 2, JSON.stringify(led));
     check('v3.32.1-blokken: ingen sidefejl', egne.length === 0, egne.join(' | '));
     await c.close();
   }
