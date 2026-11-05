@@ -1052,6 +1052,7 @@ try {
     await c.close();
   };
   if (process.env.F2_ONLY) { await f2(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun F2-blokken (kortpanelet – hurtig mutationskørsel)
+  if (process.env.TM_V3320_ONLY) { await v3320tm(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); console.log(fejl.join(' | ')); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun Test Managers v3.32.0-blok
   if (process.env.TM_V3312_ONLY) { await v3312tm(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); console.log(fejl.join(' | ')); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun Test Managers v3.31.2-blok
   if (process.env.V3312_ONLY) { await v3312(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); console.log(fejl.join(' | ')); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun v3.31.2-blokken
   if (process.env.V3311_ONLY) { await v3311(); await v3311tm(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun v3.31.1-blokken (Spil-bjælken på alle faner – hurtig mutationskørsel)
@@ -3187,6 +3188,47 @@ try {
     check('v3.31.2 TM: tallene i statistik-tabellen er højrejusteret', s1.align === 'right' || s1.align === 'end', s1.align);
     await c.close();
   }
+  // ---------- v3.32.0, Test Manager (Spring kan trænes med Fysik): appens LEDNING – nyheden i NEWS, fokusvalget på Træning og "+1 Spring" i rapporten,
+  // Træning-fanen og Trup, før OG efter en genindlæsning (sanitize.js droppede Spring-gains). Kan køres alene med TM_V3320_ONLY=1.
+  async function v3320tm() {
+    const c = await browser.newContext({ viewport: { width: 1366, height: 900 } }), p = await c.newPage();
+    p.on('pageerror', (e) => fejl.push(e.message));
+    await p.goto(BASE + '/'); await p.waitForSelector('body[data-klar="ja"]');
+    const tt = async (k) => { await p.click(`#tab-${k}`); await p.waitForSelector(`.tabpane.tab-${k}`); };
+    const mod = (f, arg) => p.evaluate(([src, a]) => { const d = JSON.parse(localStorage.getItem('tactivar_save')); const r = (0, eval)('(' + src + ')')(d, a); localStorage.setItem('tactivar_save', JSON.stringify(d)); return r; }, [f.toString(), arg ?? null]);
+    const S = await mod((d) => {
+      const me = d.league.teams.find((t) => !t.isBot), on = new Set(me.tactics.lineupSlots);
+      for (const x of me.squad) Object.assign(x, { injuryMatchesLeft: 0, banMatches: 0, banYellows: 0, freshness: 100 });
+      const q = me.squad.find((x) => x.line === 'DEF' && !on.has(x.id));   // en reserve: spiller ingen kamp, kan ikke blive skadet i den
+      Object.assign(q, { age: 20, jumpingPower: 13, trainingFocus: 'PHYSICAL', dev: { jumpingPower: 0.999 } });
+      q.potential = 20;
+      d.ui.seenVersion = '3.31.2';   // NEWS: nyheden om 3.32.0 står som besked på Hjem ved næste indlæsning
+      return { q: q.id, j: q.jumpingPower };
+    });
+    await p.reload(); await p.waitForSelector('body[data-klar="ja"]');
+    const note = (await p.textContent('#notice', { timeout: 3000 }).catch(() => '')) ?? '';
+    check('v3.32.0 TM: nyheden for 3.32.0 står i NEWS og vises som besked ved opdatering (Fysik træner Fart, Styrke og Spring)', note.includes('Spring kan nu trænes') && note.includes('Fysik træner Fart, Styrke og Spring'), note.slice(0, 120));
+    await tt('traening');
+    const opts = await p.$$eval(`#training-table tr[data-pid="${S.q}"] select option`, (os) => os.map((o) => o.textContent));
+    const many = await p.$$eval('#focus-many option', (os) => os.map((o) => o.textContent));
+    check('v3.32.0 TM: Træning-fanen viser "Fysik – Fart, Styrke, Spring" pr. spiller og i massehandlingen, og Alsidig med spillerens egne evner',
+      opts.includes('Fysik – Fart, Styrke, Spring') && many.includes('Fysik – Fart, Styrke, Spring') && many.includes('Alsidig – kædens nøgle-evner') && opts.some((o) => /^Alsidig – \w/.test(o) && !o.includes('kædens')), JSON.stringify([opts, many]));
+    check('v3.32.0 TM: fremdriften viser SPR for Fysik-spilleren', /SPR 1,0|SPR 0,9|SPR 1\.0/.test(await p.textContent(`#training-table tr[data-pid="${S.q}"] td.train-prog`)), await p.textContent(`#training-table tr[data-pid="${S.q}"] td.train-prog`));
+    await tt('taktik'); await p.click('#play-round'); await p.waitForSelector('#skip');
+    await tt('kamp'); await p.click('#skip'); await p.waitForSelector('.to-home');
+    const seen = async (where) => {
+      await tt('traening');
+      const last = await p.textContent(`#training-table tr[data-pid="${S.q}"] td:last-child`);
+      await tt('trup');
+      const cell = await p.evaluate((id) => { const td = [...document.querySelectorAll(`#matrix tr[data-pid="${id}"] td.gain`)].find((e) => /Spring/.test(e.title)); return td ? { title: td.title, val: td.textContent } : null; }, S.q);
+      check(`v3.32.0 TM ${where}: Træning "Sidste runde" siger +1 Spring, og Trup-cellen i Spring-kolonnen er mærket (+1 Spring efter runde 1, værdi ${S.j + 1})`,
+        last.includes('+1 Spring') && cell !== null && cell.title === '+1 Spring efter runde 1' && cell.val === String(S.j + 1), JSON.stringify({ last, cell }));
+    };
+    await seen('efter runden');
+    await p.reload(); await p.waitForSelector('body[data-klar="ja"]');
+    await seen('efter genindlæsning');
+    await c.close();
+  }
   await f1tm();
   await f2();
   await f2tm();
@@ -3196,6 +3238,7 @@ try {
   await v3311tm();
   await v3312();
   await v3312tm();
+  await v3320tm();
   check('Ingen sidefejl under hele forløbet', fejl.length === 0, fejl.join(' | '));
 } finally {
   await browser.close();
