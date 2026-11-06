@@ -13,13 +13,18 @@ export function renderPitch({ team, isOwn, ui, onMove, onSelect, onTokenSwap, pa
   const pitch = h('div', { class: 'pitch', id: 'pitch' }, h('div', { class: 'pitch-line mid' }), h('div', { class: 'pitch-box top' }), h('div', { class: 'pitch-box bottom' }));
   const anchorRing = h('div', { class: 'anchor-ring', hidden: true });
   pitch.append(anchorRing);
+  // Fokus (v3.32.3, brugeren 6/11: "hvem den valgte spiller spiller godt sammen med"): den valgte i et byt (pitchSwapId – valg = start
+  // byt) på banen – hans streger fremhæves (.focus), de andre dæmpes (svg data-focus), og naboernes brikker får en ring i båndets farve
+  const fslot = isOwn && pairs?.length && ui.pitchSwapId ? team.tactics.lineupSlots.indexOf(ui.pitchSwapId) : -1;
+  const mates = new Map(fslot > 0 ? pairs.filter((x) => x.i === fslot || x.j === fslot).map((x) => [x.i === fslot ? x.b.id : x.a.id, x.band]) : []);
   if (isOwn && pairs?.length) {
     const ns = 'http://www.w3.org/2000/svg', svg = document.createElementNS(ns, 'svg');
     svg.setAttribute('class', 'chem-lines'); svg.setAttribute('id', 'chem-lines'); svg.setAttribute('viewBox', '0 0 100 100'); svg.setAttribute('preserveAspectRatio', 'none');
+    if (fslot > 0) svg.dataset.focus = String(fslot);
     for (const x of pairs) {
       const a = slotPosition(team.tactics, x.i), b = slotPosition(team.tactics, x.j), l = document.createElementNS(ns, 'line');
       for (const [k, v] of [['x1', a.x], ['y1', a.y], ['x2', b.x], ['y2', b.y]]) l.setAttribute(k, String(v));
-      l.setAttribute('class', `chem chem-${x.band}`); l.dataset.pair = `${x.i}-${x.j}`;
+      l.setAttribute('class', `chem chem-${x.band}${fslot > 0 && (x.i === fslot || x.j === fslot) ? ' focus' : ''}`); l.dataset.pair = `${x.i}-${x.j}`;
       svg.append(l);
     }
     pitch.append(svg);
@@ -34,7 +39,7 @@ export function renderPitch({ team, isOwn, ui, onMove, onSelect, onTokenSwap, pa
     // v3.20.0: uden for position – vises sammen med zone-flaget (begge koster), tallet fra tabellen
     const fit = p ? slotFitOf(team.tactics, slot, p.position) : 1, kind = slotKindText(coords[slot].r, pos.y);   // v3.24.6: pladsens dybde
     const token = h('div', {
-      class: `token${out ? ' out' : custom ? ' custom' : ''}${ui.selectedPlayerId === pid ? ' selected' : ''}${ui.pitchSwapId === pid ? ' swapping' : ''}${p && outLabel(p) ? ' injured' : ''}${p?.banMatches > 0 ? ' banned' : ''}`,
+      class: `token${out ? ' out' : custom ? ' custom' : ''}${ui.selectedPlayerId === pid ? ' selected' : ''}${ui.pitchSwapId === pid ? ' swapping' : ''}${p && outLabel(p) ? ' injured' : ''}${p?.banMatches > 0 ? ' banned' : ''}${mates.has(pid) ? ` mate mate-${mates.get(pid)}` : ''}`,
       style: { left: pos.x + '%', top: pos.y + '%' }, dataset: { slot: String(slot), fit: String(fit) }, title: `${roleLabel(coords[slot].r)}${kind ? ` (${kind})` : ''} – ${p ? p.name : '?'}${p ? ` · naturlig: ${POSITION_FULL[p.position] ?? p.position}${fit < 1 ? ` – her ${fitCost(fit)} i dueller` : ''}` : ''}${p && isOwn && pairs?.length && pairText(pid) ? ` · 🤝 ${pairText(pid)}` : ''}`,
     }, h('span', { class: 'token-num' }, p ? String(p.shirtNumber) : '?'), h('span', { class: 'token-name' }, p ? p.shortName : '?'),
       p && p.banMatches > 0 ? h('span', { class: 'token-flag' }, `⛔ udelukket`) : out ? h('span', { class: 'token-flag' }, '⚠ Ude af zone (-20%)') : custom ? h('span', { class: 'token-flag ok' }, '✅ Custom pos') : null,

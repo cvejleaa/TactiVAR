@@ -32,7 +32,10 @@ export function listRows({ team, isOwn, ui }) {
 // v3.29.0 (kortpanelet): onInfo = ⓘ forrest i navnecellen åbner spillerkortet – et klik på rækken er stadig byt (brugerens valg), så ⓘ
 // stopper klikket (som #auto-bench) og rører hverken byttet eller beskeden. ui.cardId = panelets spiller (omrids, kun mens det er åbent);
 // onPickCard = "Se kort ›" i byt-beskeden, kun mens et byt er i gang (ui.swapId).
-export function renderLineupList({ team, isOwn, ui, onPick, onSort, onBlocked, onLine, onAutoBench, msg = '', onInfo = null, onPickCard = null }) {
+// v3.32.3: preview(p) = byt-forhåndsvisningen (state/actions.js swapPreview) – mens et byt er i gang står båndskiftet i Plads-cellen
+// ("+1", "−1", "±0"; title = præcis beskeden efter byttet). Bænk ⇄ reserve (ingen virkning på samspillet): ingen tekst.
+const prevText = (r) => [r.up ? `+${r.up}` : '', r.down ? `−${r.down}` : ''].filter(Boolean).join(' ') || '±0';
+export function renderLineupList({ team, isOwn, ui, onPick, onSort, onBlocked, onLine, onAutoBench, msg = '', onInfo = null, onPickCard = null, preview = null }) {
   const { line, cols, ctx, sortCol, starters, bench, reserves, benchAll, reservesAll } = listRows({ team, isOwn, ui });
   const roles = FORMATIONS[team.tactics.baseFormation], slotOf = ctx.slotOf;
   const kindOf = (s) => (s >= 0 ? slotKindText(roles[s].r, slotPosition(team.tactics, s).y) : null);
@@ -51,12 +54,18 @@ export function renderLineupList({ team, isOwn, ui, onPick, onSort, onBlocked, o
     const tip = `Arketype: ${a.name} – ${a.description}${a.isUnlocked ? ' (låst op)' : ` · ${archReqText(a, p, team.tactics.lineupSlots.includes(p.id))}`}`;
     return [h('span', { class: 'lp-arch-ico', title: tip, 'aria-label': tip }, ` ${archIcon(a)}`), h('div', { class: 'lp-arch muted', title: tip }, `${archIcon(a)} ${a.name}`)];
   };
+  const prevEl = (p) => {
+    const r = preview && ui.swapId && ui.swapId !== p.id ? preview(p) : null;
+    if (!r || r.kind !== 'swap') return null;
+    const tip = r.changes.length ? `Byt: 🤝 ${r.changes.join(' · ')}` : 'Byt: intet par skifter bånd';
+    return h('span', { class: `lp-prev${r.down ? ' down' : r.up ? ' up' : ''}`, title: tip, 'aria-label': tip, dataset: { changes: r.changes.join(' · ') } }, prevText(r));
+  };
   const row = (p, kind) => {
     const s = slotOf(p), place = kind === 'start' ? roleLabel(roles[s].r) : kind === 'bench' ? 'Bænk' : 'Res', fit = kind === 'start' ? slotFitOf(team.tactics, s, p.position) : 1;
     return h('tr', { class: `lp-row ${kind}-p` + (ui.swapId === p.id ? ' active' : '') + (ui.cardId === p.id ? ' carded' : '') + (outLabel(p) ? ' injured' : '') + (p.banMatches > 0 ? ' banned' : ''), dataset: { pid: p.id },
       title: isOwn ? (kind === 'reserve' ? 'Reserve – ikke med i kampen. Klik og så en bænkspiller (eller en brik) for at tage ham med.' : 'Klik og så en anden spiller (her eller på banen) for at bytte') : '',
       onclick: () => onPick(p) },
-    h('td', { class: 'lp-place' + (fit < 1 ? ' off-pos' : ''), title: fit < 1 ? `Naturlig: ${POSITION_FULL[p.position]} – på ${place}${kindOf(s) ? ` (${kindOf(s)})` : ''} koster det ${fitCost(fit)} i dueller` : '' }, place, fit < 1 ? ` ⚠ ${fitCost(fit)}` : ''),
+    h('td', { class: 'lp-place' + (fit < 1 ? ' off-pos' : ''), title: fit < 1 ? `Naturlig: ${POSITION_FULL[p.position]} – på ${place}${kindOf(s) ? ` (${kindOf(s)})` : ''} koster det ${fitCost(fit)} i dueller` : '' }, place, fit < 1 ? ` ⚠ ${fitCost(fit)}` : '', prevEl(p)),
     // ⓘ: tegnet står i CSS (::before), så cellens tekst stadig er "#7 Navn"
     h('td', {}, onInfo ? h('button', { class: 'lp-info', type: 'button', dataset: { pid: p.id }, title: 'Åbn spillerkortet', 'aria-label': `Spillerkort: #${p.shirtNumber} ${p.shortName}`, onclick: (e) => { e.stopPropagation(); onInfo(p); } }) : null, h('span', { class: 'lp-name' }, `#${p.shirtNumber} ${p.shortName}`), archMark(p)),
     // Kæde · naturlig position i alle tre sektioner (QC B4: så man kan se, hvem på bænken der passer)

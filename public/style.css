@@ -342,6 +342,16 @@ button.savestatus.failed { color: var(--rød); font-weight: 700; }
 .chem-lines .chem { vector-effect: non-scaling-stroke; stroke-linecap: round; }
 .chem-staerkt { stroke: #facc15; stroke-width: 5; } .chem-sammen { stroke: #e5e7eb88; stroke-width: 2.5; }
 .chem-finder { stroke: #fb923c; stroke-width: 1.5; } .chem-fremmede { stroke: #ef4444; stroke-width: 1.5; stroke-dasharray: 4 3; }
+/* v3.32.3: fokus på den valgte – hans streger tykkere og uigennemsigtige (også "spillet sammen"), de andre dæmpet; naboernes ring i
+   båndets farve (lilla = kun den valgte). Ingen overgang: tavlen tegnes om ved hvert klik (og reduceret bevægelse rammes ikke) */
+.chem-lines[data-focus] .chem:not(.focus) { opacity: .25; }
+.chem-lines .chem.focus { opacity: 1; } .chem-staerkt.focus { stroke-width: 7; } .chem-sammen.focus { stroke: #e5e7eb; stroke-width: 4; }
+.chem-finder.focus { stroke-width: 3.5; } .chem-fremmede.focus { stroke-width: 3.5; }
+.token.mate-staerkt .token-num { box-shadow: 0 0 0 3px #facc15; } .token.mate-sammen .token-num { box-shadow: 0 0 0 3px #e5e7eb; }
+.token.mate-finder .token-num { box-shadow: 0 0 0 3px #fb923c; } .token.mate-fremmede .token-num { box-shadow: 0 0 0 3px #ef4444; }
+/* Trykfeltet om brikken ≥ 44 px på telefon (brikken er 29 × 29) – et usynligt felt, tegningen er uændret */
+@media (max-width: 600px) { .token-num { position: relative; } .token-num::after { content: ''; position: absolute; inset: -10px; } }
+.lp-prev { display: block; font-size: var(--fs-1); color: var(--dæmpet); white-space: nowrap; } .lp-prev.up { color: #86efac; } .lp-prev.down { color: #fca5a5; }
 .chem-legend { font-size: var(--fs-2); margin-top: .35rem; } .chem-legend .chem-key { display: inline-block; width: 1.4rem; height: 0; vertical-align: middle; margin: 0 .2rem; border-top: 2px solid; }
 .chem-key.staerkt { border-top: 5px solid #facc15; } .chem-key.sammen { border-top-color: #e5e7eb88; } .chem-key.finder { border-top: 1.5px solid #fb923c; } .chem-key.fremmede { border-top: 2px dashed #ef4444; }
 
