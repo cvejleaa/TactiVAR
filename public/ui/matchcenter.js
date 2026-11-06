@@ -14,6 +14,7 @@ import { evMin, fmtMin, timelinePos, halfPos, playerSpan, tickClock, clockNum } 
 const shotMin = (s, { events, stoppage }) => (s.ev != null && events?.[s.ev] ? evMin(events[s.ev]) : fmtMin(tickClock(s.t, stoppage)));
 import { pl } from '../engine/clues.js';
 import { savesText, savesSplit } from '../engine/column.js';
+import { varFrame, varLog, castNames, fxFor } from './varmoment.js';
 import { heatGrid, shotsOf, thirds, zones, zoneShots, actsOf, COMBO_LABEL, COLS, ROWS, HEAT_MIN } from '../engine/heatmap.js';
 
 export const REPORT_FILTERS = [['all', 'Alle hændelser'], ['tactic', 'Kun taktik'], ['key', 'Kun nøglemomenter']];
@@ -281,6 +282,17 @@ const sentList = (sent) => (sent?.length ? fold({ id: 'sent-list', summary: `�
 // Ukendt/undefined (fx openMatchCenter) = den første. Under live-afspilning ingen faner.
 export const MC_PANES = [['replay', '🎬 Afspilning & referat'], ['stats', '📊 Statistik'], ['players', '👥 Spillerne']];
 export const paneOf = (mc) => (MC_PANES.some(([k]) => k === mc.pane) ? mc.pane : MC_PANES[0][0]);
+// VAR-rammen (v3.32.2, D2): et overlay over stillingen og tidslinjen (skubber ikke siden), role="status", pulserende "VAR"-mærke
+// (negativ animation-delay fra mc.varT0, så pulsen ikke starter forfra, når Match Center tegnes om hvert tick). "Vis kendelsen ›"
+// afbryder pausen – kun i et to-trins tjek, før kendelsen er vist. Afløser det gamle VAR-banner, der stod ét tick.
+const PULSE_MS = 1000;
+function varFrameEl(fr, name, team, mc, on) {
+  const lines = varLog(fr.seq, fr.reached, name, team), delay = mc.varT0 ? -((Date.now() - mc.varT0) % PULSE_MS) : 0;
+  return h('div', { class: 'varframe' + (fr.reached ? ' reached' : ''), id: 'var-frame', role: 'status', tabindex: '-1', dataset: { kind: fr.seq.kind ?? '', verdict: fr.reached ? fr.seq.verdict : '' } },
+    h('span', { class: 'var-mark', 'aria-hidden': 'true', style: { animationDelay: `${delay}ms` } }, 'VAR'),
+    h('ul', { class: 'var-log', id: 'var-log' }, lines.map((l) => h('li', {}, l))),
+    !fr.reached && !fr.seq.oneStep && on.showVerdict ? h('button', { class: 'mini', id: 'var-show', onclick: on.showVerdict }, 'Vis kendelsen ›') : null);
+}
 // Fuldtids-linjen (Spilfører UI): resultatet og den ene vigtigste ting fra fuldtids-analysen (match.js) – fast under stillingen, uanset
 // fane. Kun i kampe med dit hold (analysen findes kun dér) og kun efter fløjtet. Den vigtigste ting er den taktiske dom – 3. sætning,
 // duelText: "Din opbygning kom igennem 5 af 12 gange; dit pres …" (Spilfører UI v3.32.1: boldbesiddelsen står under 📊 og sagde ikke,
@@ -295,7 +307,7 @@ export function fullTimeLine(events) {
 // Linjens farve følger udfaldet (fængende: en sejr skal ligne en sejr) – læst af resultatet, som motoren skrev det
 export const ftTone = (line) => (/^Sejr /.test(line) ? 'ft-win' : /^Nederlag /.test(line) ? 'ft-loss' : 'ft-draw');
 
-export function renderMatchCenter({ mc, myTeamId, on }) {
+export function renderMatchCenter({ mc, myTeamId, on, sound = false }) {
   const m = mc.matches[mc.viewIdx];
   const all = m.events;
   const shown = mc.playing ? all.slice(0, mc.shownCount) : all;
@@ -315,6 +327,15 @@ export function renderMatchCenter({ mc, myTeamId, on }) {
   const moments = new Set((m.trace?.moments ?? []).map((x) => x.ev));
   const heatFor = (side) => (m.trace ? { trace: m.trace, stoppage: m.stoppage ?? null, events: m.events, side, mine: mc.heat ?? null, onHeat: on.heat, vsMe: isOwnSide(side === 'h' ? 'away' : 'home') } : null);
   const pane = paneOf(mc), after = !mc.playing;
+  // VAR-øjeblikket (v3.32.2, ui/varmoment.js): rammen fra tjekket til kendelsen + 5 tick – kun i den kamp, der spilles live (den første)
+  const lastIdx = shown.length - 1, ownHome = (home) => isOwnSide(home ? 'home' : 'away');
+  const fr = mc.playing && mc.viewIdx === 0 ? varFrame(all, lastIdx) : null;
+  if (fr && mc.varT0Check !== fr.seq.check) { mc.varT0 = Date.now(); mc.varT0Check = fr.seq.check; }
+  // Målet er allerede talt op i tjekket (hG++ før addEv): stillingen nedtonet med "?", til kendelsen er vist
+  const pending = !!fr && fr.seq.type === 'VAR_CHECK' && !fr.reached;
+  // Kampens fx én gang pr. hændelse (mc.fxSeen – et filterklik i samme tick afspiller ikke igen)
+  const fx = mc.playing && mc.viewIdx === 0 ? fxFor(last, lastIdx, mc.fxSeen ||= new Set(), ownHome) : null;
+  const frameEl = fr ? varFrameEl(fr, castNames(m), (home) => (home ? m.homeName : m.awayName), mc, on) : null;
   // Referatet: filterrækken (id feed-filters – ikke forveksles med underfanerne) og listen
   const feedEl = h('div', { class: 'mc-feed' }, h('div', { class: 'toolbar', id: 'feed-filters' }, REPORT_FILTERS.map(([v, l]) => h('button', { class: 'mini' + (mc.filter === v ? ' active' : ''), onclick: () => on.filter(v) }, l))),
     // Et mål åbnet fra avisen markeres i referatet (samme minut, samme målscorer).
@@ -336,20 +357,23 @@ export function renderMatchCenter({ mc, myTeamId, on }) {
   const ft = after ? fullTimeLine(all) : null;
   return h('div', { class: 'panel matchcenter', id: 'match-center', dataset: { pane: after ? pane : null } },
     h('div', { class: 'row' }, h('h3', {}, `📺 Match Center – runde ${mc.round}`),
-      mc.playing ? h('button', { class: 'mini', id: 'skip', onclick: on.skip }, '⚡ Spring til slutfløjt') : null),
+      mc.playing ? h('button', { class: 'mini', id: 'skip', onclick: on.skip }, '⚡ Spring til slutfløjt') : null,
+      // v3.32.2 (D5): lyden – én kontakt ved ⚡, under og efter afspilning (ikke i ⚙). Fra som standard.
+      on.sound ? h('button', { class: 'mini', id: 'sound-toggle', 'aria-pressed': sound ? 'true' : 'false', title: sound ? 'Lyd til – klik for at slå fra' : 'Lyd fra – klik for at slå til', onclick: on.sound }, sound ? '🔊 Lyd til' : '🔇 Lyd fra') : null),
     mc.playing ? h('div', { class: 'muted', id: 'booked-note' }, 'Runden er allerede bogført og gemt – tabellen og truppen er opdateret, også hvis du lukker siden nu.') : null,
     // v3.32.1 (R2): kampvælgeren på én linje, der ruller vandret (fade i kanten, .tablewrap) – din kamp står forrest (rundens første)
     h('div', { class: 'tablewrap cards-wrap' }, h('div', { class: 'cards', id: 'match-cards' }, mc.matches.map((x, i) => h('button', { class: 'matchcard' + (i === mc.viewIdx ? ' active' : ''), disabled: mc.playing && i !== 0, onclick: () => on.view(i) },
       // Under afspilning afsløres de andre kampes resultater ikke før slutfløjt.
-      mc.playing ? (i === 0 ? `${x.homeName} ${last.hG}-${last.aG} ${x.awayName}` : `${x.homeName} – ${x.awayName}`) : [`${x.homeName} ${x.homeGoals}-${x.awayGoals} ${x.awayName}`, x.ratings.motm ? h('span', { title: 'Kampens spiller' }, ` 👑 ${x.ratings.motm.shortName}`) : null])))),
+      mc.playing ? (i === 0 ? `${x.homeName} ${last.hG}-${last.aG}${pending ? ' ?' : ''} ${x.awayName}` : `${x.homeName} – ${x.awayName}`) : [`${x.homeName} ${x.homeGoals}-${x.awayGoals} ${x.awayName}`, x.ratings.motm ? h('span', { title: 'Kampens spiller' }, ` 👑 ${x.ratings.motm.shortName}`) : null])))),
+    h('div', { class: 'mc-board' + (fx && fx.startsWith('fx-flash') ? ` ${fx}` : ''), id: 'mc-board' },
     h('div', { class: 'scoreboard', id: 'scoreboard' },
       h('div', {}, h('strong', {}, m.homeName), h('div', { class: 'muted' }, m.homeTacticStr)),
-      h('div', { class: 'score' }, h('div', { id: 'score' }, `${last.hG} - ${last.aG}`), h('div', { class: 'muted', id: 'minute' }, mc.playing ? evMin(last) : 'Slut'),
+      h('div', { class: 'score' }, h('div', { id: 'score', class: [pending ? 'score-pending' : '', fx === 'fx-shake' ? 'fx-shake' : ''].filter(Boolean).join(' ') || null }, `${last.hG} - ${last.aG}${pending ? ' ?' : ''}`), h('div', { class: 'muted', id: 'minute' }, mc.playing ? evMin(last) : 'Slut'),
         // v3.30.0: tilskuerne under resultatet (kendt før kampen – afslører intet under afspilningen); ældre kampe uden tallet: intet
         attText(m) ? h('div', { class: 'muted', id: 'attendance', title: 'Tilskuere' }, `${attText(m)} tilskuere`) : null),
       h('div', { class: 'right' }, h('strong', {}, m.awayName), h('div', { class: 'muted' }, m.awayTacticStr))),
     timeline(shown, m.stoppage),
-    last.varMsg && mc.playing ? h('div', { class: 'varbanner' }, `📺 VAR: ${last.varMsg}`) : null,
+    frameEl),
     ft ? h('div', { class: `mc-ft ${ftTone(ft)}`, id: 'mc-ft' }, `📊 ${ft}`)
       // Kampe uden dit hold har ingen analyse: en tom linje af samme højde, så fanerne ikke hopper ved kampskift (QC)
       : after ? h('div', { class: 'mc-ft mc-ft-tom', 'aria-hidden': 'true' }, '\u00a0') : null,
