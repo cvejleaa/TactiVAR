@@ -1053,7 +1053,7 @@ try {
   };
   if (process.env.F2_ONLY) { await f2(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun F2-blokken (kortpanelet – hurtig mutationskørsel)
   if (process.env.TM_V3323_ONLY) { await v3323tm(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); console.log(fejl.join(' | ')); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun Test Managers v3.32.3-blok
-  if (process.env.V3330_ONLY) { await v3330(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); console.log(fejl.join(' | ')); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun v3.33.0-blokken (pladsen følger dybden på midten)
+  if (process.env.V3330_ONLY) { await v3330(); await v3330tm(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); console.log(fejl.join(' | ')); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun v3.33.0-blokken (pladsen følger dybden på midten)
   if (process.env.V3323_ONLY) { await v3323(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); console.log(fejl.join(' | ')); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun v3.32.3-blokken (samspil på Taktik)
   if (process.env.TM_V3320_ONLY) { await v3320tm(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); console.log(fejl.join(' | ')); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun Test Managers v3.32.0-blok
   if (process.env.TM_V3312_ONLY) { await v3312tm(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); console.log(fejl.join(' | ')); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun Test Managers v3.31.2-blok
@@ -3901,6 +3901,17 @@ try {
     check('v3.33.0: forklaringen ved listen siger, at pladsen følger dybden – også på midten', (await p.textContent('#fit-help')).includes('Pladsen følger dybden – spilleren gør ikke') && (await p.textContent('#fit-help')).includes('dybt en DM-plads'));
     await c.close();
   }
+  // v3.33.0, Test Manager: nyheden i NEWS (NEWS-nøglen var uprøvet: en forkert nøgle gav ingen besked ved opdatering, og alle tests var grønne)
+  async function v3330tm() {
+    const c = await browser.newContext({ viewport: { width: 1366, height: 900 } }), p = await c.newPage();
+    p.on('pageerror', (e) => fejl.push(e.message));
+    await p.goto(BASE + '/'); await p.waitForSelector('body[data-klar="ja"]');
+    await p.evaluate(() => { const d = JSON.parse(localStorage.getItem('tactivar_save')); d.ui.seenVersion = '3.32.3'; localStorage.setItem('tactivar_save', JSON.stringify(d)); });   // nyheden om 3.33.0 står som besked ved næste indlæsning
+    await p.reload(); await p.waitForSelector('body[data-klar="ja"]');
+    const note = (await p.textContent('#notice', { timeout: 3000 }).catch(() => '')) ?? '';
+    check('v3.33.0 TM: nyheden for 3.33.0 står i NEWS og vises som besked ved opdatering (pladsen følger dybden, "CM→DM")', note.includes('Pladsen følger dybden – spilleren gør ikke') && note.includes('"CM→DM"') && note.includes('Rollen følger med'), note.slice(0, 120));
+    await c.close();
+  }
   // ---------- v3.32.3 (brugeren 6/11: "Jeg kan ikke på taktik siden se, hvem den valgte spiller spiller godt sammen med") ----------
   // Fokus = den valgte i et byt (pitchSwapId): hans streger fremhævet, de andre dæmpet, naboernes ring i båndets farve, teksten i #pick-msg,
   // byt-forhåndsvisningen i Plads-cellen og trykfeltet ≥ 44 px om brikken ved 390. Teksterne er SKREVET her (ikke regnet med focusChemText).
@@ -3916,6 +3927,12 @@ try {
       const on = new Set(s), B1 = me.squad.find((x) => !on.has(x.id) && x.position !== 'GK' && (me.matchBench ?? []).includes(x.id)).id, F = s[6];
       me.chemistry[key(F, s[2])] = [84, 5]; me.chemistry[key(F, s[5])] = [74, 5]; me.chemistry[key(F, s[7])] = [62, 5]; delete me.chemistry[key(F, s[9])];
       me.chemistry[key(s[9], s[10])] = [95, 5]; me.chemistry[key(F, B1)] = [90, 4];
+      // TM v3.33.0 (rod-årsag til det ustabile "#pick-msg er mindst én linje kortere"): ligaen er tilfældig, og dermed navnene i beskeden. Den
+      // gamle tekst er kun ca. 30 tegn længere end den nye (< én linje à ca. 40 tegn), så om forskellen bliver 0 eller 19 px afgjorde
+      // ORDBRUDDET: 2 af 25 tilfældige ligaer gav 150 px mod 150 px (målt 6/11). Faste navne og numre → samme tekst i hver kørsel → 131 mod 150 px
+      // (forskel ≥ 19 px ved ALLE bredder 300–374 px målt, så en anden skrifttype på CI ikke vipper den).
+      [[F, 'M. Kristensen', 8], [s[2], 'A. Holm', 3], [s[5], 'J. Jensen', 6], [s[7], 'N. Kjær', 10], [s[9], 'T. Møller', 9], [B1, 'M. Schmidt', 71]]
+        .forEach(([id, shortName, shirtNumber]) => Object.assign(me.squad.find((q) => q.id === id), { shortName, shirtNumber }));
       localStorage.setItem('tactivar_save', JSON.stringify(d));
       const sh = (id) => { const x = me.squad.find((q) => q.id === id); return `#${x.shirtNumber} ${x.shortName}`; };
       return { s: s.slice(), F, B1, fShort: me.squad.find((q) => q.id === F).shortName, b1Short: me.squad.find((q) => q.id === B1).shortName, n: Object.fromEntries([2, 5, 7, 9, 10].map((i) => [i, sh(s[i])])), nF: sh(F), nB1: sh(B1) };
@@ -4159,6 +4176,7 @@ try {
   await v3323();
   await v3323tm();
   await v3330();
+  await v3330tm();
   check('Ingen sidefejl under hele forløbet', fejl.length === 0, fejl.join(' | '));
 } finally {
   await browser.close();
