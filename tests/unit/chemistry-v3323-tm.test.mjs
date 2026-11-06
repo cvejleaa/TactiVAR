@@ -203,3 +203,10 @@ test('lineup-list: forhåndsvisningen i Plads-cellen — tekst, op/ned-klasse, t
   assert.equal(calls, 0); assert.equal(all(l2, (e) => /lp-prev/.test(e.className)).length, 0);
   const l3 = render({ swapId: sel }, null); assert.equal(all(l3, (e) => /lp-prev/.test(e.className)).length, 0);
 });
+
+test('naboerne står stærkeste FØRST uanset pladsrækkefølgen (byggerens fixture var tilfældigt allerede faldende: plads 2 > 5 > 7 > 9)', () => {
+  const { t, s, F, set, sh } = fixture();
+  set(F, s[2], 62, 5); set(F, s[5], 90, 5); set(F, s[7], 74, 5); delete t.chemistry[pairKey(F, s[9])];
+  assert.deepEqual(partnersOf(t, REF, F).neighbours.map((x) => x.mate.id), [s[5], s[7], s[2], s[9]], 'faldende værdi, ikke faldende plads');
+  assert.ok(focusChemText(t, REF, F).startsWith(`🤝 Med naboerne: ${sh(s[5])} stærkt · ${sh(s[7])} spillet sammen · ${sh(s[2])} finder hinanden · ${sh(s[9])} fremmede`));
+});
