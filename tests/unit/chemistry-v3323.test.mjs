@@ -68,7 +68,7 @@ test('focusChemText: den præcise tekst for fokus, angriberen, målmanden, den s
   const { t, s, F, B1, B2, R, gk, sh } = fixture();
   const txt = focusChemText(t, REF, F);
   assert.equal(txt, `🤝 Med naboerne: ${sh(s[2])} stærkt · ${sh(s[5])} spillet sammen · ${sh(s[7])} finder hinanden · ${sh(s[9])} fremmede · svagest: ${sh(s[9]).split(' ')[0]}`
-    + ` · Kender også ${sh(B1)} (stærkt, bænk) og ${sh(R)} (finder hinanden, reserve) – vælg hans nabo, klik så på ${sh(B1).split(' ')[0]} eller ${sh(R).split(' ')[0]}`);
+    + ` · Kender også ${sh(B1)} (stærkt, bænk) og ${sh(R)} (finder hinanden, reserve) – vælg en af hans naboer, klik så på ${sh(B1).split(' ')[0]} eller ${sh(R).split(' ')[0]}`);
   // Spilfører UI 3: forklaringen "tæller kun …" står højst én gang og kun ved "Kender også" – her viser vejen den, så slet ikke
   assert.ok(!txt.includes('tæller kun'), txt);
   for (const id of t.squad.map((p) => p.id)) { const x = focusChemText(t, REF, id) ?? ''; assert.ok(x.split('tæller kun').length <= 2 && (!x.includes('tæller kun') || x.indexOf('tæller kun') > x.indexOf('Kender også ')) && x.includes('Kender også') >= x.includes('tæller kun'), x); }
@@ -200,4 +200,23 @@ test('retskrivning: "ca. 1 kamp" (ental) og "ca. N kampe" (flertal)', () => {
   assert.ok(focusChemText(t, REF, F).includes(' · Ingen stærke par endnu – ca. 1 kamp mere side om side'), focusChemText(t, REF, F));
   for (const i of [2, 5, 7, 9]) t.chemistry[pairKey(F, s[i])] = [74, 5];
   assert.ok(focusChemText(t, REF, F).includes(`(ca. ${gamesToSettle(REF, 74, 'staerkt')} kampe til stærkt)`) && gamesToSettle(REF, 74, 'staerkt') > 1);
+});
+
+test('QC efter rettelserne: en skadet/udelukket står ikke under "Kender også", og "ca. N kampe" regnes kun på naboer, der spiller', () => {
+  const { t, s, F, B1, R, sh } = fixture();
+  // A: den stærke tidligere nabo på bænken bliver skadet → han forsvinder fra "Kender også" (kan ikke sættes ved siden af)
+  t.squad.find((p) => p.id === B1).injuryMatchesLeft = 3;
+  const f = partnersOf(t, REF, F);
+  assert.deepEqual(f.others.map((x) => x.p.id), [R]);
+  assert.ok(!focusChemText(t, REF, F).includes(sh(B1)), 'den skadede bænkspiller står ikke i teksten');
+  // D: alle naboer under stærkt; den nabo, der er tættest på stærkt, er udelukket → tallet bygger på de andre
+  const set = (a, b, v) => { t.chemistry[pairKey(a, b)] = [v, 5]; };
+  set(F, s[2], 79); set(F, s[5], 60); set(F, s[7], 60); set(F, s[9], 60);
+  const games = (v) => gamesToSettle(REF, v, 'staerkt');
+  assert.ok(games(79) < games(60), `forudsætning: ${games(79)} < ${games(60)}`);
+  const txtAll = focusChemText(t, REF, F);
+  assert.ok(txtAll.includes(`ca. ${games(79)} kamp`), txtAll);   // før: den nærmeste nabo spiller
+  t.squad.find((p) => p.id === s[2]).banMatches = 1;
+  const txtOut = focusChemText(t, REF, F);
+  assert.ok(txtOut.includes(`ca. ${games(60)} kampe`) && !txtOut.includes(`ca. ${games(79)} kamp`), txtOut);
 });

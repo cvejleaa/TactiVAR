@@ -641,7 +641,7 @@ bedre kan kontrollere spil motoren".
   **Visning** (kun dit hold; ét sæt bånd på samme skala, intet 0–100-tal): fremmede ≤ −0,5 < finder hinanden ≤ −0,15 < spillet
   sammen < 0,4 ≤ stærkt (ved snit 78: 54 / 70,8 / 81,2). Kun par, motoren læser (mindst én forsvarer eller midtbane – ikke
   angriberparret). Taktik: en streg pr. par (tyk = stærkt, stiplet = fremmede) og "Svagest lige nu" under banen; ved byt eller
-  formation en 🤝-besked med de bånd, der skiftede (største fald først, højst 2). Spillerkortet: bedste makker kun ved stærkt, hans
+  formation en 🤝-besked med de bånd, der skiftede (største fald først, højst 2 – flere står som "… og N til"; par med en skadet/udelukket spiller tæller ikke, v3.32.3). Spillerkortet: bedste makker kun ved stærkt, hans
   par med naboerne nu; salgslinjen (kortet og Klub) ved stærkt; købeboksen og "Til salg i ligaen": fremmed for alle, ca. 8 kampe
   (`gamesToSettle`). Fuldtidsanalysen: én sætning om din midtbane ved kampstart (finder hinanden/fremmede eller stærkt).
   **v3.32.3** (brugeren 6/11: "Jeg kan ikke på taktik siden se, hvem den valgte spiller spiller godt sammen med"): den valgte i et

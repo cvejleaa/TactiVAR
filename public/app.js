@@ -567,7 +567,7 @@ function renderNow() {
     onSort: (c) => { if (view.listSort === c.key) view.listSortAsc = !view.listSortAsc; else { view.listSort = c.key; view.listSortAsc = false; } render(); },
     onBlocked: (c) => { view.notice = `🔒 Anti-spionage: du kan ikke sortere ${team.name} på "${c.label}" – det er skjult information.`; render(); },
     onLine: (v) => { view.listLine = v; render(); },
-    onAutoBench: () => change(() => act.setAutoBench(team)) });
+    onAutoBench: () => { clearSwap(); change(() => act.setAutoBench(team)); } });   // QC: bænken ændres – et byt i gang slutter
 
   const tactics = renderTactics({ team, isOwn, ui: game.ui, on: {
     // v3.32.3 (QC): formation, forudindstilling og "Stil op efter position" afslutter et byt i gang – ellers stod den valgtes

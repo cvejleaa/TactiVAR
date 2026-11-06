@@ -3881,7 +3881,7 @@ try {
       check(`v3.32.3 (${w}): uden valg ingen fokus – ingen line.focus, ingen data-focus, ingen naboring, alle streger fuldt synlige`, st0.focus.length === 0 && st0.svgFocus === null && st0.mates.length === 0 && st0.all.length === 12 && st0.all.every((l) => l.op === 1), JSON.stringify(st0.all.map((l) => l.op)));
       if (w < 600) await p.tap(tok(6)); else await p.click(tok(6));
       const st = await state(p);
-      const want = `🔁 Klik på den spiller, ${S.fShort} skal byttes med. 🤝 Med naboerne: ${S.n[2]} stærkt · ${S.n[5]} spillet sammen · ${S.n[7]} finder hinanden · ${S.n[9]} fremmede · svagest: ${S.n[9].split(' ')[0]} · Kender også ${S.nB1} (stærkt, bænk) – vælg hans nabo, klik så på ${S.nB1.split(' ')[0]} Se kort ›`;
+      const want = `🔁 Klik på den spiller, ${S.fShort} skal byttes med. 🤝 Med naboerne: ${S.n[2]} stærkt · ${S.n[5]} spillet sammen · ${S.n[7]} finder hinanden · ${S.n[9]} fremmede · svagest: ${S.n[9].split(' ')[0]} · Kender også ${S.nB1} (stærkt, bænk) – vælg en af hans naboer, klik så på ${S.nB1.split(' ')[0]} Se kort ›`;
       check(`v3.32.3 (${w}, ${w < 600 ? 'tap' : 'klik'} på CM'en): præcis hans 4 læste par har line.focus (2-6, 5-6, 6-7, 6-9 – ikke ST⇄ST 9-10), svg data-focus="6"`, JSON.stringify(st.focus) === JSON.stringify(['2-6', '5-6', '6-7', '6-9']) && st.svgFocus === '6', JSON.stringify(st.focus));
       const dim = st.all.filter((l) => !l.f), foc = st.all.filter((l) => l.f);
       check(`v3.32.3 (${w}): de andre 8 streger er dæmpet (opacity ≈ .25, ikke væk), hans er uigennemsigtige – "spillet sammen" fuldt hvid og tykkere end de dæmpede`, dim.length === 8 && dim.every((l) => Math.abs(l.op - 0.25) < 0.01) && foc.every((l) => l.op === 1) && foc.find((l) => l.pair === '5-6').stroke === 'rgb(229, 231, 235)' && foc.find((l) => l.pair === '5-6').sw > 2.5, JSON.stringify(st.all));
@@ -3895,7 +3895,7 @@ try {
         // står som naboer") måles i SAMME side med SAMME navne (navnene skifter fra liga til liga) – den nye skal være mindst én linje (≥ 15 px) lavere.
         // Målt: før 150 px, efter 131 px (begge ligaer set i kørslerne 6/11).
         const oldH = await p.evaluate((o) => { const m = document.getElementById('pick-msg'), t = m.firstChild, was = t.textContent; t.textContent = o; const hh = Math.round(m.getBoundingClientRect().height); t.textContent = was; return hh; },
-          st.msg.replace(/ Se kort ›$/, '').replace('skal byttes med.', 'skal byttes med – på banen eller i listen.').replace(`svagest: ${S.n[9].split(' ')[0]}`, `svagest: ${S.n[9]}`).replace(/– vælg hans nabo, klik så på #\d+$/, '– samspil tæller kun, når de står som naboer'));
+          st.msg.replace(/ Se kort ›$/, '').replace('skal byttes med.', 'skal byttes med – på banen eller i listen.').replace(`svagest: ${S.n[9].split(' ')[0]}`, `svagest: ${S.n[9]}`).replace(/– vælg en af hans naboer, klik så på #\d+$/, '– samspil tæller kun, når de står som naboer'));
         console.log(`   (måling) #pick-msg-højde ved 390 med den gamle tekst: ${oldH} px`);
         check(`v3.32.3 (390): #pick-msg er mindst én linje kortere end før – ${msgH} px mod ${oldH} px med den gamle tekst`, oldH - msgH >= 15, `${msgH} / ${oldH}`);
       }
@@ -4016,6 +4016,16 @@ try {
           was.msg?.includes('Kender også') && was.focus === '6' && !(now.msg ?? '').includes('🔁') && !(now.msg ?? '').includes('Kender også') && now.focus === null && now.swapping === 0 && now.active === 0
           && (next.msg ?? '').startsWith('🔁 Klik på den spiller') && next.focus === '4', JSON.stringify({ was: was.msg?.slice(0, 40), now, next: next.msg?.slice(0, 40) }));
       }
+      // QC efter rettelserne (C): "↺ Udtag automatisk" ændrer bænken – et byt i gang slutter også dér (før stod beskeden frossen)
+      await prep(p).then(() => p.evaluate(() => { const d = JSON.parse(localStorage.getItem('tactivar_save')), me = d.league.teams.find((t) => !t.isBot); me.matchBenchAuto = false; localStorage.setItem('tactivar_save', JSON.stringify(d)); }));
+      await ready(p);
+      await press(tok(6));
+      const abWas = await live();
+      await p.click('#auto-bench');
+      const abNow = await live();
+      check(`v3.32.3 (${w}): "↺ Udtag automatisk" under et byt — byttet er slut (ingen "🔁"/"Kender også", intet fokus, ingen valgt)`,
+        (abWas.msg ?? '').includes('🔁') && abWas.focus === '6' && !(abNow.msg ?? '').includes('🔁') && !(abNow.msg ?? '').includes('Kender også') && abNow.focus === null && abNow.swapping === 0 && abNow.active === 0,
+        JSON.stringify({ was: abWas.msg?.slice(0, 40), now: abNow }));
       // Spilfører UI 2: en udelukket nabo mærkes i beskeden, og at tage en udelukket starter ud viser intet tab for hans par
       await prep(p).then(() => p.evaluate(() => { const d = JSON.parse(localStorage.getItem('tactivar_save')), me = d.league.teams.find((t) => !t.isBot); me.squad.find((x) => x.id === me.tactics.lineupSlots[2]).banMatches = 2; localStorage.setItem('tactivar_save', JSON.stringify(d)); }));
       await ready(p);

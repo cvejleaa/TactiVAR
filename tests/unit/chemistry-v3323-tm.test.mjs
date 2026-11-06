@@ -134,7 +134,7 @@ test('"kender også": højst de to stærkeste – tre kandidater giver to', () =
   const { t, F, bench, set, sh } = fixture();
   set(F, bench[0], 90, 4); set(F, bench[1], 70, 4); set(F, bench[2], 66, 4);   // stærkt, finder, finder
   const txt = focusChemText(t, REF, F);
-  assert.ok(txt.includes(`Kender også ${sh(bench[0])} (stærkt, bænk) og ${sh(bench[1])} (finder hinanden, bænk) – vælg hans nabo, klik så på ${sh(bench[0]).split(' ')[0]} eller ${sh(bench[1]).split(' ')[0]}`), txt);
+  assert.ok(txt.includes(`Kender også ${sh(bench[0])} (stærkt, bænk) og ${sh(bench[1])} (finder hinanden, bænk) – vælg en af hans naboer, klik så på ${sh(bench[0]).split(' ')[0]} eller ${sh(bench[1]).split(' ')[0]}`), txt);
   assert.ok(!txt.includes(sh(bench[2])), 'den tredje står ikke');
 });
 

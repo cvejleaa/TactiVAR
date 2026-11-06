@@ -244,7 +244,7 @@ export function partnersOf(team, ref, pid) {
   const neighbours = isGK ? [] : playerPairs(team, ref, pid).sort((x, y) => y.v - x.v || BAND_RANK[y.band] - BAND_RANK[x.band]);
   // Hans naboer på banen – også dem, motoren ikke læser (angriber⇄angriber): de står allerede ved siden af ham, så de er ingen "kender også"
   const slots = team.tactics.lineupSlots, near = new Set(slot > 0 ? neighbourPairs(team.tactics.baseFormation).filter(([i, j]) => i === slot || j === slot).map(([i, j]) => slots[i === slot ? j : i]) : []);
-  const others = isGK || !team.chemistry ? [] : team.squad.filter((o) => o.id !== pid && o.position !== 'GK' && !near.has(o.id))
+  const others = isGK || !team.chemistry ? [] : team.squad.filter((o) => o.id !== pid && o.position !== 'GK' && !near.has(o.id) && !unavailable(o))   // QC: en skadet/udelukket kan ikke sættes ved siden af
     .map((o) => ({ p: o, k: pairKey(pid, o.id) })).filter((x) => playedTogether(team, x.k))
     .map(({ p: o, k }) => { const v = team.chemistry[k][0]; return { p: o, v, band: bandOf(v, ref), where: whereOf(team, o.id) }; })
     .filter((x) => BAND_RANK[x.band] >= BAND_RANK.finder).sort((x, y) => y.v - x.v);
@@ -262,7 +262,8 @@ export function focusChemText(team, ref, pid) {
   const st = outStatus(p), status = st === 'skadet' ? '(skadet – spiller ikke) ' : st ? `(${st}) ` : '';
   const mark = (q) => (outStatus(q) ? ` (${outStatus(q)})` : '');   // en nabo, der ikke spiller: "#6 M. Bach stærkt (udelukket)"
   if (f.isGK) return `🤝 ${status}Målmanden indgår ikke i samspil.`;
-  const games = (to) => { const n = Math.min(...nb.map((x) => gamesToSettle(ref, x.v, to))); return n > 0 && n < 60 ? n : null; };
+  const games = (to) => { const ok = nb.filter((x) => !outStatus(x.mate)); if (!ok.length) return null;   // QC: kun naboer, der spiller
+    const n = Math.min(...ok.map((x) => gamesToSettle(ref, x.v, to))); return n > 0 && n < 60 ? n : null; };
   let head;
   if (f.sameBand && !nb.some((x) => outStatus(x.mate))) {   // en nabo, der ikke spiller, skal stå med navn og mærke
     const band = nb[0].band, to = band === 'sammen' ? 'staerkt' : 'sammen', n = band === 'staerkt' ? null : games(to);
@@ -275,7 +276,7 @@ export function focusChemText(team, ref, pid) {
   } else head = f.where === 'start' ? 'Ingen af hans naboer tæller i samspillet' : `På ${f.where === 'bænk' ? 'bænken' : 'reserven'}${f.others.length ? '' : ' – ingen naboer på banen'}`;
   // "Kender også" (Spilfører UI 3: forklaringen står kun her, én gang) – med vejen dertil (QC 5): et klik på #8 nu ville bytte HAM ud for #8
   const o = f.others.slice(0, 2), on = o.filter((x) => x.where === 'start'), nums = (l) => l.map((x) => `#${x.p.shirtNumber}`).join(' eller ');
-  const way = f.where === 'start' ? `vælg hans nabo, klik så på ${nums(o)}`
+  const way = f.where === 'start' ? `vælg en af hans naboer, klik så på ${nums(o)}`
     : on.length ? `klik på en brik ved siden af ${nums(on)}` : 'samspil tæller kun, når de står som naboer';
   const also = o.length ? `Kender også ${o.map((x) => `${nm(x.p)} (${BAND_WORD[x.band]}, ${x.where})`).join(' og ')} – ${way}` : null;
   return `🤝 ${status}${[head, also].filter(Boolean).join(' · ')}`;
