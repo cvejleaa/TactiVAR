@@ -51,9 +51,28 @@ kantreglen (v3.24.6) blev lavet.
   væk; live-etiket under træk; hvad der ikke må stå.
 
 ## Resultat (6/11)
-- Målt (`node tools/measure-central.mjs sammenlign <rod for 4c149d9> N`, netto før → efter): a) +0,035 pr. rettet spiller (42 000 kampe);
-  b) +0,009 (42 000 kampe – under båndet alene; samlet a+b +0,022); c) −0,004. Ankrene ens. Største gevinst over bedste utrukne: +0,024.
+- Målt (`node tools/measure-central.mjs sammenlign <rod for 4c149d9> N`, netto før → efter, UPARRET): a) +0,035 pr. rettet spiller
+  (42 000 kampe); b) +0,009 (42 000 kampe); c) −0,004. Ankrene ens. Største gevinst over bedste utrukne: +0,024.
+  **Acceptkriteriet er IKKE opfyldt for b** (+0,009 – under båndet +0,02…+0,06; "samlet a+b +0,022" er et gennemsnit, der skjuler det).
+  b er bevidst landet: brugerens ønske er, at en DM på en DM-plads ikke straffes – det gør han ikke længere; at DM-rollen ikke giver
+  gevinst, er fordi DM'en mangler en egen opgave (backlog 0g). Se den parrede måling nedenfor.
   Gemte spil: 3 trukne pladser i 18 fixtures, 0 skifter.
 - Fingeraftrykkene uændrede. Mutationer: 26 af 27 røde; "generator: BOTH → WIDE" er en ækvivalent mutant (intet anker ligger i en
   central mellemzone – invarianten), "glid i dybden" var grøn og blev rettet ved at samle rollen ét sted (`driftOf`).
 - Karakterarket: startens rolle gemmes som den tegnede plads ("CM→DM"); en indskifters tegnede dybde gemmes ikke (bevidst udeladt).
+
+## Rettelser efter QC, Spilfører UI og Spilfører motor (6/11)
+1. (QC 1 + UI 4) Match Centers minibane siger den effektive plads som listen ("CM→DM" i navn og title – `startPlace` i ui/lineup.js, én kilde).
+2. (QC 2) Manuelt planskift i Taktik (`switchPreset` → `arrangeLineup`) fordeler efter den nye plans TEGNEDE dybder – som Hvis-Så. Unit:
+   samme plan giver samme opstilling, plads for plads.
+3. (UI 3 + QC 4) Referatet: "er trukket for langt ned/frem/til siden fra sin CM-plads" (ankrets plads og retningen) – før "for langt fra sin
+   DM-zone" om en CM-plads trukket til y 78.
+4. (UI 1) Live-etiketten under træk siger følgen for netop ham: "→ DM-plads · −2,5 %" (gul), "→ CM-plads ✓" (grøn), "· ude af zone"; egen
+   CSS (.kind-live, ikke "Ude af zone"-lyserød). `liveText` bruger `fitOf` – ingen ny beregning.
+5. (UI 2) "✅ Custom pos" vises ikke ved et pladsflag; ≤ 600 px den korte form "⚠ DM-plads / −2,5 %"; flagene gør ikke brikken bred og vokser
+   indad ved kanten (x < 25 / > 75). e2e ved 390: ingen flag overlapper hinanden eller en briks cirkel, intet skæres af banen.
+6. (Motor + QC 3) Ingen kodeændring. `tools/measure-central.mjs sammenlign` er nu PARRET (samme ligaer og rng-seeds, kamp for kamp, ± SE)
+   og har scenarie d (3-4-3, DM på CM-plads 50 → 52). `… sammenlign <rod for 4c149d9> 600 --par 4` (8 400 kampe pr. scenarie):
+   a +0,041 ± 0,010 · b −0,006 ± 0,010 · c −0,005 ± 0,010 · d +0,022 ± 0,005 · ankrene ± 0. Spilfører motors opdeling af b: kun pasform
+   +0,021 ± 0,006, kun rolle −0,032 ± 0,009. Står i spec §5 og som begrundelse i backlog 0g. b er stadig under båndet – bevidst landet.
+7. (QC) Trup-regnearkets Plads siger "CM→DM #8" (`slotPlaceLabel`, som Plads-cellen på Taktik).

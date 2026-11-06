@@ -51,7 +51,11 @@ Rangering: brugerens ønsker først, derefter værdi pr. størrelse. Første run
    motoren (begge MID: `rolesOf`, presseren, besiddelsen) – v3.33.0 lod kun prisen, løbsgruppen og bevægelsen følge den tegnede dybde.
    En DM-plads (anker eller trukket ≥ 54) skal have sin egen opgave: fx større chance for at vinde bolden tilbage i opbygningen eller
    dække foran midtstopperne (færre gennembrud mod holdet). Ny mekanik → Arkitekt + Spilfører motor + QC på planen, målt før/efter, og
-   fingeraftrykkene ændres (ankrene har CDM) – planen skal sige hvorfor.
+   fingeraftrykkene ændres (ankrene har CDM) – planen skal sige hvorfor. **Begrundelse i tal** (parret, `node tools/measure-central.mjs
+   sammenlign <rod for v3.32.3> 600 --par 4`, 8 400 kampe pr. scenarie, spec §5): en DM trukket ned på en DM-plads (b, y 56) giver
+   −0,006 ± 0,010 netto pr. kamp – KUN pasformen +0,021 ± 0,006, KUN rollen −0,032 ± 0,009 (Spilfører motor): DM-rollen koster
+   bevægelse uden at give noget igen. Mellemzonen (y 51–53: fuld pasform, CM-bevægelse) giver +0,021 ± 0,006 (b ved y 52) og
+   +0,022 ± 0,005 (d: 3-4-3, 50 → 52) – i dag er det bedst IKKE at trække helt ned. Accept for 0g: b ≥ +0,02 (som a: +0,041 ± 0,010).
 0e. **Taktik: én linje pr. VALGT mulighed** (QC/Spilfører UI på v3.32.1) · UI + motor · S · 3 · under hver dropdown, hvad det valgte gør
    ("Lynkontra: flere kontraer", "Lav blok: flere luftdueller, plads til cutbacks") i stedet for/ud over fasens faste korte linje. Teksterne
    skal godkendes af Motor-Spilføreren (de må ikke love mere, end motoren gør – fx "Ekstrem = Normal"). Bygger på `help()` (ui/dom.js).

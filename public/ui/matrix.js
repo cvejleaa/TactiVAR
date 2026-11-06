@@ -2,9 +2,9 @@
 // "🔒 ??" og kan ikke sorteres (synlighed afgøres i engine/visibility.js).
 import { POSITIONS } from '../engine/generator.js';
 import { h, dec, LOCK } from './dom.js';
-import { LINE, POSITION, POSITION_FULL, starsEl, outLabel, OUT_TITLE, archetypeOf, archIcon, archReqText, roleLabel } from './labels.js';
+import { LINE, POSITION, POSITION_FULL, starsEl, outLabel, OUT_TITLE, archetypeOf, archIcon, archReqText } from './labels.js';
 import { canSeeField } from '../engine/visibility.js';
-import { FORMATIONS } from '../engine/formations.js';
+import { slotPlaceLabel } from '../engine/formations.js';
 import { COUNTER_KEYS } from '../engine/counter.js';
 import { matchBenchOf, publicValue } from '../engine/career.js';
 import { SKILL_NAME } from './card.js';
@@ -89,7 +89,8 @@ export function renderMatrix({ team, isOwn, ui, notes, onSort, onSelect, onSwap,
   // v3.30.0 (brugeren): "💰 Til salg" efter navnet for spillere på salgslisten. Kun dit eget hold: salgslisten er ejerens
   // (visibility.js viewTeam – Security v3.19.0), og botterne har ingen liste – de sælger uden om den
   const listed = new Set(isOwn ? team.listed ?? [] : []);
-  const roles = FORMATIONS[team.tactics.baseFormation];
+  // Pladsen som Plads-cellen på Taktik (v3.33.0-rettelse, QC: Trup sagde "CM #8" om en plads trukket ned i DM-zonen): slotPlaceLabel → "CM→DM"
+  const placeOf = (s) => slotPlaceLabel(team.tactics, s);
 
   const head = h('tr', {}, COLUMNS.map((c) => {
     const allowed = canSeeField(c.field, isOwn);
@@ -104,11 +105,11 @@ export function renderMatrix({ team, isOwn, ui, notes, onSort, onSelect, onSwap,
     const cells = COLUMNS.map((c) => {
       const cls = (c.key === col.key ? 'sorted' : '') + (STICK[c.key] ? ` ${STICK[c.key]}` : '');
       if (!canSeeField(c.field, isOwn)) return h('td', { class: cls + ' lockcell' }, LOCK);
-      if (c.key === 'pos') return h('td', { class: cls + (s >= 0 ? ' starter' : ' benchnum') }, s >= 0 ? `${roleLabel(roles[s].r)} #${p.shirtNumber}` : `${benchIds.has(p.id) ? 'BÆNK' : 'RES'} #${p.shirtNumber}`);
+      if (c.key === 'pos') return h('td', { class: cls + (s >= 0 ? ' starter' : ' benchnum') }, s >= 0 ? `${placeOf(s)} #${p.shirtNumber}` : `${benchIds.has(p.id) ? 'BÆNK' : 'RES'} #${p.shirtNumber}`);
       if (c.key === 'name') { const g = gains.get(p.id) ?? [];   // mobilen: summen efter navnet (evne-kolonnerne er rullet væk)
         const sale = listed.has(p.id) ? h('span', { class: 'listed-tag', title: 'Sat til salg – andre klubber byder, når vinduet er åbent' }, '💰 Til salg') : null;
         // data-pos (v3.32.1): pladsen står i navnecellen, når kun navnet kan låses (smal skærm – ui/dom.js markScrollable)
-        const pos = s >= 0 ? roleLabel(roles[s].r) : benchIds.has(p.id) ? 'BÆNK' : 'RES';
+        const pos = s >= 0 ? placeOf(s) : benchIds.has(p.id) ? 'BÆNK' : 'RES';
         return h('td', g.length ? { class: cls + ' player-gain', dataset: { gain: String(g.length), pos }, title: `${gainWords(g)} ${after}` } : { class: cls, dataset: { pos } }, p.shortName, sale); }
       if (c.key === 'line') return h('td', { class: cls }, h('span', { class: 'chip' }, LINE[p.line]));
       if (c.key === 'natpos') return h('td', { class: cls, title: POSITION_FULL[p.position] ?? '' }, POSITION[p.position] ?? '–');

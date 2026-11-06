@@ -271,7 +271,14 @@ function customDragged(side) {
   const cc = side.tactics.customCoords || {};
   return Object.keys(cc).map(Number).filter((slot) => slot > 0 && slot < 11)
     .filter((slot) => side.starters[slot])   // ikke en udvist spillers tomme plads
-    .map((slot) => ({ player: side.starters[slot], role: slotRoleOf(side.tactics, slot), outOfZone: isOutOfZone(side.tactics, slot) }));
+    .map((slot) => ({ player: side.starters[slot], role: slotRoleOf(side.tactics, slot), anchorRole: (FORMATIONS[side.tactics.baseFormation] || FORMATIONS['4-4-2'])[slot]?.r, dir: dragDir(side.tactics, slot), outOfZone: isOutOfZone(side.tactics, slot) }));
+}
+// Hvilken vej pladsen er trukket fra ankret (referatets "for langt ned/frem/til siden fra sin CM-plads"). Ringen er om ANKRET –
+// derfor nævner teksten ankrets plads, ikke den, han nu spilles som (QC/Spilfører UI v3.33.0: "for langt fra sin DM-zone" for en
+// CM-plads trukket til y 78). Banens y vokser mod eget mål: større y = trukket ned.
+function dragDir(tactics, slot) {
+  const a = (FORMATIONS[tactics.baseFormation] || FORMATIONS['4-4-2'])[slot], p = slotPosition(tactics, slot), dx = p.x - a.x, dy = p.y - a.y;
+  return Math.abs(dx) > Math.abs(dy) ? 'til siden' : dy > 0 ? 'ned' : 'frem';
 }
 
 const avg = (arr, f) => arr.reduce((a, p) => a + f(p), 0) / Math.max(1, arr.length);
@@ -1358,7 +1365,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
       if (cp.outOfZone) {
         st[k(def, 'TacticSuccess')]++;
         sheet.adjust(cp.player.id, -0.45); sheet.adjust(presser.id, DUEL_BONUS); sheet.bump(presser.id, 'tacticWins');
-        addEv(min, 'TACTIC_FAIL', 'TACTIC', def.isHome, false, 'Ude af zone', `⚠️ [TAKTIK FEJLER • CUSTOM POS] ${tag(cp.player)} (${att.team.name}) står for langt fra sin ${roleLabel(cp.role)}-zone, og ${tag(presser)} udnytter hullet.`);
+        addEv(min, 'TACTIC_FAIL', 'TACTIC', def.isHome, false, 'Ude af zone', `⚠️ [TAKTIK FEJLER • CUSTOM POS] ${tag(cp.player)} (${att.team.name}) er trukket for langt ${cp.dir} fra sin ${roleLabel(cp.anchorRole)}-plads, og ${tag(presser)} udnytter hullet.`);
         frame('press', who);
         continue;
       }

@@ -28,7 +28,7 @@ const { createRng } = await import('../../public/engine/rng.js');
 const { createLeague } = await import('../../public/engine/generator.js');
 const { simulateMatch } = await import('../../public/engine/match.js');
 const { livePositions, driftAt, ADVANCE, RUNS_PUSH } = await import('../../public/engine/positions.js');
-const { setFormation, moveSlot, outOfPositionCount, swapPlayers, arrangeLineup } = await import('../../public/state/actions.js');
+const { setFormation, moveSlot, outOfPositionCount, swapPlayers, arrangeLineup, switchPreset } = await import('../../public/state/actions.js');
 const { renderPitch } = await import('../../public/ui/pitch.js');
 const { renderLineupList } = await import('../../public/ui/lineup-list.js');
 const { placeLabel } = await import('../../public/ui/lineup.js');
@@ -135,6 +135,32 @@ test('Hvis-Så plan-skift: de 11 fordeles efter planens TEGNEDE dybder (refit me
   assert.equal(arrangeByFit(xi, '3-4-3', '4-4-2', ys).indexOf(dm), other, 'samme fordeling som arrangeByFit med planens dybder');
 });
 
+// QC 2 (v3.33.0-rettelse): et MANUELT planskift i Taktik (switchPreset → arrangeLineup) fordelte efter ankrene (ys = null, når formationen
+// skiftede), mens Hvis-Så til samme plan fordeler efter planens tegnede dybder – samme plan gav to forskellige opstillinger.
+test('samme plan giver samme opstilling i Taktik (switchPreset) og i kampen (Hvis-Så): de 11 efter planens TEGNEDE dybder', () => {
+  const setup = () => {
+    const { L, me } = fresh(); setFormation(me, '4-4-2');
+    const dm = me.squad.find((p) => p.position === 'DM' && !me.tactics.lineupSlots.includes(p.id));
+    swapPlayers(me, me.tactics.lineupSlots[7], dm.id);   // DM'en på 4-4-2's højre CM-plads
+    const byId = new Map(me.squad.map((p) => [p.id, p])), plain = arrangeByFit(me.tactics.lineupSlots.map((id) => byId.get(id)), '3-4-3', '4-4-2');
+    const other = plain.indexOf(dm) === 5 ? 6 : 5;   // den CM-plads, DM'en IKKE får efter ankrene – planen trækker den ned i DM-zonen
+    const plan = structuredClone(me.tactics); Object.assign(plan, { baseFormation: '3-4-3', customCoords: { [other]: { x: FORMATIONS['3-4-3'][other].x, y: 56 } }, conditionalRules: [] });
+    me.tacticPresets[1] = plan;
+    return { L, me, dm, other, anchorAt: plain.indexOf(dm) };
+  };
+  const a = setup();
+  assert.ok([5, 6].includes(a.anchorAt) && a.anchorAt !== a.other, `data: efter ankrene står DM'en på den anden CM-plads (${a.anchorAt})`);
+  switchPreset(a.me, 0, 1);
+  assert.equal(a.me.tactics.baseFormation, '3-4-3');
+  assert.equal(a.me.tactics.lineupSlots.indexOf(a.dm.id), a.other, 'Taktik: DM\'en på den trukne plads (DM-zonen)');
+  assert.equal(slotFitOf(a.me.tactics, a.other, 'DM'), FIT.own);
+  const b = setup(); const opp = b.L.teams.find((t) => t.isBot);
+  b.me.tactics.conditionalRules = [{ ruleId: 1, minuteTrigger: 1, condition: 'ANY', margin: 1, newFormation: '3-4-3', newPlan: 1 }];
+  const m = simulateMatch(b.me, opp, createRng(11));
+  assert.equal(m.endState.home.formation, '3-4-3');
+  assert.deepEqual(m.endState.home.starters, a.me.tactics.lineupSlots, 'Hvis-Så = Taktik, plads for plads');
+});
+
 test('bevægelsen følger den tegnede plads: en OM trukket ned til y 46 rykker op og glider som en CM (RUNS_ROLES og DRIFT_AXES)', () => {
   const { me } = fresh(); setFormation(me, '4-2-3-1');
   me.tactics.phases.phase1_buildUp.offBallRuns = 'MANY';
@@ -179,15 +205,22 @@ test('kampen: karakterarkets rolle og km følger den tegnede plads ("CM→DM"), 
   assert.ok(cam > 0 && cm < cam * 0.75, `CM-gruppen løber sjældnere: ${cm} mod ${cam}`);
 });
 
-test('"for langt fra sin X-zone": teksten nævner den plads, han spilles som', () => {
-  let hit = null;
-  for (let s = 1; s <= 30 && !hit; s++) {
-    const { L, me } = fresh(s); const opp = L.teams.find((t) => t.isBot);
-    setFormation(me, '4-3-3'); moveSlot(me, 6, { x: 32, y: 78 });   // 34 fra ankret (y 44) – uden for zonen og i DM-dybde
-    hit = simulateMatch(me, opp, createRng(s)).events.find((e) => e.type === 'TACTIC_FAIL' && /står for langt fra sin/.test(e.text));
-  }
-  assert.ok(hit, 'data: en TACTIC_FAIL');
-  assert.match(hit.text, /står for langt fra sin DM-zone/); assert.doesNotMatch(hit.text, /sin CM-zone/);
+// v3.33.0-rettelse (QC 4 + Spilfører UI 3): ringen er om ANKRET – teksten nævner ankrets plads og retningen. Før stod der "for langt fra
+// sin DM-zone" om en CM-plads trukket til y 78 (den plads, han spilles som), hvilket læses, som om DM-pladsen var målet.
+test('"er trukket for langt ned/frem fra sin CM-plads": teksten nævner ankrets plads og retningen – ikke den, han spilles som', () => {
+  const hitAt = (y) => {
+    for (let s = 1; s <= 30; s++) {
+      const { L, me } = fresh(s); const opp = L.teams.find((t) => t.isBot);
+      setFormation(me, '4-3-3'); moveSlot(me, 6, { x: 32, y });   // ±34 fra ankret (32, 44) – uden for zonen
+      const hit = simulateMatch(me, opp, createRng(s)).events.find((e) => e.type === 'TACTIC_FAIL' && /er trukket for langt/.test(e.text));
+      if (hit) return hit.text;
+    }
+    return null;
+  };
+  const down = hitAt(78), up = hitAt(10);
+  assert.ok(down && up, 'data: en TACTIC_FAIL begge veje');
+  assert.match(down, /er trukket for langt ned fra sin CM-plads, og /); assert.doesNotMatch(down, /DM-|zone|frem/);
+  assert.match(up, /er trukket for langt frem fra sin CM-plads, og /); assert.doesNotMatch(up, /OM-|zone| ned /);
 });
 
 test('UI: brikkens title og flag, Plads-cellen og live-etiketten under træk siger den effektive plads', () => {
@@ -203,9 +236,15 @@ test('UI: brikkens title og flag, Plads-cellen og live-etiketten under træk sig
   t.listeners.pointerdown({ preventDefault() {}, pointerId: 1 });
   const live = t.children.find((c) => c instanceof FakeEl && c.className.includes('kind-live'));
   assert.ok(live, 'live-etiket under træk');
-  t.listeners.pointermove({ clientX: 32, clientY: 56 }); assert.equal(live.textContent, '→ DM-plads');
-  t.listeners.pointermove({ clientX: 32, clientY: 52 }); assert.equal(live.textContent, '→ DM-/CM-plads');
-  t.listeners.pointermove({ clientX: 32, clientY: 46 }); assert.equal(live.textContent, '→ CM-plads');
+  // v3.33.0-rettelse (Spilfører UI 1): følgen for netop ham – en CM: DM-pladsen koster −2,5 % (gul), mellemzonen og CM-pladsen passer (✓, grøn),
+  // og 34 fra ankret står "ude af zone". Egen farveklasse (warn/ok) – ikke "Ude af zone"-flagets
+  const at = (y) => { t.listeners.pointermove({ clientX: 32, clientY: y }); return [live.textContent, live.className.split(' ').filter((c) => c === 'warn' || c === 'ok').join()]; };
+  assert.deepEqual(at(56), ['→ DM-plads · −2,5 %', 'warn']);
+  assert.deepEqual(at(52), ['→ DM-/CM-plads ✓', 'ok']);
+  assert.deepEqual(at(46), ['→ CM-plads ✓', 'ok']);
+  assert.deepEqual(at(78), ['→ DM-plads · −2,5 % · ude af zone', 'warn']);
+  assert.deepEqual(at(10), ['→ OM-plads · −2,5 % · ude af zone', 'warn']);
+  assert.deepEqual(at(44), ['→ CM-plads ✓', 'ok']);
   moveSlot(me, slot, { x: 32, y: 56 });
   t = tok();
   assert.match(t.attrs.title, /^CM→DM \(DM-plads\) – /); assert.equal(t.dataset.fit, '0.975');

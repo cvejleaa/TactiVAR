@@ -178,9 +178,11 @@ Konstanterne står ét sted: `public/engine/career.js` (og `transfers.js`). Bån
 - Træk og slip "Rolle-Anker & Frit Træk": GK (slot 0) kan ikke trækkes,
   modstanderens brikker kan ikke flyttes, klem x 8–92 og y 8–82,
   `MAX_ANCHOR_RADIUS = 28` → over det "⚠ Ude af zone (-20%)" (rød), ellers
-  "✅ Custom Pos". Stiplet anker-cirkel under træk. `customCoords[slot]`.
+  "✅ Custom Pos" (ikke, når brikken også har et pladsflag – v3.33.0). Stiplet anker-cirkel under træk. `customCoords[slot]`.
   Formationsskift og "↺ Nulstil Træk" nulstiller. v3.33.0: på kant- og centrale midtbanepladser følger pladstypen den trukne dybde
-  (§5) – vist live under trækket ("→ DM-plads").
+  (§5) – vist live under trækket med følgen for netop ham: "→ DM-plads · −2,5 %" (gul), "→ CM-plads ✓" (grøn), "· ude af zone"
+  over radius 28 (`liveText` i pitch.js, samme `fitOf` som flaget). Flagene står under brikken uden at gøre den bred og vokser
+  indad ved kanten (x < 25 / > 75), så banen ikke skærer dem af; ≤ 600 px viser pladsflaget den korte form "⚠ DM-plads / −2,5 %".
 - Byt: klik spiller 1, klik spiller 2 (også start ⇄ bænk, "🔁 Byt").
 - Plan A/B/C: A 4-4-2, B 4-3-3, C 5-4-1.
 - Faser: Fase 1 passingStyle SHORT/BALANCED/DIRECT_LONG, attackFocus
@@ -224,20 +226,29 @@ Tick hvert 3. minut (1..90).
   Mellemzonerne og kantens overgangszone står i ÉN tabel (`BOTH`), som `fitOf`, `slotKindText` og botternes trupper bruger. Intet
   anker skifter klasse (CDM 54–58, CM 44–50, CAM 34–36; invarianttest) – derfor er alle fingeraftryk uændrede. **Rollen følger med**
   (`slotRoleOf`): CDM/CM/CAM efter dybden, i mellemzonen rollens egen, hvis hans position er en af de to, ellers CM. Den bruges af
-  løbsgruppen (RUN_WEIGHT), bevægelsen (`positions.js`: frem med bolden, løb uden bold, glid), km/friskhedstab, karakterarkets rolle
-  ("CM→DM") og "for langt fra sin X-zone". Ærligt: DM og CM har i dag SAMME opgaver i motoren – CM→DM ændrer prisen og bevægelsen;
+  løbsgruppen (RUN_WEIGHT), bevægelsen (`positions.js`: frem med bolden, løb uden bold, glid), km/friskhedstab og karakterarkets rolle
+  ("CM→DM"). Referatets "Ude af zone" nævner ANKRETS plads og retningen ("er trukket for langt ned/frem/til siden fra sin CM-plads"):
+  ringen er om ankret. Ærligt: DM og CM har i dag SAMME opgaver i motoren – CM→DM ændrer prisen og bevægelsen;
   CM→OM ændrer også løbsprofilen (CM-gruppe ⇄ kant/OM-gruppe). En egentlig DM-opgave er ny mekanik (backlog 0g). **Ikke** med:
   ST/CF (en falsk 9'er er lovlig), CB, kanternes rolle (v3.24.6 – kun pris og kæde følger dybden dér) og kæden (alle tre er MID:
   `midCount`, besiddelsen og samspilsnaboerne bliver på ankrene). Visning: brikkens title og flag ("⚠ Uden for position – DM-plads"),
-  Plads-cellen ("CM→DM") og pladstypen live under træk ("→ DM-plads"); en central plads nævnes kun, når dybden har gjort den til
-  noget andet end rollen. Hvis-Så til en plan fordeler de 11 efter planens TEGNEDE dybder (`refit` med ys); et formationsskift
-  (Taktik eller Hvis-Så til en formation) nulstiller de tegnede positioner. Målt (`node tools/measure-central.mjs sammenlign <rod
-  for v3.32.3> N`; dit hold mod 7 botter, begge baner; før → efter, netto mål pr. kamp): a) 4-2-3-1, CM på venstre CDM-plads
-  trukket til y 48: −0,254 → −0,219 (+0,035 pr. rettet spiller, 42 000 kampe); b) 4-3-3, DM på venstre CM-plads trukket til y 56:
-  −0,920 → −0,911 (+0,009, 42 000 kampe – under båndet +0,02…+0,06 alene, samlet a+b +0,022 pr. rettet); c) 4-2-3-1's OM trukket
-  til y 46 (nu naboplads, CM-løb): −0,722 → −0,726 (16 800 kampe). Ankrene (a0/b0/c0) er ens på begge versioner. Intet træk slår
-  den bedste utrukne (a0 −0,243) med mere end +0,024 (grænse +0,10). Gemte spil (`… fixtures <rod>`): 18 fixtures, 3 trukne
-  pladser, 0 skifter pladstype, rolle eller fit.
+  Plads-cellen ("CM→DM"), Trup-regnearkets Plads ("CM→DM #8"), Match Centers minibane (samme `startPlace` som listen) og pladstypen
+  med hans følge live under træk ("→ DM-plads · −2,5 %"); en central plads nævnes kun, når dybden har gjort den til noget andet end
+  rollen. Et PLANSKIFT fordeler de 11 efter planens TEGNEDE dybder – ens i Taktik (`switchPreset` → `arrangeLineup`, ys fra den nye
+  plans `customCoords`) og med Hvis-Så (`refit` med ys), så samme plan giver samme opstilling; et formationsskift (Taktik eller Hvis-Så
+  til en formation) nulstiller de tegnede positioner. Målt PARRET (`node tools/measure-central.mjs sammenlign <rod
+  for v3.32.3> 600 --par 4`; dit hold mod 7 botter, begge baner, samme ligaer og rng-seeds på begge versioner, forskellen kamp for
+  kamp ± SE; 8 400 kampe pr. scenarie; netto mål pr. kamp før → efter): a) 4-2-3-1, CM på venstre CDM-plads trukket til y 48:
+  −0,220 → −0,179, **+0,041 ± 0,010** pr. rettet spiller; b) 4-3-3, DM på venstre CM-plads trukket til y 56: −0,866 → −0,872,
+  **−0,006 ± 0,010** (under båndet +0,02…+0,06 – bevidst landet, se nedenfor); c) 4-2-3-1's OM trukket til y 46 (nu naboplads,
+  CM-løb): −0,681 → −0,686, −0,005 ± 0,010; d) 3-4-3, DM på venstre CM-plads 50 → 52 (mellemzonen): −1,333 → −1,311,
+  **+0,022 ± 0,005**. Ankrene (a0/b0/c0/d0) er kamp for kamp ens på begge versioner (± 0). Hvorfor b ikke giver gevinst (Spilfører
+  motor, parret, samme 8 400 kampe, én linje ændret ad gangen): KUN prisen følger dybden (`slotRoleAt` returnerer rollen) +0,021 ±
+  0,006; KUN rollen følger dybden (`fitOf` på CDM/CM/CAM efter rollenavnet) −0,032 ± 0,009 – DM-rollens bevægelse koster mere, end
+  pasformen giver, fordi DM'en endnu ingen egen opgave har. Mellemzonen (y 51–53) giver fuld pasform OG beholder CM-rollens
+  bevægelse: +0,021 ± 0,006 i b ved y 52 og +0,022 ± 0,005 i d. Derfor backlog 0g ("egentlig DM-opgave"). Intet træk slår den bedste
+  utrukne (a0 −0,226) med mere end +0,047 (grænse +0,10). (Før rettelsen målt UPARRET over 42 000 kampe: a +0,035, b +0,009, c
+  −0,004.) Gemte spil (`… fixtures <rod>`): 18 fixtures, 3 trukne pladser, 0 skifter pladstype, rolle eller fit.
   Kalibreret med `tools/measure-position.mjs` (4200 kampe): planens 0,95/0,88/0,75 kostede 0,58 mål pr. kamp for
   8 mand på naboplads – brugerens "mildt" (≈ 0,15 for 4-5 forkerte) gav 0,975/0,94/0,85. Bånd i
   `tests/unit/position-v3200.test.mjs` (ombytning −0,68…−1,2 mål pr. kamp; v3.19.0 −0,51).

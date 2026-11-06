@@ -11,12 +11,14 @@ export const isStarter = (e) => e.minIn <= 1;
 // Gamle runder uden plads (før v3.5) viser den gemte rolle – også den gennem tabellen: "MS", og en indskifter "ind (FOR)".
 // v3.33.0: startens rolle gemmes som den tegnede plads (match.js register/slotRoleOf) – så viser arket "CM→DM"; en indskifter
 // viser formationens plads (hans tegnede dybde gemmes ikke – bevidst udeladt).
+// v3.33.0: en central plads, der blev spillet som en anden (den gemte rolle = den tegnede plads ved afspark): "CM→DM". Listen og
+// minibanen i Match Center bruger denne ene (QC: minibanen sagde "CM" for en trukket plads, listen "CM→DM").
+export const startPlace = (e, r) => (CENTRAL_ROLES.has(r) && CENTRAL_ROLES.has(e.role) ? placeLabelOf(r, e.role) : roleLabel(r));
 export function placeLabel(e, formation) {
   const c = e.slot != null && formation ? FORMATIONS[formation]?.[e.slot] : null, r = c?.r ?? null;
   if (!r) return oldRole(e.role);
   if (!isStarter(e)) return `ind på ${roleLabel(r)}`;
-  // v3.33.0: en central plads, der blev spillet som en anden (den gemte rolle = den tegnede plads ved afspark): "CM→DM"
-  const place = CENTRAL_ROLES.has(r) && CENTRAL_ROLES.has(e.role) ? placeLabelOf(r, e.role) : roleLabel(r);
+  const place = startPlace(e, r);
   return lineOfRole(r, c.y) !== e.line ? `${place} (${LINE[e.line] ?? e.line})` : place;
 }
 function oldRole(role) {

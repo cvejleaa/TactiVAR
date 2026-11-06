@@ -1053,7 +1053,7 @@ try {
   };
   if (process.env.F2_ONLY) { await f2(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun F2-blokken (kortpanelet – hurtig mutationskørsel)
   if (process.env.TM_V3323_ONLY) { await v3323tm(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); console.log(fejl.join(' | ')); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun Test Managers v3.32.3-blok
-  if (process.env.V3330_ONLY) { await v3330(); await v3330tm(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); console.log(fejl.join(' | ')); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun v3.33.0-blokken (pladsen følger dybden på midten)
+  if (process.env.V3330_ONLY) { await v3330(); await v3330tm(); await v3330fix(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); console.log(fejl.join(' | ')); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun v3.33.0-blokken (pladsen følger dybden på midten)
   if (process.env.V3323_ONLY) { await v3323(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); console.log(fejl.join(' | ')); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun v3.32.3-blokken (samspil på Taktik)
   if (process.env.TM_V3320_ONLY) { await v3320tm(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); console.log(fejl.join(' | ')); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun Test Managers v3.32.0-blok
   if (process.env.TM_V3312_ONLY) { await v3312tm(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); console.log(fejl.join(' | ')); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun Test Managers v3.31.2-blok
@@ -3885,7 +3885,8 @@ try {
     let st = await tokenState();
     check('v3.33.0: på ankret (y 44) er CM-pladsen en CM-plads – ingen pladstekst, intet flag, ingen pil, Plads-cellen "CM"', /^CM – /.test(st.title) && !/plads/.test(st.title) && st.flag === null && st.fit === '1' && (await placeOf(ids.cm)) === 'CM', JSON.stringify(st));
     const live = await drag([52, 46, 56]);
-    check('v3.33.0: under trækket står pladstypen live – "→ DM-/CM-plads" i mellemzonen, "→ CM-plads" ved y 46, "→ DM-plads" ved y 56', JSON.stringify(live) === JSON.stringify(['→ DM-/CM-plads', '→ CM-plads', '→ DM-plads']), JSON.stringify(live));
+    // v3.33.0-rettelse (Spilfører UI 1): følgen for netop ham – en CM passer i mellemzonen og på CM-pladsen (✓), DM-pladsen koster −2,5 %
+    check('v3.33.0: under trækket står pladstypen og hans følge live – "→ DM-/CM-plads ✓" i mellemzonen, "→ CM-plads ✓" ved y 46, "→ DM-plads · −2,5 %" ved y 56', JSON.stringify(live) === JSON.stringify(['→ DM-/CM-plads ✓', '→ CM-plads ✓', '→ DM-plads · −2,5 %']), JSON.stringify(live));
     st = await tokenState();
     check('v3.33.0: trukket til y ≈ 56 → brikken siger "CM→DM (DM-plads)", flaget "⚠ Uden for position – DM-plads (−2,5 %)", og live-etiketten er væk', /^CM→DM \(DM-plads\) – /.test(st.title) && st.flag === '⚠ Uden for position – DM-plads (−2,5 %)' && st.fit === '0.975' && st.live === null, JSON.stringify(st));
     check('v3.33.0: Plads-cellen siger "CM→DM ⚠ −2,5 %" for CM\'en – og ingen anden brik har pil eller pladstekst', (await placeOf(ids.cm)) === 'CM→DM ⚠ −2,5 %' && (await others()).length === 0, `${await placeOf(ids.cm)} | ${JSON.stringify(await others())}`);
@@ -3910,6 +3911,46 @@ try {
     await p.reload(); await p.waitForSelector('body[data-klar="ja"]');
     const note = (await p.textContent('#notice', { timeout: 3000 }).catch(() => '')) ?? '';
     check('v3.33.0 TM: nyheden for 3.33.0 står i NEWS og vises som besked ved opdatering (pladsen følger dybden, "CM→DM")', note.includes('Pladsen følger dybden – spilleren gør ikke') && note.includes('"CM→DM"') && note.includes('Rollen følger med'), note.slice(0, 120));
+    await c.close();
+  }
+  // v3.33.0-rettelse (Spilfører UI 2, 6/11): ved 390 lå flagene oven i hinanden og blev skåret af banen. 4-3-3 med alle på deres egen plads,
+  // en CM trukket ned ved siden af DM'en (plads 6 → (32, 56)) og en angriber på højre kant (plads 10, x 82 – ved kanten): to pladsflag. De må ikke
+  // overlappe hinanden eller en anden briks cirkel, intet flag må skæres af banen, "✅ Custom pos" står ikke ved et pladsflag, og mobilen viser den
+  // korte form "⚠ DM-plads / −2,5 %". Under træk har live-etiketten sin egen farve (gul koster, grøn passer – ikke "Ude af zone"-lyserød).
+  async function v3330fix() {
+    const c = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true }), p = await c.newPage(); p.on('pageerror', (e) => fejl.push(e.message));
+    await p.goto(BASE + '/'); await p.waitForSelector('body[data-klar="ja"]');
+    const ok = await p.evaluate(() => {
+      const d = JSON.parse(localStorage.getItem('tactivar_save')), me = d.league.teams.find((t) => !t.isBot);
+      me.tactics.baseFormation = '4-3-3'; me.matchBenchAuto = false;
+      for (const x of me.squad) Object.assign(x, { injuryMatchesLeft: 0, banMatches: 0 });
+      const want = ['GK', 'FB', 'CB', 'CB', 'FB', 'DM', 'CM', 'CM', 'WM', 'ST', 'ST'], used = new Set(), xi = want.map((pos) => { const x = me.squad.find((q) => q.position === pos && !used.has(q.id)); if (x) used.add(x.id); return x?.id; });
+      if (xi.some((x) => !x)) return false;
+      me.tactics.lineupSlots = xi; me.matchBench = me.squad.filter((q) => !used.has(q.id)).slice(0, 7).map((q) => q.id);
+      me.tactics.customCoords = { 6: { x: 32, y: 56 } };
+      localStorage.setItem('tactivar_save', JSON.stringify(d)); return true;
+    });
+    await p.reload(); await p.waitForSelector('body[data-klar="ja"]'); await p.click('#tab-taktik'); await p.waitForSelector('.tabpane.tab-taktik'); await p.locator('#pitch').scrollIntoViewIfNeeded();
+    const st = await p.evaluate(() => {
+      const box = (e) => { const b = e.getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom }; }, pitch = box(document.getElementById('pitch'));
+      const flags = [...document.querySelectorAll('#pitch .token-flag')].map((f) => ({ slot: f.closest('.token').dataset.slot, text: f.textContent, b: box(f), shown: getComputedStyle(f, '::after').content, fs: getComputedStyle(f).fontSize }));
+      // Brikkerne = cirklen (.token-num): navnene er tilfældige og kan selv være bredere end afstanden mellem to brikker (det er ikke flagets skyld)
+      const parts = [...document.querySelectorAll('#pitch .token')].map((t) => ({ slot: t.dataset.slot, b: box(t.querySelector('.token-num')) }));
+      const hit = (a, b) => a.l < b.r - 0.5 && b.l < a.r - 0.5 && a.t < b.b - 0.5 && b.t < a.b - 0.5;
+      return { pitch, flags, overlap: flags.flatMap((f, i) => [...flags.slice(i + 1).filter((g) => hit(f.b, g.b)).map((g) => `${f.slot}⇄${g.slot}`), ...parts.filter((x) => x.slot !== f.slot && hit(f.b, x.b)).map((x) => `${f.slot}→brik ${x.slot}`)]),
+        cut: flags.filter((f) => f.b.l < pitch.l || f.b.r > pitch.r || f.b.t < pitch.t || f.b.b > pitch.b).map((f) => f.slot) };
+    });
+    check('v3.33.0-rettelse (390): data – to pladsflag (CM på DM-pladsen og angriber på højre kant), og ingen "✅ Custom pos" ved den trukne CM', ok && JSON.stringify(st.flags.map((f) => `${f.slot}:${f.text}`).sort()) === JSON.stringify(['10:⚠ Uden for position – kant-plads (−2,5 %)', '6:⚠ Uden for position – DM-plads (−2,5 %)']), JSON.stringify(st.flags.map((f) => `${f.slot}:${f.text}`)));
+    check('v3.33.0-rettelse (390): flagene overlapper hverken hinanden eller en anden briks cirkel, og intet flag skæres af banen', st.flags.length === 2 && st.overlap.length === 0 && st.cut.length === 0, JSON.stringify({ overlap: st.overlap, cut: st.cut, pitch: st.pitch, flags: st.flags.map((f) => [f.slot, f.b]) }));
+    const f6 = st.flags.find((f) => f.slot === '6');
+    check('v3.33.0-rettelse (390): mobilen viser den korte form "⚠ DM-plads / −2,5 %" – den lange tekst er skjult (skriftstørrelse 0)', f6?.shown === '"⚠ DM-plads\\a −2,5 %"' || f6?.shown === '"⚠ DM-plads\\a−2,5 %"' ? f6.fs === '0px' : false, JSON.stringify(f6));
+    // Live-etiketten under træk: den HØJRE CM-plads (plads 7, en CM) ned i DM-zonen → gul; op i CM-zonen → grøn
+    const T = '#pitch .token[data-slot="7"]', box = await p.locator(T + ' .token-num').boundingBox(), pb = await p.locator('#pitch').boundingBox(), seen = [];
+    await p.mouse.move(box.x + box.width / 2, box.y + box.height / 2); await p.mouse.down();
+    for (const y of [57, 46]) { await p.mouse.move(pb.x + pb.width * 0.68, pb.y + (pb.height * y) / 100, { steps: 6 }); seen.push(await p.evaluate((sel) => { const l = document.querySelector(sel + ' .kind-live'); return l && [l.textContent, getComputedStyle(l).color]; }, T)); }
+    await p.mouse.up(); await p.waitForTimeout(150);
+    const pink = await p.evaluate(() => { const e = document.createElement('span'); e.className = 'token-flag'; document.getElementById('pitch').append(e); const c = getComputedStyle(e).color; e.remove(); return c; });
+    check('v3.33.0-rettelse: live-etiketten har sin egen farve – gul ved −2,5 %, grøn ved ✓, ingen af dem "Ude af zone"-flagets lyserøde', JSON.stringify(seen) === JSON.stringify([['→ DM-plads · −2,5 %', 'rgb(253, 230, 138)'], ['→ CM-plads ✓', 'rgb(134, 239, 172)']]) && pink === 'rgb(254, 202, 202)', JSON.stringify({ seen, pink }));
     await c.close();
   }
   // ---------- v3.32.3 (brugeren 6/11: "Jeg kan ikke på taktik siden se, hvem den valgte spiller spiller godt sammen med") ----------
@@ -4177,6 +4218,7 @@ try {
   await v3323tm();
   await v3330();
   await v3330tm();
+  await v3330fix();
   check('Ingen sidefejl under hele forløbet', fejl.length === 0, fejl.join(' | '));
 } finally {
   await browser.close();

@@ -1,7 +1,7 @@
 // Taktiktavlen: "Rolle-anker & frit træk" (docs/spec.md §4). Målmanden og modstanderens
 // brikker kan ikke trækkes; uden for ankerradius 28 vises "⚠ Ude af zone (-20%)".
 import { h } from './dom.js';
-import { FORMATIONS, MAX_ANCHOR_RADIUS, slotPosition, isOutOfZone, clampPos, slotFitOf, slotKindText, slotPlaceLabel, CENTRAL_ROLES } from '../engine/formations.js';
+import { FORMATIONS, MAX_ANCHOR_RADIUS, slotPosition, isOutOfZone, clampPos, slotFitOf, slotKindText, slotPlaceLabel, CENTRAL_ROLES, fitOf } from '../engine/formations.js';
 import { POSITION_FULL, fitCost, outLabel, roleLabel } from './labels.js';
 import { BAND_WORD } from '../engine/chemistry.js';
 
@@ -38,25 +38,39 @@ export function renderPitch({ team, isOwn, ui, onMove, onSelect, onTokenSwap, pa
     const custom = !!team.tactics.customCoords?.[slot];
     // v3.20.0: uden for position – vises sammen med zone-flaget (begge koster), tallet fra tabellen
     const fit = p ? slotFitOf(team.tactics, slot, p.position) : 1, kind = slotKindText(coords[slot].r, pos.y);   // v3.24.6: pladsens dybde
+    // Flagene står i .token-flags (bredde 0, så et langt flag ikke gør brikken bred); ved kanten vokser de indad (edge-l/edge-r),
+    // så banen (overflow: hidden) ikke skærer dem af (Spilfører UI 2, v3.33.0-rettelse)
+    const flags = [
+      p && p.banMatches > 0 ? h('span', { class: 'token-flag' }, `⛔ udelukket`) : out ? h('span', { class: 'token-flag' }, '⚠ Ude af zone (-20%)') : custom && fit >= 1 ? h('span', { class: 'token-flag ok' }, '✅ Custom pos') : null,
+      fit < 1 ? posFlag(kind && kind !== 'kant-/back-plads' ? kind : null, fit) : null].filter(Boolean);   // QC v3.24.6: pladstypen synligt (mobil)
     const token = h('div', {
-      class: `token${out ? ' out' : custom ? ' custom' : ''}${ui.selectedPlayerId === pid ? ' selected' : ''}${ui.pitchSwapId === pid ? ' swapping' : ''}${p && outLabel(p) ? ' injured' : ''}${p?.banMatches > 0 ? ' banned' : ''}${mates.has(pid) ? ` mate mate-${mates.get(pid)}` : ''}`,
+      class: `token${pos.x < EDGE_X ? ' edge-l' : pos.x > 100 - EDGE_X ? ' edge-r' : ''}${out ? ' out' : custom ? ' custom' : ''}${ui.selectedPlayerId === pid ? ' selected' : ''}${ui.pitchSwapId === pid ? ' swapping' : ''}${p && outLabel(p) ? ' injured' : ''}${p?.banMatches > 0 ? ' banned' : ''}${mates.has(pid) ? ` mate mate-${mates.get(pid)}` : ''}`,
       style: { left: pos.x + '%', top: pos.y + '%' }, dataset: { slot: String(slot), fit: String(fit) }, title: `${slotPlaceLabel(team.tactics, slot)}${kind ? ` (${kind})` : ''} – ${p ? p.name : '?'}${p ? ` · naturlig: ${POSITION_FULL[p.position] ?? p.position}${fit < 1 ? ` – her ${fitCost(fit)} i dueller` : ''}` : ''}${p && isOwn && pairs?.length && pairText(pid) ? ` · 🤝 ${pairText(pid)}` : ''}`,
     }, h('span', { class: 'token-num' }, p ? String(p.shirtNumber) : '?'), h('span', { class: 'token-name' }, p ? p.shortName : '?'),
-      p && p.banMatches > 0 ? h('span', { class: 'token-flag' }, `⛔ udelukket`) : out ? h('span', { class: 'token-flag' }, '⚠ Ude af zone (-20%)') : custom ? h('span', { class: 'token-flag ok' }, '✅ Custom pos') : null,
-      fit < 1 ? h('span', { class: 'token-flag pos' }, `⚠ Uden for position${kind && kind !== 'kant-/back-plads' ? ` – ${kind}` : ''} (${fitCost(fit)})`) : null);   // QC v3.24.6: pladstypen synligt (mobil)
+      flags.length ? h('div', { class: 'token-flags' }, flags) : null);
     token.addEventListener('click', () => {
       if (!p || token.dataset.dragged) { delete token.dataset.dragged; return; }
       // Eget hold: første klik vælger, klik på en anden brik bytter de to (som i v2.5).
       if (isOwn && ui.pitchSwapId && ui.pitchSwapId !== pid) onTokenSwap(ui.pitchSwapId, pid);
       else onSelect(p, isOwn);
     });
-    if (isOwn && slot > 0) attachDrag(token, pitch, anchorRing, coords[slot], slot, onMove);
+    if (isOwn && slot > 0) attachDrag(token, pitch, anchorRing, coords[slot], slot, onMove, p);
     pitch.append(token);
   });
   return pitch;
 }
 
-function attachDrag(token, pitch, ring, anchor, slot, onMove) {
+// Spilfører UI 2 (v3.33.0-rettelse): "✅ Custom pos" vises ikke, når der også står et pladsflag – de to lå oven i hinanden og i naboen.
+// Pladsflaget har en kort form (data-short), som CSS viser ≤ 600 px: "⚠ DM-plads −2,5 %" på to linjer (textContent er den lange – title og tests).
+const EDGE_X = 25;
+const posFlag = (kind, fit) => h('span', { class: 'token-flag pos', dataset: { short: `⚠ ${kind ?? 'Uden for pos.'}\n${fitCost(fit)}` } }, `⚠ Uden for position${kind ? ` – ${kind}` : ''} (${fitCost(fit)})`);
+// liveText (v3.33.0-rettelse, Spilfører UI 1): etiketten under træk siger følgen for NETOP ham – pladstypen, hans pris eller ✓ (fitOf, samme
+// tabel som flaget) og "ude af zone". tone: 'ok' (grøn) passer, 'warn' (gul) koster – egen farve, ikke "Ude af zone"-flagets lyserøde.
+export function liveText(anchor, y, position, out) {
+  const k = slotKindText(anchor.r, y) ?? `${roleLabel(anchor.r)}-plads`, fit = position ? fitOf(position, anchor.r, y) : 1;
+  return { text: `→ ${k}${fit < 1 ? ` · ${fitCost(fit)}` : position ? ' ✓' : ''}${out ? ' · ude af zone' : ''}`, tone: fit < 1 || out ? 'warn' : 'ok' };
+}
+function attachDrag(token, pitch, ring, anchor, slot, onMove, player = null) {
   token.classList.add('draggable');
   token.addEventListener('pointerdown', (e) => {
     e.preventDefault();
@@ -71,8 +85,9 @@ function attachDrag(token, pitch, ring, anchor, slot, onMove) {
       last = clampPos({ x: ((ev.clientX - rect.left) / rect.width) * 100, y: ((ev.clientY - rect.top) / rect.height) * 100 });
       moved = true;
       token.style.left = last.x + '%'; token.style.top = last.y + '%';
-      token.classList.toggle('out', Math.hypot(last.x - anchor.x, last.y - anchor.y) > MAX_ANCHOR_RADIUS);
-      if (live) { const k = slotKindText(anchor.r, last.y); live.textContent = k ? `→ ${k}` : `→ ${roleLabel(anchor.r)}-plads`; }
+      const out = Math.hypot(last.x - anchor.x, last.y - anchor.y) > MAX_ANCHOR_RADIUS;
+      token.classList.toggle('out', out);
+      if (live) { const t = liveText(anchor, last.y, player?.position, out); live.textContent = t.text; live.className = `token-flag kind-live ${t.tone}`; }
     };
     const up = () => {
       token.removeEventListener('pointermove', move); token.removeEventListener('pointerup', up);

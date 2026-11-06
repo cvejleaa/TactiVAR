@@ -59,7 +59,10 @@ test('live-etiketten under træk på en KANTplads: "→ back-plads" / "→ kant-
   };
   const w = labels(4, [64, 57, 46]);
   assert.ok(w.live, 'LWB: live-etiket under træk');
-  assert.deepEqual(w.seen, ['→ back-plads', '→ kant-/back-plads', '→ kant-plads']);   // ≥ 60 back, 56–59 begge, ≤ 55 kant
+  const wm = me.squad.find((p) => p.id === me.tactics.lineupSlots[4]);
+  assert.equal(wm.position, 'WM', 'data: en kant på LWB-pladsen');
+  // ≥ 60 back (en kant dér: naboplads −2,5 %), 56–59 begge (✓), ≤ 55 kant (✓) – følgen for netop ham (v3.33.0-rettelse, Spilfører UI 1)
+  assert.deepEqual(w.seen, ['→ back-plads · −2,5 %', '→ kant-/back-plads ✓', '→ kant-plads ✓']);
   w.t.listeners.pointerup();
   assert.ok(w.live.removed, 'etiketten fjernes, når brikken slippes');
   for (const slot of [9, 1]) assert.equal(labels(slot, [50]).live, undefined, `slot ${slot} (ST/CB) har ingen pladstype → ingen etiket`);
