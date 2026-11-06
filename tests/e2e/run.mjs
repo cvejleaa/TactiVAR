@@ -3918,7 +3918,8 @@ try {
   // overlappe hinanden eller en anden briks cirkel, intet flag må skæres af banen, "✅ Custom pos" står ikke ved et pladsflag, og mobilen viser den
   // korte form "⚠ DM-plads / −2,5 %". Under træk har live-etiketten sin egen farve (gul koster, grøn passer – ikke "Ude af zone"-lyserød).
   async function v3330fix() {
-    const c = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true }), p = await c.newPage(); p.on('pageerror', (e) => fejl.push(e.message));
+   for (const w of [390, 1366]) {   // 1366: de lange flag (ca. 230 px) ved kanten – uden at vokse indad skar banen RW-flaget af
+    const c = await browser.newContext({ viewport: { width: w, height: w < 600 ? 844 : 900 }, hasTouch: w < 600 }), p = await c.newPage(); p.on('pageerror', (e) => fejl.push(e.message));
     await p.goto(BASE + '/'); await p.waitForSelector('body[data-klar="ja"]');
     const ok = await p.evaluate(() => {
       const d = JSON.parse(localStorage.getItem('tactivar_save')), me = d.league.teams.find((t) => !t.isBot);
@@ -3940,8 +3941,9 @@ try {
       return { pitch, flags, overlap: flags.flatMap((f, i) => [...flags.slice(i + 1).filter((g) => hit(f.b, g.b)).map((g) => `${f.slot}⇄${g.slot}`), ...parts.filter((x) => x.slot !== f.slot && hit(f.b, x.b)).map((x) => `${f.slot}→brik ${x.slot}`)]),
         cut: flags.filter((f) => f.b.l < pitch.l || f.b.r > pitch.r || f.b.t < pitch.t || f.b.b > pitch.b).map((f) => f.slot) };
     });
-    check('v3.33.0-rettelse (390): data – to pladsflag (CM på DM-pladsen og angriber på højre kant), og ingen "✅ Custom pos" ved den trukne CM', ok && JSON.stringify(st.flags.map((f) => `${f.slot}:${f.text}`).sort()) === JSON.stringify(['10:⚠ Uden for position – kant-plads (−2,5 %)', '6:⚠ Uden for position – DM-plads (−2,5 %)']), JSON.stringify(st.flags.map((f) => `${f.slot}:${f.text}`)));
-    check('v3.33.0-rettelse (390): flagene overlapper hverken hinanden eller en anden briks cirkel, og intet flag skæres af banen', st.flags.length === 2 && st.overlap.length === 0 && st.cut.length === 0, JSON.stringify({ overlap: st.overlap, cut: st.cut, pitch: st.pitch, flags: st.flags.map((f) => [f.slot, f.b]) }));
+    check(`v3.33.0-rettelse (${w}): data – to pladsflag (CM på DM-pladsen og angriber på højre kant), og ingen "✅ Custom pos" ved den trukne CM`, ok && JSON.stringify(st.flags.map((f) => `${f.slot}:${f.text}`).sort()) === JSON.stringify(['10:⚠ Uden for position – kant-plads (−2,5 %)', '6:⚠ Uden for position – DM-plads (−2,5 %)']), JSON.stringify(st.flags.map((f) => `${f.slot}:${f.text}`)));
+    check(`v3.33.0-rettelse (${w}): flagene overlapper hverken hinanden eller en anden briks cirkel, og intet flag skæres af banen`, st.flags.length === 2 && st.overlap.length === 0 && st.cut.length === 0, JSON.stringify({ overlap: st.overlap, cut: st.cut, pitch: st.pitch, flags: st.flags.map((f) => [f.slot, f.b]) }));
+    if (w > 600) { await c.close(); continue; }
     const f6 = st.flags.find((f) => f.slot === '6');
     check('v3.33.0-rettelse (390): mobilen viser den korte form "⚠ DM-plads / −2,5 %" – den lange tekst er skjult (skriftstørrelse 0)', f6?.shown === '"⚠ DM-plads\\a −2,5 %"' || f6?.shown === '"⚠ DM-plads\\a−2,5 %"' ? f6.fs === '0px' : false, JSON.stringify(f6));
     // Live-etiketten under træk: den HØJRE CM-plads (plads 7, en CM) ned i DM-zonen → gul; op i CM-zonen → grøn
@@ -3952,6 +3954,7 @@ try {
     const pink = await p.evaluate(() => { const e = document.createElement('span'); e.className = 'token-flag'; document.getElementById('pitch').append(e); const c = getComputedStyle(e).color; e.remove(); return c; });
     check('v3.33.0-rettelse: live-etiketten har sin egen farve – gul ved −2,5 %, grøn ved ✓, ingen af dem "Ude af zone"-flagets lyserøde', JSON.stringify(seen) === JSON.stringify([['→ DM-plads · −2,5 %', 'rgb(253, 230, 138)'], ['→ CM-plads ✓', 'rgb(134, 239, 172)']]) && pink === 'rgb(254, 202, 202)', JSON.stringify({ seen, pink }));
     await c.close();
+   }
   }
   // ---------- v3.32.3 (brugeren 6/11: "Jeg kan ikke på taktik siden se, hvem den valgte spiller spiller godt sammen med") ----------
   // Fokus = den valgte i et byt (pitchSwapId): hans streger fremhævet, de andre dæmpet, naboernes ring i båndets farve, teksten i #pick-msg,
