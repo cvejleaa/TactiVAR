@@ -644,6 +644,15 @@ bedre kan kontrollere spil motoren".
   formation en 🤝-besked med de bånd, der skiftede (største fald først, højst 2). Spillerkortet: bedste makker kun ved stærkt, hans
   par med naboerne nu; salgslinjen (kortet og Klub) ved stærkt; købeboksen og "Til salg i ligaen": fremmed for alle, ca. 8 kampe
   (`gamesToSettle`). Fuldtidsanalysen: én sætning om din midtbane ved kampstart (finder hinanden/fremmede eller stærkt).
+  **v3.32.3** (brugeren 6/11: "Jeg kan ikke på taktik siden se, hvem den valgte spiller spiller godt sammen med"): den valgte i et
+  byt (valg = start byt) er i fokus – på banen hans streger fremhævet (tykkere, uigennemsigtige), de andre dæmpet til 25 %, og
+  naboernes brikker får en ring i båndets farve. Valgbeskeden ved listen siger i ord hans naboer (kun de læste par, stærkeste først,
+  "svagest: …"), "Ingen stærke par endnu – ca. N kampe mere side om side" / "Alle hans naboer: …" (`gamesToSettle(ref, fra, til)`),
+  og højst 2 andre markspillere, han har spillet ved siden af (≥ finder hinanden; ikke hans naboer nu, ikke et seedet par – holdets
+  seed-runde og aldrig over 78) med hvor de står: "Kender også #8 X (stærkt, bænk) – samspil tæller kun, når de står som naboer".
+  Målmanden: "indgår ikke i samspil". Kun dit hold, kun ord. Mens byttet er i gang, står båndskiftet i Plads-cellen pr. række
+  ("+2 −1" = to par stiger og ét falder et bånd, "±0"; tooltip = præcis 🤝-beskeden efter byttet – samme `pickForSwap` på en kopi,
+  `state/actions.js swapPreview`); bænk ⇄ reserve uden. Brikkernes trykfelt er ≥ 44 px ved ≤ 600 px (tegningen uændret).
   **v3.24.2** (Spilfører UI: "belønningen er tavs"): efter runden står øverst i Trup (v3.30.0: øverst på 🏋️ Træning) de par i din opstilling, der blev stærke –
   kun når de spillede sammen i runden – og dem, der holdt op, fordi de ikke spillede sammen (`strongChanges`; før og efter mod
   det NYE snit, så snittet alene aldrig flytter et par; kun par, der fandtes før). Navne fra truppen nu; fra 4 par kun antallet;
