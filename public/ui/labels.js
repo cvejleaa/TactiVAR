@@ -78,7 +78,7 @@ export const kr = (n) => n.toLocaleString('da-DK') + ' kr.';
 
 // Uden for position (v3.20.0): prisen regnes fra tabellen (formations.js FIT) – aldrig skrevet ind som tal i en tekst
 export const fitCost = (f) => `−${String(Math.round((1 - f) * 1000) / 10).replace('.', ',')} %`;
-export const FIT_HELP = `Uden for position: egen plads 100 %, naboplads (fx DM på CM, back på kant) ${fitCost(FIT.near)}, anden markplads ${fitCost(FIT.other)}, målmand ⇄ markspiller ${fitCost(FIT.keeper)} – i dueller, afslutninger, pres og løb (ikke boldbesiddelsen). Kantpladser (${['LB', 'RB', 'LWB', 'RWB', 'LM', 'RM'].map(roleLabel).join('/')}): dybden afgør – højt på banen er det en kant-plads, dybt en back-plads, imellem passer begge; trækker du en spiller, følger prisen med.`;
+export const FIT_HELP = `Uden for position: egen plads 100 %, naboplads (fx DM på CM, back på kant) ${fitCost(FIT.near)}, anden markplads ${fitCost(FIT.other)}, målmand ⇄ markspiller ${fitCost(FIT.keeper)} – i dueller, afslutninger, pres og løb (ikke boldbesiddelsen). Pladsen følger dybden – spilleren gør ikke. Kantpladser (${['LB', 'RB', 'LWB', 'RWB', 'LM', 'RM'].map(roleLabel).join('/')}): højt en kant-plads, dybt en back-plads. Midten (${['CDM', 'CM', 'CAM'].map(roleLabel).join('/')}): dybt en DM-plads, i midten en CM-plads, højt en OM-plads. Imellem passer begge; trækker du en spiller, følger prisen med (på midten også rollen: "CM→DM").`;
 
 // Udelukkelse (v3.27.0, nr. 64): ét sted for ord og tegn. ⛔ – ikke 🟥, som i karakterarket betyder "udvist i kampen" (QC).
 export const BAN_WHY = { DIRECT: 'direkte rødt kort', SECOND_YELLOW: 'rødt kort for to gule', YELLOWS: `${BAN.YELLOW_EVERY}. gule kort i sæsonen` };

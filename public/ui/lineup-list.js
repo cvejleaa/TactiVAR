@@ -5,7 +5,7 @@
 import { h, dec, LOCK } from './dom.js';
 import { LINE, POSITION, POSITION_FULL, starsEl, outLabel, OUT_TITLE, fitCost, FIT_HELP, roleLabel, archetypeOf, archIcon, archReqText } from './labels.js';
 import { canSeeField } from '../engine/visibility.js';
-import { FORMATIONS, slotFitOf, slotKindText, slotPosition } from '../engine/formations.js';
+import { FORMATIONS, slotFitOf, slotKindText, slotPosition, slotPlaceLabel } from '../engine/formations.js';
 import { matchBenchOf, reservesOf, KEY_SKILLS, keyAvg } from '../engine/career.js';
 import { COLUMNS, heatClass, avgRating } from './matrix.js';
 
@@ -62,7 +62,7 @@ export function renderLineupList({ team, isOwn, ui, onPick, onSort, onBlocked, o
       r.up ? [' ', h('span', { class: 'up' }, `+${r.up}`)] : null, r.down ? [' ', h('span', { class: 'down' }, `−${r.down}`)] : null);
   };
   const row = (p, kind) => {
-    const s = slotOf(p), place = kind === 'start' ? roleLabel(roles[s].r) : kind === 'bench' ? 'Bænk' : 'Res', fit = kind === 'start' ? slotFitOf(team.tactics, s, p.position) : 1;
+    const s = slotOf(p), place = kind === 'start' ? slotPlaceLabel(team.tactics, s) : kind === 'bench' ? 'Bænk' : 'Res', fit = kind === 'start' ? slotFitOf(team.tactics, s, p.position) : 1;
     return h('tr', { class: `lp-row ${kind}-p` + (ui.swapId === p.id ? ' active' : '') + (ui.cardId === p.id ? ' carded' : '') + (outLabel(p) ? ' injured' : '') + (p.banMatches > 0 ? ' banned' : ''), dataset: { pid: p.id },
       title: isOwn ? (kind === 'reserve' ? 'Reserve – ikke med i kampen. Klik og så en bænkspiller (eller en brik) for at tage ham med.' : 'Klik og så en anden spiller (her eller på banen) for at bytte') : '',
       onclick: () => onPick(p) },

@@ -1053,6 +1053,7 @@ try {
   };
   if (process.env.F2_ONLY) { await f2(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun F2-blokken (kortpanelet – hurtig mutationskørsel)
   if (process.env.TM_V3323_ONLY) { await v3323tm(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); console.log(fejl.join(' | ')); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun Test Managers v3.32.3-blok
+  if (process.env.V3330_ONLY) { await v3330(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); console.log(fejl.join(' | ')); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun v3.33.0-blokken (pladsen følger dybden på midten)
   if (process.env.V3323_ONLY) { await v3323(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); console.log(fejl.join(' | ')); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun v3.32.3-blokken (samspil på Taktik)
   if (process.env.TM_V3320_ONLY) { await v3320tm(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); console.log(fejl.join(' | ')); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun Test Managers v3.32.0-blok
   if (process.env.TM_V3312_ONLY) { await v3312tm(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); console.log(fejl.join(' | ')); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun Test Managers v3.31.2-blok
@@ -3844,6 +3845,62 @@ try {
     check('v3.31.2 TM: tallene i statistik-tabellen er højrejusteret', s1.align === 'right' || s1.align === 'end', s1.align);
     await c.close();
   }
+  // ---------- v3.33.0 (brugeren 6/11: "hvis jeg trak en spiller ud af en standardopstilling, så det f.eks. gik fra at være en cm til en dm,
+  // så skulle spillet finde ud af det, og ikke give en straf til en dm spiller på den plads") ----------
+  // 4-3-3: en CM på den venstre CM-plads (slot 6, ankret y 44) trækkes ned til y ≈ 56 → DM-plads. Live-etiketten under trækket, brikkens
+  // title og flag og Plads-cellen siger det; en DM dér har ingen straf; tilbage igen → væk. Teksterne er SKREVET her. Kan køres alene med V3330_ONLY=1.
+  async function v3330() {
+    const c = await browser.newContext({ viewport: { width: 1400, height: 1000 } }), p = await c.newPage(); p.on('pageerror', (e) => fejl.push(e.message));
+    await p.goto(BASE + '/'); await p.waitForSelector('body[data-klar="ja"]');
+    // put(slot, id): spilleren på pladsen; den, der stod der, tager hans gamle plads (start, bænk eller reserve) – start og bænk overlapper aldrig
+    const edit = (src, arg) => p.evaluate(([f, a]) => {
+      const d = JSON.parse(localStorage.getItem('tactivar_save')), me = d.league.teams.find((t) => !t.isBot), s = me.tactics.lineupSlots;
+      me.matchBench ??= [];
+      const put = (slot, id) => { const j = s.indexOf(id), b = me.matchBench.indexOf(id); if (j >= 0) s[j] = s[slot]; else if (b >= 0) me.matchBench[b] = s[slot]; s[slot] = id; };
+      const r = (0, eval)('(' + f + ')')(me, s, put, a); localStorage.setItem('tactivar_save', JSON.stringify(d)); return r;
+    }, [src.toString(), arg ?? null]);
+    const ids = await edit((me, s, put) => {
+      me.tactics.baseFormation = '4-3-3'; me.tactics.customCoords = {}; me.matchBenchAuto = false;
+      for (const x of me.squad) Object.assign(x, { injuryMatchesLeft: 0, banMatches: 0 });
+      const cm = me.squad.find((x) => x.position === 'CM'), dm = me.squad.find((x) => x.position === 'DM');
+      put(6, cm.id);
+      const j = s.indexOf(dm.id);
+      if (j >= 0) put(j, me.squad.find((x) => !s.includes(x.id) && !['GK', 'CM', 'DM'].includes(x.position)).id);   // DM'en ud af start-11
+      return { cm: cm.id, dm: dm.id };
+    });
+    const reload = async () => { await p.reload(); await p.waitForSelector('body[data-klar="ja"]'); if (!(await p.locator('.tabpane.tab-taktik').count())) { await p.click('#tab-taktik'); await p.waitForSelector('.tabpane.tab-taktik'); } await p.locator('#pitch').scrollIntoViewIfNeeded(); };
+    await reload();
+    const T = '#pitch .token[data-slot="6"]';
+    const tokenState = () => p.evaluate((sel) => { const t = document.querySelector(sel); return { title: t.title, flag: t.querySelector('.token-flag.pos')?.textContent ?? null, live: t.querySelector('.kind-live')?.textContent ?? null, fit: t.dataset.fit }; }, T);
+    const placeOf = (id) => p.evaluate((pid) => document.querySelector(`#lineup-table tr[data-pid="${pid}"] td.lp-place`)?.textContent ?? null, id);
+    const others = () => p.evaluate(() => [...document.querySelectorAll('#pitch .token')].filter((t) => t.dataset.slot !== '6').map((t) => t.title).filter((x) => /→|DM-plads|CM-plads|OM-plads/.test(x)));
+    // Træk brikken gennem dybderne ys (i % af banen); live-etiketten læses ved hver – slippes ved den sidste
+    const drag = async (ys) => {
+      const box = await p.locator(T).boundingBox(), pb = await p.locator('#pitch').boundingBox(), seen = [];
+      await p.mouse.move(box.x + box.width / 2, box.y + 10); await p.mouse.down();
+      for (const y of ys) { await p.mouse.move(pb.x + pb.width * 0.32, pb.y + (pb.height * y) / 100, { steps: 6 }); seen.push((await tokenState()).live); }
+      await p.mouse.up(); await p.waitForTimeout(150);
+      return seen;
+    };
+    let st = await tokenState();
+    check('v3.33.0: på ankret (y 44) er CM-pladsen en CM-plads – ingen pladstekst, intet flag, ingen pil, Plads-cellen "CM"', /^CM – /.test(st.title) && !/plads/.test(st.title) && st.flag === null && st.fit === '1' && (await placeOf(ids.cm)) === 'CM', JSON.stringify(st));
+    const live = await drag([52, 46, 56]);
+    check('v3.33.0: under trækket står pladstypen live – "→ DM-/CM-plads" i mellemzonen, "→ CM-plads" ved y 46, "→ DM-plads" ved y 56', JSON.stringify(live) === JSON.stringify(['→ DM-/CM-plads', '→ CM-plads', '→ DM-plads']), JSON.stringify(live));
+    st = await tokenState();
+    check('v3.33.0: trukket til y ≈ 56 → brikken siger "CM→DM (DM-plads)", flaget "⚠ Uden for position – DM-plads (−2,5 %)", og live-etiketten er væk', /^CM→DM \(DM-plads\) – /.test(st.title) && st.flag === '⚠ Uden for position – DM-plads (−2,5 %)' && st.fit === '0.975' && st.live === null, JSON.stringify(st));
+    check('v3.33.0: Plads-cellen siger "CM→DM ⚠ −2,5 %" for CM\'en – og ingen anden brik har pil eller pladstekst', (await placeOf(ids.cm)) === 'CM→DM ⚠ −2,5 %' && (await others()).length === 0, `${await placeOf(ids.cm)} | ${JSON.stringify(await others())}`);
+    // DM'en på den trukne plads (de tegnede positioner bliver stående): ingen straf
+    await edit((me, s, put, a) => put(s.indexOf(a.cm), a.dm), ids);
+    await reload();
+    st = await tokenState();
+    const yNow = await p.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((t) => !t.isBot).tactics.customCoords[6]?.y);
+    check('v3.33.0: en DM på den trukne plads har ingen straf – intet flag, fit 1, Plads-cellen "CM→DM" uden ⚠', yNow >= 54 && /^CM→DM \(DM-plads\) – /.test(st.title) && st.flag === null && st.fit === '1' && (await placeOf(ids.dm)) === 'CM→DM', `${yNow} ${JSON.stringify(st)} ${await placeOf(ids.dm)}`);
+    await drag([44]);
+    st = await tokenState();
+    check('v3.33.0: tilbage til y ≈ 44 → DM-pladsen er væk: title "CM – …" uden pil og uden "DM-plads", DM\'en betaler naboprisen', /^CM – /.test(st.title) && !/→|DM-plads/.test(st.title) && st.flag === '⚠ Uden for position (−2,5 %)' && (await placeOf(ids.dm)) === 'CM ⚠ −2,5 %', JSON.stringify(st));
+    check('v3.33.0: forklaringen ved listen siger, at pladsen følger dybden – også på midten', (await p.textContent('#fit-help')).includes('Pladsen følger dybden – spilleren gør ikke') && (await p.textContent('#fit-help')).includes('dybt en DM-plads'));
+    await c.close();
+  }
   // ---------- v3.32.3 (brugeren 6/11: "Jeg kan ikke på taktik siden se, hvem den valgte spiller spiller godt sammen med") ----------
   // Fokus = den valgte i et byt (pitchSwapId): hans streger fremhævet, de andre dæmpet, naboernes ring i båndets farve, teksten i #pick-msg,
   // byt-forhåndsvisningen i Plads-cellen og trykfeltet ≥ 44 px om brikken ved 390. Teksterne er SKREVET her (ikke regnet med focusChemText).
@@ -4101,6 +4158,7 @@ try {
   await v3320tm();
   await v3323();
   await v3323tm();
+  await v3330();
   check('Ingen sidefejl under hele forløbet', fejl.length === 0, fejl.join(' | '));
 } finally {
   await browser.close();

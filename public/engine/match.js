@@ -3,7 +3,7 @@
 // Rettet ift. v2.5b: auto-indskiftning sker i en kamplokal kopi (ændrede før lineupSlots
 // permanent), og Hvis-Så-reglerne kører for begge hold og skifter reelt formation.
 import { matchBenchOf, unavailable, BAN } from './career.js';
-import { FORMATIONS, lineOfRole, slotLineOf, isOutOfZone, slotPosition, fitOf, slotFitOf, arrangeByFit, roleLabel } from './formations.js';
+import { FORMATIONS, lineOfRole, slotLineOf, isOutOfZone, slotPosition, fitOf, slotFitOf, arrangeByFit, roleLabel, slotRoleOf } from './formations.js';
 import { livePositions as livePos0, coupledPositions as coupled0, kickoffPositions, apartFrom, apartOnLine, ONSIDE_GAP, MIN_APART } from './positions.js';
 import { masteryVs, counterXpForMatch } from './counter.js';
 import { chemScale, slotChem, bandOf, BAND_WORD, CHEM_BASE } from './chemistry.js';
@@ -33,8 +33,9 @@ export function pickForSlot(list, tactics, slot, score = () => 1) {
   return list.slice().sort((a, b) => score(b) * slotFit(tactics, b, slot) - score(a) * slotFit(tactics, a, slot))[0];
 }
 // Formationsskift i kampen: de samme spillere (og tomme pladser efter rødt) fordeles efter position; målmanden bliver i mål
-function refit(side, formation) {
-  const next = arrangeByFit(side.starters, formation, side.tactics.baseFormation);
+// ys (v3.33.0, QC): pladsernes tegnede dybde i den NYE opstilling (en Hvis-Så-plan med trukne pladser) – ellers ankrene
+function refit(side, formation, ys = null) {
+  const next = arrangeByFit(side.starters, formation, side.tactics.baseFormation, ys);
   if (next[0] === side.starters[0]) side.starters = next;
 }
 const tag = (p) => `#${p.shirtNumber} ${p.shortName}`;
@@ -270,7 +271,7 @@ function customDragged(side) {
   const cc = side.tactics.customCoords || {};
   return Object.keys(cc).map(Number).filter((slot) => slot > 0 && slot < 11)
     .filter((slot) => side.starters[slot])   // ikke en udvist spillers tomme plads
-    .map((slot) => ({ player: side.starters[slot], role: coordsOf(side.tactics)[slot].r, outOfZone: isOutOfZone(side.tactics, slot) }));
+    .map((slot) => ({ player: side.starters[slot], role: slotRoleOf(side.tactics, slot), outOfZone: isOutOfZone(side.tactics, slot) }));
 }
 
 const avg = (arr, f) => arr.reduce((a, p) => a + f(p), 0) / Math.max(1, arr.length);
@@ -529,9 +530,9 @@ export function simulateMatch(home, away, rng, opts = {}) {
   // Uden for position (v3.20.0): pladsens fit (formations.js FIT) – den plads, han står på NU (skift og Hvis-Så tæller med)
   const posF = (p) => { const side = sideOf(p), slot = side ? side.starters.indexOf(p) : -1; return slot >= 0 ? slotFit(side.tactics, p, slot) : 1; };
   const ff = (p) => freshFactor(p) * (1 - TIRED_PER_POINT * lostAt(p)) * shortF(sideOf(p)) * (limping(p) ? LIMP.factor : 1) * posF(p);
-  const register = (side, p, role, minIn, slot) => sheet.register(p, side.team, side.isHome, role, minIn, rng, masteryVs(p, other(side).team), slot, slot != null ? coordsOf(side.tactics)[slot].r : role);
-
-  for (const side of [H, A]) side.starters.forEach((p, i) => p && register(side, p, coordsOf(side.tactics)[i].r, 1, i));
+  const register = (side, p, role, minIn, slot) => sheet.register(p, side.team, side.isHome, role, minIn, rng, masteryVs(p, other(side).team), slot, slot != null ? slotRoleOf(side.tactics, slot) : role);
+  // v3.33.0: rollen = den, pladsen spilles som (en CM trukket ned til y 56 løber og står som DM – karakterarket viser "CM→DM")
+  for (const side of [H, A]) side.starters.forEach((p, i) => p && register(side, p, slotRoleOf(side.tactics, i), 1, i));
   // Startformationen gemmes, så karakterarket kan vise spillerne på banen.
   const startFormations = { home: H.tactics.baseFormation, away: A.tactics.baseFormation };
   const startPhases = { home: structuredClone(H.tactics.phases), away: structuredClone(A.tactics.phases) };
@@ -1202,7 +1203,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
         // Spiller holdet allerede præcis den plan, er skiftet en tom handling – intet logges.
         const same = plan.baseFormation === side.tactics.baseFormation && JSON.stringify(plan.phases) === JSON.stringify(side.tactics.phases) && JSON.stringify(plan.customCoords || {}) === JSON.stringify(side.tactics.customCoords || {});
         if (same) return;
-        if (plan.baseFormation !== side.tactics.baseFormation) refit(side, plan.baseFormation);
+        if (plan.baseFormation !== side.tactics.baseFormation) refit(side, plan.baseFormation, FORMATIONS[plan.baseFormation].map((c, i) => plan.customCoords?.[i]?.y ?? c.y));
         side.tactics.baseFormation = plan.baseFormation;
         // Kampens taktik ændres kun ved genanvisning (aldrig i stedet), så planens objekter
         // kan bruges direkte; resultatets endState er en kopi.
@@ -1559,10 +1560,9 @@ export function simulateMatch(home, away, rng, opts = {}) {
         // afslutning som før. Kun DIT holds løb fortælles i referatet. (v3.16: afspilningen viser løberen RUN_STEP længere
         // fremme i afslutningens øjeblik – også modstanderens; brugerens valg "begge hold fuldt synlige", spec §3.)
         const runs = attPh.phase1_buildUp.offBallRuns ?? 'NORMAL';
-        const attC = coordsOf(att.tactics);
         const all = att.starters.map((p, i) => ({ p, i })).filter(({ p, i }) => i > 0 && p), sound = all.filter(({ p }) => !limping(p));
         const pool = sound.length ? sound : all;   // en haltende løber ikke fri
-        const wts = pool.map(({ i }) => RUN_WEIGHT[runGroup(attC[i].r)][runs] ?? 1);
+        const wts = pool.map(({ i }) => RUN_WEIGHT[runGroup(slotRoleOf(att.tactics, i))][runs] ?? 1);   // v3.33.0: den tegnede plads (OM trukket ned løber som CM)
         let rr = rng.next() * wts.reduce((x, y) => x + y, 0);
         const pick = pool[Math.max(0, wts.findIndex((w) => (rr -= w) < 0))] ?? pool.at(-1);
         const runner = pick.p, rs = runner.skills, zone = runZone(slotPosition(att.tactics, pick.i));

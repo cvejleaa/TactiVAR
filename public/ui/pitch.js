@@ -1,7 +1,7 @@
 // Taktiktavlen: "Rolle-anker & frit træk" (docs/spec.md §4). Målmanden og modstanderens
 // brikker kan ikke trækkes; uden for ankerradius 28 vises "⚠ Ude af zone (-20%)".
 import { h } from './dom.js';
-import { FORMATIONS, MAX_ANCHOR_RADIUS, slotPosition, isOutOfZone, clampPos, slotFitOf, slotKindText } from '../engine/formations.js';
+import { FORMATIONS, MAX_ANCHOR_RADIUS, slotPosition, isOutOfZone, clampPos, slotFitOf, slotKindText, slotPlaceLabel, CENTRAL_ROLES } from '../engine/formations.js';
 import { POSITION_FULL, fitCost, outLabel, roleLabel } from './labels.js';
 import { BAND_WORD } from '../engine/chemistry.js';
 
@@ -40,7 +40,7 @@ export function renderPitch({ team, isOwn, ui, onMove, onSelect, onTokenSwap, pa
     const fit = p ? slotFitOf(team.tactics, slot, p.position) : 1, kind = slotKindText(coords[slot].r, pos.y);   // v3.24.6: pladsens dybde
     const token = h('div', {
       class: `token${out ? ' out' : custom ? ' custom' : ''}${ui.selectedPlayerId === pid ? ' selected' : ''}${ui.pitchSwapId === pid ? ' swapping' : ''}${p && outLabel(p) ? ' injured' : ''}${p?.banMatches > 0 ? ' banned' : ''}${mates.has(pid) ? ` mate mate-${mates.get(pid)}` : ''}`,
-      style: { left: pos.x + '%', top: pos.y + '%' }, dataset: { slot: String(slot), fit: String(fit) }, title: `${roleLabel(coords[slot].r)}${kind ? ` (${kind})` : ''} – ${p ? p.name : '?'}${p ? ` · naturlig: ${POSITION_FULL[p.position] ?? p.position}${fit < 1 ? ` – her ${fitCost(fit)} i dueller` : ''}` : ''}${p && isOwn && pairs?.length && pairText(pid) ? ` · 🤝 ${pairText(pid)}` : ''}`,
+      style: { left: pos.x + '%', top: pos.y + '%' }, dataset: { slot: String(slot), fit: String(fit) }, title: `${slotPlaceLabel(team.tactics, slot)}${kind ? ` (${kind})` : ''} – ${p ? p.name : '?'}${p ? ` · naturlig: ${POSITION_FULL[p.position] ?? p.position}${fit < 1 ? ` – her ${fitCost(fit)} i dueller` : ''}` : ''}${p && isOwn && pairs?.length && pairText(pid) ? ` · 🤝 ${pairText(pid)}` : ''}`,
     }, h('span', { class: 'token-num' }, p ? String(p.shirtNumber) : '?'), h('span', { class: 'token-name' }, p ? p.shortName : '?'),
       p && p.banMatches > 0 ? h('span', { class: 'token-flag' }, `⛔ udelukket`) : out ? h('span', { class: 'token-flag' }, '⚠ Ude af zone (-20%)') : custom ? h('span', { class: 'token-flag ok' }, '✅ Custom pos') : null,
       fit < 1 ? h('span', { class: 'token-flag pos' }, `⚠ Uden for position${kind && kind !== 'kant-/back-plads' ? ` – ${kind}` : ''} (${fitCost(fit)})`) : null);   // QC v3.24.6: pladstypen synligt (mobil)
@@ -62,7 +62,9 @@ function attachDrag(token, pitch, ring, anchor, slot, onMove) {
     e.preventDefault();
     token.setPointerCapture(e.pointerId);
     const rect = pitch.getBoundingClientRect();
-    let moved = false, last = null;
+    let moved = false, last = null, live = null;
+    // v3.33.0: pladstypen live under trækket ("→ DM-plads") – den samme slotKindText som title og flaget, ud fra den trukne dybde
+    if (CENTRAL_ROLES.has(anchor.r) || slotKindText(anchor.r, anchor.y)) { live = h('span', { class: 'token-flag kind-live' }); token.append(live); }
     Object.assign(ring.style, { left: anchor.x + '%', top: anchor.y + '%', width: MAX_ANCHOR_RADIUS * 2 + '%', height: (MAX_ANCHOR_RADIUS * 2 * rect.width) / rect.height + '%' });
     ring.hidden = false;
     const move = (ev) => {
@@ -70,10 +72,11 @@ function attachDrag(token, pitch, ring, anchor, slot, onMove) {
       moved = true;
       token.style.left = last.x + '%'; token.style.top = last.y + '%';
       token.classList.toggle('out', Math.hypot(last.x - anchor.x, last.y - anchor.y) > MAX_ANCHOR_RADIUS);
+      if (live) { const k = slotKindText(anchor.r, last.y); live.textContent = k ? `→ ${k}` : `→ ${roleLabel(anchor.r)}-plads`; }
     };
     const up = () => {
       token.removeEventListener('pointermove', move); token.removeEventListener('pointerup', up);
-      ring.hidden = true;
+      ring.hidden = true; live?.remove();
       if (moved && last) { token.dataset.dragged = '1'; onMove(slot, { x: Math.round(last.x * 10) / 10, y: Math.round(last.y * 10) / 10 }); }
     };
     token.addEventListener('pointermove', move); token.addEventListener('pointerup', up);

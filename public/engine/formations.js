@@ -52,22 +52,44 @@ const ROLE_POSITION = { GK: 'GK', CB: 'CB', LB: 'FB', RB: 'FB', LWB: 'FB', RWB: 
 export const positionOfRole = (r) => ROLE_POSITION[r] ?? null;
 export const FIT = { own: 1, near: 0.975, other: 0.94, keeper: 0.85 };
 const NEAR = new Set(['CB-FB', 'CB-DM', 'FB-WM', 'DM-CM', 'CM-AM', 'CM-WM', 'AM-ST', 'AM-WM', 'WM-ST'].flatMap((k) => [k, k.split('-').reverse().join('-')]));
+// Centrale midtbanepladser (v3.33.0, brugeren 6/11: "hvis jeg trak en spiller ud af en standardopstilling, så det f.eks. gik fra at
+// være en cm til en dm, så skulle spillet finde ud af det, og ikke give en straf til en dm spiller på den plads"): på CDM/CM/CAM afgør
+// den tegnede DYBDE pladsen. y ≥ 54 DM; 51–53 DM/CM (begge fulde); 41–50 CM; 38–40 CM/OM; y ≤ 37 OM – skæringerne på halve tal, så et
+// træk til 53,5 er DM og 50,5 mellemzone. Intet anker skifter klasse (CDM 54–58, CM 44–50, CAM 34–36 – invarianttest). IKKE ST/CF (en
+// falsk 9'er er lovlig), CB (stopperen er stopper) eller kanterne (dem har WIDE_ROLES ovenfor).
+export const CENTRAL_ROLES = new Set(['CDM', 'CM', 'CAM']), CENTRAL_DM_Y = 53.5, CENTRAL_DMCM_Y = 50.5, CENTRAL_CM_Y = 40.5, CENTRAL_CMAM_Y = 37.5;
+// Mellemzonerne: pladser, hvor BEGGE positioner passer fuldt. ÉN tabel for fitOf, slotKindText og generator.js.
+export const BOTH = Object.freeze({ WIDE: ['WM', 'FB'], 'DM-CM': ['DM', 'CM'], 'CM-AM': ['CM', 'AM'] });
 // Kantpladser (v3.24.6, brugeren: "når det er en 3-5-2 opstilling, er det 5 midtbanespillere … Hvis jeg trækker min wing længere
 // tilbage så han mere er back end midtbanespiller, skal vi også have tilpasset straffen"): på en kantplads afgør DYBDEN, om
 // det er en back- eller en kant-plads – ikke rollenavnet. Højt (y ≤ WIDE_MID_Y) = kant, dybt (y ≥ WIDE_BACK_Y) = back,
 // imellem passer begge (intet hop, når man trækker lidt). 3-5-2's LWB/RWB (y 46) er altså kant-pladser, 5-3-2's (y 64) back.
 export function slotPositionOf(role, y) {
-  if (y == null || !WIDE_ROLES.has(role)) return positionOfRole(role);
-  return y <= WIDE_MID_Y ? 'WM' : y >= WIDE_BACK_Y ? 'FB' : 'WIDE';   // WIDE: både back og kant
+  if (y == null) return positionOfRole(role);
+  if (WIDE_ROLES.has(role)) return y <= WIDE_MID_Y ? 'WM' : y >= WIDE_BACK_Y ? 'FB' : 'WIDE';   // WIDE: både back og kant
+  if (CENTRAL_ROLES.has(role)) return y >= CENTRAL_DM_Y ? 'DM' : y >= CENTRAL_DMCM_Y ? 'DM-CM' : y >= CENTRAL_CM_Y ? 'CM' : y >= CENTRAL_CMAM_Y ? 'CM-AM' : 'AM';
+  return positionOfRole(role);
 }
-export const slotKindText = (role, y) => ({ WM: 'kant-plads', FB: 'back-plads', WIDE: 'kant-/back-plads' })[slotPositionOf(role, y)] ?? null;
+const WIDE_KIND = { WM: 'kant-plads', FB: 'back-plads', WIDE: 'kant-/back-plads' }, CENTRAL_KIND = { DM: 'DM-plads', CM: 'CM-plads', AM: 'OM-plads', 'DM-CM': 'DM-/CM-plads', 'CM-AM': 'CM-/OM-plads' };
+// Pladstypen i ord (brikkens title, Plads-cellen). En central plads nævnes kun, når dybden har gjort den til noget andet end rollen.
+export function slotKindText(role, y) {
+  const pos = slotPositionOf(role, y);
+  if (CENTRAL_ROLES.has(role)) return pos === positionOfRole(role) ? null : CENTRAL_KIND[pos] ?? null;
+  return WIDE_KIND[pos] ?? null;
+}
 export function fitOf(position, role, y = null) {
-  const want = slotPositionOf(role, y);
-  if (want === 'WIDE' && (position === 'WM' || position === 'FB')) return FIT.own;
-  if (!position || !want || position === want) return FIT.own;
+  const want = slotPositionOf(role, y), both = BOTH[want];
+  if (!position || !want || position === want || both?.includes(position)) return FIT.own;
   if ((position === 'GK') !== (want === 'GK')) return FIT.keeper;
-  if (want === 'WIDE') return NEAR.has(`${position}-WM`) || NEAR.has(`${position}-FB`) ? FIT.near : FIT.other;
-  return NEAR.has(`${position}-${want}`) ? FIT.near : FIT.other;
+  return (both ?? [want]).some((w) => NEAR.has(`${position}-${w}`)) ? FIT.near : FIT.other;
+}
+// Den rolle, pladsen spilles som (v3.33.0): CDM/CM/CAM efter den tegnede dybde – i mellemzonen rollens egen, hvis hans position er en af
+// de to, ellers CM. Alle andre roller uændret (kanterne bevidst: v3.24.6 holdt kampens rolle på rollenavnet). Løb, bevægelse og km.
+const CENTRAL_ROLE_OF = { DM: 'CDM', CM: 'CM', AM: 'CAM' };
+export function slotRoleAt(role, y) {
+  if (!CENTRAL_ROLES.has(role) || y == null) return role;
+  const pos = slotPositionOf(role, y);
+  return CENTRAL_ROLE_OF[pos] ?? (BOTH[pos].includes(positionOfRole(role)) ? role : 'CM');
 }
 // De SAMME spillere fordelt på formationens pladser efter position (v3.20.0): den fordeling, der giver størst samlet fit
 // (ungarsk metode – optimal og deterministisk; en grådig fordeling gav 4-2-3-1 7 i stedet for 2 uden for position). Ved lighed
@@ -132,6 +154,10 @@ export function slotPosition(tactics, slot) {
 
 // Fit på en plads i en opstilling – med pladsens (evt. flyttede) dybde. Motor, Taktik og tællerne bruger denne ene.
 export const slotLineOf = (tactics, slot) => lineOfRole((FORMATIONS[tactics.baseFormation] || FORMATIONS['4-4-2'])[slot]?.r, slotPosition(tactics, slot).y);
+// Pladsens kode med den effektive rolle (v3.33.0): "CM→DM", når en CM-plads er trukket ned i DM-zonen; ellers bare "CM"
+export const placeLabelOf = (role, effRole = role) => (effRole && effRole !== role ? `${roleLabel(role)}→${roleLabel(effRole)}` : roleLabel(role));
+export const slotPlaceLabel = (tactics, slot) => placeLabelOf((FORMATIONS[tactics.baseFormation] || FORMATIONS['4-4-2'])[slot]?.r, slotRoleOf(tactics, slot));
+export const slotRoleOf = (tactics, slot) => slotRoleAt((FORMATIONS[tactics.baseFormation] || FORMATIONS['4-4-2'])[slot]?.r, slotPosition(tactics, slot).y);
 export const slotFitOf = (tactics, slot, position) => fitOf(position, (FORMATIONS[tactics.baseFormation] || FORMATIONS['4-4-2'])[slot]?.r, slotPosition(tactics, slot).y);
 
 export function anchorDistance(tactics, slot) {
