@@ -1,50 +1,51 @@
-# NU (6/11): v3.32.3 – Samspil på Taktik (brugerens ønske 6/11, backlog 000.1)
+# NU (6/11): v3.33.0 – Træk bestemmer pladsen også på midten (brugerens ønske 6/11, backlog 000.2)
 
-Brugeren 6/11: "Jeg kan ikke på taktik siden se, hvem den valgte spiller spiller godt sammen med, og er derved afskåret fra at
-udnytte det når jeg sætter taktik." Kun UI + rene hjælpefunktioner – INGEN motorændring, intet nyt gemmefelt.
+Brugeren 6/11: "hvis jeg trak en spiller ud af en standardopstilling, så det f.eks. gik fra at være en cm til en dm, så skulle spillet
+finde ud af det, og ikke give en straf til en dm spiller på den plads." Valgt: straf OG rolle følger. Ønsket var gået tabt – kun
+kantreglen (v3.24.6) blev lavet.
 
-## Plan-gennemgangen (Arkitekt, QC opus, Spilfører UI, Spilfører klub – 6/11), indarbejdet
+## Plan-gennemgangen (Arkitekt, Spilfører motor, Spilfører klub, QC opus – 6/11), indarbejdet
 ### D0 Planfilerne
-- v3.32.2 flyttet øverst i `tidligere-planer.md` ("live 6/11, e2e mod live 786/786"); denne plan her.
+- v3.32.3 flyttet øverst i `tidligere-planer.md` ("live 6/11"); denne plan her.
 
-### D1 Rene funktioner (`engine/chemistry.js`; unit `tests/unit/chemistry-v3323.test.mjs`)
-- `lineupPairs(team, ref, slots = team.tactics.lineupSlots)` – bagudkompatibel.
-- `partnersOf(team, ref, pid)`: `neighbours` = de LÆSTE nabopar (`playerPairs`/`readPairs` – angriber⇄angriber og målmanden udelades)
-  stærkeste først; `weakest`; `others` = andre markspillere i truppen, han har spillet ved siden af (≥ "finder hinanden"), med
-  `where` start|bænk|reserve – ikke hans naboer på banen (heller ikke angriber⇄angriber); `isGK`; `sameBand`. Manglende par = fremmede
-  (`chemOf`) – ingen fallback til seedet. Et seedet par (holdets seed-runde, aldrig over 78) tæller ikke som "spillet sammen".
-- `focusChemText(team, ref, pid)`: kun båndenes ord (BAND_WORD), aldrig 0–100-tal. Naboerne i ord + "svagest: …"; alle i samme bånd →
-  "Alle hans naboer: <bånd> – samspil vokser kampe side om side (ca. N kampe til …)" (`gamesToSettle(ref, from, to)`); ingen stærke →
-  "Ingen stærke par endnu – ca. N kampe mere side om side"; højst 2 "Kender også #8 X (stærkt, bænk) – samspil tæller kun, når de står
-  som naboer"; målmand → "Målmanden indgår ikke i samspil."; skadet/udelukket markeret.
-- `swapPreview(team, ref, a, b)` → `{ kind, up, down, changes }`: SAMME `act.pickForSwap` på en kopi af `lineupSlots`/`matchBench`,
-  vurderet med `swapChanges`. Ligger i `state/actions.js` ved `pickForSwap` (ikke i chemistry.js): så findes byt-reglen ét sted, og
-  motoren importerer ikke tilstandslaget. Paritet: `changes` = 🤝-beskeden efter selve byttet (`withChem`, app.js).
+### D1 Pladsen følger dybden (`engine/formations.js` – ét sted; alle kaldere får det gratis)
+- Kun de centrale MIDTBANE-roller CDM, CM, CAM følger dybden (y = den tegnede plads). Zoner: y ≥ 54 DM; 51–53 mellemzone DM/CM (begge
+  fulde); 41–50 CM; 38–40 mellemzone CM/OM; y ≤ 37 OM (skæringerne ligger på halve tal: 53,5 / 50,5 / 40,5 / 37,5). INTET anker skifter
+  klasse (CDM 54–58, CM 44–50, CAM 34–36) – invarianttest over alle formationer.
+- ÉN tabel `BOTH = { WIDE: [WM, FB], 'DM-CM': [DM, CM], 'CM-AM': [CM, AM] }`, som `fitOf`, `slotKindText` og `generator.js` slår op i.
+- `slotKindText`: "DM-plads"/"CM-plads"/"OM-plads"/"DM-/CM-plads"/"CM-/OM-plads" – men null, når zonen er rollens egen position.
+- `slotRoleOf(tactics, slot)` / `slotRoleAt(role, y)`: den effektive rolle (CDM/CM/CAM efter dybde; mellemzone = rollens eget navn, hvis
+  hans position er en af de to, ellers CM; alle andre roller uændret).
 
-### D2 UI
-- Fokus = `view.pitchSwapId` (valg = start byt) – ingen ny tilstand. På banen: hans linjer `.focus` (tykkere, uigennemsigtige – også
-  "spillet sammen"), de andre dæmpet (`svg[data-focus]`, opacity .25); naboernes brikker en ring i båndets farve; lilla = kun valgt.
-  Ingen overgang (tavlen tegnes om ved hvert klik), så reduceret bevægelse rammes ikke.
-- Teksten i den eksisterende valgbesked `#pick-msg` (ikke en ny linje under banen); "Se kort ›" sidst. Kun eget hold.
-- Byt-forhåndsvisning i Plads-cellen ("+2 −1", "−1", "±0"; title = beskeden efter byttet) – ingen ny kolonne, intet på banen; bænk ⇄
-  reserve: ingen.
-- Trykfelt ≥ 44 px om brikkerne ved ≤ 600 px (usynligt `::after`, tegningen 29 × 29 uændret).
-- `chemLegend`, `#chem-weakest` og kortets "Bedste makker" uændret (begge nabo-baserede – teksten modsiger det ikke).
+### D2 Kampens rolle følger den tegnede plads (CDM/CM/CAM)
+- `slotRoleOf` i: løbsgruppen (`RUN_GROUP`, match.js), bevægelsen (`positions.js` ADVANCE/RUNS_PUSH/DRIFT_AXES/driftAt), km og karakter-
+  arkets rolle (`register`), "for langt fra sin X-zone"-teksten. `rolesOf`/midtbane-kæden uændret.
+- Ærligt i spec og NEWS: DM og CM har samme opgaver i motoren i dag – CM→DM ændrer straf og bevægelse; CM→OM ændrer også løbsprofil.
+- D2b: Hvis-Så plan-skift: `refit` med planens tegnede dybder (ys), før `customCoords` sættes. Et formationsskift nulstiller de tegnede
+  positioner (står i spec).
 
-### D3 Docs og udgivelse
-- spec §5 Visning · `public/version.js` 3.32.3 · NEWS '3.32.3' · backlog 000.1 → Lavet.
+### D3 UI og udgivelse
+- Plads-cellen (`ui/lineup-list.js`), brikkens title og flag (`ui/pitch.js`) og karakterarket (`ui/lineup.js`, via den gemte rolle) viser
+  den EFFEKTIVE plads ("CM→DM"). Under træk vises pladstypen live ("→ DM-plads") ud fra den trukne dybde.
+- `FIT_HELP` og spec §5 skrevet om. NEWS '3.33.0' ("Pladsen følger dybden – spilleren gør ikke"; en CM, der allerede er trukket dybt,
+  kan nu få ⚠ – brug "⇄ Stil op efter position"). `version.js` 3.33.0. Backlog: 000.2 → Lavet; nyt punkt "egentlig DM-opgave".
+
+### D4 Måling (`tools/measure-central.mjs`)
+- Dit hold mod 7 botter, begge baner, ≥ 150 seeds, mod forrige version (worktree af 4c149d9) og den nye. Scenarier: a) 4-2-3-1 med en CM
+  på en CDM-plads (ankeret og trukket til y 48); b) 4-3-3 med DM'en på en CM-plads trukket til y 56; c) 4-2-3-1's OM trukket til y 46.
+- Accept: netto pr. rettet spiller +0,02…+0,06 (0 på den gamle); ingen trukket opstilling slår den bedste utrukne med > +0,10 netto.
+- Fingeraftrykkene (GOLDEN, GOLDEN_RESULTS_400, NOPROSE_400, GOLDEN_TRACES_20) uændrede byte for byte – ingen formation har en tegnet
+  plads som standard, og ingen anker skifter klasse.
+
+## Bevidst udeladt (med begrundelse)
+- ST/CF/ANG følger ikke dybden: en falsk 9'er (ST trukket ned) skal forblive lovlig (`tools/measure-duels.mjs`).
+- CB ⇄ DM følger ikke dybden: en stopper trukket frem er stadig en stopper i kæden og i dueller; DM'ens egentlige opgave findes ikke endnu.
+- Kanterne i `slotRoleOf`: v3.24.6 holdt kampens rolle på rollenavnet bevidst (0,17 mål) – kun pris og kæde følger dybden dér.
+- Kæden: CDM/CM/CAM er alle MID – `midCount`/`MID_EXTRA`/`possMids`, samspilsnaboerne (`chemistry.js`) og besiddelsen bliver på ankrene.
+- En egentlig DM-opgave (bryder opbygningen) er ny mekanik → nyt backlog-punkt.
 
 ## Tests og mutationer
-- Unit: varierede værdier (stærk bænk-tidligere-nabo, ST⇄ST stærkt, seedet ikke-nabo på 78, målmand, skadet og udelukket starter,
-  manglende par, reserve); paritet preview ⇄ beskeden efter byttet for hvert klik fra 6 spillere.
-- e2e "v3.32.3" (390 tap, 1366 klik): line.focus = hans læste par, de andre dæmpet (computed opacity), naboring, den præcise tekst,
-  bænkrække uden fokus, modstanderhold uden samspil, preview = beskeden efter byttet, ±0 → ingen besked, trykfelt ≥ 44 ved 390, ikke ved 1366.
-
-## Efter gennemgangen (QC + Spilfører UI, 6/11) – rettet
-1. Formation, Plan A/B/C og "Stil op efter position" afslutter et byt i gang (`clearSwap`) – før stod den frosne samspilstekst med de gamle naboer.
-2. Skadet/udelukket spiller ikke: et par med en skadet/udelukket (før eller efter) tæller hverken op eller ned (`bandShifts`, chemistry.js –
-   ét sted for både Plads-cellens tal og beskeden efter byttet). Naboer, der ikke spiller, mærkes: "#6 M. Bach stærkt (udelukket)".
-3. Plads-cellen: intet ved ±0; "🤝 +2 −1" med +N grøn og −N rød; beskeden/tooltip højst 2 par + "… og N til".
-4. Kortere besked: "– på banen eller i listen" ud af 🔁 (står i hjælpelinjen); forklaringen kun ved "Kender også". 390: 150 → 131 px.
-5. "ca. 1 kamp" (pl). 6. "Kender også #8 X – vælg hans nabo, klik så på #8" (bænk: "klik på en brik ved siden af #8").
-7. Kommentar: seed-reglen kan give falske negativer senere i sæsonen, aldrig falske positiver.
+- Unit `tests/unit/central-slots-v3330.test.mjs`: bogstavelige tal ±0,5 ved 37/38/40/41/50/51/53/54, invarianten, `moveSlot` CM→56,
+  `slotRoleOf`, BOTH i generator, Hvis-Så refit med ys, løbsgruppe og bevægelse.
+- e2e "v3.33.0": træk en CM til ca. y 56 → brikkens flag/title og Plads-cellen siger DM-plads, en DM dér har ingen straf, tilbage igen →
+  væk; live-etiket under træk; hvad der ikke må stå.

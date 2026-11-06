@@ -43,3 +43,10 @@ fund der er rettet (så du ikke finder dem igen), hvad brugeren har valgt fra, o
   flere midtbanefolk køber ikke bold. Cutbackens side er en mønt (match.js:961), uanset backs. Hvis-Så kun stilling+minut (match.js:18).
 - Foreslået: midtbaneantal m. aftagende udbytte, angrebsside, mandsopdækning, flere Hvis-Så-betingelser, kampens indsats (friskhed),
   individuelle løb. Lunken: vejr, formationserfaring (samspil/mod-kunnen dækker).
+
+## Plan-gennemgang central dybde (2026-11-06, v3.32.3; kun kodelæsning)
+- I motoren er CDM og CM ens (kæde MID, RUN_GROUP 'CM', km 11,8, RUNS_ROLES); kun DRIFT_AXES og prisen skiller dem. CAM: RUN_GROUP
+  'WIDE', ikke i RUNS_ROLES, km 10,8. Ingen rolle "bryder opbygningen" (presser = nærmeste af ALLE mids, match.js:1350).
+- Botter trækker aldrig (generator.js:236 customCoords {}), én DM pr. trup (generator.js:40) → "fire DM'er" er ingen trussel;
+  risikoen er en bred mellemzone (alle parkerer der = aldrig straf) og at ankre skifter klasse (generator.js:224 → nye ligaer).
+- Anbefalet: fingeraftryk SKAL være uændret; ST/CF uden for (measure-duels.mjs:228 trækker ANG til y 32 = falsk 9'er).
