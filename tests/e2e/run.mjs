@@ -3881,7 +3881,7 @@ try {
       check(`v3.32.3 (${w}): uden valg ingen fokus – ingen line.focus, ingen data-focus, ingen naboring, alle streger fuldt synlige`, st0.focus.length === 0 && st0.svgFocus === null && st0.mates.length === 0 && st0.all.length === 12 && st0.all.every((l) => l.op === 1), JSON.stringify(st0.all.map((l) => l.op)));
       if (w < 600) await p.tap(tok(6)); else await p.click(tok(6));
       const st = await state(p);
-      const want = `🔁 Klik på den spiller, ${S.fShort} skal byttes med – på banen eller i listen. 🤝 Med naboerne: ${S.n[2]} stærkt · ${S.n[5]} spillet sammen · ${S.n[7]} finder hinanden · ${S.n[9]} fremmede · svagest: ${S.n[9]} · Kender også ${S.nB1} (stærkt, bænk) – samspil tæller kun, når de står som naboer Se kort ›`;
+      const want = `🔁 Klik på den spiller, ${S.fShort} skal byttes med. 🤝 Med naboerne: ${S.n[2]} stærkt · ${S.n[5]} spillet sammen · ${S.n[7]} finder hinanden · ${S.n[9]} fremmede · svagest: ${S.n[9]} · Kender også ${S.nB1} (stærkt, bænk) – vælg hans nabo, klik så på ${S.nB1.split(' ')[0]} Se kort ›`;
       check(`v3.32.3 (${w}, ${w < 600 ? 'tap' : 'klik'} på CM'en): præcis hans 4 læste par har line.focus (2-6, 5-6, 6-7, 6-9 – ikke ST⇄ST 9-10), svg data-focus="6"`, JSON.stringify(st.focus) === JSON.stringify(['2-6', '5-6', '6-7', '6-9']) && st.svgFocus === '6', JSON.stringify(st.focus));
       const dim = st.all.filter((l) => !l.f), foc = st.all.filter((l) => l.f);
       check(`v3.32.3 (${w}): de andre 8 streger er dæmpet (opacity ≈ .25, ikke væk), hans er uigennemsigtige – "spillet sammen" fuldt hvid og tykkere end de dæmpede`, dim.length === 8 && dim.every((l) => Math.abs(l.op - 0.25) < 0.01) && foc.every((l) => l.op === 1) && foc.find((l) => l.pair === '5-6').stroke === 'rgb(229, 231, 235)' && foc.find((l) => l.pair === '5-6').sw > 2.5, JSON.stringify(st.all));
@@ -3890,28 +3890,32 @@ try {
       check(`v3.32.3 (${w}): ingen 0–100-tal i beskeden (kun trøjenumre)`, !/\d/.test(st.msg.replace(/#\d+/g, '')), st.msg);
       if (w < 600) {
         const msgH = await p.evaluate(() => Math.round(document.getElementById('pick-msg').getBoundingClientRect().height));
-        console.log(`   (måling) #pick-msg-højde ved 390 med fokus: ${msgH} px`);
+        console.log(`   (måling) #pick-msg-højde ved 390 med fokus: ${msgH} px (${st.msg.split(/\s+/).length} ord)`); if (process.env.SHOW_MSG) console.log(st.msg);
+        // Spilfører UI 3: før 150 px (6 linjer, "– på banen eller i listen" + "– samspil tæller kun, når de står som naboer"), efter 131 px (5 linjer)
+        check(`v3.32.3 (390): #pick-msg er kortere end før – ${msgH} px (før 150, mål ≤ 140)`, msgH <= 140, String(msgH));
       }
       // Byt-forhåndsvisningen: i Plads-cellen pr. mulig række (ikke på banen); title = præcis beskeden efter byttet
       await p.click('#lineup-list .toolbar button:has-text("Alle")');
       const prev = await p.evaluate((B1) => ({ n: document.querySelectorAll('#lineup-table .lp-place .lp-prev').length, rows: document.querySelectorAll('#lineup-table tr.lp-row').length,
         b1: (() => { const e = document.querySelector(`#lineup-table tr[data-pid="${B1}"] .lp-place .lp-prev`); return e ? { txt: e.textContent, ch: e.dataset.changes, title: e.title } : null; })(),
-        zero: [...document.querySelectorAll('#lineup-table tr.lp-row')].map((r) => ({ pid: r.dataset.pid, e: r.querySelector('.lp-prev') })).filter((x) => x.e && x.e.textContent === '±0').map((x) => x.pid) }), S.B1);
-      check(`v3.32.3 (${w}): byt-tilstand – hver anden række har forhåndsvisning i Plads-cellen, ingen på banen, ingen ny kolonne`, prev.n === prev.rows - 1 && st.pitchPrev === 0 && (await p.locator('#lineup-table thead th').count()) === 6, JSON.stringify({ n: prev.n, rows: prev.rows }));
+        zero: document.querySelectorAll('#lineup-table tr.lp-row:not(.active):not(.reserve-p)').length - document.querySelectorAll('#lineup-table tr.lp-row:not(.active):not(.reserve-p) .lp-prev').length,
+        pm: document.querySelectorAll('#lineup-table .lp-prev').length && [...document.querySelectorAll('#lineup-table .lp-prev')].every((e) => e.textContent.startsWith('🤝 ') && !e.textContent.includes('±0')) }), S.B1);
+      // v3.32.3 efter gennemgangen: ±0 = ingen tekst (Spilfører UI: "±0" i hver række var støj) – så kun nogle rækker har en forhåndsvisning
+      check(`v3.32.3 (${w}): byt-tilstand – forhåndsvisning i Plads-cellen kun hvor et par skifter ("🤝 …", aldrig "±0"), ingen på banen, ingen ny kolonne`, prev.n > 0 && prev.pm && st.pitchPrev === 0 && (await p.locator('#lineup-table thead th').count()) === 6, JSON.stringify({ n: prev.n, rows: prev.rows, zero: prev.zero }));
       await p.click(`#lineup-table tr[data-pid="${S.B1}"]`);
       const after = await state(p);
-      check(`v3.32.3 (${w}): forhåndsvisningen ved ${S.nB1} (${prev.b1?.txt}) er præcis beskeden efter byttet`, !!prev.b1 && prev.b1.ch.length > 0 && after.msg === `🤝 ${prev.b1.ch}` && prev.b1.title === `Byt: 🤝 ${prev.b1.ch}` && /^(\+\d( −\d)?|−\d)$/.test(prev.b1.txt), `${JSON.stringify(prev.b1)} | ${after.msg}`);
+      check(`v3.32.3 (${w}): forhåndsvisningen ved ${S.nB1} (${prev.b1?.txt}) er præcis beskeden efter byttet`, !!prev.b1 && prev.b1.ch.length > 0 && after.msg === `🤝 ${prev.b1.ch}` && prev.b1.title === `Byt: 🤝 ${prev.b1.ch}` && /^🤝 (\+\d( −\d)?|−\d)$/.test(prev.b1.txt), `${JSON.stringify(prev.b1)} | ${after.msg}`);
       // ±0: byttet giver ingen besked
       await p.click(`#lineup-table tr[data-pid="${S.B1}"]`);   // B1 står nu på plads 6 – vælg ham, og byt med en ±0-række
-      const z = await p.evaluate(() => [...document.querySelectorAll('#lineup-table tr.lp-row')].find((r) => r.querySelector('.lp-prev')?.textContent === '±0')?.dataset.pid ?? null);
+      const z = await p.evaluate(() => [...document.querySelectorAll('#lineup-table tr.lp-row:not(.active):not(.reserve-p)')].find((r) => !r.querySelector('.lp-prev'))?.dataset.pid ?? null);
       if (z) { await p.click(`#lineup-table tr[data-pid="${z}"]`); }
-      check(`v3.32.3 (${w}): en ±0-række giver ingen samspilsbesked efter byttet`, !!z && (await state(p)).msg === null, String(z));
+      check(`v3.32.3 (${w}): en række uden forhåndsvisning (±0) giver ingen samspilsbesked efter byttet`, !!z && (await state(p)).msg === null, String(z));
       // En bænkrække: ingen fokus på banen, teksten nævner ham og hans tidligere nabo
       const S2 = await prep(p); await p.reload(); await p.waitForSelector('body[data-klar="ja"]'); await p.click('#tab-taktik'); await p.waitForSelector('.tabpane.tab-taktik');
       await p.click(`#lineup-table tr[data-pid="${S2.B1}"]`);
       const bs = await state(p);
       check(`v3.32.3 (${w}): klik på en bænkrække – ingen line.focus og ingen dæmpning, teksten nævner ham og hans stærke tidligere nabo på banen`, bs.focus.length === 0 && bs.svgFocus === null && bs.mates.length === 0 && bs.all.every((l) => l.op === 1)
-        && bs.msg === `🔁 Klik på den brik, ${S2.b1Short} skal skiftes ind for – eller en reserve, der skal tage hans plads på bænken. 🤝 På bænken – samspil tæller kun med naboerne på banen · Kender også ${S2.nF} (stærkt, start) – samspil tæller kun, når de står som naboer Se kort ›`, bs.msg);
+        && bs.msg === `🔁 Klik på den brik, ${S2.b1Short} skal skiftes ind for – eller en reserve, der skal tage hans plads på bænken. 🤝 På bænken · Kender også ${S2.nF} (stærkt, start) – klik på en brik ved siden af ${S2.nF.split(' ')[0]} Se kort ›`, bs.msg);
       // Trykfeltet ≥ 44 px om brikken ved ≤ 600 px – uden at tegningen ændres (brikken er stadig 29 × 29)
       const hit = await p.evaluate(() => { const n = document.querySelector('#pitch .token[data-slot="6"] .token-num'); n.scrollIntoView({ block: 'center' }); const r = n.getBoundingClientRect(), a = getComputedStyle(n, '::after');
         const at = (x, y) => document.elementFromPoint(x, y)?.closest('.token')?.dataset.slot ?? null;
@@ -3946,7 +3950,7 @@ try {
       me.chemistry[key(s[9], s[10])] = [95, 5]; me.chemistry[key(F, bench[0])] = [90, 4];
       localStorage.setItem('tactivar_save', JSON.stringify(d));
       const sh = (id) => { const x = me.squad.find((q) => q.id === id); return `#${x.shirtNumber} ${x.shortName}`; };
-      return { F, B1: bench[0], B2: bench[1], n7: sh(s[7]), nF: sh(F), b1Short: me.squad.find((q) => q.id === bench[0]).shortName };
+      return { F, B1: bench[0], B2: bench[1], n2: sh(s[2]), n7: sh(s[7]), nF: sh(F), b1Short: me.squad.find((q) => q.id === bench[0]).shortName };
     });
     const ready = async (p) => { await p.reload(); await p.waitForSelector('body[data-klar="ja"]'); await p.click('#tab-taktik'); await p.waitForSelector('.tabpane.tab-taktik'); };
     for (const w of [390, 1366]) {
@@ -3978,18 +3982,44 @@ try {
       await ready(p);
       await p.click('#lineup-list .toolbar button:has-text("Alle")');
       await p.click(`#lineup-table tr[data-pid="${S.B2}"]`);
-      const pv = await p.evaluate(() => [...document.querySelectorAll('#lineup-table .lp-prev')].map((e) => { const cs = getComputedStyle(e); return { cls: e.className, txt: e.textContent, color: cs.color, display: cs.display, ws: cs.whiteSpace, title: e.title, aria: e.getAttribute('aria-label'), ch: e.dataset.changes }; }));
-      const up = pv.filter((x) => x.cls.includes(' up')), down = pv.filter((x) => x.cls.includes(' down')), neutral = pv.filter((x) => x.cls === 'lp-prev');
+      const pv = await p.evaluate(() => [...document.querySelectorAll('#lineup-table .lp-prev')].map((e) => { const cs = getComputedStyle(e), col = (q) => [...e.querySelectorAll(q)].map((x) => getComputedStyle(x).color);
+        return { cls: e.className, txt: e.textContent, color: cs.color, display: cs.display, ws: cs.whiteSpace, title: e.title, aria: e.getAttribute('aria-label'), ch: e.dataset.changes, ups: col('.up'), downs: col('.down') }; }));
+      // v3.32.3 efter gennemgangen: farven sidder på tallene (+N grøn, −N rød, også i samme celle), selve mærket er dæmpet; ±0 = intet
+      const up = pv.filter((x) => x.ups.length), down = pv.filter((x) => x.downs.length);
       console.log(`   (måling) forhåndsvisninger: ${[...new Set(pv.map((x) => x.txt))].join(' | ')}`);
-      check(`v3.32.3 TM (${w}): Plads-cellens forhåndsvisning: op er lysegrøn, ned lysrød, ±0 hverken-eller; alle blok-linjer uden ombrydning`, up.length > 0 && down.length > 0 && neutral.length > 0 && up.every((x) => x.color === 'rgb(134, 239, 172)') && down.every((x) => x.color === 'rgb(252, 165, 165)')
-        && neutral.every((x) => x.color !== 'rgb(134, 239, 172)' && x.color !== 'rgb(252, 165, 165)') && pv.every((x) => x.display === 'block' && x.ws === 'nowrap'), JSON.stringify({ up: up.length, down: down.length, neutral: neutral.length, c: pv.slice(0, 3) }));
-      check(`v3.32.3 TM (${w}): title = aria-label på hver forhåndsvisning; ±0 siger "Byt: intet par skifter bånd"; op/ned-tekst er "Byt: 🤝 " + ændringerne; ned-tallet står som "−N"`,
-        pv.every((x) => x.title === x.aria) && neutral.every((x) => x.title === 'Byt: intet par skifter bånd' && x.ch === '' && x.txt === '±0') && pv.filter((x) => x.cls !== 'lp-prev').every((x) => x.title === `Byt: 🤝 ${x.ch}` && x.ch.length > 0)
-        && down.every((x) => /−\d/.test(x.txt)) && up.every((x) => /^\+\d( −\d)?$/.test(x.txt)), JSON.stringify(pv.slice(0, 3)));
+      check(`v3.32.3 TM (${w}): Plads-cellens forhåndsvisning: +N lysegrøn, −N lysrød, mærket selv hverken-eller, intet "±0"; alle blok-linjer uden ombrydning`, up.length > 0 && down.length > 0 && up.every((x) => x.ups.every((c) => c === 'rgb(134, 239, 172)')) && down.every((x) => x.downs.every((c) => c === 'rgb(252, 165, 165)'))
+        && pv.every((x) => x.color !== 'rgb(134, 239, 172)' && x.color !== 'rgb(252, 165, 165)' && !x.txt.includes('±0') && x.cls === 'lp-prev') && pv.every((x) => x.display === 'block' && x.ws === 'nowrap'), JSON.stringify({ up: up.length, down: down.length, c: pv.slice(0, 3) }));
+      check(`v3.32.3 TM (${w}): title = aria-label på hver forhåndsvisning = "Byt: 🤝 " + ændringerne; teksten er "🤝 +N", "🤝 −N" eller "🤝 +N −M"`,
+        pv.every((x) => x.title === x.aria && x.title === `Byt: 🤝 ${x.ch}` && x.ch.length > 0 && /^🤝 (\+\d( −\d)?|−\d)$/.test(x.txt)), JSON.stringify(pv.slice(0, 3)));
       // Bænk → bænk er et NYT valg: med B2 valgt giver et klik på B1 en besked om B1 (med hans stærke tidligere nabo, CM'en på banen) – ikke om B2
       await p.click(`#lineup-table tr[data-pid="${S.B1}"]`);
       const b = await snap();
-      check(`v3.32.3 TM (${w}): bænk → bænk giver nyt valg — beskeden handler om den NYE (${S.b1Short}) og hans makker ${S.nF}, ikke om den forrige`, b.msg.startsWith(`🔁 Klik på den brik, ${S.b1Short} skal skiftes ind for`) && b.msg.includes(`🤝 På bænken – samspil tæller kun med naboerne på banen · Kender også ${S.nF} (stærkt, start)`), b.msg);
+      check(`v3.32.3 TM (${w}): bænk → bænk giver nyt valg — beskeden handler om den NYE (${S.b1Short}) og hans makker ${S.nF}, ikke om den forrige`, b.msg.startsWith(`🔁 Klik på den brik, ${S.b1Short} skal skiftes ind for`) && b.msg.includes(`🤝 På bænken · Kender også ${S.nF} (stærkt, start) – klik på en brik ved siden af ${S.nF.split(' ')[0]}`), b.msg);
+      // v3.32.3 efter gennemgangen (QC 1): formation, Plan B og "Stil op efter position" afslutter et byt i gang – ingen frossen samspilstekst
+      // med de gamle naboer, intet fokus, og næste klik på en brik er et NYT valg (ikke et byt med den forrige)
+      const live = () => p.evaluate(() => ({ msg: document.getElementById('pick-msg')?.textContent ?? null, focus: document.getElementById('chem-lines')?.dataset.focus ?? null,
+        swapping: document.querySelectorAll('#pitch .token.swapping').length, active: document.querySelectorAll('#lineup-table tr.active').length }));
+      for (const [kind, act] of [['formation 4-3-3', () => p.selectOption('#formation', '4-3-3')], ['Plan B', () => p.locator('.presets button', { hasText: 'Plan B' }).click()], ['Stil op efter position', () => p.click('#arrange-lineup')]]) {
+        await prep(p); await ready(p);
+        await press(tok(6));
+        const was = await live();
+        await act();
+        const now = await live();
+        await press(tok(4));
+        const next = await live();
+        check(`v3.32.3 TM (${w}): ${kind} under et byt — byttet er slut (ingen "🔁"/"Kender også" i beskeden, intet fokus, ingen valgt), og næste klik er et nyt valg`,
+          was.msg?.includes('Kender også') && was.focus === '6' && !(now.msg ?? '').includes('🔁') && !(now.msg ?? '').includes('Kender også') && now.focus === null && now.swapping === 0 && now.active === 0
+          && (next.msg ?? '').startsWith('🔁 Klik på den spiller') && next.focus === '4', JSON.stringify({ was: was.msg?.slice(0, 40), now, next: next.msg?.slice(0, 40) }));
+      }
+      // Spilfører UI 2: en udelukket nabo mærkes i beskeden, og at tage en udelukket starter ud viser intet tab for hans par
+      await prep(p).then(() => p.evaluate(() => { const d = JSON.parse(localStorage.getItem('tactivar_save')), me = d.league.teams.find((t) => !t.isBot); me.squad.find((x) => x.id === me.tactics.lineupSlots[2]).banMatches = 2; localStorage.setItem('tactivar_save', JSON.stringify(d)); }));
+      await ready(p);
+      await press(tok(6));
+      const bm = await live();
+      check(`v3.32.3 TM (${w}): den udelukkede nabo på plads 2 står med mærke ("${S.n2} stærkt (udelukket)") – de raske uden`, (bm.msg ?? '').includes(`${S.n2} stærkt (udelukket)`) && !(bm.msg ?? '').includes(`${S.n7} fremmede (`), bm.msg);
+      await press(tok(6)); await p.click('#lineup-list .toolbar button:has-text("Alle")'); await press(tok(2));
+      const bp = await p.evaluate(() => ({ bench: document.querySelectorAll('#lineup-table tr.bench-p .lp-prev').length, any: document.querySelectorAll('#lineup-table .lp-prev').length, downs: [...document.querySelectorAll('#lineup-table tr.bench-p .lp-prev .down')].length }));
+      check(`v3.32.3 TM (${w}): valgt udelukket starter — ingen bænkrække viser "−N" for at tage ham ud (han spiller ikke alligevel), og ingen forhåndsvisning for bænkskiftet`, bp.bench === 0 && bp.downs === 0, JSON.stringify(bp));
       check(`v3.32.3 TM (${w}): ingen sidefejl`, egne.length === 0, egne.join(' | '));
       await c.close();
     }

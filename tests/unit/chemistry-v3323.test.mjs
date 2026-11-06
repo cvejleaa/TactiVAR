@@ -41,7 +41,7 @@ function fixture() {
   return { L, t, opp, s, F, B1, B2, B3, R, gk, sh };
 }
 // Ingen 0–100-tal: alt andet end trøjenumre og "ca. N kampe" er ord
-const noNumbers = (txt) => !/\d/.test(txt.replace(/#\d+/g, '').replace(/ca\. \d+ kampe/g, ''));
+const noNumbers = (txt) => !/\d/.test(txt.replace(/#\d+/g, '').replace(/ca\. \d+ kampe?/g, ''));
 
 test('partnersOf: de læste naboer stærkeste først, den svageste, og andre han har spillet sig sammen med (≥ finder hinanden) med hvor de står', () => {
   const { t, s, F, B1, B2, B3, R, gk } = fixture();
@@ -68,7 +68,10 @@ test('focusChemText: den præcise tekst for fokus, angriberen, målmanden, den s
   const { t, s, F, B1, B2, R, gk, sh } = fixture();
   const txt = focusChemText(t, REF, F);
   assert.equal(txt, `🤝 Med naboerne: ${sh(s[2])} stærkt · ${sh(s[5])} spillet sammen · ${sh(s[7])} finder hinanden · ${sh(s[9])} fremmede · svagest: ${sh(s[9])}`
-    + ` · Kender også ${sh(B1)} (stærkt, bænk) og ${sh(R)} (finder hinanden, reserve) – samspil tæller kun, når de står som naboer`);
+    + ` · Kender også ${sh(B1)} (stærkt, bænk) og ${sh(R)} (finder hinanden, reserve) – vælg hans nabo, klik så på ${sh(B1).split(' ')[0]} eller ${sh(R).split(' ')[0]}`);
+  // Spilfører UI 3: forklaringen "tæller kun …" står højst én gang og kun ved "Kender også" – her viser vejen den, så slet ikke
+  assert.ok(!txt.includes('tæller kun'), txt);
+  for (const id of t.squad.map((p) => p.id)) { const x = focusChemText(t, REF, id) ?? ''; assert.ok(x.split('tæller kun').length <= 2 && (!x.includes('tæller kun') || x.indexOf('tæller kun') > x.indexOf('Kender også ')) && x.includes('Kender også') >= x.includes('tæller kun'), x); }
   assert.ok(!txt.includes(sh(B2)) && !txt.includes(sh(s[10])) && !txt.includes(sh(gk)), 'den seedede ikke-nabo, angriberparret og målmanden står ikke');
   assert.ok(!txt.includes('Ingen stærke par'), 'han har et stærkt par');
   // Angriberen: kun CM-naboen (fremmede), ingen stærke par – antal kampe regnet (gamesToSettle 30 → stærkt ved snit 78)
@@ -77,11 +80,22 @@ test('focusChemText: den præcise tekst for fokus, angriberen, målmanden, den s
   assert.equal(focusChemText(t, REF, s[9]), `🤝 Med naboen: ${sh(F)} fremmede · Ingen stærke par endnu – ca. ${n} kampe mere side om side`);
   assert.equal(focusChemText(t, REF, gk), '🤝 Målmanden indgår ikke i samspil.');
   // Skadet (plads 3: naboerne 2, 4, 7 alle seedet 78 = spillet sammen) – og hans seedede par med resten står IKKE som "kender også"
+  // hans nabo på plads 4 er udelukket: derfor ikke "Alle hans naboer: …", men navnene med mærket (Spilfører UI)
+  assert.ok(focusChemText(t, REF, s[3]).startsWith(`🤝 (skadet – spiller ikke) Med naboerne: `), focusChemText(t, REF, s[3]));
+  assert.ok(focusChemText(t, REF, s[3]).includes(`${sh(s[4])} spillet sammen (udelukket)`), focusChemText(t, REF, s[3]));
+  t.squad.find((p) => p.id === s[4]).banMatches = 0;
   assert.equal(focusChemText(t, REF, s[3]), `🤝 (skadet – spiller ikke) Alle hans naboer: spillet sammen – samspil vokser kampe side om side (ca. ${gamesToSettle(REF, 78, 'staerkt')} kampe til stærkt)`);
+  t.squad.find((p) => p.id === s[4]).banMatches = 1;
   assert.equal(gamesToSettle(REF, 78, 'staerkt'), 3, 'data: 78 → stærkt på 3 kampe');
   assert.ok(focusChemText(t, REF, s[4]).startsWith('🤝 (udelukket) '), focusChemText(t, REF, s[4]));
-  assert.equal(focusChemText(t, REF, B1), `🤝 På bænken – samspil tæller kun med naboerne på banen · Kender også ${sh(F)} (stærkt, start) – samspil tæller kun, når de står som naboer`);
-  assert.equal(focusChemText(t, REF, B2), '🤝 På bænken – samspil tæller kun med naboerne på banen', 'seedet 78: intet "kender også"');
+  assert.equal(focusChemText(t, REF, B1), `🤝 På bænken · Kender også ${sh(F)} (stærkt, start) – klik på en brik ved siden af ${sh(F).split(' ')[0]}`);
+  assert.equal(focusChemText(t, REF, B2), '🤝 På bænken – ingen naboer på banen', 'seedet 78: intet "kender også"');
+  // Reserven R kender kun F (start) – og en anden bænkspiller: vejen nævner kun den på banen; kender han kun en på bænken: ingen vej
+  t.chemistry[pairKey(R, B1)] = [88, 3];
+  assert.ok(focusChemText(t, REF, R).endsWith(`– klik på en brik ved siden af ${sh(F).split(' ')[0]}`), focusChemText(t, REF, R));
+  delete t.chemistry[pairKey(F, R)];
+  assert.equal(focusChemText(t, REF, R), `🤝 På reserven · Kender også ${sh(B1)} (stærkt, bænk) – samspil tæller kun, når de står som naboer`);
+  t.chemistry[pairKey(F, R)] = [66, 3]; delete t.chemistry[pairKey(R, B1)];
   for (const id of t.squad.map((p) => p.id)) { const x = focusChemText(t, REF, id); assert.ok(noNumbers(x), x); assert.ok(!/fremmede\)/.test(x), '"fremmede" kun om nabopar'); }
 });
 
@@ -130,9 +144,13 @@ test('swapPreview ⇄ beskeden efter byttet: for hvert muligt klik (start, bænk
     if (k !== 'swap' && k !== 'bench') { assert.equal(pv, null, `${k}: ingen forhåndsvisning`); continue; }
     assert.equal(pv.kind, k);
     assert.deepEqual(pv.changes, msg, `${a} ⇄ ${b}`);
-    const m = new Map(was.map((x) => [`${x.i}-${x.j}`, x.band])), R_ = { fremmede: 0, finder: 1, sammen: 2, staerkt: 3 };
-    assert.equal(pv.up, now.filter((x) => R_[x.band] > R_[m.get(`${x.i}-${x.j}`)]).length);
-    assert.equal(pv.down, now.filter((x) => R_[x.band] < R_[m.get(`${x.i}-${x.j}`)]).length);
+    // uafhængigt orakel: et par med en skadet/udelukket (før eller efter) tæller ikke – han spiller ikke
+    const out = (x) => [x.a, x.b].some((q) => q.injuryMatchesLeft > 0 || q.banMatches > 0);
+    const m = new Map(was.map((x) => [`${x.i}-${x.j}`, x])), R_ = { fremmede: 0, finder: 1, sammen: 2, staerkt: 3 };
+    const cnt = (cmp) => now.filter((x) => { const w = m.get(`${x.i}-${x.j}`); return w && !out(w) && !out(x) && cmp(R_[x.band], R_[w.band]); }).length;
+    assert.equal(pv.up, cnt((n, o) => n > o)); assert.equal(pv.down, cnt((n, o) => n < o));
+    assert.equal(pv.changes.filter((c) => !c.startsWith('… og')).length, Math.min(2, pv.up + pv.down), 'højst 2 par i teksten');
+    if (pv.up + pv.down > 2) assert.equal(pv.changes[2], `… og ${pv.up + pv.down - 2} til`, 'tal og tekst enige');
     if (k === 'bench') assert.deepEqual([pv.up, pv.down, pv.changes], [0, 0, []], 'bænk ⇄ reserve: ingen virkning');
     if (pv.changes.length) nonEmpty++;
   }
@@ -140,4 +158,46 @@ test('swapPreview ⇄ beskeden efter byttet: for hvert muligt klik (start, bænk
   assert.ok(nonEmpty > 10, `data: byt med båndskift (${nonEmpty})`);
   const pv = swapPreview(t, REF, B1, s[7]);   // B1 ind på plads 7 (F's nabo, finder hinanden) → F-B1 stærkt: op
   assert.ok(pv.up >= 1 && pv.changes.some((c) => c.endsWith('finder hinanden → stærkt')), JSON.stringify(pv));
+});
+
+// v3.32.3 efter gennemgangen (Spilfører UI 2): en skadet/udelukket starter spiller ikke (motoren skifter ham ud) – at tage ham ud er intet tab
+test('skadet/udelukket: at tage den skadede starter ud giver intet "−N" for hans par; at sætte en udelukket ind intet "+N"; samme i beskeden', () => {
+  const { t, s, B1, sh } = fixture();
+  const inj = s[3];   // skadet; hans par med 2 og 7 er seedet 78 (spillet sammen), med 4 (udelukket)
+  t.chemistry[pairKey(inj, s[2])] = [92, 5]; t.chemistry[pairKey(inj, s[7])] = [92, 5];   // stærke par – ville give −2 ved at tage ham ud
+  const pv = swapPreview(t, REF, inj, B1);
+  assert.equal(pv.down, 0, JSON.stringify(pv)); assert.ok(!pv.changes.some((c) => c.includes('stærkt →')), JSON.stringify(pv.changes));
+  // kontrol (data): rask ville det være et tab på 2
+  t.squad.find((p) => p.id === inj).injuryMatchesLeft = 0; t.squad.find((p) => p.id === s[4]).banMatches = 0;
+  assert.equal(swapPreview(t, REF, inj, B1).down, 2, 'data: rask = −2');
+  // en udelukket på bænken sat ind ved siden af en stærk makker: intet "+N"
+  t.chemistry[pairKey(inj, s[2])] = [78, 5]; t.chemistry[pairKey(B1, s[2])] = [92, 5];
+  const up = swapPreview(t, REF, B1, s[3]);
+  assert.ok(up.up >= 1, 'data: rask bænkspiller giver +');
+  t.squad.find((p) => p.id === B1).banMatches = 1;
+  const ub = swapPreview(t, REF, B1, s[3]);
+  assert.deepEqual([ub.up, ub.down, ub.changes], [0, 0, []], 'alle hans par tæller ikke: intet tal, ingen besked');
+  void sh;
+});
+
+test('swapChanges: højst 2 par + "… og N til", når flere skifter; 2 eller færre uden', () => {
+  const mk = (i, band, a = { id: 'a' }, b = { id: 'b' }) => ({ i, j: i + 1, band, label: `P${i}`, a, b });
+  const before = [0, 1, 2, 3].map((i) => mk(i, 'staerkt')), after = [mk(0, 'fremmede'), mk(1, 'finder'), mk(2, 'sammen'), mk(3, 'sammen')];
+  assert.deepEqual(swapChanges(before, after), ['P0: stærkt → fremmede', 'P1: stærkt → finder hinanden', '… og 2 til']);
+  assert.deepEqual(swapChanges(before.slice(0, 2), after.slice(0, 2)), ['P0: stærkt → fremmede', 'P1: stærkt → finder hinanden']);
+  assert.deepEqual(swapChanges(before.slice(0, 3), after.slice(0, 3)), ['P0: stærkt → fremmede', 'P1: stærkt → finder hinanden', '… og 1 til']);
+  // et par med en udelukket tæller ikke – heller ikke i "… og N til"
+  const ban = { id: 'x', banMatches: 1 };
+  assert.deepEqual(swapChanges([...before.slice(0, 2), mk(2, 'staerkt', ban)], [...after.slice(0, 2), mk(2, 'sammen', ban)]), ['P0: stærkt → fremmede', 'P1: stærkt → finder hinanden']);
+});
+
+test('retskrivning: "ca. 1 kamp" (ental) og "ca. N kampe" (flertal)', () => {
+  const { t, s, F } = fixture();
+  assert.equal(gamesToSettle(REF, 81, 'staerkt'), 1, 'data: 81 → stærkt på 1 kamp');
+  for (const i of [2, 5, 7, 9]) t.chemistry[pairKey(F, s[i])] = [81, 5];
+  assert.ok(focusChemText(t, REF, F).startsWith('🤝 Alle hans naboer: spillet sammen – samspil vokser kampe side om side (ca. 1 kamp til stærkt)'), focusChemText(t, REF, F));
+  t.chemistry[pairKey(F, s[2])] = [62, 5];   // forskellige bånd, ingen stærke: minimum = 1 kamp
+  assert.ok(focusChemText(t, REF, F).includes(' · Ingen stærke par endnu – ca. 1 kamp mere side om side'), focusChemText(t, REF, F));
+  for (const i of [2, 5, 7, 9]) t.chemistry[pairKey(F, s[i])] = [74, 5];
+  assert.ok(focusChemText(t, REF, F).includes(`(ca. ${gamesToSettle(REF, 74, 'staerkt')} kampe til stærkt)`) && gamesToSettle(REF, 74, 'staerkt') > 1);
 });

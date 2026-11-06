@@ -649,10 +649,15 @@ bedre kan kontrollere spil motoren".
   naboernes brikker får en ring i båndets farve. Valgbeskeden ved listen siger i ord hans naboer (kun de læste par, stærkeste først,
   "svagest: …"), "Ingen stærke par endnu – ca. N kampe mere side om side" / "Alle hans naboer: …" (`gamesToSettle(ref, fra, til)`),
   og højst 2 andre markspillere, han har spillet ved siden af (≥ finder hinanden; ikke hans naboer nu, ikke et seedet par – holdets
-  seed-runde og aldrig over 78) med hvor de står: "Kender også #8 X (stærkt, bænk) – samspil tæller kun, når de står som naboer".
-  Målmanden: "indgår ikke i samspil". Kun dit hold, kun ord. Mens byttet er i gang, står båndskiftet i Plads-cellen pr. række
-  ("+2 −1" = to par stiger og ét falder et bånd, "±0"; tooltip = præcis 🤝-beskeden efter byttet – samme `pickForSwap` på en kopi,
-  `state/actions.js swapPreview`); bænk ⇄ reserve uden. Brikkernes trykfelt er ≥ 44 px ved ≤ 600 px (tegningen uændret).
+  seed-runde og aldrig over 78; reglen kan give falske negativer senere i sæsonen, aldrig falske positiver) med hvor de står og vejen
+  dertil: "Kender også #8 X (stærkt, bænk) – vælg hans nabo, klik så på #8" (står han selv på bænken:
+  "klik på en brik ved siden af #8"). Forklaringen står kun dér, én gang. Målmanden: "indgår ikke i samspil". En skadet/udelukket
+  (den valgte eller en nabo) mærkes: "#6 M. Bach stærkt (udelukket)". "ca. 1 kamp"/"ca. N kampe". Kun dit hold, kun ord. Formation,
+  forudindstilling og "Stil op efter position" afslutter et byt i gang. Mens byttet er i gang, står båndskiftet i Plads-cellen pr. række
+  ("🤝 +2 −1" = to par stiger (grøn) og ét falder (rød) et bånd; intet skifte = ingen tekst; tooltip = præcis 🤝-beskeden efter byttet,
+  højst 2 par + "… og N til" – samme `pickForSwap` på en kopi, `state/actions.js swapPreview`); bænk ⇄ reserve uden. Et par med en
+  skadet eller udelukket spiller (før eller efter byttet) tæller hverken op eller ned – han spiller ikke (`bandShifts`, chemistry.js:
+  ét sted for tallene og beskeden). Brikkernes trykfelt er ≥ 44 px ved ≤ 600 px (tegningen uændret).
   **v3.24.2** (Spilfører UI: "belønningen er tavs"): efter runden står øverst i Trup (v3.30.0: øverst på 🏋️ Træning) de par i din opstilling, der blev stærke –
   kun når de spillede sammen i runden – og dem, der holdt op, fordi de ikke spillede sammen (`strongChanges`; før og efter mod
   det NYE snit, så snittet alene aldrig flytter et par; kun par, der fandtes før). Navne fra truppen nu; fra 4 par kun antallet;

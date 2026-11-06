@@ -84,7 +84,7 @@ test('svageste par: laveste bånd, så laveste værdi; byt-beskeden: største fa
   const before = [mk(1, 2, 'staerkt', 90), mk(2, 3, 'sammen', 78), mk(3, 4, 'sammen', 78), mk(4, 5, 'finder', 66), mk(5, 6, 'sammen', 78)];
   const after = [mk(1, 2, 'sammen', 78), mk(2, 3, 'fremmede', 30), mk(3, 4, 'staerkt', 90), mk(4, 5, 'sammen', 78), mk(5, 6, 'sammen', 78), mk(6, 7, 'fremmede', 30)];
   // ændringer: 1-2 −1, 2-3 −2, 3-4 +1, 4-5 +1, 5-6 ingen, 6-7 findes ikke før. Mindste (største fald) først: 2-3, 1-2
-  assert.deepEqual(swapChanges(before, after), ['2-3: spillet sammen → fremmede', '1-2: stærkt → spillet sammen']);
+  assert.deepEqual(swapChanges(before, after), ['2-3: spillet sammen → fremmede', '1-2: stærkt → spillet sammen', '… og 2 til'], 'v3.32.3: højst 2 + "… og N til"');
   assert.deepEqual(swapChanges(before, after.slice(2)), ['3-4: spillet sammen → stærkt', '4-5: finder hinanden → spillet sammen'], 'kun forbedringer: stabil rækkefølge, to af to');
   assert.deepEqual(swapChanges([mk(1, 2, 'sammen', 78)], [mk(2, 1, 'fremmede', 30)]), [], 'nøglen er i-j i den rækkefølge, pladserne står');
 });

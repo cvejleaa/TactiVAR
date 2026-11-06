@@ -33,8 +33,8 @@ export function listRows({ team, isOwn, ui }) {
 // stopper klikket (som #auto-bench) og rører hverken byttet eller beskeden. ui.cardId = panelets spiller (omrids, kun mens det er åbent);
 // onPickCard = "Se kort ›" i byt-beskeden, kun mens et byt er i gang (ui.swapId).
 // v3.32.3: preview(p) = byt-forhåndsvisningen (state/actions.js swapPreview) – mens et byt er i gang står båndskiftet i Plads-cellen
-// ("+1", "−1", "±0"; title = præcis beskeden efter byttet). Bænk ⇄ reserve (ingen virkning på samspillet): ingen tekst.
-const prevText = (r) => [r.up ? `+${r.up}` : '', r.down ? `−${r.down}` : ''].filter(Boolean).join(' ') || '±0';
+// ("🤝 +2 −1": op grøn, ned rød; title = præcis beskeden efter byttet). Intet skifte (±0) og bænk ⇄ reserve: ingen tekst (Spilfører UI:
+// "±0" i hver række var støj).
 export function renderLineupList({ team, isOwn, ui, onPick, onSort, onBlocked, onLine, onAutoBench, msg = '', onInfo = null, onPickCard = null, preview = null }) {
   const { line, cols, ctx, sortCol, starters, bench, reserves, benchAll, reservesAll } = listRows({ team, isOwn, ui });
   const roles = FORMATIONS[team.tactics.baseFormation], slotOf = ctx.slotOf;
@@ -56,9 +56,10 @@ export function renderLineupList({ team, isOwn, ui, onPick, onSort, onBlocked, o
   };
   const prevEl = (p) => {
     const r = preview && ui.swapId && ui.swapId !== p.id ? preview(p) : null;
-    if (!r || r.kind !== 'swap') return null;
-    const tip = r.changes.length ? `Byt: 🤝 ${r.changes.join(' · ')}` : 'Byt: intet par skifter bånd';
-    return h('span', { class: `lp-prev${r.down ? ' down' : r.up ? ' up' : ''}`, title: tip, 'aria-label': tip, dataset: { changes: r.changes.join(' · ') } }, prevText(r));
+    if (!r || r.kind !== 'swap' || (!r.up && !r.down)) return null;
+    const tip = `Byt: 🤝 ${r.changes.join(' · ')}`;
+    return h('span', { class: 'lp-prev', title: tip, 'aria-label': tip, dataset: { changes: r.changes.join(' · ') } }, '🤝',
+      r.up ? [' ', h('span', { class: 'up' }, `+${r.up}`)] : null, r.down ? [' ', h('span', { class: 'down' }, `−${r.down}`)] : null);
   };
   const row = (p, kind) => {
     const s = slotOf(p), place = kind === 'start' ? roleLabel(roles[s].r) : kind === 'bench' ? 'Bænk' : 'Res', fit = kind === 'start' ? slotFitOf(team.tactics, s, p.position) : 1;

@@ -5,7 +5,7 @@ import { clampSubsLimit } from '../engine/freshness.js';
 import { MAX_RULES } from '../engine/match-rules.js';
 import { autoMatchBench, validFocus, SQUAD_MAX, matchBenchOf } from '../engine/career.js';
 import { windowOf } from '../engine/transfers.js';
-import { lineupPairs, swapChanges, BAND_RANK } from '../engine/chemistry.js';
+import { lineupPairs, swapChanges, bandShifts } from '../engine/chemistry.js';
 
 const IDENTITY = Array.from({ length: 11 }, (_, i) => i);
 
@@ -35,15 +35,14 @@ export function pickForSwap(team, a, id) {
 }
 // Byt-forhåndsvisningen (v3.32.3): hvad et byt a ⇄ b gør ved samspillet – simuleret med SAMME pickForSwap på en kopi af
 // opstillingen og bænken (ingen anden byt-regel; QC). changes = præcis den 🤝-besked, der står efter selve byttet (swapChanges,
-// højst 2); up/down = antal par, hvis bånd steg/faldt. null, når klikket ikke er et byt (vælg/fravælg).
+// højst 2 + "… og N til"); up/down = antal par, hvis bånd steg/faldt. null, når klikket ikke er et byt (vælg/fravælg).
 export function swapPreview(team, ref, a, b) {
   const sim = { ...team, tactics: { ...team.tactics, lineupSlots: team.tactics.lineupSlots.slice() }, matchBench: Array.isArray(team.matchBench) ? team.matchBench.slice() : team.matchBench };
   const kind = pickForSwap(sim, a, b);
   if (kind !== 'swap' && kind !== 'bench') return null;
-  const before = lineupPairs(team, ref), after = lineupPairs(team, ref, sim.tactics.lineupSlots), was = new Map(before.map((x) => [`${x.i}-${x.j}`, x.band]));
-  let up = 0, down = 0;
-  for (const x of after) { const w = was.get(`${x.i}-${x.j}`); if (w && BAND_RANK[x.band] > BAND_RANK[w]) up++; else if (w && BAND_RANK[x.band] < BAND_RANK[w]) down++; }
-  return { kind, up, down, changes: swapChanges(before, after) };
+  // Tallene og beskeden af SAMME bandShifts (chemistry.js): et par med en skadet/udelukket tæller hverken op eller ned
+  const before = lineupPairs(team, ref), after = lineupPairs(team, ref, sim.tactics.lineupSlots), sh = bandShifts(before, after);
+  return { kind, up: sh.filter((x) => x.d > 0).length, down: sh.filter((x) => x.d < 0).length, changes: swapChanges(before, after) };
 }
 export function setAutoBench(team) { team.matchBenchAuto = true; autoMatchBench(team); return true; }
 

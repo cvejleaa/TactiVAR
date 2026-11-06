@@ -39,3 +39,12 @@ udnytte det når jeg sætter taktik." Kun UI + rene hjælpefunktioner – INGEN 
   manglende par, reserve); paritet preview ⇄ beskeden efter byttet for hvert klik fra 6 spillere.
 - e2e "v3.32.3" (390 tap, 1366 klik): line.focus = hans læste par, de andre dæmpet (computed opacity), naboring, den præcise tekst,
   bænkrække uden fokus, modstanderhold uden samspil, preview = beskeden efter byttet, ±0 → ingen besked, trykfelt ≥ 44 ved 390, ikke ved 1366.
+
+## Efter gennemgangen (QC + Spilfører UI, 6/11) – rettet
+1. Formation, Plan A/B/C og "Stil op efter position" afslutter et byt i gang (`clearSwap`) – før stod den frosne samspilstekst med de gamle naboer.
+2. Skadet/udelukket spiller ikke: et par med en skadet/udelukket (før eller efter) tæller hverken op eller ned (`bandShifts`, chemistry.js –
+   ét sted for både Plads-cellens tal og beskeden efter byttet). Naboer, der ikke spiller, mærkes: "#6 M. Bach stærkt (udelukket)".
+3. Plads-cellen: intet ved ±0; "🤝 +2 −1" med +N grøn og −N rød; beskeden/tooltip højst 2 par + "… og N til".
+4. Kortere besked: "– på banen eller i listen" ud af 🔁 (står i hjælpelinjen); forklaringen kun ved "Kender også". 390: 150 → 131 px.
+5. "ca. 1 kamp" (pl). 6. "Kender også #8 X – vælg hans nabo, klik så på #8" (bænk: "klik på en brik ved siden af #8").
+7. Kommentar: seed-reglen kan give falske negativer senere i sæsonen, aldrig falske positiver.

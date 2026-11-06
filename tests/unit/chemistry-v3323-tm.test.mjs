@@ -134,7 +134,7 @@ test('"kender også": højst de to stærkeste – tre kandidater giver to', () =
   const { t, F, bench, set, sh } = fixture();
   set(F, bench[0], 90, 4); set(F, bench[1], 70, 4); set(F, bench[2], 66, 4);   // stærkt, finder, finder
   const txt = focusChemText(t, REF, F);
-  assert.ok(txt.includes(`Kender også ${sh(bench[0])} (stærkt, bænk) og ${sh(bench[1])} (finder hinanden, bænk) – samspil`), txt);
+  assert.ok(txt.includes(`Kender også ${sh(bench[0])} (stærkt, bænk) og ${sh(bench[1])} (finder hinanden, bænk) – vælg hans nabo, klik så på ${sh(bench[0]).split(' ')[0]} eller ${sh(bench[1]).split(' ')[0]}`), txt);
   assert.ok(!txt.includes(sh(bench[2])), 'den tredje står ikke');
 });
 
@@ -170,11 +170,11 @@ test('pitch: fokus på CM — præcis hans 4 læste par har .focus, svg data-foc
 });
 
 // ---------- Plads-cellen (lineup-list.js) ----------
-test('lineup-list: forhåndsvisningen i Plads-cellen — tekst, op/ned-klasse, title/aria-label/data, intet for den valgte / bænk⇄reserve / uden preview', () => {
+test('lineup-list: forhåndsvisningen i Plads-cellen — "🤝 +N −M" med grønt op og rødt ned, title/aria-label/data, INTET ved ±0 / for den valgte / bænk⇄reserve / uden preview', () => {
   const { t, s } = fixture();
   const sel = s[6], rowIds = t.squad.map((p) => p.id);
   const table = {};
-  const kinds = [{ kind: 'swap', up: 2, down: 1, changes: ['A: finder hinanden → stærkt', 'B: stærkt → spillet sammen'] }, { kind: 'swap', up: 1, down: 0, changes: ['A: fremmede → finder hinanden'] },
+  const kinds = [{ kind: 'swap', up: 2, down: 1, changes: ['A: finder hinanden → stærkt', 'B: stærkt → spillet sammen', '… og 1 til'] }, { kind: 'swap', up: 1, down: 0, changes: ['A: fremmede → finder hinanden'] },
     { kind: 'swap', up: 0, down: 2, changes: ['A: stærkt → finder hinanden'] }, { kind: 'swap', up: 0, down: 0, changes: [] }, { kind: 'bench', up: 0, down: 0, changes: [] }, null];
   rowIds.filter((id) => id !== sel).forEach((id, i) => { table[id] = kinds[i % kinds.length]; });
   const asked = [];
@@ -184,19 +184,24 @@ test('lineup-list: forhåndsvisningen i Plads-cellen — tekst, op/ned-klasse, t
   const list = render({ swapId: sel }, (p) => { asked.push(p.id); return table[p.id]; });
   assert.ok(!asked.includes(sel), 'forhåndsvisningen spørges ikke for den valgte række');
   assert.ok(prevOf(list, sel) === null);
-  const want = { '+2 −1': ['lp-prev down', 'A: finder hinanden → stærkt · B: stærkt → spillet sammen'], '+1': ['lp-prev up', 'A: fremmede → finder hinanden'], '−2': ['lp-prev down', 'A: stærkt → finder hinanden'], '±0': ['lp-prev', ''] };
+  // tekst → [grønne tal, røde tal, ændringer]
+  const want = { '🤝 +2 −1': [['+2'], ['−1'], 'A: finder hinanden → stærkt · B: stærkt → spillet sammen · … og 1 til'], '🤝 +1': [['+1'], [], 'A: fremmede → finder hinanden'], '🤝 −2': [[], ['−2'], 'A: stærkt → finder hinanden'] };
   const got = new Map();
   for (const id of rowIds.filter((x) => x !== sel)) {
     const k = table[id], sp = prevOf(list, id);
-    if (!k || k.kind === 'bench') { assert.equal(sp, null, `ingen tekst for ${k?.kind ?? 'null'}`); continue; }
+    if (!k || k.kind === 'bench' || (!k.up && !k.down)) { assert.equal(sp, null, `ingen tekst for ${k ? `${k.kind} ${k.up}/${k.down}` : 'null'}`); continue; }
     const txt = sp.textContent; got.set(txt, true);
-    const [cls, ch] = want[txt];
-    assert.equal(sp.className, cls, txt);
-    const tip = ch ? `Byt: 🤝 ${ch}` : 'Byt: intet par skifter bånd';
+    assert.ok(want[txt], txt);
+    const [ups, downs, ch] = want[txt];
+    assert.equal(sp.className, 'lp-prev', 'selve mærket er neutralt – farven sidder på tallene');
+    assert.deepEqual(all(sp, (e) => e.className === 'up').map((e) => e.textContent), ups, `grønt i ${txt}`);
+    assert.deepEqual(all(sp, (e) => e.className === 'down').map((e) => e.textContent), downs, `rødt i ${txt}`);
+    const tip = `Byt: 🤝 ${ch}`;
     assert.equal(sp.attrs.title, tip); assert.equal(sp.attrs['aria-label'], tip); assert.equal(sp.dataset.changes, ch);
     assert.ok(cellOf(list, id).className.includes('lp-place') && cellOf(list, id).children.includes(sp), 'i Plads-cellen');
   }
-  assert.deepEqual([...got.keys()].sort(), Object.keys(want).sort(), 'data: alle fire slags tekst kommer med');
+  assert.deepEqual([...got.keys()].sort(), Object.keys(want).sort(), 'data: alle tre slags tekst kommer med');
+  assert.ok(!all(list, (e) => /lp-prev/.test(e.className)).some((e) => e.textContent.includes('±0')), 'aldrig "±0"');
   // intet valgt: preview spørges aldrig; preview = null med valgt: ingen fejl og ingen tekst
   let calls = 0;
   const l2 = render({ swapId: null }, () => { calls++; return { kind: 'swap', up: 1, down: 0, changes: [] }; });
@@ -204,6 +209,17 @@ test('lineup-list: forhåndsvisningen i Plads-cellen — tekst, op/ned-klasse, t
   const l3 = render({ swapId: sel }, null); assert.equal(all(l3, (e) => /lp-prev/.test(e.className)).length, 0);
 });
 
+test('naboer, der ikke spiller: "(skadet)" og "(udelukket)" efter båndet; en rask nabo uden mærke; ingen "Alle hans naboer", når én er ude', () => {
+  const { t, s, F, set, sh } = fixture();
+  set(F, s[2], 84, 5); set(F, s[5], 84, 5); set(F, s[7], 84, 5); set(F, s[9], 84, 5);
+  assert.equal(focusChemText(t, REF, F).split(' · ')[0], '🤝 Alle hans naboer: stærkt', 'data: alle stærkt');
+  t.squad.find((p) => p.id === s[2]).injuryMatchesLeft = 1; t.squad.find((p) => p.id === s[7]).banMatches = 1;
+  t.squad.find((p) => p.id === s[5]).injuryMatchesLeft = 1; t.squad.find((p) => p.id === s[5]).banMatches = 1;   // begge: skadet står
+  const txt = focusChemText(t, REF, F);
+  assert.ok(txt.startsWith(`🤝 Med naboerne: ${sh(s[2])} stærkt (skadet) · ${sh(s[5])} stærkt (skadet) · ${sh(s[7])} stærkt (udelukket) · ${sh(s[9])} stærkt · svagest`), txt);
+  assert.ok(!txt.includes(`${sh(s[9])} stærkt (`), 'rask nabo: intet mærke');
+  assert.ok(!txt.startsWith('🤝 (') , 'den valgte selv er rask');
+});
 test('naboerne står stærkeste FØRST uanset pladsrækkefølgen (byggerens fixture var tilfældigt allerede faldende: plads 2 > 5 > 7 > 9)', () => {
   const { t, s, F, set, sh } = fixture();
   set(F, s[2], 62, 5); set(F, s[5], 90, 5); set(F, s[7], 74, 5); delete t.chemistry[pairKey(F, s[9])];
