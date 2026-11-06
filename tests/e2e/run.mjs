@@ -1970,6 +1970,71 @@ try {
     await c.close();
   }
 
+  // ---------- v3.32.2: VAR-øjeblikket og spilfornemmelsen – lyd, CSS-animationer, reduceret bevægelse, 44 px (deterministiske dele) ----------
+  // Rammen, loggen, pausen og fx'enes regler er bundet i tests/unit/var-moment-v3322.test.mjs (runden her er tilfældig – VAR er ikke givet).
+  {
+    // AudioContext stubbes og tælles: med lyd fra (standard) må den ALDRIG oprettes – heller ikke ved ▶ Spil runde
+    const stubAC = () => {
+      window.__acNew = 0;
+      const param = () => ({ setValueAtTime() {}, linearRampToValueAtTime() {} });
+      window.AudioContext = class { constructor() { window.__acNew++; this.state = 'running'; this.currentTime = 0; this.destination = {}; }
+        createOscillator() { return { type: '', frequency: param(), connect() {}, start() {}, stop() {} }; } createGain() { return { gain: param(), connect() {} }; } resume() { return Promise.resolve(); } };
+      window.webkitAudioContext = window.AudioContext;
+    };
+    const fxNames = (p) => p.evaluate(() => {
+      const box = document.createElement('div'); box.id = 'u-fx'; document.body.append(box);
+      const out = {};
+      for (const c of ['fx-shake', 'fx-flash-bad', 'fx-flash-good', 'var-mark']) { const e = document.createElement('div'); e.className = c; box.append(e); const cs = getComputedStyle(e); out[c] = { name: cs.animationName, ms: parseFloat(cs.animationDuration) * 1000, shadow: cs.boxShadow }; }
+      box.remove(); return out;
+    });
+    const c = await browser.newContext({ viewport: { width: 390, height: 844 } }); await c.addInitScript(stubAC);
+    const p = await c.newPage(), egne = []; p.on('pageerror', (e) => egne.push(e.message));
+    await p.goto(BASE + '/'); await p.waitForSelector('body[data-klar="ja"]');
+    await p.click('#play-round'); await p.waitForSelector('#skip');
+    const s0 = await p.evaluate(() => ({ ac: window.__acNew, pressed: document.getElementById('sound-toggle')?.getAttribute('aria-pressed'), key: localStorage.getItem('tactivar_sound'), txt: document.getElementById('sound-toggle')?.textContent }));
+    check('v3.32.2 lyd: FRA som standard – ▶ Spil runde opretter ingen AudioContext, kontakten står ved ⚡ som "🔇 Lyd fra"', s0.ac === 0 && s0.pressed === 'false' && s0.key === null && s0.txt === '🔇 Lyd fra', JSON.stringify(s0));
+    const hts = await p.evaluate(() => {
+      const b = document.createElement('button'); b.id = 'var-show'; b.className = 'mini'; b.textContent = 'Vis kendelsen ›'; document.getElementById('match-center').append(b);
+      const r = Object.fromEntries(['skip', 'sound-toggle', 'var-show'].map((id) => [id, Math.round(document.getElementById(id).getBoundingClientRect().height)]));
+      b.remove(); const row = document.getElementById('skip').parentElement; r.sameRow = row.contains(document.getElementById('sound-toggle')); return r;
+    });
+    check('v3.32.2 (390): ⚡ Spring til slutfløjt, lydkontakten og "Vis kendelsen ›" er ≥ 44 px høje (⚡ før 23 px) – kontakten i ⚡\'s række', hts.skip >= 44 && hts['sound-toggle'] >= 44 && hts['var-show'] >= 44 && hts.sameRow, JSON.stringify(hts));
+    const save0 = await p.evaluate(() => localStorage.getItem('tactivar_save'));
+    await p.click('#sound-toggle');
+    const s1 = await p.evaluate(() => ({ ac: window.__acNew, pressed: document.getElementById('sound-toggle')?.getAttribute('aria-pressed'), key: localStorage.getItem('tactivar_sound'), save: localStorage.getItem('tactivar_save') }));
+    check('v3.32.2 lyd: kontakten slår lyden til (AudioContext oprettes i klikket), husker under tactivar_sound – og ligaens gem er uændret', s1.ac === 1 && s1.pressed === 'true' && s1.key === '1' && s1.save === save0, JSON.stringify({ ...s1, save: s1.save === save0 }));
+    await p.click('#skip'); await p.waitForSelector('.to-home');
+    await p.reload(); await p.waitForSelector('body[data-klar="ja"]');
+    if (!(await p.locator('#match-center').count())) { await p.click('#tab-kamp'); await p.waitForSelector('#match-center'); }
+    const s2 = await p.evaluate(() => ({ pressed: document.getElementById('sound-toggle')?.getAttribute('aria-pressed'), ac: window.__acNew }));
+    check('v3.32.2 lyd: valget huskes over genindlæsning (kontakten også efter fløjtet) – og ingen AudioContext før næste klik', s2.pressed === 'true' && s2.ac === 0, JSON.stringify(s2));
+    await p.click('#sound-toggle');
+    check('v3.32.2 lyd: slået fra igen → "0" under nøglen', (await p.evaluate(() => localStorage.getItem('tactivar_sound'))) === '0' && (await p.getAttribute('#sound-toggle', 'aria-pressed')) === 'false');
+    const anim = await fxNames(p);
+    check('v3.32.2 CSS: uden reduceret bevægelse har rystelse, flash (rød/grøn) og VAR-pulsen en animation – rystelse og flash ≤ 400 ms (gentegningen hvert 420 ms skærer dem ikke over)',
+      anim['fx-shake'].name === 'fx-shake' && anim['fx-flash-bad'].name === 'fx-flash-bad' && anim['fx-flash-good'].name === 'fx-flash-good' && anim['var-mark'].name === 'var-pulse'
+      && ['fx-shake', 'fx-flash-bad', 'fx-flash-good'].every((k) => anim[k].ms > 0 && anim[k].ms <= 400), JSON.stringify(anim));
+    check('v3.32.2: #live-status (aria-live="polite") findes ved fejlboksen', (await p.getAttribute('#live-status', 'aria-live')) === 'polite');
+    check('v3.32.2-blokken (lyd/CSS): ingen sidefejl og ingen fejlboks', egne.length === 0 && (await p.locator('#fejlboks:not([hidden])').count()) === 0, egne.join(' | '));
+    await c.close();
+    // Reduceret bevægelse (ny browserkontekst): ingen animation – flashen er en statisk kant i samme farve
+    const cr = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' }), pr = await cr.newPage();
+    await pr.goto(BASE + '/'); await pr.waitForSelector('body[data-klar="ja"]');
+    const red = await fxNames(pr);
+    check('v3.32.2 CSS (prefers-reduced-motion: reduce): ingen rystelse, ingen puls, ingen flash-animation – flashen er en statisk kant (rød/grøn)',
+      Object.values(red).every((x) => x.name === 'none') && /239, 68, 68/.test(red['fx-flash-bad'].shadow) && /16, 185, 129/.test(red['fx-flash-good'].shadow), JSON.stringify(red));
+    await cr.close();
+    // Uden AudioContext (ældre browser) og med lyden slået til: ingen lyd, ingen fejlboks, ingen sidefejl
+    const cn = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    await cn.addInitScript(() => { delete window.AudioContext; delete window.webkitAudioContext; try { localStorage.setItem('tactivar_sound', '1'); } catch { /* intet */ } });
+    const pn = await cn.newPage(), egneN = []; pn.on('pageerror', (e) => egneN.push(e.message));
+    await pn.goto(BASE + '/'); await pn.waitForSelector('body[data-klar="ja"]');
+    await pn.click('#play-round'); await pn.waitForSelector('#skip'); await pn.waitForTimeout(1500);
+    await pn.click('#sound-toggle'); await pn.click('#sound-toggle'); await pn.click('#skip'); await pn.waitForSelector('.to-home');
+    check('v3.32.2 lyd uden AudioContext: runden spiller, kontakten virker – ingen fejlboks og ingen sidefejl', egneN.length === 0 && (await pn.locator('#fejlboks:not([hidden])').count()) === 0 && (await pn.getAttribute('#sound-toggle', 'aria-pressed')) === 'true', egneN.join(' | '));
+    await cn.close();
+  }
+
   // ---------- Kampe: Match Center ----------
   await seeTeam('0');
   await seeTeam('3'); // kampknappen findes også, mens man scouter
