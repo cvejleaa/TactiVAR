@@ -10,7 +10,15 @@ Rangering: brugerens ønsker først, derefter værdi pr. størrelse. Første run
 000. **Brugerens ønsker 6/11 ("det hele" – i denne rækkefølge, én udgivelse ad gangen):**
    1. ~~v3.32.3 Samspil på Taktik~~ – lavet (se "Lavet").
    2. ~~v3.33.0 Træk bestemmer pladsen også i midten~~ – lavet (se "Lavet").
-   3. **v3.33.1 VAR læser taktikken** = punkt 00. nedenfor.
+   3. **v3.33.1 Sæsonrapport på Hjem + varsel om karrierestop** (brugeren 6/11 aften) · UI · S · 5 · "sæsonrapport skal være på
+      enten Hjem eller Klub, da den vedrører min klub" → valgt Hjem (Klub får linket "Sæsonrapport ›"). "Jeg synes ikke jeg er blevet
+      advaret om at en spiller ville stoppe karrieren, det skal være med, og markeres på trup siden" → valgt: 👋 ved navnet i Trup og
+      en linje i Hjem "Før du spiller" fra runde 10 (samme regel som kortet: willRetire, deterministisk – altid sandt). Kun eget hold.
+   4. **v3.33.2 VAR læser taktikken + kalibrering mod virkeligheden** = punkt 00. nedenfor, udvidet (brugeren 6/11: "Der er blevet
+      færre VAR afgørelser nu, det matcher ikke virkeligheden"). Målt: motoren identisk i v3.32.1–3 (0,251 ændrede kendelser/kamp);
+      det gamle banner blinkede to gange pr. sag. Virkelighed (ESPN PL 2024/25; 2025/26-tal): PL 0,28, øvrige topligaer/CL 0,38–0,47;
+      PL: mål annulleret 0,124, mål godkendt efter VAR 0,092 (mangler i spillet), straffe givet 0,066, annulleret 0,029. Mål: ca. 0,35;
+      nyt "mål godkendt efter VAR" (fejlagtigt flag omstødt); annullerede mål ned mod 0,12. Måle-scriptet committes.
 00. **v3.32.3 – VAR læser taktikken (brugeren 2026-11-06: "Har taktik ikke nogen indflydelse på var? Heller ikke hvis man vælger
    ekstrem VAR-linje?" – valgt: som næste udgivelse)** · motor + UI · M · 5 · I dag læser `offsideCheck` (engine/match.js) ikke forsvarets
    `offsideTrap`, og `EXTREME_VAR_LINE` virker som `NORMAL` i kampen (kun `!== 'OFF'`, match.js ved `trapWon`); eneste forskel er
