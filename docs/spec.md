@@ -647,7 +647,7 @@ bedre kan kontrollere spil motoren".
   **v3.32.3** (brugeren 6/11: "Jeg kan ikke på taktik siden se, hvem den valgte spiller spiller godt sammen med"): den valgte i et
   byt (valg = start byt) er i fokus – på banen hans streger fremhævet (tykkere, uigennemsigtige), de andre dæmpet til 25 %, og
   naboernes brikker får en ring i båndets farve. Valgbeskeden ved listen siger i ord hans naboer (kun de læste par, stærkeste først,
-  "svagest: …"), "Ingen stærke par endnu – ca. N kampe mere side om side" / "Alle hans naboer: …" (`gamesToSettle(ref, fra, til)`),
+  "svagest: #9" – kun nummeret, navnet står i listen), "Ingen stærke par endnu – ca. N kampe mere side om side" / "Alle hans naboer: …" (`gamesToSettle(ref, fra, til)`),
   og højst 2 andre markspillere, han har spillet ved siden af (≥ finder hinanden; ikke hans naboer nu, ikke et seedet par – holdets
   seed-runde og aldrig over 78; reglen kan give falske negativer senere i sæsonen, aldrig falske positiver) med hvor de står og vejen
   dertil: "Kender også #8 X (stærkt, bænk) – vælg hans nabo, klik så på #8" (står han selv på bænken:

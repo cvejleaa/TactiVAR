@@ -1256,12 +1256,12 @@ try {
     let b0 = (await benchIds())[0];
     let info = await prep(swapBody, { bench: b0 }); await reload();
     await p.locator(`#bench tr.bench-p[data-pid="${b0}"]`).click(); await p.click('#pitch .token[data-slot="2"]');
-    const want1 = `🤝 Midtstopper-parret: spillet sammen → fremmede · ${info.X} og ${info.s6}: spillet sammen → fremmede`;
-    check('Samspil-byt: bænkspiller i listen → brik på banen – beskeden nævner de to største fald, største først, og ikke det tredje (finder hinanden)', (await msg()) === want1, `${await msg()} | ${want1}`);
+    const want1 = `🤝 Midtstopper-parret: spillet sammen → fremmede · ${info.X} og ${info.s6}: spillet sammen → fremmede · … og 1 til`;   // v3.32.3: det tredje som "… og 1 til"
+    check('Samspil-byt: bænkspiller i listen → brik på banen – beskeden nævner de to største fald, største først, og det tredje kun som "… og 1 til"', (await msg()) === want1, `${await msg()} | ${want1}`);
     await reload(); b0 = (await benchIds())[0];
     info = await prep(swapBody, { bench: b0 }); await reload();
     await p.click('#pitch .token[data-slot="2"]'); await p.locator(`#bench tr.bench-p[data-pid="${b0}"]`).click();
-    check('Samspil-byt: brik på banen → bænkspiller i listen giver samme besked (pickForSwap-vejen)', (await msg()) === `🤝 Midtstopper-parret: spillet sammen → fremmede · ${info.X} og ${info.s6}: spillet sammen → fremmede`, await msg());
+    check('Samspil-byt: brik på banen → bænkspiller i listen giver samme besked (pickForSwap-vejen)', (await msg()) === `🤝 Midtstopper-parret: spillet sammen → fremmede · ${info.X} og ${info.s6}: spillet sammen → fremmede · … og 1 til`, await msg());
     // Ligaens snit 84 og alle par på 84 (= "spillet sammen"); 62 er "finder hinanden" ved 84 – men ved snit 78 var 84 "stærkt" og beskeden "stærkt → finder hinanden" (withChem skal bruge ligaens snit)
     info = await prep('set(s[1], s[3], 62); return { a: sh(s[1]), b: sh(s[3]) };', { ref: 84, base: 84 }); await reload();
     await p.click('#pitch .token[data-slot="2"]'); await p.click('#pitch .token[data-slot="3"]');
@@ -3881,7 +3881,7 @@ try {
       check(`v3.32.3 (${w}): uden valg ingen fokus – ingen line.focus, ingen data-focus, ingen naboring, alle streger fuldt synlige`, st0.focus.length === 0 && st0.svgFocus === null && st0.mates.length === 0 && st0.all.length === 12 && st0.all.every((l) => l.op === 1), JSON.stringify(st0.all.map((l) => l.op)));
       if (w < 600) await p.tap(tok(6)); else await p.click(tok(6));
       const st = await state(p);
-      const want = `🔁 Klik på den spiller, ${S.fShort} skal byttes med. 🤝 Med naboerne: ${S.n[2]} stærkt · ${S.n[5]} spillet sammen · ${S.n[7]} finder hinanden · ${S.n[9]} fremmede · svagest: ${S.n[9]} · Kender også ${S.nB1} (stærkt, bænk) – vælg hans nabo, klik så på ${S.nB1.split(' ')[0]} Se kort ›`;
+      const want = `🔁 Klik på den spiller, ${S.fShort} skal byttes med. 🤝 Med naboerne: ${S.n[2]} stærkt · ${S.n[5]} spillet sammen · ${S.n[7]} finder hinanden · ${S.n[9]} fremmede · svagest: ${S.n[9].split(' ')[0]} · Kender også ${S.nB1} (stærkt, bænk) – vælg hans nabo, klik så på ${S.nB1.split(' ')[0]} Se kort ›`;
       check(`v3.32.3 (${w}, ${w < 600 ? 'tap' : 'klik'} på CM'en): præcis hans 4 læste par har line.focus (2-6, 5-6, 6-7, 6-9 – ikke ST⇄ST 9-10), svg data-focus="6"`, JSON.stringify(st.focus) === JSON.stringify(['2-6', '5-6', '6-7', '6-9']) && st.svgFocus === '6', JSON.stringify(st.focus));
       const dim = st.all.filter((l) => !l.f), foc = st.all.filter((l) => l.f);
       check(`v3.32.3 (${w}): de andre 8 streger er dæmpet (opacity ≈ .25, ikke væk), hans er uigennemsigtige – "spillet sammen" fuldt hvid og tykkere end de dæmpede`, dim.length === 8 && dim.every((l) => Math.abs(l.op - 0.25) < 0.01) && foc.every((l) => l.op === 1) && foc.find((l) => l.pair === '5-6').stroke === 'rgb(229, 231, 235)' && foc.find((l) => l.pair === '5-6').sw > 2.5, JSON.stringify(st.all));
@@ -3891,8 +3891,13 @@ try {
       if (w < 600) {
         const msgH = await p.evaluate(() => Math.round(document.getElementById('pick-msg').getBoundingClientRect().height));
         console.log(`   (måling) #pick-msg-højde ved 390 med fokus: ${msgH} px (${st.msg.split(/\s+/).length} ord)`); if (process.env.SHOW_MSG) console.log(st.msg);
-        // Spilfører UI 3: før 150 px (6 linjer, "– på banen eller i listen" + "– samspil tæller kun, når de står som naboer"), efter 131 px (5 linjer)
-        check(`v3.32.3 (390): #pick-msg er kortere end før – ${msgH} px (før 150, mål ≤ 140)`, msgH <= 140, String(msgH));
+        // Spilfører UI 3: samme besked i v3.32.3-før-gennemgangen-form ("– på banen eller i listen", "svagest: #9 Navn", "– samspil tæller kun, når de
+        // står som naboer") måles i SAMME side med SAMME navne (navnene skifter fra liga til liga) – den nye skal være mindst én linje (≥ 15 px) lavere.
+        // Målt: før 150 px, efter 131 px (begge ligaer set i kørslerne 6/11).
+        const oldH = await p.evaluate((o) => { const m = document.getElementById('pick-msg'), t = m.firstChild, was = t.textContent; t.textContent = o; const hh = Math.round(m.getBoundingClientRect().height); t.textContent = was; return hh; },
+          st.msg.replace(/ Se kort ›$/, '').replace('skal byttes med.', 'skal byttes med – på banen eller i listen.').replace(`svagest: ${S.n[9].split(' ')[0]}`, `svagest: ${S.n[9]}`).replace(/– vælg hans nabo, klik så på #\d+$/, '– samspil tæller kun, når de står som naboer'));
+        console.log(`   (måling) #pick-msg-højde ved 390 med den gamle tekst: ${oldH} px`);
+        check(`v3.32.3 (390): #pick-msg er mindst én linje kortere end før – ${msgH} px mod ${oldH} px med den gamle tekst`, oldH - msgH >= 15, `${msgH} / ${oldH}`);
       }
       // Byt-forhåndsvisningen: i Plads-cellen pr. mulig række (ikke på banen); title = præcis beskeden efter byttet
       await p.click('#lineup-list .toolbar button:has-text("Alle")');

@@ -109,7 +109,7 @@ test('to ens naboer = "Alle hans naboer"; to forskellige = "Med naboerne" med sv
   assert.ok(a !== b && a < b, `data: de to naboer har forskelligt antal kampe (${a} / ${b})`);
   const diff = focusChemText(t, REF, lb);
   assert.ok(diff.startsWith(`🤝 Med naboerne: `), diff);
-  assert.ok(diff.includes(` · svagest: ${sh(n2)} · Ingen stærke par endnu – ca. ${a} kampe mere side om side`), diff);   // minimum (a), ikke maksimum (b)
+  assert.ok(diff.includes(` · svagest: ${sh(n2).split(' ')[0]} · Ingen stærke par endnu – ca. ${a} kampe mere side om side`), diff);   // minimum (a), ikke maksimum (b)
 });
 
 test('snit hvor båndet aldrig nås: ingen "ca. 60 kampe" og ingen "ca. null" – hverken ved "Alle hans naboer" eller "Ingen stærke par"', () => {

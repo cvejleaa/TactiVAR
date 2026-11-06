@@ -67,7 +67,7 @@ test('partnersOf: de læste naboer stærkeste først, den svageste, og andre han
 test('focusChemText: den præcise tekst for fokus, angriberen, målmanden, den skadede, den udelukkede og en bænkspiller – kun ord, aldrig tal 0–100', () => {
   const { t, s, F, B1, B2, R, gk, sh } = fixture();
   const txt = focusChemText(t, REF, F);
-  assert.equal(txt, `🤝 Med naboerne: ${sh(s[2])} stærkt · ${sh(s[5])} spillet sammen · ${sh(s[7])} finder hinanden · ${sh(s[9])} fremmede · svagest: ${sh(s[9])}`
+  assert.equal(txt, `🤝 Med naboerne: ${sh(s[2])} stærkt · ${sh(s[5])} spillet sammen · ${sh(s[7])} finder hinanden · ${sh(s[9])} fremmede · svagest: ${sh(s[9]).split(' ')[0]}`
     + ` · Kender også ${sh(B1)} (stærkt, bænk) og ${sh(R)} (finder hinanden, reserve) – vælg hans nabo, klik så på ${sh(B1).split(' ')[0]} eller ${sh(R).split(' ')[0]}`);
   // Spilfører UI 3: forklaringen "tæller kun …" står højst én gang og kun ved "Kender også" – her viser vejen den, så slet ikke
   assert.ok(!txt.includes('tæller kun'), txt);

@@ -269,7 +269,8 @@ export function focusChemText(team, ref, pid) {
     head = `Alle hans naboer: ${BAND_WORD[band]}` + (band === 'staerkt' ? '' : ` – samspil vokser kampe side om side${n ? ` (ca. ${pl(n, 'kamp', 'kampe')} til ${BAND_WORD[to]})` : ''}`);
   } else if (nb.length) {
     head = `Med ${nb.length === 1 ? 'naboen' : 'naboerne'}: ${nb.map((x) => `${nm(x.mate)} ${BAND_WORD[x.band]}${mark(x.mate)}`).join(' · ')}`;
-    if (nb.length > 1) head += ` · svagest: ${nm(f.weakest.mate)}`;
+    // Spilfører UI 3 (kortere ved 390): navnet står allerede i listen – kun nummeret gentages
+    if (nb.length > 1) head += ` · svagest: #${f.weakest.mate.shirtNumber}`;
     if (!nb.some((x) => x.band === 'staerkt')) { const n = games('staerkt'); head += ` · Ingen stærke par endnu${n ? ` – ca. ${pl(n, 'kamp', 'kampe')} mere side om side` : ''}`; }
   } else head = f.where === 'start' ? 'Ingen af hans naboer tæller i samspillet' : `På ${f.where === 'bænk' ? 'bænken' : 'reserven'}${f.others.length ? '' : ' – ingen naboer på banen'}`;
   // "Kender også" (Spilfører UI 3: forklaringen står kun her, én gang) – med vejen dertil (QC 5): et klik på #8 nu ville bytte HAM ud for #8
