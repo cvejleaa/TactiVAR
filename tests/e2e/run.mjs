@@ -2123,7 +2123,7 @@ try {
       const frameOf = (L, close = true) => { for (let s = L; s >= Math.max(0, L - 6); s--) { const e = evs[s]; if (!STARTS.has(e.type) || !e.var) continue; const one = oneStepOf(e), v = one ? s : s + 1 < n ? s + 1 : null;
         if (L > (v ?? s) + 5) return null; if (close) for (let j = (v ?? s) + (one ? 2 : 1); j <= L; j++) if (CLOSES.has(evs[j].type)) return null; return { s, one, v, e, reached: v != null && L >= v }; } return null; };
       const teamOf = (home) => (home ? D.homeName : D.awayName);
-      const F = { frame: [], score: [], fx: [], tone: [], hold: [], delay: [], geo: [], css: [], vtone: [] }, seen = { two: 0, one: 0, hold: 0, ownGoalTicks: 0, flash: 0, pendingTicks: 0, bip: 0, closed: 0, good: 0, bad: 0 };
+      const F = { frame: [], score: [], fx: [], tone: [], hold: [], delay: [], geo: [], css: [], vtone: [] }, seen = { two: 0, one: 0, oneKept: 0, hold: 0, ownGoalTicks: 0, flash: 0, pendingTicks: 0, bip: 0, closed: 0, good: 0, bad: 0 };
       const s0 = await snap(p), startAc = { n: s0.ac, resumes: s0.resumes, tones: s0.tones };
       const expectedLive = []; let said = null, prev = s0, L = 0, hold = 0, t0 = { s: null, tick: 0 }, base = null;
       const verify = (L, snapNow, step, tick, before) => {
@@ -2175,6 +2175,7 @@ try {
           const key = `${fr.s}:${fr.reached}`;
           if (key !== said) { said = key; expectedLive.push(fr.reached ? lines.at(-1) : lines[0]); }
           if (fr.one) seen.one++; else if (fr.reached && fr.v === L) seen.two++;
+          if (fr.one && L === fr.v + 1 && CLOSES.has(evs[L].type)) seen.oneKept++;   // ét-trins: følgen (straffemål/RED) lukker IKKE rammen (QC/Spilfører UI v3.32.2)
         }
         if (!fr && frameOf(L, false)) seen.closed++;   // lukket før tid af et nyt mål/rødt (tælles i data-tjekket)
         if (!fr && base == null && snapNow.geo) base = snapNow.geo.next;
@@ -2216,7 +2217,7 @@ try {
         prev = now;
       }
       const dumpF = (k) => `${F[k].length}: ${F[k].slice(0, 3).join(' || ')}`;
-      check('v3.32.2 TM e2e: data i runden (tvungne VAR-tjek) – mindst ét to-trins tjek med pause, fx og lyd at måle på', seen.two >= 1 && seen.closed >= 1 && seen.hold >= 4 && seen.pendingTicks >= 1 && seen.bip >= 1 && n > 20, JSON.stringify({ ...seen, n }));
+      check('v3.32.2 TM e2e: data i runden (tvungne VAR-tjek) – mindst ét to-trins tjek med pause og ét ét-trins tjek, hvis følge (straffemål/RED) ikke lukker rammen, fx og lyd at måle på (lukning før tid: unit var-moment-v3322-fix + modellen tick for tick)', seen.two >= 1 && seen.oneKept >= 1 && seen.hold >= 4 && seen.pendingTicks >= 1 && seen.bip >= 1 && n > 20, JSON.stringify({ ...seen, n }));
       check('v3.32.2 TM e2e: rammen følger HVER hændelse – til stede fra tjek til kendelse + 5 (lukket før tid af et nyt mål/rødt), role=group "VAR-tjek", rigtig første linje, kendelsen med holdnavn først ved kendelsen, aldrig ev.text', F.frame.length === 0, dumpF('frame'));
       check('v3.32.2-rettelsen e2e: kendelseslinjen (og kun den) er grøn, når den er god for dit hold, ellers rød – begge forekommer', F.vtone.length === 0 && seen.good >= 1 && seen.bad >= 1, `${dumpF('vtone')} ${JSON.stringify({ good: seen.good, bad: seen.bad })}`);
       check('v3.32.2 TM e2e: pausen – mellem tjek og kendelse (4 tick) tegnes intet om: stilling, minut, ramme, toner og #live-status uændrede', F.hold.length === 0, dumpF('hold'));
