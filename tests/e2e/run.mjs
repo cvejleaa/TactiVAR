@@ -3953,6 +3953,20 @@ try {
     await p.mouse.up(); await p.waitForTimeout(150);
     const pink = await p.evaluate(() => { const e = document.createElement('span'); e.className = 'token-flag'; document.getElementById('pitch').append(e); const c = getComputedStyle(e).color; e.remove(); return c; });
     check('v3.33.0-rettelse: live-etiketten har sin egen farve – gul ved −2,5 %, grøn ved ✓, ingen af dem "Ude af zone"-flagets lyserøde', JSON.stringify(seen) === JSON.stringify([['→ DM-plads · −2,5 %', 'rgb(253, 230, 138)'], ['→ CM-plads ✓', 'rgb(134, 239, 172)']]) && pink === 'rgb(254, 202, 202)', JSON.stringify({ seen, pink }));
+    // QC efter rettelserne: under trækket af den CM, der står på DM-pladsen (plads 6, med flag), skjules flagene – de modsagde "→ CM-plads ✓";
+    // efter slip står flaget/pladsen igen efter den nye dybde
+    const T6 = '#pitch .token[data-slot="6"]', b6 = await p.locator(T6 + ' .token-num').boundingBox();
+    const flagState = () => p.evaluate((sel) => { const t = document.querySelector(sel), f = t.querySelector(':scope > .token-flags'), l = t.querySelector('.kind-live');
+      return { flags: f ? getComputedStyle(f).display : null, live: l ? [l.textContent, getComputedStyle(l).display] : null, dragging: t.classList.contains('dragging') }; }, T6);
+    const before6 = await flagState();
+    await p.mouse.move(b6.x + b6.width / 2, b6.y + b6.height / 2); await p.mouse.down();
+    await p.mouse.move(b6.x + b6.width / 2, pb.y + (pb.height * 46) / 100, { steps: 6 });
+    const during6 = await flagState();
+    await p.mouse.up(); await p.waitForTimeout(150);
+    const after6 = await flagState();
+    check('v3.33.0-rettelse (390): under trækket er flagene fra visningen skjult, og kun live-etiketten ("→ CM-plads ✓") står – efter slip er de væk/opdateret igen',
+      before6.flags === 'flex' && !before6.dragging && during6.dragging && during6.flags === 'none' && during6.live?.[0] === '→ CM-plads ✓' && during6.live?.[1] === 'block' && !after6.dragging && after6.live === null,
+      JSON.stringify({ before6, during6, after6 }));
     await c.close();
    }
   }

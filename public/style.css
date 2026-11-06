@@ -101,6 +101,8 @@ td.player-gain::after { display: none; }
 /* Flagene under brikken: bredde 0, så et langt flag ikke gør brikken bred; centreret – ved kanten vokser de indad (banen skærer ellers af) */
 .token-flags { width: 0; display: flex; flex-direction: column; align-items: center; } .token-flags .token-flag { white-space: nowrap; }
 .token.edge-l .token-flags { align-items: flex-start; } .token.edge-r .token-flags { align-items: flex-end; }
+.token.dragging > .token-flags { display: none; }   /* QC: flagene fra visningen modsiger live-etiketten under trækket */
+.token-live { width: 0; display: flex; flex-direction: column; align-items: center; } .token.edge-l .token-live { align-items: flex-start; } .token.edge-r .token-live { align-items: flex-end; }
 /* Live-etiketten under træk (v3.33.0-rettelse): egen mørk bund – ikke "Ude af zone"-flagets lyserøde; gul = koster, grøn = passer */
 .token-flag.kind-live { display: block; white-space: nowrap; background: #0f172ad9; border-radius: .3rem; padding: 0 .3rem; color: #e5e7eb; text-shadow: none; }
 .token-flag.kind-live.warn { color: #fde68a; } .token-flag.kind-live.ok { color: #86efac; }

@@ -76,9 +76,12 @@ function attachDrag(token, pitch, ring, anchor, slot, onMove, player = null) {
     e.preventDefault();
     token.setPointerCapture(e.pointerId);
     const rect = pitch.getBoundingClientRect();
-    let moved = false, last = null, live = null;
-    // v3.33.0: pladstypen live under trækket ("→ DM-plads") – den samme slotKindText som title og flaget, ud fra den trukne dybde
-    if (CENTRAL_ROLES.has(anchor.r) || slotKindText(anchor.r, anchor.y)) { live = h('span', { class: 'token-flag kind-live' }); token.append(live); }
+    let moved = false, last = null, live = null, liveBox = null;
+    // v3.33.0: pladstypen live under trækket ("→ DM-plads") – den samme slotKindText som title og flaget, ud fra den trukne dybde.
+    // QC (efter rettelserne): flagene fra visningen skjules under trækket (.dragging) – ellers stod "⚠ … DM-plads" over "→ CM-plads ✓".
+    // Etiketten står i sin egen boks med bredde 0, så den vokser indad ved kanten som flagene (edge-l/edge-r) og ikke skæres af banen.
+    token.classList.add('dragging');
+    if (CENTRAL_ROLES.has(anchor.r) || slotKindText(anchor.r, anchor.y)) { live = h('span', { class: 'token-flag kind-live' }); liveBox = h('div', { class: 'token-live' }, live); token.append(liveBox); }
     Object.assign(ring.style, { left: anchor.x + '%', top: anchor.y + '%', width: MAX_ANCHOR_RADIUS * 2 + '%', height: (MAX_ANCHOR_RADIUS * 2 * rect.width) / rect.height + '%' });
     ring.hidden = false;
     const move = (ev) => {
@@ -91,7 +94,7 @@ function attachDrag(token, pitch, ring, anchor, slot, onMove, player = null) {
     };
     const up = () => {
       token.removeEventListener('pointermove', move); token.removeEventListener('pointerup', up);
-      ring.hidden = true; live?.remove();
+      ring.hidden = true; liveBox?.remove(); token.classList.remove('dragging');
       if (moved && last) { token.dataset.dragged = '1'; onMove(slot, { x: Math.round(last.x * 10) / 10, y: Math.round(last.y * 10) / 10 }); }
     };
     token.addEventListener('pointermove', move); token.addEventListener('pointerup', up);
