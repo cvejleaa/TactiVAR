@@ -49,3 +49,11 @@ kantreglen (v3.24.6) blev lavet.
   `slotRoleOf`, BOTH i generator, Hvis-Så refit med ys, løbsgruppe og bevægelse.
 - e2e "v3.33.0": træk en CM til ca. y 56 → brikkens flag/title og Plads-cellen siger DM-plads, en DM dér har ingen straf, tilbage igen →
   væk; live-etiket under træk; hvad der ikke må stå.
+
+## Resultat (6/11)
+- Målt (`node tools/measure-central.mjs sammenlign <rod for 4c149d9> N`, netto før → efter): a) +0,035 pr. rettet spiller (42 000 kampe);
+  b) +0,009 (42 000 kampe – under båndet alene; samlet a+b +0,022); c) −0,004. Ankrene ens. Største gevinst over bedste utrukne: +0,024.
+  Gemte spil: 3 trukne pladser i 18 fixtures, 0 skifter.
+- Fingeraftrykkene uændrede. Mutationer: 26 af 27 røde; "generator: BOTH → WIDE" er en ækvivalent mutant (intet anker ligger i en
+  central mellemzone – invarianten), "glid i dybden" var grøn og blev rettet ved at samle rollen ét sted (`driftOf`).
+- Karakterarket: startens rolle gemmes som den tegnede plads ("CM→DM"); en indskifters tegnede dybde gemmes ikke (bevidst udeladt).

@@ -214,3 +214,18 @@ test('UI: brikkens title og flag, Plads-cellen og live-etiketten under træk sig
   moveSlot(me, slot, { x: 32, y: 44 });
   t = tok(); assert.match(t.attrs.title, /^CM – /); assert.doesNotMatch(t.attrs.title, /DM/); assert.equal(place().textContent, 'CM');
 });
+
+test('sporets invarianter holder med trukne midtbanepladser (målingens tre scenarier a/b/c, begge baner)', async () => {
+  const { checkTrace } = await import('../../tools/trace-invariants.mjs');
+  const { SCENARIOS } = await import('../../tools/measure-central.mjs');
+  let n = 0;
+  for (const name of ['a', 'b', 'c']) for (let s = 1; s <= 4; s++) {
+    const sc = SCENARIOS[name], { L, me } = fresh(s * 53); setFormation(me, sc.f);
+    if (sc.put) { const sub = me.squad.find((p) => p.position === sc.put[1] && !me.tactics.lineupSlots.includes(p.id)); if (!sub) continue; swapPlayers(me, me.tactics.lineupSlots[sc.put[0]], sub.id); }
+    moveSlot(me, sc.drag[0], sc.drag[1]);
+    assert.notEqual(slotRoleOf(me.tactics, sc.drag[0]), FORMATIONS[sc.f][sc.drag[0]].r, `data: ${name} skifter rolle`);
+    const opp = L.teams.filter((t) => t.isBot)[s % 7];
+    for (const m of [simulateMatch(me, opp, createRng(s * 31)), simulateMatch(opp, me, createRng(s * 37))]) { assert.deepEqual(checkTrace(m).errors, [], `${name} seed ${s}`); n++; }
+  }
+  assert.ok(n >= 18, `data: ${n} kampe`);
+});
