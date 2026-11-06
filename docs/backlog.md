@@ -7,6 +7,12 @@ Rangering: brugerens ønsker først, derefter værdi pr. størrelse. Første run
 + 3 sæsoner `measure-lifecycle`).
 
 ## Næste
+00. **v3.32.3 – VAR læser taktikken (brugeren 2026-11-06: "Har taktik ikke nogen indflydelse på var? Heller ikke hvis man vælger
+   ekstrem VAR-linje?" – valgt: som næste udgivelse)** · motor + UI · M · 5 · I dag læser `offsideCheck` (engine/match.js) ikke forsvarets
+   `offsideTrap`, og `EXTREME_VAR_LINE` virker som `NORMAL` i kampen (kun `!== 'OFF'`, match.js ved `trapWon`); eneste forskel er
+   modstanderens `vsTrapLong`-erfaring (engine/counter.js:57). Ekstrem linje skal give flere offside-fanger og flere tætte VAR-kendelser,
+   men koste mere, når linjen brydes; linjens højde (pres) med. Målt før/efter (tools/measure-duels.mjs … var + en målegennemgang af
+   mål imod), Arkitekt + Spilfører motor + QC på planen. Rammen fra v3.32.2 må derefter sige "din høje linje" – kun når motoren læste den.
 0. **Ny brugerflade i trin (brugeren 2026-11-02: "forvirrende og alt for mange informationer klemt sammen")** · UI · L · 5 · bud:
    https://claude.ai/artifact/EPcztoSQdrk6pK8Bsy3FeS (UI-gennemgang med skærmbilleder, tre designbud, QC-dom). Brugerens valg: seks faner
    (🏠 Hjem ny · Trup · Taktik · Kamp · Liga · Klub) med underfaner, spillerkortet som ét panel, ▶ Spil runde som bundbjælke på Hjem og
