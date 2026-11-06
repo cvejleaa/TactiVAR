@@ -2338,17 +2338,19 @@ try {
 
     // ---- E (v3.32.2-rettelsen, QC/Spilfører UI): rammen ved 390 og 1366 px tick for tick – stillingen og minuttet altid synlige,
     // rammen ikke ind over filterrækken, ≤ 44rem (704 px) bred, intet klippet, og siden skubbes ikke ----
-    for (const [w, ht] of [[390, 844], [1366, 900]]) {
-      const E = await mk({ width: w, height: ht });
+    // Ved 390 også seed 1: dens højeste ramme (3 linjer + "Vis kendelsen ›" på egen række, ca. 117 px) passer IKKE i 7rem (112 px –
+    // computerens højde), så data-vagten (maxNeed > 112) beviser, at 9,5rem-reglen ≤ 600 px er nødvendig
+    for (const [w, ht, seedA] of [[390, 844, 0x9e3779b9], [390, 844, 1], [1366, 900, 0x9e3779b9]]) {
+      const E = await mk({ width: w, height: ht, seedA });
       const { p, egne } = E;
       await p.click('#play-round');
-      const bad = [], st = { frames: 0, maxW: 0, minGap: Infinity, next: new Set() };
+      const bad = [], st = { frames: 0, maxW: 0, minGap: Infinity, maxNeed: 0, next: new Set() };
       for (let k = 0; k < 900; k++) {
         const q = await snap(p);
         if (!q.playing) break;
         if (q.geo?.next != null) st.next.add(Math.round(q.geo.next));
         if (q.frame) {
-          const f = q.frame; st.frames++; st.maxW = Math.max(st.maxW, f.box.r - f.box.l); st.minGap = Math.min(st.minGap, f.ff - f.box.b);
+          const f = q.frame; st.frames++; st.maxNeed = Math.max(st.maxNeed, f.need); st.maxW = Math.max(st.maxW, f.box.r - f.box.l); st.minGap = Math.min(st.minGap, f.ff - f.box.b);
           if (!f.scoreHit || f.hit) bad.push(`t${k} stillingen/minuttet dækket`);
           if (f.ff == null || f.box.b > f.ff + 0.5) bad.push(`t${k} bund ${f.box.b} > filterrækken ${f.ff}`);
           if (f.box.r - f.box.l > 704.5) bad.push(`t${k} bredde ${f.box.r - f.box.l}`);
@@ -2356,8 +2358,9 @@ try {
         }
         await p.clock.runFor(TICK);
       }
-      check(`v3.32.2-rettelsen e2e (${w} px): rammen dækker aldrig stillingen/minuttet, når ikke filterrækken, er ≤ 704 px bred og klipper intet – siden skubbes ikke (data: ≥ 3 tick med ramme)`,
-        bad.length === 0 && st.frames >= 3 && st.next.size === 1 && egne.length === 0, JSON.stringify({ bad: bad.slice(0, 3), frames: st.frames, maxW: st.maxW, minGap: st.minGap, next: [...st.next], egne }));
+      check(`v3.32.2-rettelsen e2e (${w} px, seed ${seedA}): rammen dækker aldrig stillingen/minuttet, når ikke filterrækken, er ≤ 704 px bred og klipper intet – siden skubbes ikke (data: ≥ 3 tick med ramme)`,
+        bad.length === 0 && st.frames >= 3 && st.next.size === 1 && egne.length === 0, JSON.stringify({ bad: bad.slice(0, 3), frames: st.frames, maxW: st.maxW, maxNeed: st.maxNeed, minGap: st.minGap, next: [...st.next], egne }));
+      if (seedA === 1) check('v3.32.2-rettelsen e2e (390 px, data-vagt): mindst én ramme er højere end 7rem (112 px) – så 9,5rem-zonen på telefon er bevist', st.maxNeed > 112, String(st.maxNeed));
       await E.c.close();
     }
   }
