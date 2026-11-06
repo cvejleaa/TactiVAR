@@ -14,6 +14,11 @@ Rangering: brugerens ønsker først, derefter værdi pr. størrelse. Første run
       enten Hjem eller Klub, da den vedrører min klub" → valgt Hjem (Klub får linket "Sæsonrapport ›"). "Jeg synes ikke jeg er blevet
       advaret om at en spiller ville stoppe karrieren, det skal være med, og markeres på trup siden" → valgt: 👋 ved navnet i Trup og
       en linje i Hjem "Før du spiller" fra runde 10 (samme regel som kortet: willRetire, deterministisk – altid sandt). Kun eget hold.
+      + **Liga → Statistik "dine spillere" (brugeren 6/11, skærmbillede):** "2 spillere der på denne side har 0 kampe, men alligevel har
+      fået karakter, har løbet km, og så er der ingen forklaring på hvad 'Fri (sæson)' betyder". Årsag (ui/stats.js:127-131): "Kampe" og
+      "Fri" tælles for sæsonen, men "Snit", "km/90" og "% HI" er hele karrieren (p.ratingSum/runStats) – forklaringen står kun i en grå
+      linje under tabellen. Ret: alle kolonner for SÆSONEN (samme kilde som spillerkortets sæsonstatistik, v3.31.2 cardStats), karrieren
+      i title; "–" uden kampe; kolonnen "Fri løb" med forklaring (kom fri / løb uden bold) i title og ⓘ; tallene under deres overskrift.
    4. **v3.33.2 VAR læser taktikken + kalibrering mod virkeligheden** = punkt 00. nedenfor, udvidet (brugeren 6/11: "Der er blevet
       færre VAR afgørelser nu, det matcher ikke virkeligheden"). Målt: motoren identisk i v3.32.1–3 (0,251 ændrede kendelser/kamp);
       det gamle banner blinkede to gange pr. sag. Virkelighed (ESPN PL 2024/25; 2025/26-tal): PL 0,28, øvrige topligaer/CL 0,38–0,47;
