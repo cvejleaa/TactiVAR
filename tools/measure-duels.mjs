@@ -346,7 +346,7 @@ export function measureMotm(N = 600) {
 // røde kort, hjørnespark og målscorernes kæde – pr. kamp. Før v3.15.1 (VAR som chancetype, commit 28efc6d, N=1500):
 // se balance.test.mjs. Kør: node tools/measure-duels.mjs 1500 var
 export function measureVar(N = 1500) {
-  const c = { games: 0, goals: 0, shots: 0, onTarget: 0, miss: 0, corners: 0, penalties: 0, reds: 0, varGoalOld: 0, goalChecks: 0, disallowed: 0, flags: 0, penChecks: 0, penOverturned: 0, penAwarded: 0, redChecks: 0, redDown: 0, redUp: 0, varChecksStat: 0, attGoals: 0, longshots: 0 };
+  const c = { games: 0, goals: 0, shots: 0, onTarget: 0, miss: 0, corners: 0, penalties: 0, reds: 0, varGoalOld: 0, goalChecks: 0, disallowed: 0, flags: 0, penChecks: 0, penOverturned: 0, penAwarded: 0, redChecks: 0, redDown: 0, redUp: 0, varChecksStat: 0, attGoals: 0, longshots: 0, varEvents: 0, noVar: 0 };
   for (let s = 1; s <= N; s++) {
     const L = createLeague(createRng(s));
     const m = simulateMatch(L.teams[s % 8], L.teams[(s + 3) % 8], createRng(s * 31));
@@ -354,6 +354,8 @@ export function measureVar(N = 1500) {
     c.goals += m.homeGoals + m.awayGoals; c.shots += st.hShots + st.aShots; c.onTarget += st.hOnTarget + st.aOnTarget;
     c.corners += st.hCorners + st.aCorners; c.penalties += st.hPenalties + st.aPenalties; c.reds += st.hReds + st.aReds;
     c.varChecksStat += st.hVarChecks + st.aVarChecks;
+    // v3.32.2: VAR-hændelser (med var – tjek og VAR-givne kendelser) pr. kamp og andelen af kampe helt uden
+    { const n = m.events.filter((e) => e.var).length; c.varEvents += n; if (!n) c.noVar++; }
     for (const e of m.events) {
       const v = e.var;
       if (e.type === 'MISS') c.miss++;
@@ -375,10 +377,25 @@ export function measureVar(N = 1500) {
     }
   }
   const per = Object.fromEntries(Object.entries(c).filter(([k]) => k !== 'games').map(([k, v]) => [k, v / c.games]));
-  return { ...per, games: c.games, onTargetShare: c.onTarget / c.shots, attShare: c.attGoals / c.goals, longshotShare: c.longshots / c.goals, penOverturnedShare: c.penOverturned / Math.max(1, c.penChecks) };
+  return { ...per, games: c.games, onTargetShare: c.onTarget / c.shots, attShare: c.attGoals / c.goals, longshotShare: c.longshots / c.goals, penOverturnedShare: c.penOverturned / Math.max(1, c.penChecks), noVarShare: c.noVar / c.games };
+}
+// v3.32.2 (VAR-øjeblikket, QC: "hver 4.–5." var ikke målt): andelen af DIT holds kampe (dit hold mod en bot, skiftevis hjemme/ude,
+// som tools/fingerprint.mjs) med et VAR-øjeblik – mindst én hændelse med var, dvs. rammen står mindst én gang i din afspilning – og
+// andelen med en pause før kendelsen (to-trins tjek). Kør: node tools/measure-duels.mjs 1500 var
+export function measureVarMine(N = 1500) {
+  let games = 0, moment = 0, paused = 0, events = 0;
+  for (let s = 1; s <= N; s++) {
+    const L = createLeague(createRng(s * 97)), me = L.teams.find((t) => !t.isBot), opp = L.teams[(s % 7) + 1];
+    const m = s % 2 ? simulateMatch(me, opp, createRng(s * 131)) : simulateMatch(opp, me, createRng(s * 131));
+    const v = m.events.filter((e) => e.var);
+    games++; events += v.length;
+    if (v.length) moment++;
+    if (v.some((e) => !((e.type === 'VAR_PEN' && e.var.verdict === 'AWARDED') || (e.type === 'VAR_RED' && e.var.verdict === 'UPGRADED')))) paused++;
+  }
+  return { mineGames: games, mineMomentShare: moment / games, minePausedShare: paused / games, mineVarEvents: events / games };
 }
 if (import.meta.url === `file://${process.argv[1]}` && process.argv[3] === 'var') {
-  const r = measureVar(ARG_N), f = (x) => x.toFixed(3);
+  const r = { ...measureVar(ARG_N), ...measureVarMine(ARG_N) }, f = (x) => x.toFixed(3);
   console.log(Object.entries(r).map(([k, v]) => `${k} ${Number.isInteger(v) ? v : f(v)}`).join('\n'));
 }
 

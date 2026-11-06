@@ -134,7 +134,7 @@ Noter til hukommelseskataloget (kan ikke skrives nu – træet er låst af bygge
 - Linjer pr. valgt mulighed ("Lynkontra: flere kontraer …") kommer på backloggen. Motor-Spilføreren skal godkende dem.
 
 # Køen efter v3.32.1 (brugerens valg 5/11 af de eksterne forslag – vurderet af Spilfører motor/UI og Release Manager)
-1. **v3.32.2 "VAR-øjeblikket" + game feel**
+1. **v3.32.2 "VAR-øjeblikket" + game feel** – ✔ lavet i v3.32.2 (plan: `nuvaerende-plan.md`; lyden står ved ⚡, ikke i ⚙ – plan-gennemgangen 6/11)
    - **VAR-ramme under live-afspilning:** tv-ramme, puls og en ærlig log, bygget på `events[].var` og øjebliksbilledet: type, tjekket spiller, linjeholder og kendelse, fx "Tjekker offside – #9 er forreste – linjen holdes af #4 – kendelse".
    - Rammen kan springes over, og loggen må aldrig påstå en taktisk årsag.
    - **Rød flash**, når et mål annulleres.

@@ -351,6 +351,17 @@ Tick hvert 3. minut (1..90).
     min(FIN + 8, 13) → min(FIN + 8, 10) (ellers blev langskud 19 % af målene). Angribernes andel 53 % → 61 % (målene
     afgøres nu af afslutningen, ikke af en VAR-duel uden afslutning – Spilfører: "angriberen scorer næsten aldrig i åbent
     spil"); over dokumentets 44–56 % – bevidst, til næste sæsongennemgang.
+  - **Tjekkets spillere (v3.32.2, `var.cast` – kun data til visningen):** `{ checked, line?, victim?, fouler?, other? }` med
+    spiller-**id'er** (navnene slås op i karakterarket – aldrig i teksten). Mål/offside: `checked` = den tjekkede (den forreste,
+    ikke nødvendigvis skytten), `other: true` kun når han stod foran skytten, `line` = forsvareren, duellen blev afgjort mod.
+    Mål/frispark (også tvunget ved hjørnespark og cutback): `checked` = skytten, `victim` = den skubbede, ingen `line`. Straffe/
+    offside: `checked` = den tjekkede, `line` = fælderen; filmning: `checked` = den fældede; dømt af VAR: `checked` = den fældede,
+    `fouler` = fælderen. Rødt: `checked` = fælderen. Ingen rng – felterne tages fra variabler, der findes; `cast` er visning i
+    `tools/fingerprint.mjs` (NOPROSE_400 og GOLDEN_TRACES_20 uændrede). `sanitize.js` smider en ugyldig `cast` væk (ikke-tekst-id,
+    ukendt nøgle); en ældre kamp uden `cast` får en log uden navne. Ca. 60 B pr. VAR-hændelse (Firestore-reglen ser kun størrelsen).
+  - Målt v3.32.2 (`node tools/measure-duels.mjs 1500 var`): 0,465 VAR-hændelser pr. kamp (0,32 mål-tjek, 0,16 annullerede mål),
+    63 % af kampene helt uden VAR; DIT holds kampe (mod en bot, skiftevis hjemme/ude – `measureVarMine`): 37 % har mindst ét
+    VAR-øjeblik (ca. hver 3. kamp – ikke "hver 4.–5."), 33 % en pause før kendelsen; 0,46 VAR-hændelser pr. kamp.
 - **Modtageren står hvor bolden kommer (v3.12**, brugeren: "den spiller der var nærmest hvor bolden
   blev spillet hen"): modtageren trækkes med vægt exp(−afstand/16)·(10 + evne) (`receiver`): skytten
   nær feltet (50, 20) eller på feltets kant (50, 32; 45 %) efter FIN, hovedstødsspilleren nær feltets
@@ -480,6 +491,10 @@ Tick hvert 3. minut (1..90).
   xG, luftdueller, VAR, skader/frispark. Tidslinje 90 min: mål, VAR, skader,
   kort, triggere.
 - Live-afspilning 420 ms/hændelse eller lyn-simulering. 4 kampkort pr. runde.
+  **VAR-pausen (v3.32.2, `ui/varmoment.js`):** efter et to-trins tjek (VAR_CHECK → mål/VAR_NO_GOAL, VAR_PEN STANDS/OVERTURNED →
+  straffesparket/VAR_NO_PEN, VAR_RED CONFIRMED/DOWNGRADED → RED/VAR_NO_RED) springes `VAR_HOLD_TICKS` = 4 tick over i samme
+  `setInterval` (tjek → kendelse (1 + 4) × 420 = 2100 ms, før 420 ms); ét-trins (VAR-givet straffe, opgraderet rødt) har ingen
+  pause. Ingen ekstra timer: ⚡, en ny runde og en ny liga stopper pausen, fordi de stopper timeren. "Vis kendelsen ›" afbryder den.
 - **Rettet (fejl i v2.5b):** auto-indskiftning ændrer `lineupSlots`
   permanent; skadet spiller heles −1 i samme runde (1-kamps skade forsvinder);
   der gemmes før stilling/karakterer er opdateret; avis og kampvælger vises
@@ -1204,6 +1219,27 @@ mellem bjælkerne 707 → 726 px (682 med scout-bjælken). e2e vagter: chrome �
   pladsen efter navnet (naturlig kæde i parentes ved afvigelse, indskiftere
   "ind på X"), minibane "Startopstilling" med karakter/stjerner, ikoner med
   mouse-over + forklaring under (touch).
+  **VAR-øjeblikket (v3.32.2, `ui/varmoment.js` – rene funktioner):** under live-afspilning af din kamp står en ramme (`#var-frame`,
+  `role="status"`) som overlay over stillingen og tidslinjen (`.mc-board` – den skubber ikke siden) fra tjekket til kendelsen + 5 tick
+  (≈ 2 s), med et pulserende "VAR"-mærke og en log bygget KUN af hændelsens type, `var` (kind/verdict/cast) og navnene fra karakterarket –
+  aldrig `ev.text`, taktik, kynisme, teater eller "fælden virkede": "📺 VAR tjekker: offside?" (skub i opspillet? / filmning? / rødt
+  kort?), "#9 Hansen tjekkes for offside – forreste mand" (kun ved `other`), "afgjort mod #4 Bergs placering", ved frispark "#9 Hansen
+  tjekkes for skub mod #4 Berg", og kendelsen ("❌ Målet annulleret", "✅ Målet står", "✅ Straffen står", "❌ Ingen straffe", "🟥 Rødt
+  står", "🟨 Rødt bliver gult", "📺 Straffe til …", "🟥 Opgraderet til rødt") – kendelsen først, når kendelses-hændelsen er vist. Under et
+  mål-tjek står stillingen nedtonet med "?" (målet er talt op i tjekket). "Vis kendelsen ›" (`#var-show`) i rammen. Det gamle VAR-banner
+  (ét tick) er væk. Skærmlæseren: `#live-status` (`aria-live="polite"`, ved `#fejlboks`) skrives kun ved tjekket og ved kendelsen.
+  Efter fløjt (og efter ⚡) står ingen ramme – referatets egen VAR-linje navngiver spillerne (bevidst udeladt).
+  **Spilfornemmelsen:** stillingen ryster (`.fx-shake`, 360 ms) ved dit holds endelige mål og ved det endelige røde kort (aldrig ved
+  VAR_CHECK/VAR_RED/VAR_NO_RED); et annulleret mål blinker stillingens boks rødt (`.fx-flash-bad`), når det var DIT mål, grønt
+  (`.fx-flash-good`), når det var modstanderens (400 ms). Én gang pr. hændelse (`mc.fxSeen`) – ≤ 400 ms, så gentegningen hvert tick ikke
+  skærer dem over; pulsen får negativ `animation-delay` fra `mc.varT0`. `prefers-reduced-motion: reduce`: ingen rystelse, ingen puls,
+  flashen er en statisk kant i samme farve. **Lyd** (`ui/sound.js`, Web Audio uden filer): fløjt ved kampstart og slutfløjt, bip ved
+  VAR-tjek, kort jubel ved dit mål – FRA som standard, nøglen `tactivar_sound` (ikke i ligaen). Kontakten "🔇 Lyd fra"/"🔊 Lyd til"
+  (`#sound-toggle`, `aria-pressed`) står i Match Centers række ved ⚡, under og efter afspilning – ikke i ⚙ (0b: ⚙ er sjældne og farlige
+  handlinger). AudioContext oprettes kun i et klik (▶ Spil runde med lyd til, kontakten); ingen lyd uden for Kamp; ⚡ stopper ventende
+  lyde, højst ét slutfløjt; uden AudioContext ingen lyd og ingen fejlboks. ⚡ og kontakten (og "Vis kendelsen ›") er ≥ 44 px ved 390
+  (⚡ før 23 px) – med −8 px lodret margen, så rækken ikke vokser (`tools/measure-ui.mjs`: Kamp efter fløjt 1169 / 1769 px ved 1366 / 390
+  før og efter; uden margenen 1785). Fokus gendannes efter id, når Match Center tegnes om hvert tick.
 - **Liga**: tabel ("sæson N, efter X af 14 runder"), **avisen** (v3.31.0: KUN her, lige under tabellen – `#gazette` med
   `scroll-margin-top: calc(var(--top-h) + .5rem)`, så linkene fra Hjem og Kamp lander med toppen under den faste topbar), sidste rundes
   resultater (klik = referatet i Kamp), kampprogrammet (næste runde i den rækkefølge, ▶ spiller den; "Dit
