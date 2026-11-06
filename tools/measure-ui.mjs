@@ -22,6 +22,8 @@ export async function measureUi({ base, widths = [1366, 390], afterRound = true 
       await g.goto(url); await g.waitForSelector('body[data-klar="ja"]');
       if (afterRound) {   // en spillet runde, så Kamp/Liga har indhold
         await g.click('#play-round'); await g.waitForTimeout(300);
+        // v3.32.2: Kamp UNDER afspilningen (VAR-zonen .mc-live har fast højde, mens runden spilles) – kun sidehøjden
+        if (await g.$('#skip')) out[`kamp-live@${w}`] = await g.evaluate(() => ({ height: document.documentElement.scrollHeight, feedTop: Math.round(document.getElementById('feed-filters').getBoundingClientRect().top + scrollY), live: true }));
         if (await g.$('#skip')) await g.click('#skip');
         await g.waitForTimeout(500);
       }
@@ -52,6 +54,6 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const base = process.argv.slice(2).find((a) => /^https?:/.test(a));
   const r = await measureUi({ base });
   if (process.argv.includes('--json')) console.log(JSON.stringify(r));
-  else for (const [k, v] of Object.entries(r)) console.log(k.padEnd(12), `højde ${v.height}`, `vandret ${v.overflowX}`, `skrift ${v.fontSizes.length} (${v.fontSizes.join(' ')})`, `farver ${v.colors}`, `knapper ${v.buttons}`, `tal ${v.numbers}`, `ord ${v.words}`);
+  else for (const [k, v] of Object.entries(r)) if (v.live) console.log(k.padEnd(12), `højde ${v.height} (under afspilning; referatets filterrække ved ${v.feedTop} px)`); else console.log(k.padEnd(12), `højde ${v.height}`, `vandret ${v.overflowX}`, `skrift ${v.fontSizes.length} (${v.fontSizes.join(' ')})`, `farver ${v.colors}`, `knapper ${v.buttons}`, `tal ${v.numbers}`, `ord ${v.words}`);
   process.exit(0);
 }

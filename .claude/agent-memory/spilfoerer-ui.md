@@ -55,3 +55,10 @@ fund der er rettet (så du ikke finder dem igen), hvad brugeren har valgt fra, o
 - Fundet: #rp-play og referatfiltre 23 px ved 390; banen skæres af bjælken (1366×900: 1012 vs 851; 390: 122 af 428 px synlige);
   #mc-ft = resultat+boldbesiddelse, neutral farve, gentager analysen ved siden af; Taktik første select y 1699 (390) / 1024 (1366),
   fit-help 113 px + list-help + pitch-help står stadig åbne.
+
+## v3.32.2 VAR-øjeblikket (2026-11-06) – scripts scratchpad/ui3322b/play.mjs (port 5340), billeder ui3322b/
+- Løst og målt (gå ikke efter igen): "1 - 0 ?" synlig over rammen (sc top 220/210, ramme 306/296); nyt mål lukker rammen (0-5 i 73');
+  kendelsen med hold + farve ("❌ Roskilde Rovers' mål annulleret" grøn, eget annulleret rød); filterrække 466/416 > rammens bund 458/408;
+  pause tjek→kendelse ~2,1 s; "Vis kendelsen ›" 44 px; siden hopper ikke.
+- Åbent: ét-trins kendelser (VAR_RED UPGRADED, VAR_PEN AWARDED) lukkes af deres EGEN følge-hændelse (RED/GOAL, CLOSES varmoment.js)
+  → rammen står ~0,4 s (7167→7544 ms); zonen 152 px ved 390 er et tomt hul under tidslinjen i kampe uden VAR (126 px luft); rammens indhold maks 117 px af 152 (4 linjer offside, 6 VAR-kampe ved 390). Anbefalet: behold fast zone, fyld den.

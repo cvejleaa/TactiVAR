@@ -677,7 +677,12 @@ export function simulateMatch(home, away, rng, opts = {}) {
     momentCheck = foul ? null : { id: o.off.id, offside: !o.onside };
     if (att === H) hG++; else aG++;
     addEv(min, 'VAR_CHECK', 'HIGHLIGHT', att.isHome, false, `📺 VAR tjekker målet`, `📺 [${att.team.name} • ${hG}-${aG}] Bolden er i nettet – men VAR kigger på det: ${what}? …`, `${att.team.name}: målet tjekkes …`);
-    events.at(-1).var = { kind: foul ? 'FOUL' : 'OFFSIDE', verdict: o.onside ? 'STANDS' : 'OVERTURNED' };
+    // v3.32.2 (VAR-øjeblikket): hvem tjekket gælder – spiller-id'er (navnene slås op i karakterarket), kun variabler, der findes
+    // (ingen rng). Offside: den tjekkede (o.off – ikke nødvendigvis skytten; other = han stod foran skytten), line = forsvareren,
+    // duellen blev afgjort mod. Frispark: skytten og den skubbede (victim) – ingen linje.
+    const cast = foul ? { checked: shooter.id, victim: defender.id } : { checked: o.off.id, line: defender.id };
+    if (!foul && o.other) cast.other = true;
+    events.at(-1).var = { kind: foul ? 'FOUL' : 'OFFSIDE', verdict: o.onside ? 'STANDS' : 'OVERTURNED', cast };
     if (att === H) hG--; else aG--;
     if (!o.onside) {
       homeVarNet += att === H ? -1 : 1;
@@ -1052,7 +1057,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
     if (byVar) {
       st[k(att, 'VarChecks')]++; homeVarNet += att === H ? 1 : -1;
       addEv(min, 'VAR_PEN', 'HIGHLIGHT', att.isHome, true, '📺 VAR: straffespark', `📺 [${att.team.name}] Spillet fortsatte, men VAR kalder dommeren ud til skærmen: ${tag(fouled)} blev fældet i feltet af ${tag(fouler)} (${def.team.name}). Efter at have set skærmen dømmer han straffespark!`, `${att.team.name}: straffespark`);
-      events.at(-1).var = { kind: 'PENALTY', verdict: 'AWARDED' };
+      events.at(-1).var = { kind: 'PENALTY', verdict: 'AWARDED', cast: { checked: fouled.id, fouler: fouler.id } };   // v3.32.2: den fældede og fælderen
       varNote = ' (dømt efter VAR)';
     } else if (rng.chance(VAR_RULES.PEN_CHECK_P)) {
       // Spilfører: straffen dømmes FØRST – så tjekker VAR, og kendelsen kan vende den.
@@ -1062,7 +1067,10 @@ export function simulateMatch(home, away, rng, opts = {}) {
       if (offside) shapes(att, { attacking: true, ballX: 50 });
       const o = offside ? offsideCheck(att, fouled, fouler) : { onside: rng.next() * 40 > fouled.varProfile.theatre };
       addEv(min, 'VAR_PEN', 'HIGHLIGHT', att.isHome, false, '📺 VAR tjekker straffen', `📺 [${att.team.name}] Dommeren peger på pletten – ${tag(fouled)} går ned i feltet efter kontakt med ${tag(fouler)} (${def.team.name}). Men VAR tjekker ${offside ? 'for offside i opspillet' : 'om der var kontakt nok'} …`, `${att.team.name}: straffesparket tjekkes …`);
-      events.at(-1).var = { kind: offside ? 'OFFSIDE' : 'DIVE', verdict: o.onside ? 'STANDS' : 'OVERTURNED' };
+      // v3.32.2: offside – den tjekkede (o.off) mod fælderens placering; filmning – den fældede
+      const cast = offside ? { checked: o.off.id, line: fouler.id } : { checked: fouled.id };
+      if (offside && o.other) cast.other = true;
+      events.at(-1).var = { kind: offside ? 'OFFSIDE' : 'DIVE', verdict: o.onside ? 'STANDS' : 'OVERTURNED', cast };
       if (!o.onside) {
         homeVarNet += att === H ? -1 : 1;
         const text = offside ? `📺 [${att.team.name}] VAR-KENDELSE: STRAFFESPARKET ANNULLERES! ${o.other ? `${tag(o.off)} stod offside i opspillet, før ${tag(fouled)} blev fældet` : `${tag(fouled)} stod offside, før han blev fældet`}.`
@@ -1461,7 +1469,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
             const down = rng.next() * 30 > fouler.varProfile.cynicism + 10;
             // Spilfører: kortet vises FØRST – så tjekker VAR, og kendelsen kan vende det.
             addEv(min, 'VAR_RED', 'HIGHLIGHT', foulSide.isHome, false, '📺 VAR tjekker det røde kort', `📺 [${foulSide.team.name}] Dommeren viser ${tag(fouler)} det røde kort for tacklingen – men VAR tjekker situationen …`, `${foulSide.team.name}: det røde kort tjekkes …`);
-            events.at(-1).var = { kind: 'RED', verdict: down ? 'DOWNGRADED' : 'CONFIRMED' };
+            events.at(-1).var = { kind: 'RED', verdict: down ? 'DOWNGRADED' : 'CONFIRMED', cast: { checked: fouler.id } };   // v3.32.2
             if (down) {
               homeVarNet += foulSide === H ? 1 : -1;
               addEv(min, 'VAR_NO_RED', 'HIGHLIGHT', foulSide.isHome, true, '📺 VAR: rødt bliver gult', `📺 [${foulSide.team.name}] VAR-KENDELSE: Dommeren går ud til skærmen … ${tag(fouler)} ramte bolden først. Det røde kort trækkes tilbage – det bliver gult.`, `${foulSide.team.name}: rødt bliver gult`);
@@ -1471,7 +1479,7 @@ export function simulateMatch(home, away, rng, opts = {}) {
         } else if (canSendOff(foulSide, fouler) && rng.chance(VAR_RULES.RED_UPGRADE_P) && rng.next() * 22 < fouler.varProfile.cynicism) {
           st[k(foulSide, 'VarChecks')]++; homeVarNet += foulSide === H ? -1 : 1;
           addEv(min, 'VAR_RED', 'HIGHLIGHT', foulSide.isHome, true, '📺 VAR: opgraderet til rødt', `📺 [${foulSide.team.name}] VAR kalder dommeren ud til skærmen: ${gen(tag(fouler))} tackling var med knopperne forrest. Efter at have set skærmen giver han rødt kort!`, `${foulSide.team.name}: rødt kort`);
-          events.at(-1).var = { kind: 'RED', verdict: 'UPGRADED' };
+          events.at(-1).var = { kind: 'RED', verdict: 'UPGRADED', cast: { checked: fouler.id } };   // v3.32.2
           sendOff(foulSide, fouler, min, 'DIRECT');
         }
         // Kortet står FØR indskiftningen (v3.16.7, Spilfører: skade 57', skift 58', rødt kort 59') – dommeren giver kortet, så skiftes der

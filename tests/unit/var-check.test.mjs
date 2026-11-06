@@ -214,3 +214,73 @@ test('en cutback (bolden spillet tilbage) tjekkes aldrig for offside – kun for
   }
   assert.ok(n >= 3, `data: cutbackmål med tjek ${n}`);
 });
+
+// v3.32.2 (VAR-øjeblikket, D1): var.cast – hvem tjekket gælder, som spiller-id'er. Navnene slås op i karakterarket (ikke i teksten)
+// og skal være de samme, som motorens egen tekst nævner. Hver gren: mål/offside (other = den forreste foran skytten), mål/frispark
+// (ingen line), straffe offside/filmning/dømt, rødt bekræftet/nedgraderet/opgraderet.
+const tagOf = (m, id) => { const r = [...m.ratings.home, ...m.ratings.away].find((x) => x.playerId === id); return r ? `#${r.shirtNumber} ${r.shortName}` : null; };
+const KEYS = (c) => Object.keys(c).sort().join(',');
+
+test('var.cast ved mål: offside – checked er den, teksten tjekker, line forsvareren, der holdt linjen, other kun når en anden end skytten tjekkes; frispark – skytten og den skubbede, ingen line', () => {
+  const n = { off: 0, offOther: 0, offOver: 0, foul: 0 };
+  for (const { m } of GOAL_CHECKS) for (const e of m.events.filter((x) => x.type === 'VAR_CHECK')) {
+    const c = e.var.cast, v = after(m, e);
+    assert.ok(c && typeof c.checked === 'string', e.text);
+    if (e.var.kind === 'OFFSIDE') {
+      n.off++;
+      assert.equal(KEYS(c), c.other ? 'checked,line,other' : 'checked,line', JSON.stringify(c));
+      assert.equal(tagOf(m, c.checked), e.text.match(/stod (#\d+ .+?) offside\?/)[1], e.text);
+      assert.notEqual(c.line, c.checked);
+      if (v.type === 'VAR_NO_GOAL') {
+        n.offOver++;
+        assert.ok(v.text.includes(`${tagOf(m, c.line)} (`) && v.text.includes('holdt linjen'), `line = forsvareren i kendelsen: ${v.text}`);
+        assert.equal(!!c.other, v.text.includes('var med i situationen, da'), v.text);
+      } else assert.equal(!!c.other, / foran #\d+ .+ stod ikke offside/.test(v.text), v.text);
+      if (c.other) n.offOther++;
+    } else {
+      n.foul++;
+      assert.equal(KEYS(c), 'checked,victim', JSON.stringify(c));
+      const who = e.text.match(/skubbede (#\d+ .+?) (#\d+ .+?) i opspillet/);
+      assert.equal(tagOf(m, c.checked), who[1]); assert.equal(tagOf(m, c.victim), who[2]);
+    }
+  }
+  assert.ok(n.off >= 40 && n.offOther >= 5 && n.offOver >= 5 && n.foul >= 10, `data: ${JSON.stringify(n)}`);
+});
+
+test('var.cast: et hjørnespark- og et cutbackmål med tjek er altid FOUL og har ingen line (der kan ikke være offside)', () => {
+  let n = 0;
+  for (const { m } of games(200, { [VAR_RULES.GOAL_CHECK_P]: true })) for (const e of m.events.filter((x) => x.type === 'VAR_CHECK')) {
+    const g = after(m, e);
+    if (!GOALS.has(g.type) || !m.goalsPool.some((x) => x.min === g.min && (x.kind === 'CORNER' || x.kind === 'CUTBACK') && g.text.includes(x.scorer))) continue;
+    n++; assert.equal(e.var.kind, 'FOUL', g.text); assert.ok(!('line' in e.var.cast), JSON.stringify(e.var.cast));
+  }
+  assert.ok(n >= 5, `data: ${n}`);
+});
+
+test('var.cast ved straffe og rødt: offside mod fælderen (line), filmning og dømt straffe gælder den fældede, rødt gælder fælderen', () => {
+  const n = {};
+  const force = { [VAR_RULES.PEN_CHECK_P]: true, [VAR_RULES.PEN_AWARD_P]: 0.02, [VAR_RULES.RED_CHECK_P]: true, [VAR_RULES.RED_UPGRADE_P]: 0.5, 0.06: 0.15 };
+  for (const { m } of games(250, force)) for (const e of m.events.filter((x) => x.type === 'VAR_PEN' || x.type === 'VAR_RED')) {
+    const c = e.var.cast, k = `${e.var.kind}:${e.var.verdict}`; n[k] = (n[k] ?? 0) + 1;
+    const t = (id) => tagOf(m, id);
+    if (e.type === 'VAR_RED') {
+      assert.equal(KEYS(c), 'checked');
+      if (e.var.verdict === 'UPGRADED') assert.ok(e.text.includes(`skærmen: ${t(c.checked)}`), e.text);
+      else assert.ok(e.text.includes(`viser ${t(c.checked)} det røde kort`), e.text);
+      continue;
+    }
+    if (e.var.verdict === 'AWARDED') {
+      assert.equal(KEYS(c), 'checked,fouler');
+      assert.ok(e.text.includes(`${t(c.checked)} blev fældet i feltet af ${t(c.fouler)} (`), e.text);
+      continue;
+    }
+    const [, fouled, fouler] = e.text.match(/– (#\d+ .+?) går ned i feltet efter kontakt med (#\d+ .+?) \(/);
+    if (e.var.kind === 'DIVE') { assert.equal(KEYS(c), 'checked'); assert.equal(t(c.checked), fouled); continue; }
+    assert.equal(KEYS(c), c.other ? 'checked,line,other' : 'checked,line');
+    assert.equal(t(c.line), fouler, 'line = fælderen');
+    if (c.other) assert.notEqual(t(c.checked), fouled); else assert.equal(t(c.checked), fouled);
+    const v = after(m, e);
+    if (v.type === 'VAR_NO_PEN') assert.ok(v.text.includes(c.other ? `${t(c.checked)} stod offside i opspillet` : `${fouled} stod offside, før`), v.text);
+  }
+  for (const k of ['OFFSIDE:STANDS', 'OFFSIDE:OVERTURNED', 'DIVE:STANDS', 'DIVE:OVERTURNED', 'PENALTY:AWARDED', 'RED:CONFIRMED', 'RED:DOWNGRADED', 'RED:UPGRADED']) assert.ok((n[k] ?? 0) >= 2, `${k}: ${JSON.stringify(n)}`);
+});

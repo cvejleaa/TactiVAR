@@ -30,6 +30,8 @@ import { renderLastRound, renderSchedule } from './ui/rounds.js';
 import { renderMatchCenter, renderGazette } from './ui/matchcenter.js';
 import { renderHome } from './ui/home.js';
 import { replayJump, clearReplays } from './ui/replay.js';
+import { playbackStep, varFrame, varLog, castNames, liveLine, soundFor, refocusId } from './ui/varmoment.js';
+import { soundOn, setSound, unlockSound, playSound, stopSounds } from './ui/sound.js';
 
 export const PLAYBACK_MS = 420;
 let mc = null;            // Match Center: { round, matches, gazette, viewIdx, filter, shownCount, playing }
@@ -49,6 +51,7 @@ const lastRoundView = (r) => ({ round: r.round, matches: r.matches, gazette: r.g
 function showTab(k) {
   if (k === 'admin' && game.ui.tab !== 'admin') view.prevTab = game.ui.tab;   // ⚙ "Se et andet hold" vender tilbage hertil
   if (k === 'hjem' && view.viewTeamIdx !== myIdx()) setViewTeam(myIdx());       // Hjem er altid dit hold – også Trup bagefter
+  if (game.ui.tab === 'kamp' && k !== 'kamp') stopSounds();                     // v3.32.2 (QC): ventende toner stopper, når man forlader Kamp
   game.ui.tab = k; clearSwap(); view.notice = ''; view.marketMsg = ''; view.trainMsg = ''; view.trainPid = null; view.card = null; persist(); render(); window.scrollTo(0, 0);
 }
 let timer = null;
@@ -75,7 +78,7 @@ function showTeam(idx) {
   render();
 }
 // Et nyt spil (ny liga/import) må ikke vise den gamle ligas runde i Kamp-fanen.
-function dropMatchView() { clearInterval(timer); timer = null; mc = null; pendingRaw = null; } // nyt spil: den gamle fil er taget backup af (resetGame)
+function dropMatchView() { clearInterval(timer); timer = null; stopSounds(); mc = null; pendingRaw = null; } // nyt spil: den gamle fil er taget backup af (resetGame)
 
 const app = document.getElementById('app');
 const controls = document.getElementById('controls');
@@ -143,6 +146,7 @@ const NEWS = {
   '3.28.0': '🏠 Andet skridt i den nye brugerflade: en ny Hjem-fane samler sidste runde, din placering, "Før du spiller" (udelukkede, skadede, trætte og 🟨 – med et link til at løse det), næste modstander og tabellen omkring dig. ▶ Spil runde står nu i en bjælke i bunden af Hjem og Taktik (på de andre faner som en lille ▶ øverst med de samme tegn), og modstanderens navn er et separat 🔍-link. Holdvælgeren er flyttet til Liga ("Se et hold"), og ser du et andet hold, siger en lilla bjælke det – med "← Dit hold". ⚙ øverst til højre har gem, eksport, import og versionen. På mobil står fanerne i bunden. Næste skridt: spillerkortet som ét panel.',
   '3.31.2': '📊 Spillerkortet viser nu spillerens statistik for holdet øverst: kampe, minutter, mål, oplæg, snitkarakter, 👑, 🟨 og 🟥 for denne og sidste sæson. Taktik-listen viser arketypen (🔒 låst / 🌟 låst op) ved dine spillere. Skønnet af en spillers udvikling har nu fem trin – fra "er tæt på sit loft" til "har langt mere i sig" – så ungdomsspillerne ikke alle hedder det samme, og ungdomstilbuddet viser nøglesnittet. Og positionerne er danske overalt: MV, MS, VB/HB, VKB/HKB, DM, CM, OM, VM/HM, VK/HK og ANG.',
   '3.32.1': '🧹 Mindre klemt sammen (designgennemgangen): På Kamp står afspilningen og ▶ Afspil nu på første skærm – kampene på én linje, og efter fløjtet tre faner: 🎬 Afspilning & referat · 📊 Statistik · 👥 Spillerne, med kampens resultat og boldbesiddelse fast øverst. "📤 Send kampen" ligger under "⋯ Mere". På Taktik står én kort linje under hver fase – forklaringen bag "ⓘ Sådan virker det". Brede tabeller (Trup, Træning, Klub) toner ud i kanten, når der er mere at rulle, og navnet (på Klub: runden) står fast; på mobil er Trups rækker højere, så de er lette at trykke på.',
+  '3.32.2': '📺 VAR-øjeblikket: Når VAR tjekker i din kamp, stopper afspilningen op – en ramme under stillingen siger, hvad der tjekkes, og hvem det gælder ("#9 Hansen tjekkes for offside – afgjort mod #4 Bergs placering"), og kendelsen kommer først efter et par sekunder (eller tryk "Vis kendelsen ›"). Stillingen ryster ved dine mål og røde kort, og et annulleret mål blinker rødt eller grønt. Ny lydkontakt ved ⚡: fløjt, VAR-bip og jubel – slået fra, til du tænder den.',
   '3.32.0': '✈ Spring kan nu trænes: Fysik træner Fart, Styrke og Spring, og spillerkortet viser Spring som en bjælke under "Fysik & luft". Arketypens krav viser, hvor langt han er, og hvad der træner det – fx "Låses op ved: Styrke 13/13 ✓ · Spring 13/14 – trænes med Fysik". Fokusvalget på 🏋️ Træning viser, hvilke evner hvert fokus træner, og Trup markerer et +1 i Spring som i de andre evner. Fra 30 år kan Spring falde som Styrke – træning med Fysik halverer faldet.',
   '3.31.1': '▶ Spil runde står nu samme sted på alle faner: i bjælken i bunden – også på Trup, Træning, Kamp, Liga, Klub og ⚙. Den lille ▶ øverst er væk. Bjælken viser opstillingens tegn på alle faner (⛔ udelukket, 🚑 skadet, ⚠ træt, 🟨 ét gult fra udelukkelse) – ved mange som en kort tæller, fx "⛔2 🚑1 🟨1", der viser listen på 🏠 Hjem. Mens runden spilles, står der "📺 Runde N spilles …". Og spillerkortet er nu på dansk: særpræg som Presmonster og Fyrtårn, danske positioner (OM, DM, ANG), "Låses op ved: Udholdenhed 14, Erobring 12", 🕵️ Observationer og 🧠 Erfaring mod stilarter.',
   '3.31.0': '📰 Fjerde skridt i den nye brugerflade: avisen står nu kun på Liga – lige under tabellen. Hjem og Kamp viser rundens overskrift med et link dertil. Hjem viser også kampens spiller 👑 ved sidste runde og modstanderens seneste 3 som farvede piller (V/U/T, ældste først), og 🔍 er væk fra Spil-bjælken på Hjem – næste kamp-kortet har linket.',
@@ -614,7 +618,7 @@ function renderNow() {
     // Efter fløjtet (v3.28.0, Spilfører UI: nederst blev den ikke fundet): vejen videre øverst – kun når den viste runde er den seneste og ikke afspilles
     // v3.31.0 (F3): avisen står kun på Liga – linjen her bærer rundens overskrift som link dertil
     kamp: () => [afterWhistle ? toHomeLine() : null,
-      shown ? renderMatchCenter({ mc: sendState(shown), myTeamId: mine.id, on: mcHandlers }) : h('div', { class: 'panel empty', id: 'no-matches' }, 'Ingen kampe spillet endnu. Tryk ▶ Spil runde nederst – modstanderen følger kampprogrammet på Liga-fanen.'),
+      shown ? renderMatchCenter({ mc: sendState(shown), myTeamId: mine.id, on: mcHandlers, sound: soundOn(storage) }) : h('div', { class: 'panel empty', id: 'no-matches' }, 'Ingen kampe spillet endnu. Tryk ▶ Spil runde nederst – modstanderen følger kampprogrammet på Liga-fanen.'),
       ],
     liga: () => [mc?.playing ? h('div', { class: 'notice', id: 'booked-league' }, '📺 Runden spilles i Kamp-fanen – tabellen herunder er allerede opdateret med den.') : null,
       !mc?.playing ? renderSeasonReport({ league, mine,
@@ -797,6 +801,7 @@ function playNextRound() {
   clearSwap(); view.notice = '';
   const rng = createRng(randomSeed());
   const result = playRound(game.league, rng, { replay: true });
+  if (soundOn(storage)) unlockSound();   // v3.32.2: lyden låses op i klikket (autoplay-reglen) – kun når den er slået til
   saveReplay(storage, result.replay); delete result.replay;   // v3.24.3: gengivelsen ligger for sig selv, ikke i gemmet
   commitRound(game.league, result, rng);
   game.ui.tab = 'kamp'; // gemmes med runden, så F5 midt i afspilningen lander i Kamp
@@ -805,13 +810,29 @@ function playNextRound() {
 }
 
 function openMatchCenter(result, live) {
-  clearInterval(timer); clearReplays();
-  mc = { round: result.round, matches: result.matches, gazette: result.gazette, viewIdx: 0, filter: 'all', shownCount: live ? 1 : Infinity, playing: live };
+  clearInterval(timer); clearReplays(); stopSounds();
+  // hold: tick, der springes over før en VAR-kendelse (v3.32.2, ui/varmoment.js); fxSeen: hændelser, hvis fx er vist
+  mc = { round: result.round, matches: result.matches, gazette: result.gazette, viewIdx: 0, filter: 'all', shownCount: live ? 1 : Infinity, playing: live, hold: 0, fxSeen: new Set() };
   game.ui.tab = 'kamp';
+  // v3.32.2 (QC): skærmlæserens linje fra forrige runde står ikke over den nye
+  if (live) { const box = document.getElementById('live-status'); if (box) box.textContent = ''; }
   render();
   window.scrollTo(0, 0);
-  if (live) timer = setInterval(() => { mc.shownCount++; if (mc.shownCount >= mc.matches[0].events.length) finishPlayback(); else renderMc(); }, PLAYBACK_MS);
+  if (live) { sound('whistle'); timer = setInterval(playTick, PLAYBACK_MS); }
 }
+// Ét tick i det ene setInterval (v3.32.2 D3: ingen ekstra setTimeout – ⚡/finishPlayback, openMatchCenter og dropMatchView stopper pausen
+// af sig selv, fordi de stopper timeren). Under en VAR-pause tegnes intet.
+function playTick() {
+  if (!mc?.playing) return;
+  const evs = mc.matches[0].events, r = playbackStep(mc, evs);
+  if (r === 'end') { finishPlayback(); return; }
+  if (r === 'hold') return;
+  const i = mc.shownCount - 1, m = mc.matches[0];
+  sound(soundFor(evs[i], (home) => (home ? m.homeId : m.awayId) === myTeam().id));
+  renderMc();
+}
+// Lyd kun når den er slået til OG man står på Kamp
+function sound(kind) { if (kind && soundOn(storage) && game?.ui.tab === 'kamp') playSound(kind); }
 
 // Link fra avisens "Rundens mål" (Liga-fanen – v3.31.0 står avisen kun dér): åbn kampen, markér målet og rul til det.
 function openGoal(i, goal) {
@@ -832,10 +853,15 @@ function openReport(i, { toFeed = true } = {}) {
   if (toFeed) document.getElementById('feed')?.scrollIntoView({ block: 'nearest' });
 }
 
-function finishPlayback() { clearInterval(timer); timer = null; mc.playing = false; mc.shownCount = Infinity; render(); }
+// ⚡ og det naturlige slutfløjt: ventende lyde stoppes, højst ét slutfløjt (timeren er stoppet, så det kaldes kun én gang pr. afspilning)
+function finishPlayback() { const was = mc.playing; clearInterval(timer); timer = null; mc.playing = false; mc.shownCount = Infinity; mc.hold = 0; stopSounds(); if (was) sound('final'); render(); }
 
 const mcHandlers = {
   skip: finishPlayback,
+  // v3.32.2 (D3): "Vis kendelsen ›" – pausen slutter, og kendelsen vises med det samme
+  showVerdict: () => { if (mc?.playing && mc.hold > 0) { mc.hold = 0; playTick(); } },
+  // v3.32.2 (D5): lydkontakten ved ⚡ – AudioContext oprettes i klikket, når lyden slås til
+  sound: () => { const on = !soundOn(storage); setSound(storage, on); if (on) unlockSound(); else stopSounds(); mc ||= lastRoundView(game.league.lastRound); renderMc(); },
   // Uden igangværende afspilning vises seneste runde; et valg af kamp/filter gemmer den som mc.
   view: (i) => { mc ||= lastRoundView(game.league.lastRound); mc.viewIdx = i; mc.focus = null; mc.snap = null; renderMc(); },
   // Øjebliksbillede ved et mål (v3.12.1): vis på dit holds minibane og rul derhen; null = startopstillingen.
@@ -877,8 +903,27 @@ const sendState = (v = mc) => {
   v.sent = v.playing ? [] : loadSent(storage);
   return v;
 };
-const matchCenterEl = () => (sendState(), renderMatchCenter({ mc, myTeamId: myTeam().id, on: mcHandlers }));
-// Under afspilning tegnes kun Match Center om (ikke hele siden).
-function renderMc() { const el = document.getElementById('match-center'); if (el) { const nu = matchCenterEl(); el.replaceWith(nu); markScrollable(nu); } }
+const matchCenterEl = () => (sendState(), renderMatchCenter({ mc, myTeamId: myTeam().id, on: mcHandlers, sound: soundOn(storage) }));
+// Under afspilning tegnes kun Match Center om (ikke hele siden). v3.32.2: fokus gendannes efter id (tastatur: ⚡, lydkontakten) –
+// forsvinder "Vis kendelsen ›", får rammen fokus; forsvinder rammen, får ⚡ det (refocusId, ui/varmoment.js).
+function renderMc() {
+  const el = document.getElementById('match-center');
+  if (!el) return;
+  const id = el.contains(document.activeElement) ? document.activeElement.id : null;
+  const nu = matchCenterEl(); el.replaceWith(nu); markScrollable(nu);
+  const to = refocusId(id, (x) => !!document.getElementById(x));
+  if (to) document.getElementById(to).focus({ preventScroll: true });
+  announceVar();
+}
+// Skærmlæseren (#live-status, aria-live="polite" i index.html): skrives KUN ved tjekket og ved kendelsen
+function announceVar() {
+  const box = document.getElementById('live-status');
+  if (!box || !mc?.playing) return;
+  const m = mc.matches[0], fr = varFrame(m.events, Math.min(mc.shownCount, m.events.length) - 1);
+  const key = fr ? `${fr.seq.check}:${fr.reached}` : null;
+  if (!fr || key === mc.said) return;
+  mc.said = key;
+  box.textContent = liveLine(varLog(fr.seq, fr.reached, castNames(m), (home) => (home ? m.homeName : m.awayName)), fr.reached);
+}
 
 start();

@@ -7,6 +7,17 @@ Rangering: brugerens ønsker først, derefter værdi pr. størrelse. Første run
 + 3 sæsoner `measure-lifecycle`).
 
 ## Næste
+00. **v3.32.3 – VAR læser taktikken (brugeren 2026-11-06: "Har taktik ikke nogen indflydelse på var? Heller ikke hvis man vælger
+   ekstrem VAR-linje?" – valgt: som næste udgivelse)** · motor + UI · M · 5 · I dag læser `offsideCheck` (engine/match.js) ikke forsvarets
+   `offsideTrap`, og `EXTREME_VAR_LINE` virker som `NORMAL` i kampen (kun `!== 'OFF'`, match.js ved `trapWon`); eneste forskel er
+   modstanderens `vsTrapLong`-erfaring (engine/counter.js:57). Ekstrem linje skal give flere offside-fanger og flere tætte VAR-kendelser,
+   men koste mere, når linjen brydes; linjens højde (pres) med. Målt før/efter (tools/measure-duels.mjs … var + en målegennemgang af
+   mål imod), Arkitekt + Spilfører motor + QC på planen. Rammen fra v3.32.2 må derefter sige "din høje linje" – kun når motoren læste den.
+   Desuden: ét-trins VAR-straffe: hold før selve straffesparket og vis udfaldet (🧤/⚽) i rammen – kræver Spilfører motor (er næste skud
+   - VAR-zonen (v3.32.2, Spilfører UI + QC): i kampe uden VAR står den reserverede zone tom under hele live-afspilningen (86 px ved 1366,
+     126 px ved 390). Fyld den med kampens seneste store øjeblik (mål/rødt/straffe i stor tekst – stadionskærmen), som VAR-rammen
+     afløser; overvej 8rem i stedet for 9,5rem ved 390 (rammen fylder højst 117 af 152 px) og mål ved 320 px (loggen kan klippes).
+   altid straffen?).
 0. **Ny brugerflade i trin (brugeren 2026-11-02: "forvirrende og alt for mange informationer klemt sammen")** · UI · L · 5 · bud:
    https://claude.ai/artifact/EPcztoSQdrk6pK8Bsy3FeS (UI-gennemgang med skærmbilleder, tre designbud, QC-dom). Brugerens valg: seks faner
    (🏠 Hjem ny · Trup · Taktik · Kamp · Liga · Klub) med underfaner, spillerkortet som ét panel, ▶ Spil runde som bundbjælke på Hjem og
@@ -212,6 +223,7 @@ scratchpad – et tal herfra skal måles igen med et committet værktøj, før d
 - "– det holdt ikke mod jer" efter et nederlag kan misforstås (UI) – bevidst valgt i v3.21.2 (QC); kun noteret.
 
 ## Lavet
+- v3.32.2 VAR-øjeblikket + spilfornemmelse (køens punkt 1 efter v3.32.1, `docs/plans/tidligere-planer.md`; brugeren 5/11 "VAR Monitor: ærlig ramme nu" + "Game feel"): `var.cast` (spiller-id'er, kun visning – noprose uændret) · rammen over stillingen fra tjekket til kendelsen + 5 tick med en log uden taktik og uden `ev.text` (`ui/varmoment.js`) · pausen før kendelsen (4 tick, tjek→kendelse 420 → 2100 ms) med "Vis kendelsen ›" · rystelse ved dine mål og røde kort, rød/grøn flash ved annulleret mål, `prefers-reduced-motion` · lyd (fløjt, VAR-bip, jubel) fra som standard med kontakt ved ⚡ · ⚡ 23 → 44 px ved 390. Målt: 63 % af kampene uden VAR, 37 % af DINE kampe med et VAR-øjeblik (spec §5). Næste i køen: v3.32.3 statisk (OpenGraph, manifest).
 - v3.32.1 designkritikkens røde (brugeren 5/11: "lad os tage de røde fra analysen med det samme", `docs/design-kritik-2026-11-05.md`): R1 Taktik – én kort linje pr. fase/Hvis-Så/udskiftninger, forklaringen bag "ⓘ Sådan virker det" (fælles `fold()`/`help()` i ui/dom.js, husker åben/lukket) · R2 Kamp – ▶ og banen på første skærm (knapper over banen, banen `clamp(16rem, 100svh − 26rem, 32rem)`, kampvælgeren på én linje, intro bag ⓘ, "📤 Send kampen" under "⋯ Mere") · R3 tre underfaner 🎬 Afspilning & referat · 📊 Statistik · 👥 Spillerne + fuldtids-linjen · R4 én regel for brede tabeller (fade med mask-image, opt-in låste kolonner på Trup/Træning/regnskabet) · R5 44 px Trup-rækker på mobil, "Vælg en spiller". Målt: Kamp 2702 → 1169 (1366) og 5095 → 1760 (390); ▶ Afspil 1230 → 583 px ved 390 (spec §10b)
 - v3.32.0 nr. 0c (brugeren 3/11: "kræver jumpingpower på 14 … jeg kan ikke se hvordan jeg kan træne ham i det"): Fysik træner Fart, Styrke og Spring (rate 0,07 pr. evne, `skillOf`/`setSkill`) · Spring-bjælke under "Fysik & luft" på kortet · arketypens krav med nu/krav, ✓ og fokus ("Spring 13/14 – trænes med Fysik") på kortet, Trup og Taktik · fokusvalget på Træning med evnerne · "+N" i Trups Spring-kolonne · `tools/measure-jump.mjs` (17–23 år: første Spring +1 median 18 runder, før aldrig)
 - v3.31.2 brugerens ønsker 3/11 (nr. 0c+ m.fl.): arketypen på Taktik-listen (🔒/🌟 + navn under navnet ≥ 900 px, ikonet på smal skærm – kun dit hold) og "arketype" overalt · skønnets ord i evne-point med fem trin ("er tæt på sit loft" … "har langt mere i sig") på kortet, i Træning og i ungdomstilbuddet (med nøglesnittet) – ungdom ved første syn: 95,6 % ét ord → højst 55 % (`tools/measure-youth-words.mjs`) · 📊 Statistik for holdet øverst på spillerkortet (Sæson N / N−1: kampe, min., mål, oplæg, snit, 👑, 🟨, 🟥, 🧤 – fra kamphistorikken, uden gemmeformat-ændring) · danske positionskoder overalt (MV, MS, VB/HB, VKB/HKB, DM, CM, OM, VM/HM, VK/HK, ANG – én tabel `ROLE_LABEL`) · bjælken ved 601–700 px testet (▶ inden for kanten)

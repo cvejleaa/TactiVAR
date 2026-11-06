@@ -71,7 +71,11 @@ export function normalizeLeague(league) {
     if (m.stoppage !== undefined && !isValidStoppage(m.stoppage)) delete m.stoppage;
     // Tilskuerne (v3.30.0, valgfrit felt – ældre kampe har det ikke): kun et helt tal 0–GATE_MAX bliver, ellers slettes det (ingen migrering)
     if (m.att !== undefined && !(Number.isInteger(m.att) && m.att >= 0 && m.att <= GATE_MAX)) delete m.att;
-    for (const e of Array.isArray(m.events) ? m.events : []) if (e && e.clock !== undefined && !isValidClock(e.clock)) delete e.clock;
+    for (const e of Array.isArray(m.events) ? m.events : []) {
+      if (e && e.clock !== undefined && !isValidClock(e.clock)) delete e.clock;
+      // VAR-tjekkets spillere (v3.32.2, valgfrit – ældre kampe har det ikke): kun id'er som tekst; ellers smides det væk (loggen uden navne)
+      if (e?.var && typeof e.var === 'object' && e.var.cast !== undefined && !isValidCast(e.var.cast)) delete e.var.cast;
+    }
   }
   // Kampprogrammet (v3.11): et ugyldigt eller manglende program genskabes deterministisk (holdenes
   // rækkefølge), og sæsonens start lægges, så næste runde altid er en af sæsonens 14.
@@ -167,6 +171,11 @@ export function normalizeLeague(league) {
 const okPts = (list) => Array.isArray(list) && list.length <= 11 && list.every((q) => Array.isArray(q) && q.length === 3 && (typeof q[0] === 'number' || typeof q[0] === 'string') && Number.isFinite(q[1]) && Number.isFinite(q[2]) && q[1] >= 0 && q[1] <= 100 && q[2] >= 0 && q[2] <= 100);
 const okBall = (b) => Array.isArray(b) && b.length === 2 && b.every((v) => Number.isFinite(v) && v >= 0 && v <= 100);
 const nat = (x, max) => Number.isInteger(x) && x >= 0 && x <= max;
+// var.cast (v3.32.2, match.js): checked er altid en id-tekst; line/victim/fouler kun som id-tekst; other kun som true. Intet andet.
+const CAST_IDS = new Set(['checked', 'line', 'victim', 'fouler']);
+const okId = (x) => typeof x === 'string' && x.length > 0 && x.length <= 40;
+export const isValidCast = (c) => !!c && typeof c === 'object' && !Array.isArray(c) && okId(c.checked)
+  && Object.entries(c).every(([k, v]) => (CAST_IDS.has(k) ? okId(v) : k === 'other' && v === true));
 export const isValidClock = (c) => !!c && typeof c === 'object' && nat(c.m, 90) && (c.plus === undefined || nat(c.plus, 8));
 export const isValidStoppage = (st) => Array.isArray(st) && st.length === 2 && st.every((x) => x && nat(x.S, 8) && nat(x.var, 8) && x.var <= x.S);
 const ACT_KINDS = new Set(['press', 'trap', 'flank', 'tackle', 'cb', 'run', 'cross', 'long', 'corner', 'fk']);   // match.js act – tilladelsesliste
