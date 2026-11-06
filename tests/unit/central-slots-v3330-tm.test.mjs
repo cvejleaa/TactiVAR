@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 class FakeNode {}
 class FakeText extends FakeNode { constructor(t) { super(); this.t = t; } get textContent() { return this.t; } }
 class FakeEl extends FakeNode {
-  constructor(tag) { super(); this.tag = tag; this.children = []; this.className = ''; this.dataset = {}; this.style = {}; this.attrs = {}; this.listeners = {}; this.classList = { add: (c) => { this.className += ' ' + c; }, toggle() {} }; }
+  constructor(tag) { super(); this.tag = tag; this.children = []; this.className = ''; this.dataset = {}; this.style = {}; this.attrs = {}; this.listeners = {}; this.classList = { add: (c) => { this.className += ' ' + c; }, remove: (c) => { this.className = this.className.split(' ').filter((x) => x !== c).join(' '); }, toggle() {} }; }
   append(...c) { this.children.push(...c); }
   remove() { this.removed = true; }
   setAttribute(k, v) { this.attrs[k] = v; }
@@ -53,9 +53,11 @@ test('live-etiketten under træk på en KANTplads: "→ back-plads" / "→ kant-
   const tok = (slot) => all(renderPitch({ team: me, isOwn: true, ui: {}, onMove() {}, onSelect() {}, onTokenSwap() {} }), (e) => e.dataset.slot === String(slot) && e.className.startsWith('token'))[0];
   const labels = (slot, ys) => {
     const t = tok(slot); t.listeners.pointerdown({ preventDefault() {}, pointerId: 1 });
-    const live = t.children.find((c) => c instanceof FakeEl && c.className.includes('kind-live')), seen = [];
+    // QC (efter rettelserne): etiketten står i sin egen boks (.token-live – vokser indad ved kanten), og brikken er .dragging, så flagene skjules
+    const box = t.children.find((c) => c instanceof FakeEl && c.className.includes('token-live')), seen = [];
+    const live = box?.children.find((c) => c instanceof FakeEl && c.className.includes('kind-live'));
     if (live) for (const y of ys) { t.listeners.pointermove({ clientX: 20, clientY: y }); seen.push(live.textContent); }
-    return { live, seen, t };
+    return { live, box, seen, t };
   };
   const w = labels(4, [64, 57, 46]);
   assert.ok(w.live, 'LWB: live-etiket under træk');
@@ -63,8 +65,10 @@ test('live-etiketten under træk på en KANTplads: "→ back-plads" / "→ kant-
   assert.equal(wm.position, 'WM', 'data: en kant på LWB-pladsen');
   // ≥ 60 back (en kant dér: naboplads −2,5 %), 56–59 begge (✓), ≤ 55 kant (✓) – følgen for netop ham (v3.33.0-rettelse, Spilfører UI 1)
   assert.deepEqual(w.seen, ['→ back-plads · −2,5 %', '→ kant-/back-plads ✓', '→ kant-plads ✓']);
+  assert.ok(w.t.className.split(' ').includes('dragging'), 'brikken er .dragging under trækket (flagene skjules)');
   w.t.listeners.pointerup();
-  assert.ok(w.live.removed, 'etiketten fjernes, når brikken slippes');
+  assert.ok(w.box.removed, 'etiketten (og dens boks) fjernes, når brikken slippes');
+  assert.ok(!w.t.className.split(' ').includes('dragging'), 'og .dragging er væk efter slip');
   for (const slot of [9, 1]) assert.equal(labels(slot, [50]).live, undefined, `slot ${slot} (ST/CB) har ingen pladstype → ingen etiket`);
 });
 

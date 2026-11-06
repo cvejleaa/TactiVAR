@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 class FakeNode {}
 class FakeText extends FakeNode { constructor(t) { super(); this.t = t; } get textContent() { return this.t; } }
 class FakeEl extends FakeNode {
-  constructor(tag) { super(); this.tag = tag; this.children = []; this.className = ''; this.dataset = {}; this.style = {}; this.attrs = {}; this.listeners = {}; this.classList = { add: (c) => { this.className += ' ' + c; }, toggle() {} }; }
+  constructor(tag) { super(); this.tag = tag; this.children = []; this.className = ''; this.dataset = {}; this.style = {}; this.attrs = {}; this.listeners = {}; this.classList = { add: (c) => { this.className += ' ' + c; }, remove: (c) => { this.className = this.className.split(' ').filter((x) => x !== c).join(' '); }, toggle() {} }; }
   append(...c) { this.children.push(...c); }
   remove() { this.removed = true; }
   setAttribute(k, v) { this.attrs[k] = v; }
@@ -234,7 +234,7 @@ test('UI: brikkens title og flag, Plads-cellen og live-etiketten under træk sig
   assert.ok(!t.children.some((c) => /Uden for position/.test(c?.textContent ?? '')));
   // live-etiketten under træk: pointerdown → pointermove til y 56 → "→ DM-plads"; tilbage til y 46 → "→ CM-plads"
   t.listeners.pointerdown({ preventDefault() {}, pointerId: 1 });
-  const live = t.children.find((c) => c instanceof FakeEl && c.className.includes('kind-live'));
+  const live = t.children.find((c) => c instanceof FakeEl && c.className.includes('token-live'))?.children.find((c) => c instanceof FakeEl && c.className.includes('kind-live'));
   assert.ok(live, 'live-etiket under træk');
   // v3.33.0-rettelse (Spilfører UI 1): følgen for netop ham – en CM: DM-pladsen koster −2,5 % (gul), mellemzonen og CM-pladsen passer (✓, grøn),
   // og 34 fra ankret står "ude af zone". Egen farveklasse (warn/ok) – ikke "Ude af zone"-flagets
