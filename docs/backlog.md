@@ -7,6 +7,14 @@ Rangering: brugerens ønsker først, derefter værdi pr. størrelse. Første run
 + 3 sæsoner `measure-lifecycle`).
 
 ## Næste
+000. **Brugerens ønsker 6/11 ("det hele" – i denne rækkefølge, én udgivelse ad gangen):**
+   1. **v3.32.3 Samspil på Taktik** · UI · S–M · 5 · "Jeg kan ikke på taktik siden se, hvem den valgte spiller spiller godt sammen
+      med." Vælg en brik/række → hans linjer fremhæves, resten dæmpes, og en linje viser hans bedste makkere (også bænk/reserver) og den
+      svageste. Bygger på `playerPairs`/`bandOf` (engine/chemistry.js) – data findes; i dag kun i spillerkortet og en mus-tooltip.
+   2. **v3.33.0 Træk bestemmer pladsen også i midten** · motor · M · 5 · "hvis jeg trak en spiller ud af en standardopstilling, så det
+      fx gik fra cm til dm, så skulle spillet finde ud af det og ikke give en straf" (ønsket var gået tabt – kun kantreglen v3.24.6 blev
+      lavet). Brugerens valg: straf, kæde OG rollen i kampen følger den tegnede dybde (CDM/CM/CAM, mellemzone hvor begge passer).
+   3. **v3.33.1 VAR læser taktikken** = punkt 00. nedenfor.
 00. **v3.32.3 – VAR læser taktikken (brugeren 2026-11-06: "Har taktik ikke nogen indflydelse på var? Heller ikke hvis man vælger
    ekstrem VAR-linje?" – valgt: som næste udgivelse)** · motor + UI · M · 5 · I dag læser `offsideCheck` (engine/match.js) ikke forsvarets
    `offsideTrap`, og `EXTREME_VAR_LINE` virker som `NORMAL` i kampen (kun `!== 'OFF'`, match.js ved `trapWon`); eneste forskel er
