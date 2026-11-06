@@ -31,7 +31,9 @@ export function varFrame(events, last) {
     if (!seq) continue;
     const from = seq.verdictAt ?? seq.check, end = from + FRAME_AFTER;
     if (last > end) return null;
-    for (let j = from + 1; j <= last; j++) if (CLOSES.has(events[j]?.type)) return null;
+    // Ét-trins (QC + Spilfører UI v3.32.2): følgen er motorens egen næste hændelse – straffemålet efter VAR_PEN/AWARDED, RED efter
+    // VAR_RED/UPGRADED – og lukker IKKE rammen (ellers stod "Straffe til …" og "Opgraderet: rødt …" kun ét tick, 420 ms)
+    for (let j = from + (seq.oneStep ? 2 : 1); j <= last; j++) if (CLOSES.has(events[j]?.type)) return null;
     return { seq, reached: seq.verdictAt != null && last >= seq.verdictAt };
   }
   return null;

@@ -28,6 +28,15 @@ test('varFrame lukker (null), når et nyt GOAL/HEADER_GOAL/RED vises EFTER kende
   // …men et mål EFTER STANDS-målet lukker
   const st2 = [...plain(2), chk('STANDS'), ev('GOAL'), ev('PASS'), ev('HEADER_GOAL'), ...plain(4)];
   assert.ok(varFrame(st2, 4)); assert.equal(varFrame(st2, 5), null);
+  // Ét-trins (QC/Spilfører UI): følgen (straffemålet efter AWARDED, RED efter UPGRADED) lukker IKKE – rammen står 5 tick (før 1 tick, 420 ms)
+  for (const [c, follow] of [[chk('AWARDED', 'VAR_PEN', 'PENALTY'), 'GOAL'], [chk('UPGRADED', 'VAR_RED', 'RED'), 'RED']]) {
+    const one = [...plain(2), c, ev(follow), ...plain(8)];
+    for (let last = 2; last <= 7; last++) assert.ok(varFrame(one, last)?.reached, `${c.var.verdict}: står ved ${last}`);
+    assert.equal(varFrame(one, 8), null, `${c.var.verdict}: slut efter 5 tick`);
+    // …men et mål mere efter følgen lukker
+    const more = [...plain(2), c, ev(follow), ev('PASS'), ev('GOAL'), ...plain(6)];
+    assert.ok(varFrame(more, 4)); assert.equal(varFrame(more, 5), null, `${c.var.verdict}: det næste mål lukker`);
+  }
   // Tjekket uden kendelse endnu (sidste hændelse): rammen står
   assert.ok(varFrame([...plain(3), chk()], 3));
   // Et nyt tjek efter kendelsen: rammen for det NYE tjek (ikke den gamle kendelse)

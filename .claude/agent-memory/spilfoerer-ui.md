@@ -56,10 +56,9 @@ fund der er rettet (så du ikke finder dem igen), hvad brugeren har valgt fra, o
   #mc-ft = resultat+boldbesiddelse, neutral farve, gentager analysen ved siden af; Taktik første select y 1699 (390) / 1024 (1366),
   fit-help 113 px + list-help + pitch-help står stadig åbne.
 
-## Efter-gennemgang v3.32.2 VAR-øjeblikket (2026-11-06) – scripts scratchpad/ui3322/play.mjs (W H reduce|no N click), billeder ui3322/
-- Godt (gå ikke efter igen): pausen tjek→kendelse 2087–2094 ms (før 420); "Vis kendelsen ›" svarer på 68 ms, fokus → #var-frame;
-  siden skubbes ikke (docH 900/1412 konstant); grøn flash ved modstanderens annullerede mål; reduce: animation none; 5 af 8 runder havde VAR.
-- Fundet: rammen dækker HELE #mc-board (rect = board 1300×120 / 324×120) → stillingen og "?" skjult (kun kampkortet viser "?");
-  rammen står 5 tick efter kendelsen og skjuler et NYT mål (390 rm: 2-1 i 64' med fx-shake under rammen fra 61');
-  390: rammen 124–143 px i 120 px board → dækker filterrækken 15–23 px; "❌ Målet annulleret" rødt kryds ved GOD nyhed (flash grøn);
-  ét-trins straffe: ingen pause før selve sparket (SAVE kom næste tick under rammen); #live-status står med forrige rundes kendelse.
+## v3.32.2 VAR-øjeblikket (2026-11-06) – scripts scratchpad/ui3322b/play.mjs (port 5340), billeder ui3322b/
+- Løst og målt (gå ikke efter igen): "1 - 0 ?" synlig over rammen (sc top 220/210, ramme 306/296); nyt mål lukker rammen (0-5 i 73');
+  kendelsen med hold + farve ("❌ Roskilde Rovers' mål annulleret" grøn, eget annulleret rød); filterrække 466/416 > rammens bund 458/408;
+  pause tjek→kendelse ~2,1 s; "Vis kendelsen ›" 44 px; siden hopper ikke.
+- Åbent: ét-trins kendelser (VAR_RED UPGRADED, VAR_PEN AWARDED) lukkes af deres EGEN følge-hændelse (RED/GOAL, CLOSES varmoment.js)
+  → rammen står ~0,4 s (7167→7544 ms); zonen 152 px ved 390 er et tomt hul under tidslinjen i kampe uden VAR (126 px luft); rammens indhold maks 117 px af 152 (4 linjer offside, 6 VAR-kampe ved 390). Anbefalet: behold fast zone, fyld den.

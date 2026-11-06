@@ -2121,7 +2121,7 @@ try {
       const D = await oracle(p), evs = D.events, n = evs.length, own = (home) => (home ? D.homeId : D.awayId) === D.mine;
       // Lukke-reglen (v3.32.2-rettelsen): et nyt GOAL/HEADER_GOAL/RED EFTER kendelsen lukker rammen før de 5 tick
       const frameOf = (L, close = true) => { for (let s = L; s >= Math.max(0, L - 6); s--) { const e = evs[s]; if (!STARTS.has(e.type) || !e.var) continue; const one = oneStepOf(e), v = one ? s : s + 1 < n ? s + 1 : null;
-        if (L > (v ?? s) + 5) return null; if (close) for (let j = (v ?? s) + 1; j <= L; j++) if (CLOSES.has(evs[j].type)) return null; return { s, one, v, e, reached: v != null && L >= v }; } return null; };
+        if (L > (v ?? s) + 5) return null; if (close) for (let j = (v ?? s) + (one ? 2 : 1); j <= L; j++) if (CLOSES.has(evs[j].type)) return null; return { s, one, v, e, reached: v != null && L >= v }; } return null; };
       const teamOf = (home) => (home ? D.homeName : D.awayName);
       const F = { frame: [], score: [], fx: [], tone: [], hold: [], delay: [], geo: [], css: [], vtone: [] }, seen = { two: 0, one: 0, hold: 0, ownGoalTicks: 0, flash: 0, pendingTicks: 0, bip: 0, closed: 0, good: 0, bad: 0 };
       const s0 = await snap(p), startAc = { n: s0.ac, resumes: s0.resumes, tones: s0.tones };

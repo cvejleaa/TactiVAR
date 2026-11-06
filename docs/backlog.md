@@ -14,6 +14,9 @@ Rangering: brugerens ønsker først, derefter værdi pr. størrelse. Første run
    men koste mere, når linjen brydes; linjens højde (pres) med. Målt før/efter (tools/measure-duels.mjs … var + en målegennemgang af
    mål imod), Arkitekt + Spilfører motor + QC på planen. Rammen fra v3.32.2 må derefter sige "din høje linje" – kun når motoren læste den.
    Desuden: ét-trins VAR-straffe: hold før selve straffesparket og vis udfaldet (🧤/⚽) i rammen – kræver Spilfører motor (er næste skud
+   - VAR-zonen (v3.32.2, Spilfører UI + QC): i kampe uden VAR står den reserverede zone tom under hele live-afspilningen (86 px ved 1366,
+     126 px ved 390). Fyld den med kampens seneste store øjeblik (mål/rødt/straffe i stor tekst – stadionskærmen), som VAR-rammen
+     afløser; overvej 8rem i stedet for 9,5rem ved 390 (rammen fylder højst 117 af 152 px) og mål ved 320 px (loggen kan klippes).
    altid straffen?).
 0. **Ny brugerflade i trin (brugeren 2026-11-02: "forvirrende og alt for mange informationer klemt sammen")** · UI · L · 5 · bud:
    https://claude.ai/artifact/EPcztoSQdrk6pK8Bsy3FeS (UI-gennemgang med skærmbilleder, tre designbud, QC-dom). Brugerens valg: seks faner
