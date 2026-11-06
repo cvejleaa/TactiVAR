@@ -70,3 +70,11 @@ fund der er rettet (så du ikke finder dem igen), hvad brugeren har valgt fra, o
   forhåndsvisning for en udelukket/skadet starter er rød (−2 for hver bænkspiller) skønt motoren skifter ham ud alligevel (match.js:3);
   R1 = "±0" i hver række (støj); 390: tal "−4"/"+1 −5" uden forklaring (title kan ikke ses ved tryk), #pick-msg fast 94–150 px
   dækker 4 bænkrækker (y 626–720); beskeden op til 55 ord, "– samspil tæller kun, når de står som naboer" hver gang.
+
+## Efter-gennemgang v3.33.0 Pladsen følger dybden på midten (2026-11-06) – scripts scratchpad/ui3330/{play,p2,p3}.mjs (port 5470), billeder ui3330/
+- Godt (gå ikke efter igen): live-etiketten skifter ved grænserne (y52 "→ DM-/CM-plads", 46 CM, 39 CM-/OM, 34 OM, 56 DM) ved 390 og 1366;
+  title "CM→DM (DM-plads) – …", Plads-cellen "CM→DM ⚠ −2,5 %" + title; arkets liste "CM→DM"/"CM→OM", mellemzone y52 = "CM"; ingen sidefejl.
+- Fundet: live-etiketten siger pladsen, ikke prisen for HAM (−2,5 % først efter slip) og har "Ude af zone"-rødt (#fecaca, ingen CSS for
+  .kind-live); CM trukket ned ved DM'en: 390 flag-overlap 129×12 px + flaget skåret −4 px (brik 218 px bred i 324 px bane), 1366 23×15;
+  referatet "for langt fra sin DM-zone" ved y80 / "OM-zone" ved y12 (match.js:1361 cp.role = effektiv rolle; ringen er om CM-ankeret);
+  arkets minibane siger "CM P. Bach" ved ankeret, listen under "CM→DM" (matchcenter.js:121-122 bruger coords.r, ikke e.place).

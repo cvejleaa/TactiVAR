@@ -50,3 +50,13 @@ fund der er rettet (så du ikke finder dem igen), hvad brugeren har valgt fra, o
 - Botter trækker aldrig (generator.js:236 customCoords {}), én DM pr. trup (generator.js:40) → "fire DM'er" er ingen trussel;
   risikoen er en bred mellemzone (alle parkerer der = aldrig straf) og at ankre skifter klasse (generator.js:224 → nye ligaer).
 - Anbefalet: fingeraftryk SKAL være uændret; ST/CF uden for (measure-duels.mjs:228 trækker ANG til y 32 = falsk 9'er).
+
+## v3.33.0-måling efterprøvet (2026-11-06; scratchpad/cen: paired.mjs/paired2.mjs = netto pr. kamp, samme seeds 1–600, 8400 kampe)
+- Scenarie b (DM på CM-plads trukket til y 56) ny − gammel −0,006 ± 0,010, dekomponeret i kopier: kun fit +0,021 ± 0,006, kun rolle
+  (CM→CDM-bevægelse, DRIFT_AXES CDM [11,10] mod CM [14,13] – den ENESTE forskel i motoren) −0,032 ± 0,009. Dybden alene (gl. y52 mod y56)
+  −0,003 ± 0,006. Samme DM i mellemzonen y 52 (fuld fit, rollen bliver CM): +0,021 ± 0,006 → mellemzonen slår DM-zonen med +0,025 ± 0,009.
+- Men CDM-bevægelsen er ikke generelt dårligere: a0 med CDM=[14,13] −0,017 ± 0,012. Effekten er kombinationen dyb plads + lille boks.
+- Vurdering: ærlig motor (DM har ingen opgave, kun mindre bevægelse), ikke en fejl; ikke blokerende. Lille udnyttelse: træk DM'en til
+  y 51–53 i stedet for ≥ 54 (≈ 0,35 mål pr. 14-runders sæson). Løses af backlog "egentlig DM-opgave" – ret ikke DRIFT_AXES alene
+  (ankrene CDM 54–58 i 4-2-3-1 m.fl. → fingeraftrykket flytter).
+- Værktøjets `sammenlign` er uparret og uden SE – ved næste måling: brug parret differens (samme seed og rng pr. kamp).
