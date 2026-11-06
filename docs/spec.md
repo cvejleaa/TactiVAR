@@ -1220,14 +1220,20 @@ mellem bjælkerne 707 → 726 px (682 med scout-bjælken). e2e vagter: chrome �
   "ind på X"), minibane "Startopstilling" med karakter/stjerner, ikoner med
   mouse-over + forklaring under (touch).
   **VAR-øjeblikket (v3.32.2, `ui/varmoment.js` – rene funktioner):** under live-afspilning af din kamp står en ramme (`#var-frame`,
-  `role="status"`) som overlay over stillingen og tidslinjen (`.mc-board` – den skubber ikke siden) fra tjekket til kendelsen + 5 tick
-  (≈ 2 s), med et pulserende "VAR"-mærke og en log bygget KUN af hændelsens type, `var` (kind/verdict/cast) og navnene fra karakterarket –
-  aldrig `ev.text`, taktik, kynisme, teater eller "fælden virkede": "📺 VAR tjekker: offside?" (skub i opspillet? / filmning? / rødt
-  kort?), "#9 Hansen tjekkes for offside – forreste mand" (kun ved `other`), "afgjort mod #4 Bergs placering", ved frispark "#9 Hansen
-  tjekkes for skub mod #4 Berg", og kendelsen ("❌ Målet annulleret", "✅ Målet står", "✅ Straffen står", "❌ Ingen straffe", "🟥 Rødt
-  står", "🟨 Rødt bliver gult", "📺 Straffe til …", "🟥 Opgraderet til rødt") – kendelsen først, når kendelses-hændelsen er vist. Under et
-  mål-tjek står stillingen nedtonet med "?" (målet er talt op i tjekket). "Vis kendelsen ›" (`#var-show`) i rammen. Det gamle VAR-banner
-  (ét tick) er væk. Skærmlæseren: `#live-status` (`aria-live="polite"`, ved `#fejlboks`) skrives kun ved tjekket og ved kendelsen.
+  `role="group"`, `aria-label="VAR-tjek"`) UNDER stillingen – oven på tidslinjen i zonen `.mc-live`, der under afspilning har fast højde
+  (7rem; 9,5rem ≤ 600 px), så `#score` og `#minute` altid er synlige, rammen aldrig når referatets filterrække, og siden ikke skubbes; højst
+  44rem bred (centreret). Den står fra tjekket til kendelsen + 5 tick (≈ 2 s) – men lukker før tid, når et nyt mål (GOAL/HEADER_GOAL) eller
+  rødt kort (RED) vises efter kendelsen; et nyt tjek afløser det gamle. Et pulserende "VAR"-mærke og en log bygget KUN af hændelsens type,
+  `var` (kind/verdict/cast), `isHome` og navnene fra karakterarket/holdnavnene – aldrig `ev.text`, taktik, kynisme, teater eller "fælden
+  virkede": "📺 VAR tjekker: offside?" (skub i opspillet? / filmning? / rødt kort?), "#9 Hansen tjekkes for offside – forreste mand" (kun
+  ved `other`), "afgjort mod #4 Bergs placering", ved frispark "#9 Hansen tjekkes for skub mod #4 Berg", og kendelsen med holdet (det
+  angribende ved mål og straffe, holdet med kortet ved rødt): "❌ Brøndbys mål annulleret", "✅ Brøndbys mål står", "✅ Straffen til X
+  står", "❌ Ingen straffe til X", "🟥 Rødt til X står", "🟨 Rødt til X bliver gult", "📺 Straffe til X", "🟥 Opgraderet: rødt til X"
+  (uden holdnavn de korte ord: "❌ Målet annulleret" …) – kendelsen først, når kendelses-hændelsen er vist. Kendelseslinjen er grøn
+  (`.v-good`), når den er god for DIT hold, ellers rød (`.v-bad`) – samme betydning som flashen. Under et mål-tjek står stillingen
+  nedtonet med "?" (målet er talt op i tjekket). "Vis kendelsen ›" (`#var-show`) i rammen; forsvinder den, får rammen fokus, og forsvinder
+  rammen, får ⚡ (`#skip`) det. Det gamle VAR-banner (ét tick) er væk. Skærmlæseren: `#live-status` (`aria-live="polite"`, ved
+  `#fejlboks`) er eneste annoncør – skrives kun ved tjekket og ved kendelsen og tømmes, når en ny runde starter live.
   Efter fløjt (og efter ⚡) står ingen ramme – referatets egen VAR-linje navngiver spillerne (bevidst udeladt).
   **Spilfornemmelsen:** stillingen ryster (`.fx-shake`, 360 ms) ved dit holds endelige mål og ved det endelige røde kort (aldrig ved
   VAR_CHECK/VAR_RED/VAR_NO_RED); et annulleret mål blinker stillingens boks rødt (`.fx-flash-bad`), når det var DIT mål, grønt
@@ -1236,8 +1242,8 @@ mellem bjælkerne 707 → 726 px (682 med scout-bjælken). e2e vagter: chrome �
   flashen er en statisk kant i samme farve. **Lyd** (`ui/sound.js`, Web Audio uden filer): fløjt ved kampstart og slutfløjt, bip ved
   VAR-tjek, kort jubel ved dit mål – FRA som standard, nøglen `tactivar_sound` (ikke i ligaen). Kontakten "🔇 Lyd fra"/"🔊 Lyd til"
   (`#sound-toggle`, `aria-pressed`) står i Match Centers række ved ⚡, under og efter afspilning – ikke i ⚙ (0b: ⚙ er sjældne og farlige
-  handlinger). AudioContext oprettes kun i et klik (▶ Spil runde med lyd til, kontakten); ingen lyd uden for Kamp; ⚡ stopper ventende
-  lyde, højst ét slutfløjt; uden AudioContext ingen lyd og ingen fejlboks. ⚡ og kontakten (og "Vis kendelsen ›") er ≥ 44 px ved 390
+  handlinger). AudioContext oprettes kun i et klik (▶ Spil runde med lyd til, kontakten); ingen lyd uden for Kamp (at forlade Kamp
+  stopper ventende lyde); ⚡ stopper ventende lyde, højst ét slutfløjt; uden AudioContext ingen lyd og ingen fejlboks. ⚡ og kontakten (og "Vis kendelsen ›") er ≥ 44 px ved 390
   (⚡ før 23 px) – med −8 px lodret margen, så rækken ikke vokser (`tools/measure-ui.mjs`: Kamp efter fløjt 1169 / 1769 px ved 1366 / 390
   før og efter; uden margenen 1785). Fokus gendannes efter id, når Match Center tegnes om hvert tick.
 - **Liga**: tabel ("sæson N, efter X af 14 runder"), **avisen** (v3.31.0: KUN her, lige under tabellen – `#gazette` med

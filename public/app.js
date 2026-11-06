@@ -30,7 +30,7 @@ import { renderLastRound, renderSchedule } from './ui/rounds.js';
 import { renderMatchCenter, renderGazette } from './ui/matchcenter.js';
 import { renderHome } from './ui/home.js';
 import { replayJump, clearReplays } from './ui/replay.js';
-import { playbackStep, varFrame, varLog, castNames, liveLine, soundFor } from './ui/varmoment.js';
+import { playbackStep, varFrame, varLog, castNames, liveLine, soundFor, refocusId } from './ui/varmoment.js';
 import { soundOn, setSound, unlockSound, playSound, stopSounds } from './ui/sound.js';
 
 export const PLAYBACK_MS = 420;
@@ -51,6 +51,7 @@ const lastRoundView = (r) => ({ round: r.round, matches: r.matches, gazette: r.g
 function showTab(k) {
   if (k === 'admin' && game.ui.tab !== 'admin') view.prevTab = game.ui.tab;   // ⚙ "Se et andet hold" vender tilbage hertil
   if (k === 'hjem' && view.viewTeamIdx !== myIdx()) setViewTeam(myIdx());       // Hjem er altid dit hold – også Trup bagefter
+  if (game.ui.tab === 'kamp' && k !== 'kamp') stopSounds();                     // v3.32.2 (QC): ventende toner stopper, når man forlader Kamp
   game.ui.tab = k; clearSwap(); view.notice = ''; view.marketMsg = ''; view.trainMsg = ''; view.trainPid = null; view.card = null; persist(); render(); window.scrollTo(0, 0);
 }
 let timer = null;
@@ -145,7 +146,7 @@ const NEWS = {
   '3.28.0': '🏠 Andet skridt i den nye brugerflade: en ny Hjem-fane samler sidste runde, din placering, "Før du spiller" (udelukkede, skadede, trætte og 🟨 – med et link til at løse det), næste modstander og tabellen omkring dig. ▶ Spil runde står nu i en bjælke i bunden af Hjem og Taktik (på de andre faner som en lille ▶ øverst med de samme tegn), og modstanderens navn er et separat 🔍-link. Holdvælgeren er flyttet til Liga ("Se et hold"), og ser du et andet hold, siger en lilla bjælke det – med "← Dit hold". ⚙ øverst til højre har gem, eksport, import og versionen. På mobil står fanerne i bunden. Næste skridt: spillerkortet som ét panel.',
   '3.31.2': '📊 Spillerkortet viser nu spillerens statistik for holdet øverst: kampe, minutter, mål, oplæg, snitkarakter, 👑, 🟨 og 🟥 for denne og sidste sæson. Taktik-listen viser arketypen (🔒 låst / 🌟 låst op) ved dine spillere. Skønnet af en spillers udvikling har nu fem trin – fra "er tæt på sit loft" til "har langt mere i sig" – så ungdomsspillerne ikke alle hedder det samme, og ungdomstilbuddet viser nøglesnittet. Og positionerne er danske overalt: MV, MS, VB/HB, VKB/HKB, DM, CM, OM, VM/HM, VK/HK og ANG.',
   '3.32.1': '🧹 Mindre klemt sammen (designgennemgangen): På Kamp står afspilningen og ▶ Afspil nu på første skærm – kampene på én linje, og efter fløjtet tre faner: 🎬 Afspilning & referat · 📊 Statistik · 👥 Spillerne, med kampens resultat og boldbesiddelse fast øverst. "📤 Send kampen" ligger under "⋯ Mere". På Taktik står én kort linje under hver fase – forklaringen bag "ⓘ Sådan virker det". Brede tabeller (Trup, Træning, Klub) toner ud i kanten, når der er mere at rulle, og navnet (på Klub: runden) står fast; på mobil er Trups rækker højere, så de er lette at trykke på.',
-  '3.32.2': '📺 VAR-øjeblikket: Når VAR tjekker i din kamp, stopper afspilningen op – en ramme over stillingen siger, hvad der tjekkes, og hvem det gælder ("#9 Hansen tjekkes for offside – afgjort mod #4 Bergs placering"), og kendelsen kommer først efter et par sekunder (eller tryk "Vis kendelsen ›"). Stillingen ryster ved dine mål og røde kort, og et annulleret mål blinker rødt eller grønt. Ny lydkontakt ved ⚡: fløjt, VAR-bip og jubel – slået fra, til du tænder den.',
+  '3.32.2': '📺 VAR-øjeblikket: Når VAR tjekker i din kamp, stopper afspilningen op – en ramme under stillingen siger, hvad der tjekkes, og hvem det gælder ("#9 Hansen tjekkes for offside – afgjort mod #4 Bergs placering"), og kendelsen kommer først efter et par sekunder (eller tryk "Vis kendelsen ›"). Stillingen ryster ved dine mål og røde kort, og et annulleret mål blinker rødt eller grønt. Ny lydkontakt ved ⚡: fløjt, VAR-bip og jubel – slået fra, til du tænder den.',
   '3.32.0': '✈ Spring kan nu trænes: Fysik træner Fart, Styrke og Spring, og spillerkortet viser Spring som en bjælke under "Fysik & luft". Arketypens krav viser, hvor langt han er, og hvad der træner det – fx "Låses op ved: Styrke 13/13 ✓ · Spring 13/14 – trænes med Fysik". Fokusvalget på 🏋️ Træning viser, hvilke evner hvert fokus træner, og Trup markerer et +1 i Spring som i de andre evner. Fra 30 år kan Spring falde som Styrke – træning med Fysik halverer faldet.',
   '3.31.1': '▶ Spil runde står nu samme sted på alle faner: i bjælken i bunden – også på Trup, Træning, Kamp, Liga, Klub og ⚙. Den lille ▶ øverst er væk. Bjælken viser opstillingens tegn på alle faner (⛔ udelukket, 🚑 skadet, ⚠ træt, 🟨 ét gult fra udelukkelse) – ved mange som en kort tæller, fx "⛔2 🚑1 🟨1", der viser listen på 🏠 Hjem. Mens runden spilles, står der "📺 Runde N spilles …". Og spillerkortet er nu på dansk: særpræg som Presmonster og Fyrtårn, danske positioner (OM, DM, ANG), "Låses op ved: Udholdenhed 14, Erobring 12", 🕵️ Observationer og 🧠 Erfaring mod stilarter.',
   '3.31.0': '📰 Fjerde skridt i den nye brugerflade: avisen står nu kun på Liga – lige under tabellen. Hjem og Kamp viser rundens overskrift med et link dertil. Hjem viser også kampens spiller 👑 ved sidste runde og modstanderens seneste 3 som farvede piller (V/U/T, ældste først), og 🔍 er væk fra Spil-bjælken på Hjem – næste kamp-kortet har linket.',
@@ -813,6 +814,8 @@ function openMatchCenter(result, live) {
   // hold: tick, der springes over før en VAR-kendelse (v3.32.2, ui/varmoment.js); fxSeen: hændelser, hvis fx er vist
   mc = { round: result.round, matches: result.matches, gazette: result.gazette, viewIdx: 0, filter: 'all', shownCount: live ? 1 : Infinity, playing: live, hold: 0, fxSeen: new Set() };
   game.ui.tab = 'kamp';
+  // v3.32.2 (QC): skærmlæserens linje fra forrige runde står ikke over den nye
+  if (live) { const box = document.getElementById('live-status'); if (box) box.textContent = ''; }
   render();
   window.scrollTo(0, 0);
   if (live) { sound('whistle'); timer = setInterval(playTick, PLAYBACK_MS); }
@@ -902,13 +905,14 @@ const sendState = (v = mc) => {
 };
 const matchCenterEl = () => (sendState(), renderMatchCenter({ mc, myTeamId: myTeam().id, on: mcHandlers, sound: soundOn(storage) }));
 // Under afspilning tegnes kun Match Center om (ikke hele siden). v3.32.2: fokus gendannes efter id (tastatur: ⚡, lydkontakten) –
-// forsvinder "Vis kendelsen ›", får rammen fokus.
+// forsvinder "Vis kendelsen ›", får rammen fokus; forsvinder rammen, får ⚡ det (refocusId, ui/varmoment.js).
 function renderMc() {
   const el = document.getElementById('match-center');
   if (!el) return;
   const id = el.contains(document.activeElement) ? document.activeElement.id : null;
   const nu = matchCenterEl(); el.replaceWith(nu); markScrollable(nu);
-  if (id) (document.getElementById(id) ?? (id === 'var-show' ? document.getElementById('var-frame') : null))?.focus({ preventScroll: true });
+  const to = refocusId(id, (x) => !!document.getElementById(x));
+  if (to) document.getElementById(to).focus({ preventScroll: true });
   announceVar();
 }
 // Skærmlæseren (#live-status, aria-live="polite" i index.html): skrives KUN ved tjekket og ved kendelsen

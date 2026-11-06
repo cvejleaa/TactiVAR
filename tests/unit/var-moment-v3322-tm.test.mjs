@@ -229,7 +229,7 @@ test('Match Center: rammens attributter og knap – tabindex -1, data-kind/-verd
     if (!['VAR_CHECK', 'VAR_PEN', 'VAR_RED'].includes(e.type) || !e.var) continue;
     const isOne = (e.type === 'VAR_PEN' && e.var.verdict === 'AWARDED') || (e.type === 'VAR_RED' && e.var.verdict === 'UPGRADED');
     const r = draw(m, me, live(m, i + 1)), f = byId(r, 'var-frame');
-    assert.ok(f, e.type); assert.equal(f.attrs.tabindex, '-1'); assert.equal(f.attrs.role, 'status');
+    assert.ok(f, e.type); assert.equal(f.attrs.tabindex, '-1'); assert.equal(f.attrs.role, 'group'); assert.equal(f.attrs['aria-label'], 'VAR-tjek');
     assert.equal(f.dataset.kind, e.var.kind); assert.equal(f.dataset.verdict, isOne ? e.var.verdict : '');
     assert.equal(cls(f).includes('reached'), isOne); assert.equal(!!byId(r, 'var-show'), !isOne);
     assert.equal(byId(r, 'var-log').tag, 'ul');
@@ -262,7 +262,7 @@ test('Match Center: stødet ligger på #score, flashen på tavlen – aldrig omv
   const g = G.find(({ m, me }) => m.events.some((e) => e.type === 'GOAL' && (e.isHome ? m.homeId : m.awayId) === me.id));
   const i = g.m.events.findIndex((e) => e.type === 'GOAL' && (e.isHome ? g.m.homeId : g.m.awayId) === g.me.id);
   const r = draw(g.m, g.me, live(g.m, i + 1, { fxSeen: new Set() }));
-  assert.deepEqual(cls(byId(r, 'mc-board')), ['mc-board'], 'ingen fx-klasse på tavlen ved et mål'); assert.ok(cls(byId(r, 'score')).includes('fx-shake'));
+  assert.deepEqual(cls(byId(r, 'mc-board')), ['mc-board', 'live'], 'ingen fx-klasse på tavlen ved et mål'); assert.ok(cls(byId(r, 'score')).includes('fx-shake'));
   const h = G.find(({ m }) => m.events.some((e) => e.type === 'VAR_NO_GOAL')), j = h.m.events.findIndex((e) => e.type === 'VAR_NO_GOAL');
   const r2 = draw(h.m, h.me, live(h.m, j + 1, { fxSeen: new Set() }));
   assert.ok(!cls(byId(r2, 'score')).some((c) => c.startsWith('fx-')), 'ingen fx-klasse på stillingen ved annulleret mål');

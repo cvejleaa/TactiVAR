@@ -13,6 +13,8 @@ Rangering: brugerens ønsker først, derefter værdi pr. størrelse. Første run
    modstanderens `vsTrapLong`-erfaring (engine/counter.js:57). Ekstrem linje skal give flere offside-fanger og flere tætte VAR-kendelser,
    men koste mere, når linjen brydes; linjens højde (pres) med. Målt før/efter (tools/measure-duels.mjs … var + en målegennemgang af
    mål imod), Arkitekt + Spilfører motor + QC på planen. Rammen fra v3.32.2 må derefter sige "din høje linje" – kun når motoren læste den.
+   Desuden: ét-trins VAR-straffe: hold før selve straffesparket og vis udfaldet (🧤/⚽) i rammen – kræver Spilfører motor (er næste skud
+   altid straffen?).
 0. **Ny brugerflade i trin (brugeren 2026-11-02: "forvirrende og alt for mange informationer klemt sammen")** · UI · L · 5 · bud:
    https://claude.ai/artifact/EPcztoSQdrk6pK8Bsy3FeS (UI-gennemgang med skærmbilleder, tre designbud, QC-dom). Brugerens valg: seks faner
    (🏠 Hjem ny · Trup · Taktik · Kamp · Liga · Klub) med underfaner, spillerkortet som ét panel, ▶ Spil runde som bundbjælke på Hjem og

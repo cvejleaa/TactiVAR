@@ -2043,7 +2043,12 @@ try {
     const T0 = Date.UTC(2026, 0, 1, 10, 0, 0), TICK = 420;
     const STARTS = new Set(['VAR_CHECK', 'VAR_PEN', 'VAR_RED']);
     const oneStepOf = (e) => (e.type === 'VAR_PEN' && e.var?.verdict === 'AWARDED') || (e.type === 'VAR_RED' && e.var?.verdict === 'UPGRADED');
-    const VERDICT = { 'VAR_CHECK:STANDS': '✅ Målet står', 'VAR_CHECK:OVERTURNED': '❌ Målet annulleret', 'VAR_PEN:STANDS': '✅ Straffen står', 'VAR_PEN:OVERTURNED': '❌ Ingen straffe', 'VAR_RED:CONFIRMED': '🟥 Rødt står', 'VAR_RED:DOWNGRADED': '🟨 Rødt bliver gult' };
+    // v3.32.2-rettelsen (QC/Spilfører UI): kendelsen nævner holdet (t) og er grøn for dit hold, når den er god for det (GOOD: for holdet selv)
+    const gen = (n) => (/[sxz]$/i.test(n) ? `${n}'` : `${n}s`);
+    const VERDICT = { 'VAR_CHECK:STANDS': (t) => `✅ ${gen(t)} mål står`, 'VAR_CHECK:OVERTURNED': (t) => `❌ ${gen(t)} mål annulleret`, 'VAR_PEN:STANDS': (t) => `✅ Straffen til ${t} står`, 'VAR_PEN:OVERTURNED': (t) => `❌ Ingen straffe til ${t}`,
+      'VAR_RED:CONFIRMED': (t) => `🟥 Rødt til ${t} står`, 'VAR_RED:DOWNGRADED': (t) => `🟨 Rødt til ${t} bliver gult`, 'VAR_RED:UPGRADED': (t) => `🟥 Opgraderet: rødt til ${t}` };
+    const GOOD = { STANDS: true, AWARDED: true, OVERTURNED: false, CONFIRMED: false, UPGRADED: false, DOWNGRADED: true };
+    const CLOSES = new Set(['GOAL', 'HEADER_GOAL', 'RED']);
     const QUESTION = { OFFSIDE: 'offside?', FOUL: 'skub i opspillet?', DIVE: 'filmning?', RED: 'rødt kort?' };
     const GOALS = new Set(['GOAL', 'HEADER_GOAL']);
     // Falsk klokke + seedet Math.random + AudioContext-stub, der logger toner og stop (stop() UDEN argument = stopSounds)
@@ -2084,10 +2089,17 @@ try {
       return {
         playing: !!$('#skip'), score: $('#score')?.textContent ?? null, scoreCls: $('#score')?.className ?? '', boardCls: board?.className ?? '', minute: $('#minute')?.textContent ?? null,
         card0: $('#match-cards .matchcard')?.textContent ?? null,
-        frame: fr ? { role: fr.getAttribute('role'), cls: fr.className, tabindex: fr.getAttribute('tabindex'), lines: [...fr.querySelectorAll('#var-log li')].map((li) => li.textContent), show: !!fr.querySelector('#var-show'), btn: fr.querySelector('#var-show') ? r(fr.querySelector('#var-show')) : null,
+        frame: fr ? { role: fr.getAttribute('role'), label: fr.getAttribute('aria-label'), cls: fr.className,
+          tones: [...fr.querySelectorAll('#var-log li')].map((li) => li.dataset.tone ?? ''), liColor: [...fr.querySelectorAll('#var-log li')].map((li) => getComputedStyle(li).color),
+          vbox: (() => { const v = fr.querySelector('#var-log li.verdict'); return v ? r(v) : null; })(), need: Math.max(...[...fr.children].map((x) => x.getBoundingClientRect().bottom)) - fr.getBoundingClientRect().top + 2, cH: fr.getBoundingClientRect().height, tabindex: fr.getAttribute('tabindex'), lines: [...fr.querySelectorAll('#var-log li')].map((li) => li.textContent), show: !!fr.querySelector('#var-show'), btn: fr.querySelector('#var-show') ? r(fr.querySelector('#var-show')) : null,
           delay: parseFloat(fr.querySelector('.var-mark').style.animationDelay), kind: fr.dataset.kind, verdict: fr.dataset.verdict, box: r(fr),
           border: getComputedStyle(fr).borderTopColor, bg: getComputedStyle(fr).backgroundColor, weights: [...fr.querySelectorAll('#var-log li')].map((li) => +getComputedStyle(li).fontWeight), sizes: [...fr.querySelectorAll('#var-log li')].map((li) => parseFloat(getComputedStyle(li).fontSize)),
-          hit: (() => { const q = r(sb), el = document.elementFromPoint((q.l + q.r) / 2, (q.t + q.b) / 2); return !!el?.closest('#var-frame'); })() } : null,
+          hit: (() => { const q = r(sb), el = document.elementFromPoint((q.l + q.r) / 2, (q.t + q.b) / 2); return !!el?.closest('#var-frame'); })(),
+          // stillingen og minuttet er ALTID synlige: elementet midt i #score/#minute er elementet selv (eller dets tekst) – ikke rammen
+          scoreHit: ['score', 'minute'].every((id) => { const x = document.getElementById(id), q = r(x), el = document.elementFromPoint((q.l + q.r) / 2, (q.t + q.b) / 2); return el === x || x.contains(el); }),
+          ff: $('#feed-filters') ? r($('#feed-filters')).t : null } : null,
+        names: [$('#scoreboard strong')?.textContent ?? '', $('#scoreboard .right strong')?.textContent ?? ''],
+        stray: [...document.querySelectorAll('#match-center [role="status"], #match-center [aria-live]')].length,
         geo: board ? { board: r(board), sb: r(sb), tl: tl ? r(tl) : null, next: board.nextElementSibling ? board.nextElementSibling.getBoundingClientRect().top : null } : null,
         scoreOp: $('#score') ? +getComputedStyle($('#score')).opacity : null,
         sr: (() => { const q = document.getElementById('live-status').getBoundingClientRect(); return { w: q.width, h: q.height, pos: getComputedStyle(document.getElementById('live-status')).position }; })(),
@@ -2097,7 +2109,7 @@ try {
     });
     const oracle = (p) => p.evaluate(() => {
       const s = JSON.parse(localStorage.getItem('tactivar_save')), m = s.league.lastRound.matches[0];
-      return { events: m.events.map((e) => ({ type: e.type, isHome: e.isHome, hG: e.hG, aG: e.aG, text: e.text, var: e.var ?? null })), homeId: m.homeId, awayId: m.awayId, mine: s.league.teams.find((t) => !t.isBot).id };
+      return { events: m.events.map((e) => ({ type: e.type, isHome: e.isHome, hG: e.hG, aG: e.aG, text: e.text, var: e.var ?? null })), homeId: m.homeId, awayId: m.awayId, homeName: m.homeName, awayName: m.awayName, mine: s.league.teams.find((t) => !t.isBot).id };
     });
     const ticks = async (p, n) => { for (let i = 0; i < n; i++) await p.clock.runFor(TICK); };
 
@@ -2107,8 +2119,11 @@ try {
       const { p, egne } = A;
       await p.click('#play-round');
       const D = await oracle(p), evs = D.events, n = evs.length, own = (home) => (home ? D.homeId : D.awayId) === D.mine;
-      const frameOf = (L) => { for (let s = L; s >= Math.max(0, L - 6); s--) { const e = evs[s]; if (!STARTS.has(e.type) || !e.var) continue; const one = oneStepOf(e), v = one ? s : s + 1 < n ? s + 1 : null; return L <= (v ?? s) + 5 ? { s, one, v, e, reached: v != null && L >= v } : null; } return null; };
-      const F = { frame: [], score: [], fx: [], tone: [], hold: [], delay: [], geo: [], css: [] }, seen = { two: 0, one: 0, hold: 0, ownGoalTicks: 0, flash: 0, pendingTicks: 0, bip: 0 };
+      // Lukke-reglen (v3.32.2-rettelsen): et nyt GOAL/HEADER_GOAL/RED EFTER kendelsen lukker rammen før de 5 tick
+      const frameOf = (L, close = true) => { for (let s = L; s >= Math.max(0, L - 6); s--) { const e = evs[s]; if (!STARTS.has(e.type) || !e.var) continue; const one = oneStepOf(e), v = one ? s : s + 1 < n ? s + 1 : null;
+        if (L > (v ?? s) + 5) return null; if (close) for (let j = (v ?? s) + 1; j <= L; j++) if (CLOSES.has(evs[j].type)) return null; return { s, one, v, e, reached: v != null && L >= v }; } return null; };
+      const teamOf = (home) => (home ? D.homeName : D.awayName);
+      const F = { frame: [], score: [], fx: [], tone: [], hold: [], delay: [], geo: [], css: [], vtone: [] }, seen = { two: 0, one: 0, hold: 0, ownGoalTicks: 0, flash: 0, pendingTicks: 0, bip: 0, closed: 0, good: 0, bad: 0 };
       const s0 = await snap(p), startAc = { n: s0.ac, resumes: s0.resumes, tones: s0.tones };
       const expectedLive = []; let said = null, prev = s0, L = 0, hold = 0, t0 = { s: null, tick: 0 }, base = null;
       const verify = (L, snapNow, step, tick, before) => {
@@ -2124,29 +2139,44 @@ try {
         else if (!snapNow.frame) F.frame.push(`${tag} ramme mangler (tjek ${fr.s})`);
         else {
           const f = snapNow.frame, lines = f.lines;
-          if (f.role !== 'status' || f.tabindex !== '-1') F.frame.push(`${tag} role/tabindex ${f.role}/${f.tabindex}`);
+          if (f.role !== 'group' || f.label !== 'VAR-tjek' || f.tabindex !== '-1') F.frame.push(`${tag} role/aria-label/tabindex ${f.role}/${f.label}/${f.tabindex}`);
+          if (snapNow.stray !== 0) F.frame.push(`${tag} ${snapNow.stray} role=status/aria-live i Match Center (#live-status er eneste annoncør)`);
           if (f.cls.split(' ').includes('reached') !== fr.reached) F.frame.push(`${tag} reached-klasse ${f.cls} vs ${fr.reached}`);
           if (f.show !== (!fr.reached && !fr.one)) F.frame.push(`${tag} "Vis kendelsen ›" ${f.show} vs ${!fr.reached && !fr.one}`);
           if (f.kind !== fr.e.var.kind || f.verdict !== (fr.reached ? fr.e.var.verdict : '')) F.frame.push(`${tag} data ${f.kind}/${f.verdict}`);
           const first = fr.e.type === 'VAR_PEN' && fr.e.var.verdict === 'AWARDED' ? `📺 Straffe til ` : fr.one ? '📺 VAR kalder dommeren ud: rødt kort?' : `📺 VAR tjekker: ${QUESTION[fr.e.var.kind]}`;
           if (!lines[0]?.startsWith(first)) F.frame.push(`${tag} første linje "${lines[0]}" vs "${first}"`);
           const verdictRe = /^(✅|❌|🟨|🟥 Rødt står)/;
-          if (fr.reached && !fr.one) { const want = VERDICT[`${fr.e.type}:${fr.e.var.verdict}`]; if (lines.at(-1) !== want) F.frame.push(`${tag} kendelse "${lines.at(-1)}" vs "${want}"`); if (lines.length < 2) F.frame.push(`${tag} for få linjer`); }
+          if (fr.reached && !fr.one) { const want = VERDICT[`${fr.e.type}:${fr.e.var.verdict}`](teamOf(fr.e.isHome)); if (lines.at(-1) !== want) F.frame.push(`${tag} kendelse "${lines.at(-1)}" vs "${want}"`); if (lines.length < 2) F.frame.push(`${tag} for få linjer`); }
+          // tonen: KUN kendelseslinjen (den sidste – den første ved dømt straffe) er farvet, grøn hvis god for DIT hold
+          const vi = fr.e.type === 'VAR_PEN' && fr.e.var.verdict === 'AWARDED' ? 0 : fr.reached ? lines.length - 1 : -1;
+          const wantTone = vi < 0 ? null : GOOD[fr.e.var.verdict] === own(fr.e.isHome) ? 'good' : 'bad';
+          const toneNow = f.tones.map((t) => t.replace('v-', ''));
+          if (JSON.stringify(toneNow) !== JSON.stringify(lines.map((_, i) => (i === vi ? wantTone : '')))) F.vtone.push(`${tag} toner ${JSON.stringify(toneNow)} vs ${wantTone}@${vi}`);
+          if (vi >= 0 && f.liColor[vi] !== (wantTone === 'good' ? 'rgb(110, 231, 183)' : 'rgb(252, 165, 165)')) F.vtone.push(`${tag} farve ${f.liColor[vi]} (${wantTone})`);
+          if (vi >= 0) seen[wantTone]++;
           if (!fr.reached && lines.some((l) => verdictRe.test(l) || /annulleret|står$|Ingen straffe|bliver gult/.test(l))) F.frame.push(`${tag} kendelse for tidligt: ${lines}`);
-          if (fr.one && fr.e.type === 'VAR_RED' && lines.at(-1) !== '🟥 Opgraderet til rødt') F.frame.push(`${tag} ét-trins rødt: ${lines}`);
+          if (fr.one && fr.e.type === 'VAR_RED' && lines.at(-1) !== VERDICT['VAR_RED:UPGRADED'](teamOf(fr.e.isHome))) F.frame.push(`${tag} ét-trins rødt: ${lines}`);
+          if (fr.one && fr.e.type === 'VAR_PEN' && lines[0] !== `📺 Straffe til ${teamOf(fr.e.isHome)}`) F.frame.push(`${tag} ét-trins straffe: ${lines}`);
           if (lines.some((l) => l === fr.e.text || (evs[fr.v ?? fr.s].text && l === evs[fr.v ?? fr.s].text))) F.frame.push(`${tag} ev.text i rammen`);
           if (t0.s !== fr.s) t0 = { s: fr.s, tick };
           const wantDelay = -(((tick - t0.tick) * TICK) % 1000);
           if (Math.abs(f.delay - wantDelay) > 1) F.delay.push(`${tag} delay ${f.delay} vs ${wantDelay}`);
           const g = snapNow.geo;
-          if (!(f.box.t <= g.sb.t + 1 && f.box.b >= g.tl.b - 1 && f.box.l >= g.board.l - 1 && f.box.r <= g.board.r + 1)) F.geo.push(`${tag} ramme ${JSON.stringify(f.box)} vs tavle ${JSON.stringify(g.board)} / tidslinje ${JSON.stringify(g.tl)}`);
-          if (!f.hit) F.geo.push(`${tag} rammen ligger ikke over stillingen`);
+          // v3.32.2-rettelsen: rammen står UNDER stillingen (over tidslinjen), inden i tavlen – stillingen og minuttet er altid synlige
+          if (!(f.box.t >= g.sb.b - 1 && f.box.t <= g.tl.t + 1 && f.box.b >= g.tl.b - 1 && f.box.l >= g.board.l - 1 && f.box.r <= g.board.r + 1)) F.geo.push(`${tag} ramme ${JSON.stringify(f.box)} vs stilling ${JSON.stringify(g.sb)} / tidslinje ${JSON.stringify(g.tl)}`);
+          if (f.hit || !f.scoreHit) F.geo.push(`${tag} rammen dækker stillingen/minuttet`);
+          if (f.ff == null || f.box.b > f.ff + 0.5) F.geo.push(`${tag} rammen løber ind over filterrækken: ${f.box.b} > ${f.ff}`);
+          if (f.box.r - f.box.l > 704.5) F.geo.push(`${tag} rammen er ${f.box.r - f.box.l} px bred (> 44rem)`);
+          if (f.need > f.cH + 0.5) F.geo.push(`${tag} indholdet (${f.need}) er højere end rammen (${f.cH}) – klippet`);
+          if (f.vbox && (f.vbox.b > f.box.b + 0.5 || f.vbox.t < f.box.t)) F.geo.push(`${tag} kendelseslinjen står uden for rammen`);
           if (f.btn && f.box.r - f.btn.r > 16) F.geo.push(`${tag} "Vis kendelsen ›" står ikke til højre: ${f.box.r} vs ${f.btn.r}`);
           if (base != null && Math.abs(g.next - base) > 1) F.geo.push(`${tag} siden skubbet: ${base} -> ${g.next}`);
           const key = `${fr.s}:${fr.reached}`;
           if (key !== said) { said = key; expectedLive.push(fr.reached ? lines.at(-1) : lines[0]); }
           if (fr.one) seen.one++; else if (fr.reached && fr.v === L) seen.two++;
         }
+        if (!fr && frameOf(L, false)) seen.closed++;   // lukket før tid af et nyt mål/rødt (tælles i data-tjekket)
         if (!fr && base == null && snapNow.geo) base = snapNow.geo.next;
         if (snapNow.sr.w > 1 || snapNow.sr.h > 1 || snapNow.sr.pos !== 'absolute') F.css.push(`${tag} #live-status er synlig: ${JSON.stringify(snapNow.sr)}`);
         if (fr && snapNow.frame) {
@@ -2186,14 +2216,15 @@ try {
         prev = now;
       }
       const dumpF = (k) => `${F[k].length}: ${F[k].slice(0, 3).join(' || ')}`;
-      check('v3.32.2 TM e2e: data i runden (tvungne VAR-tjek) – mindst ét to-trins tjek med pause, fx og lyd at måle på', seen.two >= 1 && seen.hold >= 4 && seen.pendingTicks >= 1 && seen.bip >= 1 && n > 20, JSON.stringify({ ...seen, n }));
-      check('v3.32.2 TM e2e: rammen følger HVER hændelse – til stede fra tjek til kendelse + 5, role=status, rigtig første linje, kendelsen først ved kendelsen, aldrig ev.text', F.frame.length === 0, dumpF('frame'));
+      check('v3.32.2 TM e2e: data i runden (tvungne VAR-tjek) – mindst ét to-trins tjek med pause, fx og lyd at måle på', seen.two >= 1 && seen.closed >= 1 && seen.hold >= 4 && seen.pendingTicks >= 1 && seen.bip >= 1 && n > 20, JSON.stringify({ ...seen, n }));
+      check('v3.32.2 TM e2e: rammen følger HVER hændelse – til stede fra tjek til kendelse + 5 (lukket før tid af et nyt mål/rødt), role=group "VAR-tjek", rigtig første linje, kendelsen med holdnavn først ved kendelsen, aldrig ev.text', F.frame.length === 0, dumpF('frame'));
+      check('v3.32.2-rettelsen e2e: kendelseslinjen (og kun den) er grøn, når den er god for dit hold, ellers rød – begge forekommer', F.vtone.length === 0 && seen.good >= 1 && seen.bad >= 1, `${dumpF('vtone')} ${JSON.stringify({ good: seen.good, bad: seen.bad })}`);
       check('v3.32.2 TM e2e: pausen – mellem tjek og kendelse (4 tick) tegnes intet om: stilling, minut, ramme, toner og #live-status uændrede', F.hold.length === 0, dumpF('hold'));
       check('v3.32.2 TM e2e: stillingen er hændelsens tal; "?" (og score-pending) står KUN under et mål-tjek før kendelsen – også i kampkortet', F.score.length === 0, dumpF('score'));
       check('v3.32.2 TM e2e: rystelse kun ved dit endelige mål/rødt, flash rød ved dit annullerede mål og grøn ved deres – ellers intet', F.fx.length === 0, dumpF('fx'));
       check('v3.32.2 TM e2e: lyden pr. hændelse – bip (2 × 880 firkant) ved hvert tjek, jubel (3 savtakstoner) ved DIT mål, intet ved deres mål', F.tone.length === 0, dumpF('tone'));
       check('v3.32.2 TM e2e: pulsens animation-delay er negativ fra rammens første tegning (ikke forfra ved hver gentegning)', F.delay.length === 0, dumpF('delay'));
-      check('v3.32.2 TM e2e: rammen er et overlay – inden i tavlen, over stillingen og tidslinjen, ligger øverst og skubber ikke siden', F.geo.length === 0, dumpF('geo'));
+      check('v3.32.2 TM e2e: rammen står under stillingen (over tidslinjen), stillingen og minuttet er synlige, ≤ 44rem, ikke over filterrækken, intet klippet – og den skubber ikke siden', F.geo.length === 0, dumpF('geo'));
       check('v3.32.2 TM e2e: CSS i brug – #live-status er skjult (sr-only), "?"-stillingen nedtonet, rammens kant skifter ved kendelsen, baggrunden dækker, kendelseslinjen er fremhævet', F.css.length === 0, dumpF('css'));
       const kf = await p.evaluate(() => {
         const out = {};
@@ -2222,6 +2253,7 @@ try {
       const stopsBefore = after.stopsNow, tonesBefore = after.tones.length;
       await p.click('#play-round');
       const nxt = await snap(p);
+      check('v3.32.2-rettelsen e2e: #live-status tømmes, når en ny runde starter live (forrige rundes kendelse står ikke over den nye)', fin.live !== '' && after.live === fin.live && nxt.live === '', JSON.stringify({ fin: fin.live, nxt: nxt.live }));
       check('v3.32.2 TM e2e: ny runde – det gamle slutfløjt stoppes, ét nyt fløjt, og samme AudioContext (ikke oprettet igen, ikke genoptaget igen)',
         nxt.stopsNow === stopsBefore + 3 && nxt.tones.length === tonesBefore + 1 && nxt.ac === 1 && nxt.resumes === 1, JSON.stringify({ stops: [stopsBefore, nxt.stopsNow], tones: [tonesBefore, nxt.tones.length], ac: nxt.ac, resumes: nxt.resumes }));
       const D2 = await oracle(p);
@@ -2242,8 +2274,12 @@ try {
       await p.click('#play-round');
       const D = await oracle(p);
       await ticks(p, 2);
+      const before0 = await snap(p);
+      await p.click('#tab-kamp');   // Kamp → Kamp: intet stoppes
       const before = await snap(p);
       await p.click('#tab-liga');
+      const left = await snap(p);
+      check('v3.32.2-rettelsen e2e: at forlade Kamp stopper de ventende toner (fløjtet: stop() uden tid) – Kamp → Kamp stopper intet', before0.stopsNow === 0 && before.stopsNow === 0 && left.stopsNow === 1, JSON.stringify({ a: before0.stopsNow, kamp: before.stopsNow, liga: left.stopsNow }));
       await ticks(p, D.events.length * 7 + 10);
       const aft = await snap(p);
       check('v3.32.2 TM e2e: lyd udenfor Kamp – efter et fanebyt midt i runden kommer ingen bip, jubel eller slutfløjt', before.tones.length === 1 && aft.tones.length === 1, JSON.stringify({ b: before.tones.length, a: aft.tones.length }));
@@ -2274,6 +2310,10 @@ try {
       await ticks(p, 1);
       const nx = await snap(p), e2 = evs[idx + 2];
       check('v3.32.2 TM e2e: efter knappen går afspilningen videre ét tick ad gangen (ingen ny pause)', nx.score.startsWith(`${e2.hG} - ${e2.aG}`) && nx.playing, nx.score);
+      // Fokus-fallback (v3.32.2-rettelsen): fokus står i rammen – når rammen forsvinder, går det til ⚡ (ikke tabt til <body>)
+      let gone = null, inFrame = nx.active;
+      for (let k = 0; k < 40 && !gone; k++) { await ticks(p, 1); const q = await snap(p); if (q.frame) inFrame = q.active; else gone = q; }
+      check('v3.32.2-rettelsen e2e: fokus i rammen → rammen forsvinder → fokus på ⚡ (#skip)', inFrame === 'var-frame' && gone?.playing && gone.active === 'skip', JSON.stringify({ inFrame, gone: gone?.active, playing: gone?.playing }));
       await p.click('#skip');
       const sk = await snap(p);
       await ticks(p, 40);
@@ -2294,6 +2334,31 @@ try {
       const hh = await D.p.evaluate(() => ['skip', 'sound-toggle'].map((id) => Math.round(document.getElementById(id).getBoundingClientRect().height)));
       check(`v3.32.2 TM e2e (${w} px): ⚡ og lydkontakten er ${ok ? '≥ 44 px' : 'under 44 px (reglen gælder kun til og med 600)'}`, ok ? hh.every((x) => x >= 44) : hh.every((x) => x < 44), JSON.stringify(hh));
       await D.c.close();
+    }
+
+    // ---- E (v3.32.2-rettelsen, QC/Spilfører UI): rammen ved 390 og 1366 px tick for tick – stillingen og minuttet altid synlige,
+    // rammen ikke ind over filterrækken, ≤ 44rem (704 px) bred, intet klippet, og siden skubbes ikke ----
+    for (const [w, ht] of [[390, 844], [1366, 900]]) {
+      const E = await mk({ width: w, height: ht });
+      const { p, egne } = E;
+      await p.click('#play-round');
+      const bad = [], st = { frames: 0, maxW: 0, minGap: Infinity, next: new Set() };
+      for (let k = 0; k < 900; k++) {
+        const q = await snap(p);
+        if (!q.playing) break;
+        if (q.geo?.next != null) st.next.add(Math.round(q.geo.next));
+        if (q.frame) {
+          const f = q.frame; st.frames++; st.maxW = Math.max(st.maxW, f.box.r - f.box.l); st.minGap = Math.min(st.minGap, f.ff - f.box.b);
+          if (!f.scoreHit || f.hit) bad.push(`t${k} stillingen/minuttet dækket`);
+          if (f.ff == null || f.box.b > f.ff + 0.5) bad.push(`t${k} bund ${f.box.b} > filterrækken ${f.ff}`);
+          if (f.box.r - f.box.l > 704.5) bad.push(`t${k} bredde ${f.box.r - f.box.l}`);
+          if (f.need > f.cH + 0.5) bad.push(`t${k} klippet: ${f.need} > ${f.cH} (${f.lines.join(' / ')})`);
+        }
+        await p.clock.runFor(TICK);
+      }
+      check(`v3.32.2-rettelsen e2e (${w} px): rammen dækker aldrig stillingen/minuttet, når ikke filterrækken, er ≤ 704 px bred og klipper intet – siden skubbes ikke (data: ≥ 3 tick med ramme)`,
+        bad.length === 0 && st.frames >= 3 && st.next.size === 1 && egne.length === 0, JSON.stringify({ bad: bad.slice(0, 3), frames: st.frames, maxW: st.maxW, minGap: st.minGap, next: [...st.next], egne }));
+      await E.c.close();
     }
   }
 

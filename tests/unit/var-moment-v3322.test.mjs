@@ -72,13 +72,15 @@ test('varLog i hver gren: spørgsmålet, de navngivne spillere (de samme som mot
     const k = `${e.type}:${e.var.kind}:${e.var.verdict}`; seen.add(k);
     if (seq.oneStep) {
       if (e.var.verdict === 'AWARDED') { assert.deepEqual(after, [`📺 Straffe til ${team(e.isHome)}`, `${name(c.checked)} fældet af ${name(c.fouler)}`]); assert.ok(e.text.includes(`${name(c.checked)} blev fældet i feltet af ${name(c.fouler)}`)); }
-      else assert.deepEqual(after, ['📺 VAR kalder dommeren ud: rødt kort?', `${name(c.checked)} tjekkes`, '🟥 Opgraderet til rødt']);
+      else assert.deepEqual(after, ['📺 VAR kalder dommeren ud: rødt kort?', `${name(c.checked)} tjekkes`, `🟥 Opgraderet: rødt til ${team(e.isHome)}`]);
       continue;
     }
     // Kendelsen står ikke på tjek-tick'et – og er den sidste linje bagefter
     assert.ok(!before.some((l) => VERDICT_LINE.test(l)), `${k}: ${before}`);
     assert.deepEqual(after.slice(0, -1), before); assert.match(after.at(-1), VERDICT_LINE);
-    const WORD = { 'VAR_CHECK:STANDS': '✅ Målet står', 'VAR_CHECK:OVERTURNED': '❌ Målet annulleret', 'VAR_PEN:STANDS': '✅ Straffen står', 'VAR_PEN:OVERTURNED': '❌ Ingen straffe', 'VAR_RED:CONFIRMED': '🟥 Rødt står', 'VAR_RED:DOWNGRADED': '🟨 Rødt bliver gult' };
+    // v3.32.2-rettelsen: kendelsen nævner holdet (t = team(isHome))
+    const t = team(e.isHome), g = /[sxz]$/i.test(t) ? `${t}'` : `${t}s`;
+    const WORD = { 'VAR_CHECK:STANDS': `✅ ${g} mål står`, 'VAR_CHECK:OVERTURNED': `❌ ${g} mål annulleret`, 'VAR_PEN:STANDS': `✅ Straffen til ${t} står`, 'VAR_PEN:OVERTURNED': `❌ Ingen straffe til ${t}`, 'VAR_RED:CONFIRMED': `🟥 Rødt til ${t} står`, 'VAR_RED:DOWNGRADED': `🟨 Rødt til ${t} bliver gult` };
     assert.equal(after.at(-1), WORD[`${e.type}:${e.var.verdict}`], k);
     const Q = { OFFSIDE: 'offside?', FOUL: 'skub i opspillet?', DIVE: 'filmning?', RED: 'rødt kort?' };
     assert.equal(before[0], `📺 VAR tjekker: ${Q[e.var.kind]}`);
@@ -144,7 +146,8 @@ test('rammen: fra tjekket til kendelsen + 5 tick; kendelsen IKKE på tjek-tick\'
       const lines = varLog(at.seq, false, castNames(m)); assert.equal(liveLine(lines, false), lines[0]);
     }
     const end = (seq.verdictAt) + FRAME_AFTER;
-    if (end < ev.length && !ev.slice(i + 1, end + 2).some((x) => STARTS.has(x.type))) { assert.equal(varFrame(ev, end)?.seq.check, i); assert.equal(varFrame(ev, end + 1), null, 'rammen går væk'); }
+    // (et nyt mål/rødt efter kendelsen lukker rammen før tid – v3.32.2-rettelsen, var-moment-v3322-fix.test.mjs)
+    if (end < ev.length && !ev.slice(i + 1, end + 2).some((x) => STARTS.has(x.type)) && !ev.slice(seq.verdictAt + 1, end + 1).some((x) => ['GOAL', 'HEADER_GOAL', 'RED'].includes(x.type))) { assert.equal(varFrame(ev, end)?.seq.check, i); assert.equal(varFrame(ev, end + 1), null, 'rammen går væk'); }
   }
   assert.ok(two >= 50 && one >= 10, `data: ${two} to-trins, ${one} ét-trins`);
   assert.equal(FRAME_AFTER, 5);
@@ -194,14 +197,16 @@ const on = { snapshot() {}, view() {}, filter() {}, skip() {}, replay() {}, heat
 const live = (m, shownCount, extra = {}) => ({ round: 1, matches: [m], gazette: null, viewIdx: 0, filter: 'all', shownCount, playing: true, canSend: false, sent: [], ...extra });
 const draw = (m, me, mc, sound = false) => { clearReplays(); return renderMatchCenter({ mc, myTeamId: me.id, on, sound }); };
 
-test('Match Center: rammen over stillingen med role="status" – på tjek-tick\'et spørgsmålet, "?" ved stillingen og "Vis kendelsen ›"; ved kendelsen kendelsen og ingen knap', () => {
+test('Match Center: rammen under stillingen (zonen .mc-live med tidslinjen) med role="group" – på tjek-tick\'et spørgsmålet, "?" ved stillingen og "Vis kendelsen ›"; ved kendelsen kendelsen og ingen knap', () => {
   let n = 0;
   for (const { m, me, i, e, seq } of seqs()) {
     if (e.type !== 'VAR_CHECK' || n >= 12) continue;
     n++;
     const r = draw(m, me, live(m, i + 1)), fr = byId(r, 'var-frame');
-    assert.ok(fr, 'rammen'); assert.equal(fr.attrs.role, 'status');
-    assert.ok(byId(r, 'mc-board').children.includes(fr), 'rammen ligger i stillingens boks (overlay)');
+    assert.ok(fr, 'rammen'); assert.equal(fr.attrs.role, 'group'); assert.equal(fr.attrs['aria-label'], 'VAR-tjek');
+    const zone = byId(r, 'mc-live'), board = byId(r, 'mc-board');
+    assert.ok(zone.children.includes(fr) && board.children.includes(zone) && !board.children.includes(fr), 'rammen ligger i zonen under stillingen');
+    assert.ok(board.children.indexOf(byId(board, 'scoreboard')) < board.children.indexOf(zone), 'zonen står efter stillingen');
     const log = byId(r, 'var-log').children.map((li) => li.textContent);
     assert.deepEqual(log, varLog(seq, false, castNames(m), (h) => (h ? m.homeName : m.awayName)));
     assert.ok(byId(r, 'var-show'), 'Vis kendelsen ›');

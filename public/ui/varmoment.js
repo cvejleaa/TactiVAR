@@ -1,4 +1,4 @@
-// VAR-øjeblikket (v3.32.2, docs/spec.md §5 live og §10b): rammen over stillingen, pausen før kendelsen og kampens fx.
+// VAR-øjeblikket (v3.32.2, docs/spec.md §5 live og §10b): rammen under stillingen, pausen før kendelsen og kampens fx.
 // Rene funktioner – app.js og matchcenter.js tegner. Loggen bygges KUN af hændelsens type, var (kind/verdict/cast) og isHome
 // plus navnene fra karakterarket: aldrig ev.text (heller ikke for gamle kampe), aldrig taktik, kynisme, teater eller "fælden virkede".
 import { gen } from '../engine/clues.js';
@@ -22,12 +22,17 @@ export function varSequence(events, i) {
 
 // Rammen ved den senest viste hændelse (last = indeks i kampens hændelser): det seneste tjek, til og med kendelsen + FRAME_AFTER tick.
 // reached = kendelses-hændelsen er vist (først da står kendelseslinjen).
+// v3.32.2 (QC): rammen lukker før tid, når et nyt mål eller rødt kort vises EFTER kendelsen (ellers stod "Målet annulleret" over det
+// næste mål). Et nyt tjek afløser det gamle af sig selv: løkken går baglæns og finder det nyeste tjek først.
+const CLOSES = new Set(['GOAL', 'HEADER_GOAL', 'RED']);
 export function varFrame(events, last) {
   for (let i = Math.min(last, events.length - 1); i >= 0 && i >= last - FRAME_AFTER - 1; i--) {
     const seq = varSequence(events, i);
     if (!seq) continue;
-    const end = (seq.verdictAt ?? seq.check) + FRAME_AFTER;
-    return last <= end ? { seq, reached: seq.verdictAt != null && last >= seq.verdictAt } : null;
+    const from = seq.verdictAt ?? seq.check, end = from + FRAME_AFTER;
+    if (last > end) return null;
+    for (let j = from + 1; j <= last; j++) if (CLOSES.has(events[j]?.type)) return null;
+    return { seq, reached: seq.verdictAt != null && last >= seq.verdictAt };
   }
   return null;
 }
@@ -54,11 +59,28 @@ export function castNames(m) {
 }
 
 const QUESTION = { OFFSIDE: 'offside?', FOUL: 'skub i opspillet?', DIVE: 'filmning?', RED: 'rødt kort?' };
+// Kendelseslinjen (v3.32.2, QC/Spilfører UI): med holdnavnet (t = team(seq.isHome) – det angribende hold ved mål og straffe, holdet med
+// kortet ved rødt). Uden holdnavn (t tom) de korte ord.
 const VERDICT = {
-  VAR_CHECK: { STANDS: '✅ Målet står', OVERTURNED: '❌ Målet annulleret' },
-  VAR_PEN: { STANDS: '✅ Straffen står', OVERTURNED: '❌ Ingen straffe' },
-  VAR_RED: { CONFIRMED: '🟥 Rødt står', DOWNGRADED: '🟨 Rødt bliver gult', UPGRADED: '🟥 Opgraderet til rødt' },
+  VAR_CHECK: { STANDS: (t) => (t ? `✅ ${gen(t)} mål står` : '✅ Målet står'), OVERTURNED: (t) => (t ? `❌ ${gen(t)} mål annulleret` : '❌ Målet annulleret') },
+  VAR_PEN: { STANDS: (t) => (t ? `✅ Straffen til ${t} står` : '✅ Straffen står'), OVERTURNED: (t) => (t ? `❌ Ingen straffe til ${t}` : '❌ Ingen straffe') },
+  VAR_RED: { CONFIRMED: (t) => (t ? `🟥 Rødt til ${t} står` : '🟥 Rødt står'), DOWNGRADED: (t) => (t ? `🟨 Rødt til ${t} bliver gult` : '🟨 Rødt bliver gult'),
+    UPGRADED: (t) => (t ? `🟥 Opgraderet: rødt til ${t}` : '🟥 Opgraderet til rødt') },
 };
+// Er kendelsen god for dit hold? own(isHome) = dit hold. Mål/straffe står (og dømt straffe) er godt for holdet, der får dem; et rødt kort,
+// der står (eller opgraderes), er dårligt for holdet, der får det. 'v-good' | 'v-bad' – samme betydning som flashen; null ved ukendt.
+const GOOD_FOR_HOLDER = { STANDS: true, AWARDED: true, OVERTURNED: false, CONFIRMED: false, UPGRADED: false, DOWNGRADED: true };
+export function verdictTone(seq, own) {
+  const g = seq ? GOOD_FOR_HOLDER[seq.verdict] : undefined;
+  if (g === undefined) return null;
+  return g === !!own(seq.isHome) ? 'v-good' : 'v-bad';
+}
+// Hvilken linje i varLog er kendelsen (den der farves)? Dømt straffe (ét-trins): den første; ellers den sidste, når kendelsen er vist. -1 = ingen.
+export function verdictIndex(seq, reached, lines) {
+  if (!seq || !lines.length) return -1;
+  if (seq.type === 'VAR_PEN' && seq.verdict === 'AWARDED') return 0;
+  return reached && VERDICT[seq.type]?.[seq.verdict] ? lines.length - 1 : -1;
+}
 // Linjerne i rammen. name: id → navn (castNames); team: isHome → holdnavn. Kendelseslinjen kun, når kendelsen er vist (reached).
 export function varLog(seq, reached, name = () => null, team = () => '') {
   if (!seq) return [];
@@ -77,8 +99,18 @@ export function varLog(seq, reached, name = () => null, team = () => '') {
     else if (seq.kind === 'DIVE') out.push(`${who} tjekkes for filmning`);
     else out.push(`${who} tjekkes`);
   }
-  if (reached) { const v = VERDICT[seq.type]?.[seq.verdict]; if (v) out.push(v); }
+  if (reached) { const v = VERDICT[seq.type]?.[seq.verdict]; if (v) out.push(v(team(seq.isHome) || '')); }
   return out;
+}
+// Fokus efter en gentegning (renderMc): samme id, hvis det findes. Forsvinder "Vis kendelsen ›", får rammen fokus; forsvinder rammen
+// (fokus stod i den), går fokus til ⚡ (#skip) – findes den heller ikke (slutfløjt), flyttes intet. exists(id) → boolean.
+const IN_FRAME = new Set(['var-frame', 'var-show']);
+export function refocusId(id, exists) {
+  if (!id) return null;
+  if (exists(id)) return id;
+  if (id === 'var-show' && exists('var-frame')) return 'var-frame';
+  if (IN_FRAME.has(id) && exists('skip')) return 'skip';
+  return null;
 }
 // Skærmlæserens linje (#live-status): spørgsmålet ved tjekket, kendelsen ved kendelsen
 export const liveLine = (lines, reached) => (reached ? lines.at(-1) : lines[0]) ?? '';

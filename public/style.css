@@ -124,13 +124,18 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .timeline { position: relative; height: 1.6rem; background: #1e293b; border-radius: .3rem; margin: .5rem 0; }
 .tl-half { position: absolute; left: 50%; top: 0; bottom: 0; border-left: 1px dashed #64748b; }
 .tl-mark { position: absolute; transform: translateX(-50%); font-size: var(--fs-2); } .tl-mark.home { top: 0; } .tl-mark.away { bottom: 0; }
-/* v3.32.2 VAR-øjeblikket (ui/varmoment.js): rammen er et overlay over stillingen og tidslinjen – den skubber ikke siden */
+/* v3.32.2 VAR-øjeblikket (ui/varmoment.js): rammen står UNDER stillingen (#score og #minute er altid synlige) – oven på tidslinjen i
+   zonen .mc-live, der under afspilning har fast højde, så rammen hverken skubber siden eller løber ind over referatets filterrække */
 .mc-board { position: relative; border-radius: .3rem; }
-.varframe { position: absolute; top: 0; left: 0; right: 0; min-height: 100%; z-index: 5; display: flex; flex-wrap: wrap; align-items: flex-start; gap: .3rem .7rem;
+.mc-live { position: relative; }
+.mc-board.live .mc-live { height: 7rem; margin-bottom: .5rem; } @media (max-width: 600px) { .mc-board.live .mc-live { height: 9.5rem; } }
+.varframe { position: absolute; inset: 0; max-width: 44rem; margin-inline: auto; overflow: hidden; z-index: 5; display: flex; flex-wrap: wrap; align-items: flex-start; align-content: flex-start; gap: .3rem .7rem;
   background: #2e1065f2; border: 2px solid var(--lilla); border-radius: .3rem; padding: .45rem .7rem; box-shadow: 0 6px 18px #000a; }
+.var-log li:not(.verdict) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }   /* navnelinjerne giver plads – kendelsen klippes aldrig */
+.var-log li.v-good { color: #6ee7b7; border-left: 4px solid var(--grøn); padding-left: .4rem; } .var-log li.v-bad { color: #fca5a5; border-left: 4px solid var(--rød); padding-left: .4rem; }
 .varframe.reached { border-color: #c4b5fd; }
 .var-mark { background: var(--lilla); color: #fff; font-weight: 900; letter-spacing: .08em; padding: .1rem .45rem; border-radius: .25rem; animation: var-pulse 1000ms ease-in-out infinite; }
-.var-log { list-style: none; margin: 0; padding: 0; flex: 1 1 14rem; font-weight: 700; } .var-log li + li { font-weight: 400; }
+.var-log { list-style: none; margin: 0; padding: 0; flex: 1 1 14rem; min-width: 0; font-weight: 700; } .var-log li + li { font-weight: 400; }
 .varframe.reached .var-log li:last-child { font-weight: 900; font-size: var(--fs-3); }
 #var-show { margin-left: auto; }
 #score.score-pending { opacity: .55; }
