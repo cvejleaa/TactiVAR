@@ -62,3 +62,11 @@ fund der er rettet (så du ikke finder dem igen), hvad brugeren har valgt fra, o
   pause tjek→kendelse ~2,1 s; "Vis kendelsen ›" 44 px; siden hopper ikke.
 - Åbent: ét-trins kendelser (VAR_RED UPGRADED, VAR_PEN AWARDED) lukkes af deres EGEN følge-hændelse (RED/GOAL, CLOSES varmoment.js)
   → rammen står ~0,4 s (7167→7544 ms); zonen 152 px ved 390 er et tomt hul under tidslinjen i kampe uden VAR (126 px luft); rammens indhold maks 117 px af 152 (4 linjer offside, 6 VAR-kampe ved 390). Anbefalet: behold fast zone, fyld den.
+
+## Efter-gennemgang v3.32.3 Samspil på Taktik (2026-11-06) – scripts scratchpad/ui3323/{play,p2}.mjs (port 5370), billeder ui3323/
+- Godt (gå ikke efter igen): fokus-streger + naboringe virker ved 390/1366/1920; teksten i ord, stærkeste først, "Kender også … (bænk)";
+  ingen sidefejl efter 1/5/10 runder.
+- Fundet: "ca. 1 kampe" (chemistry.js:255/259); udelukket/skadet NABO står "stærkt" uden mærke (status kun for den valgte, :251);
+  forhåndsvisning for en udelukket/skadet starter er rød (−2 for hver bænkspiller) skønt motoren skifter ham ud alligevel (match.js:3);
+  R1 = "±0" i hver række (støj); 390: tal "−4"/"+1 −5" uden forklaring (title kan ikke ses ved tryk), #pick-msg fast 94–150 px
+  dækker 4 bænkrækker (y 626–720); beskeden op til 55 ord, "– samspil tæller kun, når de står som naboer" hver gang.

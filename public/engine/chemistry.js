@@ -3,6 +3,8 @@
 // team.chemistry = { "idA|idB": [samspil 0–100, sidste fælles runde] } (id'er sorteret). Rent modul: ingen rng, ingen import af
 // season.js. v3.23.0 er data uden virkning i kampene (PR-A); virkningen og visningen kommer samtidig i v3.24.0 (QC: ingen usynlig skat).
 import { FORMATIONS, lineOfRole } from './formations.js';
+import { matchBenchOf, unavailable } from './career.js';
+import { pl } from './clues.js';
 
 export const CHEM_MAX = 100;
 // Seedet: ligevægten for botternes opstillinger (QC: ikke et gæt – ellers drifter ligaen den første sæson). tools/measure-chemistry.mjs
@@ -171,8 +173,9 @@ function pairName(ra, rb) {
   return null;
 }
 // Holdets par i opstillingen lige nu (kun dem, motoren læser): navn (eller numrene, når navnet ikke er entydigt), værdi og bånd.
-export function lineupPairs(team, ref) {
-  const c = FORMATIONS[team.tactics.baseFormation] ?? FORMATIONS['4-4-2'], slots = team.tactics.lineupSlots, byId = new Map(team.squad.map((p) => [p.id, p]));
+// slots (v3.32.3): en anden opstilling end den gemte (byt-forhåndsvisningen) – standard er holdets egen.
+export function lineupPairs(team, ref, slots = team.tactics.lineupSlots) {
+  const c = FORMATIONS[team.tactics.baseFormation] ?? FORMATIONS['4-4-2'], byId = new Map(team.squad.map((p) => [p.id, p]));
   const raw = readPairs(team.tactics.baseFormation).map(([i, j]) => ({ i, j, a: byId.get(slots[i]), b: byId.get(slots[j]) })).filter((x) => x.a && x.b)
     .map((x) => { const v = chemOf(team, x.a.id, x.b.id); return { ...x, v, band: bandOf(v, ref), name: pairName(c[x.i].r, c[x.j].r) }; });
   const count = new Map(); for (const x of raw) if (x.name) count.set(x.name, (count.get(x.name) ?? 0) + 1);
@@ -181,12 +184,20 @@ export function lineupPairs(team, ref) {
 export const BAND_RANK = { fremmede: 0, finder: 1, sammen: 2, staerkt: 3 };
 // Det svageste par (legenden) – laveste bånd, så laveste værdi.
 export const weakestPair = (pairs) => pairs.slice().sort((x, y) => BAND_RANK[x.band] - BAND_RANK[y.band] || x.v - y.v)[0] ?? null;
-// Byt: de par, hvis bånd skiftede (QC: båndet, ikke point) – største fald først, højst 2. Par sammenlignes på pladserne.
-export function swapChanges(before, after) {
+// Byt: de par, hvis bånd skiftede (QC: båndet, ikke point) – største fald først. Par sammenlignes på pladserne.
+// v3.32.3 (Spilfører UI): et par med en skadet eller udelukket spiller – før ELLER efter – tæller ikke: han spiller ikke (motoren
+// skifter ham ud før kampen, match.js), så et "fald" ved at tage ham ud er intet tab, og et "løft" ved at sætte ham ind ingen gevinst.
+// ÉN regel for både beskeden efter byttet (swapChanges/withChem) og forhåndsvisningens tal (swapPreview, state/actions.js).
+const pairOut = (x) => [x.a, x.b].some((p) => p && unavailable(p));
+export function bandShifts(before, after) {
   const was = new Map(before.map((x) => [`${x.i}-${x.j}`, x]));
-  return after.map((x) => ({ x, w: was.get(`${x.i}-${x.j}`) })).filter(({ x, w }) => w && w.band !== x.band)
-    .sort((p, q) => (BAND_RANK[p.x.band] - BAND_RANK[p.w.band]) - (BAND_RANK[q.x.band] - BAND_RANK[q.w.band])).slice(0, 2)
-    .map(({ x, w }) => `${x.label}: ${BAND_WORD[w.band]} → ${BAND_WORD[x.band]}`);
+  return after.map((x) => ({ x, w: was.get(`${x.i}-${x.j}`) })).filter(({ x, w }) => w && w.band !== x.band && !pairOut(w) && !pairOut(x))
+    .map(({ x, w }) => ({ x, w, d: BAND_RANK[x.band] - BAND_RANK[w.band] })).sort((p, q) => p.d - q.d);
+}
+// Beskeden: højst 2 – og "… og N til", når flere par skiftede, så tal og tekst er enige (QC)
+export function swapChanges(before, after) {
+  const all = bandShifts(before, after), out = all.slice(0, 2).map(({ x, w }) => `${x.label}: ${BAND_WORD[w.band]} → ${BAND_WORD[x.band]}`);
+  return all.length > 2 ? [...out, `… og ${all.length - 2} til`] : out;
 }
 // En spillers par med hans naboer i opstillingen lige nu (bænk: ingen).
 export const playerPairs = (team, ref, pid) => lineupPairs(team, ref).filter((x) => x.a.id === pid || x.b.id === pid).map((x) => ({ ...x, mate: x.a.id === pid ? x.b : x.a }));
@@ -201,10 +212,74 @@ export function saleChemText(team, ref, pid) {
   return st.length ? `🤝 Stærkt samspil med ${st.map((x) => `#${x.mate.shirtNumber} ${x.mate.shortName}`).join(' og ')} – et salg bryder parret.` : null;
 }
 // Kampe fra fremmede til "spillet sammen" for en fast mand ved siden af de samme (købelinjen – regnet, ikke skrevet fast; QC).
-export function gamesToSettle(ref) {
-  let v = STRANGER, n = 0;
-  while (bandOf(v, ref) !== 'sammen' && bandOf(v, ref) !== 'staerkt' && n < 60) { v = v + K_GAIN * (CHEM_MAX - v); v = v - LEAK * (v - STRANGER); n++; }
+// v3.32.3: fra en anden værdi (from) og til et andet bånd (to) – fokusteksten på Taktik. 60 = når aldrig dertil (snit over loftet).
+export function gamesToSettle(ref, from = STRANGER, to = 'sammen') {
+  let v = from, n = 0;
+  while (BAND_RANK[bandOf(v, ref)] < BAND_RANK[to] && n < 60) { v = v + K_GAIN * (CHEM_MAX - v); v = v - LEAK * (v - STRANGER); n++; }
   return n;
+}
+
+// ---------- Samspil på Taktik (v3.32.3, brugeren 6/11: "Jeg kan ikke på taktik siden se, hvem den valgte spiller spiller godt
+// sammen med") – kun visning: ingen motorændring, intet nyt gemmefelt. docs/spec.md §5 "Visning".
+// Har parret spillet ved siden af hinanden? Seedet ("truppen har spillet sammen før") står på holdets seed-runde (den laveste runde
+// i tabellen) og kun falder; et par, der har spillet, har en senere runde – eller ligger over seedet (QC: en seedet ikke-nabo på 78
+// må ikke kaldes "spillet sammen" eller makker).
+// QC: reglen kan give falske NEGATIVER senere i sæsonen (et par, der spillede i seed-runden og siden er faldet tilbage til seedet,
+// regnes som "ikke spillet") – men aldrig falske POSITIVER: et par, der aldrig har spillet, står altid på seedet og seed-runden.
+function playedTogether(team, k) {
+  const e = team.chemistry?.[k];
+  if (!e) return false;
+  let seed = Infinity;
+  for (const v of Object.values(team.chemistry)) if (v[1] < seed) seed = v[1];
+  return e[1] > seed || e[0] > CHEM_BASE;
+}
+const whereOf = (team, id) => (team.tactics.lineupSlots.includes(id) ? 'start' : matchBenchOf(team).some((p) => p.id === id) ? 'bænk' : 'reserve');
+// Hans samspil: naboerne (KUN de læste par – samme som stregerne og kortet; angriber⇄angriber og målmanden står ikke) stærkeste
+// først, den svageste af dem, og andre markspillere i truppen, han har spillet sig sammen med (≥ "finder hinanden") – en tidligere
+// nabo, der kan genbruges ved et byt. Manglende par = fremmede (chemOf) – ingen fallback til seedet.
+export function partnersOf(team, ref, pid) {
+  const p = team.squad.find((x) => x.id === pid), slot = team.tactics.lineupSlots.indexOf(pid);
+  if (!p) return null;
+  const isGK = slot === 0 || (slot < 0 && p?.position === 'GK');
+  const neighbours = isGK ? [] : playerPairs(team, ref, pid).sort((x, y) => y.v - x.v || BAND_RANK[y.band] - BAND_RANK[x.band]);
+  // Hans naboer på banen – også dem, motoren ikke læser (angriber⇄angriber): de står allerede ved siden af ham, så de er ingen "kender også"
+  const slots = team.tactics.lineupSlots, near = new Set(slot > 0 ? neighbourPairs(team.tactics.baseFormation).filter(([i, j]) => i === slot || j === slot).map(([i, j]) => slots[i === slot ? j : i]) : []);
+  const others = isGK || !team.chemistry ? [] : team.squad.filter((o) => o.id !== pid && o.position !== 'GK' && !near.has(o.id) && !unavailable(o))   // QC: en skadet/udelukket kan ikke sættes ved siden af
+    .map((o) => ({ p: o, k: pairKey(pid, o.id) })).filter((x) => playedTogether(team, x.k))
+    .map(({ p: o, k }) => { const v = team.chemistry[k][0]; return { p: o, v, band: bandOf(v, ref), where: whereOf(team, o.id) }; })
+    .filter((x) => BAND_RANK[x.band] >= BAND_RANK.finder).sort((x, y) => y.v - x.v);
+  return { neighbours, weakest: weakestPair(neighbours), others, isGK, where: whereOf(team, pid),
+    sameBand: neighbours.length > 1 && neighbours.every((x) => x.band === neighbours[0].band) };
+}
+// Teksten i valgbeskeden (#pick-msg): KUN båndenes ord – aldrig et 0–100-tal. "fremmede" kun om nabopar (others er ≥ finder hinanden).
+const nm = (p) => `#${p.shirtNumber} ${p.shortName}`;
+// Status for en, der ikke spiller (samme regel som byt-tallene: career.js unavailable) – skadet står først
+const outStatus = (p) => (!unavailable(p) ? null : p.injuryMatchesLeft > 0 ? 'skadet' : 'udelukket');
+export function focusChemText(team, ref, pid) {
+  const p = team.squad.find((x) => x.id === pid), f = p ? partnersOf(team, ref, pid) : null;
+  if (!f) return null;
+  const nb = f.neighbours;
+  const st = outStatus(p), status = st === 'skadet' ? '(skadet – spiller ikke) ' : st ? `(${st}) ` : '';
+  const mark = (q) => (outStatus(q) ? ` (${outStatus(q)})` : '');   // en nabo, der ikke spiller: "#6 M. Bach stærkt (udelukket)"
+  if (f.isGK) return `🤝 ${status}Målmanden indgår ikke i samspil.`;
+  const games = (to) => { const ok = nb.filter((x) => !outStatus(x.mate)); if (!ok.length) return null;   // QC: kun naboer, der spiller
+    const n = Math.min(...ok.map((x) => gamesToSettle(ref, x.v, to))); return n > 0 && n < 60 ? n : null; };
+  let head;
+  if (f.sameBand && !nb.some((x) => outStatus(x.mate))) {   // en nabo, der ikke spiller, skal stå med navn og mærke
+    const band = nb[0].band, to = band === 'sammen' ? 'staerkt' : 'sammen', n = band === 'staerkt' ? null : games(to);
+    head = `Alle hans naboer: ${BAND_WORD[band]}` + (band === 'staerkt' ? '' : ` – samspil vokser kampe side om side${n ? ` (ca. ${pl(n, 'kamp', 'kampe')} til ${BAND_WORD[to]})` : ''}`);
+  } else if (nb.length) {
+    head = `Med ${nb.length === 1 ? 'naboen' : 'naboerne'}: ${nb.map((x) => `${nm(x.mate)} ${BAND_WORD[x.band]}${mark(x.mate)}`).join(' · ')}`;
+    // Spilfører UI 3 (kortere ved 390): navnet står allerede i listen – kun nummeret gentages
+    if (nb.length > 1) head += ` · svagest: #${f.weakest.mate.shirtNumber}`;
+    if (!nb.some((x) => x.band === 'staerkt')) { const n = games('staerkt'); head += ` · Ingen stærke par endnu${n ? ` – ca. ${pl(n, 'kamp', 'kampe')} mere side om side` : ''}`; }
+  } else head = f.where === 'start' ? 'Ingen af hans naboer tæller i samspillet' : `På ${f.where === 'bænk' ? 'bænken' : 'reserven'}${f.others.length ? '' : ' – ingen naboer på banen'}`;
+  // "Kender også" (Spilfører UI 3: forklaringen står kun her, én gang) – med vejen dertil (QC 5): et klik på #8 nu ville bytte HAM ud for #8
+  const o = f.others.slice(0, 2), on = o.filter((x) => x.where === 'start'), nums = (l) => l.map((x) => `#${x.p.shirtNumber}`).join(' eller ');
+  const way = f.where === 'start' ? `vælg en af hans naboer, klik så på ${nums(o)}`
+    : on.length ? `klik på en brik ved siden af ${nums(on)}` : 'samspil tæller kun, når de står som naboer';
+  const also = o.length ? `Kender også ${o.map((x) => `${nm(x.p)} (${BAND_WORD[x.band]}, ${x.where})`).join(' og ')} – ${way}` : null;
+  return `🤝 ${status}${[head, also].filter(Boolean).join(' · ')}`;
 }
 
 // Bånd-skift efter runden (v3.24.2, Spilfører UI/QC): dit holds par i opstillingen, der blev stærke – kun når de spillede sammen

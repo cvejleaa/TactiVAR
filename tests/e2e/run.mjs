@@ -1052,6 +1052,8 @@ try {
     await c.close();
   };
   if (process.env.F2_ONLY) { await f2(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun F2-blokken (kortpanelet – hurtig mutationskørsel)
+  if (process.env.TM_V3323_ONLY) { await v3323tm(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); console.log(fejl.join(' | ')); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun Test Managers v3.32.3-blok
+  if (process.env.V3323_ONLY) { await v3323(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); console.log(fejl.join(' | ')); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun v3.32.3-blokken (samspil på Taktik)
   if (process.env.TM_V3320_ONLY) { await v3320tm(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); console.log(fejl.join(' | ')); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun Test Managers v3.32.0-blok
   if (process.env.TM_V3312_ONLY) { await v3312tm(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); console.log(fejl.join(' | ')); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun Test Managers v3.31.2-blok
   if (process.env.V3312_ONLY) { await v3312(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); console.log(fejl.join(' | ')); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun v3.31.2-blokken
@@ -1254,12 +1256,12 @@ try {
     let b0 = (await benchIds())[0];
     let info = await prep(swapBody, { bench: b0 }); await reload();
     await p.locator(`#bench tr.bench-p[data-pid="${b0}"]`).click(); await p.click('#pitch .token[data-slot="2"]');
-    const want1 = `🤝 Midtstopper-parret: spillet sammen → fremmede · ${info.X} og ${info.s6}: spillet sammen → fremmede`;
-    check('Samspil-byt: bænkspiller i listen → brik på banen – beskeden nævner de to største fald, største først, og ikke det tredje (finder hinanden)', (await msg()) === want1, `${await msg()} | ${want1}`);
+    const want1 = `🤝 Midtstopper-parret: spillet sammen → fremmede · ${info.X} og ${info.s6}: spillet sammen → fremmede · … og 1 til`;   // v3.32.3: det tredje som "… og 1 til"
+    check('Samspil-byt: bænkspiller i listen → brik på banen – beskeden nævner de to største fald, største først, og det tredje kun som "… og 1 til"', (await msg()) === want1, `${await msg()} | ${want1}`);
     await reload(); b0 = (await benchIds())[0];
     info = await prep(swapBody, { bench: b0 }); await reload();
     await p.click('#pitch .token[data-slot="2"]'); await p.locator(`#bench tr.bench-p[data-pid="${b0}"]`).click();
-    check('Samspil-byt: brik på banen → bænkspiller i listen giver samme besked (pickForSwap-vejen)', (await msg()) === `🤝 Midtstopper-parret: spillet sammen → fremmede · ${info.X} og ${info.s6}: spillet sammen → fremmede`, await msg());
+    check('Samspil-byt: brik på banen → bænkspiller i listen giver samme besked (pickForSwap-vejen)', (await msg()) === `🤝 Midtstopper-parret: spillet sammen → fremmede · ${info.X} og ${info.s6}: spillet sammen → fremmede · … og 1 til`, await msg());
     // Ligaens snit 84 og alle par på 84 (= "spillet sammen"); 62 er "finder hinanden" ved 84 – men ved snit 78 var 84 "stærkt" og beskeden "stærkt → finder hinanden" (withChem skal bruge ligaens snit)
     info = await prep('set(s[1], s[3], 62); return { a: sh(s[1]), b: sh(s[3]) };', { ref: 84, base: 84 }); await reload();
     await p.click('#pitch .token[data-slot="2"]'); await p.click('#pitch .token[data-slot="3"]');
@@ -3842,6 +3844,210 @@ try {
     check('v3.31.2 TM: tallene i statistik-tabellen er højrejusteret', s1.align === 'right' || s1.align === 'end', s1.align);
     await c.close();
   }
+  // ---------- v3.32.3 (brugeren 6/11: "Jeg kan ikke på taktik siden se, hvem den valgte spiller spiller godt sammen med") ----------
+  // Fokus = den valgte i et byt (pitchSwapId): hans streger fremhævet, de andre dæmpet, naboernes ring i båndets farve, teksten i #pick-msg,
+  // byt-forhåndsvisningen i Plads-cellen og trykfeltet ≥ 44 px om brikken ved 390. Teksterne er SKREVET her (ikke regnet med focusChemText).
+  // Kan køres alene med V3323_ONLY=1.
+  async function v3323() {
+    const prep = (pg) => pg.evaluate(() => {
+      const d = JSON.parse(localStorage.getItem('tactivar_save')), me = d.league.teams.find((t) => !t.isBot), s = me.tactics.lineupSlots;
+      me.tactics.baseFormation = '4-4-2'; me.tactics.customCoords = {}; d.league.leagueMetadata.chemRef = 78;
+      for (const x of me.squad) Object.assign(x, { injuryMatchesLeft: 0, banMatches: 0 });
+      const key = (a, b) => (a < b ? `${a}|${b}` : `${b}|${a}`), field = me.squad.filter((x) => x.position !== 'GK');
+      me.chemistry = {};
+      for (const x of field) for (const y of field) if (x.id < y.id) me.chemistry[key(x.id, y.id)] = [78, 0];
+      const on = new Set(s), B1 = me.squad.find((x) => !on.has(x.id) && x.position !== 'GK' && (me.matchBench ?? []).includes(x.id)).id, F = s[6];
+      me.chemistry[key(F, s[2])] = [84, 5]; me.chemistry[key(F, s[5])] = [74, 5]; me.chemistry[key(F, s[7])] = [62, 5]; delete me.chemistry[key(F, s[9])];
+      me.chemistry[key(s[9], s[10])] = [95, 5]; me.chemistry[key(F, B1)] = [90, 4];
+      localStorage.setItem('tactivar_save', JSON.stringify(d));
+      const sh = (id) => { const x = me.squad.find((q) => q.id === id); return `#${x.shirtNumber} ${x.shortName}`; };
+      return { s: s.slice(), F, B1, fShort: me.squad.find((q) => q.id === F).shortName, b1Short: me.squad.find((q) => q.id === B1).shortName, n: Object.fromEntries([2, 5, 7, 9, 10].map((i) => [i, sh(s[i])])), nF: sh(F), nB1: sh(B1) };
+    });
+    const state = (pg) => pg.evaluate(() => ({
+      focus: [...document.querySelectorAll('#chem-lines line.focus')].map((l) => l.dataset.pair).sort(),
+      all: [...document.querySelectorAll('#chem-lines line.chem')].map((l) => ({ pair: l.dataset.pair, f: l.classList.contains('focus'), op: +getComputedStyle(l).opacity, sw: parseFloat(getComputedStyle(l).strokeWidth), stroke: getComputedStyle(l).stroke })),
+      svgFocus: document.getElementById('chem-lines')?.dataset.focus ?? null,
+      mates: [...document.querySelectorAll('#pitch .token.mate')].map((t) => `${t.dataset.slot}:${[...t.classList].find((c) => c.startsWith('mate-'))}`).sort(),
+      msg: document.getElementById('pick-msg')?.textContent ?? null, lastIsCard: document.getElementById('pick-msg')?.lastElementChild?.id === 'pick-card',
+      pitchPrev: document.querySelectorAll('#pitch .lp-prev').length }));
+    for (const w of [390, 1366]) {
+      const c = await browser.newContext({ viewport: { width: w, height: w < 600 ? 844 : 900 }, hasTouch: w < 600 }), p = await c.newPage(), egne = [];
+      p.on('pageerror', (e) => egne.push(e.message));
+      await p.goto(BASE + '/'); await p.waitForSelector('body[data-klar="ja"]');
+      const S = await prep(p); await p.reload(); await p.waitForSelector('body[data-klar="ja"]');
+      await p.click('#tab-taktik'); await p.waitForSelector('.tabpane.tab-taktik');
+      const tok = (i) => `#pitch .token[data-slot="${i}"]`;
+      const st0 = await state(p);
+      check(`v3.32.3 (${w}): uden valg ingen fokus – ingen line.focus, ingen data-focus, ingen naboring, alle streger fuldt synlige`, st0.focus.length === 0 && st0.svgFocus === null && st0.mates.length === 0 && st0.all.length === 12 && st0.all.every((l) => l.op === 1), JSON.stringify(st0.all.map((l) => l.op)));
+      if (w < 600) await p.tap(tok(6)); else await p.click(tok(6));
+      const st = await state(p);
+      const want = `🔁 Klik på den spiller, ${S.fShort} skal byttes med. 🤝 Med naboerne: ${S.n[2]} stærkt · ${S.n[5]} spillet sammen · ${S.n[7]} finder hinanden · ${S.n[9]} fremmede · svagest: ${S.n[9].split(' ')[0]} · Kender også ${S.nB1} (stærkt, bænk) – vælg en af hans naboer, klik så på ${S.nB1.split(' ')[0]} Se kort ›`;
+      check(`v3.32.3 (${w}, ${w < 600 ? 'tap' : 'klik'} på CM'en): præcis hans 4 læste par har line.focus (2-6, 5-6, 6-7, 6-9 – ikke ST⇄ST 9-10), svg data-focus="6"`, JSON.stringify(st.focus) === JSON.stringify(['2-6', '5-6', '6-7', '6-9']) && st.svgFocus === '6', JSON.stringify(st.focus));
+      const dim = st.all.filter((l) => !l.f), foc = st.all.filter((l) => l.f);
+      check(`v3.32.3 (${w}): de andre 8 streger er dæmpet (opacity ≈ .25, ikke væk), hans er uigennemsigtige – "spillet sammen" fuldt hvid og tykkere end de dæmpede`, dim.length === 8 && dim.every((l) => Math.abs(l.op - 0.25) < 0.01) && foc.every((l) => l.op === 1) && foc.find((l) => l.pair === '5-6').stroke === 'rgb(229, 231, 235)' && foc.find((l) => l.pair === '5-6').sw > 2.5, JSON.stringify(st.all));
+      check(`v3.32.3 (${w}): naboernes brikker har ring i båndets farve (2 stærkt, 5 spillet sammen, 7 finder, 9 fremmede) – ikke angriberen på 10`, JSON.stringify(st.mates) === JSON.stringify(['2:mate-staerkt', '5:mate-sammen', '7:mate-finder', '9:mate-fremmede']), JSON.stringify(st.mates));
+      check(`v3.32.3 (${w}): #pick-msg siger præcis hvem han spiller godt sammen med (bånd i ord, stærkeste først, den stærke tidligere nabo på bænken) – "Se kort ›" sidst`, st.msg === want && st.lastIsCard, `${st.msg} | ${want}`);
+      check(`v3.32.3 (${w}): ingen 0–100-tal i beskeden (kun trøjenumre)`, !/\d/.test(st.msg.replace(/#\d+/g, '')), st.msg);
+      if (w < 600) {
+        const msgH = await p.evaluate(() => Math.round(document.getElementById('pick-msg').getBoundingClientRect().height));
+        console.log(`   (måling) #pick-msg-højde ved 390 med fokus: ${msgH} px (${st.msg.split(/\s+/).length} ord)`); if (process.env.SHOW_MSG) console.log(st.msg);
+        // Spilfører UI 3: samme besked i v3.32.3-før-gennemgangen-form ("– på banen eller i listen", "svagest: #9 Navn", "– samspil tæller kun, når de
+        // står som naboer") måles i SAMME side med SAMME navne (navnene skifter fra liga til liga) – den nye skal være mindst én linje (≥ 15 px) lavere.
+        // Målt: før 150 px, efter 131 px (begge ligaer set i kørslerne 6/11).
+        const oldH = await p.evaluate((o) => { const m = document.getElementById('pick-msg'), t = m.firstChild, was = t.textContent; t.textContent = o; const hh = Math.round(m.getBoundingClientRect().height); t.textContent = was; return hh; },
+          st.msg.replace(/ Se kort ›$/, '').replace('skal byttes med.', 'skal byttes med – på banen eller i listen.').replace(`svagest: ${S.n[9].split(' ')[0]}`, `svagest: ${S.n[9]}`).replace(/– vælg en af hans naboer, klik så på #\d+$/, '– samspil tæller kun, når de står som naboer'));
+        console.log(`   (måling) #pick-msg-højde ved 390 med den gamle tekst: ${oldH} px`);
+        check(`v3.32.3 (390): #pick-msg er mindst én linje kortere end før – ${msgH} px mod ${oldH} px med den gamle tekst`, oldH - msgH >= 15, `${msgH} / ${oldH}`);
+      }
+      // Byt-forhåndsvisningen: i Plads-cellen pr. mulig række (ikke på banen); title = præcis beskeden efter byttet
+      await p.click('#lineup-list .toolbar button:has-text("Alle")');
+      const prev = await p.evaluate((B1) => ({ n: document.querySelectorAll('#lineup-table .lp-place .lp-prev').length, rows: document.querySelectorAll('#lineup-table tr.lp-row').length,
+        b1: (() => { const e = document.querySelector(`#lineup-table tr[data-pid="${B1}"] .lp-place .lp-prev`); return e ? { txt: e.textContent, ch: e.dataset.changes, title: e.title } : null; })(),
+        zero: document.querySelectorAll('#lineup-table tr.lp-row:not(.active):not(.reserve-p)').length - document.querySelectorAll('#lineup-table tr.lp-row:not(.active):not(.reserve-p) .lp-prev').length,
+        pm: document.querySelectorAll('#lineup-table .lp-prev').length && [...document.querySelectorAll('#lineup-table .lp-prev')].every((e) => e.textContent.startsWith('🤝 ') && !e.textContent.includes('±0')) }), S.B1);
+      // v3.32.3 efter gennemgangen: ±0 = ingen tekst (Spilfører UI: "±0" i hver række var støj) – så kun nogle rækker har en forhåndsvisning
+      check(`v3.32.3 (${w}): byt-tilstand – forhåndsvisning i Plads-cellen kun hvor et par skifter ("🤝 …", aldrig "±0"), ingen på banen, ingen ny kolonne`, prev.n > 0 && prev.pm && st.pitchPrev === 0 && (await p.locator('#lineup-table thead th').count()) === 6, JSON.stringify({ n: prev.n, rows: prev.rows, zero: prev.zero }));
+      await p.click(`#lineup-table tr[data-pid="${S.B1}"]`);
+      const after = await state(p);
+      check(`v3.32.3 (${w}): forhåndsvisningen ved ${S.nB1} (${prev.b1?.txt}) er præcis beskeden efter byttet`, !!prev.b1 && prev.b1.ch.length > 0 && after.msg === `🤝 ${prev.b1.ch}` && prev.b1.title === `Byt: 🤝 ${prev.b1.ch}` && /^🤝 (\+\d( −\d)?|−\d)$/.test(prev.b1.txt), `${JSON.stringify(prev.b1)} | ${after.msg}`);
+      // ±0: byttet giver ingen besked
+      await p.click(`#lineup-table tr[data-pid="${S.B1}"]`);   // B1 står nu på plads 6 – vælg ham, og byt med en ±0-række
+      const z = await p.evaluate(() => [...document.querySelectorAll('#lineup-table tr.lp-row:not(.active):not(.reserve-p)')].find((r) => !r.querySelector('.lp-prev'))?.dataset.pid ?? null);
+      if (z) { await p.click(`#lineup-table tr[data-pid="${z}"]`); }
+      check(`v3.32.3 (${w}): en række uden forhåndsvisning (±0) giver ingen samspilsbesked efter byttet`, !!z && (await state(p)).msg === null, String(z));
+      // En bænkrække: ingen fokus på banen, teksten nævner ham og hans tidligere nabo
+      const S2 = await prep(p); await p.reload(); await p.waitForSelector('body[data-klar="ja"]'); await p.click('#tab-taktik'); await p.waitForSelector('.tabpane.tab-taktik');
+      await p.click(`#lineup-table tr[data-pid="${S2.B1}"]`);
+      const bs = await state(p);
+      check(`v3.32.3 (${w}): klik på en bænkrække – ingen line.focus og ingen dæmpning, teksten nævner ham og hans stærke tidligere nabo på banen`, bs.focus.length === 0 && bs.svgFocus === null && bs.mates.length === 0 && bs.all.every((l) => l.op === 1)
+        && bs.msg === `🔁 Klik på den brik, ${S2.b1Short} skal skiftes ind for – eller en reserve, der skal tage hans plads på bænken. 🤝 På bænken · Kender også ${S2.nF} (stærkt, start) – klik på en brik ved siden af ${S2.nF.split(' ')[0]} Se kort ›`, bs.msg);
+      // Trykfeltet ≥ 44 px om brikken ved ≤ 600 px – uden at tegningen ændres (brikken er stadig 29 × 29)
+      const hit = await p.evaluate(() => { const n = document.querySelector('#pitch .token[data-slot="6"] .token-num'); n.scrollIntoView({ block: 'center' }); const r = n.getBoundingClientRect(), a = getComputedStyle(n, '::after');
+        const at = (x, y) => document.elementFromPoint(x, y)?.closest('.token')?.dataset.slot ?? null;
+        return { w: Math.round(r.width), h: Math.round(r.height), aw: parseFloat(a.width) || 0, ah: parseFloat(a.height) || 0, up: at(r.left + r.width / 2, r.top - 6), upLeft: at(r.left - 6, r.top - 6) }; });
+      // (brikkens navn under cirklen gør den allerede bredere – derfor måles over og skråt over cirklen, hvor kun trykfeltet kan ramme)
+      check(`v3.32.3 (${w}): trykfeltet om brikken er ${w < 600 ? '≥ 44 px (6 px over og skråt over cirklen rammer brikken)' : 'brikken selv (ingen udvidelse over 600 px)'} – tegningen uændret 29 × 29`,
+        hit.w === 29 && hit.h === 29 && (w < 600 ? hit.aw >= 44 && hit.ah >= 44 && hit.up === '6' && hit.upLeft === '6' : hit.aw === 0 && hit.up !== '6' && hit.upLeft !== '6'), JSON.stringify(hit));
+      // Modstanderhold: aldrig samspil – ingen besked, ingen fokus, ingen ring
+      await p.click('#tab-liga'); await p.selectOption('#team-select', '1'); await p.waitForSelector('#scout-banner'); await p.click('#tab-taktik'); await p.waitForSelector('.tabpane.tab-taktik');
+      if (w < 600) await p.tap(tok(6)); else await p.click(tok(6));
+      const os = await state(p);
+      check(`v3.32.3 (${w}): modstanderhold – klik på en brik giver ingen samspilstekst, ingen streger, ingen fokus og ingen naboring`, os.msg === null && os.all.length === 0 && os.mates.length === 0 && !(await p.textContent('.tabpane')).includes('🤝'), JSON.stringify(os).slice(0, 200));
+      check(`v3.32.3 (${w}): ingen sidefejl`, egne.length === 0, egne.join(' | '));
+      await c.close();
+    }
+  }
+  // ---------- v3.32.3, Test Manager (samspil på Taktik): det byggerens blok lod stå – CSS'ens TAL (stregbredder pr. bånd, ringfarver, trykfeltets
+  // størrelse på begge sider af 600/601, Plads-cellens farver/display/title), fokus på målmanden (dæmpede før ALLE streger uden en fokuslinje),
+  // ledningen til valgbeskeden (ligaens snit, den NYE valgte ved bænk→bænk) og "fremmede" ved et snit hvor en 52'er er et andet bånd end ved 70.
+  // Kan køres alene med TM_V3323_ONLY=1.
+  async function v3323tm() {
+    const prep = (pg) => pg.evaluate(() => {
+      const d = JSON.parse(localStorage.getItem('tactivar_save')), me = d.league.teams.find((t) => !t.isBot), s = me.tactics.lineupSlots;
+      me.tactics.baseFormation = '4-4-2'; me.tactics.customCoords = {}; d.league.leagueMetadata.chemRef = 78;
+      for (const x of me.squad) Object.assign(x, { injuryMatchesLeft: 0, banMatches: 0 });
+      const key = (a, b) => (a < b ? `${a}|${b}` : `${b}|${a}`), field = me.squad.filter((x) => x.position !== 'GK');
+      me.chemistry = {};
+      for (const x of field) for (const y of field) if (x.id < y.id) me.chemistry[key(x.id, y.id)] = [78, 0];
+      const on = new Set(s), bench = (me.matchBench ?? []).filter((id) => !on.has(id) && me.squad.find((x) => x.id === id).position !== 'GK'), F = s[6];
+      // 52 mod plads 7: "fremmede" ved snit 78 (−0,54), men "finder hinanden" ved snit 70 (−0,45) – så en forkert ref i beskeden ses
+      me.chemistry[key(F, s[2])] = [84, 5]; me.chemistry[key(F, s[5])] = [74, 5]; me.chemistry[key(F, s[7])] = [52, 5]; me.chemistry[key(F, s[9])] = [62, 5];
+      me.chemistry[key(s[9], s[10])] = [95, 5]; me.chemistry[key(F, bench[0])] = [90, 4];
+      localStorage.setItem('tactivar_save', JSON.stringify(d));
+      const sh = (id) => { const x = me.squad.find((q) => q.id === id); return `#${x.shirtNumber} ${x.shortName}`; };
+      return { F, B1: bench[0], B2: bench[1], n2: sh(s[2]), n7: sh(s[7]), nF: sh(F), b1Short: me.squad.find((q) => q.id === bench[0]).shortName };
+    });
+    const ready = async (p) => { await p.reload(); await p.waitForSelector('body[data-klar="ja"]'); await p.click('#tab-taktik'); await p.waitForSelector('.tabpane.tab-taktik'); };
+    for (const w of [390, 1366]) {
+      const c = await browser.newContext({ viewport: { width: w, height: w < 600 ? 844 : 900 }, hasTouch: w < 600 }), p = await c.newPage(), egne = [];
+      p.on('pageerror', (e) => egne.push(e.message));
+      await p.goto(BASE + '/'); await p.waitForSelector('body[data-klar="ja"]');
+      const S = await prep(p); await ready(p);
+      const tok = (i) => `#pitch .token[data-slot="${i}"]`, press = (sel) => (w < 600 ? p.tap(sel) : p.click(sel));
+      const snap = () => p.evaluate(() => ({ focus: document.getElementById('chem-lines')?.dataset.focus ?? null, ops: [...document.querySelectorAll('#chem-lines line.chem')].map((l) => +getComputedStyle(l).opacity),
+        mates: document.querySelectorAll('#pitch .token.mate').length, msg: document.getElementById('pick-msg')?.textContent ?? null }));
+      // målmanden: ingen fokuslinje -> intet må dæmpes
+      await press(tok(0));
+      const g = await snap();
+      check(`v3.32.3 TM (${w}): valgt målmand — ingen data-focus, ingen dæmpning (alle 12 streger opacity 1), ingen naboring, men teksten siger det`, g.focus === null && g.ops.length === 12 && g.ops.every((o) => o === 1) && g.mates === 0 && g.msg.includes('🤝 Målmanden indgår ikke i samspil.'), JSON.stringify(g));
+      await press(tok(0));   // fravælg
+      await press(tok(6));
+      const f = await snap();
+      check(`v3.32.3 TM (${w}): ref i beskeden = ligaens snit 78 — plads 7 med 52 er "fremmede" (ikke "finder hinanden" som ved snit 70)`, f.msg.includes(`${S.n7} fremmede`) && !f.msg.includes(`${S.n7} finder hinanden`), f.msg);
+      const css = await p.evaluate(() => {
+        const sw = (pair) => { const l = document.querySelector(`#chem-lines line[data-pair="${pair}"]`); return l ? parseFloat(getComputedStyle(l).strokeWidth) : null; };
+        const ring = (slot) => getComputedStyle(document.querySelector(`#pitch .token[data-slot="${slot}"] .token-num`)).boxShadow;
+        return { sw: { '2-6': sw('2-6'), '5-6': sw('5-6'), '6-7': sw('6-7'), '6-9': sw('6-9') }, ring: { 2: ring(2), 5: ring(5), 7: ring(7), 9: ring(9), 10: ring(10) } };
+      });
+      check(`v3.32.3 TM (${w}): stregbredder under fokus: stærkt 7 (ellers 5), spillet sammen 4 (2,5), fremmede 3,5 (1,5), finder 3,5 (1,5)`, JSON.stringify(css.sw) === JSON.stringify({ '2-6': 7, '5-6': 4, '6-7': 3.5, '6-9': 3.5 }), JSON.stringify(css.sw));
+      check(`v3.32.3 TM (${w}): naboringene er 3 px i båndets farve (2 gul, 5 lysegrå, 9 orange, 7 rød) – angriberen på 10 har ingen ring`,
+        css.ring[2] === 'rgb(250, 204, 21) 0px 0px 0px 3px' && css.ring[5] === 'rgb(229, 231, 235) 0px 0px 0px 3px' && css.ring[7] === 'rgb(239, 68, 68) 0px 0px 0px 3px' && css.ring[9] === 'rgb(251, 146, 60) 0px 0px 0px 3px' && css.ring[10] === 'none', JSON.stringify(css.ring));
+      // Plads-cellen: farver, display, nowrap, title = aria-label, ±0-teksten. Bænkspilleren B2 (alle hans par seedet 78 = spillet sammen) vælges:
+      // starterne med kun "spillet sammen"-par giver ±0, dem med fremmede par giver op, CM'en med stærkt par giver ned
+      await ready(p);
+      await p.click('#lineup-list .toolbar button:has-text("Alle")');
+      await p.click(`#lineup-table tr[data-pid="${S.B2}"]`);
+      const pv = await p.evaluate(() => [...document.querySelectorAll('#lineup-table .lp-prev')].map((e) => { const cs = getComputedStyle(e), col = (q) => [...e.querySelectorAll(q)].map((x) => getComputedStyle(x).color);
+        return { cls: e.className, txt: e.textContent, color: cs.color, display: cs.display, ws: cs.whiteSpace, title: e.title, aria: e.getAttribute('aria-label'), ch: e.dataset.changes, ups: col('.up'), downs: col('.down') }; }));
+      // v3.32.3 efter gennemgangen: farven sidder på tallene (+N grøn, −N rød, også i samme celle), selve mærket er dæmpet; ±0 = intet
+      const up = pv.filter((x) => x.ups.length), down = pv.filter((x) => x.downs.length);
+      console.log(`   (måling) forhåndsvisninger: ${[...new Set(pv.map((x) => x.txt))].join(' | ')}`);
+      check(`v3.32.3 TM (${w}): Plads-cellens forhåndsvisning: +N lysegrøn, −N lysrød, mærket selv hverken-eller, intet "±0"; alle blok-linjer uden ombrydning`, up.length > 0 && down.length > 0 && up.every((x) => x.ups.every((c) => c === 'rgb(134, 239, 172)')) && down.every((x) => x.downs.every((c) => c === 'rgb(252, 165, 165)'))
+        && pv.every((x) => x.color !== 'rgb(134, 239, 172)' && x.color !== 'rgb(252, 165, 165)' && !x.txt.includes('±0') && x.cls === 'lp-prev') && pv.every((x) => x.display === 'block' && x.ws === 'nowrap'), JSON.stringify({ up: up.length, down: down.length, c: pv.slice(0, 3) }));
+      check(`v3.32.3 TM (${w}): title = aria-label på hver forhåndsvisning = "Byt: 🤝 " + ændringerne; teksten er "🤝 +N", "🤝 −N" eller "🤝 +N −M"`,
+        pv.every((x) => x.title === x.aria && x.title === `Byt: 🤝 ${x.ch}` && x.ch.length > 0 && /^🤝 (\+\d( −\d)?|−\d)$/.test(x.txt)), JSON.stringify(pv.slice(0, 3)));
+      // Bænk → bænk er et NYT valg: med B2 valgt giver et klik på B1 en besked om B1 (med hans stærke tidligere nabo, CM'en på banen) – ikke om B2
+      await p.click(`#lineup-table tr[data-pid="${S.B1}"]`);
+      const b = await snap();
+      check(`v3.32.3 TM (${w}): bænk → bænk giver nyt valg — beskeden handler om den NYE (${S.b1Short}) og hans makker ${S.nF}, ikke om den forrige`, b.msg.startsWith(`🔁 Klik på den brik, ${S.b1Short} skal skiftes ind for`) && b.msg.includes(`🤝 På bænken · Kender også ${S.nF} (stærkt, start) – klik på en brik ved siden af ${S.nF.split(' ')[0]}`), b.msg);
+      // v3.32.3 efter gennemgangen (QC 1): formation, Plan B og "Stil op efter position" afslutter et byt i gang – ingen frossen samspilstekst
+      // med de gamle naboer, intet fokus, og næste klik på en brik er et NYT valg (ikke et byt med den forrige)
+      const live = () => p.evaluate(() => ({ msg: document.getElementById('pick-msg')?.textContent ?? null, focus: document.getElementById('chem-lines')?.dataset.focus ?? null,
+        swapping: document.querySelectorAll('#pitch .token.swapping').length, active: document.querySelectorAll('#lineup-table tr.active').length }));
+      for (const [kind, act] of [['formation 4-3-3', () => p.selectOption('#formation', '4-3-3')], ['Plan B', () => p.locator('.presets button', { hasText: 'Plan B' }).click()], ['Stil op efter position', () => p.click('#arrange-lineup')]]) {
+        await prep(p); await ready(p);
+        await press(tok(6));
+        const was = await live();
+        await act();
+        const now = await live();
+        await press(tok(4));
+        const next = await live();
+        check(`v3.32.3 TM (${w}): ${kind} under et byt — byttet er slut (ingen "🔁"/"Kender også" i beskeden, intet fokus, ingen valgt), og næste klik er et nyt valg`,
+          was.msg?.includes('Kender også') && was.focus === '6' && !(now.msg ?? '').includes('🔁') && !(now.msg ?? '').includes('Kender også') && now.focus === null && now.swapping === 0 && now.active === 0
+          && (next.msg ?? '').startsWith('🔁 Klik på den spiller') && next.focus === '4', JSON.stringify({ was: was.msg?.slice(0, 40), now, next: next.msg?.slice(0, 40) }));
+      }
+      // QC efter rettelserne (C): "↺ Udtag automatisk" ændrer bænken – et byt i gang slutter også dér (før stod beskeden frossen)
+      await prep(p).then(() => p.evaluate(() => { const d = JSON.parse(localStorage.getItem('tactivar_save')), me = d.league.teams.find((t) => !t.isBot); me.matchBenchAuto = false; localStorage.setItem('tactivar_save', JSON.stringify(d)); }));
+      await ready(p);
+      await press(tok(6));
+      const abWas = await live();
+      await p.click('#auto-bench');
+      const abNow = await live();
+      check(`v3.32.3 (${w}): "↺ Udtag automatisk" under et byt — byttet er slut (ingen "🔁"/"Kender også", intet fokus, ingen valgt)`,
+        (abWas.msg ?? '').includes('🔁') && abWas.focus === '6' && !(abNow.msg ?? '').includes('🔁') && !(abNow.msg ?? '').includes('Kender også') && abNow.focus === null && abNow.swapping === 0 && abNow.active === 0,
+        JSON.stringify({ was: abWas.msg?.slice(0, 40), now: abNow }));
+      // Spilfører UI 2: en udelukket nabo mærkes i beskeden, og at tage en udelukket starter ud viser intet tab for hans par
+      await prep(p).then(() => p.evaluate(() => { const d = JSON.parse(localStorage.getItem('tactivar_save')), me = d.league.teams.find((t) => !t.isBot); me.squad.find((x) => x.id === me.tactics.lineupSlots[2]).banMatches = 2; localStorage.setItem('tactivar_save', JSON.stringify(d)); }));
+      await ready(p);
+      await press(tok(6));
+      const bm = await live();
+      check(`v3.32.3 TM (${w}): den udelukkede nabo på plads 2 står med mærke ("${S.n2} stærkt (udelukket)") – de raske uden`, (bm.msg ?? '').includes(`${S.n2} stærkt (udelukket)`) && !(bm.msg ?? '').includes(`${S.n7} fremmede (`), bm.msg);
+      await press(tok(6)); await p.click('#lineup-list .toolbar button:has-text("Alle")'); await press(tok(2));
+      const bp = await p.evaluate(() => ({ bench: document.querySelectorAll('#lineup-table tr.bench-p .lp-prev').length, any: document.querySelectorAll('#lineup-table .lp-prev').length, downs: [...document.querySelectorAll('#lineup-table tr.bench-p .lp-prev .down')].length }));
+      check(`v3.32.3 TM (${w}): valgt udelukket starter — ingen bænkrække viser "−N" for at tage ham ud (han spiller ikke alligevel), og ingen forhåndsvisning for bænkskiftet`, bp.bench === 0 && bp.downs === 0, JSON.stringify(bp));
+      check(`v3.32.3 TM (${w}): ingen sidefejl`, egne.length === 0, egne.join(' | '));
+      await c.close();
+    }
+    // Trykfeltet: 44,8 × 44,8 (24,8 + 2 × 10; mål 44–50) ved 390 og 600, væk ved 601 – brikken står stadig 29 × 29
+    for (const w of [390, 600, 601]) {
+      const c = await browser.newContext({ viewport: { width: w, height: 844 } }), p = await c.newPage();
+      await p.goto(BASE + '/'); await p.waitForSelector('body[data-klar="ja"]'); await p.click('#tab-taktik'); await p.waitForSelector('.tabpane.tab-taktik');
+      const m = await p.evaluate(() => { const n = document.querySelector('#pitch .token[data-slot="6"] .token-num'), a = getComputedStyle(n, '::after'), r = n.getBoundingClientRect();
+        return { aw: parseFloat(a.width) || 0, ah: parseFloat(a.height) || 0, w: Math.round(r.width), h: Math.round(r.height), pos: getComputedStyle(n).position }; });
+      check(`v3.32.3 TM: trykfeltet ved ${w} px er ${w <= 600 ? '44–50 px (målt 44,8: brikkens 24,8 indvendigt + 10 på hver side)' : 'væk'} — brikken uændret 29 × 29`, m.w === 29 && m.h === 29 && (w <= 600 ? m.aw >= 44 && m.aw <= 50 && m.ah >= 44 && m.ah <= 50 && m.pos === 'relative' : m.aw === 0 && m.ah === 0), JSON.stringify(m));
+      await c.close();
+    }
+  }
   // ---------- v3.32.0, Test Manager (Spring kan trænes med Fysik): appens LEDNING – nyheden i NEWS, fokusvalget på Træning og "+1 Spring" i rapporten,
   // Træning-fanen og Trup, før OG efter en genindlæsning (sanitize.js droppede Spring-gains). Kan køres alene med TM_V3320_ONLY=1.
   async function v3320tm() {
@@ -3893,6 +4099,8 @@ try {
   await v3312();
   await v3312tm();
   await v3320tm();
+  await v3323();
+  await v3323tm();
   check('Ingen sidefejl under hele forløbet', fejl.length === 0, fejl.join(' | '));
 } finally {
   await browser.close();

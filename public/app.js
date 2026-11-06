@@ -19,7 +19,7 @@ import { renderClub, shownCash, renderMarket, renderTransferLog, renderPublicClu
 import { marketInfo, buyPlayer, setListed, acceptOffer, declineOffer, releasePlayer, wageRoom, isStarter, quarantined, nextWindow, quarantineText } from './engine/transfers.js';
 import { renderSeasonReport } from './ui/season-report.js';
 import { viewTeam, viewRatingEntry } from './engine/visibility.js';
-import { lineupPairs, chemRefOf, weakestPair, swapChanges, BAND_WORD, bestPartner, saleChemText, playerPairs, gamesToSettle, bandOf, chemOf, BAND_RANK } from './engine/chemistry.js';
+import { lineupPairs, chemRefOf, weakestPair, swapChanges, BAND_WORD, bestPartner, saleChemText, playerPairs, gamesToSettle, bandOf, chemOf, BAND_RANK, focusChemText } from './engine/chemistry.js';
 import { renderPitch } from './ui/pitch.js';
 import { renderTactics } from './ui/tactics.js';
 import { renderStandings } from './ui/standings.js';
@@ -146,6 +146,7 @@ const NEWS = {
   '3.28.0': '🏠 Andet skridt i den nye brugerflade: en ny Hjem-fane samler sidste runde, din placering, "Før du spiller" (udelukkede, skadede, trætte og 🟨 – med et link til at løse det), næste modstander og tabellen omkring dig. ▶ Spil runde står nu i en bjælke i bunden af Hjem og Taktik (på de andre faner som en lille ▶ øverst med de samme tegn), og modstanderens navn er et separat 🔍-link. Holdvælgeren er flyttet til Liga ("Se et hold"), og ser du et andet hold, siger en lilla bjælke det – med "← Dit hold". ⚙ øverst til højre har gem, eksport, import og versionen. På mobil står fanerne i bunden. Næste skridt: spillerkortet som ét panel.',
   '3.31.2': '📊 Spillerkortet viser nu spillerens statistik for holdet øverst: kampe, minutter, mål, oplæg, snitkarakter, 👑, 🟨 og 🟥 for denne og sidste sæson. Taktik-listen viser arketypen (🔒 låst / 🌟 låst op) ved dine spillere. Skønnet af en spillers udvikling har nu fem trin – fra "er tæt på sit loft" til "har langt mere i sig" – så ungdomsspillerne ikke alle hedder det samme, og ungdomstilbuddet viser nøglesnittet. Og positionerne er danske overalt: MV, MS, VB/HB, VKB/HKB, DM, CM, OM, VM/HM, VK/HK og ANG.',
   '3.32.1': '🧹 Mindre klemt sammen (designgennemgangen): På Kamp står afspilningen og ▶ Afspil nu på første skærm – kampene på én linje, og efter fløjtet tre faner: 🎬 Afspilning & referat · 📊 Statistik · 👥 Spillerne, med kampens resultat og boldbesiddelse fast øverst. "📤 Send kampen" ligger under "⋯ Mere". På Taktik står én kort linje under hver fase – forklaringen bag "ⓘ Sådan virker det". Brede tabeller (Trup, Træning, Klub) toner ud i kanten, når der er mere at rulle, og navnet (på Klub: runden) står fast; på mobil er Trups rækker højere, så de er lette at trykke på.',
+  '3.32.3': '🤝 Samspil på Taktik: Vælg en spiller (på banen eller i listen), og se, hvem han spiller godt sammen med – hans streger lyser op, de andre dæmpes, og naboerne får en ring i samspillets farve. Beskeden ved listen siger det i ord (stærkeste først, den svageste) og nævner også tidligere makkere på bænken. Mens du bytter, viser Plads-kolonnen, hvad byttet gør ved samspillet ("🤝 +2 −1" – intet, når intet par skifter; en skadet eller udelukket tæller ikke, for han spiller ikke).',
   '3.32.2': '📺 VAR-øjeblikket: Når VAR tjekker i din kamp, stopper afspilningen op – en ramme under stillingen siger, hvad der tjekkes, og hvem det gælder ("#9 Hansen tjekkes for offside – afgjort mod #4 Bergs placering"), og kendelsen kommer først efter et par sekunder (eller tryk "Vis kendelsen ›"). Stillingen ryster ved dine mål og røde kort, og et annulleret mål blinker rødt eller grønt. Ny lydkontakt ved ⚡: fløjt, VAR-bip og jubel – slået fra, til du tænder den.',
   '3.32.0': '✈ Spring kan nu trænes: Fysik træner Fart, Styrke og Spring, og spillerkortet viser Spring som en bjælke under "Fysik & luft". Arketypens krav viser, hvor langt han er, og hvad der træner det – fx "Låses op ved: Styrke 13/13 ✓ · Spring 13/14 – trænes med Fysik". Fokusvalget på 🏋️ Træning viser, hvilke evner hvert fokus træner, og Trup markerer et +1 i Spring som i de andre evner. Fra 30 år kan Spring falde som Styrke – træning med Fysik halverer faldet.',
   '3.31.1': '▶ Spil runde står nu samme sted på alle faner: i bjælken i bunden – også på Trup, Træning, Kamp, Liga, Klub og ⚙. Den lille ▶ øverst er væk. Bjælken viser opstillingens tegn på alle faner (⛔ udelukket, 🚑 skadet, ⚠ træt, 🟨 ét gult fra udelukkelse) – ved mange som en kort tæller, fx "⛔2 🚑1 🟨1", der viser listen på 🏠 Hjem. Mens runden spilles, står der "📺 Runde N spilles …". Og spillerkortet er nu på dansk: særpræg som Presmonster og Fyrtårn, danske positioner (OM, DM, ANG), "Låses op ved: Udholdenhed 14, Erobring 12", 🕵️ Observationer og 🧠 Erfaring mod stilarter.',
@@ -561,22 +562,27 @@ function renderNow() {
     onInfo: (p) => openCard(p.id, `.lp-info[data-pid="${p.id}"]`),
     onPickCard: isOwn ? (id) => openCard(id, `.lp-info[data-pid="${id}"]`) : null,
     onPick: (p) => (isOwn ? pickForSwap(team, p) : (view.selectedPlayerId = p.id, openCard(p.id, `.lp-info[data-pid="${p.id}"]`))),
+    // v3.32.3: byt-forhåndsvisningen pr. række (kun dit hold, kun mens et byt er i gang)
+    preview: isOwn && view.pitchSwapId ? (p) => act.swapPreview(team, chemRefOf(league), view.pitchSwapId, p.id) : null,
     onSort: (c) => { if (view.listSort === c.key) view.listSortAsc = !view.listSortAsc; else { view.listSort = c.key; view.listSortAsc = false; } render(); },
     onBlocked: (c) => { view.notice = `🔒 Anti-spionage: du kan ikke sortere ${team.name} på "${c.label}" – det er skjult information.`; render(); },
     onLine: (v) => { view.listLine = v; render(); },
-    onAutoBench: () => change(() => act.setAutoBench(team)) });
+    onAutoBench: () => { clearSwap(); change(() => act.setAutoBench(team)); } });   // QC: bænken ændres – et byt i gang slutter
 
   const tactics = renderTactics({ team, isOwn, ui: game.ui, on: {
+    // v3.32.3 (QC): formation, forudindstilling og "Stil op efter position" afslutter et byt i gang – ellers stod den valgtes
+    // samspilstekst (frosset i pickMsg) med de gamle naboer, og næste klik byttede med en, der ikke længere stod der
     formation: (f) => {   // QC K3: sig, hvad der skete, når brikkerne flytter sig
+      clearSwap();
       const before = team.tactics.lineupSlots.slice();
       withChem(team, () => change(() => act.setFormation(team, f)));
       const moved = team.tactics.lineupSlots.filter((id, i) => id !== before[i]).length, out = act.outOfPositionCount(team);
       view.notice = `${f}: ${moved ? `${moved} spillere er flyttet, så flest står på deres naturlige position` : 'ingen behøvede at flytte'}${out ? ` – ${out} står uden for position (se ⚠ på banen)` : ''}.`;
       render();
     },
-    preset: (i) => withChem(team, () => change(() => { act.switchPreset(team, game.ui.activePresetIndex, i); game.ui.activePresetIndex = i; })),
+    preset: (i) => { clearSwap(); withChem(team, () => change(() => { act.switchPreset(team, game.ui.activePresetIndex, i); game.ui.activePresetIndex = i; })); },
     resetDrag: () => change(() => act.resetDrag(team)),
-    arrange: () => { let moved = 0; withChem(team, () => { moved = act.arrangeLineup(team); }); view.notice = moved ? '⇄ De 11 er flyttet, så flest står på deres naturlige position.' : '⇄ De 11 står allerede bedst muligt efter position.'; change(() => {}); },
+    arrange: () => { clearSwap(); let moved = 0; withChem(team, () => { moved = act.arrangeLineup(team); }); view.notice = moved ? '⇄ De 11 er flyttet, så flest står på deres naturlige position.' : '⇄ De 11 står allerede bedst muligt efter position.'; change(() => {}); },
     phase: (ph, f, v) => change(() => act.setPhase(team, ph, f, v)),
     rule: (i, patch) => change(() => act.updateRule(team, i, patch)),
     addRule: () => change(() => act.addRule(team)),
@@ -787,9 +793,12 @@ function pickForSwap(team, p) {
   if (kind === 'swap' || kind === 'bench') { clearSwap(); view.notice = ''; withChem(team, () => change(() => act.pickForSwap(team, a, p.id))); return; }
   const slots = team.tactics.lineupSlots, benchIds = matchBenchOf(team).map((x) => x.id);
   view.pitchSwapId = p.id;
-  view.pickMsg = slots.includes(p.id) ? `🔁 Klik på den spiller, ${p.shortName} skal byttes med – på banen eller i listen.`
+  view.pickMsg = slots.includes(p.id) ? `🔁 Klik på den spiller, ${p.shortName} skal byttes med.`   // v3.32.3 (Spilfører UI 3): "på banen eller i listen" står i hjælpelinjen – byt-instruktionen ét sted
     : benchIds.includes(p.id) ? `🔁 Klik på den brik, ${p.shortName} skal skiftes ind for – eller en reserve, der skal tage hans plads på bænken.`
       : `🔁 Klik på den bænkspiller, ${p.shortName} skal tage pladsen fra – eller en brik.`;
+  // v3.32.3 (brugeren 6/11): hvem han spiller godt sammen med – i samme besked (pickForSwap kaldes kun for dit eget hold)
+  const chem = focusChemText(team, chemRefOf(game.league), p.id);
+  if (chem) view.pickMsg += ` ${chem}`;
   render();
 }
 

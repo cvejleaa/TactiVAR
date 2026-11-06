@@ -641,9 +641,23 @@ bedre kan kontrollere spil motoren".
   **Visning** (kun dit hold; ét sæt bånd på samme skala, intet 0–100-tal): fremmede ≤ −0,5 < finder hinanden ≤ −0,15 < spillet
   sammen < 0,4 ≤ stærkt (ved snit 78: 54 / 70,8 / 81,2). Kun par, motoren læser (mindst én forsvarer eller midtbane – ikke
   angriberparret). Taktik: en streg pr. par (tyk = stærkt, stiplet = fremmede) og "Svagest lige nu" under banen; ved byt eller
-  formation en 🤝-besked med de bånd, der skiftede (største fald først, højst 2). Spillerkortet: bedste makker kun ved stærkt, hans
+  formation en 🤝-besked med de bånd, der skiftede (største fald først, højst 2 – flere står som "… og N til"; par med en skadet/udelukket spiller tæller ikke, v3.32.3). Spillerkortet: bedste makker kun ved stærkt, hans
   par med naboerne nu; salgslinjen (kortet og Klub) ved stærkt; købeboksen og "Til salg i ligaen": fremmed for alle, ca. 8 kampe
   (`gamesToSettle`). Fuldtidsanalysen: én sætning om din midtbane ved kampstart (finder hinanden/fremmede eller stærkt).
+  **v3.32.3** (brugeren 6/11: "Jeg kan ikke på taktik siden se, hvem den valgte spiller spiller godt sammen med"): den valgte i et
+  byt (valg = start byt) er i fokus – på banen hans streger fremhævet (tykkere, uigennemsigtige), de andre dæmpet til 25 %, og
+  naboernes brikker får en ring i båndets farve. Valgbeskeden ved listen siger i ord hans naboer (kun de læste par, stærkeste først,
+  "svagest: #9" – kun nummeret, navnet står i listen), "Ingen stærke par endnu – ca. N kampe mere side om side" / "Alle hans naboer: …" (`gamesToSettle(ref, fra, til)`),
+  og højst 2 andre markspillere, han har spillet ved siden af (≥ finder hinanden; ikke hans naboer nu, ikke et seedet par – holdets
+  seed-runde og aldrig over 78; reglen kan give falske negativer senere i sæsonen, aldrig falske positiver) med hvor de står og vejen
+  dertil: "Kender også #8 X (stærkt, bænk) – vælg hans nabo, klik så på #8" (står han selv på bænken:
+  "klik på en brik ved siden af #8"). Forklaringen står kun dér, én gang. Målmanden: "indgår ikke i samspil". En skadet/udelukket
+  (den valgte eller en nabo) mærkes: "#6 M. Bach stærkt (udelukket)". "ca. 1 kamp"/"ca. N kampe". Kun dit hold, kun ord. Formation,
+  forudindstilling og "Stil op efter position" afslutter et byt i gang. Mens byttet er i gang, står båndskiftet i Plads-cellen pr. række
+  ("🤝 +2 −1" = to par stiger (grøn) og ét falder (rød) et bånd; intet skifte = ingen tekst; tooltip = præcis 🤝-beskeden efter byttet,
+  højst 2 par + "… og N til" – samme `pickForSwap` på en kopi, `state/actions.js swapPreview`); bænk ⇄ reserve uden. Et par med en
+  skadet eller udelukket spiller (før eller efter byttet) tæller hverken op eller ned – han spiller ikke (`bandShifts`, chemistry.js:
+  ét sted for tallene og beskeden). Brikkernes trykfelt er ≥ 44 px ved ≤ 600 px (tegningen uændret).
   **v3.24.2** (Spilfører UI: "belønningen er tavs"): efter runden står øverst i Trup (v3.30.0: øverst på 🏋️ Træning) de par i din opstilling, der blev stærke –
   kun når de spillede sammen i runden – og dem, der holdt op, fordi de ikke spillede sammen (`strongChanges`; før og efter mod
   det NYE snit, så snittet alene aldrig flytter et par; kun par, der fandtes før). Navne fra truppen nu; fra 4 par kun antallet;
