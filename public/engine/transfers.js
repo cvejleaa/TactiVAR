@@ -188,10 +188,11 @@ export function openWindow(league) {
     if (offers[0]) move(league, offers[0].p, offers[0].s, t, offers[0].price);
   }
   // 3) Botter med råd (over 2 mio. kr., og 1,5 mio. tilbage) og plads (under 22) forstærker den tyndeste kæde med én spiller fra en bot med overskud
+  //    – aldrig én, der stopper efter sæsonen (v3.33.1: en forstærkning skal holde; under minimum i trin 2 må de godt købe ham)
   for (const t of bots.slice().sort((a, b) => b.cashBalance - a.cashBalance)) {
     if (t.cashBalance < BOT_BUY_CASH || t.squad.length >= 22) continue;
     const line = Object.keys(LINE_MIN).sort((a, b) => lineCount(t, a) / LINE_MIN[a] - lineCount(t, b) / LINE_MIN[b])[0];
-    const best = bots.filter((s) => s !== t && lineCount(s, line) > LINE_MIN[line] + 1).flatMap((s) => s.squad.filter((p) => p.line === line && !isStarter(s, p) && !sellBlock(league, s, p, w)).map((p) => ({ s, p, price: askPrice(s, p) })))
+    const best = bots.filter((s) => s !== t && lineCount(s, line) > LINE_MIN[line] + 1).flatMap((s) => s.squad.filter((p) => p.line === line && !p.retiring && !isStarter(s, p) && !sellBlock(league, s, p, w)).map((p) => ({ s, p, price: askPrice(s, p) })))
       .filter((o) => o.price <= t.cashBalance - 1500000 && !buyBlock(t, o.price, publicWage(o.p))).sort((a, b) => publicValue(b.p) - publicValue(a.p) || a.price - b.price)[0];
     if (best) move(league, best.p, best.s, t, best.price);
   }

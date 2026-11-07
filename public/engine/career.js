@@ -53,9 +53,14 @@ export function starsForValue(p) {
 }
 // Værdien for et ikke-helt stjernetal (startstjernerne, v3.30.0): lineært mellem de to hele stjerner – 2,9★ = 600k + 0,9 · 600k
 export const valueOfStars = (st) => { const i = Math.floor(st), f = st - i; return f ? VALUE_BY_STARS[i] + f * (VALUE_BY_STARS[i + 1] - VALUE_BY_STARS[i]) : VALUE_BY_STARS[i]; };
-export const publicValue = (p) => Math.max(25000, round(valueOfStars(starsForValue(p)) * ageFactor(p.age), 25000));
+export const baseValue = (p) => Math.max(25000, round(valueOfStars(starsForValue(p)) * ageFactor(p.age), 25000));
+// v3.33.1 (Spilfører økonomi): en spiller, der stopper efter sæsonen (p.retiring – offentligt fra runde 7), er det halve værd: 7 af
+// sæsonens 14 runder tilbage. Prisen, buddene, botternes valg og alle visninger går gennem publicValue – lønnen IKKE (publicWage fra
+// baseValue): ellers genforhandlede et køb lønnen til det halve (transfers.js move).
+export const RETIRE_VALUE = 0.5;
+export const publicValue = (p) => (p.retiring ? Math.max(25000, round(baseValue(p) * RETIRE_VALUE, 25000)) : baseValue(p));
 // Ugelønnen i hele 3.000 kr., så lønnen pr. runde (÷ 3) går op – ingen afrundingsstøj i regnskabet (Spilfører: "1.256.001 kr.")
-export const publicWage = (p) => Math.max(3000, round(publicValue(p) * WAGE_SHARE, 3000));
+export const publicWage = (p) => Math.max(3000, round(baseValue(p) * WAGE_SHARE, 3000));
 
 // ---------- Navne (v3.18.0: unikke kortnavne i hele ligaen) ----------
 export const FIRST_NAMES_EXTRA = ['Bastian', 'Daniel', 'Elias', 'Felix', 'Hjalte', 'Isak', 'Johan', 'Kristoffer', 'Laurits', 'Nicklas', 'Philip', 'Rune', 'Theo', 'Ulrik', 'Valdemar', 'Yusuf', 'Zakarias', 'Benjamin', 'Dennis', 'Hugo', 'Ida', 'Otto', 'Ruben', 'Tristan', 'Esben', 'Gabriel', 'Henrik', 'Lasse', 'Oskar', 'Vilhelm'];
