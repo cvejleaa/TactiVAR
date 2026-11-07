@@ -363,3 +363,25 @@ test('Liga, afsluttet sæson: noten over "Dit hold" følger ARKIVETS løbe-mark�
   arch.runStatsFrom = 14;
   assert.equal(period(), 'Sæson 1 (afsluttet) · km/90 og HI % fra R14', 'sidste runde: stadig "fra R14" – ikke "næste runde"');
 });
+
+test('"Dit hold": overskrifternes titler og klasser, "–" i Fri løb for en spiller med kampe men uden frie løb, rækkens data-season, karakterer uden tal tæller ikke, forklaringens fire linjer', () => {
+  const { L } = world(5), me = own(L), [p, q] = me.squad;
+  // p: 2 sæsonkampe (karakter 7 og 6; en post uden karakter i sæsonen skal ikke tælle som 0), ingen frie løb; q: ingen kampe
+  Object.assign(p, { sGames: 2, ratingSum: 13, ratingGames: 2, freeRunsSum: 0, freeRunsWonSum: 0, sMinutesSum: 180, sDistanceSum: 20, sHiKmSum: 2, sHiDistSum: 10, freshness: 77,
+    matchLog: [[1, 1, 0, 1, 1, 0, 90, 7, 3, 0, 0], [1, 2, 0, 1, 1, 0, 90, 6, 3, 0, 0], [1, 3, 0, 1, 1, 0, 0, null, 3, 0, 0]] });
+  Object.assign(q, { sGames: 0, freeRunsSum: 4, freeRunsWonSum: 1 });
+  const root = renderStats({ league: L, myTeamId: me.id });
+  const tbl = byId(root, 'my-players'), ths = all(tbl, (e) => e.tag === 'th');
+  assert.deepEqual(ths.map((t) => [t.textContent, t.className, t.attrs.title]), [
+    ['Spiller', 'st-name', 'Hold over en række (eller tryk) for hans karriere'], ['Kampe', 'num', 'Kampe i sæsonen'],
+    ['Snit', 'num', 'Karakter i snit i sæsonen (alle hans kampe i sæsonen – også for en tidligere klub)'], ['km/90', 'num', 'Løbet pr. 90 minutter i sæsonen'],
+    ['HI %', 'num', 'Andel af distancen løbet højintenst i sæsonen'], ['Fri løb', 'num', 'Løb uden bold i sæsonen: gange han kom fri / forsøg'], ['Friskhed', 'num', 'Friskhed nu']]);
+  const row = (pl) => all(tbl, (e) => e.tag === 'tr' && e.dataset.pid === pl.id)[0];
+  const cells = (r) => r.children.map((c) => c.textContent);
+  assert.deepEqual(cells(row(p)), [`#${p.shirtNumber} ${p.shortName}`, '2', '6,5', '10,0', '20 %', '–', '77 %'], 'snit (7 + 6) ÷ 2 – posten uden karakter tæller ikke; Fri løb "–" uden forsøg');
+  assert.equal(row(p).dataset.season, 'ja'); assert.equal(row(q).dataset.season, 'nej');
+  assert.deepEqual(cells(row(q)).slice(1, 6), ['–', '–', '–', '–', '–'], 'uden kampe: "–" også i Fri løb, selv om der er forsøg');
+  assert.deepEqual(all(byId(root, 'my-players-legend'), (e) => e.tag === 'li').map((e) => e.textContent), [
+    'Snit = karakter i sæsonen (alle hans kampe i sæsonen).', 'km/90 = løbet pr. 90 minutter · HI % = andel af distancen løbet højintenst.',
+    'Fri løb: løb uden bold – gange han kom fri / forsøg.', '"–" = ingen kampe i sæsonen. Friskhed er nu.']);
+});

@@ -4286,6 +4286,29 @@ try {
     const home = await p.textContent('#home-retiring');
     check('v3.33.1 TM: Hjem nævner stoppere i stigende trøjenummer (#66 før #88 – truppens rækkefølge er den modsatte)',
       home === `👋Stopper efter sæsonen: #66 ${sure.shortName} (${sure.line === 'DEF' ? 'FOR' : sure.line === 'MID' ? 'MID' : 'ANG'}, 34 år) · #88 ${sure2.shortName} (${sure2.line === 'DEF' ? 'FOR' : sure2.line === 'MID' ? 'MID' : 'ANG'}, 34 år) – vinduet er åbent til runde 8Trup ›`, home);
+    // CSS, som kun klassenavnene var målt på: 👋-mærkets luft og "Dit hold"s tal og navne (computed style)
+    await tt('trup');
+    const css = await p.evaluate(() => { const t = document.querySelector('#matrix .retiring-tag'), cs = t && getComputedStyle(t);
+      return { tagMargin: cs ? parseFloat(cs.marginLeft) : null, tagWeight: cs?.fontWeight ?? null }; });
+    check('v3.33.1 TM: 👋-mærket har luft til navnet (margin-left > 0) og normal vægt (400) – ikke klistret til og ikke fed', css.tagMargin > 0 && css.tagWeight === '400', JSON.stringify(css));
+    await tt('liga');
+    const css2 = await p.evaluate(() => { const nm = document.querySelector('#my-players .nm'), num = document.querySelector('#my-players td.num');
+      return { nm: nm ? getComputedStyle(nm).maxWidth : null, nums: num ? getComputedStyle(num).fontVariantNumeric : null }; });
+    check('v3.33.1 TM: "Dit hold" ved 1366: navnet afkortes ved 9rem (144 px), tallene har faste cifre (tabular-nums)', css2.nm === '144px' && css2.nums.includes('tabular-nums'), JSON.stringify(css2));
+    // "Trup ›" fra Hjem, mens en MODSTANDERS trup vises: skal vise DIN trup (showTeam), ikke blot skifte fane
+    const botIdx = L.teams.findIndex((t) => t.isBot);
+    await p.selectOption('#team-select', String(botIdx)); await p.waitForSelector('.tabpane.tab-trup');
+    await tt('hjem'); await p.click('#home-retiring-link'); await p.waitForSelector('.tabpane.tab-trup');
+    check('v3.33.1 TM: "Trup ›" på Hjem åbner DIN trup, også når en modstanders trup sidst blev vist', (await p.locator(`#matrix tr[data-pid="${sure.id}"]`).count()) === 1 && (await p.locator(`#matrix tr[data-pid="${sure2.id}"]`).count()) === 1);
+    // Runde 8: 👋 står stadig under afspilningen (kun runde 7 skjules), og vinduet er lukket – Hjem siger "find en afløser ved sæsonslut"
+    await tt('hjem'); await p.click('#play-round'); await p.waitForSelector('#skip');
+    await tt('trup');
+    const during8 = await p.locator('#matrix .retiring-tag').count();
+    await tt('kamp'); await p.click('#skip'); await p.waitForSelector('.to-home');
+    await tt('hjem');
+    const home8 = await p.textContent('#home-retiring');
+    check('v3.33.1 TM: under runde 8 står 👋 stadig (kun runde 7 skjules), og efter runde 8 er vinduet lukket: "find en afløser ved sæsonslut"',
+      during8 === 2 && home8.endsWith(' – find en afløser ved sæsonslutTrup ›') && !home8.includes('vinduet'), JSON.stringify({ during8, home8 }));
     // NEWS-nøglen for 3.33.1: spilleren, der sidst så 3.33.0, får nyheden som besked (sæsonrapporten på Hjem, 👋 fra runde 7, "Dit hold" = sæsonen)
     await p.evaluate(() => { const d = JSON.parse(localStorage.getItem('tactivar_save')); d.ui.seenVersion = '3.33.0'; localStorage.setItem('tactivar_save', JSON.stringify(d)); });
     await p.reload(); await p.waitForSelector('body[data-klar="ja"]');
@@ -4293,6 +4316,24 @@ try {
     check('v3.33.1 TM: nyheden for 3.33.1 står i NEWS og vises som besked ved opdatering (sæsonrapporten på Hjem, 👋 fra runde 7, "Dit hold")',
       news.startsWith('📋 Sæsonrapporten står nu på 🏠 Hjem') && news.includes('👋 Karrierestop varsles fra runde 7') && news.includes('Liga → "Dit hold"'), news.slice(0, 160));
     await c.close();
+    // Sæsonslut ved 390: "📋 Sæsonrapport ›" i Klub åbner Hjem OG ruller til rapporten; rapporten og ungdomstilbuddene har scroll-margin under topbaren
+    {
+      const E = parseSave(serialize({ league: createLeague(createRng(5)), notes: {}, ui: {} })).state.league, r2 = createRng(55);
+      for (let r = 0; r < 14; r++) commitRound(E, playRound(E, r2), r2);
+      const c2 = await browser.newContext({ viewport: { width: 390, height: 844 } }), q = await c2.newPage(); q.on('pageerror', (e) => fejl.push(e.message));
+      await q.goto(BASE + '/'); await q.waitForSelector('body[data-klar="ja"]');
+      await q.evaluate((x) => { for (const k of Object.keys(localStorage)) if (k.startsWith('tactivar_')) localStorage.removeItem(k); localStorage.setItem('tactivar_save', x); }, serialize({ league: E, notes: {}, ui: { activePresetIndex: 0, seenVersion: VERSION, tab: 'klub' } }));
+      await q.reload(); await q.waitForSelector('body[data-klar="ja"]');
+      await q.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+      await q.click('#to-season-report'); await q.waitForSelector('.tabpane.tab-hjem'); await q.waitForTimeout(400);
+      const m = await q.evaluate(() => { const r = document.getElementById('season-report'), y = document.getElementById('youth-offers');
+        return { top: Math.round(r.getBoundingClientRect().top), smR: parseFloat(getComputedStyle(r).scrollMarginTop), smY: parseFloat(getComputedStyle(y).scrollMarginTop), h3: r.querySelector('h3').textContent, fc: document.getElementById('sr-to-klub')?.textContent }; });
+      check('v3.33.1 TM: Klubs "📋 Sæsonrapport ›" åbner Hjem og ruller til rapporten (øverst i billedet, under topbaren); rapporten og ungdomstilbuddene har scroll-margin; "💼 Klub ›" i prognosen',
+        m.top >= 0 && m.top < 200 && m.smR > 0 && m.smY > 0 && /^📋 Sæson 1 er slut – nr\. [1-8] af 8$/.test(m.h3) && m.fc === '💼 Klub ›', JSON.stringify(m));
+      await q.click('#sr-to-klub'); await q.waitForSelector('.tabpane.tab-klub');
+      check('v3.33.1 TM: "💼 Klub ›" i sæsonrapporten åbner Klub', (await q.locator('#to-season-report').count()) === 1);
+      await c2.close();
+    }
   }
 
   // ---------- v3.33.1: 👋 karrierestop fra runde 7, "Dit hold" = sæsonen, rapporten på Hjem (kan køres alene med V3331_ONLY=1) ----------
