@@ -4,7 +4,7 @@
 import { normalizeLeague, normalizeRule } from '../engine/sanitize.js';
 import { COUNTER_KEYS, scaleIntoPool, counterFloor } from '../engine/counter.js';
 import { heightAtQuantile, assignPositions, teamCareerDefaults, FIRST_NAMES, LAST_NAMES } from '../engine/generator.js';
-import { initialPotential, publicWage, uniquifyNames, derivedRng } from '../engine/career.js';
+import { initialPotential, publicWage, uniquifyNames, derivedRng, willRetire, RETIRE_WARN_ROUND } from '../engine/career.js';
 import { buildSchedule } from '../engine/schedule.js';
 import { FORMATIONS, lineOfRole, positionOfRole, arrangeByFit } from '../engine/formations.js';
 import { endSeason } from '../engine/season.js';
@@ -13,7 +13,7 @@ import { clearReplay } from './replay.js';
 
 export const SAVE_KEY = 'tactivar_save';
 export const BACKUP_PREFIX = 'tactivar_backup_';
-export const SCHEMA_VERSION = 9;
+export const SCHEMA_VERSION = 10;
 
 // Migreringer: MIGRATIONS[n] løfter et gemt objekt fra skema n til n+1. Tilføj en ny,
 // hver gang gemme-formatet ændres – sammen med et fixture fra forrige version i
@@ -148,6 +148,22 @@ export const MIGRATIONS = {
     const L = d.league;
     if (L && Array.isArray(L.teams)) for (const t of L.teams) if (Array.isArray(t.squad)) seedChemistry(t, Number.isInteger(L.leagueMetadata?.round) ? L.leagueMetadata.round : 0);
     return { ...d, schemaVersion: 9 };
+  },
+  // 9 → 10 (v3.33.1, brugeren: "0 kampe, men alligevel … løbet km" og "ikke blevet advaret om at en spiller ville stoppe"): sæsonens
+  // løbetal (sDistanceSum, sMinutesSum, sHiKmSum, sHiDistSum) starter på 0 og tælles fra næste runde (league.runStatsFromRound – ældre
+  // runder kan ikke genskabes; Liga siger "fra R{k}"). Karrierestoppet p.retiring sættes, hvis sæsonens runde RETIRE_WARN_ROUND er spillet –
+  // med samme afledte rng som sæsonskiftet (willRetire), så varslet og udfaldet er det samme. Ingen spiller ældes eller forsvinder.
+  9: (d) => {
+    const L = d.league;
+    if (!L || !Array.isArray(L.teams)) return { ...d, schemaVersion: 10 };
+    const md = L.leagueMetadata ?? {}, round = Number.isInteger(md.round) ? md.round : 0;
+    L.runStatsFromRound = round + 1;
+    const played = round + 1 - (Number.isInteger(L.seasonStartRound) ? L.seasonStartRound : 1);   // spillede runder i sæsonen (0 lige efter sæsonslut)
+    for (const t of L.teams) for (const p of Array.isArray(t.squad) ? t.squad : []) {
+      p.sDistanceSum = 0; p.sMinutesSum = 0; p.sHiKmSum = 0; p.sHiDistSum = 0;
+      p.retiring = played >= RETIRE_WARN_ROUND && Number.isFinite(p.age) && willRetire(p, md.seasonNumber ?? 1);
+    }
+    return { ...d, schemaVersion: 10 };
   },
 };
 const pick = (o, keys) => Object.fromEntries(keys.filter((k) => o[k] !== undefined).map((k) => [k, o[k]]));

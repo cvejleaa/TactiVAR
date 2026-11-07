@@ -80,6 +80,7 @@ td.player-gain::after { display: none; }
 @media (max-width: 600px) { td.player-gain::after { display: inline-block; } }
 /* v3.30.0: "💰 Til salg" efter navnet i Trup – lille mærke i guld, også på mobil (navnet står i 2. kolonne, før den vandrette rulning) */
 .listed-tag { display: inline-block; margin-left: .3em; padding: 0 .35em; border-radius: 999px; background: #3b2a06; color: #fcd34d; font-size: var(--fs-1); font-weight: 700; line-height: 1.25; }
+.retiring-tag { margin-left: .25em; font-weight: 400; }   /* v3.33.1: 👋 stopper efter sæsonen (matrix.js, club.js) */
 .train-table tbody tr { cursor: default; }
 .heat-4 { color: #34d399; font-weight: 700; } .heat-3 { color: var(--blå); } .heat-2 { color: #f8fafc; } .heat-1 { color: #64748b; }
 .lockcell { color: #64748b; } .chip { background: #1e293b; padding: 0 .3rem; border-radius: .25rem; font-weight: 700; }
@@ -120,7 +121,7 @@ fieldset.phase legend { color: var(--dæmpet); padding: 0 .3rem; }
 .help-more > summary { cursor: pointer; color: var(--info); display: inline-flex; align-items: center; width: fit-content; padding: .1rem 0; }
 .help-more > :not(summary) { margin: .3rem 0 0; }
 @media (max-width: 600px) { .help-more > summary, .mc-more > summary, #replay-help > summary { min-height: 44px; } }
-.standings tr.mine td { color: var(--grøn); } .standings tr.viewing { outline: 1px solid var(--lilla); } .standings td:nth-child(2) { text-align: left; } .pts { font-weight: 800; }
+.standings tr.mine td { color: var(--grøn); } .standings tr.viewing { outline: 1px solid var(--lilla); } #standings td:nth-child(2) { text-align: left; } .pts { font-weight: 800; }
 .errorpanel { border-color: var(--rød); }
 .savestatus.failed { color: var(--rød); font-weight: 800; }
 
@@ -246,7 +247,17 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .stat-list[data-key="publicStars"] .st-val { width: 5.75rem; } /* fem stjerner skal kunne stå helt */
 .stat-table tr.mine td:first-child { box-shadow: inset 3px 0 0 var(--grøn); }
 #team-stats td, #team-stats th, #my-players td, #my-players th { white-space: nowrap; }
+/* v3.33.1 "Dit hold": spilleren til venstre, tallene højrestillet med faste cifre; navnet afkortes, så tabellen holder sig i rammen ved 390.
+   :where() holder vægten lav (0,1,1) – en bred regel som ".standings td:nth-child(2)" må ikke kunne venstrestille Kampe igen (e2e måler det) */
+:where(.my-players) :is(td, th).num { text-align: right; font-weight: 400; font-variant-numeric: tabular-nums; padding-left: .35rem; }
+:where(.my-players) :is(td, th).st-name { text-align: left; }
+:where(.my-players) .nm { display: inline-block; max-width: 9rem; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
+@media (max-width: 600px) { :where(.my-players) :is(td, th) { padding-left: .12rem; padding-right: .12rem; } :where(.my-players) .nm { max-width: 4.5rem; }
+  #my-players th { white-space: normal; vertical-align: bottom; } }   /* "Fri løb" og "HI %" på to linjer – skriftskalaen (12 px) bevares */
 #team-stats tr.mine td { color: var(--grøn); }
+/* v3.33.1: sæsonrapporten på Hjem – ungdomstilbuddenes knapper er rigtige mål på mobil */
+.youth-offer { margin: .35rem 0; } .youth-offer button { margin: .15rem .3rem .15rem 0; }
+@media (max-width: 600px) { .youth-offer button { min-height: 44px; min-width: 5.5rem; } }
 .round-bars { display: grid; gap: .15rem; max-width: 40rem; }
 .round-bar { display: grid; grid-template-columns: 2.5rem 1fr 2rem; align-items: center; gap: .4rem; font-size: var(--fs-2); }
 .rb-fill { display: block; height: .7rem; background: var(--grøn); border-radius: .2rem; min-width: 2px; }
@@ -441,13 +452,13 @@ body.has-bar { padding-bottom: 4.5rem; }
 .form-pill { display: inline-block; min-width: 1.4rem; text-align: center; border-radius: 999px; padding: 0 .35rem; font-weight: 700; font-size: var(--fs-1); line-height: 1.5; }
 .form-V { background: #0b3326; color: #6ee7b7; } .form-U { background: var(--panel-2); color: var(--dæmpet); } .form-T { background: #451a1a; color: #fca5a5; }
 /* Avisen står på Liga; links fra Hjem og Kamp ruller hertil – toppen lander under den faste topbar (og Hjem-listen fra bjælkens tæller) */
-#gazette, #home-todo { scroll-margin-top: calc(var(--top-h, 6rem) + .5rem); }   /* #home-todo: bjælkens tæller (v3.31.1) */
+#gazette, #home-todo, #season-report, #youth-offers { scroll-margin-top: calc(var(--top-h, 6rem) + .5rem); }   /* v3.33.1: rapporten på Hjem (Klubs link, "Svar ↑") */   /* #home-todo: bjælkens tæller (v3.31.1) */
 /* Spil-bjælken uden 🔍 (Hjem, Kamp efter fløjtet, under afspilning): ▶ står samme sted som på de andre faner */
 .playbar-in.no-opp #play-round { margin-left: auto; }
 .count-narrow { display: none; }
 @media (max-width: 900px) { .home-grid { grid-template-columns: 1fr; } }
 /* v3.31.0 (QC): i én kolonne kommer næste kamp før avisen – beslutningen før læsestoffet (på computer står avisen i venstre kolonne) */
-@media (max-width: 900px) { .home-main, .home-side { display: contents; } .home-last { order: 1; } .home-todo { order: 2; } .home-next { order: 3; } .home-paper { order: 4; } .home-table { order: 5; } }
+@media (max-width: 900px) { .home-main, .home-side { display: contents; } .season-report { order: 0; } .home-last { order: 1; } .home-todo { order: 2; } .home-next { order: 3; } .home-paper { order: 4; } .home-table { order: 5; } }
 /* Mobil: topbaren ruller væk – kun Spil-bjælken og bundnavigationen står fast (og scout-bjælken, når den vises) */
 @media (max-width: 600px) {
   .topbar { position: static; flex-wrap: nowrap; padding: .5rem .75rem; gap: .5rem; }

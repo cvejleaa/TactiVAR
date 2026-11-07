@@ -53,9 +53,14 @@ export function starsForValue(p) {
 }
 // Værdien for et ikke-helt stjernetal (startstjernerne, v3.30.0): lineært mellem de to hele stjerner – 2,9★ = 600k + 0,9 · 600k
 export const valueOfStars = (st) => { const i = Math.floor(st), f = st - i; return f ? VALUE_BY_STARS[i] + f * (VALUE_BY_STARS[i + 1] - VALUE_BY_STARS[i]) : VALUE_BY_STARS[i]; };
-export const publicValue = (p) => Math.max(25000, round(valueOfStars(starsForValue(p)) * ageFactor(p.age), 25000));
+export const baseValue = (p) => Math.max(25000, round(valueOfStars(starsForValue(p)) * ageFactor(p.age), 25000));
+// v3.33.1 (Spilfører økonomi): en spiller, der stopper efter sæsonen (p.retiring – offentligt fra runde 7), er det halve værd: 7 af
+// sæsonens 14 runder tilbage. Prisen, buddene, botternes valg og alle visninger går gennem publicValue – lønnen IKKE (publicWage fra
+// baseValue): ellers genforhandlede et køb lønnen til det halve (transfers.js move).
+export const RETIRE_VALUE = 0.5;
+export const publicValue = (p) => (p.retiring ? Math.max(25000, round(baseValue(p) * RETIRE_VALUE, 25000)) : baseValue(p));
 // Ugelønnen i hele 3.000 kr., så lønnen pr. runde (÷ 3) går op – ingen afrundingsstøj i regnskabet (Spilfører: "1.256.001 kr.")
-export const publicWage = (p) => Math.max(3000, round(publicValue(p) * WAGE_SHARE, 3000));
+export const publicWage = (p) => Math.max(3000, round(baseValue(p) * WAGE_SHARE, 3000));
 
 // ---------- Navne (v3.18.0: unikke kortnavne i hele ligaen) ----------
 export const FIRST_NAMES_EXTRA = ['Bastian', 'Daniel', 'Elias', 'Felix', 'Hjalte', 'Isak', 'Johan', 'Kristoffer', 'Laurits', 'Nicklas', 'Philip', 'Rune', 'Theo', 'Ulrik', 'Valdemar', 'Yusuf', 'Zakarias', 'Benjamin', 'Dennis', 'Hugo', 'Ida', 'Otto', 'Ruben', 'Tristan', 'Esben', 'Gabriel', 'Henrik', 'Lasse', 'Oskar', 'Vilhelm'];
@@ -216,8 +221,9 @@ export function bookLedger(team, entry) {
 
 // ---------- Sæsonskiftet (v3.18.0; brugerens valg: +1 år pr. sæson) ----------
 // Pension: fra 31 år (MV 33) med stigende sandsynlighed (¼, ½, ¾), sikker ved 34 (MV 36) – measure-lifecycle: snitalder 23–26. Afgjort af en afledt rng pr. spiller og sæson,
-// så varslet fra runde 10 ("overvejer at stoppe") og udfaldet ved sæsonslut er det samme.
-export const RETIRE_FROM = { field: 31, GK: 33 }, RETIRE_SURE = { field: 34, GK: 36 }, RETIRE_WARN_ROUND = 10, RETIRED_CAP = 40;
+// så varslet og udfaldet ved sæsonslut er det samme. v3.33.1: varslet står fra sæsonens runde 7 (før 10) som p.retiring (season.js
+// markRetiring) – mens vinduet før runde 8 er åbent, så du kan nå at handle.
+export const RETIRE_FROM = { field: 31, GK: 33 }, RETIRE_SURE = { field: 34, GK: 36 }, RETIRE_WARN_ROUND = 7, RETIRED_CAP = 40;
 export function retireChance(p) {
   const k = p.line === 'GK' ? 'GK' : 'field';
   return p.age >= RETIRE_SURE[k] ? 1 : p.age >= RETIRE_FROM[k] ? (p.age - RETIRE_FROM[k] + 1) / (RETIRE_SURE[k] - RETIRE_FROM[k] + 1) : 0;

@@ -40,7 +40,7 @@ const rowCells = (tr) => tr.children.map((c) => c.textContent);
 test('statistik-fanen: fire sektioner, kun spillerne åben, "fra runde N" fra ligaen (1 uden felt)', () => {
   const { L, me } = world();
   let root = render(L, me);
-  const secs = all(root, (e) => e.tag === 'details');
+  const secs = all(root, (e) => e.tag === 'details' && e.className === 'stats-sec');   // v3.33.1: ⓘ under "Dit hold" er også et <details>
   assert.deepEqual(secs.map((s) => s.attrs.id), ['stats-players', 'stats-teams', 'stats-flow', 'stats-mine']);
   assert.deepEqual(secs.map((s) => s.attrs.open), ['', undefined, undefined, undefined]);
   // v3.14.1 (brugeren: "Statistik skal tælle for sæsonen"): sæsonen står i titlen; runden er sæson-relativ, og kun et gem,
@@ -185,22 +185,33 @@ test('ligaens forløb: overskrift, søjler (bredde i forhold til rundens mål), 
   assert.ok(!byId(render(L, me), 'stats-flow').textContent.includes('Største sejr'));
 });
 
-test('dit hold (privat): pr.-kamp-tal, sæsonsummer og spillertabellen med snit, km, HI, frie løb og friskhed – kun for mit hold', () => {
+test('dit hold (privat): pr.-kamp-tal, sæsonsummer og spillertabellen – ALLE kolonner for sæsonen (v3.33.1), karrieren i title – kun for mit hold', () => {
   const { L, me, other } = world();
   const s = L.leagueMetadata.standings.find((r) => r.teamId === me.id);
   Object.assign(s, { sMatches: 4, shots: 50, onTarget: 20, xg: 6, corners: 22, freeKicks: 10, headerGoals: 5, counterGoals: 3, counterGoalsAgainst: 2, varChecks: 9 });
   Object.assign(other.squad[0], { sGames: 9, freeRunsSum: 99 });
-  const p = me.squad[4];
-  Object.assign(p, { sGames: 3, ratingSum: 27, ratingGames: 4, minutesSum: 360, distanceSum: 42, hiKmSum: 3, hiDistSum: 12, freeRunsSum: 8, freeRunsWonSum: 3, freshness: 62 });
+  const p = me.squad[4], q = me.squad[5];
+  L.leagueMetadata.round = 5;
+  // Karrieren (ratingSum, distanceSum …) og sæsonen (matchLog i sæson 1, sDistanceSum …) har FORSKELLIGE tal – en byttet kilde bliver rød
+  Object.assign(p, { sGames: 3, ratingSum: 27, ratingGames: 4, minutesSum: 360, distanceSum: 42, hiKmSum: 3, hiDistSum: 12, sMinutesSum: 270, sDistanceSum: 33, sHiKmSum: 2, sHiDistSum: 10, freeRunsSum: 8, freeRunsWonSum: 3, freshness: 62,
+    matchLog: [[1, 1, 0, 1, 1, 0, 90, 7, 3, 0, 0], [1, 2, 0, 1, 1, 0, 90, 6.5, 3, 0, 0], [1, 3, 0, 1, 1, 0, 90, 8, 4, 0, 0], [0, 9, 0, 1, 1, 0, 90, 1, 1, 0, 0]] });
+  // Brugerens fund: 0 kampe i sæsonen, men karakter og km fra karrieren – nu "–" i ALLE sæsonkolonner (Friskhed er nu)
+  Object.assign(q, { sGames: 0, ratingSum: 35, ratingGames: 5, careerGames: 5, minutesSum: 450, distanceSum: 50, hiKmSum: 4, hiDistSum: 20, sMinutesSum: 0, sDistanceSum: 0, freeRunsSum: 0, freshness: 88, matchLog: [[0, 9, 0, 1, 1, 0, 90, 7.5, 3, 0, 0]] });
   const root = render(L, me);
   assert.equal(byId(root, 'my-team-stats').textContent, 'Sæson 1, fra runde 3, pr. kamp: 12,5 afslutninger (5,0 på mål), xG 1,50, 5,5 hjørnespark, 2,5 frispark i skudafstand. I alt: kontramål 3 for / 2 imod, 9 VAR-tjek.');
   const rows = all(byId(root, 'my-players'), (e) => e.tag === 'tr' && e.children[0].tag === 'td');
   assert.equal(rows.length, 18);
-  assert.deepEqual(all(byId(root, 'my-players'), (e) => e.tag === 'th').map((t) => t.textContent), ['Spiller', 'Kampe (fra R3)', 'Snit (i alt)', 'km/90 (i alt)', '% HI (i alt)', 'Fri (fra R3)', 'Friskhed']);
-  assert.deepEqual(cells(rows[4]), [`#${p.shirtNumber} ${p.shortName}`, '3', '6,8', '10,5', '25 %', '3/8', '62 %']);   // snit 27/4 = 6,75 → 6,8 · 42/360·90 = 10,5 km
-  assert.deepEqual(cells(rows[5]).slice(1), [String(me.squad[5].sGames), '–', '–', '–', '–', `${me.squad[5].freshness} %`]);
+  assert.deepEqual(all(byId(root, 'my-players'), (e) => e.tag === 'th').map((t) => t.textContent), ['Spiller', 'Kampe', 'Snit', 'km/90', 'HI %', 'Fri løb', 'Friskhed']);
+  assert.equal(byId(root, 'my-players-period').textContent, 'Sæson 1 · 5 runder · kampe og fri løb fra R3', 'perioden står ÉN gang over tabellen');
+  // sæson: snit (7 + 6,5 + 8) / 3 = 7,17 → 7,2 (karrieren 27/4 = 6,8; med kampen fra en anden sæson 5,6) · 33/270·90 = 11,0 km (karrieren 10,5) · HI 2/10 = 20 % (karrieren 25 %)
+  assert.deepEqual(cells(rows[4]), [`#${p.shirtNumber} ${p.shortName}`, '3', '7,2', '11,0', '20 %', '3/8', '62 %']);
+  assert.deepEqual(cells(rows[5]), [`#${q.shirtNumber} ${q.shortName}`, '–', '–', '–', '–', '–', '88 %'], 'ingen sæsonkampe: intet karrieretal i en sæsonkolonne');
+  assert.equal(rows[5].attrs.title, 'Karriere: 5 kampe · snit 7,0 · 10,0 km/90 · HI 20 %', 'karrieren står i rækkens title');
+  assert.ok(!cells(rows[5]).some((c) => /7,0|10,0/.test(c)));
+  assert.equal(rows[4].attrs.title, `Karriere: ${p.careerGames} kampe · snit 6,8 · 10,5 km/90 · HI 25 %`);
   assert.ok(!byId(root, 'stats-mine').textContent.includes('99'), 'modstanderens spillere vises ikke');
-  assert.ok(byId(root, 'stats-mine').textContent.endsWith('Kun du ser disse tal – de røber evner og dine taktiske valg. Kampe og frie løb tælles for sæson 1, fra runde 3; snit, km og HI gælder alle hans kampe (de nulstilles ikke ved sæsonskifte).'));
+  assert.ok(byId(root, 'stats-mine').textContent.includes('Kun du ser disse tal – de røber evner og dine taktiske valg. Alle kolonner gælder sæsonen'));
+  assert.ok(byId(root, 'my-players-legend').textContent.includes('Fri løb: løb uden bold – gange han kom fri / forsøg.'), '"Fri" forklaret (brugeren: "ingen forklaring på hvad \'Fri (sæson)\' betyder")');
   assert.ok(byId(root, 'stats-teams').textContent.endsWith('Bold % er snit pr. kamp. Afslutninger, xG, hjørnespark, kontraer og VAR-tjek ses kun for dit eget hold (under "Dit hold") – summeret over sæsonen kunne de røbe et holds taktik.'));
   // Før første runde
   const fresh = world();

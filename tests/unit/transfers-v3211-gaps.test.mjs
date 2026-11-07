@@ -13,6 +13,7 @@ class FakeEl extends FakeNode {
   addEventListener(k, f) { this.handlers[k] = f; }
   get id() { return this.attrs.id; }
   get textContent() { return this.children.map((c) => c.textContent).join(''); }
+  set textContent(t) { this.children = [new FakeText(String(t))]; }   // starsEl (Til salg-tabellen)
 }
 globalThis.Node = FakeNode;
 globalThis.document = { createElement: (t) => new FakeEl(t), createTextNode: (t) => new FakeText(t) };
@@ -247,4 +248,21 @@ test('"Til salg i ligaen" uden rækker: over lønbudgettet (også præcis 0 i lu
   assert.match(empty(), /^Ingen lige nu – du er over lønbudgettet: sæt en spiller til salg eller fritstil ham/);
   me.squad[1].weeklyWage += 50000;
   assert.match(empty(), /^Ingen lige nu – du er over lønbudgettet/);
+});
+
+test('v3.33.1 (QC/Spilfører UI): "Til salg i ligaen" mærker den, der stopper, med 👋 ved navnet – og kun ham', () => {
+  const L = fresh(), me = own(L);
+  me.cashBalance = 50000000;
+  const rows = () => all(byId(market(L, me, { onBuy() {} }).el, 'for-sale-table'), (e) => e.tag === 'tr' && e.dataset.pid);
+  const before = rows();
+  assert.ok(before.length >= 2, `data: mindst to til salg (${before.length})`);
+  const pid = before[0].dataset.pid;
+  L.teams.flatMap((t) => t.squad).find((p) => p.id === pid).retiring = true;
+  const after = rows(), name = (tr) => tr.children[1];
+  const mine = after.find((tr) => tr.dataset.pid === pid);
+  assert.ok(mine, 'han står stadig på listen');
+  assert.ok(name(mine).textContent.endsWith(' 👋'), name(mine).textContent);
+  assert.equal(name(mine).attrs.title, 'Stopper efter sæsonen – derfor den halve pris');
+  const others = after.filter((tr) => tr.dataset.pid !== pid);
+  assert.ok(others.length >= 1 && others.every((tr) => !name(tr).textContent.includes('👋') && !name(tr).attrs.title), 'ingen andre har 👋');
 });

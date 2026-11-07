@@ -5,6 +5,9 @@
 // v3.31.0 (F3): kampens spiller 👑 ved sidste runde (modstanderens uden karakter – visibility.js i homeData) og 📰-kortet med
 // rundens overskrift → avisen på Liga. paper er en funktion, der kun kaldes uden for afspilningen (her), så klummen aldrig bygges
 // for den runde, der afspilles.
+// v3.33.1: report er sæsonrapporten (en funktion som paper – kaldes kun her, efter vagten, så præmie og placering ikke afsløres, mens
+// sæsonens sidste runde afspilles) øverst i hovedkolonnen; retiring = dit holds spillere, der stopper efter sæsonen (en info-række i
+// "Før du spiller" – ingen opgave: den tæller ikke med i "N ting", og "Holdet er klar" står stadig).
 import { h, dec } from './dom.js';
 import { kr } from './labels.js';
 
@@ -14,7 +17,7 @@ const FORM_WORD = { V: 'Vundet', U: 'Uafgjort', T: 'Tabt' };
 // Modstanderens form som piller (Spilfører UI på F1): V grøn, U grå, T rød – bogstavet er stadig teksten (skærmlæsere og tests), title fra HANS side
 const formPills = (form, name) => form.flatMap((r, i) => [i ? ' ' : null, h('span', { class: `form-pill form-${r}`, title: `${name}: ${FORM_WORD[r]}` }, r)]);
 
-export function renderHome({ club, last, place, ended, roundsPlayed, next, issues, youth, training, table, playing, paper = null, on }) {
+export function renderHome({ club, last, place, ended, roundsPlayed, next, issues, youth, training, table, playing, paper = null, report = null, retiring = null, on }) {
   const head = h('div', { class: 'panel home-club', id: 'home-club' },
     h('div', {}, h('h2', { id: 'club-name' }, club.name), h('div', { class: 'muted' }, 'Dit hold')),
     h('div', { class: 'right' }, h('div', { class: 'muted' }, 'Klubkasse'),
@@ -57,8 +60,11 @@ export function renderHome({ club, last, place, ended, roundsPlayed, next, issue
     h('div', { class: 'row lbl-row' }, h('div', { class: 'lbl' }, `Før du spiller runde ${next.k}`), issues.length ? h('span', { class: `pill pill-${issues[0].kind}` }, `${issues.length} ting`) : null),
     issues.length || youth ? null : h('div', { class: 'todo-row', id: 'home-ready' }, h('span', { class: 'pill pill-ok' }, '✔'), h('span', { class: 'todo-txt' }, 'Holdet er klar')),
     rows,
-    youth ? h('div', { class: 'todo-row', id: 'youth-pending' }, h('span', { class: 'pill pill-ok' }, '🧒'), h('span', { class: 'todo-txt' }, `${youth} ungdomstilbud venter i sæsonrapporten`),
-      h('button', { class: 'linklike', onclick: on.liga }, 'Liga ›')) : null,
+    youth ? h('div', { class: 'todo-row', id: 'youth-pending' }, h('span', { class: 'pill pill-ok' }, '🧒'), h('span', { class: 'todo-txt' }, `${youth} ungdomstilbud udløber, når du spiller runde ${next.k}`),
+      h('button', { class: 'linklike', id: 'youth-answer', onclick: on.youth }, 'Svar ↑')) : null,
+    retiring?.players.length ? h('div', { class: 'todo-row', id: 'home-retiring' }, h('span', { class: 'pill pill-info' }, '👋'),
+      h('span', { class: 'todo-txt' }, `Stopper efter sæsonen: ${retiring.players.slice(0, 3).map((p) => `#${p.shirtNumber} ${p.shortName} (${p.line}, ${p.age} år)`).join(' · ')}${retiring.players.length > 3 ? ` … og ${retiring.players.length - 3} mere` : ''} – ${retiring.windowOpen ? `sidste chance for en afløser: vinduet lukker, når du spiller runde ${retiring.windowTo}` : 'find en afløser ved sæsonslut'}`),
+      h('button', { class: 'linklike', id: 'home-retiring-link', onclick: on.trup }, 'Trup ›')) : null,
     training ? h('div', { class: 'todo-row', id: 'home-training' }, h('span', { class: 'pill pill-info' }, '🏋️'),
       h('span', { class: 'todo-txt' }, `Efter runde ${training.round}: ` + [training.gains ? `${training.gains} fremskridt` : '', training.injuries ? `${training.injuries} skadet i træningen` : '', training.strong ? `${training.strong} ${training.strong === 1 ? 'nyt stærkt par' : 'nye stærke par'}` : ''].filter(Boolean).join(' · ')),
       // v3.30.0: fremskridt og skader står på 🏋️ Træning; er der KUN nye stærke par, står stregerne på Taktik (Spilfører UI)
@@ -76,6 +82,6 @@ export function renderHome({ club, last, place, ended, roundsPlayed, next, issue
     h('button', { class: 'linklike', id: 'home-paper-link', onclick: on.paper }, 'Læs hele avisen ›')) : null;
 
   return h('div', { class: 'home home-grid', id: 'home' }, head,
-    h('div', { class: 'home-main' }, lastCard, todo, paperCard),
+    h('div', { class: 'home-main' }, report ? report() : null, lastCard, todo, paperCard),
     h('div', { class: 'home-side' }, nextCard, mini));
 }

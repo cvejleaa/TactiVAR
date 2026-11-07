@@ -1,7 +1,7 @@
 // Statistik på Liga-fanen (v3.10, brugeren: "Jeg vil gerne have noget statistik med på liga siden
 // af al mulig slags" – og "mål på hovedstød, straffe eller dødbolde. Antallet af frispark").
 // Fire sammenfoldede sektioner nederst. Hvem ser hvad afgøres i engine/visibility.js.
-import { h, dec, fold } from './dom.js';
+import { h, dec, fold, help } from './dom.js';
 import { starsEl } from './labels.js';
 import { viewPlayer, viewTeamStats } from '../engine/visibility.js';
 import { runStats, PLAYER_SEASON_DEFAULTS, TEAM_STAT_FIELDS } from '../engine/stats.js';
@@ -13,7 +13,9 @@ const TOP = 5, MIN_GAMES = 3;
 // Statistikken gælder sæsonen (brugeren v3.14.1: "skal tælle for sæsonen og ikke siden en eller anden runde").
 // Kun et gem, der var midt i en sæson, da statistikken kom (v3.10, sanitize.js), mangler sæsonens første runder –
 // dem er der ingen spillertal for. Runden vises sæson-relativt (som "Spil runde 10 af 14").
-export const statsFromK = (league) => Math.max(1, (league.statsFromRound ?? 1) - (league.seasonStartRound ?? 1) + 1);
+// fromK (v3.33.1): sæsonens runde k, et tal tælles fra – key 'statsFromRound' (kampe, mål, frie løb) eller 'runStatsFromRound' (km og HI)
+export const fromK = (league, key) => Math.max(1, (league[key] ?? league.seasonStartRound ?? 1) - (league.seasonStartRound ?? 1) + 1);
+export const statsFromK = (league) => fromK(league, 'statsFromRound');
 const since = (league) => `sæson ${league.leagueMetadata.seasonNumber}${league.endedSeason ? ' – afsluttet' : ''}${statsFromK(league) > 1 ? `, fra runde ${statsFromK(league)}` : ''}`;
 // Lige efter sæsonslut (v3.16.3): den afsluttede sæsons tal, til den nye sæsons runde 1 er spillet. Det er de SAMME
 // visninger (viewPlayer/viewTeamStats, §3) på en kopi af ligaen, hvor tabellen er sæsonarkivets og spillernes
@@ -24,7 +26,8 @@ export function endedSeasonView(league) {
   if (!last.table.every((r) => TEAM_STAT_FIELDS.every((k) => Number.isFinite(r[k])))) return null;
   return { ...league, endedSeason: last,
     leagueMetadata: { ...league.leagueMetadata, seasonNumber: last.seasonNumber, standings: last.table },
-    seasonStartRound: last.fromRound, statsFromRound: last.statsFrom ?? last.fromRound,
+    // runStatsFrom (v3.33.1): et arkiv fra før har ingen sæsonløbetal – efter sæsonen (km og HI "–")
+    seasonStartRound: last.fromRound, statsFromRound: last.statsFrom ?? last.fromRound, runStatsFromRound: last.runStatsFrom ?? last.toRound + 1,
     teams: league.teams.map((t) => ({ ...t, squad: endedSquad(league, t, saved.players) })) };
 }
 // v3.18.0 (QC B1): truppen, som den var ved sæsonslut – fra øjebliksbilledet (hold, navn, nummer), så en spiller, der er stoppet
@@ -115,6 +118,31 @@ function leagueFlow(league) {
     most ? h('p', {}, `Målrigeste kamp: ${most.label}`) : null);
 }
 
+// "Dit hold" (v3.33.1, brugeren: "2 spillere … har 0 kampe, men alligevel har fået karakter, har løbet km, og så er der ingen forklaring
+// på hvad 'Fri (sæson)' betyder"): ALLE kolonner gælder sæsonen – ÉN kilde pr. kolonne: Kampe = sGames, Snit = kamphistorikken i sæsonen
+// (karakteren, alle hans kampe i sæsonen – også for et andet hold før et køb), km/90 og HI % = runStats(p, 'season'), Fri løb = freeRunsSum.
+// Uden kampe i sæsonen står "–" i alle sæsonkolonner (Friskhed er "nu"). Karrieren står i rækkens title.
+const seasonAvg = (p, season) => { const r = (p.matchLog ?? []).filter((e) => e[LOG.S] === season && Number.isFinite(e[LOG.RT])).map((e) => e[LOG.RT]);
+  return r.length ? r.reduce((a, b) => a + b, 0) / r.length : null; };
+export function myPlayersRows(league, team) {
+  const season = league.leagueMetadata.seasonNumber;
+  return team.squad.map((p) => {
+    const r = runStats(p, 'season'), c = runStats(p, 'career'), has = p.sGames > 0, avg = seasonAvg(p, season);
+    return { p, has, cells: has ? [String(p.sGames), avg != null ? dec(avg, 1) : '–', r.km90 != null ? dec(r.km90, 1) : '–', r.hiPct != null ? `${r.hiPct} %` : '–', p.freeRunsSum ? `${p.freeRunsWonSum}/${p.freeRunsSum}` : '–'] : ['–', '–', '–', '–', '–'],
+      career: `Karriere: ${p.careerGames ?? 0} kampe${p.ratingGames ? ` · snit ${dec(p.ratingSum / p.ratingGames, 1)}` : ''}${c.km90 != null ? ` · ${dec(c.km90, 1)} km/90` : ''}${c.hiPct != null ? ` · HI ${c.hiPct} %` : ''}` };
+  });
+}
+// Perioden ÉN gang over tabellen: "Sæson N · k runder" (afsluttet: "Sæson N (afsluttet)") – og hvorfra km/HI og kampene tælles, når
+// det ikke er hele sæsonen (et gem fra før v3.33.1 / v3.10)
+function periodText(league) {
+  const n = league.leagueMetadata.seasonNumber, ended = league.endedSeason;
+  const k = ended ? ended.toRound - ended.fromRound + 1 : league.leagueMetadata.round + 1 - (league.seasonStartRound ?? 1);
+  const sk = statsFromK(league), rk = fromK(league, 'runStatsFromRound');
+  const from = [sk > 1 ? `kampe og fri løb fra R${sk}` : null, rk > 1 ? (rk > k ? (ended ? `km/90 og HI % blev ikke målt i sæson ${n}` : 'km/90 og HI % fra næste runde') : `km/90 og HI % fra R${rk}`) : null].filter(Boolean);
+  return `${ended ? `Sæson ${n} (afsluttet)` : `Sæson ${n} · ${k} runde${k === 1 ? '' : 'r'}`}${from.length ? ` · ${from.join(', ')}` : ''}`;
+}
+const MY_HEAD = [['Spiller', 'Hold over en række (eller tryk) for hans karriere'], ['Kampe', 'Kampe i sæsonen'], ['Snit', 'Karakter i snit i sæsonen (alle hans kampe i sæsonen – også for en tidligere klub)'],
+  ['km/90', 'Løbet pr. 90 minutter i sæsonen'], ['HI %', 'Andel af distancen løbet højintenst i sæsonen'], ['Fri løb', 'Løb uden bold i sæsonen: gange han kom fri / forsøg'], ['Friskhed', 'Friskhed nu']];
 function myTeam(league, myTeamId) {
   const team = league.teams.find((t) => t.id === myTeamId);
   const s = viewTeamStats(league.leagueMetadata.standings.find((r) => r.teamId === myTeamId), true);
@@ -123,13 +151,18 @@ function myTeam(league, myTeamId) {
     h('p', { id: 'my-team-stats' }, s.sMatches
       ? `${since(league)[0].toUpperCase()}${since(league).slice(1)}, pr. kamp: ${dec((s.shots / n), 1)} afslutninger (${dec((s.onTarget / n), 1)} på mål), xG ${dec((s.xg / n), 2)}, ${dec((s.corners / n), 1)} hjørnespark, ${dec((s.freeKicks / n), 1)} frispark i skudafstand. I alt: kontramål ${s.counterGoals} for / ${s.counterGoalsAgainst} imod, ${s.varChecks} VAR-tjek.`
       : 'Kommer efter første runde.'),
-    h('div', { class: 'tablewrap' }, h('table', { class: 'standings', id: 'my-players' },
-      h('thead', {}, h('tr', {}, ['Spiller', `Kampe (${statsFromK(league) > 1 ? `fra R${statsFromK(league)}` : 'sæson'})`, 'Snit (i alt)', 'km/90 (i alt)', '% HI (i alt)', `Fri (${statsFromK(league) > 1 ? `fra R${statsFromK(league)}` : 'sæson'})`, 'Friskhed'].map((x) => h('th', {}, x)))),
-      h('tbody', {}, team.squad.map((p) => { const r = runStats(p); return h('tr', {},
-        h('td', {}, `#${p.shirtNumber} ${p.shortName}`), h('td', {}, p.sGames), h('td', {}, p.ratingGames ? dec((p.ratingSum / p.ratingGames), 1) : '–'),
-        h('td', {}, r.km90 != null ? dec(r.km90, 1) : '–'), h('td', {}, r.hiPct != null ? `${r.hiPct} %` : '–'),
-        h('td', {}, p.freeRunsSum ? `${p.freeRunsWonSum}/${p.freeRunsSum}` : '–'), h('td', {}, p.freshness != null ? `${p.freshness} %` : '–')); })))),
-    h('p', { class: 'muted' }, `Kun du ser disse tal – de røber evner og dine taktiske valg. Kampe og frie løb tælles for ${since(league)}; snit, km og HI gælder alle hans kampe (de nulstilles ikke ved sæsonskifte).`));
+    h('p', { class: 'muted', id: 'my-players-period' }, periodText(league)),
+    h('div', { class: 'tablewrap' }, h('table', { class: 'standings my-players', id: 'my-players' },
+      h('thead', {}, h('tr', {}, MY_HEAD.map(([x, title], i) => h('th', { class: i ? 'num' : 'st-name', title }, x)))),
+      h('tbody', {}, myPlayersRows(league, team).map(({ p, has, cells, career }) => h('tr', { title: career, dataset: { pid: p.id, season: has ? 'ja' : 'nej' } },
+        h('td', { class: 'st-name' }, h('span', { class: 'nm' }, `#${p.shirtNumber} ${p.shortName}`)), ...cells.map((c) => h('td', { class: 'num' }, c)),
+        h('td', { class: 'num' }, p.freshness != null ? `${p.freshness} %` : '–')))))),
+    help({ id: 'my-players-help', label: 'Dit hold', short: 'Kun du ser disse tal – de røber evner og dine taktiske valg. Alle kolonner gælder sæsonen; karrieren står, når du holder over en række.',
+      long: h('ul', { id: 'my-players-legend' },
+        h('li', {}, 'Snit = karakter i sæsonen (alle hans kampe i sæsonen).'),
+        h('li', {}, 'km/90 = løbet pr. 90 minutter · HI % = andel af distancen løbet højintenst.'),
+        h('li', {}, 'Fri løb: løb uden bold – gange han kom fri / forsøg.'),
+        h('li', {}, '"–" = ingen kampe i sæsonen. Friskhed er nu.')) }));
 }
 
 export function renderStats({ league, myTeamId }) {

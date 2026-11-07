@@ -2334,7 +2334,7 @@ test('synlighed: ti sæsonfelter er offentlige på spillere, løb uden bold kun 
   const { PLAYER_SEASON_FIELDS, TEAM_STAT_FIELDS } = await import('../../public/engine/stats.js');
   const { viewTeamStats } = await import('../../public/engine/visibility.js');
   const p = Object.fromEntries(PLAYER_SEASON_FIELDS.map((k, i) => [k, i + 1]));
-  const pub = ['sGames', 'sMinutes', 'sGoals', 'sAssists', 'sMotm', 'sYellow', 'sRed', 'sCleanSheets', 'sHeaderGoals', 'sPenaltyGoals', 'sSetPieceGoals'], priv = ['freeRunsSum', 'freeRunsWonSum'];
+  const pub = ['sGames', 'sMinutes', 'sGoals', 'sAssists', 'sMotm', 'sYellow', 'sRed', 'sCleanSheets', 'sHeaderGoals', 'sPenaltyGoals', 'sSetPieceGoals'], priv = ['freeRunsSum', 'freeRunsWonSum', 'sDistanceSum', 'sMinutesSum', 'sHiKmSum', 'sHiDistSum'];   // v3.33.1: sæsonens løbetal – private som karrierens
   assert.deepEqual([...PLAYER_SEASON_FIELDS].sort(), [...pub, ...priv].sort());
   const o = viewPlayer(p, false), w = viewPlayer(p, true);
   for (const k of pub) { assert.equal(o[k], p[k], k); assert.equal(w[k], p[k], k); }

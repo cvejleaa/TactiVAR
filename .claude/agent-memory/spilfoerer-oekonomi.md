@@ -31,3 +31,10 @@ fund der er rettet (så du ikke finder dem igen), hvad brugeren har valgt fra, o
 - Foreslået: stadion (GATE_MAX 9000, career.js:159), fanforventning (= nr. 15's mål), stab på sæsonkontrakt, ungdomsspejder
   der koster, renter/kredit i minus. Tillæg til nr. 8 (salgsgebyr efter tid i klubben) og nr. 30 (sponsor efter fans + sidste sæson).
 - finance.season nulstilles i sidste runde – mål indtægtsposter før runde 14 commit, ikke efter.
+
+## v3.33.1 karrierestop – efterprøvet 2026-11-07 (scratchpad/oek/retire-331.mjs <repo> passiv|dump|leje, probe.mjs)
+- Landet som rådet: publicValue = baseValue·½ ved p.retiring (career.js:61), publicWage fra baseValue (career.js:63) → move()
+  (transfers.js:76) beholder lønnen; trin 3 springer stoppere over (transfers.js:195). p.retiring = willRetire i 65/65 tilfælde.
+- 4 seeds × 6 sæsoner: passiv IDENTISK med v3.33.0 (kasser, 1–5 transfers, trupper) – botøkonomien uberørt.
+  Dump (sælg egne stoppere): 625k→325k, 1.800k→925k, 1.875k→950k. Leje (køb bedste stopper i R8-vinduet): 1.075k + 168k løn
+  for 7 runder, ingen bud på ham senere (0) – ingen pengemaskine. Åbent (lille): trin 1/2 må stadig købe stoppere.

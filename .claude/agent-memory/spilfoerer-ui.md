@@ -78,3 +78,23 @@ fund der er rettet (så du ikke finder dem igen), hvad brugeren har valgt fra, o
   .kind-live); CM trukket ned ved DM'en: 390 flag-overlap 129×12 px + flaget skåret −4 px (brik 218 px bred i 324 px bane), 1366 23×15;
   referatet "for langt fra sin DM-zone" ved y80 / "OM-zone" ved y12 (match.js:1361 cp.role = effektiv rolle; ringen er om CM-ankeret);
   arkets minibane siger "CM P. Bach" ved ankeret, listen under "CM→DM" (matchcenter.js:121-122 bruger coords.r, ikke e.place).
+
+## Plan v3.33.1 (2026-11-07) – rapport på Hjem, 👋-varsel, "dine spillere"; scripts scratchpad/ui3331/{play,m2,m3}.mjs (port 5500-5502)
+- Målt: rapporten 274 px (1366) / 533 px (390); Tag op/Lad gå 23 px; Hjem ved sæsonslut: todo y339 (1366) / y387 (390).
+- Sæson 1: 0 pensioner i HELE ligaen (retireChance 0 for alle) – varslet ses tidligst sæson 2; kræver doktoreret alder i test.
+- Ingen transfervindue mellem R10 og sæsonskiftet (WINDOW_ROUNDS [1,8]) – varslet kan ikke handles med salg.
+- card.js:25 "overvejer at stoppe" skønt udfaldet er afgjort (career.js:219). Foreslået "stopper efter sæsonen" overalt.
+- 👋 i Trup-navnecellen: 119 → 152 px ved 390 (hele kolonnen), 100 → 119 ved 1366; rækkehøjde uændret 44/25.
+- #my-players: Kampe-td venstrestillet under centreret th (style.css:123 .standings td:nth-child(2)); 552 px i 324 ved 390,
+  korte overskrifter → 324. km/HI/fri løb findes IKKE pr. sæson i matchLog (LOG career.js:138) – kræver nye s-felter.
+
+## Efter-gennemgang v3.33.1 sæsonrapport på Hjem + 👋 + "Dit hold" sæson (2026-11-07) – scripts scratchpad/ui3331/{play,p2,p3}.mjs (port 5530), billeder ui3331/
+- Godt (gå ikke efter igen): rapporten øverst på Hjem (h3 y164 ved 390), ▶ i bjælken; "Svar ↑" ruller til tilbuddene; Tag op/Lad gå 44 px ved 390;
+  👋 i Trup (4/4) + "· 👋 = stopper efter sæsonen", kortets tekst med halv værdi/løn; Klub "📋 Sæsonrapport – sæson 1 ›"; "fra R10" efter migrering;
+  ⓘ 44 px ved 390; rapporten væk efter S2R1.
+- Fundet: Hjem-linjen 👋 (131 px ved 390) linker til Trup, ikke markedet, og "vinduet er åbent til runde 8" = sidste chance (varsel R7, vindue lukker R8);
+  Klubs "Til salg i ligaen" (club.js ~128) uden 👋 (public-club :157 har det); "Snit" = karakter 7,7 i Dit hold, men 4,0 stjerner i "⭐ Bedste snit"
+  for samme spiller (stats.js:87); karrieren kun i tr-title ("når du holder over") – umulig på touch, navne "N. Jako…" ved 390;
+  1366: "Lad gå" brydes til egen linje (23 px); ≥2 karrierestop i 18-mandstrup → 0 tilbud (season.js:300-307, klub-område);
+  rapporten = 8–10 admin-punkter, ingen sæsonens spiller/topscorer/forventning.
+- Fixture save-v3.33.0 har gammel seenVersion → notice 4230 ord (artefakt, ikke rigtige brugere).

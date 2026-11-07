@@ -89,7 +89,7 @@ export function renderMarket({ league, team, playing, onAccept, onDecline, onUnl
       // Netto (QC): akademispillerens løn trækkes fra – samme tal som købsloftet
       const gain = youth ? `${freed > 0 ? `frigør ${kr(freed)} pr. runde i løn` : 'frigør ingen løn'} – en ungdomsspiller kommer ind fra akademiet i samme kæde (1★, ${kr(Math.round(YOUTH_WAGE / 3))} pr. runde)`
         : `frigør ${kr(freed)} pr. runde i løn`;
-      return h('div', { class: 'market-row', dataset: { pid: p.id } }, `#${p.shirtNumber} ${p.shortName} (${kr(publicValue(p))}) `,
+      return h('div', { class: 'market-row', dataset: { pid: p.id } }, `#${p.shirtNumber} ${p.shortName} (${kr(publicValue(p))}${p.retiring ? ' · 👋 stopper' : ''}) `,
         block ? h('span', { class: 'muted' }, `${block} `)
           : o ? [h('strong', {}, `Bud fra ${teamName(o.to)}: ${kr(o.price)} `), h('button', { class: 'mini offer-accept', onclick: () => onAccept(p.id) }, 'Sælg'), h('button', { class: 'mini offer-decline', onclick: () => onDecline(p.id) }, 'Afvis')]
           : h('span', { class: 'muted' }, w != null ? 'Intet bud – ingen klub har råd og plads lige nu. ' : 'Venter på vinduet. '),
@@ -121,7 +121,7 @@ function renderForSale(league, me, onBuy, onLine, line, msg = '') {
       h('thead', {}, h('tr', {}, [['', ''], ['Spiller', ''], ['Pris', ''], ['Pos', ''], ['Alder', ''], ['Vurd', ''], ['Klub', 'wide'], ['Løn hos dig/runde', 'wide']].map(([x, c]) => h('th', { class: c }, x)))),
       h('tbody', {}, rows.map(({ t, p, m }) => h('tr', { dataset: { pid: p.id } },
         h('td', {}, h('button', { class: 'mini buy-row', onclick: () => onBuy(p.id) }, '💰 Køb')),
-        h('td', {}, `#${p.shirtNumber} ${p.shortName}`), h('td', { class: 'num' }, kr(m.price)), h('td', {}, `${LINE[p.line]} · ${POSITION[p.position] ?? ''}`), h('td', { class: 'num' }, p.age),
+        h('td', p.retiring ? { class: 'sale-retiring', title: 'Stopper efter sæsonen – derfor den halve pris' } : {}, `#${p.shirtNumber} ${p.shortName}${p.retiring ? ' 👋' : ''}`), h('td', { class: 'num' }, kr(m.price)), h('td', {}, `${LINE[p.line]} · ${POSITION[p.position] ?? ''}`), h('td', { class: 'num' }, p.age),
         h('td', {}, starsEl(p.publicStars)), h('td', { class: 'wide' }, t.name), h('td', { class: 'num wide' }, kr(Math.round(publicWage(p) / 3)))))))) :
       h('p', { class: 'muted', id: 'for-sale-empty' }, line === 'all' ? (wageRoom(league, me) <= 0 ? (salesLeft(league, me) > 0 ? 'Ingen lige nu – du er over lønbudgettet: sæt en spiller til salg eller fritstil ham, så kan du købe for den løn, du sparer (se Lønbudget øverst i 💼 Klub).' : `Ingen lige nu – du er over lønbudgettet og har brugt dine ${SALES_PER_WINDOW} salg i vinduet.`) : 'Ingen lige nu – kassen eller lønbudgettet er for lille (se øverst i 💼 Klub), eller klubberne har solgt deres 2 i dette vindue.') : 'Ingen i denne kæde lige nu – prøv "Alle".'));
 }
@@ -154,7 +154,7 @@ export function renderPublicClub({ league, pub, me, playing, onBuy, onBack, msg 
         const m = marketInfo(league, me, pub, p);
         return h('tr', { dataset: { pid: p.id } },
           h('td', {}, m.reason ? h('span', { class: 'muted', title: m.reason }, '–') : h('button', { class: 'mini buy-row', onclick: () => onBuy(p.id) }, '💰 Køb')),
-          h('td', {}, `#${p.shirtNumber} ${p.shortName}`), h('td', {}, `${LINE[p.line]} · ${POSITION[p.position] ?? ''}`), h('td', { class: 'num' }, p.age),
+          h('td', {}, `#${p.shirtNumber} ${p.shortName}`, p.retiring ? h('span', { class: 'retiring-tag', title: `Stopper efter sæsonen (${p.age} år) – værdien er halv` }, ' 👋') : null), h('td', {}, `${LINE[p.line]} · ${POSITION[p.position] ?? ''}`), h('td', { class: 'num' }, p.age),
           h('td', {}, starsEl(p.publicStars)), h('td', { class: 'num' }, kr(publicValue(p))), h('td', { class: 'num', title: m.reason ?? '' }, kr(m.price)), h('td', { class: 'num' }, kr(Math.round(publicWage(p) / 3))));
       })))),
     // Under afspilningen skjules transfers og pensioner som på Liga (QC: ens)

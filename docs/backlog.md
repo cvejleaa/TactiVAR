@@ -10,7 +10,8 @@ Rangering: brugerens ønsker først, derefter værdi pr. størrelse. Første run
 000. **Brugerens ønsker 6/11 ("det hele" – i denne rækkefølge, én udgivelse ad gangen):**
    1. ~~v3.32.3 Samspil på Taktik~~ – lavet (se "Lavet").
    2. ~~v3.33.0 Træk bestemmer pladsen også i midten~~ – lavet (se "Lavet").
-   3. **v3.33.1 Sæsonrapport på Hjem + varsel om karrierestop** (brugeren 6/11 aften) · UI · S · 5 · "sæsonrapport skal være på
+   3. ~~v3.33.1 Sæsonrapport på Hjem + varsel om karrierestop + sæsontal i "Dit hold"~~ – lavet (se "Lavet"). Oprindeligt:
+      **v3.33.1 Sæsonrapport på Hjem + varsel om karrierestop** (brugeren 6/11 aften) · UI · S · 5 · "sæsonrapport skal være på
       enten Hjem eller Klub, da den vedrører min klub" → valgt Hjem (Klub får linket "Sæsonrapport ›"). "Jeg synes ikke jeg er blevet
       advaret om at en spiller ville stoppe karrieren, det skal være med, og markeres på trup siden" → valgt: 👋 ved navnet i Trup og
       en linje i Hjem "Før du spiller" fra runde 10 (samme regel som kortet: willRetire, deterministisk – altid sandt). Kun eget hold.
@@ -135,6 +136,16 @@ scratchpad – et tal herfra skal måles igen med et committet værktøj, før d
     (runde 12, 90+1'). `trace-invariants`: 0 fejl i 56 kampe – fejlen er i billedet, ikke sporet.
 14. **"Din sæson" i sæsonrapporten** · klub + UI · S/M · 4 · rapporten er ren administration; placering, kurve, bedste/værste
     kamp, sæsonens spiller og topscorer – alt fra historikken (`ui/season-report.js`).
+14b. **Fund fra rollerne på v3.33.1 (små, samlet)** · UI + klub + økonomi · S · 3 ·
+   - Liga ruller 16 px vandret ved 390 px pga. stjernerne i "⭐ Bedste snit" (også i v3.33.0).
+   - "Snit" betyder to ting på Liga: karakter i "Dit hold" (7,7) og stjerner i "⭐ Bedste snit" (4,0) – omdøb den ene (Spilfører UI).
+   - "Dit hold" på mobil: karrieren står kun i rækkens title (vises ikke ved tryk) – lad et tryk åbne spillerkortet og ret ⓘ-teksten (Spilfører UI).
+   - Sæsonslut føles ikke som en afslutning: "👑 Sæsonens spiller · ⚽ Topscorer" øverst i rapporten; "Lad gå" brydes ved 1366 (23 px) – hører sammen med 14 (Spilfører UI).
+   - Mister truppen 2+ spillere, får man 0 ungdomstilbud – alle rykkes op automatisk (`season.js:300-307`), så valget forsvinder, når man mister mest (Spilfører UI → klub).
+   - 👋-linjen på Hjem linker til Trup; et "Find afløser ›" til markedet filtreret på kæden ville passe bedre (Spilfører UI).
+   - Afsluttet sæson: en spiller, der er stoppet, har ingen kamphistorik og står med kampe men "–" i Snit (`stats.js:39`, QC).
+   - Botternes trin 1 og 2 kan købe en spiller, der stopper, til halv pris; købsboksens "7 runder for prisen" nævner ikke lønnen (Spilfører økonomi).
+   - Trin 3's sortering på `publicValue` er ubevist (en pris-stigende sortering overlever – Test Manager).
 15. **Bestyrelsens mål for sæsonen** · klub · M · 4 · 🗄 (lille felt) · midtbanen har noget at kæmpe for, men ingen siger det:
     nr. 4–6 efter runde 9 er 1,9 point fra naboen og flytter 1,8 pladser til slut (10 seeds × 2 sæsoner). Mål efter styrke,
     vist i Klub og Liga, fulgt i klummen, gjort op med bonus.
@@ -249,6 +260,7 @@ scratchpad – et tal herfra skal måles igen med et committet værktøj, før d
 - "– det holdt ikke mod jer" efter et nederlag kan misforstås (UI) – bevidst valgt i v3.21.2 (QC); kun noteret.
 
 ## Lavet
+- v3.33.1 brugerens ønsker 6/11 aften (punkt 000.3): sæsonrapporten på 🏠 Hjem (øverst, ungdomstilbuddene først, "Svar ↑"; Klub linker; aldrig under afspilningen) · 👋 karrierestop fra sæsonens runde 7 (valgt 7/11: mens vinduet før runde 8 er åbent) som offentligt flag `p.retiring` – Trup (alle hold), kort, Hjem (info, ingen opgave) · værdien halv (`RETIRE_VALUE` 0,5), lønnen uændret, botterne forstærker ikke med ham · Liga → "Dit hold" = sæsonen i alle kolonner (nye sæsonfelter `sDistanceSum` …, valgt 7/11), "–" uden sæsonkampe, karrieren i title, ⓘ · gemmeformat 10 (fixture `save-v3.33.0.json`). Næste: 000.4 VAR bliver v3.33.2.
 - v3.33.0 Træk bestemmer pladsen også på midten (brugerens ønske 6/11, punkt 000.2: "hvis jeg trak en spiller ud af en standardopstilling, så det f.eks. gik fra at være en cm til en dm, så skulle spillet finde ud af det"): CDM/CM/CAM følger den tegnede dybde (≥ 54 DM, 51–53 DM/CM, 41–50 CM, 38–40 CM/OM, ≤ 37 OM) – prisen, løbsgruppen, bevægelsen og km; brikken, Plads-cellen og karakterarket siger "CM→DM", pladstypen live under træk; Hvis-Så-plan fordeler efter planens tegnede dybder. Intet anker skifter klasse (fingeraftrykkene uændrede). Målt med `tools/measure-central.mjs` (spec §5).
 - v3.32.3 Samspil på Taktik (brugerens ønske 6/11, punkt 000.1: "Jeg kan ikke på taktik siden se, hvem den valgte spiller spiller godt sammen med"): valg = start byt – hans streger fremhævet, de andre dæmpet, naboernes ring i båndets farve · teksten i valgbeskeden (#pick-msg) med naboerne i ord (stærkeste først, den svageste) og op til 2 andre, han har spillet sig sammen med (bænk/reserve/start) – kun ord, kun dit hold · byt-forhåndsvisning i Plads-cellen ("+1", "−1", "±0"; samme pickForSwap på en kopi) · trykfelt ≥ 44 px om brikkerne ved ≤ 600 px. Kun visning: ingen motorændring, intet nyt gemmefelt.
 - v3.32.2 VAR-øjeblikket + spilfornemmelse (køens punkt 1 efter v3.32.1, `docs/plans/tidligere-planer.md`; brugeren 5/11 "VAR Monitor: ærlig ramme nu" + "Game feel"): `var.cast` (spiller-id'er, kun visning – noprose uændret) · rammen over stillingen fra tjekket til kendelsen + 5 tick med en log uden taktik og uden `ev.text` (`ui/varmoment.js`) · pausen før kendelsen (4 tick, tjek→kendelse 420 → 2100 ms) med "Vis kendelsen ›" · rystelse ved dine mål og røde kort, rød/grøn flash ved annulleret mål, `prefers-reduced-motion` · lyd (fløjt, VAR-bip, jubel) fra som standard med kontakt ved ⚡ · ⚡ 23 → 44 px ved 390. Målt: 63 % af kampene uden VAR, 37 % af DINE kampe med et VAR-øjeblik (spec §5). Næste i køen: v3.32.3 statisk (OpenGraph, manifest).

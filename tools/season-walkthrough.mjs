@@ -102,7 +102,7 @@ try {
   await tab('taktik'); await shot('15-saesonslut-taktik.png');
   // v3.18.0: sæsonrapporten, Klub, eget kort (træning, 📜 Kampe, marked) og en bots kort (💰 pris) – og første runde af sæson 2
   const extra = ['# Sæsonslut og sæson 2 (v3.18.0)', ''];
-  await tab('liga'); extra.push('## Sæsonrapporten', '', (await page.textContent('#season-report').catch(() => '(ingen)')).trim(), '');
+  await tab('hjem'); extra.push('## Sæsonrapporten (på Hjem fra v3.33.1)', '', (await page.textContent('#season-report').catch(() => '(ingen)')).trim(), '');
   await page.locator('#season-report').screenshot({ path: path.join(OUT, '15-saesonrapport.png') }).catch(() => {});
   extra.push('## Transfers på Liga', '', (await page.textContent('#transfer-log').catch(() => '(ingen)')).trim(), '');
   await tab('klub'); extra.push('## Klub', '', (await page.textContent('.tabpane')).trim(), ''); await shot('15-saesonslut-klub.png');

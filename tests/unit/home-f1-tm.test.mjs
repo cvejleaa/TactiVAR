@@ -25,7 +25,7 @@ const byId = (root, id) => all(root, (e) => e.id === id)[0] ?? null;
 const text = (root, id) => byId(root, id)?.textContent ?? null;
 
 const calls = [];
-const on = { kamp: () => calls.push('kamp'), liga: () => calls.push('liga'), klub: () => calls.push('klub'), traening: () => calls.push('traening'), taktik: () => calls.push('taktik'), opp: () => calls.push('opp'), fix: (ids) => calls.push(['fix', ids]) };
+const on = { youth: () => calls.push('youth'), trup: () => calls.push('trup'), kamp: () => calls.push('kamp'), liga: () => calls.push('liga'), klub: () => calls.push('klub'), traening: () => calls.push('traening'), taktik: () => calls.push('taktik'), opp: () => calls.push('opp'), fix: (ids) => calls.push(['fix', ids]) };
 const base = () => ({
   club: { name: 'Bibamus United', cash: 1234567, delta: 4321 },
   last: { idx: 0, round: 6, text: 'Bibamus United 3 – 1 Lyngby', result: 'won', scorers: ['Kjær', 'Holm (2)'], move: 2 },
@@ -127,11 +127,11 @@ test('Hjem "Før du spiller": rækker pr. advarsel (slags + #numre + tekst), ant
   const clear = render({ issues: [] });
   assert.equal(text(clear, 'home-ready'), '✔Holdet er klar');
   assert.ok(!text(clear, 'home-todo').includes('ting'), 'ingen antal-pille uden advarsler');
-  // ungdomstilbud alene: ikke "klar" (der er noget at gøre), og linket går til Liga
+  // ungdomstilbud alene: ikke "klar" (der er noget at gøre), og "Svar ↑" ruller til tilbuddene i rapporten på Hjem (v3.33.1 – før "Liga ›")
   const youth = render({ issues: [], youth: 2 });
   assert.equal(byId(youth, 'home-ready'), null);
-  assert.equal(text(youth, 'youth-pending'), '🧒2 ungdomstilbud venter i sæsonrapportenLiga ›');
-  calls.length = 0; all(byId(youth, 'youth-pending'), (e) => e.tag === 'button')[0].on.click(); assert.deepEqual(calls, ['liga']);
+  assert.equal(text(youth, 'youth-pending'), '🧒2 ungdomstilbud udløber, når du spiller runde 7Svar ↑');
+  calls.length = 0; all(byId(youth, 'youth-pending'), (e) => e.tag === 'button')[0].on.click(); assert.deepEqual(calls, ['youth']);
   // advarsler OG ungdomstilbud: begge, "klar" ikke
   const both = render({ youth: 1 });
   assert.ok(text(both, 'youth-pending').includes('1 ungdomstilbud') && byId(both, 'home-ready') === null);
