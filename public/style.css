@@ -120,7 +120,7 @@ fieldset.phase legend { color: var(--dæmpet); padding: 0 .3rem; }
 .help-more > summary { cursor: pointer; color: var(--info); display: inline-flex; align-items: center; width: fit-content; padding: .1rem 0; }
 .help-more > :not(summary) { margin: .3rem 0 0; }
 @media (max-width: 600px) { .help-more > summary, .mc-more > summary, #replay-help > summary { min-height: 44px; } }
-.standings tr.mine td { color: var(--grøn); } .standings tr.viewing { outline: 1px solid var(--lilla); } .standings td:nth-child(2) { text-align: left; } .pts { font-weight: 800; }
+.standings tr.mine td { color: var(--grøn); } .standings tr.viewing { outline: 1px solid var(--lilla); } #standings td:nth-child(2) { text-align: left; } .pts { font-weight: 800; }
 .errorpanel { border-color: var(--rød); }
 .savestatus.failed { color: var(--rød); font-weight: 800; }
 
@@ -246,7 +246,16 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .stat-list[data-key="publicStars"] .st-val { width: 5.75rem; } /* fem stjerner skal kunne stå helt */
 .stat-table tr.mine td:first-child { box-shadow: inset 3px 0 0 var(--grøn); }
 #team-stats td, #team-stats th, #my-players td, #my-players th { white-space: nowrap; }
+/* v3.33.1 "Dit hold": spilleren til venstre, tallene højrestillet med faste cifre; navnet afkortes, så tabellen holder sig i rammen ved 390.
+   :where() holder vægten lav (0,1,1) – en bred regel som ".standings td:nth-child(2)" må ikke kunne venstrestille Kampe igen (e2e måler det) */
+:where(.my-players) :is(td, th).num { text-align: right; font-weight: 400; font-variant-numeric: tabular-nums; padding-left: .35rem; }
+:where(.my-players) :is(td, th).st-name { text-align: left; }
+:where(.my-players) .nm { display: inline-block; max-width: 9rem; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
+@media (max-width: 600px) { :where(.my-players) :is(td, th) { padding-left: .12rem; padding-right: .12rem; } :where(.my-players) td { font-size: .7rem; } :where(.my-players) th { font-size: .62rem; } :where(.my-players) .nm { max-width: 4.7rem; } }
 #team-stats tr.mine td { color: var(--grøn); }
+/* v3.33.1: sæsonrapporten på Hjem – ungdomstilbuddenes knapper er rigtige mål på mobil */
+.youth-offer { margin: .35rem 0; } .youth-offer button { margin: .15rem .3rem .15rem 0; }
+@media (max-width: 600px) { .youth-offer button { min-height: 44px; min-width: 5.5rem; } }
 .round-bars { display: grid; gap: .15rem; max-width: 40rem; }
 .round-bar { display: grid; grid-template-columns: 2.5rem 1fr 2rem; align-items: center; gap: .4rem; font-size: var(--fs-2); }
 .rb-fill { display: block; height: .7rem; background: var(--grøn); border-radius: .2rem; min-width: 2px; }

@@ -31,12 +31,14 @@ const byId = (el, id) => all(el, (e) => e.attrs.id === id)[0];
 // En liga i sæson 2, der startede i global runde 15; statistikken tæller fra global runde `from`
 function season2(from) {
   const L = createLeague(createRng(8)), me = L.teams[0];
-  Object.assign(L, { seasonStartRound: 15, statsFromRound: from }); L.leagueMetadata.seasonNumber = 2;
+  Object.assign(L, { seasonStartRound: 15, statsFromRound: from }); L.leagueMetadata.seasonNumber = 2; L.leagueMetadata.round = 20;   // 6 runder spillet i sæson 2
   Object.assign(L.leagueMetadata.standings.find((r) => r.teamId === me.id), { sMatches: 4, shots: 50, onTarget: 20, xg: 6, corners: 22, freeKicks: 10, counterGoals: 3, counterGoalsAgainst: 2, varChecks: 9 });
   return { L, me, root: renderStats({ league: L, myTeamId: me.id }) };
 }
 const heads = (root) => all(byId(root, 'my-players'), (e) => e.tag === 'th').map((t) => t.textContent);
-const titles = (root) => all(root, (e) => e.tag === 'summary').map((s) => s.textContent);
+const period = (root) => byId(root, 'my-players-period').textContent;
+const HEADS = ['Spiller', 'Kampe', 'Snit', 'km/90', 'HI %', 'Fri løb', 'Friskhed'];   // v3.33.1: korte overskrifter – perioden står ÉN gang over tabellen
+const titles = (root) => all(root, (e) => e.tag === 'details' && e.className === 'stats-sec').map((s) => s.children[0].textContent);   // sektionerne (ikke ⓘ, v3.33.1)
 
 test('statsFromK: sæsonens runde, hvor spillertallene begynder (mindst 1; udeladte felter = runde 1)', () => {
   // Dræber: `seasonStartRound ?? 0` (gav 4 for {statsFromRound: 3}), `+ 1` væk, global runde.
@@ -54,9 +56,9 @@ test('sæson 2, statistik fra sæsonens runde 4: overskrifter, kolonner og noter
   // Dræber: `fra R${league.statsFromRound}` i Kampe-/Fri-kolonnen (R18), `>= 1`, 'sæson'-teksten, gapNote-flytning/tekst.
   const { root } = season2(18);
   assert.deepEqual(titles(root).slice(0, 2), ['Spillere (sæson 2, fra runde 4)', 'Holdtal (sæson 2, fra runde 4)']);
-  assert.deepEqual(heads(root), ['Spiller', 'Kampe (fra R4)', 'Snit (i alt)', 'km/90 (i alt)', '% HI (i alt)', 'Fri (fra R4)', 'Friskhed']);
+  assert.deepEqual(heads(root), HEADS);
+  assert.equal(period(root), 'Sæson 2 · 6 runder · kampe og fri løb fra R4');
   assert.match(byId(root, 'my-team-stats').textContent, /^Sæson 2, fra runde 4, pr\. kamp: 12,5 afslutninger/);
-  assert.ok(byId(root, 'stats-mine').textContent.endsWith('Kampe og frie løb tælles for sæson 2, fra runde 4; snit, km og HI gælder alle hans kampe (de nulstilles ikke ved sæsonskifte).'));
   // linjen om de manglende runder: præcis én, i spillere-sektionen, som afsnit — og ikke i de andre sektioner
   const gaps = all(root, (e) => e.attrs.id === 'stats-gap');
   assert.equal(gaps.length, 1);
@@ -69,9 +71,9 @@ test('sæson 2, statistik fra sæsonens start (K = 1): "sæson" i kolonnerne og 
   // Dræber: `statsFromK > 1` → `>= 1` i overskrifterne ('fra R1'), 'sæson'-teksten i Kampe-/Fri-kolonnen, gapNote ved K = 1.
   const { root } = season2(15);
   assert.deepEqual(titles(root), ['Spillere (sæson 2)', 'Holdtal (sæson 2)', 'Ligaens forløb (sæson 2)', 'Dit hold (privat, sæson 2)']);
-  assert.deepEqual(heads(root), ['Spiller', 'Kampe (sæson)', 'Snit (i alt)', 'km/90 (i alt)', '% HI (i alt)', 'Fri (sæson)', 'Friskhed']);
+  assert.deepEqual(heads(root), HEADS);
+  assert.equal(period(root), 'Sæson 2 · 6 runder', 'K = 1: ingen "fra R1"');
   assert.match(byId(root, 'my-team-stats').textContent, /^Sæson 2, pr\. kamp: 12,5 afslutninger/);
-  assert.ok(byId(root, 'stats-mine').textContent.endsWith('Kampe og frie løb tælles for sæson 2; snit, km og HI gælder alle hans kampe (de nulstilles ikke ved sæsonskifte).'));
   assert.equal(all(root, (e) => e.attrs.id === 'stats-gap').length, 0);
 });
 
@@ -80,7 +82,7 @@ test('K = 2 (kun sæsonens runde 1 mangler): titel, kolonner og en linje om rund
   // testen fastlåser derfor kun det, der er sikkert: K = 2 giver en note, og den nævner runde 1.
   const { root } = season2(16);
   assert.equal(titles(root)[0], 'Spillere (sæson 2, fra runde 2)');
-  assert.equal(heads(root)[1], 'Kampe (fra R2)');
+  assert.equal(period(root), 'Sæson 2 · 6 runder · kampe og fri løb fra R2');
   const gap = byId(root, 'stats-gap');
   assert.ok(gap, 'noten findes ved K = 2');
   assert.equal(gap.textContent, 'Sæsonens runde 1 blev spillet, før statistikken fandtes, og kan ikke tælles med. Fra næste sæson tæller hele sæsonen.');   // ikke "1–1" (Test Manager)
