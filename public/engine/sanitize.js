@@ -59,7 +59,7 @@ export function normalizeLeague(league) {
   for (const s of md.standings) for (const [k, v] of Object.entries(TEAM_STAT_DEFAULTS)) if (s[k] === undefined) s[k] = v;
   // Statistikken (v3.10) tælles fra næste runde i en eksisterende liga – ældre runder er ikke gemt.
   league.statsFromRound ??= md.round + 1;
-  league.runStatsFromRound ??= md.round + 1;   // v3.33.1: sæsonens løbetal – som statistikken fra næste runde
+  // league.runStatsFromRound (v3.33.1) sættes KUN af MIGRATIONS[9], ny liga og endSeason – én vagt (mangler den, er det "fra R1")
   if (!Array.isArray(league.history)) league.history = [];
   league.scouting ||= {};
   league.lastRound ??= null;

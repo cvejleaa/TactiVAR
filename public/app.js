@@ -338,6 +338,8 @@ function migrationNotice(from) {
     // 8 → 9 (v3.23.0): en kort linje, så backup-knappen vises (Release Manager: ellers kunne backuppen ikke findes) – samspillet har
     // ingen virkning i kampene endnu og nævnes kun som forberedelse
     from <= 8 ? 'Forberedelse til samspil: hvert hold har fået et samspilstal for spillerne på nabopladser – det ændrer intet i kampene endnu.' : '',
+    // 9 → 10 (v3.33.1): én linje, så backup-knappen vises – og hvorfor km/90 og HI % i "Dit hold" står som "–" en runde
+    from <= 9 ? '"Dit hold" på Liga viser nu sæsonen i alle kolonner – km/90 og HI % tælles fra næste runde. 👋 viser, hvem der stopper efter sæsonen (fra runde 7).' : '',
   ].filter(Boolean);
   return lines.length ? 'Dit spil er opdateret: ' + lines.join(' ') : '';
 }

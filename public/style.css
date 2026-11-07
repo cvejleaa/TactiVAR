@@ -252,7 +252,8 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 :where(.my-players) :is(td, th).num { text-align: right; font-weight: 400; font-variant-numeric: tabular-nums; padding-left: .35rem; }
 :where(.my-players) :is(td, th).st-name { text-align: left; }
 :where(.my-players) .nm { display: inline-block; max-width: 9rem; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
-@media (max-width: 600px) { :where(.my-players) :is(td, th) { padding-left: .12rem; padding-right: .12rem; } :where(.my-players) td { font-size: .7rem; } :where(.my-players) th { font-size: .62rem; } :where(.my-players) .nm { max-width: 4.7rem; } }
+@media (max-width: 600px) { :where(.my-players) :is(td, th) { padding-left: .12rem; padding-right: .12rem; } :where(.my-players) .nm { max-width: 4.5rem; }
+  #my-players th { white-space: normal; vertical-align: bottom; } }   /* "Fri løb" og "HI %" på to linjer – skriftskalaen (12 px) bevares */
 #team-stats tr.mine td { color: var(--grøn); }
 /* v3.33.1: sæsonrapporten på Hjem – ungdomstilbuddenes knapper er rigtige mål på mobil */
 .youth-offer { margin: .35rem 0; } .youth-offer button { margin: .15rem .3rem .15rem 0; }

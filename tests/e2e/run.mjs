@@ -2900,7 +2900,7 @@ try {
   check('Migrering: beskeden forklarer puljen på 100, Superliga-højderne, friskheden, den naturlige position og kampprogrammet (alle trin fra skema 1 op) – og nævner backuppen', ['100 point', 'Superliga', 'Friskhed', 'Hvis-Så-regler kan nu sættes', 'naturlig position', 'kampprogram', 'Sæson 1 (uden program)', 'backup'].every((x) => migNotice.includes(x)), migNotice);
   await reload(); await reload();
   const mig = await g.evaluate(() => ({ schema: JSON.parse(localStorage.getItem('tactivar_save')).schemaVersion, backups: Object.keys(localStorage).filter((k) => k.startsWith('tactivar_backup_')).length }));
-  check('Migrering: gemmes straks i nyeste skema (9 fra v3.23.0), kun én backup trods tre genindlæsninger', mig.schema === 9 && mig.backups === 1, JSON.stringify(mig));
+  check('Migrering: gemmes straks i nyeste skema (10 fra v3.33.1), kun én backup trods tre genindlæsninger', mig.schema === 10 && mig.backups === 1, JSON.stringify(mig));
   await tab('liga'); const migHead = await g.textContent('#standings-title');
   await g.click('#past-seasons > summary');
   const past = await g.textContent('#past-seasons');
@@ -2931,7 +2931,7 @@ try {
   const nat = await g.locator('#matrix tbody tr td:nth-child(4)').allTextContents();
   check('Natur-kolonnen viser en position for alle 18 (MV/MS/Back/DM/CM/Kant/OM/ANG) – og én DM efter migreringen (v3.20.0)', nat.length === 18 && nat.every((t) => ['MV', 'MS', 'Back', 'DM', 'CM', 'Kant', 'OM', 'ANG'].includes(t.trim())) && nat.filter((t) => t.trim() === 'DM').length === 1, nat.join(','));
   const pos4 = await g.evaluate(() => { const d = JSON.parse(localStorage.getItem('tactivar_save')); const ps = d.league.teams.flatMap((t) => (t.isBot ? t.squad.filter((p) => !t.tactics.lineupSlots.includes(p.id)) : t.squad)); const m = (k) => { const x = ps.filter((p) => p.position === k).map((p) => p.heightCm); return x.reduce((a, b) => a + b) / x.length; }; return { schema: d.schemaVersion, cb: m('CB'), fb: m('FB') }; });
-  check('Migrering fra skema 4: gemt som skema 9, stoppere ≈190 og backs ≈176 cm (botternes startere fik i 7 → 8 den rolle, de spillede – uden for målingen)', pos4.schema === 9 && pos4.cb >= 189 && pos4.cb <= 192 && pos4.fb >= 174.5 && pos4.fb <= 177.5, JSON.stringify(pos4));
+  check('Migrering fra skema 4: gemt som skema 10, stoppere ≈190 og backs ≈176 cm (botternes startere fik i 7 → 8 den rolle, de spillede – uden for målingen)', pos4.schema === 10 && pos4.cb >= 189 && pos4.cb <= 192 && pos4.fb >= 174.5 && pos4.fb <= 177.5, JSON.stringify(pos4));
   await tab('kamp');
   const old4 = (await g.textContent('#match-center')) + (await pane('players'), await g.textContent('#match-center')) + (await pane('stats'), await g.textContent('#match-center'));   // v3.32.1: alle tre faner
   await pane('players');
@@ -2989,7 +2989,7 @@ try {
   await g.evaluate((f) => { for (const k of Object.keys(localStorage)) if (k.startsWith('tactivar_')) localStorage.removeItem(k); localStorage.setItem('tactivar_save', f); }, fixtureV3221);
   await reload();
   { const note = await g.textContent('#notice').catch(() => ''), saved = await g.evaluate(() => { const d = JSON.parse(localStorage.getItem('tactivar_save')); return { schema: d.schemaVersion, chem: Object.keys(d.league.teams[0].chemistry ?? {}).length, backups: Object.keys(localStorage).filter((k) => k.startsWith('tactivar_backup_')).length }; });
-    check('Gem fra v3.22.1 (skema 8): kort besked om samspillet med backup-knap, gemt som skema 9 med samspilstabel', note.startsWith('Dit spil er opdateret: Forberedelse til samspil') && (await g.locator('#download-migration-backup').isVisible()) && saved.schema === 9 && saved.chem > 50 && saved.backups === 1, JSON.stringify(saved) + ' ' + note.slice(0, 200)); }
+    check('Gem fra v3.22.1 (skema 8): kort besked om samspillet med backup-knap, gemt som skema 10 med samspilstabel', note.startsWith('Dit spil er opdateret: Forberedelse til samspil') && (await g.locator('#download-migration-backup').isVisible()) && saved.schema === 10 && saved.chem > 50 && saved.backups === 1, JSON.stringify(saved) + ' ' + note.slice(0, 200)); }
   const fixtureV39 = fs.readFileSync(new URL('../fixtures/save-v3.9.json', import.meta.url), 'utf8');
   await g.evaluate((f) => { for (const k of Object.keys(localStorage)) if (k.startsWith('tactivar_')) localStorage.removeItem(k); localStorage.setItem('tactivar_save', f); }, fixtureV39);
   await reload();
@@ -4308,7 +4308,7 @@ try {
       const st = await p.evaluate((zid) => {
         const t = document.getElementById('my-players'), wrap = t.closest('.tablewrap'), row = t.querySelector(`tr[data-pid="${zid}"]`), played = t.querySelector('tbody tr[data-season="ja"]');
         const al = (td) => getComputedStyle(td).textAlign;
-        t.style.width = 'max-content'; const natural = Math.round(t.getBoundingClientRect().width); t.style.width = '';   // indholdets egen bredde (tabellen fylder ellers 100 %)
+        t.style.width = 'min-content'; const natural = Math.round(t.getBoundingClientRect().width); t.style.width = '';   // indholdets mindste bredde (tabellen fylder ellers 100 %)
         return { natural, tableW: Math.round(t.getBoundingClientRect().width), wrapW: wrap.clientWidth, scroll: wrap.scrollWidth - wrap.clientWidth, page: document.documentElement.scrollWidth - document.documentElement.clientWidth,
           zero: row ? [...row.children].map((x) => x.textContent) : null, title: row?.title ?? null, heads: [...t.querySelectorAll('th')].map((x) => x.textContent),
           align: played ? [...played.children].map(al) : null, period: document.getElementById('my-players-period')?.textContent };
@@ -4321,6 +4321,19 @@ try {
         JSON.stringify(st.align) === JSON.stringify(['left', 'right', 'right', 'right', 'right', 'right', 'right']), JSON.stringify(st.align));
       // (siden selv ruller 16 px ved 390 på Liga også i v3.33.0 – stjernerne i "⭐ Bedste snit"-listen; ikke denne tabel)
       if (w === 390) check('v3.33.1 (390): "Dit hold"-tabellen er ikke bredere end rammen (før 552 px i 324) – ingen vandret rulning i tabellen', st.scroll <= 0 && st.natural <= st.wrapW, JSON.stringify(st));
+      await c.close();
+    }
+    // Gem fra v3.33.0 (skema 9, runde 9): beskeden med backup-knap, gemt som 10, 👋 står straks (sæsonens runde ≥ 7)
+    {
+      const c = await browser.newContext({ viewport: { width: 1366, height: 900 } }), p = await c.newPage(); p.on('pageerror', (e) => fejl.push(e.message));
+      await p.goto(BASE + '/'); await p.waitForSelector('body[data-klar="ja"]');
+      await p.evaluate((f) => { for (const k of Object.keys(localStorage)) if (k.startsWith('tactivar_')) localStorage.removeItem(k); localStorage.setItem('tactivar_save', f); }, fs.readFileSync(new URL('../fixtures/save-v3.33.0.json', import.meta.url), 'utf8'));
+      await p.reload(); await p.waitForSelector('body[data-klar="ja"]');
+      const note = await p.textContent('#notice').catch(() => ''), saved = await p.evaluate(() => { const d = JSON.parse(localStorage.getItem('tactivar_save')); return { schema: d.schemaVersion, from: d.league.runStatsFromRound, ret: d.league.teams.flatMap((t) => t.squad).filter((x) => x.retiring).length }; });
+      await p.click('#tab-trup'); await p.waitForSelector('.tabpane.tab-trup');
+      const tags = await p.locator('#matrix .retiring-tag').count();
+      check('v3.33.1: gem fra v3.33.0 (skema 9) – kort besked med backup-knap, gemt som 10, markøren = næste runde, og 👋 i Trup med det samme',
+        note.startsWith('Dit spil er opdateret: "Dit hold" på Liga viser nu sæsonen i alle kolonner') && (await p.locator('#download-migration-backup').isVisible()) && saved.schema === 10 && saved.from === 10 && saved.ret === 2 && tags === 1, JSON.stringify({ saved, tags, note: note.slice(0, 200) }));
       await c.close();
     }
     // Sæsonslut ved 390: rapporten øverst på Hjem, knapperne ≥ 44 px – og Hjems højde med og uden rapporten (uden = som v3.33.0's Hjem)
@@ -4340,6 +4353,8 @@ try {
       console.log(`  v3.33.1 måling (390): Hjem ved sæsonslut ${m.withR} px med rapporten (${m.rh} px), ${m.without} px uden (som v3.33.0)`);
       check('v3.33.1 (390) sæsonslut: rapporten står over "Sidste runde" på Hjem, Tag op/Lad gå er mindst 44 px høje, intet vandret',
         m.top < m.last && m.btn.length === 4 && m.btn.every((x) => x >= 44) && m.page <= 0, JSON.stringify(m));
+      await p.click('#tab-liga'); await p.waitForSelector('.tabpane.tab-liga');
+      check('v3.33.1 (390) sæsonslut: rapporten står ikke på Liga (kun på Hjem)', (await p.locator('#season-report').count()) === 0 && (await p.locator('#standings').count()) === 1);
       await c.close();
     }
   }
