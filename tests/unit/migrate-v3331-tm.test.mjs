@@ -27,6 +27,9 @@ const { marketInfo, isStarter, windowOf, openWindow } = await import('../../publ
 const { renderHome } = await import('../../public/ui/home.js');
 const { viewPlayer, viewTeam } = await import('../../public/engine/visibility.js');
 const { renderCard } = await import('../../public/ui/card.js');
+const { renderSeasonReport } = await import('../../public/ui/season-report.js');
+const { makeOffers } = await import('../../public/engine/transfers.js');
+const { derivedRng } = await import('../../public/engine/career.js');
 const { renderMarket, renderPublicClub } = await import('../../public/ui/club.js');
 
 const all = (el, pred, out = []) => { if (el instanceof FakeEl) { if (pred(el)) out.push(el); el.children.forEach((c) => all(c, pred, out)); } return out; };
@@ -305,4 +308,42 @@ test('sæsonskiftet rydder et forældet 👋: en spiller, der IKKE stopper, har 
   assert.ok(after, 'han bliver');
   assert.equal(after.retiring, false);
   assert.ok(players(L).every((p) => p.retiring === false), 'ingen er flagget i den nye sæson');
+});
+
+test('Hjem: "og N mere" tæller KUN over tre (præcis tre = ingen "og"), N = resten; vinduets slutrunde kommer fra data (9, ikke fast 8)', () => {
+  const on = { trup() {}, youth() {}, kamp() {}, liga() {}, klub() {}, traening() {}, taktik() {}, opp() {}, fix() {}, paper() {} };
+  const mk = (n, win) => renderHome({ club: { name: 'Mit', cash: 100, delta: null }, last: null, place: 3, ended: false, roundsPlayed: 7, next: { k: 8, of: 14, name: 'Bot', home: true, place: 2, form: [] },
+    issues: [], youth: 0, training: null, table: [], playing: false, on, retiring: { players: Array.from({ length: n }, (_, i) => ({ shirtNumber: i + 2, shortName: `S${i + 2}`, line: 'FOR', age: 34 })), windowOpen: win, windowTo: 9 } });
+  const t = (r) => all(byId(r, 'home-retiring'), (e) => e.className === 'todo-txt')[0].textContent;
+  assert.equal(t(mk(3, true)), 'Stopper efter sæsonen: #2 S2 (FOR, 34 år) · #3 S3 (FOR, 34 år) · #4 S4 (FOR, 34 år) – vinduet er åbent til runde 9');
+  assert.equal(t(mk(5, false)), 'Stopper efter sæsonen: #2 S2 (FOR, 34 år) · #3 S3 (FOR, 34 år) · #4 S4 (FOR, 34 år) … og 2 mere – find en afløser ved sæsonslut');
+});
+
+test('sæsonrapporten på Hjem har "💼 Klub ›" ved prognosen – kun når Klub-handleren gives, og den kalder den', () => {
+  const { L, rng } = world(5);
+  for (let i = 0; i < 14; i++) commitRound(L, playRound(L, rng), rng);
+  let called = 0;
+  const withK = renderSeasonReport({ league: L, mine: own(L), onTake() {}, onDrop() {}, onKlub: () => called++ });
+  const btn = byId(withK, 'sr-to-klub');
+  assert.equal(btn?.textContent, '💼 Klub ›');
+  btn.on.click(); assert.equal(called, 1);
+  assert.equal(byId(renderSeasonReport({ league: L, mine: own(L), onTake() {}, onDrop() {} }), 'sr-to-klub'), null);
+  assert.match(byId(withK, 'sr-forecast').textContent, /^📊 Med samme placering (vokser|falder) kassen ca\. [\d.]+ kr\. i sæson 2\. 💼 Klub ›$/);
+});
+
+test('bud på dine spillere til salg: en stopper får det HALVE bud (værdien i bud-formlen er publicValue), en anden i samme vindue det fulde', () => {
+  const { L } = world(3), me = own(L), [a, b] = me.squad.filter((x) => x.line !== 'GK');
+  for (const p of [a, b]) Object.assign(p, { age: 25, careerGames: 9, valueStars: 4, publicStars: 4 });
+  a.retiring = true; b.retiring = false;
+  me.listed = [a.id, b.id];
+  L.leagueMetadata.round = L.seasonStartRound + 6;
+  for (const t of L.teams) if (t.isBot) t.cashBalance = 20000000;
+  assert.ok(windowOf(L) != null, 'data');
+  L.offers = [];
+  makeOffers(L, me);
+  const w = windowOf(L), q = (v) => Math.round(v / 25000) * 25000, off = (p) => L.offers.find((o) => o.playerId === p.id);
+  assert.ok(off(a) && off(b), 'data: begge får bud');
+  for (const p of [a, b]) assert.equal(off(p).price, q(publicValue(p) * (0.9 + 0.1 * derivedRng('offer', w, p.id).next())), p.shortName);
+  assert.equal(baseValue(a), baseValue(b));
+  assert.ok(off(a).price < off(b).price * 0.65, `stopperen ${off(a).price} mod ${off(b).price}`);
 });

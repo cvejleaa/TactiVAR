@@ -1053,7 +1053,7 @@ try {
   };
   if (process.env.F2_ONLY) { await f2(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun F2-blokken (kortpanelet – hurtig mutationskørsel)
   if (process.env.TM_V3323_ONLY) { await v3323tm(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); console.log(fejl.join(' | ')); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun Test Managers v3.32.3-blok
-  if (process.env.V3331_ONLY) { await v3331(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); console.log(fejl.join(' | ')); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }
+  if (process.env.V3331_ONLY) { await v3331(); await v3331tm(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); console.log(fejl.join(' | ')); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }
   if (process.env.V3330_ONLY) { await v3330(); await v3330tm(); await v3330fix(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); console.log(fejl.join(' | ')); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun v3.33.0-blokken (pladsen følger dybden på midten)
   if (process.env.V3323_ONLY) { await v3323(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); console.log(fejl.join(' | ')); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun v3.32.3-blokken (samspil på Taktik)
   if (process.env.TM_V3320_ONLY) { await v3320tm(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); console.log(fejl.join(' | ')); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun Test Managers v3.32.0-blok
@@ -4244,6 +4244,51 @@ try {
     await seen('efter genindlæsning');
     await c.close();
   }
+  // ---------- v3.33.1, Test Manager: det forfatterens blok lod overleve – 👋 på kortet/Trup-hjælpen UNDER afspilningen af runde 7, kortet for en 31-årig der bliver,
+  //            og Hjems rækkefølge (stigende trøjenummer, ikke truppens) – køres også alene med V3331_ONLY=1 ----------
+  async function v3331tm() {
+    const { createRng } = await import('../../public/engine/rng.js');
+    const { createLeague } = await import('../../public/engine/generator.js');
+    const { playRound, commitRound } = await import('../../public/engine/season.js');
+    const { serialize, parseSave } = await import('../../public/state/storage.js');
+    const { willRetire } = await import('../../public/engine/career.js');
+    const { VERSION } = await import('../../public/version.js');
+    const L = parseSave(serialize({ league: createLeague(createRng(41)), notes: {}, ui: {} })).state.league, me = L.teams.find((t) => !t.isBot);
+    const fld = me.squad.filter((x) => x.line !== 'GK'), sure = fld.at(-1), sure2 = fld.at(-2);
+    sure.age = 34; sure2.age = 34; sure.shirtNumber = 66; sure2.shirtNumber = 88;   // truppens rækkefølge: sure2 før sure – stigende trøjenummer: sure først
+    const stay = fld.slice(0, -2).find((x) => { const a = x.age; x.age = 31; if (!willRetire(x, 1)) return true; x.age = a; return false; });
+    const rng = createRng(88);
+    for (let r = 0; r < 6; r++) commitRound(L, playRound(L, rng), rng);
+    const save = serialize({ league: L, notes: {}, ui: { activePresetIndex: 0, seenVersion: VERSION, tab: 'trup' } });
+    const c = await browser.newContext({ viewport: { width: 1366, height: 900 } }), p = await c.newPage(); p.on('pageerror', (e) => fejl.push(e.message));
+    const tt = async (k) => { await p.click(`#tab-${k}`); await p.waitForSelector(`.tabpane.tab-${k}`); };
+    await p.goto(BASE + '/'); await p.waitForSelector('body[data-klar="ja"]');
+    await p.evaluate((x) => { for (const k of Object.keys(localStorage)) if (k.startsWith('tactivar_')) localStorage.removeItem(k); localStorage.setItem('tactivar_save', x); }, save);
+    await p.reload(); await p.waitForSelector('body[data-klar="ja"]');
+    const open = async (id) => { await p.click(`#matrix tr[data-pid="${id}"]`); await p.waitForSelector('#cardpanel'); };
+    const close = async () => { await p.click('#card-close'); };
+    await p.click('#play-round'); await p.waitForSelector('#skip');
+    await tt('trup');
+    await open(sure.id);
+    const during = { help: await p.locator('#trup-retiring-help').count(), card: await p.locator('#card-retiring').count(), tags: await p.locator('#matrix .retiring-tag').count() };
+    await close();
+    check('v3.33.1 TM: UNDER afspilningen af runde 7 står 👋 hverken på kortet, i Trup-hjælpen eller ved navnene (flaget er sat, men runden er ikke vist)', during.help === 0 && during.card === 0 && during.tags === 0, JSON.stringify(during));
+    await tt('kamp'); await p.click('#skip'); await p.waitForSelector('.to-home');
+    await tt('trup');
+    await open(stay.id);
+    const stayCard = await p.locator('#card-retiring').count();
+    await close();
+    await open(sure.id);
+    const sureCard = await p.textContent('#card-retiring');
+    await close();
+    check('v3.33.1 TM: efter runde 7 har kortet for en 31-årig, der IKKE stopper, intet 👋 – og den sikre har det', stayCard === 0 && sureCard.startsWith('👋 Stopper efter sæsonen (34 år)'), JSON.stringify({ stayCard, sureCard }));
+    await tt('hjem');
+    const home = await p.textContent('#home-retiring');
+    check('v3.33.1 TM: Hjem nævner stoppere i stigende trøjenummer (#66 før #88 – truppens rækkefølge er den modsatte)',
+      home === `👋Stopper efter sæsonen: #66 ${sure.shortName} (${sure.line === 'DEF' ? 'FOR' : sure.line === 'MID' ? 'MID' : 'ANG'}, 34 år) · #88 ${sure2.shortName} (${sure2.line === 'DEF' ? 'FOR' : sure2.line === 'MID' ? 'MID' : 'ANG'}, 34 år) – vinduet er åbent til runde 8Trup ›`, home);
+    await c.close();
+  }
+
   // ---------- v3.33.1: 👋 karrierestop fra runde 7, "Dit hold" = sæsonen, rapporten på Hjem (kan køres alene med V3331_ONLY=1) ----------
   // Sæson 1 har ingen 31+: alderen sættes i gemmet (felt 34 = sikker; en 31-årig, der IKKE stopper; en bots sikre). 6 runder i node,
   // runde 7 i browseren – 👋 må ikke stå i runde 6 eller under afspilningen af runde 7.
@@ -4375,6 +4420,7 @@ try {
   await v3330tm();
   await v3330fix();
   await v3331();
+  await v3331tm();
   check('Ingen sidefejl under hele forløbet', fejl.length === 0, fejl.join(' | '));
 } finally {
   await browser.close();
