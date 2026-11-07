@@ -78,3 +78,12 @@ fund der er rettet (så du ikke finder dem igen), hvad brugeren har valgt fra, o
   .kind-live); CM trukket ned ved DM'en: 390 flag-overlap 129×12 px + flaget skåret −4 px (brik 218 px bred i 324 px bane), 1366 23×15;
   referatet "for langt fra sin DM-zone" ved y80 / "OM-zone" ved y12 (match.js:1361 cp.role = effektiv rolle; ringen er om CM-ankeret);
   arkets minibane siger "CM P. Bach" ved ankeret, listen under "CM→DM" (matchcenter.js:121-122 bruger coords.r, ikke e.place).
+
+## Plan v3.33.1 (2026-11-07) – rapport på Hjem, 👋-varsel, "dine spillere"; scripts scratchpad/ui3331/{play,m2,m3}.mjs (port 5500-5502)
+- Målt: rapporten 274 px (1366) / 533 px (390); Tag op/Lad gå 23 px; Hjem ved sæsonslut: todo y339 (1366) / y387 (390).
+- Sæson 1: 0 pensioner i HELE ligaen (retireChance 0 for alle) – varslet ses tidligst sæson 2; kræver doktoreret alder i test.
+- Ingen transfervindue mellem R10 og sæsonskiftet (WINDOW_ROUNDS [1,8]) – varslet kan ikke handles med salg.
+- card.js:25 "overvejer at stoppe" skønt udfaldet er afgjort (career.js:219). Foreslået "stopper efter sæsonen" overalt.
+- 👋 i Trup-navnecellen: 119 → 152 px ved 390 (hele kolonnen), 100 → 119 ved 1366; rækkehøjde uændret 44/25.
+- #my-players: Kampe-td venstrestillet under centreret th (style.css:123 .standings td:nth-child(2)); 552 px i 324 ved 390,
+  korte overskrifter → 324. km/HI/fri løb findes IKKE pr. sæson i matchLog (LOG career.js:138) – kræver nye s-felter.

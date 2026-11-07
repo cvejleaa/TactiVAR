@@ -31,3 +31,9 @@ fund der er rettet (så du ikke finder dem igen), hvad brugeren har valgt fra, o
 - Foreslået: stadion (GATE_MAX 9000, career.js:159), fanforventning (= nr. 15's mål), stab på sæsonkontrakt, ungdomsspejder
   der koster, renter/kredit i minus. Tillæg til nr. 8 (salgsgebyr efter tid i klubben) og nr. 30 (sponsor efter fans + sidste sæson).
 - finance.season nulstilles i sidste runde – mål indtægtsposter før runde 14 commit, ikke efter.
+
+## Plan v3.33.1 (varsel om karrierestop fra runde 7) – 2026-11-07 (script scratchpad/oek/retire-value.mjs)
+- 3 seeds × 8 sæsoner, R8-vinduet: 151 stoppere (0 i S1–S3, 0–5 pr. hold fra S5), 120 af dem startere, 16 egne. Værdi snit 643k
+  (200k–1.325k), ugeløn snit 35,6k → 83k for resten af sæsonen. Uden faktor = gratis pensionist-salg ~600k pr. stk.
+- Rådet: faktor ½ UDEN FOR publicValue/publicWage (lønnen uændret, ellers billig leje), kun askPrice/makeOffers/openWindow + UI;
+  ét prædikat (runde ≥ 7 && willRetire) for varsel og pris; botter køber ikke stoppere i trin 3.
