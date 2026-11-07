@@ -3,21 +3,21 @@ import { renderStats } from './ui/stats.js';
 import { VERSION } from './version.js';
 import { createRng, randomSeed } from './engine/rng.js';
 import { createLeague } from './engine/generator.js';
-import { matchBenchOf, reservesOf, unavailable, FOCUS, willRetire, RETIRE_WARN_ROUND, publicWage, wageRoomPerRound } from './engine/career.js';
+import { matchBenchOf, reservesOf, unavailable, FOCUS, RETIRE_WARN_ROUND, publicWage, wageRoomPerRound } from './engine/career.js';
 import { loadGame, saveGame, resetGame, exportGame, importGame, backupRaw, SAVE_KEY } from './state/storage.js';
 import * as act from './state/actions.js';
 import { saveReplay, loadReplay, replayOf, rememberSent, loadSent } from './state/replay.js';
 import { buildPayload, uploadMatch } from './state/upload.js';
 import { FIREBASE } from './firebase-config.js';
 import { h, select, markScrollable, remarkScrollable } from './ui/dom.js';
-import { kr, yellowWarn, attText } from './ui/labels.js';
+import { kr, yellowWarn, attText, LINE } from './ui/labels.js';
 import { renderMatrix, matrixRows } from './ui/matrix.js';
 import { renderLineupList, listRows } from './ui/lineup-list.js';
 import { renderTrainingTable, gainsByPlayer } from './ui/training.js';
 import { renderCard, renderCardPanel, trainingSummary } from './ui/card.js';
 import { renderClub, shownCash, renderMarket, renderTransferLog, renderPublicClub } from './ui/club.js';
-import { marketInfo, buyPlayer, setListed, acceptOffer, declineOffer, releasePlayer, wageRoom, isStarter, quarantined, nextWindow, quarantineText } from './engine/transfers.js';
-import { renderSeasonReport } from './ui/season-report.js';
+import { marketInfo, buyPlayer, setListed, acceptOffer, declineOffer, releasePlayer, wageRoom, isStarter, quarantined, nextWindow, quarantineText, windowOf } from './engine/transfers.js';
+import { renderSeasonReport, seasonReportShown } from './ui/season-report.js';
 import { viewTeam, viewRatingEntry } from './engine/visibility.js';
 import { lineupPairs, chemRefOf, weakestPair, swapChanges, BAND_WORD, bestPartner, saleChemText, playerPairs, gamesToSettle, bandOf, chemOf, BAND_RANK, focusChemText } from './engine/chemistry.js';
 import { renderPitch } from './ui/pitch.js';
@@ -69,6 +69,12 @@ const clearSwap = () => { view.pitchSwapId = null; view.pickMsg = ''; };
 function seasonAndRound(league, r) {
   const s = (league.seasons ?? []).find((x) => x.programmed !== false && r >= x.fromRound && r <= x.toRound);
   return s ? [s.seasonNumber, r - s.fromRound + 1] : [league.leagueMetadata.seasonNumber ?? 1, r - league.seasonStartRound + 1];
+}
+// 👋 (v3.33.1): flaget sættes, når sæsonens runde RETIRE_WARN_ROUND bogføres – før den er afspillet. Markeringen følger den VISTE runde
+// (som hideLog): mens netop den runde afspilles, står 👋 ingen steder (kort, Trup, Hjem)
+function retiringShown() {
+  const L = game.league;
+  return !(mc?.playing && L.lastRound && seasonAndRound(L, L.lastRound.round)[1] === RETIRE_WARN_ROUND);
 }
 function setViewTeam(idx) { view.viewTeamIdx = idx; clearSwap(); view.notice = ''; view.marketMsg = ''; view.trainMsg = ''; view.trainPid = null; view.card = null; view.selectedPlayerId = game.league.teams[idx].squad[0].id; }
 // Et hold vises (v3.28.0): fra Hjem/Træning/Kamp/Liga/⚙ i Trup – på Trup, Taktik og Klub bliver man på fanen (Klub viser holdets klubside)
@@ -518,7 +524,7 @@ function renderNow() {
     isOwn ? null : h('div', { class: 'right' }, h('span', { class: 'muted' }, 'Klubkasse '), h('strong', {}, '🔒 Skjult'), ' ',
       h('button', { class: 'linklike', id: 'public-club-link', title: 'Offentlig klubside: spillere med pris, transfers og pensioner', onclick: () => showTab('klub') }, '💼 Klubside')));
   const matrix = renderMatrix({
-    team, isOwn, ui: { ...view, swapId: view.pitchSwapId, selectedPlayerId: sel?.id ?? null, gains, gainRound: ownRound }, notes: game.notes,
+    team, isOwn, ui: { ...view, swapId: view.pitchSwapId, selectedPlayerId: sel?.id ?? null, gains, gainRound: ownRound, retiringShown: retiringShown() }, notes: game.notes,
     onSort: (c) => { if (view.sortCol === c.key) view.sortDesc = !view.sortDesc; else { view.sortCol = c.key; view.sortDesc = !!c.num; } clearSwap(); view.notice = ''; render(); },
     onBlocked: (c) => { view.notice = `🔒 Anti-spionage: du kan ikke sortere ${team.name} på "${c.label}" – det er skjult information.`; render(); },
     // v3.29.0: et klik på en række åbner kortpanelet (eller skifter spiller i det) – før rullede mobilen ned til kortet under tabellen
@@ -541,7 +547,7 @@ function renderNow() {
     hideLog: mc?.playing && league.lastRound ? seasonAndRound(league, league.lastRound.round) : null,
     // Under afspilningen af sæsonens sidste runde er det stadig den afsluttede sæson, der vises
     season: mc?.playing && league.lastRound ? seasonAndRound(league, league.lastRound.round)[0] : league.leagueMetadata.seasonNumber ?? 1, starter: !!sel && team.tactics.lineupSlots.includes(sel.id),
-    retiring: !!sel && seasonRoundOf(league, league.leagueMetadata.round) >= RETIRE_WARN_ROUND && willRetire(sel, league.leagueMetadata.seasonNumber ?? 1),
+    retiring: !!sel && !!sel.retiring && retiringShown(),   // v3.33.1: flaget (season.js markRetiring) – ÉN kilde for kort, Trup, Hjem og pris
     // v3.30.0: "ændr i Træning ›" åbner 🏋️ Træning med hans række markeret og rullet frem – står han ikke i den valgte kæde, vises alle
     onTrainLink: isOwn ? () => { const id = sel.id, line = sel.line; showTab('traening'); if ((view.trainLine ?? 'all') !== 'all' && view.trainLine !== line) view.trainLine = 'all';
       view.trainPid = id; render(); document.querySelector(`#training-table tr[data-pid="${id}"]`)?.scrollIntoView({ block: 'center' }); } : null,
@@ -600,14 +606,19 @@ function renderNow() {
   // Hver fane bygges kun, når den vises: banen og kortet er ét DOM-element og kan kun stå ét sted.
   const content = {
     // paper er en funktion (v3.31.0): home.js kalder den kun uden for afspilningen – dens ENE vagt – så klummen aldrig bygges for den runde, der afspilles
-    hjem: () => [renderHome({ ...homeData(), playing: !!mc?.playing, paper: paperHeadline, on: homeHandlers })],
+    // v3.33.1: sæsonrapporten står på Hjem (report er en funktion – home.js kalder den kun uden for afspilningen, dens ENE vagt)
+    hjem: () => [renderHome({ ...homeData(), playing: !!mc?.playing, paper: paperHeadline, on: homeHandlers,
+      report: () => renderSeasonReport({ league, mine, onKlub: () => showTab('klub'),
+        onTake: (id) => { const err = act.takeYouth(mine, id, game.league); view.notice = err ? `🧒 ${err}` : '🧒 Ungdomsspilleren er rykket op i truppen.'; change(() => {}); },
+        onDrop: (id) => change(() => act.dropYouth(mine, id)) }) })],
     // Opstilling sker i Trup: tallene og sorteringen over banen (brugeren: "nærmest umuligt at
     // opstille sit hold, da informationerne og sorteringsmulighederne ligger på 2 forskellige faner").
     trup: () => [header,
       // Sæsonslut under afspilning (som bogført-før-afspilning): runden er bogført, og sæsonskiftet er sket
-      mc?.playing && seasonJustEnded(league) ? h('div', { class: 'notice', id: 'turnover-booked' }, '🗓 Sæsonen sluttede med denne runde: alle er blevet et år ældre, og sæsonrapporten med ungdomstilbuddene står på Liga, når kampene er spillet.') : null,
+      mc?.playing && seasonJustEnded(league) ? h('div', { class: 'notice', id: 'turnover-booked' }, '🗓 Sæsonen sluttede med denne runde: alle er blevet et år ældre, og sæsonrapporten med ungdomstilbuddene står på 🏠 Hjem, når kampene er spillet.') : null,
       // v3.30.0: træningen står på sin egen fane – her kun "+N" i regnearket og, når der er nogen, hvad de betyder og hvor træningen står
       h('div', { class: 'muted help trup-help', id: 'trup-help' }, 'Vælg en spiller for at åbne spillerkortet',   // v3.32.1 (R5): neutralt ord – mus og finger
+        retiringShown() && team.squad.some((p) => p.retiring) ? h('span', { id: 'trup-retiring-help' }, ' · 👋 = stopper efter sæsonen') : null,
         anyGain ? h('span', { id: 'trup-gain-help' }, ` · +N = antal +1 efter runde ${ownRound} (træning og kampe) · træningen står på `,
           h('button', { class: 'linklike', id: 'trup-to-training', onclick: () => showTab('traening') }, '🏋️ Træning ›')) : null,
         // QC v3.30.0: lige efter sæsonslut er alle blevet et år ældre, så tallene kan være faldet – derfor ingen "+N" her, selv om Træning viser rundens +1
@@ -628,9 +639,6 @@ function renderNow() {
       shown ? renderMatchCenter({ mc: sendState(shown), myTeamId: mine.id, on: mcHandlers, sound: soundOn(storage) }) : h('div', { class: 'panel empty', id: 'no-matches' }, 'Ingen kampe spillet endnu. Tryk ▶ Spil runde nederst – modstanderen følger kampprogrammet på Liga-fanen.'),
       ],
     liga: () => [mc?.playing ? h('div', { class: 'notice', id: 'booked-league' }, '📺 Runden spilles i Kamp-fanen – tabellen herunder er allerede opdateret med den.') : null,
-      !mc?.playing ? renderSeasonReport({ league, mine,
-        onTake: (id) => { const err = act.takeYouth(mine, id, game.league); view.notice = err ? `🧒 ${err}` : '🧒 Ungdomsspilleren er rykket op i truppen.'; change(() => {}); },
-        onDrop: (id) => change(() => act.dropYouth(mine, id)) }) : null,
       // Holdvælgeren (v3.28.0): her og i scout-bjælken – før i topbaren
       h('div', { class: 'row see-team', id: 'see-team' }, h('label', { for: 'team-select' }, 'Se et hold:'), teamSelect(), h('span', { class: 'muted' }, 'eller klik på et hold i tabellen')),
       standings,
@@ -646,7 +654,10 @@ function renderNow() {
     admin: () => [renderAdmin()],
     klub: () => (!isOwn ? [renderPublicClub({ league, pub: viewTeam(team, false), me: mine, playing: !!mc?.playing, msg: view.marketMsg ?? '',
       onBack: () => showTeam(myIdx()),
-      onBuy: (id) => { const name = team.squad.find((p) => p.id === id)?.shortName; const err = buyPlayer(league, mine, id); view.marketMsg = err ? `💰 ${err}` : `💰 ${name} er købt og står nu i din trup.`; change(() => {}); } })] : null) ?? [renderClub({ league, team: mine, playing: !!mc?.playing }), renderMarket({ league, team: mine, playing: !!mc?.playing,
+      onBuy: (id) => { const name = team.squad.find((p) => p.id === id)?.shortName; const err = buyPlayer(league, mine, id); view.marketMsg = err ? `💰 ${err}` : `💰 ${name} er købt og står nu i din trup.`; change(() => {}); } })] : null) ?? [
+      // v3.33.1: rapporten står på Hjem – herfra et link i samme periode (seasonReportShown – samme prædikat), aldrig under afspilningen
+      !mc?.playing && seasonReportShown(league) ? h('div', { class: 'panel', id: 'club-report-link' }, h('button', { class: 'linklike', id: 'to-season-report', onclick: homeHandlers.report }, `📋 Sæsonrapport – sæson ${league.turnoverReport.season} ›`)) : null,
+      renderClub({ league, team: mine, playing: !!mc?.playing }), renderMarket({ league, team: mine, playing: !!mc?.playing,
       // v3.21.1: beskeden ved listen (QC) – og den nye akademispiller ved navn, hvis han kom ind
       onAccept: (id) => { view.marketMsg = transferMsg(id, () => acceptOffer(league, mine, id), 'solgt'); change(() => {}); },
       onRelease: (id) => { view.marketMsg = transferMsg(id, () => releasePlayer(league, mine, id), 'fritstillet'); change(() => {}); },
@@ -741,6 +752,9 @@ function homeData() {
     last, place: myPos, ended, roundsPlayed: L.leagueMetadata.round + 1 - L.seasonStartRound,
     next: { k: next.k, of: L.schedule.length, name: opp.name, home: next.home, place: placeOf(table, opp.id), form },
     issues: issueGroups(), youth: mine.youthOffers?.length ?? 0,
+    // 👋 (v3.33.1): kun dit hold; vinduet før runde 8 er åbent, når næste runde er sæsonens runde 8 (transfers.js windowOf)
+    retiring: retiringShown() ? { players: mine.squad.filter((p) => p.retiring).sort((a, b) => a.shirtNumber - b.shirtNumber).map((p) => ({ shirtNumber: p.shirtNumber, shortName: p.shortName, line: LINE[p.line], age: p.age })),
+      windowOpen: windowOf(L) != null, windowTo: seasonRoundOf(L, L.leagueMetadata.round + 1) } : null,
     training: training && (training.gains || training.injuries || training.strong) ? training : null,
     table: table.slice(start, start + 5).map((r) => ({ pos: placeOf(table, r.teamId), name: r.teamName, points: r.points, mine: r.teamId === mine.id })),
   };
@@ -752,6 +766,10 @@ const homeHandlers = {
   paper: () => { showTab('liga'); document.getElementById('gazette')?.scrollIntoView({ block: 'start' }); },
   opp: () => showTeam(game.league.teams.indexOf(nextMatch().opp)),
   fix: (ids) => fixIssue(ids, 'taktik'),
+  // v3.33.1: "Trup ›" ved 👋 (dit hold), "Svar ↑" til ungdomstilbuddene og Klubs "📋 Sæsonrapport ›" (Hjem, rullet til rapporten)
+  trup: () => { showTeam(myIdx()); if (tabNow() !== 'trup') showTab('trup'); },
+  youth: () => document.getElementById('youth-offers')?.scrollIntoView({ block: 'start' }),
+  report: () => { showTab('hjem'); document.getElementById('season-report')?.scrollIntoView({ block: 'start' }); },
 };
 // "Næste: runde N mod X (ude) · Forbered › · 📰 «overskrift» ›" øverst på Kamp efter fløjtet → Hjem / avisen på Liga (v3.31.0)
 function toHomeLine() {

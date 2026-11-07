@@ -451,13 +451,13 @@ body.has-bar { padding-bottom: 4.5rem; }
 .form-pill { display: inline-block; min-width: 1.4rem; text-align: center; border-radius: 999px; padding: 0 .35rem; font-weight: 700; font-size: var(--fs-1); line-height: 1.5; }
 .form-V { background: #0b3326; color: #6ee7b7; } .form-U { background: var(--panel-2); color: var(--dæmpet); } .form-T { background: #451a1a; color: #fca5a5; }
 /* Avisen står på Liga; links fra Hjem og Kamp ruller hertil – toppen lander under den faste topbar (og Hjem-listen fra bjælkens tæller) */
-#gazette, #home-todo { scroll-margin-top: calc(var(--top-h, 6rem) + .5rem); }   /* #home-todo: bjælkens tæller (v3.31.1) */
+#gazette, #home-todo, #season-report, #youth-offers { scroll-margin-top: calc(var(--top-h, 6rem) + .5rem); }   /* v3.33.1: rapporten på Hjem (Klubs link, "Svar ↑") */   /* #home-todo: bjælkens tæller (v3.31.1) */
 /* Spil-bjælken uden 🔍 (Hjem, Kamp efter fløjtet, under afspilning): ▶ står samme sted som på de andre faner */
 .playbar-in.no-opp #play-round { margin-left: auto; }
 .count-narrow { display: none; }
 @media (max-width: 900px) { .home-grid { grid-template-columns: 1fr; } }
 /* v3.31.0 (QC): i én kolonne kommer næste kamp før avisen – beslutningen før læsestoffet (på computer står avisen i venstre kolonne) */
-@media (max-width: 900px) { .home-main, .home-side { display: contents; } .home-last { order: 1; } .home-todo { order: 2; } .home-next { order: 3; } .home-paper { order: 4; } .home-table { order: 5; } }
+@media (max-width: 900px) { .home-main, .home-side { display: contents; } .season-report { order: 0; } .home-last { order: 1; } .home-todo { order: 2; } .home-next { order: 3; } .home-paper { order: 4; } .home-table { order: 5; } }
 /* Mobil: topbaren ruller væk – kun Spil-bjælken og bundnavigationen står fast (og scout-bjælken, når den vises) */
 @media (max-width: 600px) {
   .topbar { position: static; flex-wrap: nowrap; padding: .5rem .75rem; gap: .5rem; }

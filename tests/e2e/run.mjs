@@ -1053,6 +1053,7 @@ try {
   };
   if (process.env.F2_ONLY) { await f2(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun F2-blokken (kortpanelet – hurtig mutationskørsel)
   if (process.env.TM_V3323_ONLY) { await v3323tm(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); console.log(fejl.join(' | ')); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun Test Managers v3.32.3-blok
+  if (process.env.V3331_ONLY) { await v3331(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); console.log(fejl.join(' | ')); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }
   if (process.env.V3330_ONLY) { await v3330(); await v3330tm(); await v3330fix(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); console.log(fejl.join(' | ')); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun v3.33.0-blokken (pladsen følger dybden på midten)
   if (process.env.V3323_ONLY) { await v3323(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); console.log(fejl.join(' | ')); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun v3.32.3-blokken (samspil på Taktik)
   if (process.env.TM_V3320_ONLY) { await v3320tm(); const bad = results.filter((x) => !x).length; console.log(bad ? `${bad} FEJLEDE` : 'bestod'); console.log(fejl.join(' | ')); await browser.close(); server?.close(); process.exit(bad ? 1 : 0); }   // kun Test Managers v3.32.0-blok
@@ -3110,8 +3111,24 @@ try {
     await tab('trup');
     await g.click('#play-round');
     await g.waitForSelector('#skip');
+    // v3.33.1: rapporten står på Hjem – men IKKE mens sæsonens sidste runde afspilles (præmie og placering ville afsløre runden)
+    await tab('hjem');
+    const srPlaying = { report: await g.locator('#season-report').count(), playing: await g.locator('#home-playing').count() };
+    await tab('trup');
+    const srTrup = await g.textContent('#turnover-booked').catch(() => '');
+    await tab('klub');
+    const srKlub = await g.locator('#to-season-report').count();
+    check('v3.33.1 sæsonslut UNDER afspilningen: ingen sæsonrapport på Hjem og intet rapport-link i Klub; Trup siger, at rapporten står på 🏠 Hjem',
+      srPlaying.report === 0 && srPlaying.playing === 1 && srKlub === 0 && srTrup.includes('sæsonrapporten med ungdomstilbuddene står på 🏠 Hjem'), JSON.stringify({ srPlaying, srKlub, srTrup }));
+    await tab('kamp');
     await g.click('#skip');
     await tab('liga');
+    check('v3.33.1 sæsonslut: sæsonrapporten står IKKE længere på Liga', (await g.locator('#season-report').count()) === 0);
+    await tab('hjem');
+    { const order = await g.evaluate(() => [...document.querySelector('#home .home-main').children].map((e) => e.id));
+      check('v3.33.1 sæsonslut, Hjem: rapporten står øverst i hovedkolonnen (over "Sidste runde") med "📋 Sæson 1 er slut – nr. X af 8", ungdomstilbuddene før listen',
+        order[0] === 'season-report' && order[1] === 'home-last' && /^📋 Sæson 1 er slut – nr\. [1-8] af 8$/.test(await g.textContent('#season-report h3'))
+        && await g.evaluate(() => { const r = document.getElementById('season-report'); return r.children[1].id === 'youth-offers' && r.children[2].tagName === 'UL'; }), JSON.stringify(order)); }
     const sv = await g.evaluate(async () => {
       const { pairRound } = await import('/engine/season.js');
       const l = JSON.parse(localStorage.getItem('tactivar_save')).league, me = l.teams.find((t) => !t.isBot);
@@ -3122,7 +3139,7 @@ try {
     check('Sæsonslut: runde 14 afslutter sæsonen (forudsætning)', sv.end && sv.round === 14, JSON.stringify(sv));
     // v3.18.0: sæsonrapporten med ungdomstilbuddene; Tag op flytter spilleren ind i truppen
     const nBefore = await g.evaluate(() => JSON.parse(localStorage.getItem('tactivar_save')).league.teams.find((t) => !t.isBot).squad.length);
-    check('Sæsonslut, Liga: sæsonrapporten – ældre, ny løn og 2 ungdomstilbud med Tag op / Lad gå', (await g.isVisible('#season-report')) && (await g.textContent('#sr-aged')).includes('et år ældre')
+    check('Sæsonslut, Hjem: sæsonrapporten – ældre, ny løn og 2 ungdomstilbud med Tag op / Lad gå', (await g.isVisible('#season-report')) && (await g.textContent('#sr-aged')).includes('et år ældre')
       && (await g.textContent('#sr-wages')).includes('pr. runde') && (await g.locator('#youth-offers .youth-offer').count()) === 2 && !/undefined|NaN/.test(await g.textContent('#season-report')));
     const takenId = await g.locator('#youth-offers .youth-offer').first().getAttribute('data-yid');
     await g.locator('#youth-offers .youth-take').first().click();
@@ -3142,6 +3159,9 @@ try {
     const qRow = g.locator(`.market-row[data-pid="${takenId}"]`), qTxt = await qRow.textContent();
     check('Sæsonslut, Klub: den optagne ungdomsspiller til salg viser karantænen ("kom til klubben i dette eller sidste vindue") – hverken Sælg, Fritstil eller bud',
       qTxt.includes('kom til klubben i dette eller sidste vindue – kan handles igen ved sæsonslut før sæson') && !qTxt.includes('skiftede klub') && (await qRow.locator('.offer-accept, .release').count()) === 0 && !qTxt.includes('Bud fra'), qTxt);
+    // v3.33.1: Klub linker til rapporten på Hjem i samme periode
+    { const lt = await g.textContent('#to-season-report'); await g.click('#to-season-report'); await g.waitForSelector('.tabpane.tab-hjem');
+      check('v3.33.1 sæsonslut, Klub: "📋 Sæsonrapport – sæson 1 ›" skifter til Hjem, hvor rapporten står', lt === '📋 Sæsonrapport – sæson 1 ›' && (await g.isVisible('#season-report')), lt); }
     await g.evaluate(() => { const d = JSON.parse(localStorage.getItem('tactivar_save')), me = d.league.teams.find((t) => !t.isBot); me.listed = []; localStorage.setItem('tactivar_save', JSON.stringify(d)); });
     await g.reload(); await g.waitForSelector('body[data-klar="ja"]');
     await tab('trup');
@@ -3152,7 +3172,10 @@ try {
       check('Sæsonslut, Hjem: "Slutstillingen" (ikke "Tabellen"), pladsen er "slutstilling" uden ↑/↓, og minitabellen er et stykke af SLUTstillingen med dit hold',
         (await g.textContent('#home-table .lbl')) === 'Slutstillingen' && (await g.textContent('#home-last')).includes('slutstilling') && (await g.locator('#home-move').count()) === 0
         && at >= 0 && shownRows.length === 5 && shownRows.some((x) => x.startsWith(fin.mine + '|')), JSON.stringify({ shownRows, fin: fin.rows })); }
-    check('Sæsonslut, Hjem: "1 ungdomstilbud venter" med link til Liga', (await g.textContent('#youth-pending')).includes('1 ungdomstilbud') && (await g.locator('#youth-pending button').textContent()) === 'Liga ›');
+    check('Sæsonslut, Hjem: "1 ungdomstilbud udløber, når du spiller runde 1" med "Svar ↑" (v3.33.1 – før "Liga ›")', (await g.textContent('#youth-pending')).includes('1 ungdomstilbud udløber, når du spiller runde 1') && (await g.locator('#youth-pending button').textContent()) === 'Svar ↑');
+    { await g.evaluate(() => window.scrollTo(0, document.body.scrollHeight)); await g.click('#youth-answer'); await g.waitForTimeout(300);
+      const top = await g.evaluate(() => Math.round(document.getElementById('youth-offers').getBoundingClientRect().top));
+      check('v3.33.1 sæsonslut, Hjem: "Svar ↑" ruller til ungdomstilbuddene (under topbaren, synlige)', top >= 0 && top < 400, String(top)); }
     // v3.18.0 transfers: vinduet er åbent ved sæsonslut – køb en spiller, der kan købes, til den viste faste pris
     const buyable = await g.evaluate(async () => {
       const { marketInfo } = await import('/engine/transfers.js');
@@ -4221,6 +4244,105 @@ try {
     await seen('efter genindlæsning');
     await c.close();
   }
+  // ---------- v3.33.1: 👋 karrierestop fra runde 7, "Dit hold" = sæsonen, rapporten på Hjem (kan køres alene med V3331_ONLY=1) ----------
+  // Sæson 1 har ingen 31+: alderen sættes i gemmet (felt 34 = sikker; en 31-årig, der IKKE stopper; en bots sikre). 6 runder i node,
+  // runde 7 i browseren – 👋 må ikke stå i runde 6 eller under afspilningen af runde 7.
+  async function v3331() {
+    const { createRng } = await import('../../public/engine/rng.js');
+    const { createLeague } = await import('../../public/engine/generator.js');
+    const { playRound, commitRound } = await import('../../public/engine/season.js');
+    const { serialize, parseSave } = await import('../../public/state/storage.js');
+    const { willRetire } = await import('../../public/engine/career.js');
+    const { VERSION } = await import('../../public/version.js');
+    const fresh = (seed) => parseSave(serialize({ league: createLeague(createRng(seed)), notes: {}, ui: {} })).state.league;
+    const L = fresh(31), me = L.teams.find((t) => !t.isBot), botIdx = L.teams.findIndex((t) => t.isBot), bot = L.teams[botIdx];
+    const fld = me.squad.filter((x) => x.line !== 'GK'), sure = fld.at(-1); sure.age = 34;
+    const stay = fld.slice(0, -1).find((x) => { const a = x.age; x.age = 31; if (!willRetire(x, 1)) return true; x.age = a; return false; });
+    const botSure = bot.squad.filter((x) => x.line !== 'GK').at(-1); botSure.age = 34;
+    const rng = createRng(77);
+    for (let r = 0; r < 6; r++) commitRound(L, playRound(L, rng), rng);
+    const save = serialize({ league: L, notes: {}, ui: { activePresetIndex: 0, seenVersion: VERSION, tab: 'trup' } });
+    const LINE = { GK: 'MÅL', DEF: 'FOR', MID: 'MID', ATT: 'ANG' };
+    for (const [w, hgt] of [[390, 844], [1366, 900]]) {
+      const c = await browser.newContext({ viewport: { width: w, height: hgt } }), p = await c.newPage(); p.on('pageerror', (e) => fejl.push(e.message));
+      const tt = async (k) => { await p.click(`#tab-${k}`); await p.waitForSelector(`.tabpane.tab-${k}`); };
+      await p.goto(BASE + '/'); await p.waitForSelector('body[data-klar="ja"]');
+      await p.evaluate((s) => { for (const k of Object.keys(localStorage)) if (k.startsWith('tactivar_')) localStorage.removeItem(k); localStorage.setItem('tactivar_save', s); }, save);
+      await p.reload(); await p.waitForSelector('body[data-klar="ja"]');
+      const tags = () => p.locator('#matrix .retiring-tag').count();
+      await tt('trup');
+      const r6 = { trup: await tags(), help: await p.locator('#trup-retiring-help').count() };
+      await tt('hjem');
+      r6.home = await p.locator('#home-retiring').count();
+      check(`v3.33.1 (${w}): efter runde 6 står 👋 ingen steder (Trup, Trup-hjælpen, Hjem)`, r6.trup === 0 && r6.help === 0 && r6.home === 0, JSON.stringify(r6));
+      await p.click('#play-round'); await p.waitForSelector('#skip');
+      await tt('trup');
+      const during = await tags();
+      await tt('kamp'); await p.click('#skip'); await p.waitForSelector('.to-home');
+      await tt('trup');
+      const t7 = await p.evaluate(([a, b]) => ({ all: [...document.querySelectorAll('#matrix .retiring-tag')].map((e) => e.closest('tr').dataset.pid),
+        title: document.querySelector(`#matrix tr[data-pid="${a}"] .retiring-tag`)?.title, stay: document.querySelectorAll(`#matrix tr[data-pid="${b}"] .retiring-tag`).length,
+        help: document.getElementById('trup-retiring-help')?.textContent }), [sure.id, stay.id]);
+      check(`v3.33.1 (${w}): under afspilningen af runde 7 intet 👋; bagefter 👋 efter navnet på netop den, der stopper (title med alderen) – ikke på den 31-årige, der bliver – og forklaringen i Trup`,
+        during === 0 && JSON.stringify(t7.all) === JSON.stringify([sure.id]) && t7.title === 'Stopper efter sæsonen (34 år)' && t7.stay === 0 && t7.help === ' · 👋 = stopper efter sæsonen', JSON.stringify({ during, t7 }));
+      await p.click(`#matrix tr[data-pid="${sure.id}"]`); await p.waitForSelector('#card-retiring');
+      const cr = await p.textContent('#card-retiring');
+      check(`v3.33.1 (${w}): kortet – "👋 Stopper efter sæsonen (34 år) – værdi … (halv: 7 af 14 runder tilbage). Løn uændret …"`, /^👋 Stopper efter sæsonen \(34 år\) – værdi [\d.]+ kr\. \(halv: 7 af 14 runder tilbage\)\. Løn uændret [\d.]+ kr\. pr\. runde\.$/.test(cr), cr);
+      await p.click('#card-close');
+      await tt('hjem');
+      const hm = await p.evaluate(() => ({ txt: document.getElementById('home-retiring')?.textContent, issues: document.querySelectorAll('#home-todo .todo-row[data-kind]').length,
+        pill: document.querySelector('#home-todo .lbl-row .pill')?.textContent ?? null, ready: !!document.getElementById('home-ready'), kind: document.getElementById('home-retiring')?.dataset.kind ?? null }));
+      check(`v3.33.1 (${w}): Hjem – "👋 Stopper efter sæsonen: #nr navn (kæde, 34 år) – vinduet er åbent til runde 8" som info: tæller ikke i "N ting", og "Holdet er klar" følger kun opgaverne`,
+        hm.txt === `👋Stopper efter sæsonen: #${sure.shirtNumber} ${sure.shortName} (${LINE[sure.line]}, 34 år) – vinduet er åbent til runde 8Trup ›` && hm.kind === null
+        && (hm.issues ? hm.pill === `${hm.issues} ting` && !hm.ready : hm.pill === null && hm.ready), JSON.stringify(hm));
+      await p.click('#home-retiring-link'); await p.waitForSelector('.tabpane.tab-trup');
+      check(`v3.33.1 (${w}): "Trup ›" ved 👋 åbner Trup for dit hold`, (await p.locator(`#matrix tr[data-pid="${sure.id}"] .retiring-tag`).count()) === 1);
+      // Modstanderens spiller: 👋 er offentligt
+      await tt('liga'); await p.selectOption('#team-select', String(botIdx)); await p.waitForSelector('.tabpane.tab-trup');
+      check(`v3.33.1 (${w}): 👋 står også på en modstanders spiller (offentligt)`, (await p.locator(`#matrix tr[data-pid="${botSure.id}"] .retiring-tag`).count()) === 1);
+      // "Dit hold" på Liga: brugerens fund – 0 sæsonkampe, men karriere-km og karakter (sat i gemmet på en, der ikke har spillet i sæsonen)
+      const zero = await p.evaluate(() => { const d = JSON.parse(localStorage.getItem('tactivar_save')), m = d.league.teams.find((t) => !t.isBot), q = m.squad.find((x) => x.sGames === 0);
+        if (!q) return null; Object.assign(q, { ratingSum: 35, ratingGames: 5, careerGames: 5, distanceSum: 50, minutesSum: 450, hiKmSum: 4, hiDistSum: 20 }); localStorage.setItem('tactivar_save', JSON.stringify(d)); return q.id; });
+      await p.reload(); await p.waitForSelector('body[data-klar="ja"]'); await tt('liga');
+      await p.evaluate(() => { const d = document.getElementById('stats-mine'); if (d && !d.open) d.querySelector('summary').click(); });
+      const st = await p.evaluate((zid) => {
+        const t = document.getElementById('my-players'), wrap = t.closest('.tablewrap'), row = t.querySelector(`tr[data-pid="${zid}"]`), played = t.querySelector('tbody tr[data-season="ja"]');
+        const al = (td) => getComputedStyle(td).textAlign;
+        t.style.width = 'max-content'; const natural = Math.round(t.getBoundingClientRect().width); t.style.width = '';   // indholdets egen bredde (tabellen fylder ellers 100 %)
+        return { natural, tableW: Math.round(t.getBoundingClientRect().width), wrapW: wrap.clientWidth, scroll: wrap.scrollWidth - wrap.clientWidth, page: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+          zero: row ? [...row.children].map((x) => x.textContent) : null, title: row?.title ?? null, heads: [...t.querySelectorAll('th')].map((x) => x.textContent),
+          align: played ? [...played.children].map(al) : null, period: document.getElementById('my-players-period')?.textContent };
+      }, zero);
+      console.log(`  v3.33.1 måling (${w}): "Dit hold"-tabellen ${st.natural} px indhold i rammen ${st.wrapW} px (vandret rulning ${st.scroll} px)`);
+      check(`v3.33.1 (${w}): "Dit hold" – korte overskrifter, perioden over tabellen, 0 sæsonkampe = "–" i alle sæsonkolonner (karrieren i title)`,
+        JSON.stringify(st.heads) === JSON.stringify(['Spiller', 'Kampe', 'Snit', 'km/90', 'HI %', 'Fri løb', 'Friskhed']) && st.period === 'Sæson 1 · 7 runder'
+        && !!st.zero && JSON.stringify(st.zero.slice(1, 6)) === JSON.stringify(['–', '–', '–', '–', '–']) && /%$/.test(st.zero[6]) && st.title === 'Karriere: 5 kampe · snit 7,0 · 10,0 km/90 · HI 20 %', JSON.stringify(st));
+      check(`v3.33.1 (${w}): "Dit hold" – spilleren venstrestillet, alle tal højrestillet (også Kampe – før ramte ".standings td:nth-child(2)" den)`,
+        JSON.stringify(st.align) === JSON.stringify(['left', 'right', 'right', 'right', 'right', 'right', 'right']), JSON.stringify(st.align));
+      // (siden selv ruller 16 px ved 390 på Liga også i v3.33.0 – stjernerne i "⭐ Bedste snit"-listen; ikke denne tabel)
+      if (w === 390) check('v3.33.1 (390): "Dit hold"-tabellen er ikke bredere end rammen (før 552 px i 324) – ingen vandret rulning i tabellen', st.scroll <= 0 && st.natural <= st.wrapW, JSON.stringify(st));
+      await c.close();
+    }
+    // Sæsonslut ved 390: rapporten øverst på Hjem, knapperne ≥ 44 px – og Hjems højde med og uden rapporten (uden = som v3.33.0's Hjem)
+    {
+      const E = fresh(5), r2 = createRng(55);
+      for (let r = 0; r < 14; r++) commitRound(E, playRound(E, r2), r2);
+      const c = await browser.newContext({ viewport: { width: 390, height: 844 } }), p = await c.newPage(); p.on('pageerror', (e) => fejl.push(e.message));
+      await p.goto(BASE + '/'); await p.waitForSelector('body[data-klar="ja"]');
+      await p.evaluate((s) => { for (const k of Object.keys(localStorage)) if (k.startsWith('tactivar_')) localStorage.removeItem(k); localStorage.setItem('tactivar_save', s); }, serialize({ league: E, notes: {}, ui: { activePresetIndex: 0, seenVersion: VERSION, tab: 'hjem' } }));
+      await p.reload(); await p.waitForSelector('body[data-klar="ja"]');
+      const m = await p.evaluate(() => {
+        const r = document.getElementById('season-report'), btn = [...document.querySelectorAll('#youth-offers button')].map((b) => Math.round(b.getBoundingClientRect().height));
+        const top = Math.round(r.getBoundingClientRect().top + scrollY), last = Math.round(document.getElementById('home-last').getBoundingClientRect().top + scrollY), withR = document.documentElement.scrollHeight;
+        const rh = Math.round(r.getBoundingClientRect().height); r.remove(); const without = document.documentElement.scrollHeight;
+        return { btn, top, last, withR, without, rh, page: document.documentElement.scrollWidth - document.documentElement.clientWidth };
+      });
+      console.log(`  v3.33.1 måling (390): Hjem ved sæsonslut ${m.withR} px med rapporten (${m.rh} px), ${m.without} px uden (som v3.33.0)`);
+      check('v3.33.1 (390) sæsonslut: rapporten står over "Sidste runde" på Hjem, Tag op/Lad gå er mindst 44 px høje, intet vandret',
+        m.top < m.last && m.btn.length === 4 && m.btn.every((x) => x >= 44) && m.page <= 0, JSON.stringify(m));
+      await c.close();
+    }
+  }
   await f1tm();
   await f2();
   await f2tm();
@@ -4236,6 +4358,7 @@ try {
   await v3330();
   await v3330tm();
   await v3330fix();
+  await v3331();
   check('Ingen sidefejl under hele forløbet', fejl.length === 0, fejl.join(' | '));
 } finally {
   await browser.close();
