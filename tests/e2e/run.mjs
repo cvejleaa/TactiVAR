@@ -4330,10 +4330,11 @@ try {
       await p.evaluate((f) => { for (const k of Object.keys(localStorage)) if (k.startsWith('tactivar_')) localStorage.removeItem(k); localStorage.setItem('tactivar_save', f); }, fs.readFileSync(new URL('../fixtures/save-v3.33.0.json', import.meta.url), 'utf8'));
       await p.reload(); await p.waitForSelector('body[data-klar="ja"]');
       const note = await p.textContent('#notice').catch(() => ''), saved = await p.evaluate(() => { const d = JSON.parse(localStorage.getItem('tactivar_save')); return { schema: d.schemaVersion, from: d.league.runStatsFromRound, ret: d.league.teams.flatMap((t) => t.squad).filter((x) => x.retiring).length }; });
+      const backupBtn = await p.locator('#download-migration-backup').isVisible();   // før fanen skiftes (et faneklik sletter beskeden)
       await p.click('#tab-trup'); await p.waitForSelector('.tabpane.tab-trup');
       const tags = await p.locator('#matrix .retiring-tag').count();
       check('v3.33.1: gem fra v3.33.0 (skema 9) – kort besked med backup-knap, gemt som 10, markøren = næste runde, og 👋 i Trup med det samme',
-        note.startsWith('Dit spil er opdateret: "Dit hold" på Liga viser nu sæsonen i alle kolonner') && (await p.locator('#download-migration-backup').isVisible()) && saved.schema === 10 && saved.from === 10 && saved.ret === 2 && tags === 1, JSON.stringify({ saved, tags, note: note.slice(0, 200) }));
+        note.startsWith('Dit spil er opdateret: "Dit hold" på Liga viser nu sæsonen i alle kolonner') && backupBtn && saved.schema === 10 && saved.from === 10 && saved.ret === 2 && tags === 1, JSON.stringify({ saved, tags, note: note.slice(0, 200) }));
       await c.close();
     }
     // Sæsonslut ved 390: rapporten øverst på Hjem, knapperne ≥ 44 px – og Hjems højde med og uden rapporten (uden = som v3.33.0's Hjem)
