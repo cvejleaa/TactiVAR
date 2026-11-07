@@ -4286,6 +4286,12 @@ try {
     const home = await p.textContent('#home-retiring');
     check('v3.33.1 TM: Hjem nævner stoppere i stigende trøjenummer (#66 før #88 – truppens rækkefølge er den modsatte)',
       home === `👋Stopper efter sæsonen: #66 ${sure.shortName} (${sure.line === 'DEF' ? 'FOR' : sure.line === 'MID' ? 'MID' : 'ANG'}, 34 år) · #88 ${sure2.shortName} (${sure2.line === 'DEF' ? 'FOR' : sure2.line === 'MID' ? 'MID' : 'ANG'}, 34 år) – vinduet er åbent til runde 8Trup ›`, home);
+    // NEWS-nøglen for 3.33.1: spilleren, der sidst så 3.33.0, får nyheden som besked (sæsonrapporten på Hjem, 👋 fra runde 7, "Dit hold" = sæsonen)
+    await p.evaluate(() => { const d = JSON.parse(localStorage.getItem('tactivar_save')); d.ui.seenVersion = '3.33.0'; localStorage.setItem('tactivar_save', JSON.stringify(d)); });
+    await p.reload(); await p.waitForSelector('body[data-klar="ja"]');
+    const news = (await p.textContent('#notice', { timeout: 3000 }).catch(() => '')) ?? '';
+    check('v3.33.1 TM: nyheden for 3.33.1 står i NEWS og vises som besked ved opdatering (sæsonrapporten på Hjem, 👋 fra runde 7, "Dit hold")',
+      news.startsWith('📋 Sæsonrapporten står nu på 🏠 Hjem') && news.includes('👋 Karrierestop varsles fra runde 7') && news.includes('Liga → "Dit hold"'), news.slice(0, 160));
     await c.close();
   }
 

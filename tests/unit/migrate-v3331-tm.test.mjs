@@ -29,6 +29,7 @@ const { viewPlayer, viewTeam } = await import('../../public/engine/visibility.js
 const { renderCard } = await import('../../public/ui/card.js');
 const { renderSeasonReport } = await import('../../public/ui/season-report.js');
 const { makeOffers } = await import('../../public/engine/transfers.js');
+const { renderStats } = await import('../../public/ui/stats.js');
 const { derivedRng } = await import('../../public/engine/career.js');
 const { renderMarket, renderPublicClub } = await import('../../public/ui/club.js');
 
@@ -346,4 +347,19 @@ test('bud på dine spillere til salg: en stopper får det HALVE bud (værdien i 
   for (const p of [a, b]) assert.equal(off(p).price, q(publicValue(p) * (0.9 + 0.1 * derivedRng('offer', w, p.id).next())), p.shortName);
   assert.equal(baseValue(a), baseValue(b));
   assert.ok(off(a).price < off(b).price * 0.65, `stopperen ${off(a).price} mod ${off(b).price}`);
+});
+
+test('Liga, afsluttet sæson: noten over "Dit hold" følger ARKIVETS løbe-markør; et arkiv uden (fra før v3.33.1) siger "fra næste runde"', () => {
+  const { L, rng } = world(5);
+  for (let i = 0; i < 14; i++) commitRound(L, playRound(L, rng), rng);
+  const period = () => byId(renderStats({ league: L, myTeamId: own(L).id }), 'my-players-period')?.textContent;
+  const arch = L.seasons.at(-1);
+  assert.equal(arch.runStatsFrom, 1);
+  assert.equal(period(), 'Sæson 1 (afsluttet)');
+  arch.runStatsFrom = 5;
+  assert.equal(period(), 'Sæson 1 (afsluttet) · km/90 og HI % fra R5');
+  delete arch.runStatsFrom;
+  assert.equal(period(), 'Sæson 1 (afsluttet) · km/90 og HI % fra næste runde');
+  arch.runStatsFrom = 14;
+  assert.equal(period(), 'Sæson 1 (afsluttet) · km/90 og HI % fra R14', 'sidste runde: stadig "fra R14" – ikke "næste runde"');
 });
