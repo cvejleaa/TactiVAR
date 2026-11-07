@@ -4330,6 +4330,12 @@ try {
         return { top: Math.round(r.getBoundingClientRect().top), smR: parseFloat(getComputedStyle(r).scrollMarginTop), smY: parseFloat(getComputedStyle(y).scrollMarginTop), h3: r.querySelector('h3').textContent, fc: document.getElementById('sr-to-klub')?.textContent }; });
       check('v3.33.1 TM: Klubs "📋 Sæsonrapport ›" åbner Hjem og ruller til rapporten (øverst i billedet, under topbaren); rapporten og ungdomstilbuddene har scroll-margin; "💼 Klub ›" i prognosen',
         m.top >= 0 && m.top < 200 && m.smR > 0 && m.smY > 0 && /^📋 Sæson 1 er slut – nr\. [1-8] af 8$/.test(m.h3) && m.fc === '💼 Klub ›', JSON.stringify(m));
+      await q.evaluate(() => window.scrollTo(0, document.body.scrollHeight)); await q.waitForTimeout(200);
+      const bottom = await q.evaluate(() => ({ y: Math.round(window.scrollY), top: Math.round(document.getElementById('youth-offers').getBoundingClientRect().top) }));
+      await q.click('#youth-answer'); await q.waitForTimeout(400);
+      const answered = await q.evaluate(() => Math.round(document.getElementById('youth-offers').getBoundingClientRect().top));
+      check('v3.33.1 TM: "Svar ↑" i "Før du spiller" ruller (ved 390, hvor Hjem er lang) fra bunden op til ungdomstilbuddene – først uden for billedet (< 0), bagefter synlige',
+        bottom.y > 200 && bottom.top < 0 && answered >= 0 && answered < 200, JSON.stringify({ bottom, answered }));
       await q.click('#sr-to-klub'); await q.waitForSelector('.tabpane.tab-klub');
       check('v3.33.1 TM: "💼 Klub ›" i sæsonrapporten åbner Klub', (await q.locator('#to-season-report').count()) === 1);
       await c2.close();
