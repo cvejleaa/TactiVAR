@@ -4285,7 +4285,7 @@ try {
     await tt('hjem');
     const home = await p.textContent('#home-retiring');
     check('v3.33.1 TM: Hjem nævner stoppere i stigende trøjenummer (#66 før #88 – truppens rækkefølge er den modsatte)',
-      home === `👋Stopper efter sæsonen: #66 ${sure.shortName} (${sure.line === 'DEF' ? 'FOR' : sure.line === 'MID' ? 'MID' : 'ANG'}, 34 år) · #88 ${sure2.shortName} (${sure2.line === 'DEF' ? 'FOR' : sure2.line === 'MID' ? 'MID' : 'ANG'}, 34 år) – vinduet er åbent til runde 8Trup ›`, home);
+      home === `👋Stopper efter sæsonen: #66 ${sure.shortName} (${sure.line === 'DEF' ? 'FOR' : sure.line === 'MID' ? 'MID' : 'ANG'}, 34 år) · #88 ${sure2.shortName} (${sure2.line === 'DEF' ? 'FOR' : sure2.line === 'MID' ? 'MID' : 'ANG'}, 34 år) – sidste chance for en afløser: vinduet lukker, når du spiller runde 8Trup ›`, home);
     // CSS, som kun klassenavnene var målt på: 👋-mærkets luft og "Dit hold"s tal og navne (computed style)
     await tt('trup');
     const css = await p.evaluate(() => { const t = document.querySelector('#matrix .retiring-tag'), cs = t && getComputedStyle(t);
@@ -4382,16 +4382,16 @@ try {
         title: document.querySelector(`#matrix tr[data-pid="${a}"] .retiring-tag`)?.title, stay: document.querySelectorAll(`#matrix tr[data-pid="${b}"] .retiring-tag`).length,
         help: document.getElementById('trup-retiring-help')?.textContent }), [sure.id, stay.id]);
       check(`v3.33.1 (${w}): under afspilningen af runde 7 intet 👋; bagefter 👋 efter navnet på netop den, der stopper (title med alderen) – ikke på den 31-årige, der bliver – og forklaringen i Trup`,
-        during === 0 && JSON.stringify(t7.all) === JSON.stringify([sure.id]) && t7.title === 'Stopper efter sæsonen (34 år)' && t7.stay === 0 && t7.help === ' · 👋 = stopper efter sæsonen', JSON.stringify({ during, t7 }));
+        during === 0 && JSON.stringify(t7.all) === JSON.stringify([sure.id]) && t7.title === 'Stopper efter sæsonen (34 år)' && t7.stay === 0 && t7.help === ' · 👋 = stopper efter sæsonen (halv værdi)', JSON.stringify({ during, t7 }));
       await p.click(`#matrix tr[data-pid="${sure.id}"]`); await p.waitForSelector('#card-retiring');
       const cr = await p.textContent('#card-retiring');
-      check(`v3.33.1 (${w}): kortet – "👋 Stopper efter sæsonen (34 år) – værdi … (halv: 7 af 14 runder tilbage). Løn uændret …"`, /^👋 Stopper efter sæsonen \(34 år\) – værdi [\d.]+ kr\. \(halv: 7 af 14 runder tilbage\)\. Løn uændret [\d.]+ kr\. pr\. runde\.$/.test(cr), cr);
+      check(`v3.33.1 (${w}): kortet – "👋 Stopper efter sæsonen (34 år) – værdi … (halv: kun sæsonens sidste 7 af 14 runder). Løn uændret …"`, /^👋 Stopper efter sæsonen \(34 år\) – værdi [\d.]+ kr\. \(halv: kun sæsonens sidste 7 af 14 runder\)\. Løn uændret [\d.]+ kr\. pr\. runde\.$/.test(cr), cr);
       await p.click('#card-close');
       await tt('hjem');
       const hm = await p.evaluate(() => ({ txt: document.getElementById('home-retiring')?.textContent, issues: document.querySelectorAll('#home-todo .todo-row[data-kind]').length,
         pill: document.querySelector('#home-todo .lbl-row .pill')?.textContent ?? null, ready: !!document.getElementById('home-ready'), kind: document.getElementById('home-retiring')?.dataset.kind ?? null }));
-      check(`v3.33.1 (${w}): Hjem – "👋 Stopper efter sæsonen: #nr navn (kæde, 34 år) – vinduet er åbent til runde 8" som info: tæller ikke i "N ting", og "Holdet er klar" følger kun opgaverne`,
-        hm.txt === `👋Stopper efter sæsonen: #${sure.shirtNumber} ${sure.shortName} (${LINE[sure.line]}, 34 år) – vinduet er åbent til runde 8Trup ›` && hm.kind === null
+      check(`v3.33.1 (${w}): Hjem – "👋 Stopper efter sæsonen: #nr navn (kæde, 34 år) – sidste chance …: vinduet lukker, når du spiller runde 8" som info: tæller ikke i "N ting", og "Holdet er klar" følger kun opgaverne`,
+        hm.txt === `👋Stopper efter sæsonen: #${sure.shirtNumber} ${sure.shortName} (${LINE[sure.line]}, 34 år) – sidste chance for en afløser: vinduet lukker, når du spiller runde 8Trup ›` && hm.kind === null
         && (hm.issues ? hm.pill === `${hm.issues} ting` && !hm.ready : hm.pill === null && hm.ready), JSON.stringify(hm));
       await p.click('#home-retiring-link'); await p.waitForSelector('.tabpane.tab-trup');
       check(`v3.33.1 (${w}): "Trup ›" ved 👋 åbner Trup for dit hold`, (await p.locator(`#matrix tr[data-pid="${sure.id}"] .retiring-tag`).count()) === 1);

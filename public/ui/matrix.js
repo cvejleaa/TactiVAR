@@ -41,7 +41,7 @@ export const COLUMNS = [
   { key: 'mod', label: '🧠 Mod', title: 'Erfaring mod stilarter: mod gegenpres / mod lav blok / mod VAR-linje og lange bolde (sorterer på den bedste)', field: 'counterTactics', value: modBest, num: true },
   // v3.19.0 (brugeren: "Hvor står værdien og lønnen for mine egne spillere?"): sidst, så kolonnernes plads i e2e holder. Værdien er
   // offentlig (stjerner, tier og alder), lønnen kun ejerens (weeklyWage er OWNER → 🔒 for modstandere)
-  { key: 'value', label: '💰 Værdi', title: 'Offentlig værdi (stjerner og alder) – en anden klub betaler mere (1,3, en starter 1,6)', field: 'publicStars', value: (p) => publicValue(p), num: true, fmt: money },
+  { key: 'value', label: '💰 Værdi', title: 'Offentlig værdi (stjerner og alder; halv for 👋 – han stopper efter sæsonen) – en anden klub betaler mere (1,3, en starter 1,6)', field: 'publicStars', value: (p) => publicValue(p), num: true, fmt: money },
   { key: 'wage', label: 'Løn/rd', title: 'Løn pr. runde (kun dit hold) – lønbudgettet står i 💼 Klub', field: 'weeklyWage', value: (p) => Math.round(p.weeklyWage / 3), num: true, fmt: (v) => v.toLocaleString('da-DK') },
 ];
 

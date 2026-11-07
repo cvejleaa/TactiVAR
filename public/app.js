@@ -621,7 +621,7 @@ function renderNow() {
       mc?.playing && seasonJustEnded(league) ? h('div', { class: 'notice', id: 'turnover-booked' }, '🗓 Sæsonen sluttede med denne runde: alle er blevet et år ældre, og sæsonrapporten med ungdomstilbuddene står på 🏠 Hjem, når kampene er spillet.') : null,
       // v3.30.0: træningen står på sin egen fane – her kun "+N" i regnearket og, når der er nogen, hvad de betyder og hvor træningen står
       h('div', { class: 'muted help trup-help', id: 'trup-help' }, 'Vælg en spiller for at åbne spillerkortet',   // v3.32.1 (R5): neutralt ord – mus og finger
-        retiringShown() && team.squad.some((p) => p.retiring) ? h('span', { id: 'trup-retiring-help' }, ' · 👋 = stopper efter sæsonen') : null,
+        retiringShown() && team.squad.some((p) => p.retiring) ? h('span', { id: 'trup-retiring-help' }, ' · 👋 = stopper efter sæsonen (halv værdi)') : null,
         anyGain ? h('span', { id: 'trup-gain-help' }, ` · +N = antal +1 efter runde ${ownRound} (træning og kampe) · træningen står på `,
           h('button', { class: 'linklike', id: 'trup-to-training', onclick: () => showTab('traening') }, '🏋️ Træning ›')) : null,
         // QC v3.30.0: lige efter sæsonslut er alle blevet et år ældre, så tallene kan være faldet – derfor ingen "+N" her, selv om Træning viser rundens +1

@@ -183,7 +183,7 @@ test('Trup: 👋 efter navnet for alle hold (offentligt) – ikke for den 31-år
 test('kortet: "Stopper efter sæsonen" med værdi og uændret løn (dit hold) – modstanderens uden tal', () => {
   const ownCard = renderCard({ player: W.sure, team: own(W.L), isOwn: true, scouting: [], note: '', onNote() {}, retiring: true });
   const t = byId(ownCard, 'card-retiring').textContent;
-  assert.ok(t.startsWith('👋 Stopper efter sæsonen (34 år) – værdi ') && t.includes('(halv: 7 af 14 runder tilbage). Løn uændret '), t);
+  assert.ok(t.startsWith('👋 Stopper efter sæsonen (34 år) – værdi ') && t.includes('(halv: kun sæsonens sidste 7 af 14 runder). Løn uændret '), t);
   assert.ok(!t.includes('overvejer'), 'udfaldet er afgjort');
   const opp = renderCard({ player: viewPlayer(W.botSure, false), team: W.bot, isOwn: false, scouting: [], note: '', onNote() {}, retiring: true });
   assert.equal(byId(opp, 'card-retiring').textContent, `👋 ${W.botSure.shortName} stopper efter sæsonen (34 år).`);
@@ -196,7 +196,7 @@ test('Hjem: 👋-linjen er info – tæller ikke i "N ting", "Holdet er klar" st
   const base = { club: { name: 'Mit', cash: 100, delta: null }, last: null, place: 3, ended: false, roundsPlayed: 7, next: { k: 8, of: 14, name: 'Bot', home: true, place: 2, form: [] },
     issues: [], youth: 0, training: null, table: [], playing: false, on };
   const r = renderHome({ ...base, retiring: { players: ps.slice(0, 1), windowOpen: true, windowTo: 8 } });
-  assert.equal(byId(r, 'home-retiring').textContent, '👋Stopper efter sæsonen: #4 S4 (FOR, 32 år) – vinduet er åbent til runde 8Trup ›');
+  assert.equal(byId(r, 'home-retiring').textContent, '👋Stopper efter sæsonen: #4 S4 (FOR, 32 år) – sidste chance for en afløser: vinduet lukker, når du spiller runde 8Trup ›');
   assert.ok(byId(r, 'home-ready'), '"Holdet er klar" står stadig');
   assert.ok(!byId(r, 'home-todo').textContent.includes('ting'), 'ingen antal-pille');
   calls.length = 0; all(byId(r, 'home-retiring'), (e) => e.tag === 'button')[0].on.click(); assert.deepEqual(calls, ['trup']);

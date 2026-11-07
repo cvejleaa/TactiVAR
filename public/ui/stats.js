@@ -138,7 +138,7 @@ function periodText(league) {
   const n = league.leagueMetadata.seasonNumber, ended = league.endedSeason;
   const k = ended ? ended.toRound - ended.fromRound + 1 : league.leagueMetadata.round + 1 - (league.seasonStartRound ?? 1);
   const sk = statsFromK(league), rk = fromK(league, 'runStatsFromRound');
-  const from = [sk > 1 ? `kampe og fri løb fra R${sk}` : null, rk > 1 ? (rk > k ? 'km/90 og HI % fra næste runde' : `km/90 og HI % fra R${rk}`) : null].filter(Boolean);
+  const from = [sk > 1 ? `kampe og fri løb fra R${sk}` : null, rk > 1 ? (rk > k ? (ended ? `km/90 og HI % blev ikke målt i sæson ${n}` : 'km/90 og HI % fra næste runde') : `km/90 og HI % fra R${rk}`) : null].filter(Boolean);
   return `${ended ? `Sæson ${n} (afsluttet)` : `Sæson ${n} · ${k} runde${k === 1 ? '' : 'r'}`}${from.length ? ` · ${from.join(', ')}` : ''}`;
 }
 const MY_HEAD = [['Spiller', 'Hold over en række (eller tryk) for hans karriere'], ['Kampe', 'Kampe i sæsonen'], ['Snit', 'Karakter i snit i sæsonen (alle hans kampe i sæsonen – også for en tidligere klub)'],

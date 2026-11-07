@@ -121,7 +121,7 @@ function renderForSale(league, me, onBuy, onLine, line, msg = '') {
       h('thead', {}, h('tr', {}, [['', ''], ['Spiller', ''], ['Pris', ''], ['Pos', ''], ['Alder', ''], ['Vurd', ''], ['Klub', 'wide'], ['Løn hos dig/runde', 'wide']].map(([x, c]) => h('th', { class: c }, x)))),
       h('tbody', {}, rows.map(({ t, p, m }) => h('tr', { dataset: { pid: p.id } },
         h('td', {}, h('button', { class: 'mini buy-row', onclick: () => onBuy(p.id) }, '💰 Køb')),
-        h('td', {}, `#${p.shirtNumber} ${p.shortName}`), h('td', { class: 'num' }, kr(m.price)), h('td', {}, `${LINE[p.line]} · ${POSITION[p.position] ?? ''}`), h('td', { class: 'num' }, p.age),
+        h('td', p.retiring ? { class: 'sale-retiring', title: 'Stopper efter sæsonen – derfor den halve pris' } : {}, `#${p.shirtNumber} ${p.shortName}${p.retiring ? ' 👋' : ''}`), h('td', { class: 'num' }, kr(m.price)), h('td', {}, `${LINE[p.line]} · ${POSITION[p.position] ?? ''}`), h('td', { class: 'num' }, p.age),
         h('td', {}, starsEl(p.publicStars)), h('td', { class: 'wide' }, t.name), h('td', { class: 'num wide' }, kr(Math.round(publicWage(p) / 3)))))))) :
       h('p', { class: 'muted', id: 'for-sale-empty' }, line === 'all' ? (wageRoom(league, me) <= 0 ? (salesLeft(league, me) > 0 ? 'Ingen lige nu – du er over lønbudgettet: sæt en spiller til salg eller fritstil ham, så kan du købe for den løn, du sparer (se Lønbudget øverst i 💼 Klub).' : `Ingen lige nu – du er over lønbudgettet og har brugt dine ${SALES_PER_WINDOW} salg i vinduet.`) : 'Ingen lige nu – kassen eller lønbudgettet er for lille (se øverst i 💼 Klub), eller klubberne har solgt deres 2 i dette vindue.') : 'Ingen i denne kæde lige nu – prøv "Alle".'));
 }

@@ -270,7 +270,7 @@ test('kortet (dit hold): "Løn uændret" er hans RIGTIGE løn (weeklyWage ÷ 3 �
   Object.assign(p, { age: 34, retiring: true, weeklyWage: 81000, careerGames: 9, valueStars: 3 });
   assert.equal(Math.round(publicWage(p) / 3), 8000, 'data: den offentlige formel giver 8.000 (24.000 ÷ 3) – ikke 27.000');
   const card = renderCard({ player: p, team: me, isOwn: true, scouting: [], note: '', onNote() {}, retiring: true });
-  assert.equal(byId(card, 'card-retiring').textContent, '👋 Stopper efter sæsonen (34 år) – værdi 225.000 kr. (halv: 7 af 14 runder tilbage). Løn uændret 27.000 kr. pr. runde.');
+  assert.equal(byId(card, 'card-retiring').textContent, '👋 Stopper efter sæsonen (34 år) – værdi 225.000 kr. (halv: kun sæsonens sidste 7 af 14 runder). Løn uændret 27.000 kr. pr. runde.');
   assert.ok(byId(card, 'card-wage').textContent.startsWith('Løn 27.000 kr. pr. runde'), 'samme løn et andet sted på kortet');
 });
 
@@ -316,7 +316,7 @@ test('Hjem: "og N mere" tæller KUN over tre (præcis tre = ingen "og"), N = res
   const mk = (n, win) => renderHome({ club: { name: 'Mit', cash: 100, delta: null }, last: null, place: 3, ended: false, roundsPlayed: 7, next: { k: 8, of: 14, name: 'Bot', home: true, place: 2, form: [] },
     issues: [], youth: 0, training: null, table: [], playing: false, on, retiring: { players: Array.from({ length: n }, (_, i) => ({ shirtNumber: i + 2, shortName: `S${i + 2}`, line: 'FOR', age: 34 })), windowOpen: win, windowTo: 9 } });
   const t = (r) => all(byId(r, 'home-retiring'), (e) => e.className === 'todo-txt')[0].textContent;
-  assert.equal(t(mk(3, true)), 'Stopper efter sæsonen: #2 S2 (FOR, 34 år) · #3 S3 (FOR, 34 år) · #4 S4 (FOR, 34 år) – vinduet er åbent til runde 9');
+  assert.equal(t(mk(3, true)), 'Stopper efter sæsonen: #2 S2 (FOR, 34 år) · #3 S3 (FOR, 34 år) · #4 S4 (FOR, 34 år) – sidste chance for en afløser: vinduet lukker, når du spiller runde 9');
   assert.equal(t(mk(5, false)), 'Stopper efter sæsonen: #2 S2 (FOR, 34 år) · #3 S3 (FOR, 34 år) · #4 S4 (FOR, 34 år) … og 2 mere – find en afløser ved sæsonslut');
 });
 
@@ -359,7 +359,7 @@ test('Liga, afsluttet sæson: noten over "Dit hold" følger ARKIVETS løbe-mark�
   arch.runStatsFrom = 5;
   assert.equal(period(), 'Sæson 1 (afsluttet) · km/90 og HI % fra R5');
   delete arch.runStatsFrom;
-  assert.equal(period(), 'Sæson 1 (afsluttet) · km/90 og HI % fra næste runde');
+  assert.equal(period(), 'Sæson 1 (afsluttet) · km/90 og HI % blev ikke målt i sæson 1');
   arch.runStatsFrom = 14;
   assert.equal(period(), 'Sæson 1 (afsluttet) · km/90 og HI % fra R14', 'sidste runde: stadig "fra R14" – ikke "næste runde"');
 });

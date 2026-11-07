@@ -136,6 +136,16 @@ scratchpad – et tal herfra skal måles igen med et committet værktøj, før d
     (runde 12, 90+1'). `trace-invariants`: 0 fejl i 56 kampe – fejlen er i billedet, ikke sporet.
 14. **"Din sæson" i sæsonrapporten** · klub + UI · S/M · 4 · rapporten er ren administration; placering, kurve, bedste/værste
     kamp, sæsonens spiller og topscorer – alt fra historikken (`ui/season-report.js`).
+14b. **Fund fra rollerne på v3.33.1 (små, samlet)** · UI + klub + økonomi · S · 3 ·
+   - Liga ruller 16 px vandret ved 390 px pga. stjernerne i "⭐ Bedste snit" (også i v3.33.0).
+   - "Snit" betyder to ting på Liga: karakter i "Dit hold" (7,7) og stjerner i "⭐ Bedste snit" (4,0) – omdøb den ene (Spilfører UI).
+   - "Dit hold" på mobil: karrieren står kun i rækkens title (vises ikke ved tryk) – lad et tryk åbne spillerkortet og ret ⓘ-teksten (Spilfører UI).
+   - Sæsonslut føles ikke som en afslutning: "👑 Sæsonens spiller · ⚽ Topscorer" øverst i rapporten; "Lad gå" brydes ved 1366 (23 px) – hører sammen med 14 (Spilfører UI).
+   - Mister truppen 2+ spillere, får man 0 ungdomstilbud – alle rykkes op automatisk (`season.js:300-307`), så valget forsvinder, når man mister mest (Spilfører UI → klub).
+   - 👋-linjen på Hjem linker til Trup; et "Find afløser ›" til markedet filtreret på kæden ville passe bedre (Spilfører UI).
+   - Afsluttet sæson: en spiller, der er stoppet, har ingen kamphistorik og står med kampe men "–" i Snit (`stats.js:39`, QC).
+   - Botternes trin 1 og 2 kan købe en spiller, der stopper, til halv pris; købsboksens "7 runder for prisen" nævner ikke lønnen (Spilfører økonomi).
+   - Trin 3's sortering på `publicValue` er ubevist (en pris-stigende sortering overlever – Test Manager).
 15. **Bestyrelsens mål for sæsonen** · klub · M · 4 · 🗄 (lille felt) · midtbanen har noget at kæmpe for, men ingen siger det:
     nr. 4–6 efter runde 9 er 1,9 point fra naboen og flytter 1,8 pladser til slut (10 seeds × 2 sæsoner). Mål efter styrke,
     vist i Klub og Liga, fulgt i klummen, gjort op med bonus.
