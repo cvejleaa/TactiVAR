@@ -127,7 +127,7 @@ test('gemmet: ukendte spillere, forkert form og over loftet ryddes; mangler tabe
 // (seed 19) + 6 runder + serialize. Migreringen 8 → 9 seeder alle hold på BASE ved runde 6 – intet andet ændres.
 test('migrering 8 → 9 (gem fra v3.22.1): hvert hold får alle par af markspillere på BASE; trup, opstilling og sporet er urørte', () => {
   const RAW = fs.readFileSync(new URL('../fixtures/save-v3.22.1.json', import.meta.url), 'utf8'), raw = JSON.parse(RAW);
-  assert.equal(raw.schemaVersion, 8); assert.equal(SCHEMA_VERSION, 9);
+  assert.equal(raw.schemaVersion, 8); assert.equal(SCHEMA_VERSION, 10);   // v3.33.1: 9 → 10 kører bagefter
   assert.ok(raw.league.teams.every((t) => t.chemistry === undefined), 'data: ingen samspil før');
   const r = parseSave(RAW);
   assert.ok(r.ok, r.error); assert.equal(r.migratedFrom, 8);

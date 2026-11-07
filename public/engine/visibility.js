@@ -4,10 +4,13 @@
 
 // Offentligt: alle i ligaen må se det (teams_public).
 export const PUBLIC_FIELDS = ['id', 'name', 'shortName', 'shirtNumber', 'line', 'position', 'age', 'heightCm', 'freshness', 'injuryMatchesLeft', 'banMatches', 'banWhy', 'banYellows', 'publicStars', 'roleTier', 'careerGames', 'lastMove', 'valueStars',
+  // v3.33.1: karrierestoppet er offentligt (sat i sæsonens runde 7 – season.js markRetiring); værdien falder (career.js publicValue)
+  'retiring',
   // Sæsonstatistik (v3.10): alt det, der står i referaterne – mål, oplæg, kort, MotM, dødboldmål.
   'sGames', 'sMinutes', 'sGoals', 'sAssists', 'sMotm', 'sYellow', 'sRed', 'sCleanSheets', 'sHeaderGoals', 'sPenaltyGoals', 'sSetPieceGoals'];
 // Kun holdets ejer (teams_private).
-export const OWNER_FIELDS = ['skills', 'jumpingPower', 'aerialPower', 'archetype', 'weeklyWage', 'trainingFocus', 'dev', 'lastRating', 'ratingSum', 'ratingGames', 'counterTactics', 'seasonAgeCounter', 'distanceSum', 'minutesSum', 'topSpeedMax', 'hiKmSum', 'hiDistSum', 'freeRunsSum', 'freeRunsWonSum'];
+export const OWNER_FIELDS = ['skills', 'jumpingPower', 'aerialPower', 'archetype', 'weeklyWage', 'trainingFocus', 'dev', 'lastRating', 'ratingSum', 'ratingGames', 'counterTactics', 'seasonAgeCounter', 'distanceSum', 'minutesSum', 'topSpeedMax', 'hiKmSum', 'hiDistSum', 'freeRunsSum', 'freeRunsWonSum',
+  'sDistanceSum', 'sMinutesSum', 'sHiKmSum', 'sHiDistSum'];   // v3.33.1: sæsonens løbetal – private som karrierens
 // Ingen spiller – kun motoren (teams_secrets).
 export const SECRET_FIELDS = ['varProfile', 'potential'];   // potential (v3.18.0): ejeren ser kun et skøn i ord
 

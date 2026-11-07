@@ -4,7 +4,7 @@
 // 1-kamps skade ikke forsvinder i samme runde.
 import { autoMatchBench, banFromCards, logMatch, FOCUS, focusSkills, validFocus, ageTrain, roomOf, addXp, KEY_SKILLS, MATCH_XP, TRAIN_FRESH_FLOOR, TRAIN_INJURY_MATCHES, PLAYED_RELIEF, derivedRng,
   attendance, wagesPerRound, formOf, bookLedger, TV_PER_ROUND, TICKET_PRICE, PRIZE, NEW_LEAGUE_PLACE,
-  willRetire, declineSkills, seasonGrowth, trainedSkills, refreshValue, publicWage, freeShirt, neededLine, botYouthTake, repairLineup, YOUTH_OFFERS, SQUAD_MIN, RETIRED_CAP, LINE_MIN } from './career.js';
+  willRetire, RETIRE_WARN_ROUND, declineSkills, seasonGrowth, trainedSkills, refreshValue, publicWage, freeShirt, neededLine, botYouthTake, repairLineup, YOUTH_OFFERS, SQUAD_MIN, RETIRED_CAP, LINE_MIN } from './career.js';
 import { aerialBreakdown, isArchetypeUnlocked, generatePlayer, neededPosition } from './generator.js';
 import { bookMatchStats, roundHistory, HISTORY_MAX } from './stats.js';
 import { simulateMatch } from './match.js';
@@ -191,10 +191,11 @@ export function commitRound(league, result, rng) {
         // Støj ±2 på prisen, så udholdenheden ikke kan regnes baglæns af den offentlige friskhed.
         p.freshness = afterMatchFreshness(p.freshness, r.distanceKm ?? 0, p.skills.stamina, Math.round(rng.next() * 4 - 2));
         // Sæsontal til spillerkortet (kun ejeren ser dem): km pr. 90 min og bedste topfart.
-        if (r.distanceKm > 0) { p.distanceSum += r.distanceKm; p.minutesSum += Math.max(0, (r.minOut ?? 90) - (r.minIn ?? 1)); }
+        // v3.33.1: og for sæsonen (sDistanceSum … – fra league.runStatsFromRound), så "Dit hold" ikke viser karrierens km for 0 sæsonkampe
+        if (r.distanceKm > 0) { const mins = Math.max(0, (r.minOut ?? 90) - (r.minIn ?? 1)); p.distanceSum += r.distanceKm; p.minutesSum += mins; p.sDistanceSum = (p.sDistanceSum ?? 0) + r.distanceKm; p.sMinutesSum = (p.sMinutesSum ?? 0) + mins; }
         // HI-andelen har sin egen nævner: kun km fra kampe med HI-data (fra v3.7.1), så
         // ligaer fra v3.7.0 ikke viser en for lav sæsonandel.
-        if (r.distanceKm > 0 && r.hiKm != null) { p.hiKmSum += r.hiKm; p.hiDistSum += r.distanceKm; }
+        if (r.distanceKm > 0 && r.hiKm != null) { p.hiKmSum += r.hiKm; p.hiDistSum += r.distanceKm; p.sHiKmSum = (p.sHiKmSum ?? 0) + r.hiKm; p.sHiDistSum = (p.sHiDistSum ?? 0) + r.distanceKm; }
         if (r.topSpeed > p.topSpeedMax) p.topSpeedMax = r.topSpeed;
       }
     }
@@ -240,12 +241,24 @@ export function commitRound(league, result, rng) {
     for (const t of league.teams) pruneChemistry(t);   // pension: hans par forsvinder
     openWindow(league);   // transfervinduet ved sæsonslut
     if (result.gazette) result.gazette.seasonEnd = end;
-  } else if (seasonRoundOf(league, result.round) === 7) openWindow(league);   // vinduet før runde 8
+  } else {
+    // v3.33.1 (brugeren: "Jeg synes ikke jeg er blevet advaret"): karrierestoppet afgøres og står offentligt FØR vinduet åbner, så værdien
+    // (career.js publicValue) og botternes handler i vinduet før runde 8 kender det
+    if (seasonRoundOf(league, result.round) === RETIRE_WARN_ROUND) markRetiring(league);
+    if (seasonRoundOf(league, result.round) === 7) openWindow(league);   // vinduet før runde 8
+  }
   // Ligaens snit af samspil – efter sæsonskiftet og vinduets handler (QC: ellers forældet i en ny sæsons første runde)
   league.leagueMetadata.chemRef = leagueChemRef(league);
   const rep = mine && league.trainingReport?.[mine.id];
   if (rep) rep.strong = strongChanges(mine, chemBefore, league.leagueMetadata.chemRef, result.round);
   return league;
+}
+
+// Karrierestoppet (v3.33.1): flaget p.retiring er den ENE kilde for varslet (kort, Trup, Hjem) og prisen – sat for alle hold i sæsonens
+// runde RETIRE_WARN_ROUND med samme afledte rng som udfaldet (willRetire), så varslet og sæsonskiftet altid er enige.
+export function markRetiring(league) {
+  const season = league.leagueMetadata.seasonNumber ?? 1;
+  for (const t of league.teams) for (const p of t.squad) p.retiring = willRetire(p, season);
 }
 
 // Sæsonskiftet (v3.18.0) – kun fra commitRound, efter endSeason (MIGRATIONS[5] kalder endSeason; ingen ældes ved en migrering, F1).
@@ -272,6 +285,7 @@ export function seasonTurnover(league) {
     p.age += 1; p.seasonAgeCounter = (p.seasonAgeCounter ?? 1) + 1;
     if (declineSkills(p, season, trainedSkills(p, team.isBot)).length) afterSkillChange(p);
     refreshValue(p); p.weeklyWage = publicWage(p);   // lønnen genforhandles ved hvert sæsonslut (QC B6, Spilfører)
+    p.retiring = false;   // v3.33.1: varslet gælder sæsonen, der sluttede
     p.freshness = 100;   // v3.26.1, brugeren: "Truppen skal genvinde energien mellem 2 sæsoner" – sommerpausen giver fuld friskhed (skader løber videre)
   }
   league.retired = [...(league.retired ?? []), ...report.retired.map(({ id, name, teamId, age, games }) => ({ id, name, teamId, age, games, season }))].slice(-RETIRED_CAP);
@@ -320,6 +334,7 @@ export function endSeason(league, toRound, programmed) {
   const hist = (league.history || []).filter((r) => r.round >= league.seasonStartRound && r.round <= toRound);
   const summary = {
     seasonNumber: md.seasonNumber, fromRound: league.seasonStartRound, toRound, programmed, statsFrom: league.statsFromRound ?? league.seasonStartRound,
+    runStatsFrom: league.runStatsFromRound ?? league.seasonStartRound,   // v3.33.1: sæsonens løbetal (sDistanceSum …) fra denne runde
     table, champion: table[0] ? { ...decider(table[0]), teamId: table[0].teamId, runnerUp: table[1] ? decider(table[1]) : null } : null,
     myPos: mine ? table.findIndex((s) => s.teamId === mine.id) + 1 : null,
     topScorer: who(all.filter((p) => p.sGoals > 0).sort(byGoals)[0]),
@@ -337,6 +352,7 @@ export function endSeason(league, toRound, programmed) {
   for (const t of league.teams) for (const p of t.squad) { Object.assign(p, PLAYER_SEASON_DEFAULTS); p.banYellows = 0; }   // de gule nulstilles; en udelukkelse afsones videre (v3.27.0)
   md.seasonNumber = (md.seasonNumber || 1) + 1;
   league.statsFromRound = toRound + 1;
+  league.runStatsFromRound = toRound + 1;
   league.seasonStartRound = toRound + 1;
   return summary;
 }

@@ -195,7 +195,7 @@ export function generatePlayer(rng, line, roleTier, shirtNumber, teamIdx, usedSh
   const player = {
     id: id ?? `plr_t${teamIdx}_${shirtNumber}`, name: `${firstName} ${lastName}`, shortName,
     age, seasonAgeCounter: 1, line, position, shirtNumber, roleTier,
-    ...PLAYER_SEASON_DEFAULTS,
+    ...PLAYER_SEASON_DEFAULTS, retiring: false,   // v3.33.1: karrierestoppet (season.js markRetiring – offentligt)
     freshness: 100, injuryMatchesLeft: 0, banMatches: 0, banYellows: 0, banWhy: null, lastRating: 0, ratingSum: 0, ratingGames: 0, publicStars: 0, distanceSum: 0, minutesSum: 0, topSpeedMax: 0, hiKmSum: 0, hiDistSum: 0,
     heightCm, jumpingPower, aerialPower: aerialBreakdown(heightCm, jumpingPower, skills.strength, skills.positioning).total,
     skills, varProfile,
@@ -294,7 +294,7 @@ export function createLeague(rng) {
   }
   return {
     leagueMetadata: { id: 'league_div_1', name: 'TactiVAR Superligaen', seasonNumber: 1, footballYear: 1, round: 0, standings: teams.map(emptyStanding) },
-    statsFromRound: 1, history: [],
+    statsFromRound: 1, runStatsFromRound: 1, history: [],
     // Kampprogram (v3.11): sæsonen starter i runde 1; seasons er arkivet over afsluttede sæsoner.
     schedule, seasonStartRound: 1, seasons: [],
     nextPlayerSeq: 1, transferLog: [], retired: [], offers: [],

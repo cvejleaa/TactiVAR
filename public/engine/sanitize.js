@@ -59,6 +59,7 @@ export function normalizeLeague(league) {
   for (const s of md.standings) for (const [k, v] of Object.entries(TEAM_STAT_DEFAULTS)) if (s[k] === undefined) s[k] = v;
   // Statistikken (v3.10) tælles fra næste runde i en eksisterende liga – ældre runder er ikke gemt.
   league.statsFromRound ??= md.round + 1;
+  league.runStatsFromRound ??= md.round + 1;   // v3.33.1: sæsonens løbetal – som statistikken fra næste runde
   if (!Array.isArray(league.history)) league.history = [];
   league.scouting ||= {};
   league.lastRound ??= null;
@@ -105,6 +106,7 @@ export function normalizeLeague(league) {
     for (const p of team.squad) {
       for (const [k, v] of Object.entries({ ...PLAYER_DEFAULTS, ...PLAYER_SEASON_DEFAULTS })) if (p[k] === undefined) p[k] = v;
       if (!p.dev || typeof p.dev !== 'object') p.dev = {};
+      if (typeof p.retiring !== 'boolean') p.retiring = false;   // v3.33.1: karrierestoppet (offentligt) – kun true/false
       p.matchLog = Array.isArray(p.matchLog) ? p.matchLog.filter((e) => Array.isArray(e) && e.length === 11 && e.every((v) => v == null || Number.isFinite(v))).slice(-MATCH_LOG_CAP) : [];
       if (!Number.isFinite(p.potential)) p.potential = initialPotential(p);
       if (!Number.isFinite(p.weeklyWage)) p.weeklyWage = publicWage(p);

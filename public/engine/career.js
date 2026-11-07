@@ -216,8 +216,9 @@ export function bookLedger(team, entry) {
 
 // ---------- Sæsonskiftet (v3.18.0; brugerens valg: +1 år pr. sæson) ----------
 // Pension: fra 31 år (MV 33) med stigende sandsynlighed (¼, ½, ¾), sikker ved 34 (MV 36) – measure-lifecycle: snitalder 23–26. Afgjort af en afledt rng pr. spiller og sæson,
-// så varslet fra runde 10 ("overvejer at stoppe") og udfaldet ved sæsonslut er det samme.
-export const RETIRE_FROM = { field: 31, GK: 33 }, RETIRE_SURE = { field: 34, GK: 36 }, RETIRE_WARN_ROUND = 10, RETIRED_CAP = 40;
+// så varslet og udfaldet ved sæsonslut er det samme. v3.33.1: varslet står fra sæsonens runde 7 (før 10) som p.retiring (season.js
+// markRetiring) – mens vinduet før runde 8 er åbent, så du kan nå at handle.
+export const RETIRE_FROM = { field: 31, GK: 33 }, RETIRE_SURE = { field: 34, GK: 36 }, RETIRE_WARN_ROUND = 7, RETIRED_CAP = 40;
 export function retireChance(p) {
   const k = p.line === 'GK' ? 'GK' : 'field';
   return p.age >= RETIRE_SURE[k] ? 1 : p.age >= RETIRE_FROM[k] ? (p.age - RETIRE_FROM[k] + 1) / (RETIRE_SURE[k] - RETIRE_FROM[k] + 1) : 0;

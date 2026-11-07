@@ -5,7 +5,9 @@
 import { publicFacts, compactFacts } from './column.js';
 
 // Pr. spiller (fladt på spilleren, så sanitize kan give standardværdier felt for felt).
-export const PLAYER_SEASON_FIELDS = ['sGames', 'sMinutes', 'sGoals', 'sAssists', 'sMotm', 'sYellow', 'sRed', 'sCleanSheets', 'sHeaderGoals', 'sPenaltyGoals', 'sSetPieceGoals', 'freeRunsSum', 'freeRunsWonSum'];
+export const PLAYER_SEASON_FIELDS = ['sGames', 'sMinutes', 'sGoals', 'sAssists', 'sMotm', 'sYellow', 'sRed', 'sCleanSheets', 'sHeaderGoals', 'sPenaltyGoals', 'sSetPieceGoals', 'freeRunsSum', 'freeRunsWonSum',
+  // v3.33.1 (brugeren: "0 kampe, men alligevel … løbet km"): løbetallene for sæsonen – ved siden af karrierens distanceSum o.l.
+  'sDistanceSum', 'sMinutesSum', 'sHiKmSum', 'sHiDistSum'];
 export const PLAYER_SEASON_DEFAULTS = Object.fromEntries(PLAYER_SEASON_FIELDS.map((k) => [k, 0]));
 
 // Pr. hold (på tabelrækken). Mål står allerede i tabellen og gentages ikke.
@@ -70,11 +72,15 @@ export function roundHistory(round, matches) {
   return { round, matches: matches.length, goals, setPiece, kinds, biggest, most, results, facts };
 }
 
-// Sæsonens løb pr. spiller – samme tal på spillerkortet og i "Dit hold" (én formel, så de ikke driver).
-export function runStats(p) {
+// Løbetal pr. spiller – samme tal på spillerkortet og i "Dit hold" (én formel, så de ikke driver).
+// scope 'career' = alle hans kampe (distanceSum …, nulstilles aldrig); 'season' = sæsonen (sDistanceSum …, v3.33.1 – fra
+// league.runStatsFromRound). Topfarten findes kun for karrieren.
+const RUN_KEYS = { career: ['distanceSum', 'minutesSum', 'hiKmSum', 'hiDistSum'], season: ['sDistanceSum', 'sMinutesSum', 'sHiKmSum', 'sHiDistSum'] };
+export function runStats(p, scope = 'career') {
+  const [dist, mins, hiKm, hiDist] = RUN_KEYS[scope].map((k) => p[k] ?? 0);
   return {
-    km90: p.minutesSum > 0 ? p.distanceSum / p.minutesSum * 90 : null,
-    hiPct: p.hiDistSum > 0 ? Math.round(p.hiKmSum / p.hiDistSum * 100) : null,
+    km90: mins > 0 ? dist / mins * 90 : null,
+    hiPct: hiDist > 0 ? Math.round(hiKm / hiDist * 100) : null,
     top: p.topSpeedMax > 0 ? p.topSpeedMax : null,
   };
 }

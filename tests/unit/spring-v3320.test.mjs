@@ -210,7 +210,7 @@ test('Træning-fanen: fokusvalget viser sine evner ("Fysik – Fart, Styrke, Spr
   assert.ok(!/undefined|NaN/.test(t.textContent));
 });
 
-test('gem fra v3.31.2 (tests/fixtures/save-v3.31.2.json): indlæses uden migrering; dev.jumpingPower overlever gem og indlæsning', () => {
+test('gem fra v3.31.2 (tests/fixtures/save-v3.31.2.json): indlæses (siden v3.33.1 med 9 → 10 – intet om Spring); dev.jumpingPower overlever gem og indlæsning', () => {
   const RAW = fs.readFileSync(new URL('../fixtures/save-v3.31.2.json', import.meta.url), 'utf8'), raw = JSON.parse(RAW);
   const rawMe = raw.league.teams.find((t) => !t.isBot);
   assert.ok(rawMe.squad.some((p) => p.trainingFocus === 'PHYSICAL' && p.dev?.pace > 0), 'data: fixturet har spillere på Fysik med fremdrift');
@@ -218,7 +218,7 @@ test('gem fra v3.31.2 (tests/fixtures/save-v3.31.2.json): indlæses uden migreri
   const r = parseSave(RAW);
   assert.ok(r.ok, r.error);
   const L = r.state.league, me = own(L), p = me.squad.find((x) => x.trainingFocus === 'PHYSICAL' && x.injuryMatchesLeft === 0);
-  assert.equal(r.migratedFrom ?? null, null);
+  assert.equal(r.migratedFrom, 9, 'v3.33.1: skema 9 → 10 (sæsonens løbetal, karrierestop) – Spring-træningen kræver stadig ingen migrering');
   const j0 = p.jumpingPower;
   p.dev.jumpingPower = 0.995;
   trainRound(L, { round: L.leagueMetadata.round + 1, matches: [] }, new Map());
