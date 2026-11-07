@@ -98,6 +98,17 @@ td.player-gain::after { display: none; }
 .token-num { width: 1.8rem; height: 1.8rem; border-radius: 50%; display: grid; place-items: center; background: var(--bg); border: 2px solid #fff; font-weight: 800; font-size: var(--fs-1); }
 .token.custom .token-num { border-color: var(--grøn); } .token.out .token-num { border-color: var(--rød); background: #450a0a; } .token.selected .token-num { box-shadow: 0 0 0 3px var(--lilla); }
 .token.injured .token-num { background: #881337; } .token.draggable { cursor: grab; } .token-flag { font-size: var(--fs-1); color: #fecaca; } .token-flag.ok { color: #bbf7d0; } .token-flag.pos { color: #fde68a; display: block; }
+/* Flagene under brikken: bredde 0, så et langt flag ikke gør brikken bred; centreret – ved kanten vokser de indad (banen skærer ellers af) */
+.token-flags { width: 0; display: flex; flex-direction: column; align-items: center; } .token-flags .token-flag { white-space: nowrap; }
+.token.edge-l .token-flags { align-items: flex-start; } .token.edge-r .token-flags { align-items: flex-end; }
+.token.dragging > .token-flags { display: none; }   /* QC: flagene fra visningen modsiger live-etiketten under trækket */
+.token-live { width: 0; display: flex; flex-direction: column; align-items: center; } .token.edge-l .token-live { align-items: flex-start; } .token.edge-r .token-live { align-items: flex-end; }
+/* Live-etiketten under træk (v3.33.0-rettelse): egen mørk bund – ikke "Ude af zone"-flagets lyserøde; gul = koster, grøn = passer */
+.token-flag.kind-live { display: block; white-space: nowrap; background: #0f172ad9; border-radius: .3rem; padding: 0 .3rem; color: #e5e7eb; text-shadow: none; }
+.token-flag.kind-live.warn { color: #fde68a; } .token-flag.kind-live.ok { color: #86efac; }
+/* Pladsflagets korte form på mobilen: "⚠ DM-plads −2,5 %" (data-short) i stedet for "⚠ Uden for position – DM-plads (−2,5 %)" */
+@media (max-width: 600px) { .token-flags .token-flag.pos[data-short] { font-size: 0; text-align: center; } .token-flag.pos[data-short]::after { content: attr(data-short); white-space: pre; font-size: var(--fs-1); line-height: 1.15; }
+  .token.edge-l .token-flag.pos[data-short] { text-align: left; } .token.edge-r .token-flag.pos[data-short] { text-align: right; } }
 .lp-table .lp-place.off-pos { color: #f59e0b; }
 .anchor-ring { position: absolute; transform: translate(-50%, -50%); border: 2px dashed #e9d5ff; border-radius: 50%; pointer-events: none; }
 fieldset.phase { border: 1px solid var(--kant); border-radius: .4rem; margin: .5rem 0; display: flex; flex-wrap: wrap; gap: .5rem; font-size: var(--fs-1); }

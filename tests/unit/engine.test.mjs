@@ -628,14 +628,14 @@ test('generatePlayer: position gemmes på spilleren, og uden position vælges k�
   assert.equal(mk('DEF').heightCm, 184, 'uden position er en DEF en stopper (bund 184), ikke en back (169)');
 });
 test('truppens bænk og start: positionen pr. trøjenummer følger BLUEPRINT i 4-4-2 – en bots startere er bygget til formationen (v3.20.0)', async () => {
-  const { FORMATIONS, positionOfRole, lineOfRole, slotPositionOf } = await import('../../public/engine/formations.js');
+  const { FORMATIONS, positionOfRole, lineOfRole, slotPositionOf, BOTH } = await import('../../public/engine/formations.js');
   const want = ['GK', 'FB', 'CB', 'CB', 'FB', 'WM', 'CM', 'CM', 'ST', 'WM', 'ST', 'GK', 'CB', 'FB', 'DM', 'AM', 'ST', 'WM'];
   const ORDER = { GK: 0, DEF: 1, MID: 2, ATT: 3 };
   for (const seed of [3, 9]) for (const t of createLeague(createRng(seed)).teams) {
     const form = BOT_PROFILES[createLeague(createRng(seed)).teams.findIndex((x) => x.id === t.id)].form, roles = FORMATIONS[form].map((s) => s.r), ys = FORMATIONS[form].map((s) => s.y);
     // De 11 første efter kæde på formationens pladser: samme kæde → pladsens position, ellers BLUEPRINT; bænken altid BLUEPRINT
     const exp = want.slice();
-    t.squad.slice(0, 11).map((p, i) => [p, i]).sort((a, b) => ORDER[a[0].line] - ORDER[b[0].line] || a[1] - b[1]).forEach(([p, i], slot) => { if (lineOfRole(roles[slot], ys[slot]) === p.line) { const q = slotPositionOf(roles[slot], ys[slot]); exp[i] = q === 'WIDE' ? positionOfRole(roles[slot]) : q; } });   // v3.24.6: kantpladsens dybde
+    t.squad.slice(0, 11).map((p, i) => [p, i]).sort((a, b) => ORDER[a[0].line] - ORDER[b[0].line] || a[1] - b[1]).forEach(([p, i], slot) => { if (lineOfRole(roles[slot], ys[slot]) === p.line) { const q = slotPositionOf(roles[slot], ys[slot]); exp[i] = BOTH[q] ? positionOfRole(roles[slot]) : q; } });   // v3.24.6: kantpladsens dybde; v3.33.0: BOTH
     assert.deepEqual(t.squad.map((p) => p.position), exp, `${t.name} (${form})`);
     if (form === '4-4-2') assert.deepEqual(exp, want);
   }

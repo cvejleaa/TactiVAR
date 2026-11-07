@@ -308,10 +308,11 @@ test('placeLabel: "DM (FOR)" – ikke "CDM (DEF)"; indskifteren "ind på VM"; ga
   assert.equal(placeLabel(E({ slot: undefined, role: 'SUB (DEF)' }), '4-2-3-1'), 'ind (FOR)');
 });
 
-// Referatet (match.js): "Din VB … er højt oppe efter sit løb" og "står for langt fra sin VM-zone" – med danske koder
+// Referatet (match.js): "Din VB … er højt oppe efter sit løb" og "er trukket for langt … fra sin VM-plads" – med danske koder (v3.33.0:
+// teksten nævner ankrets plads og retningen – før "står for langt fra sin VM-zone")
 test('Referatet: kontra-forklaringen og Custom-pos-fejlen bruger de danske pladskoder', () => {
   const texts = [];
-  for (let seed = 1; seed <= 60 && !(texts.some((t) => /^.* Din (VB|HB|VKB|HKB) /.test(t)) && texts.some((t) => /sin [A-ZÆØÅ]+-zone/.test(t))); seed++) {
+  for (let seed = 1; seed <= 60 && !(texts.some((t) => /^.* Din (VB|HB|VKB|HKB) /.test(t)) && texts.some((t) => /sin [A-ZÆØÅ]+-plads/.test(t))); seed++) {
     const { me, opp } = fresh(seed);
     me.tactics.phases.phase1_buildUp.offBallRuns = 'MANY';
     const lm = FORMATIONS[me.tactics.baseFormation].findIndex((s) => s.r === 'LM');
@@ -319,10 +320,10 @@ test('Referatet: kontra-forklaringen og Custom-pos-fejlen bruger de danske plads
     const m = simulateMatch(me, opp, createRng(seed), { drift: false });
     texts.push(...m.events.map((e) => e.text));
   }
-  const counter = texts.filter((t) => / Din [A-ZÆØÅ]+ .* er højt oppe efter sit løb\./.test(t)), zone = texts.filter((t) => /sin [A-ZÆØÅ]+-zone/.test(t));
+  const counter = texts.filter((t) => / Din [A-ZÆØÅ]+ .* er højt oppe efter sit løb\./.test(t)), zone = texts.filter((t) => /sin [A-ZÆØÅ]+-plads/.test(t));
   assert.ok(counter.length > 0 && zone.length > 0, `data: begge tekster forekommer (${counter.length}/${zone.length})`);
   for (const t of counter) assert.match(t, / Din (VB|HB) /, t);
-  for (const t of zone) assert.match(t, /sin VM-zone/, t);
+  for (const t of zone) assert.match(t, /er trukket for langt til siden fra sin VM-plads/, t);   // (15, 45) → (90, 80): mest til siden
   for (const t of [...counter, ...zone]) assert.doesNotMatch(t, ENGLISH_ROLE, t);
 });
 

@@ -101,7 +101,10 @@ export function outOfPositionCount(team) {
 // "Stil op efter position": de 11 på banen flyttes rundt, så flest står på deres naturlige position – ingen ind eller ud
 export function arrangeLineup(team, from = team.tactics.baseFormation) {
   const byId = new Map(team.squad.map((p) => [p.id, p])), slots = team.tactics.lineupSlots;
-  const ys = from === team.tactics.baseFormation ? slots.map((_, i) => slotPosition(team.tactics, i).y) : null;   // v3.24.6: flyttede kantpladser
+  // Pladsernes TEGNEDE dybde i den formation, der stilles op i (v3.24.6 kanterne, v3.33.0 midten). Også ved et planskift (switchPreset):
+  // den nye plans egne customCoords – samme som Hvis-Så til en plan (match.js refit med planens ys), så Taktik og kampen er enige (QC).
+  // Et formationsskift (setFormation) har nulstillet customCoords, så dér er det ankrene.
+  const ys = slots.map((_, i) => slotPosition(team.tactics, i).y);
   const next = arrangeByFit(slots.map((id) => byId.get(id) ?? null), team.tactics.baseFormation, from, ys).map((p, i) => p?.id ?? slots[i]);
   if (new Set(next).size !== slots.length) return false;
   const changed = next.some((id, i) => id !== slots[i]);

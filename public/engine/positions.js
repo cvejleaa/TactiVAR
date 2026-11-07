@@ -3,7 +3,7 @@
 // bold"). Hvor holdets spillere står i netop dette øjeblik – i holdets egne koordinater (lille y =
 // fremme ved modstanderens mål). Ét sted: modtagervalget og øjebliksbilledet ved mål bruger det.
 // Udgangspunktet er den (evt. trukne) plads, så brugerens opstilling stadig betyder noget.
-import { FORMATIONS, slotPosition, lineOfRole } from './formations.js';
+import { FORMATIONS, slotPosition, lineOfRole, slotRoleOf } from './formations.js';
 import { RUNS_ROLES, runBase } from './ratings.js';
 
 // Med bolden rykker holdet op pr. rolle; løb uden bold (holdets indstilling) skubber de samme
@@ -48,6 +48,9 @@ export function driftAt(drift, role, slot, phases = {}) {
   }, 0));
 }
 
+// Pladsens bevægelse i et tick (v3.33.0): ÉT sted for både bredden (livePositions) og dybden (applyDepth) – rollen er den tegnede plads
+const driftOf = (drift, tactics, slot) => driftAt(drift, slotRoleOf(tactics, slot), slot, tactics.phases || {});
+
 // tactics: holdets taktik i kampen (formation, trukne pladser, faser). attacking: holdet har bolden.
 // ballX: hvor på banens bredde bolden er (i holdets egne koordinater). runner: pladsen på en spiller,
 // der lige har vundet et løb uden bold. Returnerer 11 punkter.
@@ -55,16 +58,18 @@ export function livePositions(tactics, { attacking = true, ballX = 50, runner = 
   const coords = FORMATIONS[tactics.baseFormation] || FORMATIONS['4-4-2'];
   const ph = tactics.phases || {};
   const runs = RUNS_PUSH[ph.phase1_buildUp?.offBallRuns] ?? 0, shape = SHAPE[ph.phase2_defending?.pressingHeight] ?? SHAPE.MID_BLOCK;
-  return coords.map((c, i) => {
+  return coords.map((_, i) => {
     const base = slotPosition(tactics, i);
     if (i === 0) return { x: base.x, y: base.y };   // målmanden bliver i målet
-    const line = lineOfRole(c.r);   // bevægelsen følger rollen (en wingback falder med tilbage) – kun kæden til valg/samspil følger dybden (v3.24.6)
+    // bevægelsen følger rollen (en wingback falder med tilbage) – kun kæden til valg/samspil følger dybden (v3.24.6). v3.33.0: på
+    // CDM/CM/CAM er rollen den tegnede plads (formations.js slotRoleOf) – en OM trukket ned til y 46 bevæger sig som en CM
+    const r = slotRoleOf(tactics, i), line = lineOfRole(r);
     let y = base.y;
     if (attacking) {
-      const adv = c.r === 'CB' ? ADVANCE.CB : FB.has(c.r) ? ADVANCE.FB : line === 'ATT' ? ADVANCE.ATT : ADVANCE.MID;
-      y = base.y - adv - (RUNS_ROLES.has(c.r) ? runs : 0) - (i === runner ? RUN_STEP : 0);
+      const adv = r === 'CB' ? ADVANCE.CB : FB.has(r) ? ADVANCE.FB : line === 'ATT' ? ADVANCE.ATT : ADVANCE.MID;
+      y = base.y - adv - (RUNS_ROLES.has(r) ? runs : 0) - (i === runner ? RUN_STEP : 0);
     } else y = base.y + shape.all + (line === 'DEF' ? 0 : shape.front);
-    const [dx] = driftAt(drift, c.r, i, ph);   // bredden her; dybden lægges på efter sammenpresningen (coupledPositions)
+    const [dx] = driftOf(drift, tactics, i);   // bredden her; dybden lægges på efter sammenpresningen (coupledPositions)
     return { x: Math.round(clamp(base.x + (ballX - 50) * BALL_PULL + dx, 3, 97)), y: Math.round(clamp(y, FRONT_LIMIT, 95)) };
   });
 }
@@ -153,13 +158,12 @@ export function apartFrom(pts, idx, other, oidx, resolve = false) {
 // hvor han stod (linjen er hans) – de andre kommer ikke bag ham (hi).
 function applyDepth(pts, tactics, drift, idx, lo, hi, rowIdx = idx, fade = 0) {
   if (!drift) return;
-  const coords = FORMATIONS[tactics.baseFormation] || FORMATIONS['4-4-2'], ph = tactics.phases || {};
   const a = Math.max(FRONT_LIMIT, lo), z = Math.min(95, hi);
   const at = (y0, dy) => { let y = y0 + dy; y = y < a ? a + (a - y) : y > z ? z - (y - z) : y; return Math.round(clamp(y, a, z)); };   // spejlet ved grænsen, ikke klemt: ellers står de på linjen i én række
   // fade: tæt på grænsen dæmpes udslaget i BEGGE retninger (boldholdets angribere holder linjen) – et spejl alene ville kun
   // sende dem bagud og give flere langskud (målt: langskud 8 → 14 % af målene)
   const damp = (i) => (fade ? clamp((pts[i].y - a) / fade, 0, 1) : 1);
-  const y0 = new Map(idx.map((i) => [i, pts[i].y])), dys = new Map(idx.map((i) => [i, driftAt(drift, coords[i].r, i, ph)[1] * damp(i)]));
+  const y0 = new Map(idx.map((i) => [i, pts[i].y])), dys = new Map(idx.map((i) => [i, driftOf(drift, tactics, i)[1] * damp(i)]));
   for (const i of idx) pts[i] = { x: pts[i].x, y: at(y0.get(i), dys.get(i)) };
   // Ingen række på mere end ROW_MAX (v3.16.1-vagten): lander han i en fuld række, prøves den anden vej, det halve og dobbelte
   const row = (i, y) => rowIdx.filter((k) => k !== i && Math.abs(pts[k].y - y) <= 3).length + 1;

@@ -9,10 +9,21 @@ Rangering: brugerens ønsker først, derefter værdi pr. størrelse. Første run
 ## Næste
 000. **Brugerens ønsker 6/11 ("det hele" – i denne rækkefølge, én udgivelse ad gangen):**
    1. ~~v3.32.3 Samspil på Taktik~~ – lavet (se "Lavet").
-   2. **v3.33.0 Træk bestemmer pladsen også i midten** · motor · M · 5 · "hvis jeg trak en spiller ud af en standardopstilling, så det
-      fx gik fra cm til dm, så skulle spillet finde ud af det og ikke give en straf" (ønsket var gået tabt – kun kantreglen v3.24.6 blev
-      lavet). Brugerens valg: straf, kæde OG rollen i kampen følger den tegnede dybde (CDM/CM/CAM, mellemzone hvor begge passer).
-   3. **v3.33.1 VAR læser taktikken** = punkt 00. nedenfor.
+   2. ~~v3.33.0 Træk bestemmer pladsen også i midten~~ – lavet (se "Lavet").
+   3. **v3.33.1 Sæsonrapport på Hjem + varsel om karrierestop** (brugeren 6/11 aften) · UI · S · 5 · "sæsonrapport skal være på
+      enten Hjem eller Klub, da den vedrører min klub" → valgt Hjem (Klub får linket "Sæsonrapport ›"). "Jeg synes ikke jeg er blevet
+      advaret om at en spiller ville stoppe karrieren, det skal være med, og markeres på trup siden" → valgt: 👋 ved navnet i Trup og
+      en linje i Hjem "Før du spiller" fra runde 10 (samme regel som kortet: willRetire, deterministisk – altid sandt). Kun eget hold.
+      + **Liga → Statistik "dine spillere" (brugeren 6/11, skærmbillede):** "2 spillere der på denne side har 0 kampe, men alligevel har
+      fået karakter, har løbet km, og så er der ingen forklaring på hvad 'Fri (sæson)' betyder". Årsag (ui/stats.js:127-131): "Kampe" og
+      "Fri" tælles for sæsonen, men "Snit", "km/90" og "% HI" er hele karrieren (p.ratingSum/runStats) – forklaringen står kun i en grå
+      linje under tabellen. Ret: alle kolonner for SÆSONEN (samme kilde som spillerkortets sæsonstatistik, v3.31.2 cardStats), karrieren
+      i title; "–" uden kampe; kolonnen "Fri løb" med forklaring (kom fri / løb uden bold) i title og ⓘ; tallene under deres overskrift.
+   4. **v3.33.2 VAR læser taktikken + kalibrering mod virkeligheden** = punkt 00. nedenfor, udvidet (brugeren 6/11: "Der er blevet
+      færre VAR afgørelser nu, det matcher ikke virkeligheden"). Målt: motoren identisk i v3.32.1–3 (0,251 ændrede kendelser/kamp);
+      det gamle banner blinkede to gange pr. sag. Virkelighed (ESPN PL 2024/25; 2025/26-tal): PL 0,28, øvrige topligaer/CL 0,38–0,47;
+      PL: mål annulleret 0,124, mål godkendt efter VAR 0,092 (mangler i spillet), straffe givet 0,066, annulleret 0,029. Mål: ca. 0,35;
+      nyt "mål godkendt efter VAR" (fejlagtigt flag omstødt); annullerede mål ned mod 0,12. Måle-scriptet committes.
 00. **v3.32.3 – VAR læser taktikken (brugeren 2026-11-06: "Har taktik ikke nogen indflydelse på var? Heller ikke hvis man vælger
    ekstrem VAR-linje?" – valgt: som næste udgivelse)** · motor + UI · M · 5 · I dag læser `offsideCheck` (engine/match.js) ikke forsvarets
    `offsideTrap`, og `EXTREME_VAR_LINE` virker som `NORMAL` i kampen (kun `!== 'OFF'`, match.js ved `trapWon`); eneste forskel er
@@ -36,6 +47,15 @@ Rangering: brugerens ønsker først, derefter værdi pr. størrelse. Første run
    et klik er stadig byt; Trup 1922 → 1500 px og Taktik 2156 → 1864 px ved 1366, Taktik 4709 → 3777 ved 390), F3 Hjem-indhold og
    avisen ét sted (v3.31.0: avisen kun på Liga lige under tabellen, Hjem 👑 + 📰-kort + formpiller, Kamp et 📰-link; Kamp 3267 → 2629 px
    ved 1366 og 5895 → 4994 ved 390). Næste: F4.
+0g. **Egentlig DM-opgave: DM'en bryder opbygningen** (v3.33.0, Spilfører motor) · motor · M · 4 · I dag har DM og CM samme opgaver i
+   motoren (begge MID: `rolesOf`, presseren, besiddelsen) – v3.33.0 lod kun prisen, løbsgruppen og bevægelsen følge den tegnede dybde.
+   En DM-plads (anker eller trukket ≥ 54) skal have sin egen opgave: fx større chance for at vinde bolden tilbage i opbygningen eller
+   dække foran midtstopperne (færre gennembrud mod holdet). Ny mekanik → Arkitekt + Spilfører motor + QC på planen, målt før/efter, og
+   fingeraftrykkene ændres (ankrene har CDM) – planen skal sige hvorfor. **Begrundelse i tal** (parret, `node tools/measure-central.mjs
+   sammenlign <rod for v3.32.3> 600 --par 4`, 8 400 kampe pr. scenarie, spec §5): en DM trukket ned på en DM-plads (b, y 56) giver
+   −0,006 ± 0,010 netto pr. kamp – KUN pasformen +0,021 ± 0,006, KUN rollen −0,032 ± 0,009 (Spilfører motor): DM-rollen koster
+   bevægelse uden at give noget igen. Mellemzonen (y 51–53: fuld pasform, CM-bevægelse) giver +0,021 ± 0,006 (b ved y 52) og
+   +0,022 ± 0,005 (d: 3-4-3, 50 → 52) – i dag er det bedst IKKE at trække helt ned. Accept for 0g: b ≥ +0,02 (som a: +0,041 ± 0,010).
 0e. **Taktik: én linje pr. VALGT mulighed** (QC/Spilfører UI på v3.32.1) · UI + motor · S · 3 · under hver dropdown, hvad det valgte gør
    ("Lynkontra: flere kontraer", "Lav blok: flere luftdueller, plads til cutbacks") i stedet for/ud over fasens faste korte linje. Teksterne
    skal godkendes af Motor-Spilføreren (de må ikke love mere, end motoren gør – fx "Ekstrem = Normal"). Bygger på `help()` (ui/dom.js).
@@ -229,6 +249,7 @@ scratchpad – et tal herfra skal måles igen med et committet værktøj, før d
 - "– det holdt ikke mod jer" efter et nederlag kan misforstås (UI) – bevidst valgt i v3.21.2 (QC); kun noteret.
 
 ## Lavet
+- v3.33.0 Træk bestemmer pladsen også på midten (brugerens ønske 6/11, punkt 000.2: "hvis jeg trak en spiller ud af en standardopstilling, så det f.eks. gik fra at være en cm til en dm, så skulle spillet finde ud af det"): CDM/CM/CAM følger den tegnede dybde (≥ 54 DM, 51–53 DM/CM, 41–50 CM, 38–40 CM/OM, ≤ 37 OM) – prisen, løbsgruppen, bevægelsen og km; brikken, Plads-cellen og karakterarket siger "CM→DM", pladstypen live under træk; Hvis-Så-plan fordeler efter planens tegnede dybder. Intet anker skifter klasse (fingeraftrykkene uændrede). Målt med `tools/measure-central.mjs` (spec §5).
 - v3.32.3 Samspil på Taktik (brugerens ønske 6/11, punkt 000.1: "Jeg kan ikke på taktik siden se, hvem den valgte spiller spiller godt sammen med"): valg = start byt – hans streger fremhævet, de andre dæmpet, naboernes ring i båndets farve · teksten i valgbeskeden (#pick-msg) med naboerne i ord (stærkeste først, den svageste) og op til 2 andre, han har spillet sig sammen med (bænk/reserve/start) – kun ord, kun dit hold · byt-forhåndsvisning i Plads-cellen ("+1", "−1", "±0"; samme pickForSwap på en kopi) · trykfelt ≥ 44 px om brikkerne ved ≤ 600 px. Kun visning: ingen motorændring, intet nyt gemmefelt.
 - v3.32.2 VAR-øjeblikket + spilfornemmelse (køens punkt 1 efter v3.32.1, `docs/plans/tidligere-planer.md`; brugeren 5/11 "VAR Monitor: ærlig ramme nu" + "Game feel"): `var.cast` (spiller-id'er, kun visning – noprose uændret) · rammen over stillingen fra tjekket til kendelsen + 5 tick med en log uden taktik og uden `ev.text` (`ui/varmoment.js`) · pausen før kendelsen (4 tick, tjek→kendelse 420 → 2100 ms) med "Vis kendelsen ›" · rystelse ved dine mål og røde kort, rød/grøn flash ved annulleret mål, `prefers-reduced-motion` · lyd (fløjt, VAR-bip, jubel) fra som standard med kontakt ved ⚡ · ⚡ 23 → 44 px ved 390. Målt: 63 % af kampene uden VAR, 37 % af DINE kampe med et VAR-øjeblik (spec §5). Næste i køen: v3.32.3 statisk (OpenGraph, manifest).
 - v3.32.1 designkritikkens røde (brugeren 5/11: "lad os tage de røde fra analysen med det samme", `docs/design-kritik-2026-11-05.md`): R1 Taktik – én kort linje pr. fase/Hvis-Så/udskiftninger, forklaringen bag "ⓘ Sådan virker det" (fælles `fold()`/`help()` i ui/dom.js, husker åben/lukket) · R2 Kamp – ▶ og banen på første skærm (knapper over banen, banen `clamp(16rem, 100svh − 26rem, 32rem)`, kampvælgeren på én linje, intro bag ⓘ, "📤 Send kampen" under "⋯ Mere") · R3 tre underfaner 🎬 Afspilning & referat · 📊 Statistik · 👥 Spillerne + fuldtids-linjen · R4 én regel for brede tabeller (fade med mask-image, opt-in låste kolonner på Trup/Træning/regnskabet) · R5 44 px Trup-rækker på mobil, "Vælg en spiller". Målt: Kamp 2702 → 1169 (1366) og 5095 → 1760 (390); ▶ Afspil 1230 → 583 px ved 390 (spec §10b)

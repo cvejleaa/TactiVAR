@@ -442,7 +442,7 @@ test('Hvis-Så til egen plan: formation, trukne positioner og faser skifter; de 
   m.endState.home.customCoords[6].x = 1; m.endState.home.phases.phase1_buildUp.passingStyle = 'SHORT';
   assert.equal(H.tacticPresets[1].customCoords[6].x, 40, 'kopi – planen deles ikke med kampen');
   assert.equal(H.tacticPresets[1].phases.phase1_buildUp.passingStyle, 'DIRECT_LONG');
-  const byId = new Map(H.squad.map((p) => [p.id, p])), want = arrangeByFit(lineup.map((id) => byId.get(id)), '3-5-2', '4-4-2').map((p) => p.id);
+  const byId = new Map(H.squad.map((p) => [p.id, p])), want = arrangeByFit(lineup.map((id) => byId.get(id)), '3-5-2', '4-4-2', FORMATIONS['3-5-2'].map((c, i) => planB.customCoords[i]?.y ?? c.y)).map((p) => p.id);   // v3.33.0: planens tegnede dybder
   assert.notDeepEqual(want, lineup, 'data: 4-4-2 → 3-5-2 flytter nogen');
   assert.deepEqual(m.endState.home.starters, want);
   // Planens fase 1 virker fra skiftet: DIRECT_LONG giver høje bolde fremover (BALANCED/CENTRAL gav ingen)

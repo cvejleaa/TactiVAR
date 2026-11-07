@@ -2,12 +2,12 @@
 // din kamp, tidslinje, statistik og karakterark. TactiVAR Avisen (renderGazette) bor også her, men tegnes
 // kun på Liga (v3.31.0, F3 – før også sidst i Kamp). Karakterer for modstandere vises kun som stjerner (engine/visibility.js).
 import { h, dec, fold } from './dom.js';
-import { starsEl, attText, roleLabel } from './labels.js';
+import { starsEl, attText } from './labels.js';
 import { viewRatingEntry, viewActs } from '../engine/visibility.js';
 import { GOAL_KIND_LABEL, goalMatchIdx } from '../engine/gazette.js';
 import { championText } from '../engine/season.js';
 import { FORMATIONS } from '../engine/formations.js';
-import { isStarter, placeLabel, lineupSort } from './lineup.js';
+import { isStarter, placeLabel, startPlace, lineupSort } from './lineup.js';
 import { replayEl, drawY } from './replay.js';
 import { evMin, fmtMin, timelinePos, halfPos, playerSpan, tickClock, clockNum } from '../engine/clock.js';
 // Afslutningens minut i heat- og zone-kortet: hændelsens eget ur (QC v3.16.4 – ellers tick'ets start, fx "42'" for et mål i 45+6)
@@ -117,9 +117,10 @@ function ratingsTable(list, isOwn, title, formation, snap = null, onSnap = null,
 function miniPitch(rows, formation, isOwn, down = false) {
   const coords = FORMATIONS[formation], X = (x) => (down ? 100 - x : x), Y = (y) => drawY(down ? 100 - y : y);
   return h('div', { class: 'minipitch-wrap' }, h('div', { class: 'muted' }, `Startopstilling (${formation}) – indskiftere og formationsskift står i listen`),
-    h('div', { class: 'minipitch' }, rows.filter((e) => e.slot != null && coords[e.slot]).map((e) => h('div', {
-      class: 'mp-token' + (e.isMotM ? ' motm' : ''), style: { left: X(coords[e.slot].x) + '%', top: Y(coords[e.slot].y) + '%' }, title: `${roleLabel(coords[e.slot].r)} – #${e.shirtNumber} ${e.shortName}`,
-    }, h('span', { class: 'mp-val' }, isOwn ? dec(e.rating, 1) : starsEl(e.stars)), h('span', { class: 'mp-name' }, `${roleLabel(coords[e.slot].r)} ${e.shortName}`)))));
+    // Pladsen som i listen ved siden af (startPlace – "CM→DM" for en trukket central plads); brikken står på ankret
+    h('div', { class: 'minipitch' }, rows.filter((e) => e.slot != null && coords[e.slot]).map((e) => { const place = startPlace(e, coords[e.slot].r); return h('div', {
+      class: 'mp-token' + (e.isMotM ? ' motm' : ''), dataset: { slot: String(e.slot) }, style: { left: X(coords[e.slot].x) + '%', top: Y(coords[e.slot].y) + '%' }, title: `${place} – #${e.shirtNumber} ${e.shortName}`,
+    }, h('span', { class: 'mp-val' }, isOwn ? dec(e.rating, 1) : starsEl(e.stars)), h('span', { class: 'mp-name' }, `${place} ${e.shortName}`)); })));
 }
 
 // Hvor dit hold stod, da et mål faldt (v3.12.1, brugeren: "Vi måler hvor langt de løber … løbe uden
