@@ -1,6 +1,6 @@
 // Spillerkort: offentlige data for alle, evner og mod-kunnen kun for eget hold, VAR-profilen
 // for ingen. Observationer (scouting) og private noter vises for alle spillere.
-import { publicValue, publicWage, RETIRE_WARN_ROUND, LOG, stampText, KEY_SKILLS, trainingEstimate, skillOf, FOCUS, focusSkills, ageTrain, roomPoints, MATCH_XP, PLAYED_RELIEF, TRAIN_FRESH_FLOOR } from '../engine/career.js';
+import { publicValue, RETIRE_WARN_ROUND, LOG, stampText, KEY_SKILLS, trainingEstimate, skillOf, FOCUS, focusSkills, ageTrain, roomPoints, MATCH_XP, PLAYED_RELIEF, TRAIN_FRESH_FLOOR } from '../engine/career.js';
 import { viewPlayer } from '../engine/visibility.js';
 import { h, dec, LOCK } from './dom.js';
 import { LINE, POSITION_FULL, SKILL_LABELS, kr, starsEl, banText, yellowWarn, archetypeOf, archIcon, archReqText } from './labels.js';
@@ -17,7 +17,7 @@ const bar = (label, v, max = 20) => h('div', { class: 'bar' }, h('span', { class
 
 // 👋 på dit eget kort (v3.33.1, Spilfører økonomi): værdien er halv – lønnen er den samme (career.js publicValue/publicWage)
 const RETIRE_LEFT = SEASON_ROUNDS - RETIRE_WARN_ROUND;
-export const retiringOwnText = (p) => `👋 Stopper efter sæsonen (${p.age} år) – værdi ${kr(publicValue(p))} (halv: ${RETIRE_LEFT} af ${SEASON_ROUNDS} runder tilbage). Løn uændret ${kr(Math.round(publicWage(p) / 3))} pr. runde.`;
+export const retiringOwnText = (p) => `👋 Stopper efter sæsonen (${p.age} år) – værdi ${kr(publicValue(p))} (halv: ${RETIRE_LEFT} af ${SEASON_ROUNDS} runder tilbage). Løn uændret ${kr(Math.round(p.weeklyWage / 3))} pr. runde.`;
 // chem (v3.24.0, kun dit hold): { best, pairs, isNew } fra chemistry.js – samspillet med hans naboer i ord (intet 0–100-tal, QC)
 // onTrainLink (v3.30.0): "ændr i Træning ›" i træningsblokken åbner 🏋️ Træning med spillerens række markeret. Kortet sætter ALDRIG
 // fokus selv (brugeren: træningen sættes ét sted – nu Træning-fanen); det viser fokus, fremdriften og skønnet, ens på Trup og Taktik

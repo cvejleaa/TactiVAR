@@ -20,10 +20,11 @@ globalThis.document = { createElement: (t) => new FakeEl(t), createTextNode: (t)
 
 const { createRng } = await import('../../public/engine/rng.js');
 const { createLeague } = await import('../../public/engine/generator.js');
-const { playRound, commitRound, endSeason } = await import('../../public/engine/season.js');
+const { playRound, commitRound, endSeason, seasonTurnover } = await import('../../public/engine/season.js');
 const { parseSave, serialize, loadGame, MIGRATIONS, SCHEMA_VERSION, SAVE_KEY } = await import('../../public/state/storage.js');
-const { willRetire, publicValue, baseValue, RETIRE_WARN_ROUND } = await import('../../public/engine/career.js');
-const { marketInfo, isStarter, windowOf } = await import('../../public/engine/transfers.js');
+const { willRetire, publicValue, publicWage, baseValue, RETIRE_WARN_ROUND } = await import('../../public/engine/career.js');
+const { marketInfo, isStarter, windowOf, openWindow } = await import('../../public/engine/transfers.js');
+const { renderHome } = await import('../../public/ui/home.js');
 const { viewPlayer, viewTeam } = await import('../../public/engine/visibility.js');
 const { renderCard } = await import('../../public/ui/card.js');
 const { renderMarket, renderPublicClub } = await import('../../public/ui/club.js');
@@ -104,6 +105,10 @@ test('beskadiget gem: uden liga, uden hold, hold uden trup – parseSave afviser
   assert.equal(parseSave(JSON.stringify({ schemaVersion: 9 })).ok, false);
   assert.equal(parseSave(JSON.stringify({ schemaVersion: 9, league: {} })).ok, false);
   assert.equal(parseSave(JSON.stringify({ schemaVersion: 9, league: { teams: 'x' } })).ok, false);
+  const g = JSON.parse(read('save-v3.33.0.json')); delete g.league.leagueMetadata;
+  assert.doesNotThrow(() => MIGRATIONS[9](structuredClone(g)));
+  assert.doesNotThrow(() => parseSave(JSON.stringify(g)));
+  assert.equal(MIGRATIONS[9](structuredClone(g)).league.runStatsFromRound, 1, 'uden leagueMetadata: runde 0 → markør 1');
   const d = JSON.parse(read('save-v3.33.0.json')); delete d.league.teams[3].squad; delete d.league.leagueMetadata.round;
   assert.doesNotThrow(() => parseSave(JSON.stringify(d)));
   const e = JSON.parse(read('save-v3.33.0.json')); delete e.league.teams[3].squad;
@@ -222,4 +227,82 @@ test('Klub: "dine spillere til salg" og den offentlige klubside viser 👋 for e
   assert.equal(tag.attrs.title, `Stopper efter sæsonen (${c.age} år) – værdien er halv`);
   assert.equal(all(tr(d.id), (e) => e.className === 'retiring-tag').length, 0);
   assert.equal(all(pc, (e) => e.className === 'retiring-tag').length, bot.squad.filter((x) => x.retiring).length);
+});
+
+// ---------- arkivet og de små vagter, som overlevede første runde ----------
+test('endSeason arkiverer sæsonens løbe-markør (runStatsFrom) – IKKE kampenes (statsFrom); uden markør (før 9 → 10) = sæsonens start', () => {
+  const L = parseSave(read('save-v3.33.0.json')).state.league;   // markør 10 (efter migrering), kampe tælles fra R1
+  assert.equal(L.runStatsFromRound, 10); assert.equal(L.statsFromRound, 1);
+  const A = structuredClone(L); endSeason(A, A.leagueMetadata.round, true);
+  const s = A.seasons.at(-1);
+  assert.equal(s.runStatsFrom, 10, 'løbetallene fra R10');
+  assert.equal(s.statsFrom, 1, 'kampene fra R1');
+  const B = structuredClone(L); delete B.runStatsFromRound; endSeason(B, B.leagueMetadata.round, true);
+  assert.equal(B.seasons.at(-1).runStatsFrom, 1, 'ingen markør: sæsonens første runde (seasonStartRound), ikke 0');
+});
+
+test('markRetiring uden sæsonnummer (ældre gem) bruger sæson 1 – samme som sæsonskiftets afledte rng, så varsel og udfald er enige', async () => {
+  const { markRetiring } = await import('../../public/engine/season.js');
+  const L = parseSave(read('save-v3.33.0.json')).state.league;
+  L.teams.forEach((t) => t.squad.forEach((p, i) => { p.age = [32, 33, 28][i % 3]; p.retiring = false; }));
+  delete L.leagueMetadata.seasonNumber;
+  markRetiring(L);
+  const want = players(L).filter((p) => willRetire(p, 1)).map((p) => p.id).sort();
+  assert.ok(want.length >= 20 && want.length !== players(L).filter((p) => willRetire(p, 2)).length, 'data: sæson 1 og 2 giver forskellige antal');
+  assert.deepEqual(players(L).filter((p) => p.retiring).map((p) => p.id).sort(), want);
+});
+
+test('commitRound tæller sæsonens løbetal også på en spiller UDEN felterne (liga i hukommelsen før normalisering) – aldrig NaN', () => {
+  const L = createLeague(createRng(21)), rng = createRng(5);
+  for (const p of players(L)) for (const k of ['sDistanceSum', 'sMinutesSum', 'sHiKmSum', 'sHiDistSum']) delete p[k];
+  commitRound(L, playRound(L, rng), rng);
+  const ran = players(L).filter((p) => p.distanceSum > 0 && p.hiDistSum > 0);
+  assert.ok(ran.length > 20, 'data');
+  for (const p of ran) for (const k of ['sDistanceSum', 'sMinutesSum', 'sHiKmSum', 'sHiDistSum']) assert.ok(Number.isFinite(p[k]) && p[k] > 0, `${p.shortName} ${k} = ${p[k]}`);
+});
+
+test('kortet (dit hold): "Løn uændret" er hans RIGTIGE løn (weeklyWage ÷ 3 – samme tal som #card-wage på samme kort), ikke den offentlige formel', () => {
+  const { L } = world(3), me = own(L), p = me.squad.find((x) => x.line !== 'GK');
+  Object.assign(p, { age: 34, retiring: true, weeklyWage: 81000, careerGames: 9, valueStars: 3 });
+  assert.equal(Math.round(publicWage(p) / 3), 8000, 'data: den offentlige formel giver 8.000 (24.000 ÷ 3) – ikke 27.000');
+  const card = renderCard({ player: p, team: me, isOwn: true, scouting: [], note: '', onNote() {}, retiring: true });
+  assert.equal(byId(card, 'card-retiring').textContent, '👋 Stopper efter sæsonen (34 år) – værdi 225.000 kr. (halv: 7 af 14 runder tilbage). Løn uændret 27.000 kr. pr. runde.');
+  assert.ok(byId(card, 'card-wage').textContent.startsWith('Løn 27.000 kr. pr. runde'), 'samme løn et andet sted på kortet');
+});
+
+test('Hjem: 👋-rækkens mærke er "info" (ikke "ok" – det er ingen opgave og ingen succes)', () => {
+  const on = { trup() {}, youth() {}, kamp() {}, liga() {}, klub() {}, traening() {}, taktik() {}, opp() {}, fix() {}, paper() {} };
+  const r = renderHome({ club: { name: 'Mit', cash: 100, delta: null }, last: null, place: 3, ended: false, roundsPlayed: 7, next: { k: 8, of: 14, name: 'Bot', home: true, place: 2, form: [] },
+    issues: [], youth: 0, training: null, table: [], playing: false, on, retiring: { players: [{ shirtNumber: 4, shortName: 'S4', line: 'FOR', age: 34 }], windowOpen: true, windowTo: 8 } });
+  assert.deepEqual(all(byId(r, 'home-retiring'), (e) => e.tag === 'span').map((e) => e.className), ['pill pill-info', 'todo-txt']);
+});
+
+test('vinduets trin 2: en bot UNDER minimum i en kæde køber, hvad der findes – også en stopper (en tom kæde er værre end en kort kontrakt)', () => {
+  const { L } = world(13), [A, B] = L.teams.filter((t) => t.isBot);
+  const gk = (t) => t.squad.filter((x) => x.line === 'GK');
+  // A har kun én målmand (minimum 2); alle andre botters reservemålmænd stopper (flaget sat) – kun stoppere kan købes
+  A.squad = A.squad.filter((x) => x.id !== gk(A)[1].id);
+  for (const t of L.teams) if (t.isBot && t !== A) for (const q of t.squad) if (q.line === 'GK' && !isStarter(t, q)) q.retiring = true;
+  for (const t of L.teams) if (t.isBot) t.cashBalance = 9000000;
+  L.leagueMetadata.round = L.seasonStartRound + 6;   // sæsonens runde 7 spillet: vinduet kan åbne
+  assert.ok(windowOf(L) != null && gk(A).length === 1, 'data');
+  const n0 = L.transferLog.length;
+  openWindow(L);
+  const bought = L.transferLog.slice(n0).filter((e) => e.kind === 'buy' && e.to === A.id);
+  assert.equal(bought.length >= 1, true, 'trin 2 køber en stopper: ' + JSON.stringify(L.transferLog.slice(n0).map((e) => [e.kind, e.id])));
+  assert.equal(A.squad.find((x) => x.id === bought[0].id).retiring, true, 'den købte er en stopper');
+  assert.equal(gk(A).length, 2);
+});
+
+test('sæsonskiftet rydder et forældet 👋: en spiller, der IKKE stopper, har ikke flaget i den nye sæson (importeret/ældre gem)', () => {
+  const L = parseSave(read('save-v3.33.0.json')).state.league;
+  const stay = players(L).find((p) => p.age <= 25);
+  stay.retiring = true;   // forældet flag: willRetire(25 år) = falsk
+  assert.equal(willRetire(stay, 1), false);
+  endSeason(L, L.leagueMetadata.round, true);
+  seasonTurnover(L);
+  const after = players(L).find((p) => p.id === stay.id);
+  assert.ok(after, 'han bliver');
+  assert.equal(after.retiring, false);
+  assert.ok(players(L).every((p) => p.retiring === false), 'ingen er flagget i den nye sæson');
 });
