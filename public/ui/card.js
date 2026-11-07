@@ -1,12 +1,13 @@
 // Spillerkort: offentlige data for alle, evner og mod-kunnen kun for eget hold, VAR-profilen
 // for ingen. Observationer (scouting) og private noter vises for alle spillere.
-import { publicValue, LOG, stampText, KEY_SKILLS, trainingEstimate, skillOf, FOCUS, focusSkills, ageTrain, roomPoints, MATCH_XP, PLAYED_RELIEF, TRAIN_FRESH_FLOOR } from '../engine/career.js';
+import { publicValue, publicWage, RETIRE_WARN_ROUND, LOG, stampText, KEY_SKILLS, trainingEstimate, skillOf, FOCUS, focusSkills, ageTrain, roomPoints, MATCH_XP, PLAYED_RELIEF, TRAIN_FRESH_FLOOR } from '../engine/career.js';
 import { viewPlayer } from '../engine/visibility.js';
 import { h, dec, LOCK } from './dom.js';
 import { LINE, POSITION_FULL, SKILL_LABELS, kr, starsEl, banText, yellowWarn, archetypeOf, archIcon, archReqText } from './labels.js';
 import { aerialBreakdown } from '../engine/generator.js';
 import { runStats } from '../engine/stats.js';
 import { WINDOW_ROUNDS } from '../engine/transfers.js';
+import { SEASON_ROUNDS } from '../engine/schedule.js';
 import { BAND_WORD } from '../engine/chemistry.js';
 import { COUNTER_KEYS, COUNTER_LABELS, COUNTER_POOL } from '../engine/counter.js';
 
@@ -14,6 +15,9 @@ const dk = (v) => v.toLocaleString('da-DK', { minimumFractionDigits: 2, maximumF
 const bar = (label, v, max = 20) => h('div', { class: 'bar' }, h('span', { class: 'bar-label' }, label),
   h('span', { class: 'bar-track' }, h('span', { class: 'bar-fill', style: { width: `${Math.round((v / max) * 100)}%` } })), h('span', { class: 'bar-val' }, String(v)));
 
+// 👋 på dit eget kort (v3.33.1, Spilfører økonomi): værdien er halv – lønnen er den samme (career.js publicValue/publicWage)
+const RETIRE_LEFT = SEASON_ROUNDS - RETIRE_WARN_ROUND;
+export const retiringOwnText = (p) => `👋 Stopper efter sæsonen (${p.age} år) – værdi ${kr(publicValue(p))} (halv: ${RETIRE_LEFT} af ${SEASON_ROUNDS} runder tilbage). Løn uændret ${kr(Math.round(publicWage(p) / 3))} pr. runde.`;
 // chem (v3.24.0, kun dit hold): { best, pairs, isNew } fra chemistry.js – samspillet med hans naboer i ord (intet 0–100-tal, QC)
 // onTrainLink (v3.30.0): "ændr i Træning ›" i træningsblokken åbner 🏋️ Træning med spillerens række markeret. Kortet sætter ALDRIG
 // fokus selv (brugeren: træningen sættes ét sted – nu Træning-fanen); det viser fokus, fremdriften og skønnet, ens på Trup og Taktik
@@ -22,7 +26,8 @@ export function renderCard({ player: p, team, isOwn, scouting, note, onNote, tea
   if (!p) return h('div', { class: 'panel muted' }, 'Klik på en spiller for at se spillerkortet.');
   const head = h('div', { class: 'card-head' },
     h('h3', {}, `#${p.shirtNumber} ${p.name}`),
-    retiring ? h('div', { class: 'notice', id: 'card-retiring' }, `👋 ${p.shortName} overvejer at stoppe efter sæsonen (${p.age} år).`) : null,
+    // v3.33.1: udfaldet er afgjort (p.retiring fra runde 7 – app.js sender det kun, når runden er vist); dit hold ser prisen for det
+    retiring ? h('div', { class: 'notice', id: 'card-retiring' }, isOwn ? retiringOwnText(p) : `👋 ${p.shortName} stopper efter sæsonen (${p.age} år).`) : null,
     h('div', { class: 'muted' }, `${team.name} • ${LINE[p.line]}${POSITION_FULL[p.position] ? ` • ${POSITION_FULL[p.position]}` : ''} • ${p.age} år • ${p.heightCm} cm • ${p.injuryMatchesLeft > 0 ? `🚑 skadet i ${p.injuryMatchesLeft} kamp${p.injuryMatchesLeft === 1 ? '' : 'e'}` : `Friskhed ${p.freshness} %`}`),
     // v3.27.0: udelukkelsen (offentlig) og advarslen før det tællende gule kort
     banText(p) ? h('div', { class: 'notice ban', id: 'card-ban' }, banText(p)) : null,
@@ -128,6 +133,7 @@ function renderMarketBox(p, m) {
     m.saleChem ? h('div', { class: 'muted', id: 'list-chem' }, m.saleChem) : null);
   return h('div', { class: 'marketbox', id: 'card-market' }, h('h4', {}, '💰 Marked'),
     h('div', {}, `Pris: ${kr(m.price)} (offentlig værdi ${kr(publicValue(p))}${m.starter ? ' · startspiller: +60 %' : ' · +30 %'})`),
+    p.retiring ? h('div', { class: 'notice', id: 'buy-retiring' }, `Pris ${kr(m.price)} – han stopper efter sæsonen: ${RETIRE_LEFT} runder for prisen.`) : null,
     h('div', { class: 'muted', id: 'buy-terms' }, `Hans løn hos dig: ${kr(m.wage)} pr. runde · du har ${kr(Math.max(0, m.room))} pr. runde til løn (budgettet – efter et salg din løn før salget) · kassen efter købet: ${kr(m.cashAfter)}`),
     m.settle ? h('div', { class: 'muted', id: 'buy-chem' }, `🤝 Ny i truppen: fremmed for alle – ca. ${m.settle} kampe ved siden af de samme, før han har spillet sig ind.`) : null,
     m.reason ? h('div', { class: 'muted', id: 'buy-reason' }, m.reason) : h('button', { id: 'buy-player', onclick: m.onBuy }, `💰 Køb for ${kr(m.price)}`));

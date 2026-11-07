@@ -37,7 +37,7 @@ export const COLUMNS = [
   ...[['pace', 'PAC', 'Fart'], ['stamina', 'STA', 'Udholdenhed'], ['strength', 'STR', 'Styrke'], ['ballControl', 'BAL', 'Boldkontrol'], ['passing', 'PAS', 'Pasning'], ['finishing', 'FIN', 'Afslutning'], ['positioning', 'POS', 'Positionering'], ['intercepting', 'INT', 'Erobring'], ['goalkeeping', 'GK', 'Målmandsspil']]
     .map(([k, label, title]) => ({ key: k, label, title, field: 'skills', value: (p) => p.skills[k], num: true, heat: true, skill: true, gain: k })),
   { key: 'avg', label: 'Gns', title: 'Gennemsnit af de 9 kerne-evner – Spring tæller ikke med', field: 'skills', value: avgSkill, num: true, fmt: (v) => dec(v, 1) },
-  { key: 'rating', label: '⭐ Vurd', title: 'Eget hold: gennemsnitlig karakter. Modstandere: stjerner', field: 'publicStars', value: (p, c) => (c.isOwn ? avgRating(p) : p.publicStars), num: true },
+  { key: 'rating', label: '⭐ Vurd', title: 'Eget hold: gennemsnitlig karakter (karriere – alle hans kampe; sæsonens snit står på Liga under "Dit hold"). Modstandere: stjerner', field: 'publicStars', value: (p, c) => (c.isOwn ? avgRating(p) : p.publicStars), num: true },
   { key: 'mod', label: '🧠 Mod', title: 'Erfaring mod stilarter: mod gegenpres / mod lav blok / mod VAR-linje og lange bolde (sorterer på den bedste)', field: 'counterTactics', value: modBest, num: true },
   // v3.19.0 (brugeren: "Hvor står værdien og lønnen for mine egne spillere?"): sidst, så kolonnernes plads i e2e holder. Værdien er
   // offentlig (stjerner, tier og alder), lønnen kun ejerens (weeklyWage er OWNER → 🔒 for modstandere)
@@ -108,9 +108,11 @@ export function renderMatrix({ team, isOwn, ui, notes, onSort, onSelect, onSwap,
       if (c.key === 'pos') return h('td', { class: cls + (s >= 0 ? ' starter' : ' benchnum') }, s >= 0 ? `${placeOf(s)} #${p.shirtNumber}` : `${benchIds.has(p.id) ? 'BÆNK' : 'RES'} #${p.shirtNumber}`);
       if (c.key === 'name') { const g = gains.get(p.id) ?? [];   // mobilen: summen efter navnet (evne-kolonnerne er rullet væk)
         const sale = listed.has(p.id) ? h('span', { class: 'listed-tag', title: 'Sat til salg – andre klubber byder, når vinduet er åbent' }, '💰 Til salg') : null;
+        // v3.33.1 (brugeren: "markeres på trup siden"): 👋 for alle hold (offentligt) – ui.retiringShown er falsk, mens runde 7 afspilles
+        const bye = p.retiring && ui.retiringShown !== false ? h('span', { class: 'retiring-tag', title: `Stopper efter sæsonen (${p.age} år)` }, '👋') : null;
         // data-pos (v3.32.1): pladsen står i navnecellen, når kun navnet kan låses (smal skærm – ui/dom.js markScrollable)
         const pos = s >= 0 ? placeOf(s) : benchIds.has(p.id) ? 'BÆNK' : 'RES';
-        return h('td', g.length ? { class: cls + ' player-gain', dataset: { gain: String(g.length), pos }, title: `${gainWords(g)} ${after}` } : { class: cls, dataset: { pos } }, p.shortName, sale); }
+        return h('td', g.length ? { class: cls + ' player-gain', dataset: { gain: String(g.length), pos }, title: `${gainWords(g)} ${after}` } : { class: cls, dataset: { pos } }, p.shortName, bye, sale); }
       if (c.key === 'line') return h('td', { class: cls }, h('span', { class: 'chip' }, LINE[p.line]));
       if (c.key === 'natpos') return h('td', { class: cls, title: POSITION_FULL[p.position] ?? '' }, POSITION[p.position] ?? '–');
       if (c.key === 'fresh') return h('td', { class: cls }, outLabel(p) ? h('span', { class: 'injury', title: OUT_TITLE }, outLabel(p)) : `${p.freshness}%`);   // v3.27.0: 🚑/⛔

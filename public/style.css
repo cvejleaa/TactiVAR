@@ -80,6 +80,7 @@ td.player-gain::after { display: none; }
 @media (max-width: 600px) { td.player-gain::after { display: inline-block; } }
 /* v3.30.0: "💰 Til salg" efter navnet i Trup – lille mærke i guld, også på mobil (navnet står i 2. kolonne, før den vandrette rulning) */
 .listed-tag { display: inline-block; margin-left: .3em; padding: 0 .35em; border-radius: 999px; background: #3b2a06; color: #fcd34d; font-size: var(--fs-1); font-weight: 700; line-height: 1.25; }
+.retiring-tag { margin-left: .25em; font-weight: 400; }   /* v3.33.1: 👋 stopper efter sæsonen (matrix.js, club.js) */
 .train-table tbody tr { cursor: default; }
 .heat-4 { color: #34d399; font-weight: 700; } .heat-3 { color: var(--blå); } .heat-2 { color: #f8fafc; } .heat-1 { color: #64748b; }
 .lockcell { color: #64748b; } .chip { background: #1e293b; padding: 0 .3rem; border-radius: .25rem; font-weight: 700; }
