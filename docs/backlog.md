@@ -7,6 +7,11 @@ Rangering: brugerens ønsker først, derefter værdi pr. størrelse. Første run
 + 3 sæsoner `measure-lifecycle`).
 
 ## Næste
+**v4-programmet (brugeren 7/11: "en stor bid … så vi faktisk rykker os til v. 4" → valgt "v4 STOR", "kør løs"):** rækkefølgen og
+begrundelserne står i `docs/plans/v4-forslag.md` (23 PR'er i tre baner; 00 først = v4.0.0). Punkter, der blev fundet dækket: 3 (= 00),
+36 (v3.25.0), 40's gemmeændring (ownReports gemmes), 51 (forventningstallet i 15). Udskudt til v5: 61, 48, 47, 49, 46, 60, 53, 21, 20,
+65, 58, 59, 67, 63, F5/F6.
+
 000. **Brugerens ønsker 6/11 ("det hele" – i denne rækkefølge, én udgivelse ad gangen):**
    1. ~~v3.32.3 Samspil på Taktik~~ – lavet (se "Lavet").
    2. ~~v3.33.0 Træk bestemmer pladsen også i midten~~ – lavet (se "Lavet").
@@ -93,7 +98,7 @@ Rangering: brugerens ønsker først, derefter værdi pr. størrelse. Første run
    Forfiner/erstatter nr. 30.
 Rundtur 2: 2026-10-28 (v3.24.0, sæson spillet i browseren + `measure-lifecycle` 5 seeds × 3 sæsoner; Spilførernes scripts i
 scratchpad – et tal herfra skal måles igen med et committet værktøj, før det begrunder en ændring).
-1. **Sig det, når et par bliver stærkt** · UI · S · 4 · samspillets belønning er tavs: første gang det nævnes er runde 8
+1. ~~**Sig det, når et par bliver stærkt**~~ (✔ allerede lavet: v3.24.2 strongChanges, Hjem "N nyt stærkt par", legenden – fundet 7/11 af Spilfører UI) · UI · S · 4 · samspillets belønning er tavs: første gang det nævnes er runde 8
    (fuldtid); legenden siger ved sæsonslut "Alle par har spillet sig sammen", mens 6 par er stærke. "🤝 Nyt stærkt par: #7 X –
    #8 Y" i opsamlingen efter runden (bånd før/efter som `swapChanges`); legenden tæller de stærke.
 2. **Stabilitet skal kunne mærkes – i dag er rotation gratis** · klub + motor · M · 4 · brugeren 2026-10-28: "Ja, mærkbart" ·
@@ -183,7 +188,7 @@ scratchpad – et tal herfra skal måles igen med et committet værktøj, før d
 29. **Spillerens historie pr. sæson** · klub · S/M · 3 · 🗄 · `matchLog` holder 28 kampe – en 17-målssæson er væk i sæson 3.
 30. **Ét valg om indtægterne** · økonomi · M · 3 · 🗄 · TV og billetter er faste, ingen sponsor. Ved sæsonstart: sponsor
     fast/bonus eller billetpris lav/normal/høj.
-31. **Avisen står to gange** · UI · S · 2 · hele avisen både på Kamp og Liga; Kamp-fanen 5720 px ved 390 px.
+31. ~~**Avisen står to gange**~~ (✔ lavet i v3.31.0: avisen kun på Liga, Kamp har 📰-link – fundet 7/11) · UI · S · 2 · hele avisen både på Kamp og Liga; Kamp-fanen 5720 px ved 390 px.
 32. **Samspil for den, der faktisk spiller** · motor + UI · S · 2 · en skadet starter beholder sine streger på Taktik (set på
     `15-saesonslut-taktik.png`), mens kampen bruger afløserens par. Vis afløserens, eller sig det.
 33. **Ét sted afgør "kun dit hold" på banen** · UI · S · 1 · Test Manager v3.24.0: `isOwn` vogtes både i `ui/pitch.js` og
